@@ -6,49 +6,49 @@ Changelog
 
 Features
 
-- Support cross-referencing models across dbt projects using dbt-loom by @pankajkoti in #2271
-- Support use of YAML selectors when using ``LoadMode.DBT_MANIFEST`` by @YourRoyalLinus in #2261
-- Introduce ``ExecutionMode.WATCHER_KUBERNETES`` to use the watcher with ``KubernetesPodOperator`` by @tatiana in #2207
-- Add support for StarRocks profile mapping by @kurkim0661 in #2256
-- Allow pushing URIs as XComs for Cosmos tasks by @corsettigyg in #2275
+* Support cross-referencing models across dbt projects using dbt-loom by @pankajkoti in #2271
+* Support use of YAML selectors when using ``LoadMode.DBT_MANIFEST`` by @YourRoyalLinus in #2261
+* Introduce ``ExecutionMode.WATCHER_KUBERNETES`` to use the watcher with ``KubernetesPodOperator`` by @tatiana in #2207
+* Add support for StarRocks profile mapping by @kurkim0661 in #2256
+* Allow pushing URIs as XComs for Cosmos tasks by @corsettigyg in #2275
 
 Enhancements
 
-- Refactor: remove duplicate ``_construct_dest_file_path`` by @jx2lee in #2077
-- Leverage Airflow ``::group::`` to group logs associated with DAG parsing by @tatiana in #2235
-- Refactor ``DbtConsumerWatcherSensor`` for reusability by @tatiana in #2245
-- Restore plain text output when using ``ExecutionMode.WATCHER`` by @tiovader in #2241
+* Refactor: remove duplicate ``_construct_dest_file_path`` by @jx2lee in #2077
+* Leverage Airflow ``::group::`` to group logs associated with DAG parsing by @tatiana in #2235
+* Refactor ``DbtConsumerWatcherSensor`` for reusability by @tatiana in #2245
+* Restore plain text output when using ``ExecutionMode.WATCHER`` by @tiovader in #2241
 
 Bug Fixes
 
-- Fix running empty models or ephemeral nodes in ``ExecutionMode.WATCHER`` by @tatiana in #2279
-- Improve watcher producer task priority in scheduling and the UI by @tatiana in #2237
-- Fix typos and formatting issues in documentation by @pankajkoti in #2259
-- Allow watcher producer retries without erroring by @tatiana in #2283
-- Fix ``TestBehavior.AFTER_ALL`` is missing project_name information when loading project using manifest file by @tuantran0910 in #2242
-- Fix duplicate log lines in watcher subprocess execution and format timestamps by @pankajkoti in #2301
+* Fix running empty models or ephemeral nodes in ``ExecutionMode.WATCHER`` by @tatiana in #2279
+* Improve watcher producer task priority in scheduling and the UI by @tatiana in #2237
+* Fix typos and formatting issues in documentation by @pankajkoti in #2259
+* Allow watcher producer retries without erroring by @tatiana in #2283
+* Fix ``TestBehavior.AFTER_ALL`` is missing project_name information when loading project using manifest file by @tuantran0910 in #2242
+* Fix duplicate log lines in watcher subprocess execution and format timestamps by @pankajkoti in #2301
 
 Docs
 
-- Add Watcher Kubernetes documentation by @tatiana in #2303
-- Document newly added telemetry metrics in the privacy notice by @pankajkoti in #2249
-- Add compatibility policy document by @pankajastro in #2251
-- Improve watcher documentation related to dbt threads by @tatiana in #2273
-- Fix link in watcher execution mode documentation by @jedcunningham in #2277
-- Update Apache Airflow minimum compatibility policy by @tatiana in #2285
-- Clarify Cosmos runtime support until "End of Basic Support" by @jedcunningham in #2286
-- Update watcher docs by @tatiana in #2298
+* Add Watcher Kubernetes documentation by @tatiana in #2303
+* Document newly added telemetry metrics in the privacy notice by @pankajkoti in #2249
+* Add compatibility policy document by @pankajastro in #2251
+* Improve watcher documentation related to dbt threads by @tatiana in #2273
+* Fix link in watcher execution mode documentation by @jedcunningham in #2277
+* Update Apache Airflow minimum compatibility policy by @tatiana in #2285
+* Clarify Cosmos runtime support until "End of Basic Support" by @jedcunningham in #2286
+* Update watcher docs by @tatiana in #2298
 
 Others
 
-- Add Airflow 3 DAG versioning tests for Cosmos by @michal-mrazek in #2177
-- Add dbt Core 1.11 to the test matrix by @tatiana in #2230
-- Add integration tests using InvocationMode.SUBPROCESS and validate output by @tatiana in #2287
-- Fix main branch failing tests by @tatiana in #2296
-- Update pre-commit hooks to the latest versions by @jedcunningham in #2289
-- Pre-commit autoupdates by @pre-commit in #2222, #2264, #2274 and #2290
-- Dependabot updates by @dependabot in #2218, #2219, #2220, #2280 and #2284
-- Add Scarf metrics to understand Cosmos feature usage patterns
+* Add Airflow 3 DAG versioning tests for Cosmos by @michal-mrazek in #2177
+* Add dbt Core 1.11 to the test matrix by @tatiana in #2230
+* Add integration tests using InvocationMode.SUBPROCESS and validate output by @tatiana in #2287
+* Fix main branch failing tests by @tatiana in #2296
+* Update pre-commit hooks to the latest versions by @jedcunningham in #2289
+* Pre-commit autoupdates by @pre-commit in #2222, #2264, #2274 and #2290
+* Dependabot updates by @dependabot in #2218, #2219, #2220, #2280 and #2284
+* Add Scarf metrics to understand Cosmos feature usage patterns
 
   - Add telemetry tracking for dbt docs plugin usage by @pankajkoti in #2240
   - Add DAG run telemetry metrics for load mode, invocation, and render_config parameters by @pankajkoti in #2223

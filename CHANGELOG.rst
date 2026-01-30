@@ -6,12 +6,11 @@ Changelog
 
 Features
 
-- Introduce ``ExecutionMode.WATCHER_KUBERNETES`` to use the watcher with ``KubernetesPodOperator`` by @tatiana in #2207
-- Leverage Airflow ``::group::`` to group logs associated with DAG parsing by @tatiana in #2235
-- Add support for StarRocks profile mapping by @kurkim0661 in #2256
-- Allow pushing URIs as XComs for Cosmos tasks by @corsettigyg in #2275
 - Support cross-referencing models across dbt projects using dbt-loom by @pankajkoti in #2271
 - Support use of YAML selectors when using ``LoadMode.DBT_MANIFEST`` by @YourRoyalLinus in #2261
+- Introduce ``ExecutionMode.WATCHER_KUBERNETES`` to use the watcher with ``KubernetesPodOperator`` by @tatiana in #2207
+- Add support for StarRocks profile mapping by @kurkim0661 in #2256
+- Allow pushing URIs as XComs for Cosmos tasks by @corsettigyg in #2275
 
 Enhancements
 

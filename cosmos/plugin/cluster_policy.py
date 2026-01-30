@@ -1,7 +1,11 @@
 from logging import getLogger
+from packaging.version import Version
 
 from airflow.models.taskinstance import TaskInstance
 from airflow.policies import hookimpl
+from cosmos.settings import watcher_retry_queue
+from cosmos.constants import AIRFLOW_VERSION
+from cosmos.operators._watcher.base import BaseConsumerSensor
 
 log = getLogger(__name__)
 
@@ -11,16 +15,10 @@ def _is_watcher_sensor(task_instance: TaskInstance) -> bool:
         f"Checking if task {task_instance.task_id} is a watcher sensor",
     )
 
-    # Avoid circular import by checking class name instead of isinstance
-    task_class_name = task_instance.task.__class__.__name__
-    task_module = task_instance.task.__class__.__module__
-
-    is_consumer_sensor = task_class_name == "BaseConsumerSensor" or "BaseConsumerSensor" in [
-        base.__name__ for base in task_instance.task.__class__.__mro__
-    ]
+    is_consumer_sensor = isinstance(task_instance.task, BaseConsumerSensor)
 
     log.info(
-        f"Task is a consumer sensor: {is_consumer_sensor} (class: {task_class_name}, module: {task_module})",
+        f"Task {task_instance.task_id} is a consumer sensor: {is_consumer_sensor}",
     )
 
     return is_consumer_sensor
@@ -29,10 +27,17 @@ def _is_watcher_sensor(task_instance: TaskInstance) -> bool:
 @hookimpl
 def task_instance_mutation_hook(task_instance: TaskInstance) -> None:
 
-    # from airflow.configuration import conf
-
-    # watcher_retry_queue = conf.get("cosmos", "watcher_retry_queue", fallback=None)
+    # In Airflow 3.x the task_instance_mutation_hook try_number starts at None or 0
+    # in Airflow 2.x it starts at 1
+    if AIRFLOW_VERSION < Version("3.0.0"):
+        first_try_number = 1
+    else:
+        first_try_number = 2
 
     if task_instance.try_number and _is_watcher_sensor(task_instance):
-        if task_instance.try_number >= 1:
-            task_instance.queue = "test"
+        log.info(f"CLUSTER POLICY: {task_instance.task_id} try number: {task_instance.try_number}")
+        if task_instance.try_number >= first_try_number and watcher_retry_queue:
+            log.info(
+                f"CLUSTER POLICY: Setting task {task_instance.task_id} to use watcher retry queue: {watcher_retry_queue}",
+            )
+            task_instance.queue = watcher_retry_queue

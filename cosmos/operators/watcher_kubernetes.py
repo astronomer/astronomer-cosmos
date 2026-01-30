@@ -1,20 +1,24 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover
-    from pendulum import DateTime
 
     try:
         from airflow.sdk.definitions.context import Context
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
+import asyncio
+from functools import wraps
+
 import kubernetes.client as k8s
 from airflow.exceptions import AirflowException
-from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
+from airflow.models.taskinstance import TaskInstance
+from airflow.providers.cncf.kubernetes.callbacks import ExecutionMode, KubernetesPodOperatorCallback
 
 try:
     from airflow.providers.standard.operators.empty import EmptyOperator
@@ -23,7 +27,11 @@ except ImportError:  # pragma: no cover
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
-from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
+from cosmos.operators._watcher.base import (
+    BaseConsumerSensor,
+    store_dbt_resource_status_from_log,
+    store_dbt_resource_status_to_xcom,
+)
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
@@ -38,21 +46,48 @@ from cosmos.operators.kubernetes import (
 logger = get_logger(__name__)
 
 
-# This global variable is currently used to make the task context available to the K8s callback.
-# While the callback is set during the operator initialization, the context is only created during the operator's execution.
-producer_task_context = None
+def serializable_callback(f):
+    """Convert async callback so it can run in sync or async mode."""
+
+    @wraps(f)
+    def wrapper(*args, mode: str, **kwargs):
+        if mode == ExecutionMode.ASYNC:
+            return f(*args, mode=mode, **kwargs)
+        return asyncio.run(f(*args, mode=mode, **kwargs))
+
+    return wrapper
+
+
+def get_task_instance_from_pod(pod: k8s.V1Pod) -> TaskInstance:
+    run_id = pod.metadata.labels["run_id"]
+    m_run_id = re.match(
+        r"^(?P<prefix>.*?__\d{4}-\d{2}-\d{2}T)(?P<H>\d{2})(?P<M>\d{2})(?P<S>\d{2})(?P<f>\.?\d*)(?P<oH>-?\d{2})(?P<oM>\d{2})-",
+        run_id,
+    )
+    p_run_id = m_run_id.groupdict()
+    if not p_run_id["oH"].startswith("-"):
+        p_run_id["oH"] = f"+{p_run_id['oH']}"
+    fixed_run_id = (
+        f"{p_run_id['prefix']}{p_run_id['H']}:{p_run_id['M']}:"
+        f"{p_run_id['S']}{p_run_id['f']}{p_run_id['oH']}:{p_run_id['oM']}"
+    )
+    return TaskInstance.get_task_instance(
+        dag_id=pod.metadata.labels["dag_id"],
+        task_id=pod.metadata.labels["task_id"],
+        run_id=fixed_run_id,
+        map_index=int(pod.metadata.labels.get("map_index", -1)),
+    )
 
 
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
+    task_instance: TaskInstance | None = None
 
-    @staticmethod
-    def progress_callback(
+    @classmethod
+    @serializable_callback
+    async def progress_callback(
+        cls,
         *,
         line: str,
-        client: client_type,
-        mode: str,
-        container_name: str,
-        timestamp: DateTime | None,
         pod: k8s.V1Pod,
         **kwargs: Any,
     ) -> None:
@@ -66,11 +101,9 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param timestamp: the timestamp of the log line.
         :param pod: the pod from which the log line was read.
         """
-        if "context" not in kwargs:
-            # This global variable is used to make the task context available to the K8s callback.
-            # While the callback is set during the operator initialization, the context is only created during the operator's execution.
-            kwargs["context"] = producer_task_context
-        store_dbt_resource_status_from_log(line, kwargs)
+        if cls.task_instance is None:
+            cls.task_instance = get_task_instance_from_pod(pod)
+        store_dbt_resource_status_to_xcom(line, cls.task_instance)
 
 
 class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
@@ -120,10 +153,6 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             )
             return None
 
-        # This global variable is used to make the task context available to the K8s callback.
-        # While the callback is set during the operator initialization, the context is only created during the operator's execution.
-        global producer_task_context
-        producer_task_context = context
         return super().execute(context, **kwargs)
 
 

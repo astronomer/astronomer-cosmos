@@ -12,15 +12,22 @@ log = getLogger(__name__)
 
 
 def _is_watcher_sensor(task_instance: TaskInstance) -> bool:
+    """
+    Check if the task instance is a watcher sensor.
 
-    is_consumer_sensor = isinstance(task_instance.task, BaseConsumerSensor)
+    In Airflow 3, task_instance.task is a SerializedBaseOperator, isinstance checks won't work.
+    Instead, check the task's module path, which is preserved in serialization.
+    """
+    task = task_instance.task
+    # Get the module, using _task_module if available (serialized tasks) or __module__ as fallback
+    module = getattr(task, "_task_module", None) or task.__class__.__module__
 
-    return is_consumer_sensor
+    # Check if it's from the watcher operators module
+    return "cosmos.operators.watcher" in module or isinstance(task, BaseConsumerSensor)
 
 
 @hookimpl
 def task_instance_mutation_hook(task_instance: TaskInstance) -> None:
-
     # In Airflow 3.x the task_instance_mutation_hook try_number starts at None or 0
     # in Airflow 2.x it starts at 1
     if AIRFLOW_VERSION >= Version("3.0.0"):

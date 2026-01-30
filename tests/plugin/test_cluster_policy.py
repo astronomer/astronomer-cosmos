@@ -26,10 +26,45 @@ class TestIsWatcherSensor:
 
         assert result is True
 
+    def test_is_watcher_sensor_returns_true_for_serialized_watcher_task(self):
+        """Test that _is_watcher_sensor returns True for a serialized watcher task (Airflow 3)."""
+        # Simulate a SerializedBaseOperator with _task_module attribute
+        mock_task = MagicMock()
+        mock_task._task_module = "cosmos.operators.watcher"
+        mock_task.__class__.__module__ = "airflow.serialization.serialized_objects"
+        task_instance = SimpleNamespace(task=mock_task)
+
+        result = _is_watcher_sensor(task_instance)
+
+        assert result is True
+
+    def test_is_watcher_sensor_returns_true_for_watcher_module_fallback(self):
+        """Test that _is_watcher_sensor uses __module__ fallback when _task_module is not available."""
+        # Simulate a task without _task_module but with __module__ pointing to watcher
+        mock_task = MagicMock()
+        del mock_task._task_module  # Ensure _task_module doesn't exist
+        mock_task.__class__.__module__ = "cosmos.operators.watcher"
+        task_instance = SimpleNamespace(task=mock_task)
+
+        result = _is_watcher_sensor(task_instance)
+
+        assert result is True
+
     def test_is_watcher_sensor_returns_false_for_non_sensor(self):
         """Test that _is_watcher_sensor returns False for non-BaseConsumerSensor tasks."""
         mock_operator = MagicMock(spec=EmptyOperator)
         task_instance = SimpleNamespace(task=mock_operator)
+
+        result = _is_watcher_sensor(task_instance)
+
+        assert result is False
+
+    def test_is_watcher_sensor_returns_false_for_serialized_non_watcher_task(self):
+        """Test that _is_watcher_sensor returns False for a serialized non-watcher task."""
+        mock_task = MagicMock()
+        mock_task._task_module = "cosmos.operators.local"
+        mock_task.__class__.__module__ = "airflow.serialization.serialized_objects"
+        task_instance = SimpleNamespace(task=mock_task)
 
         result = _is_watcher_sensor(task_instance)
 

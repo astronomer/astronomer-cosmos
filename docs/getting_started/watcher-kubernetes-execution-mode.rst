@@ -135,7 +135,7 @@ The producer node created by the ``ExecutionMode.WATCHER_KUBERNETES`` producer t
         },
     )
 
-Conversely, the consumer tasks that subclass ``DbtConsumerWatcherKubernetesSensor`` run in deferrable mode by default when operating as a sensor.
+Conversely, the consumer tasks that subclass ``DbtConsumerWatcherKubernetesSensor`` run in deferrable mode by default when operating as a sensor. They can also operate in deferrable mode if they are running dbt themselves upon retry.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Mandatory ``operator_args``

@@ -56,6 +56,7 @@ Others
   - Collect profile metrics for DAG runs by @pankajastro in #2228
   - Compress telemetry metadata to reduce serialized DAG size by @pankajkoti in #2252
   - Skip storing telemetry metadata when emission is disabled by @pankajkoti in #2278
+  - Hide telemetry metadata parameters from the Airflow trigger UI by @pankajkoti in #2247
 
 1.12.1 (2026-01-14)
 -------------------

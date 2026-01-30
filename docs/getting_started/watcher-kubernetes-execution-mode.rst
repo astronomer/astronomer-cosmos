@@ -109,7 +109,7 @@ Support for KPO deferrable mode
 
 The producer node created by the ``ExecutionMode.WATCHER_KUBERNETES`` producer task can be set to deferrable mode as long as:
 
-- The correct version of Airflow Kubernetes is installed (``>=10.12.2``). This version fixed a bug (`PR <https://github.com/apache/airflow/pull/58684>`_) that prevented setting callbacks and parsing the logs when the Kubernetes Operator run using `deferrable`.
+- The correct version of Airflow Kubernetes is installed (``>=10.12.2``). This version fixed a bug (`PR <https://github.com/apache/airflow/pull/58684>`_) that prevented setting callbacks and parsing the logs when the Kubernetes Operator run using `deferrable`. The experience should be further improved once `this other PR is merged <https://github.com/apache/airflow/pull/60778>_`.
 
 .. code-block:: bash
 

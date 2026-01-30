@@ -340,6 +340,7 @@ class TestCallbacksNormalization:
         )
         assert op.callbacks == [CustomCallback1, CustomCallback2, WatcherKubernetesCallback]
 
+
 def test_callbacks_included_in_producer_operator():
     """
     Test that the WatcherKubernetesCallback is included in the callbacks of the DbtProducerWatcherKubernetesOperator.
@@ -362,4 +363,3 @@ def test_callbacks_included_in_producer_operator():
     )
     callback_classes = [callback.__name__ for callback in op.callbacks]
     assert "WatcherKubernetesCallback" in callback_classes
-

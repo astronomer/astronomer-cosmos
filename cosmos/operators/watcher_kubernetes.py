@@ -58,10 +58,8 @@ def serializable_callback(f):
 
 def get_task_instance_from_pod(pod: k8s.V1Pod) -> TaskInstance:
     run_id = pod.metadata.labels["run_id"]
-    m_run_id = re.match(r"^(?P<prefix>.*?__\d{4}-\d{2}-\d{2}T)(?P<H>\d{2})(?P<M>\d{2})(?P<S>\d{2})(?P<f>\d*)(?P<oH>-?\d{2})(?P<oM>\d{2})-", run_id)
+    m_run_id = re.match(r"^(?P<prefix>.*?__\d{4}-\d{2}-\d{2}T)(?P<H>\d{2})(?P<M>\d{2})(?P<S>\d{2})(?P<f>\.?\d*)(?P<oH>-?\d{2})(?P<oM>\d{2})-", run_id)
     p_run_id = m_run_id.groupdict()
-    if p_run_id["f"]:
-        p_run_id["f"] = f".{p_run_id['f']}"
     if not p_run_id["oH"].startswith("-"):
         p_run_id["oH"] = f"+{p_run_id['oH']}"
     fixed_run_id = (

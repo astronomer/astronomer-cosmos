@@ -115,7 +115,7 @@ The producer node created by the ``ExecutionMode.WATCHER_KUBERNETES`` producer t
 
     pip install "apache-airflow-providers-cncf-kubernetes>=10.12.2"
 
-- The arguments ``deferrable=True`` and ``is_delete_operator_pod=Ture`` are set:
+- The arguments ``deferrable=True`` and ``is_delete_operator_pod=True`` are set:
 
 .. code-block: python
 

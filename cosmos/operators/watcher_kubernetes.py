@@ -1,26 +1,24 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
-import re
 
 if TYPE_CHECKING:  # pragma: no cover
-    from pendulum import DateTime
 
     try:
         from airflow.sdk.definitions.context import Context
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
-import kubernetes.client as k8s
-from airflow.exceptions import AirflowException
-from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback
-from airflow.models.taskinstance import TaskInstance
-
-from airflow.providers.cncf.kubernetes.callbacks import ExecutionMode
 import asyncio
 from functools import wraps
+
+import kubernetes.client as k8s
+from airflow.exceptions import AirflowException
+from airflow.models.taskinstance import TaskInstance
+from airflow.providers.cncf.kubernetes.callbacks import ExecutionMode, KubernetesPodOperatorCallback
 
 try:
     from airflow.providers.standard.operators.empty import EmptyOperator
@@ -29,7 +27,11 @@ except ImportError:  # pragma: no cover
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
-from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log, store_dbt_resource_status_to_xcom
+from cosmos.operators._watcher.base import (
+    BaseConsumerSensor,
+    store_dbt_resource_status_from_log,
+    store_dbt_resource_status_to_xcom,
+)
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
@@ -58,7 +60,10 @@ def serializable_callback(f):
 
 def get_task_instance_from_pod(pod: k8s.V1Pod) -> TaskInstance:
     run_id = pod.metadata.labels["run_id"]
-    m_run_id = re.match(r"^(?P<prefix>.*?__\d{4}-\d{2}-\d{2}T)(?P<H>\d{2})(?P<M>\d{2})(?P<S>\d{2})(?P<f>\.?\d*)(?P<oH>-?\d{2})(?P<oM>\d{2})-", run_id)
+    m_run_id = re.match(
+        r"^(?P<prefix>.*?__\d{4}-\d{2}-\d{2}T)(?P<H>\d{2})(?P<M>\d{2})(?P<S>\d{2})(?P<f>\.?\d*)(?P<oH>-?\d{2})(?P<oM>\d{2})-",
+        run_id,
+    )
     p_run_id = m_run_id.groupdict()
     if not p_run_id["oH"].startswith("-"):
         p_run_id["oH"] = f"+{p_run_id['oH']}"
@@ -72,6 +77,7 @@ def get_task_instance_from_pod(pod: k8s.V1Pod) -> TaskInstance:
         run_id=fixed_run_id,
         map_index=int(pod.metadata.labels.get("map_index", -1)),
     )
+
 
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
     task_instance: TaskInstance | None = None

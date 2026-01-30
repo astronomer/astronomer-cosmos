@@ -117,7 +117,7 @@ The producer node created by the ``ExecutionMode.WATCHER_KUBERNETES`` producer t
 
 - The arguments ``deferrable=True`` and ``is_delete_operator_pod=True`` are set:
 
-.. code-block: python
+.. code-block:: python
 
     dag = DbtDag(
         dag_id="jaffle_shop_watcher_kubernetes",

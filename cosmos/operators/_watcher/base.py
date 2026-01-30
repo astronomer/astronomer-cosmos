@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from airflow.exceptions import AirflowException
 
@@ -23,11 +23,18 @@ except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
     from airflow.utils.context import Context  # type: ignore[attr-defined]
 
+if TYPE_CHECKING:
+    from airflow.models.taskinstance import TaskInstance
 
 logger = get_logger(__name__)
 
 
 def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
+    context = extra_kwargs.get("context")
+    assert context is not None  # Make MyPy happy
+    store_dbt_resource_status_to_xcom(line, context["ti"])
+
+def store_dbt_resource_status_to_xcom(line: str, task_instance: "TaskInstance") -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
 
@@ -50,9 +57,7 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
 
         # TODO: Handle and store all possible node statuses, not just the current success and failed
         if node_status in ["success", "failed"]:
-            context = extra_kwargs.get("context")
-            assert context is not None  # Make MyPy happy
-            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+            safe_xcom_push(task_instance=task_instance, key=f"{unique_id.replace('.', '__')}_status", value=node_status)
 
     # Additionally, log the message from dbt logs
     log_info = log_line.get("info", {})

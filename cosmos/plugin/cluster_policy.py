@@ -1,11 +1,12 @@
 from logging import getLogger
-from packaging.version import Version
 
 from airflow.models.taskinstance import TaskInstance
 from airflow.policies import hookimpl
-from cosmos.settings import watcher_retry_queue
+from packaging.version import Version
+
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.operators._watcher.base import BaseConsumerSensor
+from cosmos.settings import watcher_retry_queue
 
 log = getLogger(__name__)
 

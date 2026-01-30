@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.13.0a4 (2026-01-29)
+1.13.0a5 (2026-01-30)
 ---------------------
 
 Features
@@ -38,6 +38,7 @@ Bug Fixes
 
 Docs
 
+- Add Watcher Kubernetes documentation by @tatiana in #2303
 - Document newly added telemetry metrics in the privacy notice by @pankajkoti in #2249
 - Add compatibility policy document by @pankajastro in #2251
 - Improve watcher documentation related to dbt threads by @tatiana in #2273
@@ -48,6 +49,7 @@ Docs
 
 Others
 
+- Add Airflow 3 DAG versioning tests for Cosmos by @michal-mrazek in #2177
 - Add dbt Core 1.11 to the test matrix by @tatiana in #2230
 - Add integration tests using InvocationMode.SUBPROCESS and validate output by @tatiana in #2287
 - Fix main branch failing tests by @tatiana in #2296

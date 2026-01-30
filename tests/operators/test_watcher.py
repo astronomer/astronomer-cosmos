@@ -550,6 +550,51 @@ class TestStoreDbtStatusFromLog:
         assert msg in caplog.text
         assert any(record.levelname == logging.getLevelName(dynamic_level) for record in caplog.records)
 
+    def test_store_dbt_resource_status_from_log_logs_message_only_once(self, caplog):
+        """Test that dbt log messages are logged exactly once (no duplicates)."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        test_msg = "1 of 5 START sql view model release_17.stg_customers"
+        log_line = json.dumps({"info": {"msg": test_msg, "level": "info", "ts": "2025-01-29T13:16:05.123456Z"}})
+
+        with caplog.at_level(logging.INFO):
+            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        # Count how many times the message appears in log records
+        message_count = sum(1 for record in caplog.records if test_msg in record.message)
+        assert message_count == 1, f"Expected message to be logged exactly once, but found {message_count} times"
+
+    def test_store_dbt_resource_status_from_log_formats_timestamp(self, caplog):
+        """Test that the timestamp is formatted as HH:MM:SS to match dbt runner format."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        test_msg = "Running with dbt=1.10.11"
+        log_line = json.dumps({"info": {"msg": test_msg, "level": "info", "ts": "2025-01-29T13:16:05.123456Z"}})
+
+        with caplog.at_level(logging.INFO):
+            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        # Verify the timestamp is formatted as HH:MM:SS
+        assert any("13:16:05" in record.message and test_msg in record.message for record in caplog.records)
+
+    def test_store_dbt_resource_status_from_log_invalid_timestamp_falls_back_to_raw(self, caplog):
+        """Test that invalid timestamps fall back to raw value instead of raising an error."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        test_msg = "Running with dbt=1.10.11"
+        # Looks like a valid ISO timestamp but has invalid month (13) - triggers ValueError in fromisoformat()
+        invalid_ts = "2025-13-29T13:16:05.123456Z"
+        log_line = json.dumps({"info": {"msg": test_msg, "level": "info", "ts": invalid_ts}})
+
+        with caplog.at_level(logging.INFO):
+            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        # Verify the raw timestamp is used when parsing fails
+        assert any(invalid_ts in record.message and test_msg in record.message for record in caplog.records)
+
     def test_process_log_line_callable_integration_with_subprocess_pattern(self):
         """Test the exact pattern used in subprocess.py: process_log_line(line, kwargs)."""
         op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -1071,7 +1116,12 @@ def test_dbt_dag_with_watcher(capsys):
         not in stdout
     )
 
-    assert "OK loaded seed file public.raw_orders" in stdout
+    log_message = "OK loaded seed file public.raw_orders"
+    assert log_message in stdout
+
+    # Verify that log messages are not duplicated (each dbt message should appear only once)
+    message_count = stdout.count(log_message)
+    assert message_count == 1, f"Expected '{log_message}' to be logged exactly once, but found {message_count} times"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")
@@ -1111,7 +1161,13 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
         '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"'''
         not in caplog.text
     )
-    assert "OK loaded seed file public.raw_orders" in caplog.text
+
+    log_message = "OK loaded seed file public.raw_orders"
+    assert log_message in caplog.text
+
+    # Verify that log messages are not duplicated (each dbt message should appear only once)
+    message_count = sum(1 for record in caplog.records if log_message in record.message)
+    assert message_count == 1, f"Expected '{log_message}' to be logged exactly once, but found {message_count} times"
 
 
 # Airflow 3.0.0 hangs indefinitely, while Airflow 3.0.6 fails due to this Airflow bug:

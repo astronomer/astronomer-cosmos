@@ -223,6 +223,7 @@ def test_use_event_returns_false():
     sensor = make_sensor()
     assert sensor.use_event() is False
 
+
 def test_callbacks_included_in_producer_operator():
     """
     Test that the WatcherKubernetesCallback is included in the callbacks of the DbtProducerWatcherKubernetesOperator.

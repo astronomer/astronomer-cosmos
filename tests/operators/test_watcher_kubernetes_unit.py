@@ -339,3 +339,27 @@ class TestCallbacksNormalization:
             callbacks=[CustomCallback1, CustomCallback2],
         )
         assert op.callbacks == [CustomCallback1, CustomCallback2, WatcherKubernetesCallback]
+
+def test_callbacks_included_in_producer_operator():
+    """
+    Test that the WatcherKubernetesCallback is included in the callbacks of the DbtProducerWatcherKubernetesOperator.
+    """
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        callbacks=MagicMock,
+    )
+    callback_classes = [callback.__name__ for callback in op.callbacks]
+    assert "WatcherKubernetesCallback" in callback_classes
+    assert "MagicMock" in callback_classes
+
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        callbacks=[MagicMock],
+    )
+    callback_classes = [callback.__name__ for callback in op.callbacks]
+    assert "WatcherKubernetesCallback" in callback_classes
+

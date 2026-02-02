@@ -246,6 +246,41 @@ This behavior is designed to support TaskGroup-level retries, as reported in `#2
 
 The overall retry behavior will be further improved once `#1978 <https://github.com/astronomer/astronomer-cosmos/issues/1978>`_ is implemented.
 
+**Watcher retry queue**
+
+.. versionadded:: 1.14.0
+
+In watcher execution mode, consumer sensor tasks are lightweight sensors that wait for the producer task to complete. On their first attempt, they require minimal CPU and memory resources. However, when these tasks retry, they execute the actual dbt model commands, which may require significantly more resources.
+
+The ``watcher_retry_queue`` configuration allows you to specify a different worker queue for retry attempts. This enables you to:
+
+- **Optimize resource allocation** — Use lightweight workers for initial sensor execution and high-resource workers for retries
+- **Improve scheduling efficiency** — Prevent resource contention between initial sensor tasks and retry executions
+- **Scale independently** — Scale retry queues separately based on retry workload patterns
+
+**Configuration:**
+
+Set the ``watcher_retry_queue`` in your Airflow configuration:
+
+.. code-block:: ini
+
+   [cosmos]
+   watcher_retry_queue = high_memory_queue
+
+Or via environment variable:
+
+.. code-block:: bash
+
+   export AIRFLOW__COSMOS__WATCHER_RETRY_QUEUE=high_memory_queue
+
+**How it works:**
+
+- On the first attempt (try_number = 1 in Airflow 2.x, or try_number = 0/1 in Airflow 3.x), consumer sensor tasks run on their default queue
+- On retry attempts (try_number >= 2 in Airflow 2.x, or try_number >= 1 in Airflow 3.x), if ``watcher_retry_queue`` is configured, the task is automatically assigned to the specified queue
+- This applies only to ``DbtConsumerWatcherSensor`` tasks (watcher sensors)
+
+For more information, see :ref:`watcher_retry_queue` in the configuration documentation.
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Installation of Airflow and dbt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

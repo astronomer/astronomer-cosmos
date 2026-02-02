@@ -27,6 +27,9 @@ x-airflow-common:
     POSTGRES_PASSWORD: pg_password
     POSTGRES_DB: airflow
     POSTGRES_SCHEMA: public
+    AIRFLOW__COSMOS__WATCHER_RETRY_QUEUE: watcher_retry_queue
+    AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
+
   volumes:
     - ./dags:/usr/local/airflow/dags
     - ./logs:/usr/local/airflow/logs

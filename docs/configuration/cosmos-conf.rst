@@ -283,7 +283,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 .. _watcher_retry_queue:
 
 `watcher_retry_queue`_:
-    (Introduced in Cosmos 1.14.0): In watcher execution mode, when the watcher sensor fails, the consumer tasks run the individual models on retry.
+    (Introduced in Cosmos 1.14.0): In watcher execution mode, when the producer watcher task fails, the consumer tasks run the individual models on retry.
     Since these tasks are sensors that require low memory/CPU on their first try, this setting allows retries to run on a queue with larger resources,
     which is often necessary for larger dbt projects. When a watcher sensor task is retried (try_number >= 2 in Airflow 2.x, or try_number >= 1 in Airflow 3.x),
     it will automatically be assigned to the specified queue.

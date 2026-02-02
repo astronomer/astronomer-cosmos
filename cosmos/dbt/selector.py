@@ -774,6 +774,7 @@ class YamlSelectors:
         :param selector_name: str - Name of the selector to retrieve
         :param default: Any - Default value to return if selector is not found
         :return: dict[str, Any] | Any - The parsed selector definition or the default value
+        :raises CosmosValueError: If the selector has parsing errors
         """
         parsed_selector = self.parsed.get(selector_name, default)
 
@@ -802,17 +803,15 @@ class YamlSelectors:
         :param key: str - The key to look up in the dictionary
         :return: tuple[list[dict[str, Any]], list[str]] - Tuple of (list of dictionaries, list of error messages)
         """
-        result: list[dict[str, Any]] = []
-        errors: list[str] = []
-
         if key not in dct:
-            errors.append(f"Expected to find key '{key}' in dict, only found {list(dct)}")
-            return (result, errors)
+            return ([], [f"Expected to find key '{key}' in dict, only found {list(dct)}"])
 
         values = dct[key]
         if not isinstance(values, list):
-            errors.append(f"Invalid value for key '{key}'. Expected a list.")
-            return (result, errors)
+            return ([], [f"Invalid value for key '{key}'. Expected a list."])
+
+        result: list[dict[str, Any]] = []
+        errors: list[str] = []
 
         for value in values:
             if isinstance(value, dict):
@@ -831,21 +830,26 @@ class YamlSelectors:
 
     @staticmethod
     def _parse_selection_graph_operators(
-        selector: str, parents: bool, children: bool, parents_depth: int, children_depth: int, childrens_parents: bool
-    ) -> tuple[str, str | None]:
+        selector: str | None,
+        parents: bool,
+        children: bool,
+        parents_depth: int,
+        children_depth: int,
+        childrens_parents: bool,
+    ) -> tuple[str | None, str | None]:
         """
         Apply graph operator syntax to a selector string.
 
         Transforms a selector by adding graph operators (+, @) based on the specified parameters.
         These operators control traversal of the DAG to include parents, children, or both.
 
-        :param selector: str - The base selector string to modify
+        :param selector: str | None - The base selector string to modify (None if there was a parse error)
         :param parents: bool - Whether to include parent nodes
         :param children: bool - Whether to include child nodes
         :param parents_depth: int - Number of parent generations to include (0 for all)
         :param children_depth: int - Number of child generations to include (0 for all)
         :param childrens_parents: bool - Whether to use the @ operator (all ancestors of children)
-        :return: tuple[str, str | None] - Tuple of (selector string with graph operators, error message or None)
+        :return: tuple[str | None, str | None] - Tuple of (selector string with graph operators or None, error message or None)
 
         Examples:
             - selector="my_model", parents=True, children=False -> ("+my_model", None)
@@ -872,7 +876,7 @@ class YamlSelectors:
         return (selector, None)
 
     @staticmethod
-    def _parse_selection_from_cosmos_spec(method: str, value: str) -> tuple[str, str | None]:
+    def _parse_selection_from_cosmos_spec(method: str, value: str) -> tuple[str | None, str | None]:
         """
         Convert a dbt YAML selector method and value into Cosmos selector syntax.
 
@@ -881,7 +885,7 @@ class YamlSelectors:
 
         :param method: str - The selector method (e.g., "tag", "path", "config.materialized")
         :param value: str - The value for the selector method
-        :return: tuple[str, str | None] - Tuple of (selector string, error message or None)
+        :return: tuple[str | None, str | None] - Tuple of (selector string or None, error message or None)
 
         Examples:
             - method="tag", value="nightly" -> ("tag:nightly", None)
@@ -908,10 +912,10 @@ class YamlSelectors:
         if any(method.startswith(f"{CONFIG_SELECTOR}{config}") for config in SUPPORTED_CONFIG):
             return (f"{method}:{value}", None)
 
-        return ("", f"Unsupported selector method: '{method}'")
+        return (None, f"Unsupported selector method: '{method}'")
 
     @classmethod
-    def _parse_selector(cls, dct: dict[str, Any]) -> tuple[str, list[str]]:
+    def _parse_selector(cls, dct: dict[str, Any]) -> tuple[str | None, list[str]]:
         """
         Parse a single selector definition dictionary into a Cosmos selector string.
 
@@ -920,7 +924,7 @@ class YamlSelectors:
 
         :param dct: dict[str, Any] - Dictionary containing selector definition with keys like 'method', 'value',
                    'parents', 'children', 'parents_depth', 'children_depth', 'childrens_parents'
-        :return: tuple[str, list[str]] - Tuple of (selector string, list of error messages)
+        :return: tuple[str | None, list[str]] - Tuple of (selector string or None, list of error messages)
 
         Example Input:
             {
@@ -949,12 +953,12 @@ class YamlSelectors:
             errors.append(f"children_depth must be an integer, got {type(children_depth)}: {children_depth}")
 
         if errors:
-            return ("", errors)
+            return (None, errors)
 
         selector, error = cls._parse_selection_from_cosmos_spec(method, value)
         if error:
             errors.append(error)
-            return ("", errors)
+            return (None, errors)
 
         selector, error = cls._parse_selection_graph_operators(
             selector, parents, children, parents_depth, children_depth, childrens_parents

@@ -1557,6 +1557,92 @@ def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition
             },
             ["parents_depth must be an integer", "children_depth must be an integer"],
         ),
+        (
+            "union_with_multiple_errors",
+            {
+                "name": "union_with_multiple_errors",
+                "definition": {
+                    "union": [
+                        {"method": "unsupported_method1", "value": "test1"},
+                        {"method": "unsupported_method2", "value": "test2"},
+                        {"method": "tag", "value": "valid"},
+                    ]
+                },
+            },
+            [
+                "Unsupported selector method: 'unsupported_method1'",
+                "Unsupported selector method: 'unsupported_method2'",
+            ],
+        ),
+        (
+            "intersection_with_multiple_errors",
+            {
+                "name": "intersection_with_multiple_errors",
+                "definition": {
+                    "intersection": [
+                        {"method": "tag", "value": "nightly", "parents": True, "parents_depth": "invalid1"},
+                        {"method": "path", "value": "models/", "children": True, "children_depth": "invalid2"},
+                    ]
+                },
+            },
+            ["parents_depth must be an integer", "children_depth must be an integer"],
+        ),
+        (
+            "nested_errors",
+            {
+                "name": "nested_errors",
+                "definition": {
+                    "union": [
+                        {
+                            "method": "tag",
+                            "value": "nightly",
+                            "parents": True,
+                            "parents_depth": "not_an_int",
+                            "childrens_parents": True,
+                        },
+                        {"method": "unknown_method", "value": "test"},
+                    ]
+                },
+            },
+            ["parents_depth must be an integer", "Unsupported selector method: 'unknown_method'"],
+        ),
+        (
+            "errors_in_include_and_exclude",
+            {
+                "name": "errors_in_include_and_exclude",
+                "definition": {
+                    "method": "unknown_include_method",
+                    "value": "test",
+                    "exclude": [{"method": "unknown_exclude_method", "value": "test2"}],
+                },
+            },
+            [
+                "Unsupported selector method: 'unknown_include_method'",
+                "Unsupported selector method: 'unknown_exclude_method'",
+            ],
+        ),
+        (
+            "multiple_errors_complex",
+            {
+                "name": "multiple_errors_complex",
+                "definition": {
+                    "union": [
+                        {"method": "tag", "value": "nightly", "exclude": [{"method": "tag", "value": "deprecated"}]},
+                        {"method": "path", "value": "models/", "exclude": [{"method": "tag", "value": "archived"}]},
+                        {"method": "invalid_method", "value": "test"},
+                    ]
+                },
+            },
+            ["You cannot provide multiple exclude arguments", "Unsupported selector method: 'invalid_method'"],
+        ),
+        (
+            "list_and_method_errors",
+            {
+                "name": "list_and_method_errors",
+                "definition": {"union": [{"method": "unknown_method", "value": "test"}, "not_a_dict"]},
+            },
+            ["Unsupported selector method: 'unknown_method'", "Invalid value type", "not_a_dict"],
+        ),
     ],
 )
 def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, exception_msg):

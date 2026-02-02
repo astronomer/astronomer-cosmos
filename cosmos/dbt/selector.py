@@ -779,7 +779,7 @@ class YamlSelectors:
         parsed_selector = self.parsed.get(selector_name, default)
 
         if parsed_selector and isinstance(parsed_selector, dict):
-            errors = parsed_selector.pop("errors", [])
+            errors = parsed_selector.get("errors", [])
 
             if errors:
                 if len(errors) == 1:
@@ -815,14 +815,15 @@ class YamlSelectors:
 
         for value in values:
             if isinstance(value, dict):
-                for value_key in value:
-                    if not isinstance(value_key, str):
-                        errors.append(
-                            f'Expected all keys to "{key}" dict to be strings, '
-                            f'but "{value_key}" is a "{type(value_key)}"'
-                        )
-                        continue
-                result.append(value)
+                if all(isinstance(value_key, str) for value_key in value):
+                    result.append(value)
+                else:
+                    for value_key in value:
+                        if not isinstance(value_key, str):
+                            errors.append(
+                                f'Expected all keys to "{key}" dict to be strings, '
+                                f'but "{value_key}" is a "{type(value_key)}"'
+                            )
             else:
                 errors.append(f'Invalid value type {type(value)} in key "{key}", expected dict (value: {value}).')
 

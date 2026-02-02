@@ -1653,8 +1653,8 @@ def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, e
         _ = yaml_selectors.get_parsed(selector_name)
 
     error_message = str(err_info.value)
-    exception_msgs = exception_msg if isinstance(exception_msg, list) else [exception_msg]
-    assert all(msg in error_message for msg in exception_msgs)
+    expected_messages = exception_msg if isinstance(exception_msg, list) else [exception_msg]
+    assert all(msg in error_message for msg in expected_messages)
 
 
 @pytest.mark.parametrize(

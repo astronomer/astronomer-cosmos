@@ -1,4 +1,4 @@
-FROM quay.io/astronomer/astro-runtime:11.6.0-base
+FROM quay.io/astronomer/astro-runtime:13.1.0-base
 
 USER root
 
@@ -28,5 +28,6 @@ USER astro
 
 # add a connection to the airflow db for testing
 ENV AIRFLOW_CONN_AIRFLOW_DB=postgres://airflow:pg_password@postgres:5432/airflow
+ENV AIRFLOW_CONN_EXAMPLE_CONN=postgres://airflow:pg_password@postgres:5432/airflow
 ENV DBT_ROOT_PATH=/usr/local/airflow/dags/dbt
 ENV DBT_DOCS_PATH=/usr/local/airflow/dbt-docs

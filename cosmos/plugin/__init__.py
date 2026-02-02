@@ -11,11 +11,20 @@ if TYPE_CHECKING:  # pragma: no cover
     from .airflow2 import CosmosPlugin as _CosmosPluginType
     from .airflow3 import CosmosAF3Plugin as _CosmosAF3PluginType
 
-CosmosPlugin: _CosmosPluginType | _CosmosAF3PluginType | None = None
+_CosmosPlugin: _CosmosPluginType | _CosmosAF3PluginType | None = None
 
-# Airflow 2.x (FAB/Flask) plugin
-if version.parse(airflow_version).major < _AIRFLOW3_MAJOR_VERSION:
-    from .airflow2 import CosmosPlugin as CosmosPlugin  # type: ignore[assignment]  # noqa: F401
-else:
-    # Airflow 3.x (FastAPI) plugin
-    from .airflow3 import CosmosAF3Plugin as CosmosPlugin  # type: ignore[assignment]  # noqa: F401
+
+def __getattr__(name: str) -> _CosmosPluginType | _CosmosAF3PluginType | None:
+    if name == "CosmosPlugin":
+        global _CosmosPlugin
+        if _CosmosPlugin is None:
+            if version.parse(airflow_version).major < _AIRFLOW3_MAJOR_VERSION:
+                from .airflow2 import CosmosPlugin  # type: ignore[assignment]  # noqa: F401
+
+                _CosmosPlugin = CosmosPlugin  # type: ignore[assignment]
+            else:
+                from .airflow3 import CosmosAF3Plugin  # type: ignore[assignment]  # noqa: F401
+
+                _CosmosPlugin = CosmosAF3Plugin  # type: ignore[assignment]
+        return _CosmosPlugin
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

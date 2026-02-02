@@ -1264,10 +1264,11 @@ class YamlSelectors:
             {
                 "nightly_models": {
                     "select": ["tag:nightly"],
-                    "exclude": None,
-                    "errors": []
+                    "exclude": None
                 }
             }
+
+            Note: An "errors" key will only be present if parsing errors occurred
         """
         result: dict[str, dict[str, Any]] = {}
         cache: dict[str, tuple[list[str], list[str]]] = {}

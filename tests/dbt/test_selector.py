@@ -1421,11 +1421,12 @@ def test_valid_graph_operator_yaml_selectors(selector_name, selector_definition,
 )
 def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition, exception_msg):
     selectors = {selector_name: selector_definition}
+    yaml_selectors = YamlSelectors.parse(selectors)
 
     with pytest.raises(CosmosValueError) as err_info:
-        _ = YamlSelectors.parse(selectors)
+        _ = yaml_selectors.get_parsed(selector_name)
 
-    assert err_info.value.args[0] == exception_msg
+    assert exception_msg in str(err_info.value)
 
 
 @pytest.mark.parametrize(
@@ -1542,6 +1543,38 @@ def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition
             "Unsupported selector method: 'unknown_random'",
         ),
         (
+            "multiple_errors_non_int_depths",
+            {
+                "name": "multiple_errors_non_int_depths",
+                "definition": {
+                    "method": "tag",
+                    "value": "nightly",
+                    "parents": True,
+                    "parents_depth": "invalid",
+                    "children": True,
+                    "children_depth": "also_invalid",
+                },
+            },
+            ["parents_depth must be an integer", "children_depth must be an integer"],
+        ),
+    ],
+)
+def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, exception_msg):
+    selectors = {selector_name: selector_definition}
+    yaml_selectors = YamlSelectors.parse(selectors)
+
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = yaml_selectors.get_parsed(selector_name)
+
+    error_message = str(err_info.value)
+    exception_msgs = exception_msg if isinstance(exception_msg, list) else [exception_msg]
+    assert all(msg in error_message for msg in exception_msgs)
+
+
+@pytest.mark.parametrize(
+    "selector_name, selector_definition, exception_msg",
+    [
+        (
             "non_dict_definition",
             "not_a_dict",
             "Invalid selector definition for 'non_dict_definition'. Expected a dict, got <class 'str'>: not_a_dict",
@@ -1558,13 +1591,14 @@ def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition
         ),
     ],
 )
-def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, exception_msg):
+def test_invalid_yaml_structure_raises_immediately(selector_name, selector_definition, exception_msg):
+    """Test that structural YAML errors (missing name/definition) raise immediately from parse()."""
     selectors = {selector_name: selector_definition}
 
     with pytest.raises(CosmosValueError) as err_info:
         _ = YamlSelectors.parse(selectors)
 
-    assert err_info.value.args[0] == exception_msg
+    assert exception_msg in str(err_info.value)
 
 
 @pytest.mark.parametrize(
@@ -1577,11 +1611,12 @@ def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, e
 )
 def test_invalid_value_type_for_list_keys(selector_name, definition_key, invalid_value, expected_error_fragment):
     selectors = {selector_name: {"name": selector_name, "definition": {definition_key: invalid_value}}}
+    yaml_selectors = YamlSelectors.parse(selectors)
 
     with pytest.raises(CosmosValueError) as err_info:
-        _ = YamlSelectors.parse(selectors)
+        _ = yaml_selectors.get_parsed(selector_name)
 
-    assert expected_error_fragment in err_info.value.args[0]
+    assert expected_error_fragment in str(err_info.value)
 
 
 @pytest.mark.parametrize(
@@ -1603,13 +1638,15 @@ def test_invalid_items_in_selector_lists(selector_name, definition_key, invalid_
         }
     }
 
-    with pytest.raises(CosmosValueError) as err_info:
-        _ = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors)
 
-    assert (
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = yaml_selectors.get_parsed(selector_name)
+
+    expected_error = (
         f'Invalid value type {item_type_str} in key "{definition_key}", expected dict (value: {invalid_list_item}).'
-        in err_info.value.args[0]
     )
+    assert expected_error in str(err_info.value)
 
 
 @pytest.mark.parametrize(
@@ -1630,11 +1667,19 @@ def test_non_string_keys_in_selector_dicts(selector_name, definition_key, non_st
         }
     }
 
-    with pytest.raises(CosmosValueError) as err_info:
-        _ = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors)
 
-    assert f'Expected all keys to "{definition_key}" dict to be strings' in err_info.value.args[0]
-    assert f'but "{non_string_key}" is a "{key_type_str}"' in err_info.value.args[0]
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = yaml_selectors.get_parsed(selector_name)
+
+    error_message = str(err_info.value)
+    assert all(
+        part in error_message
+        for part in [
+            f'Expected all keys to "{definition_key}" dict to be strings',
+            f'but "{non_string_key}" is a "{key_type_str}"',
+        ]
+    )
 
 
 def test_selector_reference_resolves_from_cache():

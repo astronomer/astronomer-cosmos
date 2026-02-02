@@ -89,7 +89,7 @@ class TestTaskInstanceMutationHook:
             (Version("2.10.0"), 2, True),  # Later Airflow 2.x versions should also work
         ],
     )
-    @patch("cosmos.plugin.cluster_policy.watcher_retry_queue", "custom_retry_queue")
+    @patch("cosmos.settings.watcher_retry_queue", "custom_retry_queue")
     def test_queue_set_based_on_airflow_version_and_try_number(self, airflow_version, try_number, should_set_queue):
         """Test that queue is set correctly based on Airflow version and try_number."""
         with patch("cosmos.plugin.cluster_policy.AIRFLOW_VERSION", airflow_version):
@@ -111,7 +111,7 @@ class TestTaskInstanceMutationHook:
     @pytest.mark.parametrize("nullish_value", [None, 0, ""])
     def test_queue_not_set_when_watcher_retry_queue_is_none(self, nullish_value):
         """Test that queue is not modified when watcher_retry_queue setting is None."""
-        with patch("cosmos.plugin.cluster_policy.watcher_retry_queue", nullish_value):
+        with patch("cosmos.settings.watcher_retry_queue", nullish_value):
             mock_sensor = MagicMock(spec=BaseConsumerSensor)
             task_instance = SimpleNamespace(
                 task=mock_sensor,
@@ -124,7 +124,7 @@ class TestTaskInstanceMutationHook:
 
             assert task_instance.queue == "default"
 
-    @patch("cosmos.plugin.cluster_policy.watcher_retry_queue", "custom_retry_queue")
+    @patch("cosmos.settings.watcher_retry_queue", "custom_retry_queue")
     def test_queue_not_set_for_non_watcher_sensor(self):
         """Test that queue is not modified for tasks that are not watcher sensors."""
         mock_operator = MagicMock(spec=EmptyOperator)
@@ -139,7 +139,7 @@ class TestTaskInstanceMutationHook:
 
         assert task_instance.queue == "default"
 
-    @patch("cosmos.plugin.cluster_policy.watcher_retry_queue", "custom_retry_queue")
+    @patch("cosmos.settings.watcher_retry_queue", "custom_retry_queue")
     def test_queue_not_set_when_try_number_is_none(self):
         """Test that queue is not modified when try_number is None."""
         mock_sensor = MagicMock(spec=BaseConsumerSensor)
@@ -154,7 +154,7 @@ class TestTaskInstanceMutationHook:
 
         assert task_instance.queue == "default"
 
-    @patch("cosmos.plugin.cluster_policy.watcher_retry_queue", "custom_retry_queue")
+    @patch("cosmos.settings.watcher_retry_queue", "custom_retry_queue")
     def test_queue_not_set_when_try_number_is_zero(self):
         """Test that queue is not modified when try_number is 0."""
         mock_sensor = MagicMock(spec=BaseConsumerSensor)
@@ -169,7 +169,7 @@ class TestTaskInstanceMutationHook:
 
         assert task_instance.queue == "default"
 
-    @patch("cosmos.plugin.cluster_policy.watcher_retry_queue", "custom_retry_queue")
+    @patch("cosmos.settings.watcher_retry_queue", "custom_retry_queue")
     @patch("cosmos.plugin.cluster_policy.log")
     def test_logging_when_queue_is_set(self, mock_log):
         """Test that appropriate log message is generated when queue is set."""
@@ -187,7 +187,7 @@ class TestTaskInstanceMutationHook:
             "Setting task my_test_task to use watcher retry queue: custom_retry_queue",
         )
 
-    @patch("cosmos.plugin.cluster_policy.watcher_retry_queue", "custom_retry_queue")
+    @patch("cosmos.settings.watcher_retry_queue", "custom_retry_queue")
     @patch("cosmos.plugin.cluster_policy.log")
     def test_no_logging_when_queue_not_set(self, mock_log):
         """Test that no log message is generated when queue is not set."""
@@ -215,7 +215,7 @@ class TestTaskInstanceMutationHook:
     @patch("cosmos.plugin.cluster_policy.AIRFLOW_VERSION", AIRFLOW_VERSION)
     def test_various_queue_names(self, queue_name):
         """Test that different queue names are correctly applied."""
-        with patch("cosmos.plugin.cluster_policy.watcher_retry_queue", queue_name):
+        with patch("cosmos.settings.watcher_retry_queue", queue_name):
             mock_sensor = MagicMock(spec=BaseConsumerSensor)
             task_instance = SimpleNamespace(
                 task=mock_sensor,
@@ -228,7 +228,7 @@ class TestTaskInstanceMutationHook:
 
             assert task_instance.queue == queue_name
 
-    @patch("cosmos.plugin.cluster_policy.watcher_retry_queue", "retry_queue")
+    @patch("cosmos.settings.watcher_retry_queue", "retry_queue")
     @patch("cosmos.plugin.cluster_policy.AIRFLOW_VERSION", AIRFLOW_VERSION)
     def test_queue_already_set_gets_overwritten(self):
         """Test that the queue is overwritten even if it was previously set to a different value."""

@@ -1,6 +1,99 @@
 Changelog
 =========
 
+1.14.0a2 (2026-02-16)
+---------------------
+
+Breaking changes
+
+* Drop support for Airflow versions earlier than **2.9** by @jedcunningham in #2288
+
+Features
+
+* Add watcher mode support for dbt test node states by @michal-mrazek in #2318
+* Add cluster policy support for ``ExecutionMode.WATCHER`` sensor retries by @astro-anand in #2293
+* Add debug mode to track memory utilization by @tatiana in #2327
+* Add FQN selection support for ``LoadMode.DBT_MANIFEST`` by @pankajastro in #2375
+* Introduce interceptors for Cosmos tasks by @tatiana in #2419
+
+Enhancements
+
+* Rename watcher-mode sensor retry queue and reuse it for producer tasks by @pankajastro in #2331
+* Fix leaked semaphore warnings in Airflow 3 by resetting dbt adapters by @pankajkoti in #2335
+* Improve dbt Fusion support and related tests by @tatiana in #2356
+* Default Snowflake profile mappings to four threads by @tatiana in #2374
+* Attempt to remove Pydantic as a dependency by @tatiana in #2377
+* Log dbt-core and adapter versions in watcher consumer tasks by @pankajastro in #2412
+* Log model errors in watcher consumer on dbt node failure by @pankajastro in #2431
+
+Bug Fixes
+
+* Handle invalid YAML errors with ``LoadMode.DBT_MANIFEST`` and ``RenderConfig.selector`` by @YourRoyalLinus in #2316
+* Populate ``compiled_sql`` for ``InvocationMode.SUBPROCESS`` in ``ExecutionMode.WATCHER`` by @pankajkoti in #2319
+* Fix inclusion of package models and selection/exclusion behavior by @pankajkoti in #2357
+* Fix select/exclude type mismatch by @tatiana in #2364
+* Set ``emit_datasets=False`` for ``DbtTest*`` operators by @pankajastro in #2365
+* Set correct queue priority for watcher producer tasks by @pankajastro in #2372
+* Preserve ``extra_context`` for watcher consumer task instances by @pankajkoti in #2381
+* Respect ``deferrable=False`` from ``operator_args`` on watcher consumer sensors by @pankajkoti in #2384
+* Fix watcher queue precedence and add documentation by @pankajastro in #2391
+* Do not set ``compiled_sql`` on ``ExecutionMode.WATCHER`` producers by @pankajkoti in #2440
+
+Docs
+
+* Document cluster policy configuration for ``ExecutionMode.WATCHER`` sensor tasks by @pankajastro in #2315
+* Remove outdated docs for the dbt docs plugin with Airflow 3 by @pankajastro in #2353
+* Make Watcher DBT Execution Queue heading clickable by @pankajastro in #2354
+* Update ``ExecutionMode.WATCHER`` documentation regarding test node implementation by @jroachgolf84 in #2355
+* Fix ``pre_dbt_fusion`` configuration rendering by @pankajastro in #2369
+* Add documentation for including/excluding nodes based on FQN by @pankajastro in #2371
+* Update watcher execution mode documentation by @tatiana in #2380
+* Add documentation for ``DbtSeedLocalOperator`` by @jroachgolf84 in #2383
+* Fix miscellaneous Sphinx warnings by @pankajastro in #2395
+* Improve contributing documentation by @lzdanski in #2397
+* Add **Get Started in 5 Minutes** guide by @lzdanski in #2398
+* Add Sphinx reredirects package for documentation redirects by @lzdanski in #2407
+* Restructure **Getting Started** and **Guides** sections by @lzdanski in #2418
+* Add open-source quickstart by @lzdanski in #2439
+* Fix documentation redirects by @lzdanski in #2442
+* Restructure and refactor reference documentation by @lzdanski in #2443
+* Add execution modes decision documentation by @lzdanski in #2444
+* Add **Core Concepts** page to Getting Started by @lzdanski in #2448
+* Add guide: *How Cosmos Works* by @lzdanski in #2449
+* Update **Getting Started** overview and index pages by @lzdanski in #2452
+* Add guide: *How Cosmos Runs dbt* by @lzdanski in #2453
+* Fix miscellaneous documentation links by @lzdanski in #2454
+* Add Mermaid diagrams and execution mode diagrams by @lzdanski in #2459
+* Add documentation for memory optimization options by @pankajastro in #2340
+
+Others
+
+* Fix tests after removing support for Airflow versions earlier than 2.9 by @tatiana in #2321
+* Enable listener tests for Airflow 3.1 by @pankajastro in #2348
+* Accept ``int`` or ``float`` for ``cosmos_debug_max_memory_mb`` in integration tests by @pankajkoti in #2352
+* Update ``CODEOWNERS`` to prioritize ``oss-integrations`` by @tatiana in #2359
+* Fix automatic reviewer assignment in GitHub by @tatiana and @phanikumv in #2360
+* Improve PyPI tagging by @tatiana in #2363
+* Add integration tests for dbt Fusion and ``ExecutionMode.WATCHER`` by @tatiana in #2373
+* Fix Zizmor check by @tatiana in #2376
+* Remove ``methodtools`` dependency by @tatiana in #2378
+* Improve comments on #2389 by @evanvolgas in #2394
+* Refactor ``load_from_dbt_manifest`` to reduce code complexity by @pankajkoti in #2399
+* Refactor ``_handle_no_precursors_or_descendants`` to reduce complexity by @pankajkoti in #2400
+* Improve issue templates by @tatiana in #2401
+* Avoid running tests when only docs change by @tatiana in #2402
+* Add ``no-reload`` target for serving docs locally by @pankajkoti in #2405
+* Fix test hash checks on macOS by @tatiana in #2406
+* Attempt deterministic dbt project copy in test fixtures by @pankajkoti in #2409
+* Pin ``virtualenv <21`` due to hatch incompatibility in CI by @pankajkoti in #2410
+* Revert virtualenv pin for hatch installation in CI by @pankajkoti in #2426
+* Add version comments for commit SHA pinned GitHub Actions by @pankajkoti in #2436
+* Fix ``hatch run docs:build`` issues by @tatiana in #2437
+* Minor code improvements by @dnskr in #2446
+* Pre-commit autoupdate by @pre-commit-ci in #2367, #2396, #2422, and #2451
+* Add file to support Claude understanding the Cosmos repository by @tatiana in #2458
+* Dependency updates by @dependabot in #2368, #2425, #2435, and #2465
+
 1.13.1 (2026-02-25)
 -------------------
 
@@ -30,7 +123,6 @@ Others
 * Add .airflow-registry.yaml for Airflow Provider Registry by @kaxil in #2387
 * Improve test coverage for PR #2307 by @tatiana in #2308
 * Address feedback from code review #2389 by @evanvolgas in #2394
-
 
 1.13.0 (2026-01-30)
 ---------------------

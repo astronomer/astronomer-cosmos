@@ -7,7 +7,7 @@ on:
   # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
   # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.
   pull_request_target:
-    branches: [main, drop_airflow_under_29] # zizmor: ignore[dangerous-triggers]
+    branches: [main] # zizmor: ignore[dangerous-triggers]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}

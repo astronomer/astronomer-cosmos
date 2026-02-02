@@ -279,6 +279,7 @@ Or via environment variable:
 - On retry attempts (Airflow 2.x: ``try_number >= 2``; Airflow 3.x: ``try_number >= 1``), if ``watcher_retry_queue`` is configured, the task is automatically assigned to the specified queue
 - This applies only to ``DbtConsumerWatcherSensor`` tasks (watcher sensors)
 - Cosmos registers an Airflow task instance mutation policy (``task_instance_mutation_hook``) that mutates the queue for watcher sensor task instances on retries, so this reassignment happens at runtime rather than at DAG parse time
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Installation of Airflow and dbt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

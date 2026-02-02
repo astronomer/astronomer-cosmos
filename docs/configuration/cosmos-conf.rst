@@ -290,6 +290,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
     This behavior is enforced by Cosmos via an Airflow policy (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts.
     As a result, the configured ``watcher_retry_queue`` can overwrite any queue set directly on the operator, but only for retries; the initial run continues to use the operator's original queue.
+
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_RETRY_QUEUE``
 

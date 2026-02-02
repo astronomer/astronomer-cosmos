@@ -279,7 +279,6 @@ Or via environment variable:
 - On retry attempts (try_number >= 2 in Airflow 2.x, or try_number >= 1 in Airflow 3.x), if ``watcher_retry_queue`` is configured, the task is automatically assigned to the specified queue
 - This applies only to ``DbtConsumerWatcherSensor`` tasks (watcher sensors)
 
-For more information, see :ref:`watcher_retry_queue` in the configuration documentation.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Installation of Airflow and dbt

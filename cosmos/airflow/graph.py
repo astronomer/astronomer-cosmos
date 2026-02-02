@@ -853,7 +853,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     """
     tasks_map: dict[str, TaskGroup | BaseOperator] = {}
     task_or_group: TaskGroup | BaseOperator | None
-    producer_task: TaskGroup | BaseOperator | None = None
+    producer_task: BaseOperator | None = None
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents

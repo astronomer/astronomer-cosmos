@@ -275,8 +275,8 @@ Or via environment variable:
 
 **How it works:**
 
-- On the first attempt (try_number = 1 in Airflow 2.x, or try_number = 0/1 in Airflow 3.x), consumer sensor tasks run on their default queue
-- On retry attempts (try_number >= 2 in Airflow 2.x, or try_number >= 1 in Airflow 3.x), if ``watcher_retry_queue`` is configured, the task is automatically assigned to the specified queue
+- On the first attempt, consumer sensor tasks run on their default queue (Airflow 2.x: ``try_number = 1``; Airflow 3.x: ``try_number`` is ``None`` or ``0``)
+- On retry attempts (Airflow 2.x: ``try_number >= 2``; Airflow 3.x: ``try_number >= 1``), if ``watcher_retry_queue`` is configured, the task is automatically assigned to the specified queue
 - This applies only to ``DbtConsumerWatcherSensor`` tasks (watcher sensors)
 
 

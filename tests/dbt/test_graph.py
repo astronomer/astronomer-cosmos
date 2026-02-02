@@ -2376,7 +2376,6 @@ def test_should_use_yaml_selectors_cache(enable_cache, enable_cache_yaml_selecto
         assert graph.should_use_yaml_selectors_cache() == should_use
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")
@@ -2400,7 +2399,6 @@ def test_save_dbt_ls_cache_remote_cache_dir(
     mock_remote_cache_key_path.open.assert_called_once_with("w")
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")
@@ -2464,7 +2462,6 @@ def test_get_dbt_ls_cache_remote_cache_dir(
     assert result == expected_result
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")

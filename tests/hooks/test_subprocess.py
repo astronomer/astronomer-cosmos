@@ -91,7 +91,7 @@ def test_send_sigterm(mock_killpg, mock_getpgid):
         ("failed", None, False, True),
     ],
 )
-def teststore_dbt_resource_status_from_log_param(status, context, should_push, expect_assert):
+def test_store_dbt_resource_status_from_log_param(status, context, should_push, expect_assert):
     # Prepare log line
     log_line = {"data": {"node_info": {"node_status": status, "unique_id": "model.jaffle_shop.stg_orders"}}}
     line = json.dumps(log_line)
@@ -110,7 +110,7 @@ def teststore_dbt_resource_status_from_log_param(status, context, should_push, e
                 mock_push.assert_not_called()
 
 
-def teststore_dbt_resource_status_from_log_invalid_json():
+def test_store_dbt_resource_status_from_log_invalid_json():
     invalid_line = "{not a valid json}"
 
     with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:

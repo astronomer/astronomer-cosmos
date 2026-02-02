@@ -25,6 +25,7 @@ from airflow.utils.db import create_session
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.cache import (
+    _calculate_yaml_selectors_cache_current_version,
     _configure_remote_cache_dir,
     _copy_partial_parse_to_project,
     _create_cache_identifier,
@@ -34,10 +35,11 @@ from cosmos.cache import (
     _get_sha1_hash,
     _update_partial_parse_cache,
     create_cache_profile,
-    delete_unused_dbt_ls_cache,
+    delete_unused_dbt_cache,
     get_cached_profile,
     is_cache_package_lockfile_enabled,
     is_profile_cache_enabled,
+    were_yaml_selectors_modified,
 )
 from cosmos.constants import (
     DBT_PARTIAL_PARSE_FILE_NAME,
@@ -196,18 +198,18 @@ def vars_session():
 
 
 @pytest.mark.integration
-def test_delete_unused_dbt_ls_cache_deletes_a_week_ago_cache(vars_session):
+def test_delete_unused_dbt_cache_deletes_a_week_ago_cache(vars_session):
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
-    assert delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=5), session=vars_session) == 1
+    assert delete_unused_dbt_cache(max_age_last_usage=timedelta(days=5), session=vars_session) == 1
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
 
 
 @pytest.mark.integration
-def test_delete_unused_dbt_ls_cache_deletes_all_cache_five_minutes_ago(vars_session):
+def test_delete_unused_dbt_cache_deletes_all_cache_five_minutes_ago(vars_session):
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_b").first()
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").first()
-    assert delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(minutes=5), session=vars_session) == 3
+    assert delete_unused_dbt_cache(max_age_last_usage=timedelta(minutes=5), session=vars_session) == 3
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_b").first()
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").first()
@@ -437,3 +439,40 @@ def test_remote_cache_path_initialization_with_conn_id(mock_object_storage_path)
     configured_remote_cache_dir = _configure_remote_cache_dir()
     mock_object_storage_path.assert_called_with("s3://some-bucket/cache", conn_id="my_conn_id")
     assert configured_remote_cache_dir == mock_cache_path
+
+
+def test_calculate_yaml_selectors_cache_current_version_equals():
+    mock_create_dbt_folder_version_hash = MagicMock()
+    mock_create_dbt_folder_version_hash.return_value = "dbt_project_hash_v1"
+    selector_definitions = {
+        "core_models": {
+            "definition": {"method": "tag", "value": "core"},
+            "description": "Select core business logic models (non-staging)",
+            "name": "core_models",
+        },
+    }
+
+    with patch("cosmos.cache._create_folder_version_hash", mock_create_dbt_folder_version_hash):
+        result = _calculate_yaml_selectors_cache_current_version(
+            "cosmos_cache__dag_a", Path("/path/to/project"), selector_definitions, ["yamlselectors_hash_v1"]
+        )
+
+        parts = result.split(",")
+
+        assert len(parts) == 3
+
+        assert parts[0] == "dbt_project_hash_v1"
+        assert parts[1] == "d424de5f9a889bd3afee43a5012f1c65"
+        assert parts[2] == "fbbaca69581c53891710fed3d53badcb"
+
+
+def test_were_yaml_selectors_modified_true():
+    previous_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
+    current_version = "dbt_project_hash_v1, yamlselectors_hash_v2, impl_hash_v1"
+    assert were_yaml_selectors_modified(previous_version, current_version) is True
+
+
+def test_were_yaml_selectors_modified_false():
+    previous_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
+    current_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
+    assert were_yaml_selectors_modified(previous_version, current_version) is False

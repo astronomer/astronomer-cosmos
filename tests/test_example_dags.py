@@ -20,7 +20,6 @@ EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
-
 IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py", "jaffle_shop_watcher_kubernetes.py"]
 
 
@@ -53,6 +52,9 @@ def get_dag_bag() -> DagBag:  # noqa: C901
 
         if DBT_VERSION < Version("1.5.0"):
             file.writelines(["example_source_rendering.py\n"])
+
+        if AIRFLOW_VERSION >= Version("3.0.0"):
+            file.writelines("example_cosmos_cleanup_dag.py\n")
 
         # Disabling these DAGs temporarily due to an Airflow 3 bug on processing DatasetAlias that contain non-ASCII characters:
         # https://github.com/apache/airflow/issues/51566

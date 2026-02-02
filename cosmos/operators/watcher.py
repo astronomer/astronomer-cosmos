@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import zlib
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -83,7 +83,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
     # Use staticmethod to prevent Python's descriptor protocol from binding the function to `self`
     # when accessed via instance, which would incorrectly pass `self` as the first argument
-    _process_log_line_callable = staticmethod(store_dbt_resource_status_from_log)
+    _process_log_line_callable: Callable[[str, Any], None] | None = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
@@ -96,9 +96,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         default_args["retries"] = 0
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
-        kwargs["log_format"] = "json"
-
         super().__init__(task_id=task_id, *args, **kwargs)
+
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            self.log_format = "json"
 
     @staticmethod
     def _serialize_event(event_message: EventMsg) -> dict[str, Any]:
@@ -147,7 +148,23 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         if startup_events:
             safe_xcom_push(task_instance=context["ti"], key="dbt_startup_events", value=startup_events)
 
+    def _set_invocation_mode_if_not_set(self) -> None:
+        if not self.invocation_mode:
+            logger.info("No invocation mode provided, discovering it")
+            self._discover_invocation_mode()
+
+    def _set_process_log_line_callable_if_subprocess(self) -> None:
+        if self.invocation_mode == InvocationMode.SUBPROCESS:
+            logger.info(
+                "DbtProducerWatcherOperator: Setting log_format to json and process_log_line_callable to store_dbt_resource_status_from_log"
+            )
+            self.log_format = "json"
+            self._process_log_line_callable = store_dbt_resource_status_from_log
+
     def execute(self, context: Context, **kwargs: Any) -> Any:
+        self._set_invocation_mode_if_not_set()
+        self._set_process_log_line_callable_if_subprocess()
+
         task_instance = context.get("ti")
         if task_instance is None:
             raise AirflowException("DbtProducerWatcherOperator expects a task instance in the execution context")
@@ -168,9 +185,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         )
 
         try:
-            if not self.invocation_mode:
-                self._discover_invocation_mode()
-
             use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
             logger.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
 
@@ -237,7 +251,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         )
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-
         dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
         if dbt_startup_events:  # pragma: no cover
             logger.info("Dbt Startup Event: %s", dbt_startup_events)

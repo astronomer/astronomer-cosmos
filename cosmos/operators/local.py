@@ -453,9 +453,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             process_log_line=self._process_log_line_callable,
             **kwargs,
         )
-        # Logging changed in Airflow 3.1 and we needed to replace the output by the full output:
-        output = "".join(subprocess_result.full_output)
-        logger.info(output)
         return subprocess_result
 
     def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> dbtRunnerResult:

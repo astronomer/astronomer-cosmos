@@ -288,6 +288,8 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     which is often necessary for larger dbt projects. When a watcher sensor task is retried (try_number >= 2 in Airflow 2.x, or try_number >= 1 in Airflow 3.x),
     it will automatically be assigned to the specified queue.
 
+    This behavior is enforced by Cosmos via an Airflow policy (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts.
+    As a result, the configured ``watcher_retry_queue`` can overwrite any queue set directly on the operator, but only for retries; the initial run continues to use the operator's original queue.
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_RETRY_QUEUE``
 

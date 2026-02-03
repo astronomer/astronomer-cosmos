@@ -620,6 +620,89 @@ class TestStoreDbtStatusFromLog:
         assert ti.store.get("model__pkg__model_b_status") == "failed"
         assert len(ti.store) == 2  # Only success and failed statuses are stored
 
+    def test_store_dbt_resource_status_from_log_pushes_compiled_sql_for_models(self, tmp_path):
+        """Test that compiled_sql is pushed to XCom for successful model nodes."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        # Create a fake compiled SQL file
+        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
+        compiled_dir.mkdir(parents=True)
+        compiled_sql_file = compiled_dir / "my_model.sql"
+        compiled_sql_file.write_text("SELECT * FROM orders WHERE status = 'completed'")
+
+        # JSON log with node_path and resource_type
+        log_line = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "success",
+                        "unique_id": "model.pkg.my_model",
+                        "node_path": "my_model.sql",
+                        "resource_type": "model",
+                    }
+                }
+            }
+        )
+
+        store_dbt_resource_status_from_log(log_line, {"context": ctx, "project_dir": str(tmp_path)})
+
+        assert ti.store.get("model__pkg__my_model_status") == "success"
+        assert ti.store.get("model__pkg__my_model_compiled_sql") == "SELECT * FROM orders WHERE status = 'completed'"
+
+    def test_store_dbt_resource_status_from_log_no_compiled_sql_for_non_models(self, tmp_path):
+        """Test that compiled_sql is not pushed for non-model resources like seeds or tests."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        # JSON log for a seed (not a model)
+        log_line = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "success",
+                        "unique_id": "seed.pkg.my_seed",
+                        "node_path": "my_seed.csv",
+                        "resource_type": "seed",
+                    }
+                }
+            }
+        )
+
+        store_dbt_resource_status_from_log(log_line, {"context": ctx, "project_dir": str(tmp_path)})
+
+        assert ti.store.get("seed__pkg__my_seed_status") == "success"
+        assert "seed__pkg__my_seed_compiled_sql" not in ti.store
+
+    def test_store_dbt_resource_status_from_log_pushes_compiled_sql_on_failure(self, tmp_path):
+        """Test that compiled_sql is pushed for failed models too (useful for debugging)."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        # Create a fake compiled SQL file (compilation happens before execution, so it exists even if model fails)
+        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
+        compiled_dir.mkdir(parents=True)
+        compiled_sql_file = compiled_dir / "failed_model.sql"
+        compiled_sql_file.write_text("SELECT * FROM orders WHERE invalid_column = 1")
+
+        log_line = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "failed",
+                        "unique_id": "model.pkg.failed_model",
+                        "node_path": "failed_model.sql",
+                        "resource_type": "model",
+                    }
+                }
+            }
+        )
+
+        store_dbt_resource_status_from_log(log_line, {"context": ctx, "project_dir": str(tmp_path)})
+
+        assert ti.store.get("model__pkg__failed_model_status") == "failed"
+        assert ti.store.get("model__pkg__failed_model_compiled_sql") == "SELECT * FROM orders WHERE invalid_column = 1"
+
 
 @patch("cosmos.dbt.runner.is_available", return_value=False)
 @patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", return_value="done")
@@ -812,6 +895,25 @@ class TestDbtConsumerWatcherSensor:
 
         result = sensor.poke(context)
         assert result is True
+
+    @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+    def test_poke_subprocess_mode_extracts_compiled_sql_from_xcom(self, mock_override_rtif):
+        """Test that in subprocess mode, poke extracts compiled_sql from per-model XCom key when status is success."""
+        sensor = self.make_sensor()
+        sensor.invocation_mode = "SUBPROCESS"
+        sensor.model_unique_id = MODEL_UNIQUE_ID
+
+        ti = MagicMock()
+        ti.try_number = 1
+        # First call returns status from per-model XCom key, second call returns compiled_sql from per-model XCom key
+        ti.xcom_pull.side_effect = ["success", "SELECT * FROM orders"]
+        context = self.make_context(ti)
+
+        assert sensor.compiled_sql == ""  # Initially empty
+        result = sensor.poke(context)
+        assert result is True
+        assert sensor.compiled_sql == "SELECT * FROM orders"
+        mock_override_rtif.assert_called_once_with(context)
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_status", return_value=None)
     def _fallback_to_non_watcher_run(self, mock_get_producer_task_status):
@@ -1029,6 +1131,32 @@ class TestDbtConsumerWatcherSensor:
         else:
             assert sensor.execute_complete(context=Mock(), event=mock_event) is None
 
+    @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+    def test_execute_complete_extracts_compiled_sql(self, mock_override_rtif):
+        """Test that execute_complete extracts compiled_sql from the event and sets it on the sensor."""
+        sensor = self.make_sensor()
+        context = Mock()
+
+        assert sensor.compiled_sql == ""  # Initially empty
+
+        event = {"status": "success", "compiled_sql": "SELECT * FROM orders WHERE status = 'active'"}
+        sensor.execute_complete(context=context, event=event)
+
+        assert sensor.compiled_sql == "SELECT * FROM orders WHERE status = 'active'"
+        mock_override_rtif.assert_called_once_with(context)
+
+    def test_execute_complete_handles_missing_compiled_sql(self):
+        """Test that execute_complete handles events without compiled_sql gracefully."""
+        sensor = self.make_sensor()
+        context = Mock()
+
+        assert sensor.compiled_sql == ""  # Initially empty
+
+        event = {"status": "success"}  # No compiled_sql in event
+        sensor.execute_complete(context=context, event=event)
+
+        assert sensor.compiled_sql == ""  # Should remain empty
+
 
 class TestDbtBuildWatcherOperator:
     def test_dbt_build_watcher_operator_raises_not_implemented_error(self):
@@ -1039,6 +1167,81 @@ class TestDbtBuildWatcherOperator:
 
         with pytest.raises(NotImplementedError, match=expected_message):
             DbtBuildWatcherOperator()
+
+
+class TestWatcherTrigger:
+    """Tests for WatcherTrigger compiled_sql extraction."""
+
+    def make_trigger(self, use_event: bool = False):
+        return WatcherTrigger(
+            model_unique_id="model.pkg.my_model",
+            producer_task_id="dbt_producer_watcher",
+            dag_id="test_dag",
+            run_id="test_run",
+            map_index=None,
+            use_event=use_event,
+            poke_interval=1.0,
+        )
+
+    @pytest.mark.asyncio
+    async def test_parse_node_status_and_compiled_sql_subprocess_mode(self):
+        """Test that compiled_sql is extracted from XCom in subprocess mode."""
+        trigger = self.make_trigger(use_event=False)
+
+        # Mock get_xcom_val to return status and compiled_sql
+        async def mock_get_xcom_val(key):
+            if key == "model__pkg__my_model_status":
+                return "success"
+            elif key == "model__pkg__my_model_compiled_sql":
+                return "SELECT * FROM orders"
+            return None
+
+        trigger.get_xcom_val = mock_get_xcom_val
+
+        status, compiled_sql = await trigger._parse_node_status_and_compiled_sql()
+
+        assert status == "success"
+        assert compiled_sql == "SELECT * FROM orders"
+
+    @pytest.mark.asyncio
+    async def test_parse_node_status_and_compiled_sql_subprocess_no_compiled_sql(self):
+        """Test that missing compiled_sql is handled gracefully in subprocess mode."""
+        trigger = self.make_trigger(use_event=False)
+
+        # Mock get_xcom_val to return only status
+        async def mock_get_xcom_val(key):
+            if key == "model__pkg__my_model_status":
+                return "success"
+            return None
+
+        trigger.get_xcom_val = mock_get_xcom_val
+
+        status, compiled_sql = await trigger._parse_node_status_and_compiled_sql()
+
+        assert status == "success"
+        assert compiled_sql is None
+
+    @pytest.mark.asyncio
+    async def test_parse_node_status_and_compiled_sql_dbt_runner_mode(self):
+        """Test that compiled_sql is extracted from compressed event in dbt_runner mode."""
+        trigger = self.make_trigger(use_event=True)
+
+        # Create compressed event payload with compiled_sql
+        event_data = {"data": {"run_result": {"status": "success"}}, "compiled_sql": "SELECT id FROM users"}
+        compressed = base64.b64encode(zlib.compress(json.dumps(event_data).encode())).decode()
+
+        # Mock get_xcom_val to return compressed event
+        async def mock_get_xcom_val(key):
+            if key == "nodefinished_model__pkg__my_model":
+                return compressed
+            return None
+
+        trigger.get_xcom_val = mock_get_xcom_val
+
+        status, compiled_sql = await trigger._parse_node_status_and_compiled_sql()
+
+        assert status == "success"
+        assert compiled_sql == "SELECT id FROM users"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")

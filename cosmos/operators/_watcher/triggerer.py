@@ -98,7 +98,15 @@ class WatcherTrigger(BaseTrigger):
         else:
             return await self.get_xcom_val_af3(key)
 
-    async def _parse_node_status(self) -> str | None:
+    async def _parse_node_status_and_compiled_sql(self) -> tuple[str | None, str | None]:
+        """
+        Parse node status and compiled_sql from XCom.
+
+        Returns a tuple of (status, compiled_sql).
+        For dbt_runner mode (use_event=True), both are extracted from the compressed event payload.
+        For subprocess mode (use_event=False), status comes from per-model status key,
+        and compiled_sql comes from per-model compiled_sql key.
+        """
         key = (
             f"nodefinished_{self.model_unique_id.replace('.', '__')}"
             if self.use_event
@@ -108,12 +116,21 @@ class WatcherTrigger(BaseTrigger):
         if self.use_event:
             compressed_xcom_val = await self.get_xcom_val(key)
             if not compressed_xcom_val:
-                return None
+                return None, None
 
             data_json = _parse_compressed_xcom(compressed_xcom_val)
-            return data_json.get("data", {}).get("run_result", {}).get("status")  # type: ignore[no-any-return]
+            status = data_json.get("data", {}).get("run_result", {}).get("status")
+            compiled_sql = data_json.get("compiled_sql")
+            return status, compiled_sql
 
-        return await self.get_xcom_val(key)
+        # Subprocess mode: get status and compiled_sql from separate XCom keys
+        status = await self.get_xcom_val(key)
+        compiled_sql = None
+        # compiled_sql is available for both success and failed models - it's compiled before execution
+        if status is not None:
+            compiled_sql_key = f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
+            compiled_sql = await self.get_xcom_val(compiled_sql_key)
+        return status, compiled_sql
 
     async def _get_producer_task_status(self) -> str | None:
         """Retrieve the producer task state for both Airflow 2 and Airflow 3."""
@@ -135,14 +152,20 @@ class WatcherTrigger(BaseTrigger):
 
         while True:
             producer_task_state = await self._get_producer_task_status()
-            node_status = await self._parse_node_status()
+            node_status, compiled_sql = await self._parse_node_status_and_compiled_sql()
             if node_status == "success":
                 logger.info("Model '%s' succeeded", self.model_unique_id)
-                yield TriggerEvent({"status": "success"})  # type: ignore[no-untyped-call]
+                event_data: dict[str, Any] = {"status": "success"}
+                if compiled_sql:
+                    event_data["compiled_sql"] = compiled_sql
+                yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif node_status == "failed":
                 logger.warning("Model '%s' failed", self.model_unique_id)
-                yield TriggerEvent({"status": "failed", "reason": "model_failed"})  # type: ignore[no-untyped-call]
+                event_data = {"status": "failed", "reason": "model_failed"}
+                if compiled_sql:
+                    event_data["compiled_sql"] = compiled_sql
+                yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == "failed":
                 logger.error(

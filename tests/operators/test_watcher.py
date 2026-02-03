@@ -564,6 +564,46 @@ class TestStoreDbtStatusFromLog:
 
         assert "model__pkg__running_model_status" not in ti.store
 
+    def test_store_dbt_resources_status_from_log_detects_passed_test_status(self):
+        """Test that a passed test status is correctly parsed and stored in XCom."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        log_line = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "pass",
+                        "unique_id": "test.pkg.my_test",
+                    }
+                }
+            }
+        )
+
+        store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        assert ti.store.get("test__pkg__my_test_status") == "pass"
+
+    def test_store_dbt_resource_status_from_log_detects_failed_test_status(self):
+        """Test that a failed test status is correctly parsed and stored in XCom."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        log_line = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "fail",
+                        "unique_id": "test.pkg.my_test",
+                    }
+                }
+            }
+        )
+
+        store_dbt_resource_status_from_log(log_line, {"context": ctx})
+
+        assert ti.store.get("test__pkg__my_test_status") == "fail"
+
     def test_store_dbt_resource_status_from_log_handles_invalid_json(self, caplog):
         """Test that invalid JSON doesn't raise an exception."""
         ti = _MockTI()

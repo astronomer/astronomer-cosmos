@@ -247,7 +247,7 @@ class TestWatcherTrigger:
         assert len(events) == 1
         assert events[0].payload == {"status": "success", "reason": "model_not_run"}
         assert "The producer task 'task_1' succeeded" in caplog.text
-        assert "There is no information about the model 'model.test' execution" in caplog.text
+        assert "There is no information about the node 'model.test' execution" in caplog.text
 
     @pytest.mark.asyncio
     async def test_run_poke_interval_and_debug_log(self, caplog):

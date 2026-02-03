@@ -14,6 +14,25 @@ from packaging.version import Version
 
 ProducerStateFetcher = Callable[[], str | None]
 
+# dbt uses different status values for different node types (models/tests):"
+SUCCESS_STATUSES = frozenset({"success", "pass"})
+FAILED_STATUSES = frozenset({"failed", "fail", "error"})
+
+
+def is_node_status_success(status: str | None) -> bool:
+    """Check if the dbt node status indicates success (works for both models and tests)."""
+    return status in SUCCESS_STATUSES
+
+
+def is_node_status_failed(status: str | None) -> bool:
+    """Check if the dbt node status indicates failure (works for both models and tests)."""
+    return status in FAILED_STATUSES
+
+
+def is_node_status_terminal(status: str | None) -> bool:
+    """Check if the dbt node status is terminal (success or failed)."""
+    return is_node_status_success(status) or is_node_status_failed(status)
+
 
 xcom_set_lock = Lock()
 

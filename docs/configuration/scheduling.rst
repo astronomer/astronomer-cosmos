@@ -92,7 +92,6 @@ Will trigger the following DAG to be run:
     from airflow.datasets import Dataset
     from airflow.operators.empty import EmptyOperator
 
-
     with DAG(
         "dataset_triggered_dag",
         description="A DAG that should be triggered via Dataset",
@@ -117,7 +116,6 @@ From Cosmos 1.7 and Airflow 2.10, it is also possible to trigger DAGs be to be r
     from airflow import DAG
     from airflow.datasets import DatasetAlias
     from airflow.operators.empty import EmptyOperator
-
 
     with DAG(
         "datasetalias_triggered_dag",

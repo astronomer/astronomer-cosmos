@@ -803,9 +803,6 @@ class YamlSelectors:
         :param key: str - The key to look up in the dictionary
         :return: tuple[list[dict[str, Any]], list[str]] - Tuple of (list of dictionaries, list of error messages)
         """
-        if key not in dct:
-            return ([], [f"Expected to find key '{key}' in dict, only found {list(dct)}"])
-
         values = dct[key]
         if not isinstance(values, list):
             return ([], [f"Invalid value for key '{key}'. Expected a list."])

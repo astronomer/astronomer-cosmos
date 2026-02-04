@@ -1131,11 +1131,11 @@ class DbtGraph:
         if TYPE_CHECKING:
             assert self.project.manifest_path is not None  # pragma: no cover
 
-        if settings.enable_orjson_parser:
-            if orjson is None:
-                raise CosmosLoadDbtException(
-                    "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
+        if settings.enable_orjson_parser and not orjson:
+            raise CosmosLoadDbtException(
+                "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
                 )
+        elif settings.enable_orjson_parser:
             manifest_content = self.project.manifest_path.read_bytes()
             manifest = orjson.loads(manifest_content)
         else:

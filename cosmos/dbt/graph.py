@@ -1109,15 +1109,15 @@ class DbtGraph:
     def _load_manifest_from_file(self, manifest_path: Path) -> dict[str, Any]:
         """
         Load and parse a dbt manifest JSON file.
-        
+
         Uses orjson for faster parsing if enabled and available, otherwise falls back to standard json.
-        
+
         Args:
             manifest_path: Path to the manifest.json file
-            
+
         Returns:
             Parsed manifest dictionary
-            
+
         Raises:
             CosmosLoadDbtException: If orjson is enabled but not installed
         """

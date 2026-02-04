@@ -14,16 +14,6 @@ from cosmos.dbt.graph import CosmosLoadDbtException, DbtGraph
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 
 
-def _is_orjson_available() -> bool:
-    """Check if orjson is available for testing."""
-    try:
-        import orjson
-
-        return True
-    except ImportError:
-        return False
-
-
 class TestOrjsonParserSettings:
     """Tests for orjson parser settings."""
 
@@ -62,10 +52,6 @@ class TestOrjsonParserWithoutOrjson:
         assert "astronomer-cosmos[orjson]" in str(exc_info.value)
 
 
-@pytest.mark.skipif(
-    not _is_orjson_available(),
-    reason="orjson not installed - install with: pip install orjson",
-)
 class TestOrjsonParserWithOrjson:
     """Tests that require orjson to be installed."""
 
@@ -85,7 +71,6 @@ class TestOrjsonParserWithOrjson:
 
         assert len(dbt_graph.nodes) > 0
 
-    @patch.object(settings, "enable_orjson_parser", True)
     def test_orjson_produces_same_results_as_standard(self):
         """Verify orjson produces identical results to standard json parser."""
         project_config = ProjectConfig(manifest_path=SAMPLE_MANIFEST, project_name="jaffle_shop")
@@ -107,7 +92,8 @@ class TestOrjsonParserWithOrjson:
             execution_config=execution_config,
             render_config=render_config,
         )
-        dbt_graph_orjson.load_from_dbt_manifest()
+        with patch.object(settings, "enable_orjson_parser", True):
+            dbt_graph_orjson.load_from_dbt_manifest()
 
         # Compare results
         assert dbt_graph_standard.nodes.keys() == dbt_graph_orjson.nodes.keys()

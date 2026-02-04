@@ -18,6 +18,7 @@ def _is_orjson_available() -> bool:
     """Check if orjson is available for testing."""
     try:
         import orjson
+
         return True
     except ImportError:
         return False
@@ -110,11 +111,11 @@ class TestOrjsonParserWithOrjson:
 
         # Compare results
         assert dbt_graph_standard.nodes.keys() == dbt_graph_orjson.nodes.keys()
-        
+
         for node_id in dbt_graph_standard.nodes:
             standard_node = dbt_graph_standard.nodes[node_id]
             orjson_node = dbt_graph_orjson.nodes[node_id]
-            
+
             assert standard_node.unique_id == orjson_node.unique_id
             assert standard_node.resource_type == orjson_node.resource_type
             assert standard_node.depends_on == orjson_node.depends_on

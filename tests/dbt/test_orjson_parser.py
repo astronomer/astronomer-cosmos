@@ -2,7 +2,6 @@
 Tests for the experimental orjson parser feature.
 """
 
-import importlib.util
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,11 +12,6 @@ from cosmos.config import ExecutionConfig, ProjectConfig, RenderConfig
 from cosmos.dbt.graph import CosmosLoadDbtException, DbtGraph
 
 SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
-
-
-def _is_orjson_available() -> bool:
-    """Check if orjson is available for testing."""
-    return importlib.util.find_spec("orjson") is not None
 
 
 class TestOrjsonParserSettings:
@@ -58,10 +52,6 @@ class TestOrjsonParserWithoutOrjson:
         assert "astronomer-cosmos[orjson]" in str(exc_info.value)
 
 
-@pytest.mark.skipif(
-    not _is_orjson_available(),
-    reason="orjson not installed - install with: pip install orjson",
-)
 class TestOrjsonParserWithOrjson:
     """Tests that require orjson to be installed."""
 

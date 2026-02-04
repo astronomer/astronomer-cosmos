@@ -170,6 +170,7 @@ dependencies = [
     "Werkzeug<3.0.0",
     "methodtools",
     "pytest-asyncio",
+    "orjson"
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

@@ -18,6 +18,11 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
 
+try:
+    import orjson
+except ImportError:
+    orjson = None
+
 if TYPE_CHECKING:
     try:
         # Airflow 3 onwards
@@ -1126,67 +1131,75 @@ class DbtGraph:
         if TYPE_CHECKING:
             assert self.project.manifest_path is not None  # pragma: no cover
 
-        with self.project.manifest_path.open() as fp:
-            manifest = json.load(fp)
+        if settings.enable_orjson_parser:
+            if orjson is None:
+                raise CosmosLoadDbtException(
+                    "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
+                )
+            manifest_content = self.project.manifest_path.read_bytes()
+            manifest = orjson.loads(manifest_content)
+        else:
+            with self.project.manifest_path.open() as fp:
+                manifest = json.load(fp)
 
-            resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
-            for unique_id, node_dict in resources.items():
-                # External nodes (e.g., from dbt-loom) may not have a file path - skip them
-                # Check for both None and empty string since dbt-loom may set either
-                original_file_path = node_dict.get("original_file_path")
-                if not original_file_path:
-                    logger.debug(
-                        "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
-                        unique_id,
-                    )
-                    continue
+        resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
+        for unique_id, node_dict in resources.items():
+            # External nodes (e.g., from dbt-loom) may not have a file path - skip them
+            # Check for both None and empty string since dbt-loom may set either
+            original_file_path = node_dict.get("original_file_path")
+            if not original_file_path:
+                logger.debug(
+                    "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
+                    unique_id,
+                )
+                continue
 
-                node = DbtNode(
-                    unique_id=unique_id,
-                    package_name=node_dict.get("package_name"),
-                    resource_type=DbtResourceType(node_dict["resource_type"]),
-                    depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.execution_config.project_path / _normalize_path(original_file_path),
-                    tags=node_dict.get("tags") or [],
-                    config=node_dict.get("config") or {},
-                    has_freshness=(
-                        is_freshness_effective(node_dict.get("freshness"))
-                        if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
-                        else False
-                    ),
+            node = DbtNode(
+                unique_id=unique_id,
+                package_name=node_dict.get("package_name"),
+                resource_type=DbtResourceType(node_dict["resource_type"]),
+                depends_on=node_dict.get("depends_on", {}).get("nodes", []),
+                file_path=self.execution_config.project_path / _normalize_path(original_file_path),
+                tags=node_dict.get("tags") or [],
+                config=node_dict.get("config") or {},
+                has_freshness=(
+                    is_freshness_effective(node_dict.get("freshness"))
+                    if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
+                    else False
+                ),
+            )
+
+            nodes[node.unique_id] = node
+
+        if self.render_config.selector:
+            selector_definitions = manifest.get("selectors", {})
+
+            if not selector_definitions:
+                raise CosmosLoadDbtException(f"Selectors not found in manifest file `{self.project.manifest_path}`")
+
+            yaml_selectors = self.load_parsed_selectors(selector_definitions)
+            selections = yaml_selectors.get_parsed(self.render_config.selector)
+
+            if not selections:
+                raise CosmosLoadDbtException(
+                    f"Selector `{self.render_config.selector}` not found in parsed YAML selectors `{selector_definitions}`"
                 )
 
-                nodes[node.unique_id] = node
-
-            if self.render_config.selector:
-                selector_definitions = manifest.get("selectors", {})
-
-                if not selector_definitions:
-                    raise CosmosLoadDbtException(f"Selectors not found in manifest file `{self.project.manifest_path}`")
-
-                yaml_selectors = self.load_parsed_selectors(selector_definitions)
-                selections = yaml_selectors.get_parsed(self.render_config.selector)
-
-                if not selections:
-                    raise CosmosLoadDbtException(
-                        f"Selector `{self.render_config.selector}` not found in parsed YAML selectors `{selector_definitions}`"
-                    )
-
-                self.nodes = nodes
-                self.filtered_nodes = select_nodes(
-                    project_dir=self.execution_config.project_path,
-                    nodes=nodes,
-                    select=selections["select"],
-                    exclude=selections["exclude"],
-                )
-            else:
-                self.nodes = nodes
-                self.filtered_nodes = select_nodes(
-                    project_dir=self.execution_config.project_path,
-                    nodes=nodes,
-                    select=self.render_config.select,
-                    exclude=self.render_config.exclude,
-                )
+            self.nodes = nodes
+            self.filtered_nodes = select_nodes(
+                project_dir=self.execution_config.project_path,
+                nodes=nodes,
+                select=selections["select"],
+                exclude=selections["exclude"],
+            )
+        else:
+            self.nodes = nodes
+            self.filtered_nodes = select_nodes(
+                project_dir=self.execution_config.project_path,
+                nodes=nodes,
+                select=self.render_config.select,
+                exclude=self.render_config.exclude,
+            )
 
     def update_node_dependency(self) -> None:
         """

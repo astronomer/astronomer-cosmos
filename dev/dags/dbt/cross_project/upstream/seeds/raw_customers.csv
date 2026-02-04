@@ -1,0 +1,11 @@
+customer_id,first_name,last_name,email,created_at,country,segment
+1,John,Doe,john.doe@example.com,2023-01-15,USA,Enterprise
+2,Jane,Smith,jane.smith@example.com,2023-02-20,UK,SMB
+3,Bob,Johnson,bob.j@example.com,2023-03-10,Canada,Enterprise
+4,Alice,Williams,alice.w@example.com,2023-04-05,USA,SMB
+5,Charlie,Brown,charlie.b@example.com,2023-05-12,Germany,Startup
+6,Diana,Miller,diana.m@example.com,2023-06-18,France,Enterprise
+7,Edward,Davis,edward.d@example.com,2023-07-22,USA,SMB
+8,Fiona,Wilson,fiona.w@example.com,2023-08-30,UK,Startup
+9,George,Taylor,george.t@example.com,2023-09-14,Australia,Enterprise
+10,Hannah,Anderson,hannah.a@example.com,2023-10-25,USA,SMB

@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 import jinja2
-from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from packaging.version import Version
@@ -463,9 +462,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             process_log_line=self._process_log_line_callable,
             **kwargs,
         )
-        # Logging changed in Airflow 3.1 and we needed to replace the output by the full output:
-        output = "".join(subprocess_result.full_output)
-        logger.info(output)
         return subprocess_result
 
     def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> dbtRunnerResult:
@@ -812,6 +808,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
+        from airflow import DAG
+
         if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
             logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")
             raise AirflowCompatibilityError(

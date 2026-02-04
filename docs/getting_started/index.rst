@@ -16,6 +16,7 @@
    GCP Cloud Run Job Execution Mode <gcp-cloud-run-job>
    Airflow Async Execution Mode <async-execution-mode>
    Watcher Execution Mode <watcher-execution-mode>
+   Watcher Kubernetes Execution Mode <watcher-kubernetes-execution-mode>
    dbt and Airflow Similar Concepts <dbt-airflow-concepts>
    Operators <operators>
    Custom Airflow Properties <custom-airflow-properties>
@@ -46,6 +47,7 @@ For specific guides, see the following:
 
 - `Executing dbt DAGs with Docker Operators <docker.html>`__
 - `Executing dbt DAGs with KubernetesPodOperators <kubernetes.html>`__
+- `Executing dbt DAGs with Watcher Kubernetes Mode <watcher-kubernetes-execution-mode.html>`__
 - `Executing dbt DAGs with AzureContainerInstancesOperators <azure-container-instance.html>`__
 - `Executing dbt DAGs with GcpCloudRunExecuteJobOperators <gcp-cloud-run-job.html>`__
 

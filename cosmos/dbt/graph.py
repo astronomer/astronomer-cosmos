@@ -18,11 +18,10 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
 
-# Optional orjson import for faster JSON parsing
 try:
     import orjson
 except ImportError:
-    orjson = None  # type: ignore
+    orjson = None
 
 if TYPE_CHECKING:
     try:
@@ -1132,7 +1131,6 @@ class DbtGraph:
         if TYPE_CHECKING:
             assert self.project.manifest_path is not None  # pragma: no cover
 
-        # Load manifest using orjson if enabled, otherwise use standard json
         if settings.enable_orjson_parser:
             if orjson is None:
                 raise CosmosLoadDbtException(

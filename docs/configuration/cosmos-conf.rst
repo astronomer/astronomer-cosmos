@@ -264,7 +264,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 .. _enable_orjson_parser:
 
 `enable_orjson_parser`_:
-    (EXPERIMENTAL - Introduced in Cosmos 1.13.1): Enable the use of orjson for parsing dbt manifest files
+    (EXPERIMENTAL - Introduced in Cosmos 1.14.0): Enable the use of orjson for parsing dbt manifest files
     instead of the standard json library. orjson provides significantly faster JSON parsing performance,
     which can reduce DAG parsing time for large dbt projects. Requires installing orjson via
     ``astronomer-cosmos[orjson]``.

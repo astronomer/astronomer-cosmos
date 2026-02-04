@@ -1106,6 +1106,32 @@ class DbtGraph:
 
         return self.parse_yaml_selectors(selector_definitions)
 
+    def _load_manifest_from_file(self, manifest_path: Path) -> dict[str, Any]:
+        """
+        Load and parse a dbt manifest JSON file.
+        
+        Uses orjson for faster parsing if enabled and available, otherwise falls back to standard json.
+        
+        Args:
+            manifest_path: Path to the manifest.json file
+            
+        Returns:
+            Parsed manifest dictionary
+            
+        Raises:
+            CosmosLoadDbtException: If orjson is enabled but not installed
+        """
+        if settings.enable_orjson_parser and orjson:
+            manifest_content = manifest_path.read_bytes()
+            return orjson.loads(manifest_content)
+        elif settings.enable_orjson_parser:
+            raise CosmosLoadDbtException(
+                "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
+            )
+        else:
+            with manifest_path.open() as fp:
+                return json.load(fp)
+
     def load_from_dbt_manifest(self) -> None:
         """
         This approach accurately loads `dbt` projects using the `manifest.yml` file.
@@ -1131,16 +1157,7 @@ class DbtGraph:
         if TYPE_CHECKING:
             assert self.project.manifest_path is not None  # pragma: no cover
 
-        if settings.enable_orjson_parser:
-            if orjson is None:
-                raise CosmosLoadDbtException(
-                    "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
-                )
-            manifest_content = self.project.manifest_path.read_bytes()
-            manifest = orjson.loads(manifest_content)
-        else:
-            with self.project.manifest_path.open() as fp:
-                manifest = json.load(fp)
+        manifest = self._load_manifest_from_file(self.project.manifest_path)
 
         resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
         for unique_id, node_dict in resources.items():

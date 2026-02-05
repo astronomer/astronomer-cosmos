@@ -139,6 +139,48 @@ class TestStopMemoryTracking:
             mock_context["ti"].xcom_push.assert_not_called()
 
 
+class TestPsutilNotAvailable:
+    """Tests for when psutil is not available."""
+
+    @pytest.fixture
+    def mock_context(self):
+        """Create a mock Airflow context."""
+        mock_ti = MagicMock()
+        mock_ti.dag_id = "test_dag"
+        mock_ti.task_id = "test_task"
+        mock_ti.run_id = "test_run_no_psutil"
+        return {"ti": mock_ti}
+
+    def test_memory_tracker_run_without_psutil(self):
+        """Test MemoryTracker._run() returns early when psutil is not available."""
+        tracker = debug.MemoryTracker(pid=os.getpid(), poll_interval=0.05)
+        with patch.object(debug, "PSUTIL_AVAILABLE", False):
+            # Call _run directly to test the branch
+            tracker._run()
+            # Should return immediately without tracking any memory
+            assert tracker.max_rss_bytes == 0
+
+    def test_start_memory_tracking_without_psutil_logs_warning(self, mock_context):
+        """Test start_memory_tracking logs warning when psutil is not available."""
+        with patch.object(debug.settings, "enable_debug_mode", True):
+            with patch.object(debug, "PSUTIL_AVAILABLE", False):
+                with patch.object(debug.logger, "warning") as mock_warning:
+                    debug.start_memory_tracking(mock_context)
+                    mock_warning.assert_called_once()
+                    assert "psutil is not available" in mock_warning.call_args[0][0]
+                    # No tracker should be created
+                    task_key = f"{mock_context['ti'].dag_id}.{mock_context['ti'].task_id}.{mock_context['ti'].run_id}"
+                    assert task_key not in debug._memory_trackers
+
+    def test_stop_memory_tracking_without_psutil_returns_early(self, mock_context):
+        """Test stop_memory_tracking returns early when psutil is not available."""
+        with patch.object(debug.settings, "enable_debug_mode", True):
+            with patch.object(debug, "PSUTIL_AVAILABLE", False):
+                debug.stop_memory_tracking(mock_context)
+                # Should not push to XCom
+                mock_context["ti"].xcom_push.assert_not_called()
+
+
 class TestIntegration:
     """Integration tests for the full debug flow."""
 

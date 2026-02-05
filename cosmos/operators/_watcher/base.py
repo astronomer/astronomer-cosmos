@@ -17,8 +17,8 @@ from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
     build_producer_state_fetcher,
     get_xcom_val,
-    is_node_status_success,
-    is_node_status_terminal,
+    is_dbt_node_status_success,
+    is_dbt_node_status_terminal,
     safe_xcom_push,
 )
 from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
@@ -107,17 +107,19 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     else:
         logger.debug("Log line: %s", log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
-        node_status = node_info.get("node_status")
+        dbt_node_status = node_info.get("node_status")
         unique_id = node_info.get("unique_id")
 
-        logger.debug("Model: %s is in %s state", unique_id, node_status)
+        logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
         # Handle terminal statuses for both models (success/failed) and tests (pass/fail)
         # TODO: handle all possible statuses including skipped, warn, etc.
-        if is_node_status_terminal(node_status):
+        if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
             assert context is not None  # Make MyPy happy
-            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+            safe_xcom_push(
+                task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=dbt_node_status
+            )
 
             # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
             # compiled_sql is available for both success and failed models - it's compiled before execution
@@ -385,7 +387,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             self.poke_retry_number += 1
 
             return False
-        elif is_node_status_success(status):
+        elif is_dbt_node_status_success(status):
             return True
         else:
             raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")

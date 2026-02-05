@@ -92,7 +92,7 @@ class TestWatcherTrigger:
             (False, "success", "success", "SELECT * FROM table"),
         ],
     )
-    async def test_parse_node_status_and_compiled_sql(
+    async def test_parse_dbt_node_status_and_compiled_sql(
         self, use_event, xcom_val, expected_status, expected_compiled_sql
     ):
         self.trigger.use_event = use_event
@@ -112,7 +112,7 @@ class TestWatcherTrigger:
             patch("cosmos.operators._watcher.triggerer._parse_compressed_xcom", return_value=xcom_val),
             patch.object(self.trigger, "get_xcom_val", AsyncMock(side_effect=mock_get_xcom_val)),
         ):
-            status, compiled_sql = await self.trigger._parse_node_status_and_compiled_sql()
+            status, compiled_sql = await self.trigger._parse_dbt_node_status_and_compiled_sql()
             assert status == expected_status
             assert compiled_sql == expected_compiled_sql
 
@@ -135,7 +135,7 @@ class TestWatcherTrigger:
                     assert val == "af3"
 
     @pytest.mark.parametrize(
-        "node_status, producer_state, expected",
+        "dbt_node_status, producer_state, expected",
         [
             ("success", "running", {"status": "success"}),
             ("failed", "running", {"status": "failed", "reason": "model_failed"}),
@@ -143,7 +143,7 @@ class TestWatcherTrigger:
             (None, "success", {"status": "success", "reason": "model_not_run"}),
         ],
     )
-    async def test_run_various_outcomes(self, node_status, producer_state, expected):
+    async def test_run_various_outcomes(self, dbt_node_status, producer_state, expected):
 
         async def fake_get_xcom_val(key):
             # Return None for compiled_sql key so payload matches expected (no compiled_sql)
@@ -156,7 +156,7 @@ class TestWatcherTrigger:
             patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value=producer_state)),
             patch(
                 "cosmos.operators._watcher.triggerer._parse_compressed_xcom",
-                return_value={"data": {"run_result": {"status": node_status}}} if node_status else {},
+                return_value={"data": {"run_result": {"status": dbt_node_status}}} if dbt_node_status else {},
             ),
         ):
             events = [event async for event in self.trigger.run()]
@@ -232,13 +232,13 @@ class TestWatcherTrigger:
     async def test_run_producer_success_model_not_run(self, caplog):
         """Test that when producer succeeds but model has no status, trigger yields success with model_not_run reason."""
         get_producer_status_mock = AsyncMock(return_value="success")
-        parse_node_status_and_compiled_sql_mock = AsyncMock(return_value=(None, None))
+        parse_dbt_node_status_and_compiled_sql_mock = AsyncMock(return_value=(None, None))
 
         caplog.set_level("INFO")
 
         with (
             patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
-            patch.object(self.trigger, "_parse_node_status_and_compiled_sql", parse_node_status_and_compiled_sql_mock),
+            patch.object(self.trigger, "_parse_dbt_node_status_and_compiled_sql", parse_dbt_node_status_and_compiled_sql_mock),
         ):
             events = []
             async for event in self.trigger.run():
@@ -253,7 +253,7 @@ class TestWatcherTrigger:
     async def test_run_poke_interval_and_debug_log(self, caplog):
         get_xcom_val_mock = AsyncMock(side_effect=["compressed_data"])
         get_producer_status_mock = AsyncMock(side_effect=["running", "running", "running"])
-        parse_node_status_and_compiled_sql_mock = AsyncMock(
+        parse_dbt_node_status_and_compiled_sql_mock = AsyncMock(
             side_effect=[(None, None), (None, None), ("success", "SELECT 1")]
         )
 
@@ -262,7 +262,7 @@ class TestWatcherTrigger:
         with (
             patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock),
             patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
-            patch.object(self.trigger, "_parse_node_status_and_compiled_sql", parse_node_status_and_compiled_sql_mock),
+            patch.object(self.trigger, "_parse_dbt_node_status_and_compiled_sql", parse_dbt_node_status_and_compiled_sql_mock),
             patch("asyncio.sleep", new_callable=AsyncMock) as sleep_mock,
         ):
             events = []

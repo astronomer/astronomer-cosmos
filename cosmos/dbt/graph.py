@@ -20,8 +20,8 @@ from airflow.models import Variable
 
 try:
     import orjson
-except ImportError:
-    orjson = None
+except ImportError:  # pragma: no cover
+    orjson = None  # type: ignore[assignment] # pragma: no cover
 
 if TYPE_CHECKING:
     try:
@@ -1106,7 +1106,7 @@ class DbtGraph:
 
         return self.parse_yaml_selectors(selector_definitions)
 
-    def _load_manifest_from_file(self, manifest_path: Path) -> dict[str, Any]:
+    def _load_manifest_from_file(self, manifest_path: Path | ObjectStoragePath) -> dict[str, Any]:
         """
         Load and parse a dbt manifest JSON file.
 
@@ -1123,14 +1123,14 @@ class DbtGraph:
         """
         if settings.enable_orjson_parser and orjson:
             manifest_content = manifest_path.read_bytes()
-            return orjson.loads(manifest_content)
+            return orjson.loads(manifest_content)  # type: ignore[no-any-return]
         elif settings.enable_orjson_parser:
             raise CosmosLoadDbtException(
                 "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
             )
         else:
             with manifest_path.open() as fp:
-                return json.load(fp)
+                return json.load(fp)  # type: ignore[no-any-return]
 
     def load_from_dbt_manifest(self) -> None:
         """

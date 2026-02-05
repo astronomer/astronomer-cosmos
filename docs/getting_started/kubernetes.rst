@@ -162,5 +162,4 @@ The Kubernetes execution mode has the following limitations:
 - Does not support `Callbacks <https://astronomer.github.io/astronomer-cosmos/configuration/callbacks.html>`_ (there is an `open ticket <https://github.com/astronomer/astronomer-cosmos/issues/1575>`_ to address this)
 - Does not expose Compiled SQL as a `templated field <https://astronomer.github.io/astronomer-cosmos/configuration/compiled-sql.html>`_
 - Does not benefit from `Cosmos caching mechanisms <https://astronomer.github.io/astronomer-cosmos/configuration/caching.html>`_
-- Does not support Cosmos `callbacks <https://astronomer.github.io/astronomer-cosmos/configuration/callbacks.html>`_
 - Does not support `generating dbt docs & uploading to an object store <https://astronomer.github.io/astronomer-cosmos/configuration/generating-docs.html>`_ (there is a `PR <https://github.com/astronomer/astronomer-cosmos/pull/2058>`_ to solve this for S3)

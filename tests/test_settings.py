@@ -37,3 +37,19 @@ def test_enable_memory_optimised_imports_false(monkeypatch):
 
     result = subprocess.run(["python", "-c", script], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
+
+
+@patch.dict(os.environ, {"AIRFLOW__COSMOS__ENABLE_DEBUG_MODE": "True"}, clear=True)
+def test_enable_debug_mode_env_var():
+    reload(settings)
+    assert settings.enable_debug_mode is True
+
+
+@patch.dict(
+    os.environ,
+    {"AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS": "0.25"},
+    clear=True,
+)
+def test_debug_memory_poll_interval_env_var():
+    reload(settings)
+    assert settings.debug_memory_poll_interval_seconds == 0.25

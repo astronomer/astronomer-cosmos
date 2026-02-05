@@ -60,7 +60,7 @@ def new_test_dag(dag: DAG) -> DagRun:
             session.commit()
 
         t1 = time.perf_counter()
-        log.info("[TIMING] DagBundle creation: %.3fs", t1 - t0)
+        print(f"[TIMING] DagBundle creation: {t1 - t0:.3f}s")
 
         # This creates both DagModel and DagVersion records
         # NOTE: dag_folder=None is required to create an empty DagBag instead of
@@ -69,29 +69,29 @@ def new_test_dag(dag: DAG) -> DagRun:
         dagbag.bag_dag(dag)
 
         t2 = time.perf_counter()
-        log.info("[TIMING] DagBag creation + bag_dag: %.3fs", t2 - t1)
+        print(f"[TIMING] DagBag creation + bag_dag: {t2 - t1:.3f}s")
 
         sync_bag_to_db(dagbag, bundle_name="test_bundle", bundle_version="1")
 
         t3 = time.perf_counter()
-        log.info("[TIMING] sync_bag_to_db: %.3fs", t3 - t2)
+        print(f"[TIMING] sync_bag_to_db: {t3 - t2:.3f}s")
 
         dr = dag.test(logical_date=timezone.utcnow())
 
         t4 = time.perf_counter()
-        log.info("[TIMING] dag.test() execution: %.3fs", t4 - t3)
-        log.info("[TIMING] Total new_test_dag for %s: %.3fs", dag.dag_id, t4 - t0)
+        print(f"[TIMING] dag.test() execution: {t4 - t3:.3f}s")
+        print(f"[TIMING] Total new_test_dag for {dag.dag_id}: {t4 - t0:.3f}s")
 
     elif AIRFLOW_VERSION >= version.Version("3.0"):
         t0 = time.perf_counter()
         dr = dag.test(logical_date=timezone.utcnow())
         t1 = time.perf_counter()
-        log.info("[TIMING] dag.test() execution for %s: %.3fs", dag.dag_id, t1 - t0)
+        print(f"[TIMING] dag.test() execution for {dag.dag_id}: {t1 - t0:.3f}s")
     else:
         t0 = time.perf_counter()
         dr = dag.test()
         t1 = time.perf_counter()
-        log.info("[TIMING] dag.test() execution for %s: %.3fs", dag.dag_id, t1 - t0)
+        print(f"[TIMING] dag.test() execution for {dag.dag_id}: {t1 - t0:.3f}s")
     return dr
 
 

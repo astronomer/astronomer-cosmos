@@ -15,7 +15,8 @@ from warnings import warn
 from airflow.models.dag import DAG
 
 try:
-    from airflow.sdk import Param
+    # Airflow 3.0 onwards
+    from airflow.sdk.definitions.param import Param
 except ImportError:  # pragma: no cover
     from airflow.models.param import Param
 

@@ -14,7 +14,6 @@ from cosmos.io import (
     upload_to_cloud_storage,
     upload_to_gcp_gs,
 )
-from cosmos.settings import AIRFLOW_IO_AVAILABLE
 
 
 @pytest.fixture
@@ -104,7 +103,6 @@ def test_upload_artifacts_to_cloud_storage_no_remote_path():
             upload_to_cloud_storage("/project_dir", **{})
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 def test_upload_artifacts_to_cloud_storage_success(dummy_kwargs):
     """Test upload_artifacts_to_cloud_storage with valid setup."""
     with (
@@ -131,7 +129,6 @@ def test_upload_artifacts_to_cloud_storage_success(dummy_kwargs):
         assert mock_copy.call_count == 2
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.io.settings.remote_target_path", "s3://bucket/path/to/file")
 @patch("cosmos.io.settings.remote_target_path_conn_id", None)
 @patch("cosmos.io.ObjectStoragePath")
@@ -147,7 +144,6 @@ def test_configure_remote_target_path_no_conn_id(mock_urlparse, mock_object_stor
     assert result == (mock_object_storage.return_value, _default_s3_conn)
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.io.settings.remote_target_path", "abcd://bucket/path/to/file")
 @patch("cosmos.io.settings.remote_target_path_conn_id", None)
 @patch("cosmos.io.ObjectStoragePath")
@@ -161,22 +157,3 @@ def test_configure_remote_target_path_conn_id_is_none(mock_urlparse, mock_object
 
     result = _configure_remote_target_path()
     assert result == (None, None)
-
-
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("cosmos.settings.AIRFLOW_IO_AVAILABLE", False)
-@patch("cosmos.io.settings.remote_target_path", "s3://bucket/path/to/file")
-@patch("cosmos.io.ObjectStoragePath")
-@patch("cosmos.io.urlparse")
-def test_configure_remote_target_path_airflow_io_unavailable(mock_urlparse, mock_object_storage):
-    """Test when AIRFLOW_IO_AVAILABLE is False."""
-    mock_urlparse.return_value.scheme = "s3"
-
-    mock_storage_path = MagicMock()
-    mock_storage_path.exists.return_value = True
-    mock_object_storage.return_value = mock_storage_path
-
-    with pytest.raises(CosmosValueError) as exc_info:
-        _configure_remote_target_path()
-
-    assert "Object Storage feature is unavailable" in str(exc_info.value)

@@ -144,7 +144,6 @@ def upload_to_azure_wasb(
 
 def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tuple[None, None]:
     """Configure the remote target path if it is provided."""
-    from airflow.version import version as airflow_version
 
     if not settings.remote_target_path:
         return None, None
@@ -160,12 +159,6 @@ def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tu
     if remote_conn_id is None:
         return None, None
 
-    if not settings.AIRFLOW_IO_AVAILABLE:
-        raise CosmosValueError(
-            f"You're trying to specify remote target path {target_path_str}, but the required "
-            f"Object Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
-            "Airflow 2.8 or later."
-        )
     _configured_target_path = ObjectStoragePath(target_path_str, conn_id=remote_conn_id)
 
     if not _configured_target_path.exists():  # type: ignore[no-untyped-call]

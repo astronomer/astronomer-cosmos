@@ -13,7 +13,11 @@ from typing import Any
 from warnings import warn
 
 from airflow.models.dag import DAG
-from airflow.models.param import Param
+
+try:
+    from airflow.sdk import Param
+except ImportError:  # pragma: no cover
+    from airflow.models.param import Param
 
 try:
     # Airflow 3.1 onwards

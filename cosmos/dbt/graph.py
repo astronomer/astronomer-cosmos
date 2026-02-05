@@ -569,8 +569,8 @@ class DbtGraph:
                 encoded_data = base64.b64decode(dbt_ls_compressed.encode())
                 cache_dict["dbt_ls"] = zlib.decompress(encoded_data).decode()
             else:
-                # This indicates that the cache was previously used for dbt ls output
-                # Returning an empty dict will result in a cache miss.
+                # Missing 'dbt_ls_compressed' key indicates wrong cache type or corrupted cache
+                # Return empty dict to trigger cache miss and force fresh dbt ls run
                 cache_dict = {}
 
         return cache_dict
@@ -1001,8 +1001,8 @@ class DbtGraph:
 
                 cache_dict["yaml_selectors"] = YamlSelectors(raw_selectors, parsed_selectors)
             else:
-                # This indicates that the cache was previously used for dbt ls output
-                # Returning an empty dict will result in a cache miss.
+                # Missing selector keys indicates wrong cache type or corrupted cache
+                # Return empty dict to trigger cache miss and force fresh selector parsing
                 cache_dict = {}
         return cache_dict
 

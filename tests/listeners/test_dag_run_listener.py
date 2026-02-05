@@ -143,7 +143,9 @@ def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
             session.commit()
 
         # This creates both DagModel and DagVersion records
-        dagbag = DagBag(include_examples=False)
+        # NOTE: dag_folder=None is required to create an empty DagBag instead of
+        # loading all DAGs from the default DAGS_FOLDER (which would be slow)
+        dagbag = DagBag(dag_folder=None, include_examples=False)
         dagbag.bag_dag(dag)
         sync_bag_to_db(dagbag, bundle_name="test_bundle_listener", bundle_version="1")
 

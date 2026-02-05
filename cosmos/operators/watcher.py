@@ -12,12 +12,12 @@ from airflow.exceptions import AirflowException
 
 from cosmos.config import ProfileConfig
 from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
+from cosmos.settings import watcher_dbt_execution_queue
 
 try:
     from airflow.providers.standard.operators.empty import EmptyOperator
 except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
-
 
 from cosmos.constants import (
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
@@ -51,6 +51,10 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
+try:
+    from airflow.sdk.definitions._internal.abstractoperator import DEFAULT_QUEUE
+except ImportError:  # pragma: no cover
+    from airflow.models.abstractoperator import DEFAULT_QUEUE  # type: ignore[no-redef]
 
 logger = get_logger(__name__)
 
@@ -96,6 +100,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         default_args["retries"] = 0
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
+        kwargs["queue"] = watcher_dbt_execution_queue if watcher_dbt_execution_queue is not None else DEFAULT_QUEUE
         super().__init__(task_id=task_id, *args, **kwargs)
 
         if self.invocation_mode == InvocationMode.SUBPROCESS:

@@ -1135,7 +1135,7 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
         project_config=project_config,
         profile_config=profile_config,
         start_date=datetime(2023, 1, 1),
-        dag_id="watcher_dag",
+        dag_id="watcher_dag_with_subprocess",
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER,
             invocation_mode=InvocationMode.SUBPROCESS,
@@ -1213,7 +1213,7 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
         project_config=project_config,
         profile_config=profile_config,
         start_date=datetime(2023, 1, 1),
-        dag_id="watcher_dag",
+        dag_id="watcher_dag_empty_model",
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER,
             invocation_mode=InvocationMode.DBT_RUNNER,

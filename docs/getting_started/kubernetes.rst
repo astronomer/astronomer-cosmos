@@ -155,7 +155,7 @@ Known Limitations
 
 The Kubernetes execution mode has the following limitations:
 
-- Does not emit OpenLineage events (there is an `open ticket <https://github.com/astronomer/astronomer-cosmos/issues/2313>`_ to address this)
+- Does not emit OpenLineage events (there is an `open ticket <https://github.com/astronomer/astronomer-cosmos/issues/496>`_ to address this)
 - Does not emit Airflow datasets, assets, and dataset aliases
 - Does not handle installing dbt deps for users (there is an `open ticket <https://github.com/astronomer/astronomer-cosmos/issues/679>`_ to address this)
 - Does not support `ProfileMapping <https://astronomer.github.io/astronomer-cosmos/profiles/index.html#using-a-profile-mapping>`_ (there is an `open ticket <https://github.com/astronomer/astronomer-cosmos/issues/749>`_ to address this)

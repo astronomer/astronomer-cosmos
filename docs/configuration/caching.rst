@@ -172,7 +172,7 @@ As an example, the following clean-up DAG will delete any cache associated with 
 
 **Cache key**
 
-The Airflow variables that represent the dbt ls cache are prefixed by ``cosmos_cache``.
+The Airflow variables that represent the yaml selectors cache are prefixed by ``cosmos_cache``.
 When using ``DbtDag``, the keys use the DAG name. When using ``DbtTaskGroup``, they contain the ``TaskGroup`` and parent task groups and DAG.
 
 Examples:

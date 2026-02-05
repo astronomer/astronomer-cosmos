@@ -60,7 +60,7 @@ enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_ta
 # in watcher mode, if the producer watcher fails, the consumer tasks run the individual models on retry.
 # since these tasks are sensors that require low memory/cpu on their first try,
 # this setting allows retries to run on a queue with larger resources, which is often necessary for larger dbt projects
-# this would be also use to run the producer task
+# this would also be used to run the producer task
 watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
 
 # The following environment variable is populated in Astro Cloud

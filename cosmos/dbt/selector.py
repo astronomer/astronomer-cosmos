@@ -782,11 +782,8 @@ class YamlSelectors:
             errors = parsed_selector.get("errors", [])
 
             if errors:
-                if len(errors) == 1:
-                    error_message = f"Error parsing selector '{selector_name}': {errors[0]}"
-                else:
-                    error_list = "\n  - ".join(errors)
-                    error_message = f"Errors parsing selector '{selector_name}':\n  - {error_list}"
+                error_list = "\n  - ".join(errors)
+                error_message = f"Error(s) parsing selector '{selector_name}':\n  - {error_list}"
                 raise CosmosValueError(error_message)
 
         return parsed_selector

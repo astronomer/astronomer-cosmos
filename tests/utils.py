@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 import warnings
 from datetime import datetime
 from typing import Any
@@ -49,6 +50,8 @@ def new_test_dag(dag: DAG) -> DagRun:
         from airflow.models.dagbundle import DagBundleModel
         from airflow.utils.session import create_session
 
+        t0 = time.perf_counter()
+
         # Create DagBundle if it doesn't exist (required for DagModel foreign key)
         # This mimics what get_bagged_dag does via manager.sync_bundles_to_db()
         with create_session() as session:
@@ -56,17 +59,39 @@ def new_test_dag(dag: DAG) -> DagRun:
             session.merge(dag_bundle)
             session.commit()
 
+        t1 = time.perf_counter()
+        log.info("[TIMING] DagBundle creation: %.3fs", t1 - t0)
+
         # This creates both DagModel and DagVersion records
         # NOTE: dag_folder=None is required to create an empty DagBag instead of
         # loading all DAGs from the default DAGS_FOLDER (which would be slow)
         dagbag = DagBag(dag_folder=None, include_examples=False)
         dagbag.bag_dag(dag)
+
+        t2 = time.perf_counter()
+        log.info("[TIMING] DagBag creation + bag_dag: %.3fs", t2 - t1)
+
         sync_bag_to_db(dagbag, bundle_name="test_bundle", bundle_version="1")
+
+        t3 = time.perf_counter()
+        log.info("[TIMING] sync_bag_to_db: %.3fs", t3 - t2)
+
         dr = dag.test(logical_date=timezone.utcnow())
+
+        t4 = time.perf_counter()
+        log.info("[TIMING] dag.test() execution: %.3fs", t4 - t3)
+        log.info("[TIMING] Total new_test_dag for %s: %.3fs", dag.dag_id, t4 - t0)
+
     elif AIRFLOW_VERSION >= version.Version("3.0"):
+        t0 = time.perf_counter()
         dr = dag.test(logical_date=timezone.utcnow())
+        t1 = time.perf_counter()
+        log.info("[TIMING] dag.test() execution for %s: %.3fs", dag.dag_id, t1 - t0)
     else:
+        t0 = time.perf_counter()
         dr = dag.test()
+        t1 = time.perf_counter()
+        log.info("[TIMING] dag.test() execution for %s: %.3fs", dag.dag_id, t1 - t0)
     return dr
 
 

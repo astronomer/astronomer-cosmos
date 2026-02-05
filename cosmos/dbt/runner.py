@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import sys
 from collections.abc import Callable
 from functools import lru_cache
@@ -61,6 +62,28 @@ def get_runner(callbacks: list[Callable] | None = None) -> dbtRunner:  # type: i
     return _get_cached_dbt_runner()
 
 
+def _cleanup_dbt_adapters() -> None:
+    """
+    Reset dbt adapters to release semaphores.
+
+    dbt adapters maintain internal state that holds onto
+    semaphores. Resetting the adapters after each dbt command combined with
+    garbage collection prevents "leaked semaphore objects" warnings.
+
+    See: https://github.com/astronomer/astronomer-cosmos/issues/2334
+    """
+    try:
+        from dbt.adapters.factory import reset_adapters
+
+        reset_adapters()
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.debug("Error resetting dbt adapters: %s", e)
+
+    gc.collect()
+
+
 def run_command(
     command: list[str], env: dict[str, str], cwd: str, callbacks: list[Callable] | None = None, **kwargs: Any  # type: ignore[type-arg]
 ) -> dbtRunnerResult:
@@ -75,6 +98,11 @@ def run_command(
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
         runner = get_runner(callbacks=callbacks)
         result = runner.invoke(cli_args)
+
+    # Reset dbt adapters to release semaphores
+    # See: https://github.com/astronomer/astronomer-cosmos/issues/2334
+    _cleanup_dbt_adapters()
+
     return result
 
 

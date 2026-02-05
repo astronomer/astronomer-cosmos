@@ -38,15 +38,6 @@ if python3 -c "import sys; print(sys.version_info >= (3, 10))" | grep -q 'True';
   pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
 fi
 
-# To overcome CI issues when running Py 3.10 and AF 2.6 with dbt-core 1.9
-# Such as:
-# ERROR tests/operators/_asynchronous/test_base.py - pydantic.errors.PydanticUserError: A non-annotated attribute was detected: `dag_id = <class 'str'>`. All model fields require a type annotation; if `dag_id` is not meant to be a field, you may be able to resolve this error by annotating it as a `ClassVar` or updating `model_config['ignored_types']`.
-if [ "$AIRFLOW_VERSION" = "2.6.0" ] ; then
-  pip install "pydantic<2"
-  pip freeze
-  pip freeze | grep -i pydantic
-fi
-
 pip install -U openlineage-airflow apache-airflow==$AIRFLOW_VERSION
 
 if [ "$AIRFLOW_VERSION" = "3.1.0" ] ; then

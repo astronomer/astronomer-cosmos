@@ -6,8 +6,6 @@ from pathlib import Path
 
 import airflow
 from airflow.configuration import conf
-from airflow.version import version as airflow_version
-from packaging.version import Version
 
 from cosmos.constants import (
     DEFAULT_COSMOS_CACHE_DIR_NAME,
@@ -63,8 +61,6 @@ enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_ta
 # since these tasks are sensors that require low memory/cpu on their first try,
 # this setting allows retries to run on a queue with larger resources, which is often necessary for larger dbt projects
 watcher_retry_queue = conf.get("cosmos", "watcher_retry_queue", fallback=None)
-
-AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")
 
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"

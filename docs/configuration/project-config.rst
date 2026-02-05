@@ -9,8 +9,7 @@ variables that should be used for rendering and execution. It takes the followin
 - ``seeds_relative_path``: The path to your seeds directory, relative to the ``dbt_project_path``. This defaults to ``seeds``
 - ``snapshots_relative_path``: The path to your snapshots directory, relative to the ``dbt_project_path``. This defaults to ``snapshots``
 - ``manifest_path``: The absolute path to your manifests directory. This is only required if you're using Cosmos' manifest
-  parsing mode. Along with supporting local paths for manifest parsing, starting with Cosmos 1.6.0, if you've
-  Airflow >= 2.8.0, Cosmos also supports remote paths for manifest parsing(e.g. S3 URL). See :ref:`parsing-methods` for more details.
+  parsing mode. Cosmos supports both local and remote paths for manifest parsing (e.g. S3 URL). See :ref:`parsing-methods` for more details.
 - ``project_name`` : The name of the project. If ``dbt_project_path`` is provided, the ``project_name`` defaults to the
   folder name containing ``dbt_project.yml``. If ``dbt_project_path`` is not provided, and ``manifest_path`` is provided,
   ``project_name`` is required as the name can not be inferred from ``dbt_project_path``

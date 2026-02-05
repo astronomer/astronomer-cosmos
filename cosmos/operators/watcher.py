@@ -100,7 +100,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         default_args["retries"] = 0
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
-        kwargs["queue"] = watcher_dbt_execution_queue if watcher_dbt_execution_queue is not None else DEFAULT_QUEUE
+        kwargs["queue"] = watcher_dbt_execution_queue or DEFAULT_QUEUE
         super().__init__(task_id=task_id, *args, **kwargs)
 
         if self.invocation_mode == InvocationMode.SUBPROCESS:

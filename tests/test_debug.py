@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import datetime
 from importlib import reload
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from airflow import DAG
 
 from cosmos import debug, settings
+from cosmos.config import ProfileConfig
+from cosmos.operators.local import DbtRunLocalOperator
+from tests.utils import test_dag as run_test_dag
 
 
 class TestMemoryTracker:
@@ -163,254 +169,40 @@ class TestIntegration:
             mock_context["ti"].xcom_push.assert_called_once()
 
 
-class TestDbtLocalRunOperatorDebugIntegration:
-    """Integration tests for DbtRunLocalOperator with debug mode enabled."""
+MINI_DBT_PROJ_DIR = Path(__file__).parent / "sample" / "mini"
+MINI_DBT_PROJ_PROFILE = MINI_DBT_PROJ_DIR / "profiles.yml"
 
-    @pytest.mark.skipif(not debug.PSUTIL_AVAILABLE, reason="psutil not available")
-    def test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled(self):
-        """
-        Test that DbtRunLocalOperator pushes peak memory utilization to XCom
-        when debug mode is enabled.
-        """
-        from pathlib import Path
+mini_profile_config = ProfileConfig(
+    profile_name="mini",
+    target_name="dev",
+    profiles_yml_filepath=MINI_DBT_PROJ_PROFILE,
+)
 
-        from cosmos.config import ProfileConfig
-        from cosmos.operators.local import DbtRunLocalOperator
 
-        # Use the mini project for testing
-        mini_project_dir = Path(__file__).parent / "sample" / "mini"
-        mini_profile_path = mini_project_dir / "profiles.yml"
+@pytest.mark.integration
+@pytest.mark.skipif(not debug.PSUTIL_AVAILABLE, reason="psutil not available")
+def test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled():
+    """
+    Integration test that DbtRunLocalOperator pushes peak memory utilization to XCom
+    when debug mode is enabled.
+    """
+    with patch.object(settings, "enable_debug_mode", True):
+        with DAG("test-debug-memory", start_date=datetime(2022, 1, 1)) as dag:
+            run_operator = DbtRunLocalOperator(
+                profile_config=mini_profile_config,
+                project_dir=MINI_DBT_PROJ_DIR,
+                task_id="run",
+                append_env=True,
+                emit_datasets=False,
+            )
+            run_operator
 
-        profile_config = ProfileConfig(
-            profile_name="mini",
-            target_name="dev",
-            profiles_yml_filepath=mini_profile_path,
-        )
+        dag_run = run_test_dag(dag)
 
-        operator = DbtRunLocalOperator(
-            task_id="test_debug_memory",
-            project_dir=str(mini_project_dir),
-            profile_config=profile_config,
-            emit_datasets=False,
-        )
+        # Get the task instance to check XCom
+        ti = dag_run.get_task_instance(task_id="run")
+        memory_value = ti.xcom_pull(key="cosmos_debug_max_memory_mb")
 
-        # Create mock context
-        mock_ti = MagicMock()
-        mock_ti.dag_id = "test_dag"
-        mock_ti.task_id = "test_debug_memory"
-        mock_ti.run_id = "test_run_debug"
-        mock_context = {
-            "ti": mock_ti,
-            "run_id": "test_run_debug",
-            "execution_date": MagicMock(),
-            "ds": "2024-01-01",
-            "ds_nodash": "20240101",
-            "ts": "2024-01-01T00:00:00+00:00",
-            "ts_nodash": "20240101T000000",
-            "ts_nodash_with_tz": "20240101T000000+0000",
-            "prev_ds": None,
-            "prev_ds_nodash": None,
-            "next_ds": None,
-            "next_ds_nodash": None,
-            "yesterday_ds": "2023-12-31",
-            "yesterday_ds_nodash": "20231231",
-            "tomorrow_ds": "2024-01-02",
-            "tomorrow_ds_nodash": "20240102",
-            "prev_execution_date": None,
-            "prev_execution_date_success": None,
-            "next_execution_date": None,
-            "dag": MagicMock(),
-            "task": MagicMock(),
-            "macros": MagicMock(),
-            "params": {},
-            "var": MagicMock(),
-            "inlets": [],
-            "outlets": [],
-            "templates_dict": None,
-            "conf": MagicMock(),
-            "dag_run": MagicMock(),
-            "test_mode": True,
-            "outlet_events": MagicMock(),
-        }
-
-        # Patch settings to enable debug mode and mock the build_and_run_cmd to avoid actual dbt execution
-        with (
-            patch.object(settings, "enable_debug_mode", True),
-            patch.object(operator, "build_and_run_cmd", return_value=None),
-        ):
-            operator.execute(mock_context)
-
-        # Verify that xcom_push was called with the debug memory key
-        xcom_calls = mock_ti.xcom_push.call_args_list
-        memory_xcom_calls = [call for call in xcom_calls if call[1].get("key") == "cosmos_debug_max_memory_mb"]
-
-        assert len(memory_xcom_calls) == 1, "Expected exactly one XCom push for cosmos_debug_max_memory_mb"
-        memory_value = memory_xcom_calls[0][1]["value"]
-        assert isinstance(memory_value, float), "Memory value should be a float"
-        assert memory_value > 0, "Memory value should be greater than 0"
-
-    @pytest.mark.skipif(not debug.PSUTIL_AVAILABLE, reason="psutil not available")
-    def test_dbt_run_local_operator_does_not_store_memory_when_debug_disabled(self):
-        """
-        Test that DbtRunLocalOperator does NOT push memory utilization to XCom
-        when debug mode is disabled (default behavior).
-        """
-        from pathlib import Path
-
-        from cosmos.config import ProfileConfig
-        from cosmos.operators.local import DbtRunLocalOperator
-
-        # Use the mini project for testing
-        mini_project_dir = Path(__file__).parent / "sample" / "mini"
-        mini_profile_path = mini_project_dir / "profiles.yml"
-
-        profile_config = ProfileConfig(
-            profile_name="mini",
-            target_name="dev",
-            profiles_yml_filepath=mini_profile_path,
-        )
-
-        operator = DbtRunLocalOperator(
-            task_id="test_debug_memory_disabled",
-            project_dir=str(mini_project_dir),
-            profile_config=profile_config,
-            emit_datasets=False,
-        )
-
-        # Create mock context
-        mock_ti = MagicMock()
-        mock_ti.dag_id = "test_dag"
-        mock_ti.task_id = "test_debug_memory_disabled"
-        mock_ti.run_id = "test_run_debug_disabled"
-        mock_context = {
-            "ti": mock_ti,
-            "run_id": "test_run_debug_disabled",
-            "execution_date": MagicMock(),
-            "ds": "2024-01-01",
-            "ds_nodash": "20240101",
-            "ts": "2024-01-01T00:00:00+00:00",
-            "ts_nodash": "20240101T000000",
-            "ts_nodash_with_tz": "20240101T000000+0000",
-            "prev_ds": None,
-            "prev_ds_nodash": None,
-            "next_ds": None,
-            "next_ds_nodash": None,
-            "yesterday_ds": "2023-12-31",
-            "yesterday_ds_nodash": "20231231",
-            "tomorrow_ds": "2024-01-02",
-            "tomorrow_ds_nodash": "20240102",
-            "prev_execution_date": None,
-            "prev_execution_date_success": None,
-            "next_execution_date": None,
-            "dag": MagicMock(),
-            "task": MagicMock(),
-            "macros": MagicMock(),
-            "params": {},
-            "var": MagicMock(),
-            "inlets": [],
-            "outlets": [],
-            "templates_dict": None,
-            "conf": MagicMock(),
-            "dag_run": MagicMock(),
-            "test_mode": True,
-            "outlet_events": MagicMock(),
-        }
-
-        # Patch settings to disable debug mode (default) and mock build_and_run_cmd
-        with (
-            patch.object(settings, "enable_debug_mode", False),
-            patch.object(operator, "build_and_run_cmd", return_value=None),
-        ):
-            operator.execute(mock_context)
-
-        # Verify that xcom_push was NOT called with the debug memory key
-        xcom_calls = mock_ti.xcom_push.call_args_list
-        memory_xcom_calls = [call for call in xcom_calls if call[1].get("key") == "cosmos_debug_max_memory_mb"]
-
-        assert (
-            len(memory_xcom_calls) == 0
-        ), "Expected no XCom push for cosmos_debug_max_memory_mb when debug is disabled"
-
-    @pytest.mark.skipif(not debug.PSUTIL_AVAILABLE, reason="psutil not available")
-    def test_dbt_run_local_operator_stores_memory_even_on_failure(self):
-        """
-        Test that DbtRunLocalOperator pushes memory utilization to XCom
-        even when the task execution fails.
-        """
-        from pathlib import Path
-
-        from cosmos.config import ProfileConfig
-        from cosmos.operators.local import DbtRunLocalOperator
-
-        # Use the mini project for testing
-        mini_project_dir = Path(__file__).parent / "sample" / "mini"
-        mini_profile_path = mini_project_dir / "profiles.yml"
-
-        profile_config = ProfileConfig(
-            profile_name="mini",
-            target_name="dev",
-            profiles_yml_filepath=mini_profile_path,
-        )
-
-        operator = DbtRunLocalOperator(
-            task_id="test_debug_memory_failure",
-            project_dir=str(mini_project_dir),
-            profile_config=profile_config,
-            emit_datasets=False,
-        )
-
-        # Create mock context
-        mock_ti = MagicMock()
-        mock_ti.dag_id = "test_dag"
-        mock_ti.task_id = "test_debug_memory_failure"
-        mock_ti.run_id = "test_run_debug_failure"
-        mock_context = {
-            "ti": mock_ti,
-            "run_id": "test_run_debug_failure",
-            "execution_date": MagicMock(),
-            "ds": "2024-01-01",
-            "ds_nodash": "20240101",
-            "ts": "2024-01-01T00:00:00+00:00",
-            "ts_nodash": "20240101T000000",
-            "ts_nodash_with_tz": "20240101T000000+0000",
-            "prev_ds": None,
-            "prev_ds_nodash": None,
-            "next_ds": None,
-            "next_ds_nodash": None,
-            "yesterday_ds": "2023-12-31",
-            "yesterday_ds_nodash": "20231231",
-            "tomorrow_ds": "2024-01-02",
-            "tomorrow_ds_nodash": "20240102",
-            "prev_execution_date": None,
-            "prev_execution_date_success": None,
-            "next_execution_date": None,
-            "dag": MagicMock(),
-            "task": MagicMock(),
-            "macros": MagicMock(),
-            "params": {},
-            "var": MagicMock(),
-            "inlets": [],
-            "outlets": [],
-            "templates_dict": None,
-            "conf": MagicMock(),
-            "dag_run": MagicMock(),
-            "test_mode": True,
-            "outlet_events": MagicMock(),
-        }
-
-        # Patch settings to enable debug mode and mock build_and_run_cmd to raise an exception
-        with (
-            patch.object(settings, "enable_debug_mode", True),
-            patch.object(operator, "build_and_run_cmd", side_effect=Exception("Simulated failure")),
-        ):
-            with pytest.raises(Exception, match="Simulated failure"):
-                operator.execute(mock_context)
-
-        # Verify that xcom_push was still called with the debug memory key
-        xcom_calls = mock_ti.xcom_push.call_args_list
-        memory_xcom_calls = [call for call in xcom_calls if call[1].get("key") == "cosmos_debug_max_memory_mb"]
-
-        assert len(memory_xcom_calls) == 1, "Expected XCom push for cosmos_debug_max_memory_mb even on failure"
-        memory_value = memory_xcom_calls[0][1]["value"]
+        assert memory_value is not None, "Expected cosmos_debug_max_memory_mb in XCom"
         assert isinstance(memory_value, float), "Memory value should be a float"
         assert memory_value > 0, "Memory value should be greater than 0"

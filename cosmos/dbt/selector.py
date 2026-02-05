@@ -24,6 +24,7 @@ CONFIG_META_PATH = "meta"
 SUPPORTED_CONFIG = ["materialized", "schema", "tags", CONFIG_META_PATH]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
+FQN_SELECTOR = "fqn:"
 CONFIG_SELECTOR = "config."
 SOURCE_SELECTOR = "source:"
 EXPOSURE_SELECTOR = "exposure:"
@@ -220,6 +221,12 @@ class GraphSelector:
             path_selection = self.node_name[len(PATH_SELECTOR) :].rstrip("*")
             root_nodes.update({node_id for node_id, node in nodes.items() if path_selection in str(node.file_path)})
 
+        elif FQN_SELECTOR in self.node_name:
+            fqn_selection = self.node_name[len(FQN_SELECTOR) :]
+            root_nodes.update(
+                {node_id for node_id, node in nodes.items() if node.fqn and fqn_selection in ".".join(node.fqn)}
+            )
+
         elif TAG_SELECTOR in self.node_name:
             tag_selection = self.node_name[len(TAG_SELECTOR) :]
             root_nodes.update({node_id for node_id, node in nodes.items() if tag_selection in node.tags})
@@ -347,6 +354,7 @@ class SelectorConfig:
         self.project_dir = project_dir
         self.paths: list[Path] = []
         self.tags: list[str] = []
+        self.fqn: list[str] = []
         self.config: dict[str, str] = {}
         self.other: list[str] = []
         self.graph_selectors: list[GraphSelector] = []
@@ -361,6 +369,7 @@ class SelectorConfig:
         return not (
             self.paths
             or self.tags
+            or self.fqn
             or self.config
             or self.graph_selectors
             or self.other
@@ -401,6 +410,8 @@ class SelectorConfig:
             self._parse_path_selector(f"{PATH_SELECTOR}{node_name}")
         elif node_name.startswith(TAG_SELECTOR):
             self._parse_tag_selector(item)
+        elif node_name.startswith(FQN_SELECTOR):
+            self._parse_fqn_selector(item)
         elif node_name.startswith(CONFIG_SELECTOR):
             self._parse_config_selector(item)
         elif node_name.startswith(SOURCE_SELECTOR):
@@ -441,6 +452,9 @@ class SelectorConfig:
         else:
             self.paths.append(Path(item[index:]))
 
+    def _parse_fqn_selector(self, item: str) -> None:
+        self.fqn.append(item)
+
     def _parse_resource_type_selector(self, item: str) -> None:
         index = len(RESOURCE_TYPE_SELECTOR)
         resource_type_value = item[index:].strip()
@@ -466,6 +480,7 @@ class SelectorConfig:
             "SelectorConfig("
             + f"paths={self.paths}, "
             + f"tags={self.tags}, "
+            + f"fqn={self.fqn}, "
             + f"config={self.config}, "
             + f"sources={self.sources}, "
             + f"resource={self.resource_types}, "
@@ -547,7 +562,7 @@ class NodeSelector:
             return False
         return True
 
-    def _should_include_node(self, node_id: str, node: DbtNode) -> bool:
+    def _should_include_node(self, node_id: str, node: DbtNode) -> bool:  # noqa: C901
         """
         Checks if a single node should be included. Only runs once per node with caching."""
         logger.debug("Inspecting if the node <%s> should be included.", node_id)
@@ -583,6 +598,9 @@ class NodeSelector:
             return False
 
         if self.config.paths and not self._is_path_matching(node):
+            return False
+
+        if self.config.fqn and not self._is_fqn_matching(node):
             return False
 
         if self.config.resource_types and not self._is_resource_type_matching(node):
@@ -651,6 +669,20 @@ class NodeSelector:
                 model_node = self.nodes.get(node.depends_on[0])
                 if model_node:
                     return self._should_include_node(node.depends_on[0], model_node)
+        return False
+
+    def _is_fqn_matching(self, node: DbtNode) -> bool:
+        """Checks if the node's FQN matches any of the config's FQN selectors."""
+        if not node.fqn:
+            return False
+        node_fqn_str = ".".join(node.fqn)
+        for fqn_selector in self.config.fqn:
+            # Remove 'fqn:' prefix if present
+            selector_value = (
+                fqn_selector[len(FQN_SELECTOR) :] if fqn_selector.startswith(FQN_SELECTOR) else fqn_selector
+            )
+            if selector_value in node_fqn_str:
+                return True
         return False
 
     def select_by_graph_operator(self) -> set[str]:
@@ -1303,6 +1335,7 @@ def validate_filters(exclude: list[str], select: list[str]) -> None:
             if (
                 filter_parameter.startswith(PATH_SELECTOR)
                 or filter_parameter.startswith(TAG_SELECTOR)
+                or filter_parameter.startswith(FQN_SELECTOR)
                 or filter_parameter.startswith(RESOURCE_TYPE_SELECTOR)
                 or filter_parameter.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR)
                 or filter_parameter.startswith(SOURCE_SELECTOR)

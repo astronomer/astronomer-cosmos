@@ -30,6 +30,9 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+# XCom key for storing maximum memory usage in debug mode
+XCOM_DEBUG_MAX_MEMORY_MB_KEY = "cosmos_debug_max_memory_mb"
+
 # Global dictionary to store memory trackers per task
 _memory_trackers: dict[str, MemoryTracker] = {}
 
@@ -134,4 +137,4 @@ def stop_memory_tracking(context: Context) -> None:
         max_mb = tracker.max_rss_bytes / 1024 / 1024
         logger.info("Max memory usage (RSS, incl. children): %.2f MB", max_mb)
         # Persist to XCom for observability
-        ti.xcom_push(key="cosmos_debug_max_memory_mb", value=round(max_mb, 2))
+        ti.xcom_push(key=XCOM_DEBUG_MAX_MEMORY_MB_KEY, value=round(max_mb, 2))

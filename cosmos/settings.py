@@ -60,7 +60,8 @@ enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_ta
 # in watcher mode, if the producer watcher fails, the consumer tasks run the individual models on retry.
 # since these tasks are sensors that require low memory/cpu on their first try,
 # this setting allows retries to run on a queue with larger resources, which is often necessary for larger dbt projects
-watcher_retry_queue = conf.get("cosmos", "watcher_retry_queue", fallback=None)
+# this would also be used to run the producer task
+watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
 
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
@@ -85,3 +86,7 @@ def convert_to_boolean(value: str | None) -> bool:
 enable_telemetry = conf.getboolean("cosmos", "enable_telemetry", fallback=True)
 do_not_track = convert_to_boolean(os.getenv("DO_NOT_TRACK"))
 no_analytics = convert_to_boolean(os.getenv("SCARF_NO_ANALYTICS"))
+
+# Debug mode - when enabled, Cosmos will track and push memory utilization to XCom
+enable_debug_mode = conf.getboolean("cosmos", "enable_debug_mode", fallback=False)
+debug_memory_poll_interval_seconds = conf.getfloat("cosmos", "debug_memory_poll_interval_seconds", fallback=0.5)

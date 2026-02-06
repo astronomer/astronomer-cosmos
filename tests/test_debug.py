@@ -1,0 +1,239 @@
+"""Tests for the cosmos.debug module."""
+
+from __future__ import annotations
+
+import os
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+from airflow import DAG
+
+from cosmos import debug, settings
+from cosmos.config import ProfileConfig
+from cosmos.operators.local import DbtRunLocalOperator
+from tests.utils import test_dag as run_test_dag
+
+
+class TestPsutilImport:
+    """Tests for psutil import handling."""
+
+    def test_import_raises_runtime_error_when_psutil_unavailable(self):
+        """Test that importing cosmos.debug raises RuntimeError when psutil is not available."""
+        # Remove cosmos.debug from sys.modules to allow re-import
+        modules_to_remove = [key for key in sys.modules if key.startswith("cosmos.debug")]
+        original_modules = {key: sys.modules.pop(key) for key in modules_to_remove}
+
+        # Mock psutil to simulate it not being installed
+        with patch.dict(sys.modules, {"psutil": None}):
+            with pytest.raises(RuntimeError) as exc_info:
+                from importlib import import_module
+
+                import_module("cosmos.debug")
+
+            assert "psutil is not available" in str(exc_info.value)
+
+        # Restore original modules
+        sys.modules.update(original_modules)
+
+
+class TestMemoryTracker:
+    """Tests for the MemoryTracker class."""
+
+    def test_memory_tracker_initialization(self):
+        """Test MemoryTracker initializes with correct values."""
+        tracker = debug.MemoryTracker(pid=os.getpid(), poll_interval=0.1)
+        assert tracker.pid == os.getpid()
+        assert tracker.poll_interval == 0.1
+        assert tracker.max_rss_bytes == 0
+
+    def test_memory_tracker_tracks_memory(self):
+        """Test MemoryTracker actually tracks memory usage."""
+        tracker = debug.MemoryTracker(pid=os.getpid(), poll_interval=0.05)
+        tracker.start()
+        # Give it time to sample
+        time.sleep(0.2)
+        tracker.stop()
+        # Memory should be tracked (current process uses some memory)
+        assert tracker.max_rss_bytes > 0
+
+    def test_memory_tracker_stop_without_start(self):
+        """Test MemoryTracker.stop() doesn't raise if not started."""
+        tracker = debug.MemoryTracker(pid=os.getpid())
+        # Should not raise
+        tracker.stop()
+
+    def test_memory_tracker_with_nonexistent_pid(self):
+        """Test MemoryTracker handles non-existent PID gracefully."""
+        # Use a very high PID that's unlikely to exist
+        tracker = debug.MemoryTracker(pid=999999999, poll_interval=0.05)
+        tracker.start()
+        time.sleep(0.1)
+        tracker.stop()
+        # Should have 0 bytes since process doesn't exist
+        assert tracker.max_rss_bytes == 0
+
+    def test_memory_tracker_handles_child_process_termination(self):
+        """Test MemoryTracker continues when a child process terminates during memory_info() call."""
+        import psutil
+
+        tracker = debug.MemoryTracker(pid=os.getpid(), poll_interval=0.05)
+
+        # Mock a child process that raises NoSuchProcess when memory_info() is called
+        mock_child = MagicMock()
+        mock_child.memory_info.side_effect = psutil.NoSuchProcess(pid=12345)
+
+        mock_parent = MagicMock()
+        mock_parent.memory_info.return_value = MagicMock(rss=1024 * 1024)  # 1 MB
+        mock_parent.children.return_value = [mock_child]
+
+        with patch("psutil.Process", return_value=mock_parent):
+            tracker.start()
+            time.sleep(0.15)
+            tracker.stop()
+
+        # Should have tracked memory from parent only (child raised NoSuchProcess)
+        assert tracker.max_rss_bytes >= 1024 * 1024
+
+    def test_memory_tracker_handles_parent_children_call_failure(self):
+        """Test MemoryTracker breaks loop when parent.children() raises NoSuchProcess."""
+        import psutil
+
+        tracker = debug.MemoryTracker(pid=os.getpid(), poll_interval=0.05)
+
+        mock_parent = MagicMock()
+        # First call succeeds, second call raises NoSuchProcess
+        mock_parent.memory_info.return_value = MagicMock(rss=1024 * 1024)
+        mock_parent.children.side_effect = [[], psutil.NoSuchProcess(pid=os.getpid())]
+
+        with patch("psutil.Process", return_value=mock_parent):
+            tracker.start()
+            time.sleep(0.15)
+            tracker.stop()
+
+        # Should have tracked some memory before the exception
+        assert tracker.max_rss_bytes >= 1024 * 1024
+
+
+class TestStartMemoryTracking:
+    """Tests for the start_memory_tracking function."""
+
+    @pytest.fixture
+    def mock_context(self):
+        """Create a mock Airflow context."""
+        mock_ti = MagicMock()
+        mock_ti.dag_id = "test_dag"
+        mock_ti.task_id = "test_task"
+        mock_ti.run_id = "test_run_123"
+        return {"ti": mock_ti}
+
+    def test_start_memory_tracking_creates_tracker(self, mock_context):
+        """Test start_memory_tracking creates tracker."""
+        debug.start_memory_tracking(mock_context)
+        task_key = f"{mock_context['ti'].dag_id}.{mock_context['ti'].task_id}.{mock_context['ti'].run_id}"
+        assert task_key in debug._memory_trackers
+        # Cleanup
+        tracker = debug._memory_trackers.pop(task_key)
+        tracker.stop()
+
+
+class TestStopMemoryTracking:
+    """Tests for the stop_memory_tracking function."""
+
+    @pytest.fixture
+    def mock_context(self):
+        """Create a mock Airflow context."""
+        mock_ti = MagicMock()
+        mock_ti.dag_id = "test_dag"
+        mock_ti.task_id = "test_task"
+        mock_ti.run_id = "test_run_123"
+        return {"ti": mock_ti}
+
+    def test_stop_memory_tracking_pushes_xcom(self, mock_context):
+        """Test stop_memory_tracking pushes memory data to XCom."""
+        # Start tracking first
+        debug.start_memory_tracking(mock_context)
+        time.sleep(0.1)  # Let it sample
+        # Stop and check XCom push
+        debug.stop_memory_tracking(mock_context)
+        mock_context["ti"].xcom_push.assert_called_once()
+        call_args = mock_context["ti"].xcom_push.call_args
+        assert call_args[1]["key"] == "cosmos_debug_max_memory_mb"
+        assert isinstance(call_args[1]["value"], float)
+        assert call_args[1]["value"] > 0
+
+    def test_stop_memory_tracking_no_tracker(self, mock_context):
+        """Test stop_memory_tracking handles missing tracker gracefully."""
+        # Don't start tracking, just stop
+        debug.stop_memory_tracking(mock_context)
+        # Should not raise and xcom_push should not be called
+        mock_context["ti"].xcom_push.assert_not_called()
+
+
+class TestIntegration:
+    """Integration tests for the full debug flow."""
+
+    @pytest.fixture
+    def mock_context(self):
+        """Create a mock Airflow context."""
+        mock_ti = MagicMock()
+        mock_ti.dag_id = "test_dag"
+        mock_ti.task_id = "test_task"
+        mock_ti.run_id = "test_run_integration"
+        return {"ti": mock_ti}
+
+    def test_full_tracking_lifecycle(self, mock_context):
+        """Test complete memory tracking lifecycle."""
+        # Start
+        debug.start_memory_tracking(mock_context)
+        task_key = f"{mock_context['ti'].dag_id}.{mock_context['ti'].task_id}.{mock_context['ti'].run_id}"
+        assert task_key in debug._memory_trackers
+
+        # Simulate some work
+        time.sleep(0.2)
+
+        # Stop
+        debug.stop_memory_tracking(mock_context)
+        assert task_key not in debug._memory_trackers
+        mock_context["ti"].xcom_push.assert_called_once()
+
+
+MINI_DBT_PROJ_DIR = Path(__file__).parent / "sample" / "mini"
+MINI_DBT_PROJ_PROFILE = MINI_DBT_PROJ_DIR / "profiles.yml"
+
+mini_profile_config = ProfileConfig(
+    profile_name="mini",
+    target_name="dev",
+    profiles_yml_filepath=MINI_DBT_PROJ_PROFILE,
+)
+
+
+@pytest.mark.integration
+def test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled():
+    """
+    Integration test that DbtRunLocalOperator pushes peak memory utilization to XCom
+    when debug mode is enabled.
+    """
+    with patch.object(settings, "enable_debug_mode", True):
+        with DAG("test-debug-memory", start_date=datetime(2022, 1, 1)) as dag:
+            run_operator = DbtRunLocalOperator(
+                profile_config=mini_profile_config,
+                project_dir=MINI_DBT_PROJ_DIR,
+                task_id="run",
+                append_env=True,
+                emit_datasets=False,
+            )
+            run_operator
+
+        dag_run = run_test_dag(dag)
+
+        # Get the task instance to check XCom
+        ti = dag_run.get_task_instance(task_id="run")
+        memory_value = ti.xcom_pull(key="cosmos_debug_max_memory_mb")
+
+        assert memory_value is not None, "Expected cosmos_debug_max_memory_mb in XCom"
+        assert isinstance(memory_value, float), "Memory value should be a float"
+        assert memory_value > 0, "Memory value should be greater than 0"

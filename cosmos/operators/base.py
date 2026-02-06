@@ -24,6 +24,7 @@ except ImportError:  # pragma: no cover
 
 from airflow.utils.strings import to_boolean
 
+from cosmos import settings
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
 
@@ -315,7 +316,18 @@ class AbstractDbtBase(metaclass=ABCMeta):
         if self.extra_context:
             context_merge(context, self.extra_context)
 
-        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
+        if settings.enable_debug_mode:
+            from cosmos.debug import start_memory_tracking, stop_memory_tracking
+
+            start_memory_tracking(context)
+            try:
+                self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
+                stop_memory_tracking(context)
+            except Exception:
+                stop_memory_tracking(context)
+                raise
+        else:
+            self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
 
 
 class DbtBuildMixin:

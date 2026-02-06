@@ -150,6 +150,8 @@ Enable and trigger a run of the `jaffle_shop_k8s <https://github.com/astronomer/
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_k8s_dag_run.png
     :width: 800
 
+.. _kubernetes-known-limitations:
+
 Known Limitations
 +++++++++++++++++
 

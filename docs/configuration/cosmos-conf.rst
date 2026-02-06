@@ -283,9 +283,9 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 .. _watcher_dbt_execution_queue:
 
 `watcher_dbt_execution_queue`_:
-    (Introduced in Cosmos 1.14.0): In watcher execution mode, when the producer watcher task fails, the consumer tasks run the individual models on retry.
-    Since these tasks are sensors that require low memory/CPU on their first try, this setting allows retries to run on a queue with larger resources,
-    which is often necessary for larger dbt projects. When a watcher sensor task is retried (try_number >= 2 in Airflow 2.x, or try_number >= 1 in Airflow 3.x),
+    (Introduced in Cosmos 1.14.0) When using watcher execution mode, tasks may need to run dbt or not, depending on their type (producer vs. consumer) and the retry number. When running the dbt command, tasks use more resources (CPU and memory) than when behaving as sensors. The computational cost of running these tasks can vary widely. For example, a Cosmos watcher sensor consumes approximately 200MB, compared to 700MB consumed by a dbt build task running a project with almost 200 dbt models. This configuration allows users to define which queue to use when dbt commands are run, optimising their Airflow deployment. Internally, Cosmos leverages the [Airflow cluster policy feature](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html). As of now, this configuration will be used:
+    - for watcher producer tasks, during their first execution
+    - for watcher consumer tasks, from their first retry onwards
     it will automatically be assigned to the specified queue.
 
     This behavior is enforced by Cosmos via an Airflow policy (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts.

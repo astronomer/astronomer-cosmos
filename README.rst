@@ -1,22 +1,58 @@
+.. License badge
+.. |license| image:: https://img.shields.io/:license-Apache%202-blue.svg
+    :target: https://www.apache.org/licenses/LICENSE-2.0.txt
+    :alt: License
+
+.. PyPI badges
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
+    :alt: PyPI version
 
-.. |ossrank| image:: https://img.shields.io/endpoint?url=https://ossrank.com/shield/2121
-    :target: https://ossrank.com/p/2121-astronomer-cosmos
+.. |python| image:: https://img.shields.io/pypi/pyversions/astronomer-cosmos.svg
+    :target: https://pypi.org/project/astronomer-cosmos/
+    :alt: Python versions
 
-.. |downloads| image:: https://pepy.tech/badge/astronomer-cosmos/month
-    :target: https://pepy.tech/project/astronomer-cosmos
+.. |downloads| image:: https://img.shields.io/pypi/dm/astronomer-cosmos
+    :target: https://pypi.org/project/astronomer-cosmos/
+    :alt: PyPI downloads
 
+.. Community badges
+.. |contributors| image:: https://img.shields.io/github/contributors/astronomer/astronomer-cosmos
+    :target: https://github.com/astronomer/astronomer-cosmos/graphs/contributors
+    :alt: Contributors
+
+.. |commits| image:: https://img.shields.io/github/commit-activity/m/astronomer/astronomer-cosmos
+    :target: https://github.com/astronomer/astronomer-cosmos/commits/main
+    :alt: Commit activity
+
+.. |slack| image:: https://img.shields.io/badge/slack-%23airflow--dbt-white.svg?logo=slack&style=social
+    :target: https://join.slack.com/t/apache-airflow/shared_invite/zt-1zy8e8h85-es~fn19iMzUmkhPwnyRT6Q
+    :alt: Slack #airflow-dbt
+
+.. |health| image:: https://insights.linuxfoundation.org/api/badge/health-score?project=astronomer-astronomer-cosmos
+    :target: https://insights.linuxfoundation.org/project/astronomer-astronomer-cosmos
+    :alt: LFX Health Score
+
+.. Dev tools badges
 .. |pre-commit| image:: https://results.pre-commit.ci/badge/github/astronomer/astronomer-cosmos/main.svg
-   :target: https://results.pre-commit.ci/latest/github/astronomer/astronomer-cosmos/main
-   :alt: pre-commit.ci status
+    :target: https://results.pre-commit.ci/latest/github/astronomer/astronomer-cosmos/main
+    :alt: pre-commit.ci status
+
+.. Build status badges
+.. |build-main| image:: https://github.com/astronomer/astronomer-cosmos/actions/workflows/test.yml/badge.svg
+    :target: https://github.com/astronomer/astronomer-cosmos/actions
+    :alt: Build main
 
 .. image:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos-logo.svg
 
 
 ===========================================================
 
-|fury| |ossrank| |downloads| |pre-commit|
+|license| |fury| |python| |downloads|
+
+|contributors| |commits| |slack| |health|
+
+|pre-commit| |build-main|
 
 Run your dbt Core projects as `Apache Airflow® <https://airflow.apache.org/>`_ DAGs and Task Groups with a few lines of code. Benefits include:
 

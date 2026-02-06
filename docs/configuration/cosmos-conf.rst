@@ -158,7 +158,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     in a remote location (an alternative to the Variable cache approach released previously since Cosmos 1.5.0)
     using this configuration. The value for the remote cache directory can be any of the schemes that are supported by
     the `Airflow Object Store <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`_
-    feature introduced in Airflow 2.8.0 (e.g. ``s3://your_s3_bucket/cache_dir/``, ``gs://your_gs_bucket/cache_dir/``,
+    feature (e.g. ``s3://your_s3_bucket/cache_dir/``, ``gs://your_gs_bucket/cache_dir/``,
     ``abfs://your_azure_container/cache_dir``, etc.)
 
     This is an experimental feature available since Cosmos 1.6 to gather user feedback and will be merged into the
@@ -187,7 +187,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     the target directory.
     The value for the remote target path can be any of the schemes that are supported by the
     `Airflow Object Store <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`_
-    feature introduced in Airflow 2.8.0 (e.g. ``s3://your_s3_bucket/target_dir/``, ``gs://your_gs_bucket/target_dir/``,
+    feature (e.g. ``s3://your_s3_bucket/target_dir/``, ``gs://your_gs_bucket/target_dir/``,
     ``abfs://your_azure_container/cache_dir``, etc.)
 
     - Default: ``None``
@@ -276,6 +276,24 @@ This page lists all available Airflow configurations that affect ``astronomer-co
         This is an experimental feature. If enabled without installing orjson, Cosmos will raise an error
         with installation instructions.
 
+.. _enable_debug_mode:
+
+`enable_debug_mode`_:
+    Enable or disable debug mode. When enabled, Cosmos will track memory utilization for its tasks and push the peak
+    memory usage (in MB) to XCom under the key ``cosmos_debug_max_memory_mb``. This is useful for profiling and
+    optimizing resource allocation for dbt tasks. Requires ``psutil`` to be installed.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_DEBUG_MODE``
+
+.. _debug_memory_poll_interval_seconds:
+
+`debug_memory_poll_interval_seconds`_:
+    The interval (in seconds) at which memory utilization is polled when debug mode is enabled. Lower values provide
+    more accurate peak memory measurements but may add slight overhead.
+
+    - Default: ``0.5``
+    - Environment Variable: ``AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS``
 
 [openlineage]
 ~~~~~~~~~~~~~

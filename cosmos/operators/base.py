@@ -321,14 +321,13 @@ class AbstractDbtBase(metaclass=ABCMeta):
 
             start_memory_tracking(context)
             try:
-                result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
+                self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
                 stop_memory_tracking(context)
-                return result
             except Exception:
                 stop_memory_tracking(context)
                 raise
         else:
-            return self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
+            self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
 
 
 class DbtBuildMixin:

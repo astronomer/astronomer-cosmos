@@ -93,12 +93,11 @@ Read the `Privacy Notice <https://github.com/astronomer/astronomer-cosmos/blob/m
 Related Repositories
 ____________________
 
-The following repositories are part of the Astronomer Cosmos project ecosystem:
+The core Astronomer Cosmos library is developed in this repository (`astronomer-cosmos <https://github.com/astronomer/astronomer-cosmos>`_). The following additional repositories are maintained as part of the Astronomer Cosmos project:
 
-- `astronomer-cosmos <https://github.com/astronomer/astronomer-cosmos>`_ - The main Cosmos library (this repository)
 - `cosmos-demo <https://github.com/astronomer/cosmos-demo>`_ - Example DAGs and demo project for Cosmos
 
-Note: Cosmos does not have any subprojects. The repositories listed above represent the complete project scope.
+At this time, Cosmos has no other subprojects or additional repositories beyond the one listed above.
 
 
 Security Policy

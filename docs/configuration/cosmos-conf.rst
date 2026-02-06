@@ -261,6 +261,24 @@ This page lists all available Airflow configurations that affect ``astronomer-co
         :start-after: [START cosmos_init_imports]
         :end-before: [END cosmos_init_imports]
 
+.. _enable_debug_mode:
+
+`enable_debug_mode`_:
+    Enable or disable debug mode. When enabled, Cosmos will track memory utilization for its tasks and push the peak
+    memory usage (in MB) to XCom under the key ``cosmos_debug_max_memory_mb``. This is useful for profiling and
+    optimizing resource allocation for dbt tasks. Requires ``psutil`` to be installed.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_DEBUG_MODE``
+
+.. _debug_memory_poll_interval_seconds:
+
+`debug_memory_poll_interval_seconds`_:
+    The interval (in seconds) at which memory utilization is polled when debug mode is enabled. Lower values provide
+    more accurate peak memory measurements but may add slight overhead.
+
+    - Default: ``0.5``
+    - Environment Variable: ``AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS``
 
 [openlineage]
 ~~~~~~~~~~~~~

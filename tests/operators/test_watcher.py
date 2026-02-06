@@ -13,6 +13,12 @@ from unittest.mock import ANY, MagicMock, Mock, patch
 import pytest
 from airflow.exceptions import AirflowException, TaskDeferred
 from airflow.utils.state import DagRunState
+
+try:
+    from airflow.sdk.definitions._internal.abstractoperator import DEFAULT_QUEUE
+except ImportError:  # pragma: no cover
+    from airflow.models.abstractoperator import DEFAULT_QUEUE  # type: ignore[no-redef]
+
 from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
@@ -106,6 +112,20 @@ def test_dbt_producer_watcher_operator_priority_weight_default():
     """Test that DbtProducerWatcherOperator uses default priority_weight of 9999."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     assert op.priority_weight == PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT
+
+
+@pytest.mark.parametrize(
+    "queue_override, expected_queue",
+    [
+        ("custom_retry_queue", "custom_retry_queue"),
+        (None, DEFAULT_QUEUE),
+    ],
+)
+def test_dbt_producer_watcher_operator_queue(queue_override, expected_queue):
+    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", queue_override):
+        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+        assert op.queue == expected_queue
 
 
 def test_dbt_producer_watcher_operator_priority_weight_override():

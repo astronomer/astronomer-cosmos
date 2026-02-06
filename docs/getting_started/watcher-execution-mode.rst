@@ -252,7 +252,7 @@ The overall retry behavior will be further improved once `#1978 <https://github.
 
 In watcher execution mode, consumer sensor tasks are lightweight sensors that wait for the producer task to complete. On their first attempt, they require minimal CPU and memory resources. However, when these tasks retry, they execute the dbt command for the node, which may require significantly more resources.
 
-The ``watcher_retry_queue`` configuration allows you to specify a different worker queue for retry attempts. This enables you to:
+The ``watcher_dbt_execution_queue`` configuration allows you to specify a different worker queue for retry attempts. This enables you to:
 
 - **Optimize resource allocation** — Use lightweight workers for initial sensor execution and high-resource workers for retries
 - **Improve scheduling efficiency** — Prevent resource contention between initial sensor tasks and retry executions
@@ -260,12 +260,12 @@ The ``watcher_retry_queue`` configuration allows you to specify a different work
 
 **Configuration:**
 
-Set the ``watcher_retry_queue`` in your Airflow configuration:
+Set the ``watcher_dbt_execution_queue`` in your Airflow configuration:
 
 .. code-block:: ini
 
    [cosmos]
-   watcher_retry_queue = high_memory_queue
+   watcher_dbt_execution_queue = high_memory_queue
 
 Or via environment variable:
 
@@ -276,7 +276,7 @@ Or via environment variable:
 **How it works:**
 
 - On the first attempt, consumer sensor tasks run on their default queue (Airflow 2.x: ``try_number = 1``; Airflow 3.x: ``try_number`` is ``None`` or ``0``)
-- On retry attempts (Airflow 2.x: ``try_number >= 2``; Airflow 3.x: ``try_number >= 1``), if ``watcher_retry_queue`` is configured, the task is automatically assigned to the specified queue
+- On retry attempts (Airflow 2.x: ``try_number >= 2``; Airflow 3.x: ``try_number >= 1``), if ``watcher_dbt_execution_queue`` is configured, the task is automatically assigned to the specified queue
 - This applies only to ``DbtConsumerWatcherSensor`` tasks (watcher sensors)
 - Cosmos registers an Airflow task instance mutation policy (``task_instance_mutation_hook``) that mutates the queue for watcher sensor task instances on retries, so this reassignment happens at runtime rather than at DAG parse time
 

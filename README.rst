@@ -25,9 +25,13 @@
     :target: https://github.com/astronomer/astronomer-cosmos/commits/main
     :alt: Commit activity
 
-.. |slack| image:: https://img.shields.io/badge/slack-join_chat-white.svg?logo=slack&style=social
+.. |slack| image:: https://img.shields.io/badge/slack-%23airflow--dbt-white.svg?logo=slack&style=social
     :target: https://join.slack.com/t/apache-airflow/shared_invite/zt-1zy8e8h85-es~fn19iMzUmkhPwnyRT6Q
-    :alt: Slack
+    :alt: Slack #airflow-dbt
+
+.. |health| image:: https://insights.linuxfoundation.org/api/badge/health-score?project=astronomer-astronomer-cosmos
+    :target: https://insights.linuxfoundation.org/project/astronomer-astronomer-cosmos
+    :alt: LFX Health Score
 
 .. Dev tools badges
 .. |pre-commit| image:: https://results.pre-commit.ci/badge/github/astronomer/astronomer-cosmos/main.svg
@@ -44,17 +48,19 @@
 
 ===========================================================
 
-+--------------+------------------------------------------------------------+
-| License      | |license|                                                  |
-+--------------+------------------------------------------------------------+
-| PyPI         | |fury| |python| |downloads|                                |
-+--------------+------------------------------------------------------------+
-| Community    | |contributors| |commits| |slack|                          |
-+--------------+------------------------------------------------------------+
-| Dev tools    | |pre-commit|                                               |
-+--------------+------------------------------------------------------------+
-| Build status | |build-main|                                               |
-+--------------+------------------------------------------------------------+
+.. list-table::
+   :widths: 15 85
+
+   * - **License**
+     - |license|
+   * - **PyPI**
+     - |fury| |python| |downloads|
+   * - **Community**
+     - |contributors| |commits| |slack| |health|
+   * - **Dev tools**
+     - |pre-commit|
+   * - **Build status**
+     - |build-main|
 
 Run your dbt Core projects as `Apache Airflow® <https://airflow.apache.org/>`_ DAGs and Task Groups with a few lines of code. Benefits include:
 

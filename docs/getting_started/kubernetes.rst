@@ -149,3 +149,19 @@ Enable and trigger a run of the `jaffle_shop_k8s <https://github.com/astronomer/
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_k8s_dag_run.png
     :width: 800
+
+.. _kubernetes-known-limitations:
+
+Known Limitations
++++++++++++++++++
+
+The Kubernetes execution mode has the following limitations:
+
+- Does not emit OpenLineage events (there is an `open ticket <https://github.com/astronomer/astronomer-cosmos/issues/496>`_ to address this)
+- Does not emit Airflow datasets, assets, and dataset aliases (there is an `open ticket <https://github.com/astronomer/astronomer-cosmos/issues/2329>`_ to address this)
+- Does not handle installing dbt deps for users (there is an `open ticket <https://github.com/astronomer/astronomer-cosmos/issues/679>`_ to address this)
+- Does not support `ProfileMapping <https://astronomer.github.io/astronomer-cosmos/profiles/index.html#using-a-profile-mapping>`_ (there is an `open ticket <https://github.com/astronomer/astronomer-cosmos/issues/749>`_ to address this)
+- Does not support `Callbacks <https://astronomer.github.io/astronomer-cosmos/configuration/callbacks.html>`_ (there is an `open ticket <https://github.com/astronomer/astronomer-cosmos/issues/1575>`_ to address this)
+- Does not expose Compiled SQL as a `templated field <https://astronomer.github.io/astronomer-cosmos/configuration/compiled-sql.html>`_
+- Does not benefit from `Cosmos caching mechanisms <https://astronomer.github.io/astronomer-cosmos/configuration/caching.html>`_
+- Does not support `generating dbt docs & uploading to an object store <https://astronomer.github.io/astronomer-cosmos/configuration/generating-docs.html>`_ (there is a `PR <https://github.com/astronomer/astronomer-cosmos/pull/2058>`_ to solve this for S3)

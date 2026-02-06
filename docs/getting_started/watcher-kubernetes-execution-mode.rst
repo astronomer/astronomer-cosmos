@@ -174,6 +174,8 @@ The following limitations from ``ExecutionMode.WATCHER`` also apply to ``Executi
 
 For more details on these limitations, refer to the :ref:`watcher-execution-mode` documentation.
 
+Additionally, the limitations from ``ExecutionMode.KUBERNETES`` also apply to ``ExecutionMode.WATCHER_KUBERNETES``. For details, refer to the :ref:`kubernetes-known-limitations` documentation.
+
 -------------------------------------------------------------------------------
 
 Example DAG

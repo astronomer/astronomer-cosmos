@@ -14,10 +14,10 @@ from typing import TYPE_CHECKING
 
 try:
     import psutil
-
-    PSUTIL_AVAILABLE = True
 except ImportError:
-    PSUTIL_AVAILABLE = False
+    raise RuntimeError(
+        "psutil is not available.  Install `https://pypi.org/project/psutil/` to enable memory tracking."
+    )
 
 from cosmos import settings
 from cosmos.log import get_logger
@@ -62,9 +62,6 @@ class MemoryTracker:
 
     def _run(self) -> None:
         """Background thread that polls memory usage."""
-        if not PSUTIL_AVAILABLE:
-            return
-
         try:
             parent = psutil.Process(self.pid)
         except psutil.NoSuchProcess:
@@ -95,15 +92,6 @@ def start_memory_tracking(context: Context) -> None:
 
     :param context: The Airflow task context.
     """
-    if not settings.enable_debug_mode:
-        return
-
-    if not PSUTIL_AVAILABLE:
-        logger.warning(
-            "psutil is not available. Memory tracking is disabled. Install psutil to enable memory tracking."
-        )
-        return
-
     ti = context["ti"]
     task_key = f"{ti.dag_id}.{ti.task_id}.{ti.run_id}"
     pid = os.getpid()
@@ -122,12 +110,6 @@ def stop_memory_tracking(context: Context) -> None:
 
     :param context: The Airflow task context.
     """
-    if not settings.enable_debug_mode:
-        return
-
-    if not PSUTIL_AVAILABLE:
-        return
-
     ti = context["ti"]
     task_key = f"{ti.dag_id}.{ti.task_id}.{ti.run_id}"
     tracker = _memory_trackers.pop(task_key, None)

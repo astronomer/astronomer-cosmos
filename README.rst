@@ -22,6 +22,7 @@
     :alt: Contributors
 
 .. |commits| image:: https://img.shields.io/github/commit-activity/m/astronomer/astronomer-cosmos
+    :target: https://github.com/astronomer/astronomer-cosmos/commits/main
     :alt: Commit activity
 
 .. |slack| image:: https://img.shields.io/badge/slack-join_chat-white.svg?logo=slack&style=social

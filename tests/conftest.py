@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +14,13 @@ if AIRFLOW_VERSION >= Version("3.1"):
     base_operator_get_connection_path = "airflow.sdk.BaseHook.get_connection"
 else:
     base_operator_get_connection_path = "airflow.hooks.base.BaseHook.get_connection"
+
+
+def pytest_runtest_logreport(report):
+    """Log timestamp when tests pass/fail to help diagnose slow transitions."""
+    if report.when == "call":  # Only log for the actual test call, not setup/teardown
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        print(f"  [{timestamp}] {report.nodeid} {report.outcome.upper()}")
 
 
 @pytest.fixture()

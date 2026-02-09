@@ -33,3 +33,4 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Caching <caching>
    Task display name <task-display-name>
    Callbacks <callbacks>
+   Memory Optimization <memory_optimization>

@@ -271,14 +271,13 @@ Or via environment variable:
 
 .. code-block:: bash
 
-   export AIRFLOW__COSMOS__WATCHER_RETRY_QUEUE=high_memory_queue
+   export AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE=high_memory_queue
 
 **How it works:**
 
-- On the first attempt, consumer sensor tasks run on their default queue (Airflow 2.x: ``try_number = 1``; Airflow 3.x: ``try_number`` is ``None`` or ``0``)
-- On retry attempts (Airflow 2.x: ``try_number >= 2``; Airflow 3.x: ``try_number >= 1``), if ``watcher_dbt_execution_queue`` is configured, the task is automatically assigned to the specified queue
-- This applies only to ``DbtConsumerWatcherSensor`` tasks (watcher sensors)
-- Cosmos registers an Airflow task instance mutation policy (``task_instance_mutation_hook``) that mutates the queue for watcher sensor task instances on retries, so this reassignment happens at runtime rather than at DAG parse time
+- For watcher producer tasks (``DbtProducerWatcherOperator``), the configured queue is used during their first execution
+- For watcher consumer tasks (``DbtConsumerWatcherSensor``), from their first retry onwards, if ``watcher_dbt_execution_queue`` is configured, the task is automatically assigned to the specified queue
+- This behavior is enforced by Cosmos via an `Airflow cluster policy <https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html>`_ (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Installation of Airflow and dbt

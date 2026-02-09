@@ -13,56 +13,33 @@ if [ "$GITHUB_ACTIONS" = "true" ] && [ -z "${VIRTUAL_ENV}" ]; then
   py_path=$(which python)
   virtual_env_dir=$(dirname "$(dirname "$py_path")")
   export VIRTUAL_ENV="$virtual_env_dir"
+  echo "${VIRTUAL_ENV}"
 fi
-
-echo "${VIRTUAL_ENV}"
-
-if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
-  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.2/constraints-$PYTHON_VERSION.txt"
-elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
-  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.0/constraints-$PYTHON_VERSION.txt"
-  uv pip install "apache-airflow-devel-common"
-else
-  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.0/constraints-$PYTHON_VERSION.txt"
-fi;
-
-curl -sSL $CONSTRAINT_URL -o /tmp/constraint.txt
-# Workaround to remove PyYAML constraint that will work on both Linux and MacOS
-sed '/PyYAML==/d' /tmp/constraint.txt > /tmp/constraint.txt.tmp
-mv /tmp/constraint.txt.tmp /tmp/constraint.txt
 
 # Install Airflow with constraints
 pip install uv
 uv pip install pip --upgrade
 
-uv pip install "apache-airflow==$AIRFLOW_VERSION" apache-airflow-providers-docker apache-airflow-providers-postgres --constraint /tmp/constraint.txt --pre
-
-# Due to issue https://github.com/fsspec/gcsfs/issues/664
-uv pip install "gcsfs<2025.3.0"
-
-
 if [ "$AIRFLOW_VERSION" = "2.9" ] ; then
-  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
-  # The Airflow 2.9 constraints file at
-  # https://raw.githubusercontent.com/apache/airflow/constraints-2.9.0/constraints-3.11.txt
-  # specifies apache-airflow-providers-google==10.16.0. However, our CI setup uses a Google connection without a token,
-  # which previously led to authentication issues when the token was None. This issue was resolved in PR
-  # https://github.com/apache/airflow/pull/38102 and fixed in apache-airflow-providers-google==10.17.0. Consequently,
-  # we are using apache-airflow-providers-google>=10.17.0 and skipping constraints installation, as the specified
-  # version does not meet our requirements.
-  uv pip install "apache-airflow-providers-google>=10.17.0" "apache-airflow==$AIRFLOW_VERSION"
+  uv pip install -r requirements/requirements-airflow-2.9-dbt-1.11.txt
+elif [ "$AIRFLOW_VERSION" = "2.10" ] ; then
+  uv pip install -r requirements/requirements-airflow-2.10-dbt-1.11.txt
+elif [ "$AIRFLOW_VERSION" = "2.11" ] ; then
+  uv pip install -r requirements/requirements-airflow-2.11-dbt-1.11.txt
+elif [ "$AIRFLOW_VERSION" = "3.0" ] ; then
+  uv pip install -r requirements/requirements-airflow-3.0-dbt-1.11.txt
+elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
+  uv pip install -r requirements/requirements-airflow-3.1-dbt-1.11.txt
 else
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-google" "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
+  uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
+  uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0" apache-airflow==$AIRFLOW_VERSION
 fi
 
-rm /tmp/constraint.txt
-
-actual_version=$(airflow version | cut -d. -f1,2)
+actual_version=$(airflow version 2>/dev/null | tail -1 | cut -d. -f1,2)
 desired_version=$(echo $AIRFLOW_VERSION | cut -d. -f1,2)
 
 if [ "$actual_version" = $desired_version ]; then
@@ -72,5 +49,6 @@ else
     exit 1
 fi
 
-# Install dbt-loom for cross-project references
-uv pip install "dbt-loom"
+# Installation of dbt in a separate Python virtual environment:
+python -m venv venv-subprocess
+venv-subprocess/bin/pip install -U dbt-postgres

@@ -37,6 +37,7 @@ else
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
   uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0" apache-airflow==$AIRFLOW_VERSION
+  uv pip install dbt-loom
 fi
 
 actual_version=$(airflow version 2>/dev/null | tail -1 | cut -d. -f1,2)

@@ -11,10 +11,6 @@ ls $AIRFLOW_HOME
 
 airflow db check
 
-python -m venv venv-subprocess
-venv-subprocess/bin/pip install -U dbt-postgres
-
-
 rm -rf dbt/jaffle_shop/dbt_packages;
 
 pytest -vv \

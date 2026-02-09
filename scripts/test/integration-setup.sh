@@ -20,7 +20,6 @@ airflow db reset -y
 
 
 # ATTENTION: Airflow and its dependencies are installed using pre-install-airflow.sh script, so we don't install them here.
-
 AIRFLOW_VERSION=$(airflow version)
 AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | cut -d. -f1)
 if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
@@ -34,6 +33,11 @@ else
     airflow db init
 fi
 
+# Installation of dbt in a separate Python virtual environment:
+python -m venv venv-subprocess
+venv-subprocess/bin/pip install -U dbt-postgres
+
+# Installation of dbt in the same Python virtual environment as Airflow:
 uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
 
 if python3 -c "import sys; print(sys.version_info >= (3, 10))" | grep -q 'True'; then

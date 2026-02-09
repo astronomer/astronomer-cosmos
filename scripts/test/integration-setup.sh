@@ -38,8 +38,6 @@ if python3 -c "import sys; print(sys.version_info >= (3, 10))" | grep -q 'True';
   pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
 fi
 
-pip install -U openlineage-airflow apache-airflow==$AIRFLOW_VERSION
-
 if [ "$AIRFLOW_VERSION" = "3.1.0" ] ; then
   # This error was happening only in Airflow 3.1:
   # No module named 'dbt.adapters.catalogs'

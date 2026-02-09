@@ -47,7 +47,7 @@ if [ "$AIRFLOW_VERSION" = "2.6.0" ] ; then
   pip freeze | grep -i pydantic
 fi
 
-pip install -U openlineage-airflow apache-airflow==$AIRFLOW_VERSION
+pip install -U openlineage-airflow apache-airflow-providers-google apache-airflow==$AIRFLOW_VERSION
 
 if [ "$AIRFLOW_VERSION" = "3.1.0" ] ; then
   # This error was happening only in Airflow 3.1:

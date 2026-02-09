@@ -35,7 +35,18 @@ def check_dag_success(dag_run: DagRun | None, expect_success: bool = True) -> bo
     """Check if a DAG was successful, if that Airflow version allows it."""
     if dag_run is not None:
         if expect_success:
-            return dag_run.state == DagRunState.SUCCESS
+            if dag_run.state != DagRunState.SUCCESS:
+                return False
+            # Verify all task instances actually reached a terminal state.
+            for ti in dag_run.get_task_instances():
+                if ti.state not in ("success", "skipped", "upstream_failed"):
+                    log.error(
+                        "Task %s is in unexpected state '%s' (expected success, skipped, or upstream_failed)",
+                        ti.task_id,
+                        ti.state,
+                    )
+                    return False
+            return True
         else:
             return dag_run.state == DagRunState.FAILED
     return True

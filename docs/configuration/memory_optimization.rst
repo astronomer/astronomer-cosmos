@@ -12,12 +12,13 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Configuration**:
 
-.. code-block:: bash
+.. code-block:: cfg
 
    # In airflow.cfg
    [cosmos]
    enable_memory_optimised_imports = True
 
+.. code-block:: bash
    # Or via environment variable
    export AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS=True
 

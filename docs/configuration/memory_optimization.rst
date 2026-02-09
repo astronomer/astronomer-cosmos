@@ -1,7 +1,9 @@
 Memory Optimization Options for Astronomer Cosmos
 ==================================================
 
-This document outlines various options to reduce memory usage when using astronomer-cosmos.
+When running dbt pipelines with Astronomer Cosmos, the framework executes dbt commands that can consume significant memory resources. In high-memory scenarios, tasks may reach a zombie state or workers may be killed due to Out of Memory (OOM) errors, leading to pipeline failures and reduced reliability.
+
+Cosmos provides various configuration options and execution modes to optimize memory usage, reduce worker resource consumption, and prevent OOM issues. This document outlines these memory optimization strategies, from simple configuration changes to advanced execution modes that can dramatically reduce memory footprint while maintaining or improving pipeline performance.
 
 1. Enable Memory-Optimized Imports (Recommended)
 -------------------------------------------------
@@ -259,3 +261,54 @@ This document outlines various options to reduce memory usage when using astrono
 4. Monitor task queuing - if tasks are queued for long periods, consider increasing ``concurrency``
 
 **Reference**: `Airflow Scaling Workers Documentation <https://www.astronomer.io/docs/learn/airflow-scaling-workers>`_
+
+-------------------------------------------------------------------------------
+
+7. Enable Task Profiling with Debug Mode
+-----------------------------------------
+
+**Impact**: Low - Provides visibility into memory usage patterns to help identify optimization opportunities and prevent OOM issues.
+
+**Configuration**:
+
+.. code-block:: bash
+
+   # In airflow.cfg
+   [cosmos]
+   enable_debug_mode = True
+
+   # Or via environment variable
+   export AIRFLOW__COSMOS__ENABLE_DEBUG_MODE=True
+
+**What it does**: When enabled, Cosmos tracks memory utilization for its tasks during execution and pushes the peak memory usage (in MB) to XCom under the key ``cosmos_debug_max_memory_mb``. This enables you to:
+
+- **Profile Memory Usage**: Identify which tasks consume the most memory
+- **Optimize Resource Allocation**: Set appropriate memory limits and worker queue assignments based on actual usage
+- **Track Memory Trends**: Monitor memory usage over time to detect regressions or improvements
+
+**How to Access Memory Data**:
+
+The peak memory usage is stored in XCom and can be accessed via the Airflow UI
+
+**Requirements**:
+
+- ``psutil`` package must be installed in your Airflow environment
+- Debug mode adds minimal overhead (memory polling occurs at configurable intervals)
+
+**Configuration for Poll Interval**:
+
+You can adjust the memory polling frequency to balance accuracy and overhead:
+
+.. code-block:: bash
+
+   # In airflow.cfg
+   [cosmos]
+   enable_debug_mode = True
+   debug_memory_poll_interval_seconds = 0.5  # Default: 0.5 seconds
+
+   # Or via environment variable
+   export AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS=0.5
+
+Lower values provide more accurate peak memory measurements but may add slight overhead. Higher values reduce overhead but may miss short memory spikes.
+
+**Default**: ``False``

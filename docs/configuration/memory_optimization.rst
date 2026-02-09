@@ -48,7 +48,8 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 .. code-block:: python
 
-   from cosmos import DbtDag, ProjectConfig, RenderConfig, LoadMode
+   from cosmos.airflow.dag import DbtDag
+   from cosmos.config import ProjectConfig, RenderConfig, LoadMode
 
    DbtDag(
        project_config=ProjectConfig(dbt_project_path="/path/to/dbt/project"),

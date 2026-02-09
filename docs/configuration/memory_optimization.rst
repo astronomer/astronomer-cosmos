@@ -99,15 +99,17 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Configuration**:
 
-.. code-block:: bash
+.. code-block:: cfg
 
    # In airflow.cfg (should be enabled, not disabled)
    [cosmos]
    enable_cache_partial_parse = True
 
+.. code-block:: python
+
    # Also ensure mock profiles are disabled for partial parse to work
    # In your DbtDag:
-   render_config=RenderConfig(
+   render_config = RenderConfig(
        enable_mock_profile=False,  # Required for partial parse
    )
 

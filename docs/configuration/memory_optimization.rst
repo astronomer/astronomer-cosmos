@@ -7,8 +7,8 @@ When running dbt pipelines with Astronomer Cosmos, the framework executes dbt co
 
 Cosmos provides various configuration options and execution modes to optimize memory usage, reduce worker resource consumption, and prevent OOM issues. This document outlines these memory optimization strategies, from simple configuration changes to advanced execution modes that can dramatically reduce memory footprint while maintaining or improving pipeline performance.
 
-1. Enable Memory-Optimized Imports (Recommended)
--------------------------------------------------
+1. Enable Memory-Optimized Imports
+-------------------------------------
 
 **Impact**: High - Reduces memory footprint even when Cosmos is installed but not actively used.
 

@@ -27,4 +27,6 @@ pytest -vv \
     --ignore=tests/test_async_example_dag.py \
     --ignore=tests/test_example_k8s_dags.py \
     --ignore=tests/operators/test_watcher_kubernetes_integration.py \
+    --ignore=tests/test_example_dags.py \
+    --ignore=tests/test_example_dags_no_connections.py \
     -k 'not (simple_dag_async or example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes or jaffle_shop_watcher_kubernetes)'

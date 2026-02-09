@@ -1,3 +1,5 @@
+.. _memory-optimization:
+
 Memory Optimization Options for Astronomer Cosmos
 ==================================================
 

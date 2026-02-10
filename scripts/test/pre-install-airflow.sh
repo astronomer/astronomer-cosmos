@@ -40,13 +40,23 @@ else
   uv pip install dbt-loom
 fi
 
-actual_version=$(airflow version 2>/dev/null | tail -1 | cut -d. -f1,2)
-desired_version=$(echo $AIRFLOW_VERSION | cut -d. -f1,2)
+actual_airflow_version=$(airflow version 2>/dev/null | tail -1 | cut -d. -f1,2)
+desired_airflow_version=$(echo $AIRFLOW_VERSION | cut -d. -f1,2)
 
-if [ "$actual_version" = $desired_version ]; then
-    echo "Version is as expected: $desired_version"
+if [ "$actual_airflow_version" = $desired_airflow_version ]; then
+    echo "Version is as expected: $desired_airflow_version"
 else
-    echo "Version does not match. Expected: $desired_version, but got: $actual_version"
+    echo "Version does not match. Expected: $desired_airflow_version, but got: $actual_airflow_version"
+    exit 1
+fi
+
+actual_dbt_version=$(dbt --version 2>/dev/null | awk '/Core:/{print $2}' | cut -d. -f1,2)
+desired_dbt_version=$(echo "$DBT_VERSION" | cut -d. -f1,2)
+
+if [ "$actual_dbt_version" = "$desired_dbt_version" ]; then
+    echo "Version is as expected: $desired_dbt_version"
+else
+    echo "Version does not match. Expected: $desired_dbt_version, but got: $actual_dbt_version"
     exit 1
 fi
 

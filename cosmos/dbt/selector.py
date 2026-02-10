@@ -28,7 +28,6 @@ CONFIG_SELECTOR = "config."
 SOURCE_SELECTOR = "source:"
 EXPOSURE_SELECTOR = "exposure:"
 RESOURCE_TYPE_SELECTOR = "resource_type:"
-EXCLUDE_RESOURCE_TYPE_SELECTOR = "exclude_resource_type:"
 PLUS_SELECTOR = "+"
 AT_SELECTOR = "@"
 GRAPH_SELECTOR_REGEX = r"^(@|[0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
@@ -87,7 +86,6 @@ class GraphSelector:
         +config.materialized:view
         resource_type:resource_name
         source:source_name
-        exclude_resource_type:resource_name
         exposure:exposure_name
 
     https://docs.getdbt.com/reference/node-selection/graph-operators
@@ -353,7 +351,6 @@ class SelectorConfig:
         self.sources: list[str] = []
         self.exposures: list[str] = []
         self.resource_types: list[str] = []
-        self.exclude_resource_types: list[str] = []
         self.load_from_statement(statement)
 
     @property
@@ -367,7 +364,6 @@ class SelectorConfig:
             or self.sources
             or self.exposures
             or self.resource_types
-            or self.exclude_resource_types
         )
 
     def load_from_statement(self, statement: str) -> None:
@@ -409,8 +405,6 @@ class SelectorConfig:
             self._parse_exposure_selector(item)
         elif node_name.startswith(RESOURCE_TYPE_SELECTOR):
             self._parse_resource_type_selector(item)
-        elif node_name.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR):
-            self._parse_exclude_resource_type_selector(item)
         else:
             self._parse_unknown_selector(item)
 
@@ -446,11 +440,6 @@ class SelectorConfig:
         resource_type_value = item[index:].strip()
         self.resource_types.append(resource_type_value)
 
-    def _parse_exclude_resource_type_selector(self, item: str) -> None:
-        index = len(EXCLUDE_RESOURCE_TYPE_SELECTOR)
-        resource_type_value = item[index:].strip()
-        self.exclude_resource_types.append(resource_type_value)
-
     def _parse_source_selector(self, item: str) -> None:
         index = len(SOURCE_SELECTOR)
         source_name = item[index:].strip()
@@ -470,7 +459,6 @@ class SelectorConfig:
             + f"sources={self.sources}, "
             + f"resource={self.resource_types}, "
             + f"exposures={self.exposures}, "
-            + f"exclude_resource={self.exclude_resource_types}, "
             + f"other={self.other}, "
             + f"graph_selectors={self.graph_selectors})"
         )
@@ -588,9 +576,6 @@ class NodeSelector:
         if self.config.resource_types and not self._is_resource_type_matching(node):
             return False
 
-        if self.config.exclude_resource_types and self._is_exclude_resource_type_matching(node):
-            return False
-
         if self.config.sources and not self._is_source_matching(node):
             return False
 
@@ -604,10 +589,6 @@ class NodeSelector:
         if node.resource_type.value not in self.config.resource_types:
             return False
         return True
-
-    def _is_exclude_resource_type_matching(self, node: DbtNode) -> bool:
-        """Checks if the node's resource type is a subset of the config's exclude resource type."""
-        return node.resource_type.value in self.config.exclude_resource_types
 
     def _is_source_matching(self, node: DbtNode) -> bool:
         """Checks if the node's source is a subset of the config's source."""
@@ -1304,7 +1285,6 @@ def validate_filters(exclude: list[str], select: list[str]) -> None:
                 filter_parameter.startswith(PATH_SELECTOR)
                 or filter_parameter.startswith(TAG_SELECTOR)
                 or filter_parameter.startswith(RESOURCE_TYPE_SELECTOR)
-                or filter_parameter.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR)
                 or filter_parameter.startswith(SOURCE_SELECTOR)
                 or filter_parameter.startswith(EXPOSURE_SELECTOR)
                 or PLUS_SELECTOR in filter_parameter

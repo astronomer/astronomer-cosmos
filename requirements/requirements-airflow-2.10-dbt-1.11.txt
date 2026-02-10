@@ -91,6 +91,7 @@ dbt-adapters==1.22.5
 dbt-bigquery==1.11.0
 dbt-common==1.37.2
 dbt-core==1.11.3
+dbt-databricks
 dbt-duckdb==1.10.0
 dbt-extractor==0.6.0
 dbt-loom==0.9.4

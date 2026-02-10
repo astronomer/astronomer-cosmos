@@ -2,6 +2,7 @@ adal==1.2.7
 adlfs==2024.2.0
 aenum==3.1.16
 agate==1.9.1
+aiobotocore
 aiofiles==23.2.1
 aiohappyeyeballs==2.6.1
 airflow-provider-duckdb==0.2.0

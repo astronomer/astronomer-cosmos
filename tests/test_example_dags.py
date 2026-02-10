@@ -56,6 +56,10 @@ def get_dag_bag() -> DagBag:  # noqa: C901
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.writelines("example_cosmos_cleanup_dag.py\n")
 
+        if AIRFLOW_VERSION == Version("2.9.0"):
+            # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9
+            file.writelines("cosmos_example_manifest_dag.py\n")
+
         # Disabling these DAGs temporarily due to an Airflow 3 bug on processing DatasetAlias that contain non-ASCII characters:
         # https://github.com/apache/airflow/issues/51566
         # https://github.com/astronomer/astronomer-cosmos/issues/1802

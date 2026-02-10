@@ -46,6 +46,9 @@ def get_dag_bag() -> DagBag:
             print(f"Adding {file_name} to .airflowignore")
             file.write(f"{file_name}\n")
 
+        if AIRFLOW_VERSION == Version("2.9.0"):
+            file.writelines("example_cosmos_python_models\n")
+
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.writelines("example_cosmos_cleanup_dag.py\n")
 

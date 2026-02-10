@@ -9,12 +9,9 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from typing import cast
 
-try:
-    # Airflow 3 onwards
-    from airflow.sdk import Variable
-except ImportError:
-    from airflow.models import Variable
+from airflow.models import Variable
 
 from cosmos.log import get_logger
 
@@ -66,7 +63,7 @@ def get_stored_seed_hash(dag_task_group_identifier: str, node_unique_id: str) ->
     """
     variable_key = _get_variable_key(dag_task_group_identifier, node_unique_id)
     try:
-        return Variable.get(variable_key, None)
+        return cast(str | None, Variable.get(variable_key, None))
     except Exception as e:
         logger.warning("Failed to retrieve seed hash variable %s: %s", variable_key, e)
         return None

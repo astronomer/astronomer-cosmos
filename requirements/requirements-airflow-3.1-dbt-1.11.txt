@@ -205,7 +205,6 @@ mypy==1.9.0
 mypy-extensions==1.1.0
 natsort==8.4.0
 nbformat==5.10.4
-networkx==3.6.1
 nodeenv==1.10.0
 oauthlib==3.3.1
 openai==1.109.0
@@ -286,7 +285,6 @@ python-slugify==8.0.4
 pytimeparse==1.1.8
 pytokens==0.4.1
 pytz==2025.2
-pyyaml==6.0.3
 pyyaml-ft==8.0.0
 redshift-connector==2.1.8
 referencing==0.37.0

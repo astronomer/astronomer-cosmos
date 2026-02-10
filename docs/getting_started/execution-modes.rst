@@ -3,7 +3,7 @@
 Execution Modes
 ===============
 
-Cosmos can run ``dbt`` commands using five different approaches, called ``execution modes``:
+Cosmos can run ``dbt`` commands using several different approaches, called ``execution modes``:
 
 1. **local**: Run ``dbt`` commands using a local ``dbt`` installation (default)
 2. **virtualenv**: Run ``dbt`` commands from Python virtual environments managed by Cosmos
@@ -15,6 +15,7 @@ Cosmos can run ``dbt`` commands using five different approaches, called ``execut
 8. **aws_ecs**: Run ``dbt`` commands from AWS ECS instances managed by Cosmos (requires a pre-existing Docker image)
 9. **airflow_async**: (stable since Cosmos 1.9.0) Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__
 10. **watcher**: (experimental since Cosmos 1.11.0) Run a single ``dbt build`` command from a producer task and have sensor tasks to watch the progress of the producer, with improved DAG run time while maintaining the tasks lineage in the Airflow UI, and ability to retry failed tasks. Check the :ref:`watcher-execution-mode` for more details.
+11. **watcher_kubernetes**: (experimental since Cosmos 1.13.0) Combines the speed of the watcher execution mode with the isolation of Kubernetes. Check the :ref:`watcher-kubernetes-execution-mode` for more details.
 
 The choice of the ``execution mode`` can vary based on each user's needs and concerns. For more details, check each execution mode described below.
 
@@ -68,6 +69,10 @@ The choice of the ``execution mode`` can vary based on each user's needs and con
      - Very Fast
      - None
      - Yes
+   * - Watcher Kubernetes
+     - Fast
+     - High
+     - No
 
 Local
 -----
@@ -326,6 +331,16 @@ The ``watcher`` execution mode is an experimental execution mode that runs a sin
 It is designed to improve DAG run time while maintaining the tasks lineage in the Airflow UI, and ability to retry failed tasks.
 
 Check the :ref:`watcher-execution-mode` for more details.
+
+
+Watcher Kubernetes Execution Mode (Experimental)
+------------------------------------------------
+
+.. versionadded:: 1.13.0
+
+The ``watcher_kubernetes`` execution mode combines the speed of the ``watcher`` execution mode with the isolation of the ``kubernetes`` execution mode. It runs a single ``dbt build`` command from a producer task inside a Kubernetes pod and has sensor tasks to watch the progress of the producer.
+
+Check the :ref:`watcher-kubernetes-execution-mode` for more details.
 
 
 .. _invocation_modes:

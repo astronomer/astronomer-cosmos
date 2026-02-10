@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: int_orders_enriched
+    description: "Intermediate model joining orders with their line items to calculate order totals."
+    access: public
+    columns:
+      - name: order_id
+        description: "Unique identifier for each order"
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "Foreign key to customer"
+      - name: order_total
+        description: "Total value of the order"
+      - name: total_items
+        description: "Total quantity of items in the order"
+
+  - name: int_customer_orders
+    description: "Intermediate model aggregating customer order history and lifetime value."
+    access: public
+    columns:
+      - name: customer_id
+        description: "Unique identifier for each customer"
+        tests:
+          - unique
+          - not_null
+      - name: lifetime_value
+        description: "Total amount spent by the customer"
+      - name: total_orders
+        description: "Number of completed orders"
+      - name: first_order_date
+        description: "Date of customer's first order"
+      - name: last_order_date
+        description: "Date of customer's most recent order"

@@ -39,6 +39,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-added-large-files
+        exclude: ^dev/dags/dbt/cross_project/downstream/target/manifest.json$
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
@@ -70,7 +71,7 @@ repos:
       - id: rst-backticks
       - id: python-check-mock-methods
   - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.5.5
+    rev: v1.5.6
     hooks:
       - id: remove-crlf
       - id: remove-tabs
@@ -83,13 +84,12 @@ repos:
           - --py310-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.10
+    rev: v0.14.14
     hooks:
-      - id: ruff
-        args:
-          - --fix
+      - id: ruff-check
+        args: [ --fix ]
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 25.12.0
+    rev: 26.1.0
     hooks:
       - id: black
         args: ["--config", "./pyproject.toml"]

@@ -3,7 +3,8 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import pytest
 from packaging.version import Version
 
-from cosmos.operators._watcher.triggerer import AIRFLOW_VERSION, WatcherTrigger
+from cosmos.constants import AIRFLOW_VERSION
+from cosmos.operators._watcher.triggerer import WatcherTrigger
 
 _real_import = __import__
 
@@ -120,6 +121,7 @@ class TestWatcherTrigger:
             ("success", "running", {"status": "success"}),
             ("failed", "running", {"status": "failed", "reason": "model_failed"}),
             (None, "failed", {"status": "failed", "reason": "producer_failed"}),
+            (None, "success", {"status": "success", "reason": "model_not_run"}),
         ],
     )
     async def test_run_various_outcomes(self, node_status, producer_state, expected):
@@ -141,7 +143,6 @@ class TestWatcherTrigger:
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow2(self):
         fetcher = MagicMock(return_value="failed")
-
         with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("2.9.0")):
             with patch(
                 "cosmos.operators._watcher.triggerer.build_producer_state_fetcher", return_value=fetcher
@@ -183,7 +184,6 @@ class TestWatcherTrigger:
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow3_missing_state(self):
         fetcher = MagicMock(return_value=None)
-
         with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("3.0.0")):
             with patch("cosmos.operators._watcher.triggerer.build_producer_state_fetcher", return_value=fetcher):
                 state = await self.trigger._get_producer_task_status()
@@ -205,6 +205,27 @@ class TestWatcherTrigger:
             state = await self.trigger._get_producer_task_status()
 
         assert state is None
+
+    @pytest.mark.asyncio
+    async def test_run_producer_success_model_not_run(self, caplog):
+        """Test that when producer succeeds but model has no status, trigger yields success with model_not_run reason."""
+        get_producer_status_mock = AsyncMock(return_value="success")
+        parse_node_status_mock = AsyncMock(return_value=None)
+
+        caplog.set_level("INFO")
+
+        with (
+            patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
+            patch.object(self.trigger, "_parse_node_status", parse_node_status_mock),
+        ):
+            events = []
+            async for event in self.trigger.run():
+                events.append(event)
+
+        assert len(events) == 1
+        assert events[0].payload == {"status": "success", "reason": "model_not_run"}
+        assert "The producer task 'task_1' succeeded" in caplog.text
+        assert "There is no information about the model 'model.test' execution" in caplog.text
 
     @pytest.mark.asyncio
     async def test_run_poke_interval_and_debug_log(self, caplog):

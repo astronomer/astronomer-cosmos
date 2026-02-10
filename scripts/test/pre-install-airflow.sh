@@ -41,29 +41,7 @@ uv pip install "apache-airflow==$AIRFLOW_VERSION" apache-airflow-providers-docke
 uv pip install "gcsfs<2025.3.0"
 
 
-if [ "$AIRFLOW_VERSION" = "2.6" ]  ; then
-  uv pip install "apache-airflow-providers-amazon" "apache-airflow==$AIRFLOW_VERSION" "urllib3<2"
-  uv pip install "apache-airflow-providers-cncf-kubernetes" "apache-airflow==$AIRFLOW_VERSION"
-  uv pip install  "apache-airflow-providers-google<10.11" "apache-airflow==$AIRFLOW_VERSION"
-  uv pip install "apache-airflow-providers-microsoft-azure" "apache-airflow==$AIRFLOW_VERSION"
-  uv pip install "pydantic<2.0"
-elif [ "$AIRFLOW_VERSION" = "2.7" ] ; then
-  uv pip install "apache-airflow-providers-amazon" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
-  uv pip install apache-airflow-providers-microsoft-azure --constraint /tmp/constraint.txt
-elif [ "$AIRFLOW_VERSION" = "2.8" ] ; then
-  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-google<=10.26" "apache-airflow==$AIRFLOW_VERSION"
-  # The Airflow 2.8 constraints file at
-  # https://raw.githubusercontent.com/apache/airflow/constraints-2.8.0/constraints-3.11.txt
-  # specifies apache-airflow-providers-microsoft-azure==8.4.0. However, our Azure connection setup in the CI,
-  # previously led to authentication issues with this version. This issue got resolved in
-  # apache-airflow-providers-microsoft-azure==8.5.0. Hence, we are using apache-airflow-providers-microsoft-azure>=8.5.0
-  # and skipping installation with constraints, as the specified version does not meet our requirements.
-  uv pip install "apache-airflow-providers-microsoft-azure>=8.5.0" "apache-airflow==$AIRFLOW_VERSION"
-elif [ "$AIRFLOW_VERSION" = "2.9" ] ; then
+if [ "$AIRFLOW_VERSION" = "2.9" ] ; then
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
@@ -93,3 +71,6 @@ else
     echo "Version does not match. Expected: $desired_version, but got: $actual_version"
     exit 1
 fi
+
+# Install dbt-loom for cross-project references
+uv pip install "dbt-loom"

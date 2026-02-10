@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 import jinja2
-from airflow import DAG
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from packaging.version import Version
@@ -32,13 +31,12 @@ if TYPE_CHECKING:  # pragma: no cover
 
 from attrs import define
 
-from cosmos import cache, settings
+try:
+    from airflow.sdk import ObjectStoragePath
+except ImportError:
+    from airflow.io.path import ObjectStoragePath
 
-if settings.AIRFLOW_IO_AVAILABLE:
-    try:
-        from airflow.sdk import ObjectStoragePath
-    except ImportError:
-        from airflow.io.path import ObjectStoragePath
+from cosmos import cache, settings
 from cosmos._utils.importer import load_method_from_module
 from cosmos.cache import (
     _copy_cached_package_lockfile_to_project,
@@ -142,9 +140,7 @@ except (ImportError, ModuleNotFoundError):
     try:
         from openlineage.airflow.extractors.base import OperatorLineage
     except (ImportError, ModuleNotFoundError):
-        logger.warning(
-            "To enable emitting Openlineage events, upgrade to Airflow 2.7 or install astronomer-cosmos[openlineage]."
-        )
+        logger.warning("To enable emitting Openlineage events, install apache-airflow-providers-openlineage.")
         logger.debug(
             "Further details on lack of Openlineage Airflow provider:",
             stack_info=True,
@@ -321,13 +317,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             )
             return None, None
 
-        if not settings.AIRFLOW_IO_AVAILABLE:
-            raise CosmosValueError(
-                f"You're trying to specify remote target path {target_path_str}, but the required "
-                f"Object Storage feature is unavailable in Airflow version {AIRFLOW_VERSION}. Please upgrade to "
-                "Airflow 2.8 or later."
-            )
-
         _configured_target_path = ObjectStoragePath(target_path_str, conn_id=remote_conn_id)
 
         if not _configured_target_path.exists():  # type: ignore[no-untyped-call]
@@ -463,9 +452,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             process_log_line=self._process_log_line_callable,
             **kwargs,
         )
-        # Logging changed in Airflow 3.1 and we needed to replace the output by the full output:
-        output = "".join(subprocess_result.full_output)
-        logger.info(output)
         return subprocess_result
 
     def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> dbtRunnerResult:
@@ -575,6 +561,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         logger.info("Outlets: %s", outlets)
         self.register_dataset(inlets, outlets, context)
 
+        if settings.enable_uri_xcom and (uris := [outlet.uri for outlet in outlets]):
+            context["ti"].xcom_push(key="uri", value=uris)
+            logger.info(f"Pushed outlet URI(s) to XCom: {uris}")
+
     def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
             return
@@ -663,7 +653,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self._handle_partial_parse(tmp_dir_path)
 
             with self.profile_config.ensure_profile() as profile_values:
-                (profile_path, env_vars) = profile_values
+                profile_path, env_vars = profile_values
                 env.update(env_vars)
                 logger.debug("Using environment variables keys: %s", env.keys())
 
@@ -752,26 +742,22 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             if settings.use_dataset_airflow3_uri_standard:
                 dataset_uri = airflow_3_uri
             else:
-                logger.warning(
-                    f"""
+                logger.warning(f"""
                     Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs (standard used by Cosmos) will no longer be valid.
                     Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to <{airflow_3_uri}>.
                     Previously, with Airflow 2.x, the URI was <{airflow_2_uri}>.
                     If you want to use the Airflow 3 URI standard while still using Airflow 2, please, set:
                         export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1
                     Remember to update any DAGs that are scheduled using this dataset.
-                    """
-                )
+                    """)
                 dataset_uri = airflow_2_uri
         else:
-            logger.warning(
-                f"""
+            logger.warning(f"""
                 Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs (standard used by Cosmos) are no longer accepted.
                 Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <{airflow_3_uri}>.
                 Before, with Airflow 2.x, the URI used to be <{airflow_2_uri}>.
                 Please, change any DAGs that were scheduled using the old standard to the new one.
-                """
-            )
+                """)
             dataset_uri = airflow_3_uri
         return dataset_uri
 
@@ -812,6 +798,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
+        from airflow import DAG
+
         if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
             logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")
             raise AirflowCompatibilityError(

@@ -1,0 +1,29 @@
+name: 'upstream'
+version: '1.0.0'
+config-version: 2
+
+profile: 'upstream'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Model configurations
+models:
+  upstream:
+    # Staging models - public for cross-project reference
+    staging:
+      +materialized: view
+      +access: public
+    # Intermediate models - public for cross-project reference
+    intermediate:
+      +materialized: view
+      +access: public
+
+# Seed configurations - seeds use the default schema from the profile

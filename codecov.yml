@@ -1,0 +1,2 @@
+ignore:
+  - "cosmos/airflow/_override.py"

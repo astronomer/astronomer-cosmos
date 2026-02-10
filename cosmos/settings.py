@@ -6,8 +6,6 @@ from pathlib import Path
 
 import airflow
 from airflow.configuration import conf
-from airflow.version import version as airflow_version
-from packaging.version import Version
 
 from cosmos.constants import (
     DEFAULT_COSMOS_CACHE_DIR_NAME,
@@ -19,6 +17,7 @@ DEFAULT_CACHE_DIR = Path(tempfile.gettempdir(), DEFAULT_COSMOS_CACHE_DIR_NAME)
 cache_dir = Path(conf.get("cosmos", "cache_dir", fallback=DEFAULT_CACHE_DIR) or DEFAULT_CACHE_DIR)
 enable_cache = conf.getboolean("cosmos", "enable_cache", fallback=True)
 enable_dataset_alias = conf.getboolean("cosmos", "enable_dataset_alias", fallback=True)
+enable_uri_xcom = conf.getboolean("cosmos", "enable_uri_xcom", fallback=False)
 use_dataset_airflow3_uri_standard = conf.getboolean(
     "cosmos",
     "enable_dataset_airflow3_uri",
@@ -27,6 +26,7 @@ use_dataset_airflow3_uri_standard = conf.getboolean(
 enable_cache_partial_parse = conf.getboolean("cosmos", "enable_cache_partial_parse", fallback=True)
 enable_cache_package_lockfile = conf.getboolean("cosmos", "enable_cache_package_lockfile", fallback=True)
 enable_cache_dbt_ls = conf.getboolean("cosmos", "enable_cache_dbt_ls", fallback=True)
+enable_cache_dbt_yaml_selectors = conf.getboolean("cosmos", "enable_cache_dbt_yaml_selectors", fallback=True)
 rich_logging = conf.getboolean("cosmos", "rich_logging", fallback=False)
 dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)
@@ -56,7 +56,12 @@ enable_memory_optimised_imports = conf.getboolean("cosmos", "enable_memory_optim
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
 enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)
 
-AIRFLOW_IO_AVAILABLE = Version(airflow_version) >= Version("2.8.0")
+# DBT Watcher Execution Mode Watcher Task Retry Queue
+# in watcher mode, if the producer watcher fails, the consumer tasks run the individual models on retry.
+# since these tasks are sensors that require low memory/cpu on their first try,
+# this setting allows retries to run on a queue with larger resources, which is often necessary for larger dbt projects
+# this would also be used to run the producer task
+watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
 
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
@@ -81,3 +86,7 @@ def convert_to_boolean(value: str | None) -> bool:
 enable_telemetry = conf.getboolean("cosmos", "enable_telemetry", fallback=True)
 do_not_track = convert_to_boolean(os.getenv("DO_NOT_TRACK"))
 no_analytics = convert_to_boolean(os.getenv("SCARF_NO_ANALYTICS"))
+
+# Debug mode - when enabled, Cosmos will track and push memory utilization to XCom
+enable_debug_mode = conf.getboolean("cosmos", "enable_debug_mode", fallback=False)
+debug_memory_poll_interval_seconds = conf.getfloat("cosmos", "debug_memory_poll_interval_seconds", fallback=0.5)

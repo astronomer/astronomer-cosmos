@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from airflow import DAG
-
 if TYPE_CHECKING:
     try:
+        from airflow.sdk import DAG  # type: ignore[assignment]
+
         # Airflow 3.1 onwards
         from airflow.utils.task_group import TaskGroup
     except ImportError:
+        from airflow import DAG  # type: ignore[assignment]
         from airflow.utils.task_group import TaskGroup
 
 

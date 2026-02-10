@@ -9,6 +9,7 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :caption: Contents:
 
    dbt Fusion <dbt-fusion>
+   Multi-Project Setups <multi-project>
 
    Project Config <project-config>
    Profile Config <profile-config>

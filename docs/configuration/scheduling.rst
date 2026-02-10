@@ -27,7 +27,7 @@ Data-Aware Scheduling
 
 `Apache Airflow® <https://airflow.apache.org/>`_ 2.4 introduced the concept of `scheduling based on Datasets <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/datasets.html>`_.
 
-By default, if using a version between Airflow 2.4 or higher is used, Cosmos emits `Airflow Datasets <https://airflow.apache.org/docs/apache-airflow/stable/concepts/datasets.html>`_ when running dbt projects. This allows you to use Airflow's data-aware scheduling capabilities to schedule your dbt projects. Cosmos emits datasets using the OpenLineage URI format, as detailed in the `OpenLineage Naming Convention <https://github.com/OpenLineage/OpenLineage/blob/main/spec/Naming.md>`_.
+By default, if using a version between Airflow 2.4 or higher, Cosmos emits `Airflow Datasets <https://airflow.apache.org/docs/apache-airflow/stable/concepts/datasets.html>`_ when running dbt projects. This allows you to use Airflow's data-aware scheduling capabilities to schedule your dbt projects. Cosmos emits datasets using the OpenLineage URI format, as detailed in the `OpenLineage Naming Convention <https://github.com/OpenLineage/OpenLineage/blob/main/spec/Naming.md>`_.
 
 .. important::
 
@@ -83,7 +83,7 @@ This example DAG:
     :end-before: [END local_example]
 
 
-Will trigger the following DAG to be run (when using Cosmos 1.1 when using Airflow 2.4 or newer):
+Will trigger the following DAG to be run:
 
 .. code-block:: python
 
@@ -91,7 +91,6 @@ Will trigger the following DAG to be run (when using Cosmos 1.1 when using Airfl
     from airflow import DAG
     from airflow.datasets import Dataset
     from airflow.operators.empty import EmptyOperator
-
 
     with DAG(
         "dataset_triggered_dag",
@@ -117,7 +116,6 @@ From Cosmos 1.7 and Airflow 2.10, it is also possible to trigger DAGs be to be r
     from airflow import DAG
     from airflow.datasets import DatasetAlias
     from airflow.operators.empty import EmptyOperator
-
 
     with DAG(
         "datasetalias_triggered_dag",
@@ -194,7 +192,7 @@ We've reported this issue and it will be resolved in future versions of Airflow:
 - https://github.com/apache/airflow/issues/42495
 
 For users to overcome this limitation in local tests, until the Airflow community solves this, we introduced the configuration
-``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS``, that is ``True`` by default. If users want to run ``dags test` and not see ``sqlalchemy.orm.exc.FlushError``,
+``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS``, that is ``True`` by default. If users want to run ``dags test`` and not see ``sqlalchemy.orm.exc.FlushError``,
 they can set this configuration to ``False``. It can also be set in the ``airflow.cfg`` file:
 
 .. code-block::
@@ -202,4 +200,46 @@ they can set this configuration to ``False``. It can also be set in the ``airflo
     [cosmos]
     enable_dataset_alias = False
 
-Starting in Airflow 3, Cosmos users no longer allowed to set ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS`` to ``True``.
+Starting in Airflow 3, Cosmos users are no longer allowed to set ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS`` to ``True``.
+
+
+Emitting Dataset URIs as XCom
+.............................
+
+By default, Cosmos emits datasets as Airflow inlets/outlets but does not expose the raw dataset URIs as XCom values.
+If you need access to the dataset URIs (for example, to use them in downstream tasks or for debugging purposes),
+you can enable the ``enable_uri_xcom`` setting.
+
+When enabled, Cosmos will push the outlet URIs to XCom with the key ``uri`` after each task execution that emits datasets.
+
+To enable this feature, set the environment variable:
+
+.. code-block:: bash
+
+    export AIRFLOW__COSMOS__ENABLE_URI_XCOM=True
+
+Or in your ``airflow.cfg``:
+
+.. code-block::
+
+    [cosmos]
+    enable_uri_xcom = True
+
+When enabled, you can access the URIs in downstream tasks using XCom:
+
+.. code-block:: python
+
+    from airflow.decorators import task
+
+
+    @task
+    def process_uris(**context):
+        ti = context["ti"]
+        uris = ti.xcom_pull(task_ids="my_dbt_task", key="uri")
+        for uri in uris:
+            print(f"Processing dataset: {uri}")
+
+.. note::
+
+    This feature is available for all Airflow versions (2.4+) and works alongside the existing dataset emission behavior.
+    The ``uri`` XCom contains a list of URI strings, even if there is only one outlet.

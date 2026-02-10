@@ -108,6 +108,7 @@ class ExecutionMode(Enum):
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
     GCP_CLOUD_RUN_JOB = "gcp_cloud_run_job"
+    WATCHER_KUBERNETES = "watcher_kubernetes"
 
 
 class InvocationMode(Enum):
@@ -188,6 +189,9 @@ TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtReso
 DBT_SETUP_ASYNC_TASK_ID = "dbt_setup_async"
 DBT_TEARDOWN_ASYNC_TASK_ID = "dbt_teardown_async"
 
+WATCHER_TASK_WEIGHT_RULE = "absolute"
+CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT = 2
+PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT = 20
 PRODUCER_WATCHER_TASK_ID = "dbt_producer_watcher"
 
 # Historical telemetry endpoints retained for reference:
@@ -202,3 +206,5 @@ TELEMETRY_VERSION = "v3"
 TELEMETRY_TIMEOUT = 1.0
 
 _AIRFLOW3_MAJOR_VERSION = 3
+
+_K8s_WATCHER_MIN_K8S_PROVIDER_VERSION = Version("10.8.0")

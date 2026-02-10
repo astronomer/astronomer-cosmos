@@ -3,37 +3,29 @@ from __future__ import annotations
 from functools import cache
 from pathlib import Path
 
-import airflow
 import pytest
 from airflow.models.dagbag import DagBag
 from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
+from cosmos.constants import AIRFLOW_VERSION
+
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 
-MIN_VER_DAG_FILE: dict[str, list[str]] = {
-    "2.8": ["cosmos_manifest_example.py"],
-}
-
-IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py"]
-
-# Sort descending based on Versions and convert string to an actual version
-MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {
-    Version(version): MIN_VER_DAG_FILE[version] for version in sorted(MIN_VER_DAG_FILE, key=Version, reverse=True)
-}
+IGNORED_DAG_FILES = [
+    "performance_dag.py",
+    "jaffle_shop_kubernetes.py",
+    "jaffle_shop_watcher_kubernetes.py",
+    "cosmos_manifest_selectors_example.py",
+]
 
 
 @cache
 def get_dag_bag() -> DagBag:
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:
-        for min_version, files in MIN_VER_DAG_FILE_VER.items():
-            if Version(airflow.__version__) < min_version:
-                print(f"Adding {files} to .airflowignore")
-                file.writelines([f"{file_name}\n" for file_name in files])
-
         for dagfile in IGNORED_DAG_FILES:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
@@ -53,6 +45,10 @@ def get_dag_bag() -> DagBag:
         for file_name in ["cosmos_profile_mapping.py"]:
             print(f"Adding {file_name} to .airflowignore")
             file.write(f"{file_name}\n")
+
+        if AIRFLOW_VERSION >= Version("3.0.0"):
+            file.writelines("example_cosmos_cleanup_dag.py\n")
+
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)

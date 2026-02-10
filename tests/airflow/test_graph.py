@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from airflow import __version__ as airflow_version
 from airflow.models import DAG
 
 from cosmos.operators.watcher import DbtTestWatcherOperator
@@ -18,8 +17,6 @@ except ImportError:
     from airflow.models.abstractoperator import DEFAULT_OWNER
     from airflow.operators.empty import EmptyOperator
     from airflow.utils.task_group import TaskGroup
-
-from packaging import version
 
 from cosmos.airflow.graph import (
     _add_teardown_task,
@@ -815,10 +812,6 @@ def _normalize_task_display_name(node: DbtNode) -> str:
     return f"new_task_display_name_{node.name}_{node.resource_type.value}"
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.9"),
-    reason="Airflow task did not have display_name until the 2.9 release",
-)
 @pytest.mark.parametrize(
     "node_type,node_id,normalize_task_id,normalize_task_display_name,use_task_group,test_behavior,expected_node_id,expected_display_name",
     [
@@ -1834,3 +1827,24 @@ def test_skip_test_task_when_only_detached_tests_exist():
         ]
 
         assert list(tasks_map.keys()) == expected_task_ids
+
+
+def test_create_test_task_metadata_watcher_kubernetes_after_all():
+    """
+    Test that create_test_task_metadata creates a DbtTestKubernetesOperator
+    when test_behavior is AFTER_ALL and execution_mode is WATCHER_KUBERNETES.
+    """
+    render_config = RenderConfig(
+        test_behavior=TestBehavior.AFTER_ALL,
+    )
+
+    metadata = create_test_task_metadata(
+        test_task_name="my_project_test",
+        execution_mode=ExecutionMode.WATCHER_KUBERNETES,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"project_dir": SAMPLE_PROJ_PATH},
+        render_config=render_config,
+    )
+
+    assert metadata.id == "my_project_test"
+    assert metadata.operator_class == "cosmos.operators.kubernetes.DbtTestKubernetesOperator"

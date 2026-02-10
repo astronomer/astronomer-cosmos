@@ -33,7 +33,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -55,26 +55,10 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        airflow-version: ["2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0", "3.1"]
+        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1"]
         dbt-version: ["1.10"]
         exclude:
-          # Apache Airflow versions prior to 2.9.0 have not been tested with Python 3.12.
-          # Official support for Python 3.12 and the corresponding constraints.txt are available only for Apache Airflow >= 2.9.0.
-          # See: https://github.com/apache/airflow/tree/2.9.0?tab=readme-ov-file#requirements
-          # See: https://github.com/apache/airflow/tree/2.8.4?tab=readme-ov-file#requirements
-          - python-version: "3.12"
-            airflow-version: "2.6"
-          - python-version: "3.12"
-            airflow-version: "2.7"
-          - python-version: "3.12"
-            airflow-version: "2.8"
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
-          - python-version: "3.13"
-            airflow-version: "2.6"
-          - python-version: "3.13"
-            airflow-version: "2.7"
-          - python-version: "3.13"
-            airflow-version: "2.8"
           - python-version: "3.13"
             airflow-version: "2.9"
           - python-version: "3.13"
@@ -84,7 +68,7 @@ jobs:
           - python-version: "3.13"
             airflow-version: "3.0"
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -127,26 +111,10 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        airflow-version: ["2.6", "2.7", "2.8", "2.9", "2.10", "2.11", "3.0", "3.1"]
+        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1"]
         dbt-version: [ "1.11" ]
         exclude:
-          # Apache Airflow versions prior to 2.9.0 have not been tested with Python 3.12.
-          # Official support for Python 3.12 and the corresponding constraints.txt are available only for Apache Airflow >= 2.9.0.
-          # See: https://github.com/apache/airflow/tree/2.9.0?tab=readme-ov-file#requirements
-          # See: https://github.com/apache/airflow/tree/2.8.4?tab=readme-ov-file#requirements
-          - python-version: "3.12"
-            airflow-version: "2.6"
-          - python-version: "3.12"
-            airflow-version: "2.7"
-          - python-version: "3.12"
-            airflow-version: "2.8"
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
-          - python-version: "3.13"
-            airflow-version: "2.6"
-          - python-version: "3.13"
-            airflow-version: "2.7"
-          - python-version: "3.13"
-            airflow-version: "2.8"
           - python-version: "3.13"
             airflow-version: "2.9"
           - python-version: "3.13"
@@ -168,7 +136,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -197,6 +165,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration
         env:
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS: 0
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
           AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
@@ -251,7 +220,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -321,7 +290,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [ "3.11" ]
-        airflow-version: [ "2.8", "3.0" ]
+        airflow-version: [ "2.10", "3.0" ]
         dbt-version: [ "1.5" ]
     services:
       postgres:
@@ -337,7 +306,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -413,7 +382,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -483,7 +452,7 @@ jobs:
         dbt-version: ["2.0"]  # dbt Fusion
 
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -521,6 +490,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbtf
         env:
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS: 0
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
@@ -580,7 +550,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -642,7 +612,7 @@ jobs:
         airflow-version: [ "2.10", "3.0" ]
         dbt-version: [ "1.11" ]
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -713,7 +683,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false

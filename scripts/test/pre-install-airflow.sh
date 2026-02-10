@@ -16,6 +16,10 @@ if [ "$GITHUB_ACTIONS" = "true" ] && [ -z "${VIRTUAL_ENV}" ]; then
   echo "${VIRTUAL_ENV}"
 fi
 
+# Remove artifacts used locally
+rm -f $AIRFLOW_HOME/airflow.cfg
+rm -f $AIRFLOW_HOME/airflow.db
+
 # Install Airflow with constraints
 pip install uv
 uv pip install pip --upgrade
@@ -31,6 +35,23 @@ elif [ "$AIRFLOW_VERSION" = "3.0" ] ; then
 elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
   uv pip install -r requirements/requirements-airflow-3.1-dbt-1.11.txt
 else
+  # Download Airflow constraints according to the version being used
+  if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
+    CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.2/constraints-$PYTHON_VERSION.txt"
+  elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
+    CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.0/constraints-$PYTHON_VERSION.txt"
+    uv pip install "apache-airflow-devel-common"
+  else
+    CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-$AIRFLOW_VERSION.0/constraints-$PYTHON_VERSION.txt"
+  fi;
+
+  curl -sSL $CONSTRAINT_URL -o /tmp/constraint.txt
+  # Workaround to remove PyYAML constraint that will work on both Linux and MacOS
+  sed '/PyYAML==/d' /tmp/constraint.txt > /tmp/constraint.txt.tmp
+
+  mv /tmp/constraint.txt.tmp /tmp/constraint.txt
+
+  # Install Airflow providers, dbt adapters
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-google" "apache-airflow==$AIRFLOW_VERSION" --constraint /tmp/constraint.txt
@@ -38,6 +59,9 @@ else
   uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0" apache-airflow==$AIRFLOW_VERSION
   uv pip install dbt-loom
+
+  # Delete the no longer needed constraint file
+  rm /tmp/constraint.txt
 fi
 
 actual_airflow_version=$(airflow version 2>/dev/null | tail -1 | cut -d. -f1,2)
@@ -62,4 +86,4 @@ fi
 
 # Installation of dbt in a separate Python virtual environment:
 python -m venv venv-subprocess
-venv-subprocess/bin/pip install -U dbt-postgres
+venv-subprocess/bin/pip install -U dbt-postgres dbt-loom

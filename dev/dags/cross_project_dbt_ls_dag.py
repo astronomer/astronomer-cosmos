@@ -44,6 +44,7 @@ POSTGRES_CONN_ID = "example_conn"
 DBT_UPSTREAM_PROJECT_PATH = DBT_ROOT_PATH / "cross_project" / "upstream"
 DBT_DOWNSTREAM_PROJECT_PATH = DBT_ROOT_PATH / "cross_project" / "downstream"
 
+DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess" / "bin" / "dbt"
 
 # [START cross_project_dbt_ls_dag]
 # =============================================================================
@@ -79,6 +80,7 @@ with DAG(
         group_id="upstream",
         project_config=ProjectConfig(
             dbt_project_path=DBT_UPSTREAM_PROJECT_PATH,
+            dbt_executable_path=DBT_EXECUTABLE_PATH,
         ),
         profile_config=upstream_profile_config,
         render_config=RenderConfig(

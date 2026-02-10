@@ -262,6 +262,7 @@ rich-argparse==1.4.0
 rpds-py==0.30.0
 rsa==4.9
 ruamel-yaml==0.19.1
+s3fs
 s3transfer==0.10.1
 scikit-learn==1.5.2
 scipy==1.15.3

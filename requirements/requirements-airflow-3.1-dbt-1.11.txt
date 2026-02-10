@@ -119,7 +119,6 @@ executing==2.2.1
 fastapi==0.117.1
 fastapi-cli==0.0.13
 fastjsonschema==2.21.2
-fastuuid==0.12.0
 filelock==3.20.3
 frozenlist==1.7.0
 fsspec==2025.9.0
@@ -175,7 +174,6 @@ lazy-object-proxy==1.12.0
 leather==0.4.1
 libcst==1.8.4
 linkify-it-py==2.0.3
-litellm==1.77.5
 lockfile==0.12.2
 looker-sdk==25.16.0
 lxml==5.4.0

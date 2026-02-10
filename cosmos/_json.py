@@ -40,6 +40,7 @@ def load(fp: IO[str] | IO[bytes], **kwargs: Any) -> Any:
         return _orjson.loads(fp.read())  # type: ignore[union-attr]
     return _json.load(fp, **kwargs)
 
+
 def _orjson_option(sort_keys: bool = False, indent: int | None = None) -> int | None:
     """Build the ``option`` bitmask for :func:`orjson.dumps`."""
     option = 0

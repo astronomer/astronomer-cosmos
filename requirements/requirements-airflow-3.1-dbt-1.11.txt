@@ -210,7 +210,6 @@ mypy==1.9.0
 mypy_extensions==1.1.0
 natsort==8.4.0
 nbformat==5.10.4
-networkx==3.6.1
 nodeenv==1.10.0
 oauthlib==3.3.1
 openai==1.109.0

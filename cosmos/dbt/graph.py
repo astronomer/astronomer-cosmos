@@ -4,7 +4,6 @@ import base64
 import datetime
 import functools
 import itertools
-import json
 import os
 import platform
 import tempfile
@@ -18,11 +17,6 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
 
-try:
-    import orjson
-except ImportError:  # pragma: no cover
-    orjson = None  # type: ignore[assignment] # pragma: no cover
-
 if TYPE_CHECKING:
     try:
         # Airflow 3 onwards
@@ -34,6 +28,7 @@ if TYPE_CHECKING:
             pass
 
 import cosmos.dbt.runner as dbt_runner
+from cosmos import _json as json
 from cosmos import cache, settings
 from cosmos.cache import (
     _configure_remote_cache_dir,
@@ -247,7 +242,7 @@ def run_command_with_dbt_runner(command: list[str], tmp_dir: Path | None, env_va
     stderr = ""
     stdout = ""
     result_list = (
-        [json.dumps(item.to_dict()) if hasattr(item, "to_dict") else item for item in response.result]
+        [json.dumps_str(item.to_dict()) if hasattr(item, "to_dict") else item for item in response.result]
         if response.result
         else []
     )
@@ -432,7 +427,7 @@ class DbtGraph:
         Change args list in-place so they include dbt vars, if they are set.
         """
         if self.dbt_vars:
-            cmd_args.extend(["--vars", json.dumps(self.dbt_vars, sort_keys=True)])
+            cmd_args.extend(["--vars", json.dumps_str(self.dbt_vars, sort_keys=True)])
 
     @cached_property
     def dbt_ls_args(self) -> list[str]:
@@ -466,7 +461,7 @@ class DbtGraph:
         cache_args = list(self.dbt_ls_args)
         env_vars = self.env_vars
         if env_vars:
-            envvars_str = json.dumps(env_vars, sort_keys=True)
+            envvars_str = json.dumps_str(env_vars, sort_keys=True)
             cache_args.append(envvars_str)
         if self.render_config.airflow_vars_to_purge_dbt_ls_cache:
             for var_name in self.render_config.airflow_vars_to_purge_dbt_ls_cache:
@@ -1016,13 +1011,11 @@ class DbtGraph:
             "last_modified": "Isoformat timestamp"
         }
         """
-        raw_selectors_json = json.dumps(yaml_selectors.raw, sort_keys=True)
-        compressed_raw = zlib.compress(raw_selectors_json.encode("utf-8"))
+        compressed_raw = zlib.compress(json.dumps_bytes(yaml_selectors.raw, sort_keys=True))
         encoded_raw = base64.b64encode(compressed_raw)
         raw_selectors_compressed = encoded_raw.decode("utf-8")
 
-        parsed_selectors_json = json.dumps(yaml_selectors.parsed, sort_keys=True)
-        compressed_parsed = zlib.compress(parsed_selectors_json.encode("utf-8"))
+        compressed_parsed = zlib.compress(json.dumps_bytes(yaml_selectors.parsed, sort_keys=True))
         encoded_parsed = base64.b64encode(compressed_parsed)
         parsed_selectors_compressed = encoded_parsed.decode("utf-8")
 
@@ -1106,32 +1099,6 @@ class DbtGraph:
 
         return self.parse_yaml_selectors(selector_definitions)
 
-    def _load_manifest_from_file(self, manifest_path: Path | ObjectStoragePath) -> dict[str, Any]:
-        """
-        Load and parse a dbt manifest JSON file.
-
-        Uses orjson for faster parsing if enabled and available, otherwise falls back to standard json.
-
-        Args:
-            manifest_path: Path to the manifest.json file
-
-        Returns:
-            Parsed manifest dictionary
-
-        Raises:
-            CosmosLoadDbtException: If orjson is enabled but not installed
-        """
-        if settings.enable_orjson_parser and orjson:
-            manifest_content = manifest_path.read_bytes()
-            return orjson.loads(manifest_content)  # type: ignore[no-any-return]
-        elif settings.enable_orjson_parser:
-            raise CosmosLoadDbtException(
-                "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
-            )
-        else:
-            with manifest_path.open() as fp:
-                return json.load(fp)  # type: ignore[no-any-return]
-
     def load_from_dbt_manifest(self) -> None:
         """
         This approach accurately loads `dbt` projects using the `manifest.yml` file.
@@ -1157,7 +1124,8 @@ class DbtGraph:
         if TYPE_CHECKING:
             assert self.project.manifest_path is not None  # pragma: no cover
 
-        manifest = self._load_manifest_from_file(self.project.manifest_path)
+        with self.project.manifest_path.open() as fp:
+            manifest = json.load(fp)
 
         resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
         for unique_id, node_dict in resources.items():

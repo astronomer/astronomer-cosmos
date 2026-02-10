@@ -25,4 +25,5 @@ else
     airflow db init
 fi
 
+echo "Packages installed:"
 uv pip freeze

@@ -285,7 +285,6 @@ python-slugify==8.0.4
 pytimeparse==1.1.8
 pytokens==0.4.1
 pytz==2025.2
-pyyaml-ft==8.0.0
 redshift-connector==2.1.8
 referencing==0.37.0
 regex==2025.9.18

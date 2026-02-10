@@ -217,8 +217,8 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         logger.info("Node Info: %s", run_results_json)
         self.compiled_sql = node_result.get("compiled_code")
-        if self.compiled_sql:
-            self._override_rtif(context)  # type: ignore[attr-defined]
+        if self.compiled_sql and hasattr(self, "_override_rtif"):
+            self._override_rtif(context)
 
         return node_result.get("status")
 
@@ -276,7 +276,8 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         compiled_sql = event.get("compiled_sql")
         if compiled_sql:
             self.compiled_sql = compiled_sql
-            self._override_rtif(context)  # type: ignore[attr-defined]
+            if hasattr(self, "_override_rtif"):
+                self._override_rtif(context)
 
         if status != "failed":
             return
@@ -330,7 +331,8 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 )
                 if compiled_sql:
                     self.compiled_sql = compiled_sql
-                    self._override_rtif(context)  # type: ignore[attr-defined]
+                    if hasattr(self, "_override_rtif"):
+                        self._override_rtif(context)
 
         if status is None:
 

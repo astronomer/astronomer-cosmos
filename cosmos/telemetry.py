@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import platform
 import zlib
 from base64 import b64decode, b64encode
@@ -12,6 +11,7 @@ import httpx
 from airflow import __version__ as airflow_version
 
 import cosmos
+from cosmos import _json as json
 from cosmos import constants, settings
 from cosmos.log import get_logger
 
@@ -101,8 +101,7 @@ def _compress_telemetry_metadata(metadata: dict[str, Any]) -> str:
     :param metadata: Telemetry metadata dictionary
     :returns: Base64-encoded zlib-compressed JSON string
     """
-    json_bytes = json.dumps(metadata).encode("utf-8")
-    compressed = zlib.compress(json_bytes, level=9)
+    compressed = zlib.compress(json.dumps_bytes(metadata), level=9)
     return b64encode(compressed).decode("ascii")
 
 

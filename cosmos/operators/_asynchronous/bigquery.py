@@ -156,8 +156,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     def get_remote_sql(self) -> str:
         start_time = time.time()
 
-        if not settings.AIRFLOW_IO_AVAILABLE:  # pragma: no cover
-            raise CosmosValueError(f"Cosmos async support is only available starting in Airflow 2.8 or later.")
         try:
             from airflow.sdk import ObjectStoragePath
         except ImportError:

@@ -232,7 +232,7 @@ lazy-object-proxy==1.12.0
 leather==0.4.1
 libcst==1.8.4
 linkify-it-py==2.0.3
-litellm==1.77.3
+litellm==1.77.5
 lockfile==0.12.2
 looker-sdk==25.16.0
 lxml==5.4.0

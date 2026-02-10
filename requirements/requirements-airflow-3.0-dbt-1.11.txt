@@ -6,6 +6,7 @@ agate==1.9.1
 aiobotocore==2.22.0
 aiofiles==24.1.0
 aiohappyeyeballs==2.6.1
+airflow-provider-duckdb==0.2.0
 aiohttp==3.12.7
 aiohttp-cors==0.8.1
 aioitertools==0.12.0
@@ -96,6 +97,7 @@ dbt-bigquery==1.11.0
 dbt-common==1.37.2
 dbt-core==1.11.3
 dbt-databricks==1.10.9
+dbt-duckdb==1.10.0
 dbt-extractor==0.6.0
 dbt-loom==0.9.4
 dbt-postgres==1.10.0
@@ -112,6 +114,8 @@ distro==1.9.0
 dnspython==2.7.0
 docker==7.1.0
 docstring-parser==0.16
+duckdb==1.4.4
+duckdb-engine==0.17.0
 durationpy==0.10
 email-validator==2.2.0
 et-xmlfile==2.0.0

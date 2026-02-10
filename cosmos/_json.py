@@ -65,7 +65,7 @@ def dumps(
     guaranteed return type.
     """
     if _use_orjson():
-        return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent))  # type: ignore[union-attr]
+        return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent))  # type: ignore[union-attr,no-any-return]
     return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs)
 
 
@@ -79,7 +79,7 @@ def dumps_bytes(
 ) -> bytes:
     """Serialize *obj* to JSON **bytes**.  Efficient for both backends."""
     if _use_orjson():
-        return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent))  # type: ignore[union-attr]
+        return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent))  # type: ignore[union-attr,no-any-return]
     return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs).encode()
 
 
@@ -93,7 +93,7 @@ def dumps_str(
 ) -> str:
     """Serialize *obj* to a JSON **string**.  Convenient for both backends."""
     if _use_orjson():
-        return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent)).decode()  # type: ignore[union-attr]
+        return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent)).decode()  # type: ignore[union-attr,no-any-return]
     return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs)
 
 

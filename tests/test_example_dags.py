@@ -20,7 +20,12 @@ EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
-IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py", "jaffle_shop_watcher_kubernetes.py"]
+IGNORED_DAG_FILES = [
+    "performance_dag.py",
+    "jaffle_shop_kubernetes.py",
+    "jaffle_shop_watcher_kubernetes.py",
+    "cross_project_dbt_ls_dag.py",
+]
 
 
 @provide_session

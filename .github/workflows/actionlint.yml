@@ -1,0 +1,29 @@
+# Validates all workflow YAML files (syntax, duplicate keys, etc.) so that invalid
+# workflows are caught before merge. Runs in a separate file so it still runs even
+# when another workflow (e.g. test.yml) has parse errors and would not run at all.
+name: Validate workflow files
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/**"]
+  pull_request:
+    branches: [main]
+    paths: [".github/workflows/**"]
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Download actionlint
+        id: get_actionlint
+        run: bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.10 .
+        shell: bash
+
+      - name: Validate workflow files
+        run: ./actionlint -color
+        shell: bash

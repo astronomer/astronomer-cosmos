@@ -1,6 +1,14 @@
 Changelog
 =========
 
+1.14.0a1 (2026-02-02)
+---------------------
+
+Features
+
+* Add Add cluster policy for ``ExecutionMode.WATCHER`` sensor for retry by @astro-anand in #2293
+
+
 1.13.0 (2026-01-30)
 ---------------------
 

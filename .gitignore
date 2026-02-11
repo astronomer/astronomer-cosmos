@@ -3,7 +3,7 @@
 docs/profiles/*
 
 # actionlint binary (downloaded when running validate-workflows or locally)
-/actionlint
+actionlint
 
 # SQLite database files (generated artifacts - OSPS-QA-05.01 compliance)
 *.db

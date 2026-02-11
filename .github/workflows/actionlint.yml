@@ -19,11 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Download actionlint
-        id: get_actionlint
-        run: bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.10 .
-        shell: bash
-
       - name: Validate workflow files
-        run: ./actionlint -color
-        shell: bash
+        uses: reviewdog/action-actionlint@17c9bbf607128674f917b0de377503b1da11748a # v1.44.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-check
+          level: error

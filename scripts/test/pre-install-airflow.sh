@@ -17,8 +17,8 @@ if [ "$GITHUB_ACTIONS" = "true" ] && [ -z "${VIRTUAL_ENV}" ]; then
 fi
 
 # Remove artifacts used locally
-rm -f "${AIRFLOW_HOME:?}/airflow.cfg"
-rm -f "${AIRFLOW_HOME:?}/airflow.db"
+rm -f $AIRFLOW_HOME/airflow.cfg
+rm -f $AIRFLOW_HOME/airflow.db
 
 # Install Airflow with constraints
 pip install uv

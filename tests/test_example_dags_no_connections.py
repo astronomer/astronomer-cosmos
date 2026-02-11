@@ -48,7 +48,7 @@ def get_dag_bag() -> DagBag:
             file.write(f"{file_name}\n")
 
         if AIRFLOW_VERSION == Version("2.9.0"):
-            # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9
+            # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9.0
             file.write("cosmos_example_manifest_dag.py\n")
             # This DAG is taking too long to run int the CI (https://github.com/astronomer/astronomer-cosmos/actions/runs/21902660682/job/63234728594)
             file.write("example_cosmos_python_models.py\n")

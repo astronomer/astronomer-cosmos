@@ -470,10 +470,6 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
-    # try:
-    #     from airflow.models.asset import AssetAliasModel
-    # except ModuleNotFoundError:
-    #     from airflow.models.dataset import DatasetAliasModel as AssetAliasModel
     from sqlalchemy.orm.exc import FlushError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:

@@ -23,12 +23,10 @@ except (ModuleNotFoundError, ImportError):  # Airflow 2
     from airflow.datasets import Dataset as Asset  # type: ignore
 
 from airflow.utils.context import Context  # type: ignore
-from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION
-from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
@@ -95,17 +93,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         AbstractDbtLocalBase.__init__(
             self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )
-        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
-            from airflow.datasets import DatasetAlias
-
-            # ignoring the type because older versions of Airflow raise the follow error in mypy
-            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
-            dag_id = kwargs.get("dag")
-            task_group_id = kwargs.get("task_group")
-            kwargs["outlets"] = [
-                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
-            ]  # type: ignore
-
         # This is a workaround for Airflow 3 compatibility. In Airflow 2, the super().__init__() call worked correctly,
         # but in Airflow 3, it attempts to re-initialize AbstractDbtLocalBase with filtered kwargs that only include
         # BigQueryInsertJobOperator parameters and hence fails to initialise the operator due to missing arguments.

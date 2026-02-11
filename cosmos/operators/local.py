@@ -783,6 +783,56 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         return assets
 
+    def _register_datasets_without_alias(
+        self, new_inlets: list[Asset], new_outlets: list[Asset], context: Context
+    ) -> None:
+        """Register datasets without DatasetAlias (for Airflow < 2.10 or when DatasetAlias is disabled)."""
+        from airflow import DAG
+        from airflow.utils.session import create_session
+
+        logger.info("Assigning inlets/outlets without DatasetAlias")
+        with create_session() as session:
+            self.outlets.extend(new_outlets)  # type: ignore[has-type, attr-defined]
+            self.inlets.extend(new_inlets)  # type: ignore[has-type, attr-defined]
+            for task in self.dag.tasks:  # type: ignore[attr-defined]
+                if task.task_id == self.task_id:
+                    task.outlets.extend(new_outlets)
+                    task.inlets.extend(new_inlets)
+            DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined, call-arg, arg-type]
+            session.commit()
+
+    def _register_datasets_with_alias_airflow2(
+        self, new_outlets: list[Asset], dataset_alias_name: str, context: Context
+    ) -> None:
+        """Register datasets with DatasetAlias for Airflow 2.10+."""
+        from airflow.datasets import DatasetAlias
+
+        logger.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
+        dataset_alias = DatasetAlias(name=dataset_alias_name)
+        if not hasattr(self, "outlets") or not self.outlets:  # type: ignore[has-type]
+            self.outlets = []  # type: ignore[var-annotated, attr-defined]
+        if dataset_alias not in self.outlets:  # type: ignore[has-type]
+            self.outlets.append(dataset_alias)  # type: ignore[has-type, attr-defined]
+
+        for outlet in new_outlets:
+            context["outlet_events"][dataset_alias_name].add(outlet)  # type: ignore[index]
+
+    def _register_datasets_with_alias_airflow3(
+        self, new_outlets: list[Asset], dataset_alias_name: str, context: Context
+    ) -> None:
+        """Register datasets with AssetAlias for Airflow 3+."""
+        from airflow.sdk.definitions.asset import AssetAlias
+
+        logger.info("Assigning outlets with DatasetAlias in Airflow 3")
+        asset_alias = AssetAlias(dataset_alias_name)
+        if not hasattr(self, "outlets") or not self.outlets:  # type: ignore[has-type]
+            self.outlets = []  # type: ignore[var-annotated, attr-defined]
+        if asset_alias not in self.outlets:  # type: ignore[has-type]
+            self.outlets.append(asset_alias)  # type: ignore[has-type, attr-defined, call-arg, arg-type]
+
+        for outlet in new_outlets:
+            context["outlet_events"][asset_alias].add(outlet)
+
     def register_dataset(self, new_inlets: list[Asset], new_outlets: list[Asset], context: Context) -> None:
         """
         Register a list of datasets as outlets of the current task, when possible.
@@ -798,7 +848,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
-        from airflow import DAG
+        # Test operators should not emit outlets since tests don't produce outputs.
+        # This check ensures test operators never register outlets even if they somehow get outlets.
+        is_test_operator = DbtTestMixin in self.__class__.__mro__
+        if is_test_operator:
+            # Only register inlets for test operators, not outlets
+            new_outlets = []
 
         if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
             logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")
@@ -806,34 +861,17 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
             )
         elif AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
-            from airflow.utils.session import create_session
-
-            logger.info("Assigning inlets/outlets without DatasetAlias")
-            with create_session() as session:
-                self.outlets.extend(new_outlets)  # type: ignore[attr-defined]
-                self.inlets.extend(new_inlets)  # type: ignore[attr-defined]
-                for task in self.dag.tasks:  # type: ignore[attr-defined]
-                    if task.task_id == self.task_id:
-                        task.outlets.extend(new_outlets)
-                        task.inlets.extend(new_inlets)
-                DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined, call-arg, arg-type]
-                session.commit()
+            self._register_datasets_without_alias(new_inlets, new_outlets, context)
         else:
-            dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
+            # Only create DatasetAlias/AssetAlias when there are actual outlets to register.
+            # This prevents orphaned aliases for tasks that don't produce outputs (e.g., test operators).
+            if new_outlets:
+                dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
 
-            if AIRFLOW_VERSION.major == 2:
-                logger.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
-
-                for outlet in new_outlets:
-                    context["outlet_events"][dataset_alias_name].add(outlet)  # type: ignore[index]
-            else:  # AIRFLOW_VERSION.major == 3
-                logger.info("Assigning outlets with DatasetAlias in Airflow 3")
-                from airflow.sdk.definitions.asset import AssetAlias
-
-                # This line was necessary in Airflow 3.0.0, but this may become automatic in newer versions
-                self.outlets.append(AssetAlias(dataset_alias_name))  # type: ignore[attr-defined, call-arg, arg-type]
-                for outlet in new_outlets:
-                    context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)
+                if AIRFLOW_VERSION.major == 2:
+                    self._register_datasets_with_alias_airflow2(new_outlets, dataset_alias_name, context)
+                else:  # AIRFLOW_VERSION.major == 3
+                    self._register_datasets_with_alias_airflow3(new_outlets, dataset_alias_name, context)
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """
@@ -943,28 +981,13 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                     pass
 
         AbstractDbtLocalBase.__init__(self, **base_kwargs)
-        if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
-            if (
-                kwargs.get("emit_datasets", True)
-                and settings.enable_dataset_alias
-                and AIRFLOW_VERSION >= Version("2.10")
-            ):
-                from airflow.datasets import DatasetAlias
-
-                # ignoring the type because older versions of Airflow raise the follow error in mypy
-                # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
-                dag_id = kwargs.get("dag")
-                task_group_id = kwargs.get("task_group")
-                operator_kwargs["outlets"] = [
-                    DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
-                ]  # type: ignore
 
         if "task_id" in operator_kwargs:
             operator_kwargs.pop("task_id")
         BaseOperator.__init__(self, task_id=self.task_id, **operator_kwargs)
 
 
-class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
+class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):  # type: ignore[misc]
     """
     Executes a dbt core build command.
     """
@@ -1003,7 +1026,7 @@ class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):
             self._handle_warnings(result, context)
 
 
-class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):
+class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):  # type: ignore[misc]
     """
     Executes a dbt core ls command.
     """
@@ -1014,7 +1037,7 @@ class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
+class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):  # type: ignore[misc]
     """
     Executes a dbt core seed command.
     """
@@ -1025,7 +1048,7 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
+class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):  # type: ignore[misc]
     """
     Executes a dbt core snapshot command.
     """
@@ -1036,7 +1059,7 @@ class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
+class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):  # type: ignore[misc]
     """
     Executes a dbt source freshness command.
     """
@@ -1075,7 +1098,7 @@ class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
             self._handle_warnings(result, context)
 
 
-class DbtRunLocalOperator(DbtRunMixin, DbtLocalBaseOperator):
+class DbtRunLocalOperator(DbtRunMixin, DbtLocalBaseOperator):  # type: ignore[misc]
     """
     Executes a dbt core run command.
     """
@@ -1086,7 +1109,7 @@ class DbtRunLocalOperator(DbtRunMixin, DbtLocalBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
+class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):  # type: ignore[misc]
     """
     Executes a dbt core test command.
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
@@ -1138,7 +1161,7 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
             self._handle_warnings(result, context)
 
 
-class DbtRunOperationLocalOperator(DbtRunOperationMixin, DbtLocalBaseOperator):
+class DbtRunOperationLocalOperator(DbtRunOperationMixin, DbtLocalBaseOperator):  # type: ignore[misc]
     """
     Executes a dbt core run-operation command.
 
@@ -1179,7 +1202,7 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
                 self.required_files.remove("graph.gpickle")
 
 
-class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
+class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):  # type: ignore[misc]
     """
     Abstract class for operators that upload the generated documentation to cloud storage.
     """
@@ -1380,7 +1403,7 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
         )
 
 
-class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
+class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):  # type: ignore[misc]
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -1388,7 +1411,7 @@ class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
+class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):  # type: ignore[misc]
     """
     Executes a dbt core clone command.
     """

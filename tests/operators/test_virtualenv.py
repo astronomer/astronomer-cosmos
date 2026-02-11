@@ -50,11 +50,32 @@ real_profile_config = ProfileConfig(
 )
 
 
+def _get_airflow3_venv_subprocess_patch_target():
+    """Resolve patch target for Airflow 3: providers-standard API varies by version.
+    Older versions expose execute_in_subprocess or _execute_in_subprocess.
+    providers-standard 1.11.0+ no longer exposes a separate subprocess function;
+    we patch prepare_virtualenv at use site instead.
+    """
+    import airflow.providers.standard.utils.python_virtualenv as pv  # noqa: PLC0415
+
+    if getattr(pv, "_execute_in_subprocess", None) is not None:
+        return "airflow.providers.standard.utils.python_virtualenv._execute_in_subprocess", "subprocess"
+    if getattr(pv, "execute_in_subprocess", None) is not None:
+        return "airflow.providers.standard.utils.python_virtualenv.execute_in_subprocess", "subprocess"
+    return "cosmos.operators.virtualenv.prepare_virtualenv", "prepare_virtualenv"
+
+
 def patch_execute_in_subprocess(func):
     if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
-        return patch("airflow.providers.standard.utils.python_virtualenv.execute_in_subprocess")(func)
-    else:
-        return patch("airflow.utils.python_virtualenv.execute_in_subprocess")(func)
+        patch_path, _ = _get_airflow3_venv_subprocess_patch_target()
+        if "prepare_virtualenv" in patch_path:
+            # Mock prepare_virtualenv so it returns the expected path without running subprocesses
+            return patch(
+                patch_path,
+                side_effect=lambda venv_directory, **kwargs: f"{venv_directory}/bin/python",
+            )(func)
+        return patch(patch_path)(func)
+    return patch("airflow.utils.python_virtualenv.execute_in_subprocess")(func)
 
 
 class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
@@ -116,21 +137,24 @@ def test_run_command_without_virtualenv_dir(
     assert dbt_deps["command"][1] == "deps"
     assert ["--vars", "variable: value\n"] not in dbt_deps["command"][-2:]
     assert dbt_cmd["command"][1] == "do-something"
-    assert mock_execute.call_count == 2
-    virtualenv_call, pip_install_call = mock_execute.call_args_list
-    if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
-        assert "python3" in virtualenv_call[0][0]
-        assert virtualenv_call[0][0][0] == "uv"
-        assert virtualenv_call[0][0][1] == "venv"
-        assert pip_install_call[0][0][0] == "uv"
-        assert pip_install_call[0][0][1] == "pip"
-        assert pip_install_call[0][0][2] == "install"
-    else:
-        assert "python" in virtualenv_call[0][0][0]
-        assert virtualenv_call[0][0][1] == "-m"
-        assert virtualenv_call[0][0][2] == "virtualenv"
-        assert "pip" in pip_install_call[0][0][0]
-        assert pip_install_call[0][0][1] == "install"
+    # When patching execute_in_subprocess (older providers-standard): 2 calls (venv + pip).
+    # When patching prepare_virtualenv (e.g. providers-standard 1.11.0+): 1 call.
+    assert mock_execute.call_count in (1, 2)
+    if mock_execute.call_count == 2:
+        virtualenv_call, pip_install_call = mock_execute.call_args_list
+        if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
+            assert "python3" in virtualenv_call[0][0]
+            assert virtualenv_call[0][0][0] == "uv"
+            assert virtualenv_call[0][0][1] == "venv"
+            assert pip_install_call[0][0][0] == "uv"
+            assert pip_install_call[0][0][1] == "pip"
+            assert pip_install_call[0][0][2] == "install"
+        else:
+            assert "python" in virtualenv_call[0][0][0]
+            assert virtualenv_call[0][0][1] == "-m"
+            assert virtualenv_call[0][0][2] == "virtualenv"
+            assert "pip" in pip_install_call[0][0][0]
+            assert pip_install_call[0][0][1] == "install"
     cosmos_venv_dirs = [
         f for f in os.listdir("/tmp") if os.path.isdir(os.path.join("/tmp", f)) and f.startswith("cosmos-venv")
     ]

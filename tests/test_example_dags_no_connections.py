@@ -19,6 +19,7 @@ IGNORED_DAG_FILES = [
     "jaffle_shop_kubernetes.py",
     "jaffle_shop_watcher_kubernetes.py",
     "cosmos_manifest_selectors_example.py",
+    "cross_project_dbt_ls_dag.py",
 ]
 
 

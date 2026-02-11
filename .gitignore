@@ -122,6 +122,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.env
+venv-subprocess/
 
 # Spyder project settings
 .spyderproject

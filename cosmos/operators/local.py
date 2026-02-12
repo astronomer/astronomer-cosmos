@@ -852,7 +852,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # This check ensures test operators never register outlets even if they somehow get outlets.
         is_test_operator = DbtTestMixin in self.__class__.__mro__
         if is_test_operator:
-            # Only register inlets for test operators, not outlets
             new_outlets = []
 
         if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:

@@ -10,7 +10,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 1. Enable Memory-Optimized Imports
 -------------------------------------
 
-**Impact**: High - Reduces memory footprint even when Cosmos is installed but not actively used.
+**Impact**: High - Reduces memory footprint both at the DAG Processor and at Worker nodes.
 
 **Configuration**:
 

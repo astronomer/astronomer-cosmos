@@ -78,7 +78,7 @@ def _cleanup_dbt_adapters() -> None:
         reset_adapters()
     except ImportError:
         pass
-    except Exception as e:
+    except (RuntimeError, KeyError, AttributeError) as e:
         logger.debug("Error resetting dbt adapters: %s", e)
 
     gc.collect()
@@ -97,11 +97,12 @@ def run_command(
     with change_working_directory(cwd), environ(env):
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
         runner = get_runner(callbacks=callbacks)
-        result = runner.invoke(cli_args)
-
-    # Reset dbt adapters to release semaphores
-    # See: https://github.com/astronomer/astronomer-cosmos/issues/2334
-    _cleanup_dbt_adapters()
+        try:
+            result = runner.invoke(cli_args)
+        finally:
+            # Reset dbt adapters to release semaphores (run on all exit paths)
+            # See: https://github.com/astronomer/astronomer-cosmos/issues/2334
+            _cleanup_dbt_adapters()
 
     return result
 

@@ -2,6 +2,7 @@ import os
 import shutil
 import sys
 import tempfile
+import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -72,15 +73,24 @@ def test_cleanup_dbt_adapters_calls_reset_adapters_and_gc():
 
 def test_cleanup_dbt_adapters_handles_import_error():
     """_cleanup_dbt_adapters does not raise when dbt.adapters.factory is not available."""
-    with patch("cosmos.dbt.runner.gc") as mock_gc:
-        with patch("builtins.__import__") as mock_import:
-            mock_import.side_effect = ImportError("No module named 'dbt.adapters.factory'")
-            dbt_runner._cleanup_dbt_adapters()
+
+    # Use a fake module in sys.modules so the "from dbt.adapters.factory import ..." fails
+    # with ImportError without patching builtins.__import__ globally.
+    class FakeFactoryModule(types.ModuleType):
+        def __getattr__(self, name: str):
+            raise ImportError("No module named 'dbt.adapters.factory'")
+
+    fake_factory = FakeFactoryModule("dbt.adapters.factory")
+    with (
+        patch("cosmos.dbt.runner.gc") as mock_gc,
+        patch.dict("sys.modules", {"dbt.adapters.factory": fake_factory}),
+    ):
+        dbt_runner._cleanup_dbt_adapters()
     mock_gc.collect.assert_called_once()
 
 
 def test_cleanup_dbt_adapters_handles_reset_exception():
-    """_cleanup_dbt_adapters catches exceptions from reset_adapters and still runs gc.collect()."""
+    """_cleanup_dbt_adapters catches RuntimeError/KeyError/AttributeError from reset_adapters and still runs gc.collect()."""
     factory_mock = MagicMock()
     factory_mock.reset_adapters.side_effect = RuntimeError("adapter error")
     with (
@@ -117,6 +127,28 @@ def test_run_command_calls_cleanup_dbt_adapters():
             cwd="/tmp/project",
         )
     assert result is fake_result
+    fake_runner.invoke.assert_called_once()
+    mock_cleanup.assert_called_once()
+
+
+def test_run_command_calls_cleanup_dbt_adapters_when_invoke_raises():
+    """run_command calls _cleanup_dbt_adapters even when runner.invoke raises (try/finally)."""
+    fake_runner = MagicMock()
+    fake_runner.invoke.side_effect = RuntimeError("invoke failed")
+
+    with (
+        patch.object(dbt_runner, "get_runner", return_value=fake_runner),
+        patch.object(dbt_runner, "_cleanup_dbt_adapters") as mock_cleanup,
+        patch.object(dbt_runner, "change_working_directory"),
+        patch.object(dbt_runner, "environ"),
+        patch.object(dbt_runner, "logger"),
+    ):
+        with pytest.raises(RuntimeError, match="invoke failed"):
+            dbt_runner.run_command(
+                command=["dbt", "deps"],
+                env={},
+                cwd="/tmp/project",
+            )
     fake_runner.invoke.assert_called_once()
     mock_cleanup.assert_called_once()
 

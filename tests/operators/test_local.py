@@ -470,6 +470,10 @@ def test_run_operator_dataset_inlets_and_outlets(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
+    try:
+        from airflow.models.asset import AssetAliasModel
+    except ModuleNotFoundError:
+        from airflow.models.dataset import DatasetAliasModel as AssetAliasModel
     from sqlalchemy.orm.exc import FlushError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
@@ -504,8 +508,8 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
         seed_operator >> run_operator >> test_operator
 
     assert seed_operator.outlets == []  # because emit_datasets=False,
-    assert run_operator.outlets == []  # Outlets set during execution, not initialization
-    assert test_operator.outlets == []  # Test operators should not emit outlets
+    assert run_operator.outlets == [AssetAliasModel(name="test_id_1__run")]
+    assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
 
     with pytest.raises(FlushError):
         run_test_dag(dag, custom_tester=True)

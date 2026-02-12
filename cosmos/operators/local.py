@@ -853,6 +853,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         is_test_operator = DbtTestMixin in self.__class__.__mro__
         if is_test_operator:
             new_outlets = []
+            # Clear any pre-populated outlets/aliases for test operators to avoid orphaned aliases in the UI.
+            if hasattr(self, "outlets") and getattr(self, "outlets"):  # type: ignore[has-type]
+                try:
+                    self.outlets.clear()  # type: ignore[has-type, attr-defined]
+                except AttributeError:
+                    self.outlets = []  # type: ignore[var-annotated, attr-defined]
 
         if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
             logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")

@@ -2173,7 +2173,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
         assert hash_dir in ("71afaf84962c855b0b67caf59c808521",)
     else:
-        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
+        assert hash_dir == "633a523f295ef0cd496525428815537b"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2213,7 +2213,7 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
         assert hash_dir in ("71afaf84962c855b0b67caf59c808521",)
     else:
-        assert hash_dir == "85cba4ef17dd7c161938da6980a6ff85"
+        assert hash_dir == "633a523f295ef0cd496525428815537b"
 
 
 @pytest.mark.integration

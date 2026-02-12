@@ -246,6 +246,39 @@ This behavior is designed to support TaskGroup-level retries, as reported in `#2
 
 The overall retry behavior will be further improved once `#1978 <https://github.com/astronomer/astronomer-cosmos/issues/1978>`_ is implemented.
 
+**Watcher retry queue**
+
+.. versionadded:: 1.14.0
+
+In watcher execution mode, by default, consumer sensor tasks are lightweight sensors that wait for the producer task to complete. On their first attempt, they require minimal CPU and memory resources. However, when these tasks retry, they execute the dbt command for the node, which may require significantly more resources.
+
+The ``watcher_dbt_execution_queue`` configuration allows you to specify a different worker queue for retry attempts. This enables you to:
+
+- **Optimize resource allocation** — Use lightweight workers for initial sensor execution and high-resource workers for retries
+- **Improve scheduling efficiency** — Prevent resource contention between initial sensor tasks and retry executions
+- **Scale independently** — Scale retry queues separately based on retry workload patterns
+
+**Configuration:**
+
+Set the ``watcher_dbt_execution_queue`` in your Airflow configuration:
+
+.. code-block:: ini
+
+   [cosmos]
+   watcher_dbt_execution_queue = high_memory_queue
+
+Or via environment variable:
+
+.. code-block:: bash
+
+   export AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE=high_memory_queue
+
+**How it works:**
+
+- For watcher producer tasks (``DbtProducerWatcherOperator``), the configured queue is used during their first execution
+- For watcher consumer tasks (``DbtConsumerWatcherSensor``), from their first retry onwards, if ``watcher_dbt_execution_queue`` is configured, the task is automatically assigned to the specified queue
+- This behavior is enforced by Cosmos via an `Airflow cluster policy <https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html>`_ (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Installation of Airflow and dbt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

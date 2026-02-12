@@ -65,10 +65,12 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Requirements**: You need a ``manifest.json`` file (can be generated with ``dbt compile`` or ``dbt run``).
 
--------------------------------------------------------------------------------
+---------------------------------
 
-3. Use DBT_RUNNER Invocation Mode (default for `ExecutionMode.LOCAL` since 1.4.0, default for `RenderConfig.DBT_LS` since Cosmos 1.9.0)
--------------------------------------------------------------
+3. Use DBT_RUNNER Invocation Mode
+-----------------------------------
+
+* (default for ``ExecutionMode.LOCAL`` since 1.4.0, default for ``RenderConfig.DBT_LS`` since Cosmos 1.9.0)
 
 **Impact**: Medium-High. Depends on the execution and load modes used. Can reduce subprocess overhead and memory usage compared to subprocess mode.
 

@@ -101,16 +101,13 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             and settings.enable_dataset_alias
             and Version("2.10.0") <= AIRFLOW_VERSION < Version("3.0.0")
         ):
-            try:
-                from airflow.sdk.definitions.asset import AssetAlias
-            except ImportError:
-                from airflow.datasets import DatasetAlias as AssetAlias  # type: ignore[no-redef]
+            from airflow.datasets import DatasetAlias
 
             # ignoring the type because older versions of Airflow raise the follow error in mypy
             # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
             dag_id = kwargs.get("dag")
             task_group_id = kwargs.get("task_group")
-            kwargs["outlets"] = [AssetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))]  # type: ignore
+            kwargs["outlets"] = [DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))]  # type: ignore
 
         # This is a workaround for Airflow 3 compatibility. In Airflow 2, the super().__init__() call worked correctly,
         # but in Airflow 3, it attempts to re-initialize AbstractDbtLocalBase with filtered kwargs that only include

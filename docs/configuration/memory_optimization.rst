@@ -131,77 +131,9 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Configuration**:
 
-.. code-block:: python
+- `Getting Started with ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/getting_started/watcher-execution-mode.html>`_
+- `Configure Custom queue for producer and watcher task in ExecutionMode.WATCHER <> `_
 
-   from cosmos import DbtDag, ProjectConfig, RenderConfig, ExecutionMode, ExecutionConfig
-
-   DbtDag(
-       project_config=ProjectConfig(dbt_project_path="/path/to/dbt/project"),
-       execution_config=ExecutionConfig(
-           execution_mode=ExecutionMode.WATCHER,
-       ),
-       # ...
-   )
-
-**What it does**:
-
-- **Producer-Consumer Pattern**: Runs a single ``dbt build`` command via one producer task, instead of one dbt command per model
-- **Low Concurrency**: Consumer tasks are lightweight sensors that use deferrable execution (default since Cosmos 1.12.0), freeing up worker slots
-- **Memory Efficient**: Consumer sensors require minimal memory/CPU on first try (they just poll XCom)
-- **Performance**: Can be up to 5× faster than ``ExecutionMode.LOCAL`` while using far fewer worker slots
-
-**Key Benefits**:
-
-1. **Single Producer Task**: Only one task runs the actual dbt build, reducing memory overhead
-2. **Deferrable Sensors**: Consumer sensors use deferrable execution by default, freeing worker slots while waiting
-3. **Low Resource Usage**: Consumer sensors are lightweight and only consume resources when actively polling
-4. **Queue Support**: Configure ``watcher_dbt_execution_queue`` to route dbt execution tasks to a queue with larger resources
-
-**Configuration for Worker Queue**:
-
-.. code-block:: bash
-
-   # In airflow.cfg
-   [cosmos]
-   watcher_dbt_execution_queue = high_memory_queue
-
-   # Or via environment variable
-   export AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE=high_memory_queue
-
-**How it works**:
-
-- **Producer Tasks**: The ``DbtProducerWatcherOperator`` (producer task) uses the configured queue on its first execution, as it runs the full dbt build command and requires significant resources (e.g., ~700MB for a project with ~200 models)
-- **Consumer Sensor Tasks**: On their first attempt, consumer sensors are lightweight (~200MB) and run on their default queue. On retry attempts (when they execute dbt commands), they are automatically assigned to the configured ``watcher_dbt_execution_queue`` if set
-- **Resource Optimization**: This allows you to use lightweight workers for initial sensor execution and high-resource workers for dbt command execution, optimizing resource allocation
-- **Automatic Assignment**: Cosmos uses Airflow's cluster policy feature (``task_instance_mutation_hook``) to automatically assign tasks to the specified queue at runtime
-
-**Thread Configuration**: Control dbt concurrency via ``threads`` in your dbt profile:
-
-.. code-block:: python
-
-   from cosmos.config import ProfileConfig
-   from cosmos.profiles import PostgresUserPasswordProfileMapping
-
-   profile_config = ProfileConfig(
-       profile_name="jaffle_shop",
-       target_name="prod",
-       profile_mapping=PostgresUserPasswordProfileMapping(
-           conn_id="postgres_connection",
-           profile_args={"threads": 8},  # Adjust based on worker capacity
-       ),
-   )
-
-**Requirements**:
-
-- Cosmos 1.11.0+ (deferrable execution requires Cosmos 1.12.0+)
-- dbt installed alongside Airflow (for producer task)
-- Triggerer component enabled in Airflow (for deferrable sensors)
-
-**Performance Impact**:
-
-- Up to 80% reduction in total DAG runtime
-- Dramatically fewer worker slots used (1 producer + lightweight sensors vs. 1 task per model)
-- Lower memory usage per DAG run
 
 -------------------------------------------------------------------------------
 

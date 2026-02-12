@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, improve-dbt-fusion-tests]
   # Also run on pull requests originating from forks. Although this is insecure by default, we need it to run
   # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
   # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.
@@ -503,6 +503,7 @@ jobs:
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
           RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
       - name: Upload coverage to Github

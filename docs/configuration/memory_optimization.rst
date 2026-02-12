@@ -70,7 +70,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 3. Use DBT_RUNNER Invocation Mode (Default since Cosmos 1.9)
 -------------------------------------------------------------
 
-**Impact**: Medium-High - Reduces subprocess overhead and memory usage compared to subprocess mode.
+**Impact**: Medium-High. Depends on the execution and load modes used. Can reduce subprocess overhead and memory usage compared to subprocess mode.
 
 **Configuration**:
 

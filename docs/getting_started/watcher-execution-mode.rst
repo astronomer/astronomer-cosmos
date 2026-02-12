@@ -330,6 +330,8 @@ Test support for `TestBehavior.AFTER_ALL` and `TestBehavior.NONE` modes have bee
 
 Tests with ``TestBehavior.AFTER_EACH``, which is the default test behavior, are still being rendered as ``EmptyOperators``.
 
+However, this gap should be addressed with `#2311 <https://github.com/astronomer/astronomer-cosmos/issues/2311>`_.
+
 Additionally, since the ``dbt build`` command does not run ``source`` nodes, the operator ``DbtSourceWatcherOperator`` is equivalent to the ``DbtSourceLocalOperator`` operator, from ``ExecutionMode.LOCAL``.
 
 Finally, the following features are not implemented as operators under ``ExecutionMode.WATCHER``:

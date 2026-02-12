@@ -78,8 +78,8 @@ def _cleanup_dbt_adapters() -> None:
         reset_adapters()
     except ImportError:
         pass
-    except (RuntimeError, KeyError, AttributeError) as e:
-        logger.debug("Error resetting dbt adapters: %s", e)
+    except (RuntimeError, KeyError, AttributeError):
+        logger.debug("Error resetting dbt adapters", exc_info=True)
 
     gc.collect()
 

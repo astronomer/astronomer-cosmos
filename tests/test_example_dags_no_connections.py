@@ -19,6 +19,7 @@ IGNORED_DAG_FILES = [
     "jaffle_shop_kubernetes.py",
     "jaffle_shop_watcher_kubernetes.py",
     "cosmos_manifest_selectors_example.py",
+    "cross_project_dbt_ls_dag.py",
 ]
 
 
@@ -46,8 +47,14 @@ def get_dag_bag() -> DagBag:
             print(f"Adding {file_name} to .airflowignore")
             file.write(f"{file_name}\n")
 
+        if AIRFLOW_VERSION == Version("2.9.0"):
+            # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9.0
+            file.write("cosmos_example_manifest_dag.py\n")
+            # This DAG is taking too long to run in the CI (https://github.com/astronomer/astronomer-cosmos/actions/runs/21902660682/job/63234728594)
+            file.write("example_cosmos_python_models.py\n")
+
         if AIRFLOW_VERSION >= Version("3.0.0"):
-            file.writelines("example_cosmos_cleanup_dag.py\n")
+            file.write("example_cosmos_cleanup_dag.py\n")
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())

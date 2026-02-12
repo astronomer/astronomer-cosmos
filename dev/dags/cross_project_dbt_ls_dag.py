@@ -31,7 +31,7 @@ from pathlib import Path
 
 from airflow import DAG
 
-from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -44,6 +44,7 @@ POSTGRES_CONN_ID = "example_conn"
 DBT_UPSTREAM_PROJECT_PATH = DBT_ROOT_PATH / "cross_project" / "upstream"
 DBT_DOWNSTREAM_PROJECT_PATH = DBT_ROOT_PATH / "cross_project" / "downstream"
 
+DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess" / "bin" / "dbt"
 
 # [START cross_project_dbt_ls_dag]
 # =============================================================================
@@ -83,6 +84,9 @@ with DAG(
         profile_config=upstream_profile_config,
         render_config=RenderConfig(
             dbt_deps=True,
+        ),
+        execution_config=ExecutionConfig(
+            dbt_executable_path=DBT_EXECUTABLE_PATH,
         ),
         operator_args={
             "install_deps": True,

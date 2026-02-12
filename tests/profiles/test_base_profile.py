@@ -51,9 +51,10 @@ def test_disable_event_tracking(disable_event_tracking: bool):
     )
     profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
 
-    assert ("config" in profile_contents) == disable_event_tracking
+    assert "config" not in profile_contents
     if disable_event_tracking:
-        assert profile_contents["config"]["send_anonymous_usage_stats"] is False
+        assert test_profile.env_vars["DO_NOT_TRACK"] == "1"
+        assert test_profile.env_vars["DBT_SEND_ANONYMOUS_USAGE_STATS"] == "False"
 
 
 def test_disable_event_tracking_and_send_anonymous_usage_stats():
@@ -107,7 +108,7 @@ def test_dbt_config_vars_config(config: bool):
     )
     profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
 
-    assert ("config" in profile_contents) == config
+    assert ("config" in profile_contents["fake-profile-name"]) == config
 
 
 @pytest.mark.parametrize("dbt_config_var,dbt_config_value", [("debug", True), ("debug", False)])
@@ -122,8 +123,8 @@ def test_validate_dbt_config_vars(dbt_config_var: str, dbt_config_value: Any):
     )
     profile_contents = yaml.safe_load(test_profile.get_profile_file_contents(profile_name="fake-profile-name"))
 
-    assert "config" in profile_contents
-    assert profile_contents["config"][dbt_config_var] == dbt_config_value
+    assert "config" in profile_contents["fake-profile-name"]
+    assert profile_contents["fake-profile-name"]["config"][dbt_config_var] == dbt_config_value
 
 
 @pytest.mark.parametrize(

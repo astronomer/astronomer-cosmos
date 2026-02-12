@@ -2376,6 +2376,59 @@ def test_should_use_yaml_selectors_cache(enable_cache, enable_cache_yaml_selecto
         assert graph.should_use_yaml_selectors_cache() == should_use
 
 
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=True)
+@patch("cosmos.dbt.graph.DbtGraph.should_use_yaml_selectors_cache", return_value=True)
+@patch("cosmos.dbt.graph.Variable.get")
+def test_cache_miss_when_loading_dbt_ls_cache_as_yaml_selectors_cache(
+    mock_variable_get, mock_should_use_yaml_selectors_cache, mock_should_use_dbt_ls_cache, tmp_dbt_project_dir
+):
+    """
+    Test that loading a dbt ls cache as a yaml selectors cache causes a cache miss.
+
+    This ensures that when both cache types use the same Airflow Variable key, attempting to load
+    a dbt ls cache as a yaml selectors cache will fail gracefully and return a cache miss instead of corrupted data.
+    """
+    graph = DbtGraph(cache_identifier="test_swap", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+
+    dbt_ls_cache_data = {
+        "version": "hash_dir,hash_args",  # dbt ls version format (2 parts)
+        "dbt_ls_compressed": "eJwrzs9NVcgvLSkoLQEAGpAEhg==",
+        "last_modified": "2022-01-01T12:00:00",
+    }
+    mock_variable_get.return_value = dbt_ls_cache_data
+
+    yaml_cache_result = graph.get_yaml_selectors_cache()
+
+    assert yaml_cache_result == {}, "Expected cache miss when loading dbt ls cache as yaml selectors cache"
+
+
+@patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=True)
+@patch("cosmos.dbt.graph.DbtGraph.should_use_yaml_selectors_cache", return_value=True)
+@patch("cosmos.dbt.graph.Variable.get")
+def test_cache_miss_when_loading_yaml_selectors_cache_as_dbt_ls_cache(
+    mock_variable_get, mock_should_use_yaml_selectors_cache, mock_should_use_dbt_ls_cache, tmp_dbt_project_dir
+):
+    """
+    Test that loading a yaml selectors cache as a dbt ls cache causes a cache miss.
+
+    This ensures that when both cache types use the same Airflow Variable key, attempting to load
+    a yaml selectors cache as a dbt ls cache will fail gracefully and return a cache miss instead of corrupted data.
+    """
+    graph = DbtGraph(cache_identifier="test_swap", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+
+    yaml_selectors_cache_data = {
+        "version": "hash_dir,hash_selectors,hash_impl",  # yaml selectors version format (3 parts)
+        "raw_selectors_compressed": "eJyrViouSUzPzEuPzy9KSS0qVrJSqFZKSU3LzMssyczPA3NzU0sy8lOATCWgUiUdBaWyxJzSVCg/PlGpFiiUl5gLFkEzrbYWAFRnILk=",
+        "parsed_selectors_compressed": "eJyrVkqtSM4pTUlVslLIK83J0VFQKk7NSU0uAfKjlUoS062AOD5RKbYWADB2DhQ=",
+        "last_modified": "2022-01-01T12:00:00",
+    }
+    mock_variable_get.return_value = yaml_selectors_cache_data
+
+    dbt_ls_cache_result = graph.get_dbt_ls_cache()
+
+    assert dbt_ls_cache_result == {}, "Expected cache miss when loading yaml selectors cache as dbt ls cache"
+
+
 @patch(object_storage_path)
 @patch("cosmos.config.ProjectConfig")
 @patch("cosmos.dbt.graph._configure_remote_cache_dir")

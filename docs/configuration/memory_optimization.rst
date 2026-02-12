@@ -129,11 +129,10 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Impact**: Very High - Dramatically reduces Airflow worker slot usage and memory consumption.
 
-**Configuration**:
+**Configuration**
 
 - `Getting Started with ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/getting_started/watcher-execution-mode.html>`_
-- `Configure Custom queue for producer and watcher task in ExecutionMode.WATCHER <> `_
-
+- `Configure a Custom Queue for Producer and Watcher Tasks in ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/getting_started/watcher-execution-mode/#watcher-dbt-execution-queue>`_
 
 -------------------------------------------------------------------------------
 

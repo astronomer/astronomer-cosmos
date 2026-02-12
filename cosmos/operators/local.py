@@ -783,9 +783,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         return assets
 
-    def _register_datasets_without_alias(
-        self, new_inlets: list[Asset], new_outlets: list[Asset], context: Context
-    ) -> None:
+    def _register_datasets_without_alias(self, new_inlets: list[Asset], new_outlets: list[Asset]) -> None:
         """Register datasets without DatasetAlias (for Airflow < 2.10 or when DatasetAlias is disabled)."""
         from airflow import DAG
         from airflow.utils.session import create_session
@@ -866,7 +864,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
             )
         elif AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
-            self._register_datasets_without_alias(new_inlets, new_outlets, context)
+            self._register_datasets_without_alias(new_inlets, new_outlets)
         else:
             # Only create DatasetAlias/AssetAlias when there are actual outlets to register.
             # This prevents orphaned aliases for tasks that don't produce outputs (e.g., test operators).

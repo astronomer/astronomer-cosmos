@@ -823,7 +823,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """Register datasets with AssetAlias for Airflow 3+."""
         from airflow.sdk.definitions.asset import AssetAlias
 
-        logger.info("Assigning outlets with DatasetAlias in Airflow 3")
+        logger.info("Assigning outlets with AssetAlias in Airflow 3")
         asset_alias = AssetAlias(dataset_alias_name)
         if not hasattr(self, "outlets") or not self.outlets:  # type: ignore[has-type]
             self.outlets = []  # type: ignore[var-annotated, attr-defined]
@@ -981,6 +981,21 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                     pass
 
         AbstractDbtLocalBase.__init__(self, **base_kwargs)
+        if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
+            if (
+                kwargs.get("emit_datasets", True)
+                and settings.enable_dataset_alias
+                and AIRFLOW_VERSION >= Version("2.10")
+            ):
+                from airflow.datasets import DatasetAlias
+
+                # ignoring the type because older versions of Airflow raise the follow error in mypy
+                # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
+                dag_id = kwargs.get("dag")
+                task_group_id = kwargs.get("task_group")
+                operator_kwargs["outlets"] = [
+                    DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
+                ]  # type: ignore
 
         if "task_id" in operator_kwargs:
             operator_kwargs.pop("task_id")

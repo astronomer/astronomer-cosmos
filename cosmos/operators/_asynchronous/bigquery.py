@@ -7,6 +7,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from packaging.version import Version
+
+from cosmos.dataset import get_dataset_alias_name
+from cosmos.dbt.parser.project import logger
 from cosmos.operators.base import _sanitize_xcom_key
 
 try:
@@ -93,6 +97,24 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         AbstractDbtLocalBase.__init__(
             self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )
+        if (
+            kwargs.get("emit_datasets", True)
+            and settings.enable_dataset_alias
+            and Version("2.10.0") <= AIRFLOW_VERSION < Version("3.0.0")
+        ):
+            try:
+                from airflow.sdk.definitions.asset import AssetAlias
+            except ImportError:
+                from airflow.datasets import DatasetAlias as AssetAlias  # type: ignore[no-redef]
+
+            # ignoring the type because older versions of Airflow raise the follow error in mypy
+            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
+            dag_id = kwargs.get("dag")
+            task_group_id = kwargs.get("task_group")
+            dataset_alias = get_dataset_alias_name(dag_id, task_group_id, self.task_id)
+            logger.info("dataset_alias: %s", dataset_alias)
+            kwargs["outlets"] = [AssetAlias(name=dataset_alias)]  # type: ignore
+
         # This is a workaround for Airflow 3 compatibility. In Airflow 2, the super().__init__() call worked correctly,
         # but in Airflow 3, it attempts to re-initialize AbstractDbtLocalBase with filtered kwargs that only include
         # BigQueryInsertJobOperator parameters and hence fails to initialise the operator due to missing arguments.

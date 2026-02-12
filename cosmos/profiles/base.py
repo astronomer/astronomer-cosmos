@@ -232,6 +232,10 @@ class BaseProfileMapping(ABC):
 
             env_vars[env_var_name] = str(value)
 
+        if self.disable_event_tracking:
+            env_vars["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
+            env_vars["DO_NOT_TRACK"] = "1"
+
         return env_vars
 
     def get_profile_file_contents(
@@ -258,10 +262,7 @@ class BaseProfileMapping(ABC):
         }
 
         if self.dbt_config_vars:
-            profile_contents["config"] = self.dbt_config_vars.as_dict()
-
-        if self.disable_event_tracking:
-            profile_contents["config"] = {"send_anonymous_usage_stats": False}
+            profile_contents[profile_name]["config"] = self.dbt_config_vars.as_dict()
 
         return str(yaml.dump(profile_contents, indent=4))
 

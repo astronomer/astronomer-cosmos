@@ -246,7 +246,9 @@ This behavior is designed to support TaskGroup-level retries, as reported in `#2
 
 The overall retry behavior will be further improved once `#1978 <https://github.com/astronomer/astronomer-cosmos/issues/1978>`_ is implemented.
 
-**Watcher retry queue**
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Watcher dbt Execution Queue
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. versionadded:: 1.14.0
 

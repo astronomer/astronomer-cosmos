@@ -326,7 +326,7 @@ However, other operators that are available in the ``ExecutionMode.LOCAL`` mode 
 
 The ``DbtBuildWatcherOperator`` is not implemented, since the build command is executed by the producer ``DbtProducerWatcherOperator`` operator.
 
-Test support for `TestBehavior.AFTER_ALL` and `TestBehavior.NONE` have been implemented for the ``ExecuteMode.WATCHER`` as part of `#2047 <https://github.com/astronomer/astronomer-cosmos/pull/2047>`_. and `#2049 <https://github.com/astronomer/astronomer-cosmos/pull/2049>`_.
+Test support for `TestBehavior.AFTER_ALL` and `TestBehavior.NONE` modes have been implemented for the ``ExecuteMode.WATCHER`` as part of `#2047 <https://github.com/astronomer/astronomer-cosmos/pull/2047>`_. and `#2049 <https://github.com/astronomer/astronomer-cosmos/pull/2049>`_.
 
 Additionally, since the ``dbt build`` command does not run ``source`` nodes, the operator ``DbtSourceWatcherOperator`` is equivalent to the ``DbtSourceLocalOperator`` operator, from ``ExecutionMode.LOCAL``.
 

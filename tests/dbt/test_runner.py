@@ -90,7 +90,7 @@ def test_cleanup_dbt_adapters_handles_import_error():
 
 
 def test_cleanup_dbt_adapters_handles_reset_exception():
-    """_cleanup_dbt_adapters catches RuntimeError/KeyError/AttributeError from reset_adapters and still runs gc.collect()."""
+    """_cleanup_dbt_adapters catches exceptions from reset_adapters and still runs gc.collect()."""
     factory_mock = MagicMock()
     factory_mock.reset_adapters.side_effect = RuntimeError("adapter error")
     with (
@@ -100,8 +100,7 @@ def test_cleanup_dbt_adapters_handles_reset_exception():
     ):
         dbt_runner._cleanup_dbt_adapters()
     mock_gc.collect.assert_called_once()
-    mock_logger.debug.assert_called_once()
-    assert "adapter error" in str(mock_logger.debug.call_args[0][1])
+    mock_logger.debug.assert_called_once_with("Error resetting dbt adapters", exc_info=True)
 
 
 def test_run_command_calls_cleanup_dbt_adapters():

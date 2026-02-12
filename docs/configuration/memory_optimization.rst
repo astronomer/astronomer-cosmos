@@ -44,7 +44,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 2. Use DBT_MANIFEST Load Mode
 ------------------------------
 
-**Impact**: High - Avoids running ``dbt ls`` subprocess which can consume significant CPU and memory.
+**Impact**: High - Avoids running ``dbt ls`` subprocess which can consume significant CPU and memory. This reduces memory consumption when a cache miss occurs in the DBT LS method. It may not significantly reduce the memory footprint if there is a cache hit.
 
 **Configuration**:
 

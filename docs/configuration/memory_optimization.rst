@@ -26,7 +26,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **What it does**: Disables eager imports in ``cosmos/__init__.py``, preventing unused modules and classes from being loaded into memory.
 
-**Note**: When enabled, you must use full module paths for imports:
+**Note**: When enabled, you must use full module paths for importing classes, functions and objects from Cosmos:
 
 .. code-block:: python
 

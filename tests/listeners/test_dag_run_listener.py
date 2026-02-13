@@ -125,9 +125,6 @@ def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
             triggered_by=DagRunTriggeredByType.TIMETABLE,
         )
     else:
-        # This is not currently working.
-        # We need to find a way of testing this in Airflow 3.1 onwards
-        #
         # Airflow 3.1.0+ requires DAG to be serialized to database before calling dag.create_dagrun()
         # because create_dagrun() checks for DagVersion and DagModel records
         from airflow.models.dagbag import DagBag, sync_bag_to_db
@@ -137,23 +134,31 @@ def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
 
         # Create DagBundle if it doesn't exist (required for DagModel foreign key)
         # This mimics what get_bagged_dag does via manager.sync_bundles_to_db()
+        bundle_name = f"test_bundle_listener_{dag.dag_id}"
         with create_session() as session:
-            dag_bundle = DagBundleModel(name="test_bundle_listener")
+            dag_bundle = DagBundleModel(name=bundle_name)
             session.merge(dag_bundle)
             session.commit()
 
         # This creates both DagModel and DagVersion records
         dagbag = DagBag(include_examples=False)
+        # Ensure the DAG is added to the dagbag's dags dictionary
+        dagbag.dags[dag.dag_id] = dag
         dagbag.bag_dag(dag)
-        sync_bag_to_db(dagbag, bundle_name="test_bundle_listener", bundle_version="1")
+        sync_bag_to_db(dagbag, bundle_name=bundle_name, bundle_version="1")
 
-        dag_run = dag.create_dagrun(
-            state=State.NONE,
-            run_id=run_id,
-            run_after=run_after,
-            run_type=DagRunType.MANUAL,
-            triggered_by=DagRunTriggeredByType.TIMETABLE,
-        )
+        # Retrieve the DAG from dagbag after syncing (it may have been modified)
+        synced_dag = dagbag.get_dag(dag_id=dag.dag_id)
+
+        with create_session() as session:
+            dag_run = synced_dag.create_dagrun(
+                state=State.NONE,
+                run_id=run_id,
+                run_after=run_after,
+                run_type=DagRunType.MANUAL,
+                triggered_by=DagRunTriggeredByType.TIMETABLE,
+                session=session,
+            )
     return dag_run
 
 

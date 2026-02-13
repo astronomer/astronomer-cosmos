@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import Any
 from warnings import warn
 
+from airflow.exceptions import ParamValidationError
 from airflow.models.dag import DAG
 
 try:
@@ -453,7 +454,11 @@ class DbtToAirflowConverter:
         # Store metadata in dag.params which is preserved during serialization
         # Using a key that's unlikely to conflict with user params
         compressed_metadata = _compress_telemetry_metadata(metadata)
-        dag.params["__cosmos_telemetry_metadata__"] = Param(default=compressed_metadata, const=compressed_metadata)
+        try:
+            dag.params["__cosmos_telemetry_metadata__"] = Param(default=compressed_metadata, const=compressed_metadata)
+        except ParamValidationError as e:
+            logger.warning(f"Failed to store compressed Cosmos telemetry metadata in DAG {dag.dag_id} params: {e}")
+
         logger.debug(
             f"Stored compressed Cosmos telemetry metadata in DAG {dag.dag_id} params (original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
         )

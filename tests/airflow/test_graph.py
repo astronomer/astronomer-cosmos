@@ -33,6 +33,7 @@ from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
     DbtResourceType,
     ExecutionMode,
+    SeedRenderingBehavior,
     SourceRenderingBehavior,
     TestBehavior,
     TestIndirectSelection,
@@ -155,6 +156,7 @@ def test_build_airflow_graph_with_after_each():
             render_config=RenderConfig(
                 test_behavior=TestBehavior.AFTER_EACH,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+                seed_rendering_behavior=SeedRenderingBehavior.ALWAYS,
             ),
             dbt_project_name="astro_shop",
         )
@@ -229,6 +231,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
         render_config=RenderConfig(
             test_behavior=TestBehavior.AFTER_EACH,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            seed_rendering_behavior=SeedRenderingBehavior.ALWAYS,
         ),
         on_warning_callback=None,
     )
@@ -255,6 +258,7 @@ def test_build_airflow_graph_with_after_all():
             select=["tag:some"],
             test_behavior=TestBehavior.AFTER_ALL,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            seed_rendering_behavior=SeedRenderingBehavior.ALWAYS,
         )
         build_airflow_graph(
             nodes=sample_nodes,
@@ -294,6 +298,7 @@ def test_build_airflow_graph_with_build():
         }
         render_config = RenderConfig(
             test_behavior=TestBehavior.BUILD,
+            seed_rendering_behavior=SeedRenderingBehavior.ALWAYS,
         )
         build_airflow_graph(
             nodes=sample_nodes,
@@ -340,7 +345,7 @@ def test_build_airflow_graph_with_override_profile_config():
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
             dbt_project_name="astro_shop",
-            render_config=RenderConfig(),
+            render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.ALWAYS),
         )
 
     generated_seed_profile_config = dag.task_dict["seed_parent_seed"].profile_config
@@ -625,7 +630,11 @@ def test_create_task_metadata_seed(caplog, use_task_group):
     )
     if use_task_group is None:
         metadata = create_task_metadata(
-            sample_node, execution_mode=ExecutionMode.DOCKER, args={}, dbt_dag_task_group_identifier=""
+            sample_node,
+            execution_mode=ExecutionMode.DOCKER,
+            args={},
+            dbt_dag_task_group_identifier="",
+            render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.ALWAYS),
         )
     else:
         metadata = create_task_metadata(
@@ -634,6 +643,7 @@ def test_create_task_metadata_seed(caplog, use_task_group):
             args={},
             dbt_dag_task_group_identifier="",
             use_task_group=use_task_group,
+            render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.ALWAYS),
         )
 
     if not use_task_group:
@@ -643,6 +653,136 @@ def test_create_task_metadata_seed(caplog, use_task_group):
 
     assert metadata.operator_class == "cosmos.operators.docker.DbtSeedDockerOperator"
     assert metadata.arguments == {"select": "my_seed"}
+
+
+@pytest.mark.parametrize(
+    "seed_rendering_behavior, expected_id, expected_operator_class",
+    [
+        (SeedRenderingBehavior.ALWAYS, "my_seed_seed", "cosmos.operators.local.DbtSeedLocalOperator"),
+        (SeedRenderingBehavior.NONE, None, None),
+        (SeedRenderingBehavior.WHEN_SEED_CHANGES, "my_seed_seed", "cosmos.operators.local.DbtSeedLocalOperator"),
+    ],
+)
+def test_create_task_metadata_seed_with_rendering_options(
+    seed_rendering_behavior, expected_id, expected_operator_class, caplog
+):
+    """Test that seed rendering behavior options work correctly in create_task_metadata."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.SEED.value}.my_folder.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        file_path=Path(""),
+        tags=[],
+        config={},
+    )
+
+    metadata = create_task_metadata(
+        sample_node,
+        execution_mode=ExecutionMode.LOCAL,
+        render_config=RenderConfig(
+            seed_rendering_behavior=seed_rendering_behavior,
+        ),
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+
+    if metadata:
+        assert metadata.id == expected_id
+        assert metadata.operator_class == expected_operator_class
+    else:
+        assert expected_id is None
+
+
+@pytest.mark.parametrize(
+    "seed_rendering_behavior",
+    [
+        SeedRenderingBehavior.ALWAYS,
+        SeedRenderingBehavior.WHEN_SEED_CHANGES,
+    ],
+)
+def test_create_task_metadata_seed_with_build_test_behavior(seed_rendering_behavior, caplog):
+    """Test that seed rendering behavior works correctly with TestBehavior.BUILD."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.SEED.value}.my_folder.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        file_path=Path(""),
+        tags=[],
+        config={},
+    )
+
+    metadata = create_task_metadata(
+        sample_node,
+        execution_mode=ExecutionMode.LOCAL,
+        render_config=RenderConfig(
+            seed_rendering_behavior=seed_rendering_behavior,
+            test_behavior=TestBehavior.BUILD,
+        ),
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+
+    assert metadata is not None
+    assert metadata.id == "my_seed_seed_build"
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "seed_rendering_behavior",
+    [
+        SeedRenderingBehavior.ALWAYS,
+        SeedRenderingBehavior.WHEN_SEED_CHANGES,
+    ],
+)
+def test_generate_task_or_group_seed_with_rendering_behavior(seed_rendering_behavior):
+    """Test that seed rendering behavior works correctly with TestBehavior.AFTER_EACH.
+
+    With TestBehavior.AFTER_EACH and has_non_detached_test=True, seeds should create TaskGroups.
+    Test behavior is controlled by TestBehavior, not SeedRenderingBehavior.
+    """
+    with DAG("test-seed-rendering-behavior", start_date=datetime(2022, 1, 1)) as dag:
+        node = DbtNode(
+            unique_id=f"{DbtResourceType.SEED.value}.my_folder.my_seed",
+            resource_type=DbtResourceType.SEED,
+            file_path=SAMPLE_PROJ_PATH / "seeds/my_seed.csv",
+            tags=[],
+            config={},
+            depends_on=[],
+            has_test=True,
+            has_non_detached_test=True,
+        )
+
+        output = generate_task_or_group(
+            dag=dag,
+            task_group=None,
+            node=node,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn",
+                        profile_args={"schema": "public"},
+                    ),
+                ),
+            },
+            dbt_project_name="test_project",
+            node_converters={},
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.AFTER_EACH,
+                seed_rendering_behavior=seed_rendering_behavior,
+            ),
+            on_warning_callback=None,
+        )
+
+        # With TestBehavior.AFTER_EACH and has_non_detached_test=True, should create TaskGroup
+        assert isinstance(output, TaskGroup)
+        assert "seed" in list(output.children.keys())[0]
+        assert "test" in list(output.children.keys())[1]
 
 
 def test_create_task_metadata_snapshot(caplog):
@@ -911,6 +1051,7 @@ def test_create_task_metadata_normalize_task_id(
             normalize_task_id=normalize_task_id,
             normalize_task_display_name=normalize_task_display_name,
             source_rendering_behavior=SourceRenderingBehavior.ALL,
+            seed_rendering_behavior=SeedRenderingBehavior.ALWAYS,
             test_behavior=test_behavior,
         ),
     )
@@ -1128,6 +1269,7 @@ def test_test_behavior_for_watcher_mode(test_behavior):
         task_args=task_args,
         render_config=RenderConfig(
             test_behavior=test_behavior,
+            seed_rendering_behavior=SeedRenderingBehavior.ALWAYS,
         ),
         dbt_project_name="astro_shop",
     )
@@ -1595,6 +1737,7 @@ def test_build_airflow_graph_with_node_convert(test_behavior, node_converters, e
             render_config=RenderConfig(
                 test_behavior=test_behavior,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+                seed_rendering_behavior=SeedRenderingBehavior.ALWAYS,
                 node_converters=node_converters,
                 node_conversion_by_task_group=False,
             ),

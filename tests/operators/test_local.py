@@ -527,6 +527,27 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 
 
 @pytest.mark.skipif(
+    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
+)
+@pytest.mark.integration
+def test_test_operator_do_not_register_outlets(caplog):
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+
+    new_test_dag(dag)
+    assert "Outlets: []" in caplog.text
+
+
+@pytest.mark.skipif(
     version.parse(airflow_version) < version.Version("3.0.0"),
     reason="From Airflow 3.0 onwards, we started using AssetAlias, which changed the original behaviour",
 )
@@ -566,7 +587,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
     caplog.clear()
 
     new_test_dag(dag)
-    assert "Assigning outlets with DatasetAlias in Airflow 3" in caplog.text
+    assert "Assigning outlets with AssetAlias in Airflow 3" in caplog.text
     assert (
         "Outlets: [Asset(name='postgres://0.0.0.0:5432/postgres/public/stg_customers', uri='postgres://0.0.0.0:5432/postgres/public/stg_customers'"
         in caplog.text

@@ -526,6 +526,23 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
         # assert dataset_model == 1
 
 
+@pytest.mark.integration
+def test_test_operator_do_not_register_outlets(caplog):
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+
+        new_test_dag(dag)
+        assert "Outlets: []" in caplog.text
+
+
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.Version("3.0.0"),
     reason="From Airflow 3.0 onwards, we started using AssetAlias, which changed the original behaviour",

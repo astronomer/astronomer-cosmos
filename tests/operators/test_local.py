@@ -566,7 +566,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
     caplog.clear()
 
     new_test_dag(dag)
-    assert "Assigning outlets with DatasetAlias in Airflow 3" in caplog.text
+    assert "Assigning outlets with AssetAlias in Airflow 3" in caplog.text
     assert (
         "Outlets: [Asset(name='postgres://0.0.0.0:5432/postgres/public/stg_customers', uri='postgres://0.0.0.0:5432/postgres/public/stg_customers'"
         in caplog.text

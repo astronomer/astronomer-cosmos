@@ -959,6 +959,103 @@ def test_select_nodes_by_exposure_name():
     assert selected == expected
 
 
+def test_select_nodes_by_select_package():
+    """
+    Test selecting nodes by package name using 'package:package_name'.
+    Used when loading from manifest to include only nodes from a given package.
+    """
+    local_nodes = dict(sample_nodes)
+    # Add nodes from dbt_artifacts package (package_name is set when loading from manifest)
+    artifact_node_1 = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    artifact_node_2 = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_2",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_2.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    local_nodes[artifact_node_1.unique_id] = artifact_node_1
+    local_nodes[artifact_node_2.unique_id] = artifact_node_2
+
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["package:dbt_artifacts"],
+    )
+    expected = {artifact_node_1.unique_id: artifact_node_1, artifact_node_2.unique_id: artifact_node_2}
+    assert selected == expected
+
+
+def test_select_nodes_by_exclude_package():
+    """
+    Test excluding nodes by package name using 'package:package_name'.
+    This fixes manifest load mode not respecting exclude for packages (e.g. dbt_artifacts).
+    """
+    local_nodes = dict(sample_nodes)
+    # Add nodes from dbt_artifacts package
+    artifact_node_1 = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    local_nodes[artifact_node_1.unique_id] = artifact_node_1
+
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        exclude=["package:dbt_artifacts"],
+    )
+    # All original sample_nodes remain; artifact nodes are excluded
+    assert artifact_node_1.unique_id not in selected
+    assert set(selected.keys()) == set(sample_nodes.keys())
+
+
+def test_select_nodes_by_exclude_bare_package_name():
+    """
+    Bare package name (no 'package:' prefix) is equivalent to 'package:name', matching dbt behavior.
+    So exclude=['dbt_artifacts'] works the same as exclude=['package:dbt_artifacts'].
+    """
+    local_nodes = dict(sample_nodes)
+    artifact_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    local_nodes[artifact_node.unique_id] = artifact_node
+
+    selected_bare = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        exclude=["dbt_artifacts"],
+    )
+    selected_explicit = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        exclude=["package:dbt_artifacts"],
+    )
+    assert artifact_node.unique_id not in selected_bare
+    assert artifact_node.unique_id not in selected_explicit
+    assert set(selected_bare.keys()) == set(selected_explicit.keys()) == set(sample_nodes.keys())
+
+
 def test_select_exposure_nodes_by_graph_ancestry():
     """
     Test selecting an exposure node and its directs ancestors using the syntax '+exposure:exposure_name'.

@@ -54,6 +54,7 @@ from cosmos.dbt.project import (
     copy_dbt_packages,
     create_symlinks,
     environ,
+    get_dbt_packages_subpath,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
 )
@@ -1137,6 +1138,11 @@ class DbtGraph:
             manifest = json.load(fp)
 
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
+            project_path = self.execution_config.project_path
+            packages_subpath = get_dbt_packages_subpath(project_path)
+            # Root project name from manifest metadata (dbt 1.x); when absent, treat all nodes as root (e.g. old/test manifests)
+            manifest_project_name = (manifest.get("metadata") or {}).get("project_name")
+
             for unique_id, node_dict in resources.items():
                 # External nodes (e.g., from dbt-loom) may not have a file path - skip them
                 # Check for both None and empty string since dbt-loom may set either
@@ -1148,12 +1154,23 @@ class DbtGraph:
                     )
                     continue
 
+                package_name = node_dict.get("package_name")
+                # For installed-package nodes, original_file_path is relative to the package root (e.g. models/edr/...).
+                # Resolve to project_path/dbt_packages/<package_name>/<original_file_path>.
+                # Root project nodes (manifest_project_name == package_name) use project_path/original_file_path.
+                # When manifest has no project_name (old/test manifests), treat every node as root for backward compatibility.
+                is_root_project_node = manifest_project_name is None or (package_name == manifest_project_name)
+                if package_name and not is_root_project_node:
+                    resolved_path = project_path / packages_subpath / package_name / _normalize_path(original_file_path)
+                else:
+                    resolved_path = project_path / _normalize_path(original_file_path)
+
                 node = DbtNode(
                     unique_id=unique_id,
-                    package_name=node_dict.get("package_name"),
+                    package_name=package_name,
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.execution_config.project_path / _normalize_path(original_file_path),
+                    file_path=resolved_path,
                     tags=node_dict.get("tags") or [],
                     config=node_dict.get("config") or {},
                     has_freshness=(

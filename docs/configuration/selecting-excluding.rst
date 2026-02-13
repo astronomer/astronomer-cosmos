@@ -33,6 +33,7 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``source:my_source.my_table``: include/exclude nodes that have the source ``my_source`` and the table ``my_table``
 - ``exposure:my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and are of resource_type ``exposure``
 - ``exposure:+my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and their parents
+- ``package:package_name``: include/exclude all nodes that belong to the given package (e.g. ``package:dbt_artifacts``). Especially useful with ``LoadMode.DBT_MANIFEST`` when excluding installed packages from the DAG. A bare name without a method prefix (e.g. ``dbt_artifacts`` or ``child``) is resolved like dbt: it matches nodes by package name or by node name (e.g. ``exclude=['dbt_artifacts']`` excludes that package; ``select=['child']`` selects the node named ``child``).
 
 .. note::
 
@@ -102,6 +103,18 @@ Examples:
     jaffle_shop = DbtDag(
         render_config=RenderConfig(
             exclude=["node_name+"],  # node_name and its children
+        )
+    )
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+
+    jaffle_shop = DbtDag(
+        render_config=RenderConfig(
+            exclude=[
+                "package:dbt_artifacts"
+            ],  # exclude all nodes from dbt_artifacts package (e.g. when using manifest load mode)
         )
     )
 

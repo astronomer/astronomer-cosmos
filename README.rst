@@ -3,9 +3,6 @@
     :target: https://www.apache.org/licenses/LICENSE-2.0.txt
     :alt: License
 
-
-
-
 .. PyPI badges
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos

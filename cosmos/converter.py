@@ -454,11 +454,14 @@ class DbtToAirflowConverter:
         # Store metadata in dag.params which is preserved during serialization
         # Using a key that's unlikely to conflict with user params
         compressed_metadata = _compress_telemetry_metadata(metadata)
+        stored_metadata = False
         try:
             dag.params["__cosmos_telemetry_metadata__"] = Param(default=compressed_metadata, const=compressed_metadata)
+            stored_metadata = True
         except ParamValidationError as e:
             logger.warning(f"Failed to store compressed Cosmos telemetry metadata in DAG {dag.dag_id} params: {e}")
 
-        logger.debug(
-            f"Stored compressed Cosmos telemetry metadata in DAG {dag.dag_id} params (original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
-        )
+        if stored_metadata:
+            logger.debug(
+                f"Stored compressed Cosmos telemetry metadata in DAG {dag.dag_id} params (original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
+            )

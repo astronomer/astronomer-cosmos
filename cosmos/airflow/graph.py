@@ -170,6 +170,8 @@ def create_test_task_metadata(
     """
     task_args = dict(task_args)
     task_args["on_warning_callback"] = on_warning_callback
+    # Test operators (DbtTest*) do not emit DatasetAlias
+    task_args["emit_datasets"] = False
     extra_context = {}
     detached_from_parent = detached_from_parent or {}
     task_owner = ""

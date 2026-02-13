@@ -261,6 +261,21 @@ This page lists all available Airflow configurations that affect ``astronomer-co
         :start-after: [START cosmos_init_imports]
         :end-before: [END cosmos_init_imports]
 
+.. _enable_orjson_parser:
+
+`enable_orjson_parser`_:
+    (EXPERIMENTAL - Introduced in Cosmos 1.14.0): Enable the use of ``orjson`` for **all** JSON operations
+    across Cosmos instead of the standard ``json`` library. ``orjson`` provides significantly faster JSON
+    serialization and deserialization, which can reduce DAG parsing time for large dbt projects.
+    Requires installing orjson via ``astronomer-cosmos[orjson]``.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_ORJSON_PARSER``
+
+    .. note::
+        This is an experimental feature. If enabled without installing orjson, Cosmos will raise an
+        ``ImportError`` with installation instructions.
+
 .. _enable_debug_mode:
 
 `enable_debug_mode`_:

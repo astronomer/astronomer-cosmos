@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import json
 import zlib
 from collections.abc import Callable, Sequence
 from datetime import timedelta
@@ -10,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 
+from cosmos import _json as json
 from cosmos.config import ProfileConfig
 from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
 from cosmos.settings import watcher_dbt_execution_queue
@@ -145,7 +145,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         compiled_sql = self._extract_compiled_sql_for_node_event(event_message)
         if compiled_sql:
             event_message_dict["compiled_sql"] = compiled_sql
-        payload = base64.b64encode(zlib.compress(json.dumps(event_message_dict).encode())).decode()
+        payload = base64.b64encode(zlib.compress(json.dumps_bytes(event_message_dict))).decode()
         safe_xcom_push(task_instance=context["ti"], key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:

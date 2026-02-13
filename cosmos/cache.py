@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import hashlib
-import json
 import os
 import shutil
 import tempfile
@@ -20,6 +19,7 @@ from airflow.utils.session import provide_session
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from cosmos import _json as json
 from cosmos import settings
 
 if TYPE_CHECKING:
@@ -296,7 +296,7 @@ def _calculate_yaml_selectors_cache_current_version(
 
     # Use JSON with sorted keys for deterministic hashing, resilient to dict ordering changes
     yaml_selector_hash = hashlib.md5(
-        json.dumps(selector_definitions, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps_bytes(selector_definitions, sort_keys=True, separators=(",", ":"))
     ).hexdigest()
     cache_key_hash = hashlib.md5("".join(sorted(cache_key)).encode()).hexdigest()
 

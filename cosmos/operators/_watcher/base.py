@@ -1,10 +1,10 @@
-import json
 import logging
 from datetime import datetime, timedelta
 from typing import Any
 
 from airflow.exceptions import AirflowException
 
+from cosmos import _json as json
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     AIRFLOW_VERSION,

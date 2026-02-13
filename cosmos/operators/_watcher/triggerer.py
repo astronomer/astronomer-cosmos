@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import json
 import zlib
 from collections.abc import AsyncIterator
 from typing import Any
@@ -11,6 +10,7 @@ from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
 
+from cosmos import _json as json
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import build_producer_state_fetcher

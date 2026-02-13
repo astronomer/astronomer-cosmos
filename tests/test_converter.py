@@ -1,9 +1,11 @@
+import logging
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from airflow.exceptions import ParamValidationError
 from airflow.models import DAG
 
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
@@ -1272,6 +1274,41 @@ def test_telemetry_metadata_storage(mock_load_dbt_graph, mock_should_emit):
     assert "profile_strategy" in metadata
     assert "profile_mapping_class" in metadata
     assert "database" in metadata
+
+
+@patch("cosmos.converter.Param", side_effect=ParamValidationError("Invalid param"))
+@patch("cosmos.converter.should_emit", return_value=True)
+@patch("cosmos.converter.DbtGraph.load")
+def test_telemetry_metadata_storage_handles_param_validation_error(
+    mock_load_dbt_graph, mock_should_emit, mock_param, caplog
+):
+    """Test that ParamValidationError during telemetry metadata storage is caught and logged as a warning."""
+    dag = DAG("test_dag_telemetry_param_error", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig()
+
+    with caplog.at_level(logging.WARNING, logger="cosmos.converter"):
+        # Should NOT raise, even though Param raises ParamValidationError
+        _ = DbtToAirflowConverter(
+            dag=dag,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+        )
+
+    # Verify a warning was logged
+    "Failed to store compressed Cosmos telemetry metadata in DAG test_dag_telemetry_param_error params" in caplog.text
+
+    # Verify metadata was NOT stored in dag.params (since the assignment failed)
+    assert "__cosmos_telemetry_metadata__" not in dag.params
 
 
 @patch("cosmos.converter.DbtGraph.load")

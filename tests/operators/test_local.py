@@ -527,9 +527,8 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 
 
 @pytest.mark.skipif(
-    version.parse(airflow_version) not in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
-    # https://github.com/apache/airflow/issues/39486
+    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
 )
 @pytest.mark.integration
 def test_test_operator_do_not_register_outlets(caplog):

@@ -539,8 +539,8 @@ def test_test_operator_do_not_register_outlets(caplog):
             append_env=True,
         )
 
-        new_test_dag(dag)
-        assert "Outlets: []" in caplog.text
+    new_test_dag(dag)
+    assert "Outlets: []" in caplog.text
 
 
 @pytest.mark.skipif(

@@ -88,13 +88,13 @@ class TestWatcherTrigger:
             (False, "failed", "failed"),
         ],
     )
-    async def test_parse_node_status(self, use_event, xcom_val, expected_status):
+    async def test_parse_dbt_node_status(self, use_event, xcom_val, expected_status):
         self.trigger.use_event = use_event
         with (
             patch("cosmos.operators._watcher.triggerer._parse_compressed_xcom", return_value=xcom_val),
             patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=xcom_val)),
         ):
-            status = await self.trigger._parse_node_status()
+            status = await self.trigger._parse_dbt_node_status()
             assert status == expected_status
 
     @pytest.mark.parametrize(
@@ -116,7 +116,7 @@ class TestWatcherTrigger:
                     assert val == "af3"
 
     @pytest.mark.parametrize(
-        "node_status, producer_state, expected",
+        "dbt_node_status, producer_state, expected",
         [
             ("success", "running", {"status": "success"}),
             ("failed", "running", {"status": "failed", "reason": "model_failed"}),
@@ -124,7 +124,7 @@ class TestWatcherTrigger:
             (None, "success", {"status": "success", "reason": "model_not_run"}),
         ],
     )
-    async def test_run_various_outcomes(self, node_status, producer_state, expected):
+    async def test_run_various_outcomes(self, dbt_node_status, producer_state, expected):
 
         async def fake_get_xcom_val(key):
             return "compressed_data"
@@ -134,7 +134,7 @@ class TestWatcherTrigger:
             patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value=producer_state)),
             patch(
                 "cosmos.operators._watcher.triggerer._parse_compressed_xcom",
-                return_value={"data": {"run_result": {"status": node_status}}} if node_status else {},
+                return_value={"data": {"run_result": {"status": dbt_node_status}}} if dbt_node_status else {},
             ),
         ):
             events = [event async for event in self.trigger.run()]
@@ -210,13 +210,13 @@ class TestWatcherTrigger:
     async def test_run_producer_success_model_not_run(self, caplog):
         """Test that when producer succeeds but model has no status, trigger yields success with model_not_run reason."""
         get_producer_status_mock = AsyncMock(return_value="success")
-        parse_node_status_mock = AsyncMock(return_value=None)
+        parse_dbt_node_status_mock = AsyncMock(return_value=None)
 
         caplog.set_level("INFO")
 
         with (
             patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
-            patch.object(self.trigger, "_parse_node_status", parse_node_status_mock),
+            patch.object(self.trigger, "_parse_dbt_node_status", parse_dbt_node_status_mock),
         ):
             events = []
             async for event in self.trigger.run():
@@ -225,20 +225,22 @@ class TestWatcherTrigger:
         assert len(events) == 1
         assert events[0].payload == {"status": "success", "reason": "model_not_run"}
         assert "The producer task 'task_1' succeeded" in caplog.text
-        assert "There is no information about the model 'model.test' execution" in caplog.text
+        assert "There is no information about the node 'model.test' execution" in caplog.text
 
     @pytest.mark.asyncio
     async def test_run_poke_interval_and_debug_log(self, caplog):
         get_xcom_val_mock = AsyncMock(side_effect=["compressed_data"])
         get_producer_status_mock = AsyncMock(side_effect=["running", "running", "running"])
-        parse_node_status_mock = AsyncMock(side_effect=[None, None, "success"])
+        parse_dbt_node_status_mock = AsyncMock(side_effect=[None, None, "success"])
 
         caplog.set_level("DEBUG")
 
         with (
             patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock),
             patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
-            patch("cosmos.operators._watcher.triggerer.WatcherTrigger._parse_node_status", parse_node_status_mock),
+            patch(
+                "cosmos.operators._watcher.triggerer.WatcherTrigger._parse_dbt_node_status", parse_dbt_node_status_mock
+            ),
             patch("asyncio.sleep", new_callable=AsyncMock) as sleep_mock,
         ):
             events = []

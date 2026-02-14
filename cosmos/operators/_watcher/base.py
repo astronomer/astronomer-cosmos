@@ -13,7 +13,13 @@ from cosmos.constants import (
     WATCHER_TASK_WEIGHT_RULE,
 )
 from cosmos.log import get_logger
-from cosmos.operators._watcher.state import build_producer_state_fetcher, get_xcom_val, safe_xcom_push
+from cosmos.operators._watcher.state import (
+    build_producer_state_fetcher,
+    get_xcom_val,
+    is_dbt_node_status_success,
+    is_dbt_node_status_terminal,
+    safe_xcom_push,
+)
 from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
 
 try:
@@ -43,16 +49,19 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     else:
         logger.debug("Log line: %s", log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
-        node_status = node_info.get("node_status")
+        dbt_node_status = node_info.get("node_status")
         unique_id = node_info.get("unique_id")
 
-        logger.debug("Model: %s is in %s state", unique_id, node_status)
+        logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
-        # TODO: Handle and store all possible node statuses, not just the current success and failed
-        if node_status in ["success", "failed"]:
+        # Handle terminal statuses for both models (success/failed) and tests (pass/fail)
+        # TODO: handle all possible statuses including skipped, warn, etc.
+        if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
             assert context is not None  # Make MyPy happy
-            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+            safe_xcom_push(
+                task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=dbt_node_status
+            )
 
     # Additionally, log the message from dbt logs
     log_info = log_line.get("info", {})
@@ -289,7 +298,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             self.poke_retry_number += 1
 
             return False
-        elif status == "success":
+        elif is_dbt_node_status_success(status):
             return True
         else:
             raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")

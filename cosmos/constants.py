@@ -145,6 +145,16 @@ class SourceRenderingBehavior(Enum):
     WITH_TESTS_OR_FRESHNESS = "with_tests_or_freshness"
 
 
+class SeedRenderingBehavior(Enum):
+    """
+    Modes to configure the seed rendering behavior.
+    """
+
+    ALWAYS = "always"
+    NONE = "none"
+    WHEN_SEED_CHANGES = "when_seed_changes"
+
+
 class DbtResourceType(aenum.Enum):  # type: ignore
     """
     Type of dbt node.

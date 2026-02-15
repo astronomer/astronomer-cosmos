@@ -27,6 +27,7 @@ if not settings.enable_memory_optimised_imports:
         ExecutionMode,
         InvocationMode,
         LoadMode,
+        SeedRenderingBehavior,
         SourceRenderingBehavior,
         TestBehavior,
         TestIndirectSelection,
@@ -257,6 +258,7 @@ if not settings.enable_memory_optimised_imports:
         "TestBehavior",
         "InvocationMode",
         "TestIndirectSelection",
+        "SeedRenderingBehavior",
         "SourceRenderingBehavior",
         "DbtResourceType",
         # Local Execution Mode

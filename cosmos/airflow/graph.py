@@ -136,7 +136,7 @@ def exclude_detached_tests_if_needed(
     current_exclude = task_args.get("exclude")
     # Handle both list[str] (legacy) and str formats for backward compatibility
     if isinstance(current_exclude, list):
-        exclude_items = list(current_exclude)
+        exclude_items = current_exclude
     elif isinstance(current_exclude, str):
         exclude_items = current_exclude.split() if current_exclude else []
     else:

@@ -51,7 +51,8 @@ Cosmos provides various configuration options and execution modes to optimize me
 .. code-block:: python
 
    from cosmos.airflow.dag import DbtDag
-   from cosmos.config import ProjectConfig, RenderConfig, LoadMode
+   from cosmos.config import ProjectConfig, RenderConfig
+   from cosmos.constants import LoadMode
 
    DbtDag(
        project_config=ProjectConfig(dbt_project_path="/path/to/dbt/project"),
@@ -78,7 +79,9 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 .. code-block:: python
 
-   from cosmos import DbtDag, ProjectConfig, RenderConfig, LoadMode, InvocationMode
+   from cosmos.airflow.dag import DbtDag
+   from cosmos.config import ProjectConfig, RenderConfig
+   from cosmos.constants import LoadMode, InvocationMode
 
    DbtDag(
        project_config=ProjectConfig(dbt_project_path="/path/to/dbt/project"),
@@ -145,7 +148,9 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 .. code-block:: python
 
-   from cosmos import DbtDag, ProjectConfig, RenderConfig, ExecutionConfig, ExecutionMode
+   from cosmos.airflow.dag import DbtDag
+   from cosmos.config import ProjectConfig, RenderConfig, ExecutionConfig
+   from cosmos.constants import ExecutionMode
 
    DbtDag(
        project_config=ProjectConfig(dbt_project_path="/path/to/dbt/project"),

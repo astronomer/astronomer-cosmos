@@ -4,7 +4,6 @@ import base64
 import datetime
 import functools
 import itertools
-import json
 import os
 import platform
 import tempfile
@@ -29,6 +28,7 @@ if TYPE_CHECKING:
             pass
 
 import cosmos.dbt.runner as dbt_runner
+from cosmos import _json as json
 from cosmos import cache, settings
 from cosmos.cache import (
     _configure_remote_cache_dir,
@@ -242,7 +242,7 @@ def run_command_with_dbt_runner(command: list[str], tmp_dir: Path | None, env_va
     stderr = ""
     stdout = ""
     result_list = (
-        [json.dumps(item.to_dict()) if hasattr(item, "to_dict") else item for item in response.result]
+        [json.dumps_str(item.to_dict()) if hasattr(item, "to_dict") else item for item in response.result]
         if response.result
         else []
     )
@@ -427,7 +427,7 @@ class DbtGraph:
         Change args list in-place so they include dbt vars, if they are set.
         """
         if self.dbt_vars:
-            cmd_args.extend(["--vars", json.dumps(self.dbt_vars, sort_keys=True)])
+            cmd_args.extend(["--vars", json.dumps_str(self.dbt_vars, sort_keys=True)])
 
     @cached_property
     def dbt_ls_args(self) -> list[str]:
@@ -461,7 +461,7 @@ class DbtGraph:
         cache_args = list(self.dbt_ls_args)
         env_vars = self.env_vars
         if env_vars:
-            envvars_str = json.dumps(env_vars, sort_keys=True)
+            envvars_str = json.dumps_str(env_vars, sort_keys=True)
             cache_args.append(envvars_str)
         if self.render_config.airflow_vars_to_purge_dbt_ls_cache:
             for var_name in self.render_config.airflow_vars_to_purge_dbt_ls_cache:
@@ -1018,13 +1018,11 @@ class DbtGraph:
             "last_modified": "Isoformat timestamp"
         }
         """
-        raw_selectors_json = json.dumps(yaml_selectors.raw, sort_keys=True)
-        compressed_raw = zlib.compress(raw_selectors_json.encode("utf-8"))
+        compressed_raw = zlib.compress(json.dumps_bytes(yaml_selectors.raw, sort_keys=True))
         encoded_raw = base64.b64encode(compressed_raw)
         raw_selectors_compressed = encoded_raw.decode("utf-8")
 
-        parsed_selectors_json = json.dumps(yaml_selectors.parsed, sort_keys=True)
-        compressed_parsed = zlib.compress(parsed_selectors_json.encode("utf-8"))
+        compressed_parsed = zlib.compress(json.dumps_bytes(yaml_selectors.parsed, sort_keys=True))
         encoded_parsed = base64.b64encode(compressed_parsed)
         parsed_selectors_compressed = encoded_parsed.decode("utf-8")
 
@@ -1136,64 +1134,64 @@ class DbtGraph:
         with self.project.manifest_path.open() as fp:
             manifest = json.load(fp)
 
-            resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
-            for unique_id, node_dict in resources.items():
-                # External nodes (e.g., from dbt-loom) may not have a file path - skip them
-                # Check for both None and empty string since dbt-loom may set either
-                original_file_path = node_dict.get("original_file_path")
-                if not original_file_path:
-                    logger.debug(
-                        "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
-                        unique_id,
-                    )
-                    continue
+        resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
+        for unique_id, node_dict in resources.items():
+            # External nodes (e.g., from dbt-loom) may not have a file path - skip them
+            # Check for both None and empty string since dbt-loom may set either
+            original_file_path = node_dict.get("original_file_path")
+            if not original_file_path:
+                logger.debug(
+                    "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
+                    unique_id,
+                )
+                continue
 
-                node = DbtNode(
-                    unique_id=unique_id,
-                    package_name=node_dict.get("package_name"),
-                    resource_type=DbtResourceType(node_dict["resource_type"]),
-                    depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.execution_config.project_path / _normalize_path(original_file_path),
-                    tags=node_dict.get("tags") or [],
-                    config=node_dict.get("config") or {},
-                    has_freshness=(
-                        is_freshness_effective(node_dict.get("freshness"))
-                        if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
-                        else False
-                    ),
+            node = DbtNode(
+                unique_id=unique_id,
+                package_name=node_dict.get("package_name"),
+                resource_type=DbtResourceType(node_dict["resource_type"]),
+                depends_on=node_dict.get("depends_on", {}).get("nodes", []),
+                file_path=self.execution_config.project_path / _normalize_path(original_file_path),
+                tags=node_dict.get("tags") or [],
+                config=node_dict.get("config") or {},
+                has_freshness=(
+                    is_freshness_effective(node_dict.get("freshness"))
+                    if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
+                    else False
+                ),
+            )
+
+            nodes[node.unique_id] = node
+
+        if self.render_config.selector:
+            selector_definitions = manifest.get("selectors", {})
+
+            if not selector_definitions:
+                raise CosmosLoadDbtException(f"Selectors not found in manifest file `{self.project.manifest_path}`")
+
+            yaml_selectors = self.load_parsed_selectors(selector_definitions)
+            selections = yaml_selectors.get_parsed(self.render_config.selector)
+
+            if not selections:
+                raise CosmosLoadDbtException(
+                    f"Selector `{self.render_config.selector}` not found in parsed YAML selectors `{selector_definitions}`"
                 )
 
-                nodes[node.unique_id] = node
-
-            if self.render_config.selector:
-                selector_definitions = manifest.get("selectors", {})
-
-                if not selector_definitions:
-                    raise CosmosLoadDbtException(f"Selectors not found in manifest file `{self.project.manifest_path}`")
-
-                yaml_selectors = self.load_parsed_selectors(selector_definitions)
-                selections = yaml_selectors.get_parsed(self.render_config.selector)
-
-                if not selections:
-                    raise CosmosLoadDbtException(
-                        f"Selector `{self.render_config.selector}` not found in parsed YAML selectors `{selector_definitions}`"
-                    )
-
-                self.nodes = nodes
-                self.filtered_nodes = select_nodes(
-                    project_dir=self.execution_config.project_path,
-                    nodes=nodes,
-                    select=selections["select"],
-                    exclude=selections["exclude"],
-                )
-            else:
-                self.nodes = nodes
-                self.filtered_nodes = select_nodes(
-                    project_dir=self.execution_config.project_path,
-                    nodes=nodes,
-                    select=self.render_config.select,
-                    exclude=self.render_config.exclude,
-                )
+            self.nodes = nodes
+            self.filtered_nodes = select_nodes(
+                project_dir=self.execution_config.project_path,
+                nodes=nodes,
+                select=selections["select"],
+                exclude=selections["exclude"],
+            )
+        else:
+            self.nodes = nodes
+            self.filtered_nodes = select_nodes(
+                project_dir=self.execution_config.project_path,
+                nodes=nodes,
+                select=self.render_config.select,
+                exclude=self.render_config.exclude,
+            )
 
     def update_node_dependency(self) -> None:
         """

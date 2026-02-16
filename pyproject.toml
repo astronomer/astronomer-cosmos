@@ -79,6 +79,7 @@ dbt-sqlserver = ["dbt-sqlserver"]
 dbt-teradata = ["dbt-teradata"]
 dbt-vertica = ["dbt-vertica<=1.5.4"]
 openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]
+orjson = ["orjson"]
 amazon = [
     "apache-airflow-providers-amazon[s3fs]>=3.0.0",
 ]
@@ -169,6 +170,7 @@ dependencies = [
     "Werkzeug<3.0.0",
     "methodtools",
     "pytest-asyncio",
+    "orjson",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

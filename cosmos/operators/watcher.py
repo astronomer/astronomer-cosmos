@@ -260,10 +260,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
 
         logger.info("Node Info: %s", event_json)
 
-        self.compiled_sql = event_json.get("compiled_sql", "")
-        if self.compiled_sql:
-            self._override_rtif(context)
-
         return event_json.get("data", {}).get("run_result", {}).get("status")
 
     def use_event(self) -> bool:

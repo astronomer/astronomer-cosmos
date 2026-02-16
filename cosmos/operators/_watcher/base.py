@@ -390,16 +390,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             status = self._get_status_from_events(ti, context)
         else:
             status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
-            # For subprocess mode, also try to extract compiled_sql from per-model XCom key.
-            # The producer pushes compiled_sql for each model as it completes (both success and failed).
-            if status is not None:
-                compiled_sql = get_xcom_val(
-                    ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
-                )
-                if compiled_sql:
-                    self.compiled_sql = compiled_sql
-                    if hasattr(self, "_override_rtif"):
-                        self._override_rtif(context)
+
+        # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
+        if status is not None:
+            compiled_sql = get_xcom_val(
+                ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
+            )
+            if compiled_sql:
+                self.compiled_sql = compiled_sql
+                if hasattr(self, "_override_rtif"):
+                    self._override_rtif(context)
 
         if status is None:
 

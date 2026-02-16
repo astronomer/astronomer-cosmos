@@ -1013,6 +1013,28 @@ class TestDbtConsumerWatcherSensor:
         assert sensor.compiled_sql == "SELECT * FROM orders"
         mock_override_rtif.assert_called_once_with(context)
 
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor.use_event", return_value=True)
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_status", return_value="running")
+    @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+    def test_poke_event_mode_extracts_compiled_sql_from_canonical_key(
+        self, mock_override_rtif, mock_get_producer, mock_use_event
+    ):
+        """Test that in event (DBT_RUNNER) mode, poke gets compiled_sql from canonical *_compiled_sql key after status."""
+        sensor = self.make_sensor()
+        sensor.model_unique_id = MODEL_UNIQUE_ID
+
+        ti = MagicMock()
+        ti.try_number = 1
+        # _get_status_from_events: dbt_startup_events=None, nodefinished_*=ENCODED_EVENT; then get_xcom_val(compiled_sql_key)
+        ti.xcom_pull.side_effect = [None, ENCODED_EVENT, "SELECT * FROM orders"]
+        context = self.make_context(ti)
+
+        assert sensor.compiled_sql == ""  # Initially empty
+        result = sensor.poke(context)
+        assert result is True
+        assert sensor.compiled_sql == "SELECT * FROM orders"
+        mock_override_rtif.assert_called_once_with(context)
+
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_status", return_value=None)
     def _fallback_to_non_watcher_run(self, mock_get_producer_task_status):
         sensor = self.make_sensor()
@@ -1117,17 +1139,18 @@ class TestDbtConsumerWatcherSensor:
         result = sensor._get_status_from_events(ti, context)
         assert result is None
 
-    def test_get_status_from_events_sets_compiled_sql(self):
+    def test_get_status_from_events_does_not_set_compiled_sql_from_event(self):
+        """compiled_sql is no longer in the event payload; it is read from the canonical XCom key in poke()."""
         sensor = self.make_sensor()
         ti = MagicMock()
-        event_payload = {"data": {"run_result": {"status": "success"}}, "compiled_sql": "select 42"}
+        event_payload = {"data": {"run_result": {"status": "success"}}}
         encoded_event = base64.b64encode(zlib.compress(json.dumps(event_payload).encode())).decode("utf-8")
         ti.xcom_pull.side_effect = [None, encoded_event]
         context = self.make_context(ti)
 
         result = sensor._get_status_from_events(ti, context)
         assert result == "success"
-        assert sensor.compiled_sql == "select 42"
+        assert sensor.compiled_sql == ""  # not set from event; poke() will get it from canonical key
 
     @patch("cosmos.operators._watcher.base.get_xcom_val")
     def test_producer_state_failed(self, mock_get_xcom_val):

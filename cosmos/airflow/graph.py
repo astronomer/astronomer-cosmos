@@ -43,6 +43,18 @@ from cosmos.log import get_logger
 logger = get_logger(__name__)
 
 
+def _convert_list_to_str(value: list[str] | str | None) -> str | None:
+    """Convert a list of strings to a space-separated string for dbt CLI flags.
+
+    RenderConfig stores select/exclude as list[str], but AbstractDbtBase operators
+    expect them as str | None. This helper bridges the two interfaces without
+    requiring a breaking change to AbstractDbtBase.
+    """
+    if isinstance(value, list):
+        return " ".join(value) if value else None
+    return value
+
+
 def _snake_case_to_camelcase(value: str) -> str:
     """Convert snake_case to CamelCase
 
@@ -121,12 +133,19 @@ def exclude_detached_tests_if_needed(
     """
     if detached_from_parent is None:
         detached_from_parent = {}
-    exclude: list[str] = task_args.get("exclude", [])  # type: ignore
+    current_exclude = task_args.get("exclude")
+    # Handle both list[str] (legacy) and str formats for backward compatibility
+    if isinstance(current_exclude, list):
+        exclude_items = current_exclude
+    elif isinstance(current_exclude, str):
+        exclude_items = current_exclude.split() if current_exclude else []
+    else:
+        exclude_items = []
     tests_detached_from_this_node: list[DbtNode] = detached_from_parent.get(node.unique_id, [])  # type: ignore
     for test_node in tests_detached_from_this_node:
-        exclude.append(test_node.resource_name.split(".")[0])
-    if exclude:
-        task_args["exclude"] = exclude  # type: ignore
+        exclude_items.append(test_node.resource_name.split(".")[0])
+    if exclude_items:
+        task_args["exclude"] = _convert_list_to_str(exclude_items) or ""
 
 
 def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_override: dict[str, Any]) -> None:
@@ -189,9 +208,9 @@ def create_test_task_metadata(
         extra_context = {"dbt_node_config": node.context_dict}
         task_owner = node.owner
     elif render_config is not None:  # TestBehavior.AFTER_ALL
-        task_args["select"] = render_config.select
+        task_args["select"] = _convert_list_to_str(render_config.select)
         task_args["selector"] = render_config.selector
-        task_args["exclude"] = render_config.exclude
+        task_args["exclude"] = _convert_list_to_str(render_config.exclude)
 
     if node:
         exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
@@ -625,9 +644,9 @@ def _add_dbt_setup_async_task(
         raise CosmosValueError("ExecutionConfig.AIRFLOW_ASYNC needs async_py_requirements to be set")
 
     if render_config is not None:
-        task_args["select"] = render_config.select
+        task_args["select"] = _convert_list_to_str(render_config.select)
         task_args["selector"] = render_config.selector
-        task_args["exclude"] = render_config.exclude
+        task_args["exclude"] = _convert_list_to_str(render_config.exclude)
         task_args["py_requirements"] = async_py_requirements
 
     setup_task_metadata = TaskMetadata(
@@ -667,15 +686,17 @@ def _add_watcher_producer_task(
     producer_task_args = task_args.copy()
 
     if render_config is not None:
-        producer_task_args["select"] = render_config.select
+        producer_task_args["select"] = _convert_list_to_str(render_config.select)
         producer_task_args["selector"] = render_config.selector
-        producer_task_args["exclude"] = render_config.exclude
+        producer_task_args["exclude"] = _convert_list_to_str(render_config.exclude)
 
         if render_config.test_behavior in [TestBehavior.NONE, TestBehavior.AFTER_ALL]:
-            producer_task_args["exclude"] = producer_task_args["exclude"] + [
-                "resource_type:test",
-                "resource_type:unit_test",
-            ]
+            additional_excludes = "resource_type:test resource_type:unit_test"
+            current_exclude = producer_task_args.get("exclude")
+            if current_exclude:
+                producer_task_args["exclude"] = f"{current_exclude} {additional_excludes}"
+            else:
+                producer_task_args["exclude"] = additional_excludes
 
     class_name = calculate_operator_class(execution_mode, "DbtProducer")
 
@@ -802,9 +823,9 @@ def _add_teardown_task(
         raise CosmosValueError("ExecutionConfig.AIRFLOW_ASYNC needs async_py_requirements to be set")
 
     if render_config is not None:
-        task_args["select"] = render_config.select
+        task_args["select"] = _convert_list_to_str(render_config.select)
         task_args["selector"] = render_config.selector
-        task_args["exclude"] = render_config.exclude
+        task_args["exclude"] = _convert_list_to_str(render_config.exclude)
         task_args["py_requirements"] = async_py_requirements
 
     teardown_task_metadata = TaskMetadata(

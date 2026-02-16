@@ -20,6 +20,7 @@ except ImportError:
 
 from cosmos.airflow.graph import (
     _add_teardown_task,
+    _convert_list_to_str,
     _snake_case_to_camelcase,
     build_airflow_graph,
     calculate_detached_node_name,
@@ -27,6 +28,7 @@ from cosmos.airflow.graph import (
     calculate_operator_class,
     create_task_metadata,
     create_test_task_metadata,
+    exclude_detached_tests_if_needed,
     generate_task_or_group,
 )
 from cosmos.config import ProfileConfig, RenderConfig
@@ -274,7 +276,7 @@ def test_build_airflow_graph_with_after_all():
 
     assert len(dag.leaves) == 1
     assert dag.leaves[0].task_id == "astro_shop_test"
-    assert dag.leaves[0].select == ["tag:some"]
+    assert dag.leaves[0].select == "tag:some"
 
 
 @pytest.mark.integration
@@ -1702,3 +1704,251 @@ def test_create_test_task_metadata_watcher_kubernetes_after_all():
 
     assert metadata.id == "my_project_test"
     assert metadata.operator_class == "cosmos.operators.kubernetes.DbtTestKubernetesOperator"
+
+
+class TestConvertListToStr:
+    """Tests for the _convert_list_to_str helper function."""
+
+    def test_empty_list_returns_none(self):
+        assert _convert_list_to_str([]) is None
+
+    def test_single_item_list(self):
+        assert _convert_list_to_str(["tag:nightly"]) == "tag:nightly"
+
+    def test_multiple_items_list(self):
+        assert _convert_list_to_str(["tag:nightly", "model_a"]) == "tag:nightly model_a"
+
+    def test_none_returns_none(self):
+        assert _convert_list_to_str(None) is None
+
+    def test_string_passthrough(self):
+        assert _convert_list_to_str("tag:nightly") == "tag:nightly"
+
+    def test_empty_string_passthrough(self):
+        assert _convert_list_to_str("") == ""
+
+
+class TestExcludeDetachedTestsIfNeeded:
+    """Tests for exclude_detached_tests_if_needed with string-based exclude."""
+
+    def test_exclude_not_set_with_detached_tests(self):
+        """When exclude is not in task_args, detached tests should produce a string."""
+        node = DbtNode(
+            unique_id="model.my_folder.my_model",
+            resource_type=DbtResourceType.MODEL,
+            depends_on=[],
+            file_path="",
+        )
+        detached_test = DbtNode(
+            unique_id="test.my_folder.test_detached",
+            resource_type=DbtResourceType.TEST,
+            depends_on=["model.my_folder.my_model", "model.my_folder.other_model"],
+            file_path="",
+        )
+        task_args: dict = {}
+        detached_from_parent = {"model.my_folder.my_model": [detached_test]}
+
+        exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
+
+        assert isinstance(task_args["exclude"], str)
+        assert task_args["exclude"] == "test_detached"
+
+    def test_exclude_is_string_with_detached_tests(self):
+        """When exclude is already a string, detached tests should be appended as space-separated."""
+        node = DbtNode(
+            unique_id="model.my_folder.my_model",
+            resource_type=DbtResourceType.MODEL,
+            depends_on=[],
+            file_path="",
+        )
+        detached_test = DbtNode(
+            unique_id="test.my_folder.test_detached",
+            resource_type=DbtResourceType.TEST,
+            depends_on=["model.my_folder.my_model", "model.my_folder.other_model"],
+            file_path="",
+        )
+        task_args: dict = {"exclude": "existing_exclude"}
+        detached_from_parent = {"model.my_folder.my_model": [detached_test]}
+
+        exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
+
+        assert isinstance(task_args["exclude"], str)
+        assert task_args["exclude"] == "existing_exclude test_detached"
+
+    def test_exclude_is_list_with_detached_tests(self):
+        """Backward compatibility: when exclude is a list, result should still be a string."""
+        node = DbtNode(
+            unique_id="model.my_folder.my_model",
+            resource_type=DbtResourceType.MODEL,
+            depends_on=[],
+            file_path="",
+        )
+        detached_test = DbtNode(
+            unique_id="test.my_folder.test_detached",
+            resource_type=DbtResourceType.TEST,
+            depends_on=["model.my_folder.my_model", "model.my_folder.other_model"],
+            file_path="",
+        )
+        task_args: dict = {"exclude": ["existing_exclude"]}
+        detached_from_parent = {"model.my_folder.my_model": [detached_test]}
+
+        exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
+
+        assert isinstance(task_args["exclude"], str)
+        assert task_args["exclude"] == "existing_exclude test_detached"
+
+    def test_no_detached_tests(self):
+        """When there are no detached tests, exclude should not be set."""
+        node = DbtNode(
+            unique_id="model.my_folder.my_model",
+            resource_type=DbtResourceType.MODEL,
+            depends_on=[],
+            file_path="",
+        )
+        task_args: dict = {}
+        exclude_detached_tests_if_needed(node, task_args, {})
+
+        assert "exclude" not in task_args
+
+
+class TestSelectExcludeAsStringsInOperators:
+    """Tests verifying that select/exclude/selector are passed as strings (not lists) to operators."""
+
+    @pytest.mark.integration
+    def test_after_all_passes_select_as_string(self):
+        """When test_behavior is AFTER_ALL, select from RenderConfig should be a string in the operator."""
+        with DAG("test-select-str", start_date=datetime(2022, 1, 1)) as dag:
+            task_args = {
+                "project_dir": SAMPLE_PROJ_PATH,
+                "conn_id": "fake_conn",
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn",
+                        profile_args={"schema": "public"},
+                    ),
+                ),
+            }
+            render_config = RenderConfig(
+                select=["tag:some", "model_a"],
+                test_behavior=TestBehavior.AFTER_ALL,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            )
+            build_airflow_graph(
+                nodes=sample_nodes,
+                dag=dag,
+                execution_mode=ExecutionMode.LOCAL,
+                test_indirect_selection=TestIndirectSelection.EAGER,
+                task_args=task_args,
+                dbt_project_name="astro_shop",
+                render_config=render_config,
+            )
+
+        # The test task (AFTER_ALL) should have select as a string, not a list
+        test_task = dag.task_dict["astro_shop_test"]
+        assert isinstance(test_task.select, str)
+        assert test_task.select == "tag:some model_a"
+
+    @pytest.mark.integration
+    def test_after_all_passes_exclude_as_string(self):
+        """When test_behavior is AFTER_ALL, exclude from RenderConfig should be a string in the operator."""
+        with DAG("test-exclude-str", start_date=datetime(2022, 1, 1)) as dag:
+            task_args = {
+                "project_dir": SAMPLE_PROJ_PATH,
+                "conn_id": "fake_conn",
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn",
+                        profile_args={"schema": "public"},
+                    ),
+                ),
+            }
+            render_config = RenderConfig(
+                exclude=["tag:nightly", "model_b"],
+                test_behavior=TestBehavior.AFTER_ALL,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            )
+            build_airflow_graph(
+                nodes=sample_nodes,
+                dag=dag,
+                execution_mode=ExecutionMode.LOCAL,
+                test_indirect_selection=TestIndirectSelection.EAGER,
+                task_args=task_args,
+                dbt_project_name="astro_shop",
+                render_config=render_config,
+            )
+
+        test_task = dag.task_dict["astro_shop_test"]
+        assert isinstance(test_task.exclude, str)
+        assert test_task.exclude == "tag:nightly model_b"
+
+    @pytest.mark.integration
+    def test_after_all_empty_select_is_none(self):
+        """When test_behavior is AFTER_ALL and select is empty, it should be None in the operator."""
+        with DAG("test-empty-select", start_date=datetime(2022, 1, 1)) as dag:
+            task_args = {
+                "project_dir": SAMPLE_PROJ_PATH,
+                "conn_id": "fake_conn",
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn",
+                        profile_args={"schema": "public"},
+                    ),
+                ),
+            }
+            render_config = RenderConfig(
+                test_behavior=TestBehavior.AFTER_ALL,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            )
+            build_airflow_graph(
+                nodes=sample_nodes,
+                dag=dag,
+                execution_mode=ExecutionMode.LOCAL,
+                test_indirect_selection=TestIndirectSelection.EAGER,
+                task_args=task_args,
+                dbt_project_name="astro_shop",
+                render_config=render_config,
+            )
+
+        test_task = dag.task_dict["astro_shop_test"]
+        assert test_task.select is None
+        assert test_task.exclude is None
+
+    def test_create_test_task_metadata_after_all_converts_select(self):
+        """create_test_task_metadata should convert list select/exclude to strings for AFTER_ALL."""
+        render_config = RenderConfig(
+            select=["tag:some", "model_a"],
+            exclude=["tag:nightly"],
+            test_behavior=TestBehavior.AFTER_ALL,
+        )
+        metadata = create_test_task_metadata(
+            test_task_name="test_all",
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={"project_dir": SAMPLE_PROJ_PATH},
+            render_config=render_config,
+        )
+        assert metadata.arguments["select"] == "tag:some model_a"
+        assert metadata.arguments["exclude"] == "tag:nightly"
+        assert metadata.arguments["selector"] is None
+
+    def test_create_test_task_metadata_after_all_empty_lists(self):
+        """create_test_task_metadata should convert empty lists to None."""
+        render_config = RenderConfig(
+            test_behavior=TestBehavior.AFTER_ALL,
+        )
+        metadata = create_test_task_metadata(
+            test_task_name="test_all",
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={"project_dir": SAMPLE_PROJ_PATH},
+            render_config=render_config,
+        )
+        assert metadata.arguments["select"] is None
+        assert metadata.arguments["exclude"] is None
+        assert metadata.arguments["selector"] is None

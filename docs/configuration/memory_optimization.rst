@@ -120,7 +120,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **What it does**: Uses dbt's ``partial_parse.msgpack`` to avoid re-parsing unchanged parts of the project, reducing memory and CPU usage.
 
-**Default**: ``True``
+**Default**: ``True`` since Cosmos 1.4.0
 
 -------------------------------------------------------------------------------
 

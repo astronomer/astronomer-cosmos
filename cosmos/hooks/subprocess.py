@@ -101,7 +101,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
             assert self.sub_process.stdout is not None
 
             # Make cwd available to the callback `process_log_line` function via kwargs
-            kwargs["project_dir"] = cwd
+            kwargs.setdefault("project_dir", cwd)
             for line in self.sub_process.stdout:
                 line = line.rstrip("\n")
                 last_line = line

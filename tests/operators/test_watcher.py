@@ -24,6 +24,7 @@ from packaging.version import Version
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
 from cosmos.constants import PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
+from cosmos.operators._watcher.base import store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
@@ -721,6 +722,52 @@ class TestStoreDbtStatusFromLog:
 
         assert ti.store.get("model__pkg__failed_model_status") == "failed"
         assert ti.store.get("model__pkg__failed_model_compiled_sql") == "SELECT * FROM orders WHERE invalid_column = 1"
+
+
+class TestStoreCompiledSqlForModelPathHandling:
+    """Tests for store_compiled_sql_for_model path sanitization and normalization."""
+
+    def test_missing_node_path_does_not_push(self, tmp_path):
+        """When node_path is None or empty, no compiled_sql is extracted or pushed."""
+        ti = _MockTI()
+        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.m", None, "model")
+        assert "model__pkg__m_compiled_sql" not in ti.store
+
+        ti2 = _MockTI()
+        store_compiled_sql_for_model(ti2, str(tmp_path), "model.pkg.m", "", "model")
+        assert "model__pkg__m_compiled_sql" not in ti2.store
+
+    def test_rejects_absolute_node_path(self, tmp_path):
+        """Absolute node_path must be rejected (path traversal prevention)."""
+        ti = _MockTI()
+        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.my_model", "/etc/passwd", "model")
+        assert "model__pkg__my_model_compiled_sql" not in ti.store
+
+    def test_rejects_path_traversal(self, tmp_path):
+        """node_path with .. segments that escape compiled root must be rejected."""
+        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
+        compiled_dir.mkdir(parents=True)
+        (compiled_dir / "legit.sql").write_text("SELECT 1")
+        ti = _MockTI()
+        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.m", "../../../etc/passwd", "model")
+        assert "model__pkg__m_compiled_sql" not in ti.store
+
+    def test_strips_leading_models_segment(self, tmp_path):
+        """node_path like models/staging/foo.sql is normalized so file is found."""
+        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models" / "staging"
+        compiled_dir.mkdir(parents=True)
+        (compiled_dir / "stg_orders.sql").write_text("SELECT * FROM staging.orders")
+        ti = _MockTI()
+        store_compiled_sql_for_model(
+            ti, str(tmp_path), "model.pkg.stg_orders", "models/staging/stg_orders.sql", "model"
+        )
+        assert ti.store.get("model__pkg__stg_orders_compiled_sql") == "SELECT * FROM staging.orders"
+
+    def test_empty_after_normalization(self, tmp_path):
+        """node_path that becomes empty after stripping models/ does not push."""
+        ti = _MockTI()
+        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.m", "models/", "model")
+        assert "model__pkg__m_compiled_sql" not in ti.store
 
 
 @patch("cosmos.dbt.runner.is_available", return_value=False)

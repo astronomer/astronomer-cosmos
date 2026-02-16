@@ -83,9 +83,11 @@ class TestWatcherTrigger:
     @pytest.mark.parametrize(
         "use_event, xcom_val, expected_status, expected_compiled_sql",
         [
-            (True, {"data": {"run_result": {"status": "success"}}, "compiled_sql": "SELECT 1"}, "success", "SELECT 1"),
+            # Event mode: status from event payload; compiled_sql from canonical *_compiled_sql key only
+            (True, {"data": {"run_result": {"status": "success"}}}, "success", "SELECT 1"),
             (True, {"data": {"run_result": {"status": "success"}}}, "success", None),
             (True, None, None, None),
+            # Subprocess mode: status from *_status key; compiled_sql from canonical key
             (False, "failed", "failed", None),
             (False, "success", "success", "SELECT * FROM table"),
         ],
@@ -271,3 +273,17 @@ class TestWatcherTrigger:
 
         assert events[0].payload["status"] == "success"
         assert events[0].payload["compiled_sql"] == "SELECT 1"
+
+    @pytest.mark.asyncio
+    async def test_run_failed_model_includes_compiled_sql_in_event(self):
+        """When model fails and compiled_sql is available, event payload includes it."""
+        parse_mock = AsyncMock(return_value=("failed", "SELECT * FROM broken_model"))
+        with (
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="running")),
+            patch.object(self.trigger, "_parse_node_status_and_compiled_sql", parse_mock),
+        ):
+            events = [event async for event in self.trigger.run()]
+        assert len(events) == 1
+        assert events[0].payload["status"] == "failed"
+        assert events[0].payload["reason"] == "model_failed"
+        assert events[0].payload["compiled_sql"] == "SELECT * FROM broken_model"

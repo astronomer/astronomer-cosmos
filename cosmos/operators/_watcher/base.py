@@ -44,17 +44,39 @@ def _extract_compiled_sql(
         logger.debug("node_path not available, cannot extract compiled_sql")
         return None
 
-    package = unique_id.split(".")[1]
-    compiled_sql_path = Path(project_dir) / "target" / "compiled" / package / "models" / node_path
+    # Normalize: use forward slashes and strip leading models/ (dbt may send e.g. models/staging/foo.sql)
+    normalized = node_path.replace("\\", "/").lstrip("/")
+    if Path(normalized).is_absolute():
+        logger.warning("Rejecting absolute node_path: %s", node_path)
+        return None
+    if normalized.lower().startswith("models/"):
+        normalized = normalized[7:]
+    if not normalized:
+        logger.debug("node_path empty after normalization")
+        return None
 
-    if not compiled_sql_path.exists():
+    package = unique_id.split(".")[1]
+    compiled_root = Path(project_dir) / "target" / "compiled" / package / "models"
+
+    try:
+        full_path = (compiled_root / normalized).resolve()
+        compiled_root_resolved = compiled_root.resolve()
+        full_path.relative_to(compiled_root_resolved)
+    except ValueError:
         logger.warning(
-            "Compiled sql path %s does not exist and hence the compiled_sql for the model will not be populated",
-            compiled_sql_path,
+            "node_path escapes compiled root (rejecting path traversal): %s",
+            node_path,
         )
         return None
 
-    return compiled_sql_path.read_text(encoding="utf-8").strip() or None
+    if not full_path.exists():
+        logger.warning(
+            "Compiled sql path %s does not exist and hence the compiled_sql for the model will not be populated",
+            full_path,
+        )
+        return None
+
+    return full_path.read_text(encoding="utf-8").strip() or None
 
 
 def _push_compiled_sql_for_model(task_instance: Any, unique_id: str, compiled_sql: str) -> None:

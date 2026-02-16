@@ -235,5 +235,6 @@ def test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled():
         memory_value = ti.xcom_pull(key="cosmos_debug_max_memory_mb")
 
         assert memory_value is not None, "Expected cosmos_debug_max_memory_mb in XCom"
-        assert isinstance(memory_value, float), "Memory value should be a float"
-        assert memory_value > 0, "Memory value should be greater than 0"
+        # XCom JSON serialization can deserialize whole numbers as int (e.g. 10.0 -> 10)
+        assert isinstance(memory_value, (int, float)), "Memory value should be a number (int or float)"
+        assert float(memory_value) > 0, "Memory value should be greater than 0"

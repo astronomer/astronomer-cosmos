@@ -93,7 +93,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Requirements**: dbt version 1.5.0+ and dbt installed in the same Python environment as Airflow.
 
-**Default**: ``InvocationMode.DBT_RUNNER`` (since Cosmos 1.9)
+**Default**: default behaviour for ``ExecutionMode.LOCAL`` since 1.4.0, default behaviour for ``RenderConfig.DBT_LS`` since Cosmos 1.9.0
 
 -------------------------------------------------------------------------------
 

@@ -1,13 +1,31 @@
 Changelog
 =========
 
-1.14.0a1 (2026-02-02)
+1.14.0a1 (2026-02-16)
 ---------------------
+
+Breaking changes
+
+* Drop support for Airflow under 2.9 by @jedcunningham in #2288
 
 Features
 
 * Add Add cluster policy for ``ExecutionMode.WATCHER`` sensor for retry by @astro-anand in #2293
+* Add debug mode feature to track memory utilisation by @tatiana in #2327
 
+Enhancements
+
+* Rename watcher-mode sensor retry queue and reuse it for producer tasks by @pankajastro in #2331
+
+Docs
+
+* Document the cluster policy config for ExecutionMode.WATCHER sensor task by @pankajastro in #2315
+* Make Watcher DBT Execution Queue heading clickable by @pankajastro in #2354
+
+Others
+
+* Accept int or float for cosmos_debug_max_memory_mb in integration test by @pankajkoti in #2352
+* Fix tests after removing support to Airflow versions under 2.9 support @tatiana in #2321
 
 1.13.0 (2026-01-30)
 ---------------------

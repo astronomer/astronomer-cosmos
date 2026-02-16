@@ -5,6 +5,7 @@ import hashlib
 import inspect
 import re
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -400,28 +401,27 @@ class SelectorConfig:
                     self._handle_no_precursors_or_descendants(item, node_name)
 
     def _handle_no_precursors_or_descendants(self, item: str, node_name: str) -> None:
-        if node_name.startswith(PATH_SELECTOR):
-            self._parse_path_selector(item)
-        elif "/" in node_name:
-            self._parse_path_selector(f"{PATH_SELECTOR}{node_name}")
-        elif node_name.startswith(TAG_SELECTOR):
-            self._parse_tag_selector(item)
-        elif node_name.startswith(CONFIG_SELECTOR):
-            self._parse_config_selector(item)
-        elif node_name.startswith(SOURCE_SELECTOR):
-            self._parse_source_selector(item)
-        elif node_name.startswith(EXPOSURE_SELECTOR):
-            self._parse_exposure_selector(item)
-        elif node_name.startswith(PACKAGE_SELECTOR):
-            self._parse_package_selector(item)
-        elif node_name.startswith(RESOURCE_TYPE_SELECTOR):
-            self._parse_resource_type_selector(item)
-        elif node_name.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR):
-            self._parse_exclude_resource_type_selector(item)
-        elif self._is_bare_identifier(node_name):
-            self._parse_bare_identifier(node_name)
-        else:
-            self._parse_unknown_selector(item)
+        """Dispatch to the correct parser based on node_name prefix/pattern. Keeps C901 low via dispatch list."""
+        dispatch: list[tuple[bool, Callable[[], None]]] = [
+            (node_name.startswith(PATH_SELECTOR), lambda: self._parse_path_selector(item)),
+            ("/" in node_name, lambda: self._parse_path_selector(f"{PATH_SELECTOR}{node_name}")),
+            (node_name.startswith(TAG_SELECTOR), lambda: self._parse_tag_selector(item)),
+            (node_name.startswith(CONFIG_SELECTOR), lambda: self._parse_config_selector(item)),
+            (node_name.startswith(SOURCE_SELECTOR), lambda: self._parse_source_selector(item)),
+            (node_name.startswith(EXPOSURE_SELECTOR), lambda: self._parse_exposure_selector(item)),
+            (node_name.startswith(PACKAGE_SELECTOR), lambda: self._parse_package_selector(item)),
+            (node_name.startswith(RESOURCE_TYPE_SELECTOR), lambda: self._parse_resource_type_selector(item)),
+            (
+                node_name.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR),
+                lambda: self._parse_exclude_resource_type_selector(item),
+            ),
+            (self._is_bare_identifier(node_name), lambda: self._parse_bare_identifier(node_name)),
+        ]
+        for condition, handler in dispatch:
+            if condition:
+                handler()
+                return
+        self._parse_unknown_selector(item)
 
     def _is_bare_identifier(self, value: str) -> bool:
         """True if value is a bare selector: no : / + @ .
@@ -582,54 +582,60 @@ class NodeSelector:
             return node_id in self.selected_nodes
 
         self.visited_nodes.add(node_id)
-
-        # Disclaimer: this method currently copies the tags from parent nodes to children nodes
-        # that are tests. This can lead to incorrect results in graph node selectors such as reported in
-        # https://github.com/astronomer/astronomer-cosmos/pull/1466
-        if node.resource_type == DbtResourceType.TEST and node.depends_on and len(node.depends_on) > 0:
-            node.tags = getattr(self.nodes.get(node.depends_on[0]), "tags", [])
-            logger.debug(
-                "The test node <%s> inherited these tags from the parent node <%s>: %s",
-                node_id,
-                node.depends_on[0],
-                node.tags,
-            )
-
+        self._inherit_test_node_tags(node_id, node)
         if not self._is_tags_subset(node):
             logger.debug("Excluding node <%s>", node_id)
             return False
+        if not self._node_passes_config_filters(node):
+            return False
+        if not self._node_passes_type_and_path_filters(node):
+            return False
+        if not self._node_passes_selector_filters(node):
+            return False
+        return True
 
-        # Remove 'tags' as they've already been filtered for
+    def _inherit_test_node_tags(self, node_id: str, node: DbtNode) -> None:
+        """Copy tags from parent to test nodes (see #1466). Mutates node.tags in place."""
+        if node.resource_type != DbtResourceType.TEST or not node.depends_on:
+            return
+        node.tags = getattr(self.nodes.get(node.depends_on[0]), "tags", [])
+        logger.debug(
+            "The test node <%s> inherited these tags from the parent node <%s>: %s",
+            node_id,
+            node.depends_on[0],
+            node.tags,
+        )
+
+    def _node_passes_config_filters(self, node: DbtNode) -> bool:
+        """Check meta and non-meta/non-tag config filters."""
         config_copy = copy.deepcopy(self.config.config)
         config_copy.pop("tags", None)
-
-        # Handle other config attributes, including meta and general config
-        if not self._should_include_based_on_meta(
-            node, config_copy
-        ) or not self._should_include_based_on_non_meta_and_non_tag_config(node, config_copy):
+        if not self._should_include_based_on_meta(node, config_copy):
             return False
+        if not self._should_include_based_on_non_meta_and_non_tag_config(node, config_copy):
+            return False
+        return True
 
+    def _node_passes_type_and_path_filters(self, node: DbtNode) -> bool:
+        """Check path, resource_type, and exclude_resource_type filters."""
         if self.config.paths and not self._is_path_matching(node):
             return False
-
         if self.config.resource_types and not self._is_resource_type_matching(node):
             return False
-
         if self.config.exclude_resource_types and self._is_exclude_resource_type_matching(node):
             return False
+        return True
 
+    def _node_passes_selector_filters(self, node: DbtNode) -> bool:
+        """Check source, exposure, package, and bare-identifier filters."""
         if self.config.sources and not self._is_source_matching(node):
             return False
-
         if self.config.exposures and not self._is_exposure_matching(node):
             return False
-
         if self.config.packages and not self._is_package_matching(node):
             return False
-
         if self.config.bare_identifiers and not self._is_bare_identifier_matching(node):
             return False
-
         return True
 
     def _is_resource_type_matching(self, node: DbtNode) -> bool:

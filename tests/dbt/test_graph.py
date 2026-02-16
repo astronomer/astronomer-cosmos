@@ -2683,9 +2683,9 @@ def test__normalize_path():
     "pre_dbt_fusion_value,source_rendering_behaviour_value,expected_args_count",
     [
         (True, SourceRenderingBehavior.NONE, 4),
-        (False, SourceRenderingBehavior.NONE, 13),
-        (True, SourceRenderingBehavior.ALL, 13),
-        (False, SourceRenderingBehavior.ALL, 13),
+        (False, SourceRenderingBehavior.NONE, 14),
+        (True, SourceRenderingBehavior.ALL, 14),
+        (False, SourceRenderingBehavior.ALL, 14),
     ],
 )
 @patch("cosmos.dbt.graph.settings")

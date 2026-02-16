@@ -1013,10 +1013,7 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
     assert metadata.id == "test_no_nulls"
     assert metadata.operator_class == "cosmos.operators.local.DbtTestLocalOperator"
     assert metadata.arguments == {
-        **{
-            "task_arg": "value",
-            "on_warning_callback": True,
-        },
+        **{"task_arg": "value", "on_warning_callback": True, "emit_datasets": False},
         **additional_arguments,
     }
 

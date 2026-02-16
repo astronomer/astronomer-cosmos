@@ -145,7 +145,7 @@ def exclude_detached_tests_if_needed(
     for test_node in tests_detached_from_this_node:
         exclude_items.append(test_node.resource_name.split(".")[0])
     if exclude_items:
-        task_args["exclude"] = " ".join(exclude_items)
+        task_args["exclude"] = _convert_list_to_str(exclude_items)
 
 
 def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_override: dict[str, Any]) -> None:

@@ -85,7 +85,15 @@ def _extract_compiled_sql(
         )
         return None
 
-    return full_path.read_text(encoding="utf-8").strip() or None
+    try:
+        return full_path.read_text(encoding="utf-8").strip() or None
+    except (OSError, UnicodeDecodeError) as exc:
+        logger.warning(
+            "Failed to read compiled sql from %s: %s. The compiled_sql for the model will not be populated",
+            full_path,
+            exc,
+        )
+        return None
 
 
 def _push_compiled_sql_for_model(task_instance: Any, unique_id: str, compiled_sql: str) -> None:

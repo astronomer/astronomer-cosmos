@@ -769,6 +769,38 @@ class TestStoreCompiledSqlForModelPathHandling:
         store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.m", "models/", "model")
         assert "model__pkg__m_compiled_sql" not in ti.store
 
+    def test_unique_id_without_package_does_not_push(self, tmp_path):
+        """unique_id with fewer than two segments (e.g. 'model') cannot yield a package; no push."""
+        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
+        compiled_dir.mkdir(parents=True)
+        (compiled_dir / "foo.sql").write_text("SELECT 1")
+        ti = _MockTI()
+        store_compiled_sql_for_model(ti, str(tmp_path), "model", "foo.sql", "model")
+        assert "model_compiled_sql" not in ti.store
+
+    def test_read_compiled_sql_oserror_does_not_push(self, tmp_path):
+        """When reading the compiled file raises OSError, no compiled_sql is pushed."""
+        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
+        compiled_dir.mkdir(parents=True)
+        (compiled_dir / "foo.sql").write_text("SELECT 1")
+        ti = _MockTI()
+        with patch("cosmos.operators._watcher.base.Path.read_text", side_effect=OSError(13, "Permission denied")):
+            store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.foo", "foo.sql", "model")
+        assert "model__pkg__foo_compiled_sql" not in ti.store
+
+    def test_read_compiled_sql_unicode_decode_error_does_not_push(self, tmp_path):
+        """When reading the compiled file raises UnicodeDecodeError, no compiled_sql is pushed."""
+        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
+        compiled_dir.mkdir(parents=True)
+        (compiled_dir / "foo.sql").write_bytes(b"\xff\xfe invalid utf-8")
+        ti = _MockTI()
+        with patch(
+            "cosmos.operators._watcher.base.Path.read_text",
+            side_effect=UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid continuation byte"),
+        ):
+            store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.foo", "foo.sql", "model")
+        assert "model__pkg__foo_compiled_sql" not in ti.store
+
 
 @patch("cosmos.dbt.runner.is_available", return_value=False)
 @patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", return_value="done")

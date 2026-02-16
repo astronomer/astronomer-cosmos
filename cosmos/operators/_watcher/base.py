@@ -49,8 +49,9 @@ def _extract_compiled_sql(
     if Path(normalized).is_absolute():
         logger.warning("Rejecting absolute node_path: %s", node_path)
         return None
-    if normalized.lower().startswith("models/"):
-        normalized = normalized[7:]
+    _models_prefix = "models/"
+    if normalized.lower().startswith(_models_prefix):
+        normalized = normalized[len(_models_prefix) :]
     if not normalized:
         logger.debug("node_path empty after normalization")
         return None

@@ -24,7 +24,7 @@ from packaging.version import Version
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
 from cosmos.constants import PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
-from cosmos.operators._watcher.base import store_compiled_sql_for_model
+from cosmos.operators._watcher.base import _extract_compiled_sql, store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
@@ -742,6 +742,17 @@ class TestStoreCompiledSqlForModelPathHandling:
         ti = _MockTI()
         store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.my_model", "/etc/passwd", "model")
         assert "model__pkg__my_model_compiled_sql" not in ti.store
+
+    def test_extract_compiled_sql_rejects_absolute_path(self):
+        """_extract_compiled_sql returns None when normalized path is absolute (covers is_absolute branch)."""
+        # After normalize (replace + lstrip), "/etc/passwd" becomes "etc/passwd" so we need to mock
+        # Path.is_absolute() to hit the branch on all platforms (real absolute path survives on Windows only).
+        with patch("cosmos.operators._watcher.base.Path") as mock_path_cls:
+            mock_path = MagicMock()
+            mock_path.is_absolute.return_value = True
+            mock_path_cls.return_value = mock_path
+            result = _extract_compiled_sql("/project", "model.pkg.m", "some/model.sql", "model")
+        assert result is None
 
     def test_rejects_path_traversal(self, tmp_path):
         """node_path with .. segments that escape compiled root must be rejected."""

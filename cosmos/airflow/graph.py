@@ -288,7 +288,7 @@ def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
     return dbt_resource_to_class
 
 
-def create_task_metadata(
+def create_task_metadata(  # noqa: C901
     node: DbtNode,
     execution_mode: ExecutionMode,
     args: dict[str, Any],
@@ -340,7 +340,10 @@ def create_task_metadata(
         models_select_key = "models" if settings.pre_dbt_fusion else "select"
 
         if render_config.test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
-            args[models_select_key] = f"{node.resource_name}"
+            if node.fqn and len(node.fqn) > 0:
+                args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"
+            else:
+                args[models_select_key] = f"{node.resource_name}"
             if test_indirect_selection != TestIndirectSelection.EAGER:
                 args["indirect_selection"] = test_indirect_selection.value
             args["on_warning_callback"] = on_warning_callback
@@ -390,7 +393,10 @@ def create_task_metadata(
                     args = {}
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
         else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
-            args[models_select_key] = node.resource_name
+            if node.fqn and len(node.fqn) > 0:
+                args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"
+            else:
+                args[models_select_key] = node.resource_name
             task_id, args = _get_task_id_and_args(
                 node=node,
                 args=args,

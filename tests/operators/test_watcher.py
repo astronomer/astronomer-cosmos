@@ -1465,7 +1465,7 @@ def test_dbt_task_group_with_watcher_has_correct_templated_dbt_cmd():
     assert full_cmd[1] == "run"  # dbt run command
 
     cmd = " ".join(full_cmd)
-    assert "--select stg_customers" in cmd
+    assert "--select fqn:jaffle_shop.staging.stg_customers" in cmd
     assert "--threads 1" in cmd
 
 

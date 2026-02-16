@@ -28,18 +28,20 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 
-def _extract_compiled_sql_for_subprocess(
+def _extract_compiled_sql(
     project_dir: str, unique_id: str, node_path: str | None, resource_type: str | None
 ) -> str | None:
     """
     Extract compiled SQL from the target directory for a given dbt node.
 
-    This is the subprocess equivalent of DbtProducerWatcherOperator._extract_compiled_sql_for_node_event.
+    Used by both the subprocess strategy (via store_dbt_resource_status_from_log)
+    and the node-event strategy (via DbtProducerWatcherOperator._handle_node_finished);
+    both consume from the same target/compiled layout under project_dir.
     """
     if resource_type != "model":
         return None
     if not node_path:
-        logger.debug("node_path not available in JSON log, cannot extract compiled_sql")
+        logger.debug("node_path not available, cannot extract compiled_sql")
         return None
 
     package = unique_id.split(".")[1]
@@ -53,6 +55,37 @@ def _extract_compiled_sql_for_subprocess(
         return None
 
     return compiled_sql_path.read_text(encoding="utf-8").strip() or None
+
+
+def _push_compiled_sql_for_model(task_instance: Any, unique_id: str, compiled_sql: str) -> None:
+    """
+    Push compiled SQL for a model to XCom under the canonical key.
+
+    Single place where both subprocess and node-event producer paths set compiled_sql.
+    Consumers (sensor poke and trigger) always read from this key.
+    """
+    safe_xcom_push(
+        task_instance=task_instance,
+        key=f"{unique_id.replace('.', '__')}_compiled_sql",
+        value=compiled_sql,
+    )
+
+
+def store_compiled_sql_for_model(
+    task_instance: Any,
+    project_dir: str,
+    unique_id: str,
+    node_path: str | None,
+    resource_type: str | None,
+) -> None:
+    """
+    Read compiled SQL from the target directory and store to XCom if present.
+
+    Single sequence used by both subprocess and node-event producer paths.
+    """
+    compiled_sql = _extract_compiled_sql(project_dir, unique_id, node_path, resource_type)
+    if compiled_sql:
+        _push_compiled_sql_for_model(task_instance, unique_id, compiled_sql)
 
 
 def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
@@ -82,19 +115,13 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
             assert context is not None  # Make MyPy happy
             safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
 
-            # Extract and push compiled_sql for models (similar to dbt_runner mode)
+            # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
             # compiled_sql is available for both success and failed models - it's compiled before execution
             project_dir = extra_kwargs.get("project_dir")
             if project_dir:
-                node_path = node_info.get("node_path")
-                resource_type = node_info.get("resource_type")
-                compiled_sql = _extract_compiled_sql_for_subprocess(project_dir, unique_id, node_path, resource_type)
-                if compiled_sql:
-                    safe_xcom_push(
-                        task_instance=context["ti"],
-                        key=f"{unique_id.replace('.', '__')}_compiled_sql",
-                        value=compiled_sql,
-                    )
+                store_compiled_sql_for_model(
+                    context["ti"], project_dir, unique_id, node_info.get("node_path"), node_info.get("resource_type")
+                )
 
     # Additionally, log the message from dbt logs
     log_info = log_line.get("info", {})

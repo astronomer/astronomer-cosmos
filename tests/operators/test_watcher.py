@@ -345,10 +345,8 @@ def test_handle_node_finished_injects_compiled_sql(tmp_path, monkeypatch):
         ev = _fake_event(name="NodeFinished", uid="model.pkg.my_model", resource_type="model", node_path="my_model.sql")
         op._handle_node_finished(ev, ctx)
 
-    stored = list(ti.store.values())[0]
-    raw = zlib.decompress(base64.b64decode(stored)).decode()
-    data = json.loads(raw)
-    assert data.get("compiled_sql") == sql_text
+    # Compiled SQL is pushed to the canonical XCom key (single strategy for both event and subprocess)
+    assert ti.store.get("model__pkg__my_model_compiled_sql") == sql_text
 
 
 def test_handle_node_finished_without_compiled_sql_does_not_inject(tmp_path, monkeypatch):
@@ -363,10 +361,11 @@ def test_handle_node_finished_without_compiled_sql_does_not_inject(tmp_path, mon
         ev = _fake_event(name="NodeFinished", uid="model.pkg.my_model", resource_type="model", node_path="my_model.sql")
         op._handle_node_finished(ev, ctx)
 
+    # Event payload does not contain compiled_sql; canonical key is only set when extraction succeeds
     stored = list(ti.store.values())[0]
-    raw = zlib.decompress(base64.b64decode(stored)).decode()
-    data = json.loads(raw)
+    data = json.loads(zlib.decompress(base64.b64decode(stored)).decode())
     assert "compiled_sql" not in data
+    assert "model__pkg__my_model_compiled_sql" not in ti.store
 
 
 def test_execute_streaming_mode():
@@ -1243,17 +1242,18 @@ class TestWatcherTrigger:
 
     @pytest.mark.asyncio
     async def test_parse_node_status_and_compiled_sql_dbt_runner_mode(self):
-        """Test that compiled_sql is extracted from compressed event in dbt_runner mode."""
+        """Test that in dbt_runner mode status comes from event payload and compiled_sql from canonical key."""
         trigger = self.make_trigger(use_event=True)
 
-        # Create compressed event payload with compiled_sql
-        event_data = {"data": {"run_result": {"status": "success"}}, "compiled_sql": "SELECT id FROM users"}
+        # Event payload (no longer contains compiled_sql; it is stored under canonical key)
+        event_data = {"data": {"run_result": {"status": "success"}}}
         compressed = base64.b64encode(zlib.compress(json.dumps(event_data).encode())).decode()
 
-        # Mock get_xcom_val to return compressed event
         async def mock_get_xcom_val(key):
             if key == "nodefinished_model__pkg__my_model":
                 return compressed
+            if key == "model__pkg__my_model_compiled_sql":
+                return "SELECT id FROM users"
             return None
 
         trigger.get_xcom_val = mock_get_xcom_val

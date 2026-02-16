@@ -96,14 +96,14 @@ class TestWatcherTrigger:
         self.trigger.use_event = use_event
 
         async def mock_get_xcom_val(key):
+            # compiled_sql is always read from the canonical key (same for both modes)
+            if key.endswith("_compiled_sql"):
+                return expected_compiled_sql
             if use_event:
                 return xcom_val if xcom_val else None
-            else:
-                # For subprocess mode, simulate status and compiled_sql keys
-                if key.endswith("_status"):
-                    return xcom_val
-                elif key.endswith("_compiled_sql"):
-                    return expected_compiled_sql
+            # Subprocess mode: status from per-model key
+            if key.endswith("_status"):
+                return xcom_val
             return None
 
         with (
@@ -144,6 +144,9 @@ class TestWatcherTrigger:
     async def test_run_various_outcomes(self, node_status, producer_state, expected):
 
         async def fake_get_xcom_val(key):
+            # Return None for compiled_sql key so payload matches expected (no compiled_sql)
+            if key.endswith("_compiled_sql"):
+                return None
             return "compressed_data"
 
         with (

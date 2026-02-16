@@ -103,33 +103,26 @@ class WatcherTrigger(BaseTrigger):
         Parse node status and compiled_sql from XCom.
 
         Returns a tuple of (status, compiled_sql).
-        For dbt_runner mode (use_event=True), both are extracted from the compressed event payload.
-        For subprocess mode (use_event=False), status comes from per-model status key,
-        and compiled_sql comes from per-model compiled_sql key.
+        Status comes from mode-specific keys (nodefinished_* for event, *_status for subprocess).
+        compiled_sql is always read from the canonical per-model key (same for both modes).
         """
-        key = (
+        status_key = (
             f"nodefinished_{self.model_unique_id.replace('.', '__')}"
             if self.use_event
             else f"{self.model_unique_id.replace('.', '__')}_status"
         )
+        compiled_sql_key = f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
 
         if self.use_event:
-            compressed_xcom_val = await self.get_xcom_val(key)
+            compressed_xcom_val = await self.get_xcom_val(status_key)
             if not compressed_xcom_val:
                 return None, None
-
             data_json = _parse_compressed_xcom(compressed_xcom_val)
             status = data_json.get("data", {}).get("run_result", {}).get("status")
-            compiled_sql = data_json.get("compiled_sql")
-            return status, compiled_sql
+        else:
+            status = await self.get_xcom_val(status_key)
 
-        # Subprocess mode: get status and compiled_sql from separate XCom keys
-        status = await self.get_xcom_val(key)
-        compiled_sql = None
-        # compiled_sql is available for both success and failed models - it's compiled before execution
-        if status is not None:
-            compiled_sql_key = f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
-            compiled_sql = await self.get_xcom_val(compiled_sql_key)
+        compiled_sql = await self.get_xcom_val(compiled_sql_key) if status is not None else None
         return status, compiled_sql
 
     async def _get_producer_task_status(self) -> str | None:

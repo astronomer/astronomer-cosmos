@@ -55,7 +55,16 @@ def _extract_compiled_sql(
         logger.debug("node_path empty after normalization")
         return None
 
-    package = unique_id.split(".")[1]
+    parts = unique_id.split(".")
+    if len(parts) < 2:
+        logger.warning(
+            "unique_id '%s' does not have the expected format (e.g., 'model.package.name'); "
+            "cannot determine package for compiled SQL lookup",
+            unique_id,
+        )
+        return None
+
+    package = parts[1]
     compiled_root = Path(project_dir) / "target" / "compiled" / package / "models"
 
     try:

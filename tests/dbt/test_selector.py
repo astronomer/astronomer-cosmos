@@ -1135,7 +1135,7 @@ def test_exposure_selector():
         (
             "fqn_method",
             {"name": "fqn_method", "definition": {"method": "fqn", "value": "customers"}},
-            {"select": ["customers"], "exclude": None},
+            {"select": ["fqn:customers"], "exclude": None},
         ),
         (
             "fqn_star_method",

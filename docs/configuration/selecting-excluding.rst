@@ -33,6 +33,7 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``source:my_source.my_table``: include/exclude nodes that have the source ``my_source`` and the table ``my_table``
 - ``exposure:my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and are of resource_type ``exposure``
 - ``exposure:+my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and their parents
+- ``fqn:some_model``: include/exclude nodes based on their fully qualified names (FQN)
 
 .. note::
 
@@ -74,7 +75,6 @@ Examples:
         )
     )
 
-
 .. code-block:: python
 
     from cosmos import DbtDag, RenderConfig
@@ -113,6 +113,19 @@ Examples:
         render_config=RenderConfig(
             select=["@my_model"],  # selects my_model, all its descendants,
             # and all ancestors needed to build those descendants
+        )
+    )
+
+.. code-block:: python
+
+    from cosmos.airflow.dag import DbtDag
+    from cosmos.config import RenderConfig
+
+    jaffle_shop = DbtDag(
+        render_config=RenderConfig(
+            select=[
+                "fqn:fqn:jaffle_shop.foo.foo"
+            ],  # selects based on their fully qualified name
         )
     )
 

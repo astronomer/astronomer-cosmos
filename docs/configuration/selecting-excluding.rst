@@ -124,8 +124,8 @@ Examples:
     jaffle_shop = DbtDag(
         render_config=RenderConfig(
             select=[
-                "fqn:jaffle_shop.foo.foo"
-            ],  # selects based on their fully qualified name
+                "fqn:jaffle_shop.analytics.tables.my_model"
+            ],  # selects models by fully qualified name
         )
     )
 

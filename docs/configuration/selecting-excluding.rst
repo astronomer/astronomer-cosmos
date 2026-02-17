@@ -33,7 +33,7 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``source:my_source.my_table``: include/exclude nodes that have the source ``my_source`` and the table ``my_table``
 - ``exposure:my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and are of resource_type ``exposure``
 - ``exposure:+my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and their parents
-- ``fqn:some_model``: include/exclude nodes based on their fully qualified names (FQN)
+- ``fqn:some_model``: include/exclude nodes based on their fully qualified names (FQN), which consist of the project name, folder path, and model name. For example, ``fqn:my_dbt_project.analytics.tables.my_model`` selects the model ``my_model`` in the ``analytics/tables`` folder of the ``my_dbt_project`` project.
 
 .. note::
 

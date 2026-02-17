@@ -7,6 +7,7 @@ from typing import Any
 from cosmos.profiles.base import BaseProfileMapping
 
 DEFAULT_AWS_REGION = "us-west-2"
+DEFAULT_THREADS = 4
 
 
 class SnowflakeBaseProfileMapping(BaseProfileMapping):
@@ -16,6 +17,7 @@ class SnowflakeBaseProfileMapping(BaseProfileMapping):
         """Gets profile."""
         profile_vars = {
             **self.mapped_params,
+            "threads": DEFAULT_THREADS,
             **self.profile_args,
         }
         return profile_vars

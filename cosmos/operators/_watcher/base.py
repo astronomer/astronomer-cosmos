@@ -110,7 +110,6 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
         pass
 
 
-
 def store_dbt_resource_status_to_xcom(line: str, task_instance: "TaskInstance") -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
@@ -135,7 +134,6 @@ def store_dbt_resource_status_to_xcom(line: str, task_instance: "TaskInstance") 
         # TODO: Handle and store all possible node statuses, not just the current success and failed
         if node_status in ["success", "failed"]:
             safe_xcom_push(task_instance=task_instance, key=f"{unique_id.replace('.', '__')}_status", value=node_status)
-
 
     # Additionally, log the message from dbt logs
     log_info = log_line.get("info", {})

@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -63,6 +64,11 @@ def test_dbt_fusion(dag_id, execution_config, profile_config):
     - Airflow tasks
     And that the tasks are in the expected topological order.
     """
+    if os.getenv("CI"):
+        operator_args = {"trigger_rule": "all_success"}
+    else:
+        operator_args = {}
+
     dbt_fusion_dag = DbtDag(
         execution_config=execution_config,
         project_config=project_config,
@@ -71,6 +77,7 @@ def test_dbt_fusion(dag_id, execution_config, profile_config):
         start_date=datetime(2023, 1, 1),
         dag_id=dag_id,
         tags=["profiles"],
+        operator_args=operator_args,
     )
     outcome = dbt_fusion_dag.test()
     assert outcome.state == DagRunState.SUCCESS

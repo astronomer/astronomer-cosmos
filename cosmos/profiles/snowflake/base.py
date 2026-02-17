@@ -12,12 +12,14 @@ DEFAULT_THREADS = 4
 
 class SnowflakeBaseProfileMapping(BaseProfileMapping):
 
+    profile_defaults: dict[str, Any] = {"threads": DEFAULT_THREADS}
+
     @property
     def profile(self) -> dict[str, Any | None]:
         """Gets profile."""
         profile_vars = {
             **self.mapped_params,
-            "threads": DEFAULT_THREADS,
+            **self.profile_defaults,
             **self.profile_args,
         }
         return profile_vars

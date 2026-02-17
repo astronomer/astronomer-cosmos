@@ -10,7 +10,7 @@ readme = "README.rst"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 authors = [{ name = "Astronomer", email = "humans@astronomer.io" }]
-keywords = ["airflow", "apache-airflow", "astronomer", "dags", "dbt"]
+keywords = ["airflow", "apache-airflow", "astronomer", "dags", "dbt", "dbt-core", "dbt-fusion"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Web Environment",

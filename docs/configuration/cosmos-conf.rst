@@ -130,6 +130,8 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_PROFILE``
 
 .. _pre_dbt_fusion:
+
+`pre_dbt_fusion`_:
     From Cosmos 1.11, we have introduced support for dbt Fusion. Some of the changes may not be compatible with legacy versions of dbt-core.
     If you find any issues on how Cosmos interacts with older versions of dbt-core you can use this configuration.
 
@@ -279,6 +281,20 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
     - Default: ``0.5``
     - Environment Variable: ``AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS``
+
+.. _watcher_dbt_execution_queue:
+
+`watcher_dbt_execution_queue`_:
+    (Introduced in Cosmos 1.14.0) When using watcher execution mode, tasks may need to run dbt or not, depending on their type (producer vs. consumer) and the retry number. When running the dbt command, tasks use more resources (CPU and memory) than when behaving as sensors. The computational cost of running these tasks can vary widely. For example, a Cosmos watcher sensor consumes approximately 200MB, compared to 700MB consumed by a dbt build task running a project with almost 200 dbt models. This configuration allows users to define which queue to use when dbt commands are run, optimising their Airflow deployment. Internally, Cosmos leverages the [Airflow cluster policy feature](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html). As of now, this configuration will be used:
+    - for watcher producer tasks, during their first execution
+    - for watcher consumer tasks, from their first retry onwards
+    - it will automatically be assigned to the specified queue.
+
+    This behavior is enforced by Cosmos via an Airflow policy (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts.
+    As a result, the configured ``watcher_dbt_execution_queue`` can overwrite any queue set directly on the operator, but only for retries; the initial run continues to use the operator's original queue.
+
+    - Default: ``None``
+    - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE``
 
 [openlineage]
 ~~~~~~~~~~~~~

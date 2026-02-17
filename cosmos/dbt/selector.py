@@ -940,7 +940,7 @@ class YamlSelectors:
             - method="config.materialized", value="view" -> "config.materialized:view"
         """
         if method == "fqn":
-            return "" if value == "*" else f"{FQN_SELECTOR}{value}"
+            return "" if value == "*" else f"{FQN_SELECTOR}{value}", None
 
         method_mappings = {
             TAG_SELECTOR[:-1]: TAG_SELECTOR,

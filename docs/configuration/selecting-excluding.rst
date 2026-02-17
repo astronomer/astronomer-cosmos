@@ -124,7 +124,7 @@ Examples:
     jaffle_shop = DbtDag(
         render_config=RenderConfig(
             select=[
-                "fqn:fqn:jaffle_shop.foo.foo"
+                "fqn:jaffle_shop.foo.foo"
             ],  # selects based on their fully qualified name
         )
     )

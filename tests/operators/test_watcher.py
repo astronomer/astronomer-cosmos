@@ -129,6 +129,7 @@ def test_dbt_producer_watcher_operator_queue(queue_override, expected_queue):
         assert op.queue == expected_queue
 
 
+@pytest.mark.integration
 def test_producer_queue_from_setup_operator_args_when_both_set():
     """
     When both setup_operator_args queue and watcher_dbt_execution_queue are set,
@@ -150,6 +151,7 @@ def test_producer_queue_from_setup_operator_args_when_both_set():
     assert producer.queue == "dbt_producer_task_queue"
 
 
+@pytest.mark.integration
 def test_producer_queue_from_watcher_dbt_execution_queue_when_only_watcher_set():
     """
     When only watcher_dbt_execution_queue is set (no queue in setup_operator_args),

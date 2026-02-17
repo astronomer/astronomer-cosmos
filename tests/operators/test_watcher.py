@@ -24,7 +24,7 @@ from packaging.version import Version
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
 from cosmos.constants import PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
-from cosmos.operators._watcher.base import _extract_compiled_sql, store_compiled_sql_for_model
+from cosmos.operators._watcher.base import store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
@@ -725,7 +725,7 @@ class TestStoreDbtStatusFromLog:
 
 
 class TestStoreCompiledSqlForModelPathHandling:
-    """Tests for store_compiled_sql_for_model path sanitization and normalization."""
+    """Tests for store_compiled_sql_for_model (node_path is relative to target/compiled/<package>/models/)."""
 
     def test_missing_node_path_does_not_push(self, tmp_path):
         """When node_path is None or empty, no compiled_sql is extracted or pushed."""
@@ -737,25 +737,14 @@ class TestStoreCompiledSqlForModelPathHandling:
         store_compiled_sql_for_model(ti2, str(tmp_path), "model.pkg.m", "", "model")
         assert "model__pkg__m_compiled_sql" not in ti2.store
 
-    def test_rejects_absolute_node_path(self, tmp_path):
-        """Absolute node_path must be rejected (path traversal prevention)."""
+    def test_nonexistent_path_does_not_push(self, tmp_path):
+        """When compiled SQL path does not exist, we do not push."""
         ti = _MockTI()
-        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.my_model", "/etc/passwd", "model")
+        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.my_model", "nonexistent.sql", "model")
         assert "model__pkg__my_model_compiled_sql" not in ti.store
 
-    def test_extract_compiled_sql_rejects_absolute_path(self):
-        """_extract_compiled_sql returns None when normalized path is absolute (covers is_absolute branch)."""
-        # After normalize (replace + lstrip), "/etc/passwd" becomes "etc/passwd" so we need to mock
-        # Path.is_absolute() to hit the branch on all platforms (real absolute path survives on Windows only).
-        with patch("cosmos.operators._watcher.base.Path") as mock_path_cls:
-            mock_path = MagicMock()
-            mock_path.is_absolute.return_value = True
-            mock_path_cls.return_value = mock_path
-            result = _extract_compiled_sql("/project", "model.pkg.m", "some/model.sql", "model")
-        assert result is None
-
-    def test_rejects_path_traversal(self, tmp_path):
-        """node_path with .. segments that escape compiled root must be rejected."""
+    def test_path_traversal_outside_project_does_not_push(self, tmp_path):
+        """node_path with .. that resolves outside compiled root: file does not exist, so we do not push."""
         compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
         compiled_dir.mkdir(parents=True)
         (compiled_dir / "legit.sql").write_text("SELECT 1")
@@ -763,54 +752,23 @@ class TestStoreCompiledSqlForModelPathHandling:
         store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.m", "../../../etc/passwd", "model")
         assert "model__pkg__m_compiled_sql" not in ti.store
 
-    def test_strips_leading_models_segment(self, tmp_path):
-        """node_path like models/staging/foo.sql is normalized so file is found."""
+    def test_compiled_sql_under_models_pushed(self, tmp_path):
+        """node_path relative to models/ (e.g. staging/foo.sql) is read and pushed."""
         compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models" / "staging"
         compiled_dir.mkdir(parents=True)
         (compiled_dir / "stg_orders.sql").write_text("SELECT * FROM staging.orders")
         ti = _MockTI()
-        store_compiled_sql_for_model(
-            ti, str(tmp_path), "model.pkg.stg_orders", "models/staging/stg_orders.sql", "model"
-        )
+        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.stg_orders", "staging/stg_orders.sql", "model")
         assert ti.store.get("model__pkg__stg_orders_compiled_sql") == "SELECT * FROM staging.orders"
 
-    def test_empty_after_normalization(self, tmp_path):
-        """node_path that becomes empty after stripping models/ does not push."""
-        ti = _MockTI()
-        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.m", "models/", "model")
-        assert "model__pkg__m_compiled_sql" not in ti.store
-
-    def test_unique_id_without_package_does_not_push(self, tmp_path):
-        """unique_id with fewer than two segments (e.g. 'model') cannot yield a package; no push."""
+    def test_compiled_sql_flat_path_pushed(self, tmp_path):
+        """node_path as single file under models/ (e.g. foo.sql) is read and pushed."""
         compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
         compiled_dir.mkdir(parents=True)
         (compiled_dir / "foo.sql").write_text("SELECT 1")
         ti = _MockTI()
-        store_compiled_sql_for_model(ti, str(tmp_path), "model", "foo.sql", "model")
-        assert "model_compiled_sql" not in ti.store
-
-    def test_read_compiled_sql_oserror_does_not_push(self, tmp_path):
-        """When reading the compiled file raises OSError, no compiled_sql is pushed."""
-        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
-        compiled_dir.mkdir(parents=True)
-        (compiled_dir / "foo.sql").write_text("SELECT 1")
-        ti = _MockTI()
-        with patch("cosmos.operators._watcher.base.Path.read_text", side_effect=OSError(13, "Permission denied")):
-            store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.foo", "foo.sql", "model")
-        assert "model__pkg__foo_compiled_sql" not in ti.store
-
-    def test_read_compiled_sql_unicode_decode_error_does_not_push(self, tmp_path):
-        """When reading the compiled file raises UnicodeDecodeError, no compiled_sql is pushed."""
-        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
-        compiled_dir.mkdir(parents=True)
-        (compiled_dir / "foo.sql").write_bytes(b"\xff\xfe invalid utf-8")
-        ti = _MockTI()
-        with patch(
-            "cosmos.operators._watcher.base.Path.read_text",
-            side_effect=UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid continuation byte"),
-        ):
-            store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.foo", "foo.sql", "model")
-        assert "model__pkg__foo_compiled_sql" not in ti.store
+        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.foo", "foo.sql", "model")
+        assert ti.store.get("model__pkg__foo_compiled_sql") == "SELECT 1"
 
 
 @patch("cosmos.dbt.runner.is_available", return_value=False)

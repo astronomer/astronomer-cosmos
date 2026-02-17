@@ -37,64 +37,21 @@ def _extract_compiled_sql(
     Used by both the subprocess strategy (via store_dbt_resource_status_from_log)
     and the node-event strategy (via DbtProducerWatcherOperator._handle_node_finished);
     both consume from the same target/compiled layout under project_dir.
+
+    Assumes inputs come from dbt (relative node_path, unique_id like model.package.name).
     """
-    if resource_type != "model":
-        return None
-    if not node_path:
-        logger.debug("node_path not available, cannot extract compiled_sql")
+    if resource_type != "model" or not node_path:
         return None
 
-    # Normalize: use forward slashes and strip leading models/ (dbt may send e.g. models/staging/foo.sql)
-    normalized = node_path.replace("\\", "/").lstrip("/")
-    if Path(normalized).is_absolute():
-        logger.warning("Rejecting absolute node_path: %s", node_path)
-        return None
-    _models_prefix = "models/"
-    if normalized.lower().startswith(_models_prefix):
-        normalized = normalized[len(_models_prefix) :]
-    if not normalized:
-        logger.debug("node_path empty after normalization")
-        return None
-
-    parts = unique_id.split(".")
-    if len(parts) < 2:
+    package = unique_id.split(".", 2)[1]
+    compiled_sql_path = Path(project_dir) / "target" / "compiled" / package / "models" / node_path
+    if not compiled_sql_path.exists():
         logger.warning(
-            "unique_id '%s' does not have the expected format (e.g., 'model.package.name'); "
-            "cannot determine package for compiled SQL lookup",
-            unique_id,
+            "Compiled sql path %s does not exist and hence the rendered template field compiled_sql for the model will not be populated",
+            compiled_sql_path,
         )
         return None
-
-    package = parts[1]
-    compiled_root = Path(project_dir) / "target" / "compiled" / package / "models"
-
-    try:
-        full_path = (compiled_root / normalized).resolve()
-        compiled_root_resolved = compiled_root.resolve()
-        full_path.relative_to(compiled_root_resolved)
-    except ValueError:
-        logger.warning(
-            "node_path escapes compiled root (rejecting path traversal): %s",
-            node_path,
-        )
-        return None
-
-    if not full_path.exists():
-        logger.warning(
-            "Compiled sql path %s does not exist and hence the compiled_sql for the model will not be populated",
-            full_path,
-        )
-        return None
-
-    try:
-        return full_path.read_text(encoding="utf-8").strip() or None
-    except (OSError, UnicodeDecodeError) as exc:
-        logger.warning(
-            "Failed to read compiled sql from %s: %s. The compiled_sql for the model will not be populated",
-            full_path,
-            exc,
-        )
-        return None
+    return compiled_sql_path.read_text(encoding="utf-8").strip() or None
 
 
 def _push_compiled_sql_for_model(task_instance: Any, unique_id: str, compiled_sql: str) -> None:

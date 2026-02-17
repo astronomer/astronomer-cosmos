@@ -933,11 +933,11 @@ class YamlSelectors:
         :return: tuple[str | None, str | None] - Tuple of (selector string or None, error message or None)
 
         Examples:
-            - method="tag", value="nightly" -> "tag:nightly"
-            - method="path", value="models/" -> "path:models/"
-            - method="fqn", value="*" -> ""
-            - method="fqn", value="jaffle_shop.customers" -> "fqn:jaffle_shop.customers"
-            - method="config.materialized", value="view" -> "config.materialized:view"
+            - method="tag", value="nightly" -> ("tag:nightly", None)
+            - method="path", value="models/" -> ("path:models/", None)
+            - method="fqn", value="*" -> ("", None)
+            - method="fqn", value="jaffle_shop.customers" -> ("fqn:jaffle_shop.customers", None)
+            - method="config.materialized", value="view" -> ("config.materialized:view", None)
         """
         if method == "fqn":
             return "" if value == "*" else f"{FQN_SELECTOR}{value}", None

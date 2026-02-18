@@ -1056,6 +1056,39 @@ def test_select_nodes_by_exclude_bare_package_name():
     assert set(selected_bare.keys()) == set(selected_explicit.keys()) == set(sample_nodes.keys())
 
 
+def test_select_nodes_by_bare_folder_name():
+    """
+    Bare identifier as folder name (path segment) matches nodes under that folder.
+    Ensures select=['folder_a'] / exclude=['folder_a'] work with manifest load mode.
+    """
+    # gen1 contains grandparent, another_grandparent; gen3 contains child, sibling1, sibling2, sibling3, orphaned
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=sample_nodes,
+        select=["gen1"],
+    )
+    assert set(selected.keys()) == {grandparent_node.unique_id, another_grandparent_node.unique_id}
+
+
+def test_exclude_nodes_by_bare_folder_name():
+    """Exclude by folder name (path segment) excludes all nodes under that folder."""
+    excluded = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=sample_nodes,
+        exclude=["gen3"],
+    )
+    gen3_ids = {
+        child_node.unique_id,
+        sibling1_node.unique_id,
+        sibling2_node.unique_id,
+        sibling3_node.unique_id,
+        orphaned_node.unique_id,
+    }
+    assert gen3_ids.isdisjoint(excluded.keys())
+    assert grandparent_node.unique_id in excluded
+    assert parent_node.unique_id in excluded
+
+
 def test_select_exposure_nodes_by_graph_ancestry():
     """
     Test selecting an exposure node and its directs ancestors using the syntax '+exposure:exposure_name'.

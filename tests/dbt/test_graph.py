@@ -33,6 +33,7 @@ from cosmos.dbt.graph import (
     DbtNode,
     LoadMode,
     _normalize_path,
+    _parse_manifest_resources_to_nodes,
     parse_dbt_ls_output,
     run_command,
 )
@@ -425,6 +426,72 @@ def test_load_via_manifest_with_select(project_name, manifest_filepath, model_fi
         "model.jaffle_shop.stg_payments",
     ]
     assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / f"{project_name}/models/{model_filepath}"
+
+
+def test_load_from_dbt_manifest_raises_without_execution_project_path():
+    """load_from_dbt_manifest raises when ExecutionConfig.dbt_project_path is not set."""
+    project_config = ProjectConfig(manifest_path=SAMPLE_MANIFEST, project_name="jaffle_shop")
+    execution_config = ExecutionConfig()  # project_path is None
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_from_dbt_manifest()
+    assert err_info.value.args[0] == "Unable to load manifest without ExecutionConfig.dbt_project_path"
+
+
+def test_load_from_dbt_manifest_handles_null_manifest(tmp_path):
+    """When manifest file contains JSON null, it is treated as empty dict (covers manifest = {} branch)."""
+    manifest_file = tmp_path / "manifest_null.json"
+    manifest_file.write_text("null")
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="test")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+    assert dbt_graph.nodes == {}
+    assert dbt_graph.filtered_nodes == {}
+
+
+def test_parse_manifest_resources_to_nodes_resolves_package_path(tmp_path):
+    """Package nodes get file_path under project_path/dbt_packages/<package_name>/."""
+    manifest = {
+        "metadata": {"project_name": "my_project"},
+        "nodes": {
+            "model.some_package.foo": {
+                "original_file_path": "models/edr/foo.sql",
+                "package_name": "some_package",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    nodes = _parse_manifest_resources_to_nodes(manifest, tmp_path)
+    assert "model.some_package.foo" in nodes
+    node = nodes["model.some_package.foo"]
+    assert node.package_name == "some_package"
+    assert "dbt_packages" in str(node.file_path)
+    assert "some_package" in node.file_path.parts
+    assert node.file_path.name == "foo.sql"
 
 
 def test_load_via_manifest_with_selectors_and_missing_definitions():

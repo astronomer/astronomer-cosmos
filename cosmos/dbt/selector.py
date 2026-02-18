@@ -669,8 +669,15 @@ class NodeSelector:
         return (node.package_name or "") in self.config.packages
 
     def _is_bare_identifier_matching(self, node: DbtNode) -> bool:
-        """Bare identifiers match by package_name or node name (dbt-like: default path/file/fqn resolution)."""
-        return (node.package_name or "") in self.config.bare_identifiers or node.name in self.config.bare_identifiers
+        """Bare identifiers match by package_name, node name, or path segment (e.g. folder name)."""
+        if (node.package_name or "") in self.config.bare_identifiers or node.name in self.config.bare_identifiers:
+            return True
+        # Match by path segment (folder name): e.g. "folder_a" matches nodes under .../folder_a/...
+        try:
+            path_parts = node.file_path.parts
+        except AttributeError:
+            path_parts = ()
+        return any(bare in path_parts for bare in self.config.bare_identifiers)
 
     def _is_tags_subset(self, node: DbtNode) -> bool:
         """Checks if the node's tags are a subset of the config's tags."""

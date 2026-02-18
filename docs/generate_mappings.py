@@ -72,6 +72,7 @@ def generate_mapping_docs(
                         "mapping_description": "\n\n".join(docstring.split("\n")),
                         "fields": [field.__dict__ for field in get_fields_from_mapping(mapping=mapping)],
                         "airflow_conn_type": mapping.airflow_connection_type,
+                        "profile_defaults": getattr(mapping, "profile_defaults", {}),
                     }
                 )
             )

@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from airflow.exceptions import AirflowException
@@ -25,6 +26,63 @@ except ImportError:  # pragma: no cover
 
 
 logger = get_logger(__name__)
+
+
+def _extract_compiled_sql(
+    project_dir: str, unique_id: str, node_path: str | None, resource_type: str | None
+) -> str | None:
+    """
+    Extract compiled SQL from the target directory for a given dbt node.
+
+    Used by both the subprocess strategy (via store_dbt_resource_status_from_log)
+    and the node-event strategy (via DbtProducerWatcherOperator._handle_node_finished);
+    both consume from the same target/compiled layout under project_dir.
+
+    Assumes inputs come from dbt (relative node_path, unique_id like model.package.name).
+    """
+    if resource_type != "model" or not node_path:
+        return None
+
+    package = unique_id.split(".", 2)[1]
+    compiled_sql_path = Path(project_dir) / "target" / "compiled" / package / "models" / node_path
+    if not compiled_sql_path.exists():
+        logger.warning(
+            "Compiled sql path %s does not exist and hence the rendered template field compiled_sql for the model will not be populated",
+            compiled_sql_path,
+        )
+        return None
+    return compiled_sql_path.read_text(encoding="utf-8").strip() or None
+
+
+def _push_compiled_sql_for_model(task_instance: Any, unique_id: str, compiled_sql: str) -> None:
+    """
+    Push compiled SQL for a model to XCom under the canonical key.
+
+    Single place where both subprocess and node-event producer paths set compiled_sql.
+    Consumers (sensor poke and trigger) always read from this key.
+    """
+    safe_xcom_push(
+        task_instance=task_instance,
+        key=f"{unique_id.replace('.', '__')}_compiled_sql",
+        value=compiled_sql,
+    )
+
+
+def store_compiled_sql_for_model(
+    task_instance: Any,
+    project_dir: str,
+    unique_id: str,
+    node_path: str | None,
+    resource_type: str | None,
+) -> None:
+    """
+    Read compiled SQL from the target directory and store to XCom if present.
+
+    Single sequence used by both subprocess and node-event producer paths.
+    """
+    compiled_sql = _extract_compiled_sql(project_dir, unique_id, node_path, resource_type)
+    if compiled_sql:
+        _push_compiled_sql_for_model(task_instance, unique_id, compiled_sql)
 
 
 def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
@@ -53,6 +111,14 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
             context = extra_kwargs.get("context")
             assert context is not None  # Make MyPy happy
             safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+
+            # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
+            # compiled_sql is available for both success and failed models - it's compiled before execution
+            project_dir = extra_kwargs.get("project_dir")
+            if project_dir:
+                store_compiled_sql_for_model(
+                    context["ti"], project_dir, unique_id, node_info.get("node_path"), node_info.get("resource_type")
+                )
 
     # Additionally, log the message from dbt logs
     log_info = log_line.get("info", {})
@@ -175,8 +241,8 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         logger.info("Node Info: %s", run_results_json)
         self.compiled_sql = node_result.get("compiled_code")
-        if self.compiled_sql:
-            self._override_rtif(context)  # type: ignore[attr-defined]
+        if self.compiled_sql and hasattr(self, "_override_rtif"):
+            self._override_rtif(context)
 
         return node_result.get("status")
 
@@ -230,6 +296,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 self.model_unique_id,
             )
 
+        # Extract and store compiled_sql from the event if available
+        compiled_sql = event.get("compiled_sql")
+        if compiled_sql:
+            self.compiled_sql = compiled_sql
+            if hasattr(self, "_override_rtif"):
+                self._override_rtif(context)
+
         if status != "failed":
             return
 
@@ -274,6 +347,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             status = self._get_status_from_events(ti, context)
         else:
             status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+
+        # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
+        if status is not None:
+            compiled_sql = get_xcom_val(
+                ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
+            )
+            if compiled_sql:
+                self.compiled_sql = compiled_sql
+                if hasattr(self, "_override_rtif"):
+                    self._override_rtif(context)
 
         if status is None:
 

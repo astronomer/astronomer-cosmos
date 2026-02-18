@@ -193,3 +193,26 @@ Parsing of the ``default`` and ``indirect_selection`` keywords is not currently 
 In the event the dbt YAML selector specification changes, Cosmos will attempt to keep up to date with the changes, but there may be a lag between dbt releases and Cosmos releases.
 Once a new Cosmos version is released with the updated selector parsing logic, users should update their Cosmos version to ensure compatibility with the latest dbt selector specification.
 For subsequent updates to the YAML selector parser, existing YAML selector caches will be invalidated the next time the DAG is parsed.
+
+**Error Handling**
+
+Cosmos distinguishes between two types of errors when parsing YAML selectors:
+
+- **Structural YAML Errors** - These cause immediate failure during manifest parsing:
+
+  - Selector definition is not a dictionary
+  - Missing required ``name`` key
+  - Missing required ``definition`` key
+
+  These errors indicate malformed YAML structure and will raise a ``CosmosValueError`` immediately when calling ``YamlSelectors.parse()``.
+
+- **Selector Definition Errors** - These are isolated and surfaced when accessing the selector:
+
+  - Unsupported selector methods (e.g., ``method: "state"``, ``method: "package"``)
+  - Invalid graph operator configurations (e.g., non-integer depth values)
+  - Invalid selector logic (e.g., multiple root keys in a definition)
+
+  These errors are collected during parsing but only raised when you attempt to retrieve the selector using ``get_parsed(selector_name)``.
+  This allows the manifest to be loaded successfully even if some selectors have definition errors, enabling you to work with valid selectors while debugging invalid ones.
+
+If a selector has multiple definition errors, they will all be reported together in a formatted error message when accessing the selector.

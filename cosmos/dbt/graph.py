@@ -96,6 +96,7 @@ class DbtNode:
     has_test: bool = False
     has_non_detached_test: bool = False
     downstream: list[str] = field(default_factory=lambda: [])
+    fqn: list[str] | None = None
 
     @property
     def meta(self) -> dict[str, Any]:
@@ -343,6 +344,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
                         else False
                     ),
+                    fqn=node_dict.get("fqn"),
                 )
             except (KeyError, TypeError):
                 logger.info("Could not parse following the dbt ls line even though it was a valid JSON `%s`", line)
@@ -385,6 +387,7 @@ def _parse_manifest_resources_to_nodes(manifest: dict[str, Any], project_path: P
             has_freshness=(
                 is_freshness_effective(node_dict.get("freshness")) if resource_type == DbtResourceType.SOURCE else False
             ),
+            fqn=node_dict.get("fqn"),
         )
         nodes[node.unique_id] = node
     return nodes
@@ -684,6 +687,7 @@ class DbtGraph:
                 "tags",
                 "config",
                 "freshness",
+                "fqn",
             ]
         else:
             ls_command = [

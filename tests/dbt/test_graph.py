@@ -2274,7 +2274,7 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     hash_dir, hash_selectors, hash_impl = version.split(",")
 
     assert hash_selectors == "43303af03e84e3b51fbfcf598261fae4"
-    assert hash_impl == "3ae7ccd90b387308920fa408907de75d"
+    assert hash_impl == "c7ba8b331e80ae876d5c7c7c1cfdf93d"
 
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
@@ -2750,9 +2750,9 @@ def test__normalize_path():
     "pre_dbt_fusion_value,source_rendering_behaviour_value,expected_args_count",
     [
         (True, SourceRenderingBehavior.NONE, 4),
-        (False, SourceRenderingBehavior.NONE, 13),
-        (True, SourceRenderingBehavior.ALL, 13),
-        (False, SourceRenderingBehavior.ALL, 13),
+        (False, SourceRenderingBehavior.NONE, 14),
+        (True, SourceRenderingBehavior.ALL, 14),
+        (False, SourceRenderingBehavior.ALL, 14),
     ],
 )
 @patch("cosmos.dbt.graph.settings")

@@ -54,3 +54,22 @@ Some notes about the table above:
   For example, if the Airflow field name is ``['password', 'extra.token']``, the profile mapping
   will first look for a field named ``password``. If that field is not present, it will look for
   ``extra.token``.
+{% if profile_defaults %}
+
+Default Values
+--------------
+
+This profile mapping sets the following default values. These can be overridden by passing
+them in ``profile_args``.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Field Name
+     - Default Value
+
+   {% for key, value in profile_defaults.items() %}
+   * - ``{{ key }}``
+     - ``{{ value }}``
+   {% endfor %}
+{% endif %}

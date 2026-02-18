@@ -1024,6 +1024,17 @@ def test_select_nodes_by_exclude_package():
     assert set(selected.keys()) == set(sample_nodes.keys())
 
 
+def test_select_nodes_raises_on_empty_package_selector():
+    """Empty package: (e.g. select=['package:']) would match all nodes with package_name None; we raise instead."""
+    with pytest.raises(CosmosValueError) as err_info:
+        select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["package:"])
+    assert "package: selector requires a non-empty package name" in err_info.value.args[0]
+
+    with pytest.raises(CosmosValueError) as err_info:
+        select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["package:"])
+    assert "package: selector requires a non-empty package name" in err_info.value.args[0]
+
+
 def test_select_nodes_by_exclude_bare_package_name():
     """
     Bare package name (no 'package:' prefix) is equivalent to 'package:name', matching dbt behavior.

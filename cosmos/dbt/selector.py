@@ -485,6 +485,10 @@ class SelectorConfig:
     def _parse_package_selector(self, item: str) -> None:
         index = len(PACKAGE_SELECTOR)
         package_name = item[index:].strip()
+        if not package_name:
+            raise CosmosValueError(
+                "package: selector requires a non-empty package name (e.g. select=['package:dbt_artifacts'])"
+            )
         self.packages.append(package_name)
 
     def __repr__(self) -> str:

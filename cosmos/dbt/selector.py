@@ -361,7 +361,7 @@ class SelectorConfig:
         self.sources: list[str] = []
         self.exposures: list[str] = []
         self.packages: list[str] = []
-        self.bare_identifiers: list[str] = []  # bare strings: match by package_name or node name (dbt-like)
+        self.bare_identifiers: list[str] = []  # bare strings: match by package_name, node name or folder name (dbt ls-like)
         self.resource_types: list[str] = []
         self.exclude_resource_types: list[str] = []
         self.load_from_statement(statement)

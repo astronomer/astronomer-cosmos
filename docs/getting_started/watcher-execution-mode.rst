@@ -221,9 +221,9 @@ How retries work
 
 When the ``dbt build`` command run by ``DbtProducerWatcherOperator`` fails, it will notify all the ``DbtConsumerWatcherSensor``.
 
-The individual watcher tasks, that subclass ``DbtConsumerWatcherSensor``, can retry the dbt command by themselves using the same behaviour as ``ExecutionMode.LOCAL``.
+The individual watcher tasks that subclass ``DbtConsumerWatcherSensor``can retry the dbt command themselves, using the same behaviour as ``ExecutionMode.LOCAL``.
 
-If a branch of the DAG failed, users can clear the status of a failed consumer task, including its downstream tasks, via the Airflow UI - and each of them will run using the ``ExecutionMode.LOCAL``.
+If a branch of the DAG fails, users can clear the status of a failed consumer task, including its downstream tasks, via the Airflow UI, and each of them will run in ``ExecutionMode.LOCAL``.
 
 **Producer retry behavior**
 
@@ -285,7 +285,7 @@ Or via environment variable:
 Installation of Airflow and dbt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Since Cosmos 1.12.0, the ``ExecutionMode.WATCHER`` works well regardless if dbt and Airflow are installed in the same Python virtual environment or not.
+Since Cosmos 1.12.0, ``ExecutionMode.WATCHER`` works well regardless of whether dbt and Airflow are installed in the same Python virtual environment.
 
 When dbt and Airflow are installed in the same Python virtual environment, the ``ExecutionMode.WATCHER`` uses dbt `callback features <https://docs.getdbt.com/reference/programmatic-invocations#registering-callbacks>`_.
 
@@ -310,10 +310,9 @@ Known Limitations
 Producer task implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The producer task is implemented as a ``DbtProducerWatcherOperator`` operator and it currently relies on dbt being installed alongside the Airflow deployment, similar to the ``ExecutionMode.LOCAL`` implementation.
+The producer task is implemented as a ``DbtProducerWatcherOperator``and currently relies on dbt being installed alongside the Airflow deployment, as in the ``ExecutionMode.LOCAL`` implementation.
 
-There are discussions about allowing this node to be implemented as the ``ExecutionMode.VIRTUALENV`` and ``ExecutionMode.KUBERNETES`` execution modes, so that there is a higher isolation between dbt and Airflow dependencies.
-
+The alternative to this implementation is to use ``ExecutionMode.WATCHER_KUBERNETES``, which is built on top of ``ExecutionMode.KUBERNETES``. Check :ref:`watcher-kubernetes-execution-mode` for more information.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Individual dbt Operators
@@ -328,12 +327,6 @@ However, other operators that are available in the ``ExecutionMode.LOCAL`` mode 
 
 The ``DbtBuildWatcherOperator`` is not implemented, since the build command is executed by the producer ``DbtProducerWatcherOperator`` operator.
 
-Test support for ``TestBehavior.AFTER_ALL`` and ``TestBehavior.NONE`` modes have been implemented for the ``ExecuteMode.WATCHER`` as part of `#2047 <https://github.com/astronomer/astronomer-cosmos/pull/2047>`_. and `#2049 <https://github.com/astronomer/astronomer-cosmos/pull/2049>`_.
-
-Tests with ``TestBehavior.AFTER_EACH``, which is the default test behavior, are still being rendered as ``EmptyOperators``.
-
-However, this gap should be addressed with `#2311 <https://github.com/astronomer/astronomer-cosmos/issues/2311>`_.
-
 Additionally, since the ``dbt build`` command does not run ``source`` nodes, the operator ``DbtSourceWatcherOperator`` is equivalent to the ``DbtSourceLocalOperator`` operator, from ``ExecutionMode.LOCAL``.
 
 Finally, the following features are not implemented as operators under ``ExecutionMode.WATCHER``:
@@ -345,16 +338,47 @@ Finally, the following features are not implemented as operators under ``Executi
 
 You can still invoke these operators using the default ``ExecutionMode.LOCAL`` mode.
 
+~~~~~~~~~~~~~
+Test behavior
+~~~~~~~~~~~~~
+
+By default, the watcher mode runs tests alongside models via the ``dbt build`` command being executed by the producer ``DbtProducerWatcherOperator`` operator.
+
+As a starting point, this execution mode does not support the ``TestBehavior.AFTER_EACH`` behaviour, since the tests are not run as individual tasks. Since this is the default ``TestBehavior`` in Cosmos, we are injecting ``EmptyOperator`` as a starting point to ensure a seamless transition to the new mode.
+
+The ``TestBehavior.BUILD`` behaviour is embedded to the producer ``DbtProducerWatcherOperator`` operator.
+
+The ``TestBehaviour.NONE`` and ``TestBehaviour.AFTER_ALL`` behave similar to ``ExecutionMode.LOCAL``.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Airflow Datasets and Assets
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+While the ``ExecutionMode.WATCHER`` supports the ``emit_datasets`` parameter, the Airflow Datasets and Assets are emitted from the ``DbtProducerWatcherOperator`` task instead of the consumer tasks, as done for other Cosmos' execution modes.
+
+~~~~~~~~~~~~~~~~~~~~~~
+Source freshness nodes
+~~~~~~~~~~~~~~~~~~~~~~
+
+Since Cosmos 1.6, it `supports the rendering of source nodes <https://www.astronomer.io/blog/native-support-for-source-node-rendering-in-cosmos/>`_.
+
+We noticed some Cosmos users use this feature alongside `overriding Cosmos source nodes <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#customizing-how-nodes-are-rendered-experimental>`_ as sensors or another operator that allows them to skip the following branch of the DAG if the source is not fresh.
+
+This use-case is not currently supported by the ``ExecutionMode.WATCHER``, since the ``dbt build`` command does not run `source freshness checks <https://docs.getdbt.com/reference/commands/build#source-freshness-checks>`_.
+
+We have a follow-up ticket to `further investigate this use-case <https://github.com/astronomer/astronomer-cosmos/issues/2053>`_.
+
+
+Additional details
+------------------- 
+
 ~~~~~~~~~~~~~~~~
 Callback support
 ~~~~~~~~~~~~~~~~
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` will use the user-defined callback function similar to ``ExecutionMode.LOCAL`` mode.
 
-This means that you can define a single callback function for all ``ExecutionMode.WATCHER`` tasks. The behaviour will be similar to the ``ExecutionMode.LOCAL`` mode, except that there will be a unified ``run_results.json`` file.
-
-If there is demand, we will support different callback functions for the ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators.
-
+It is possible to define different ``callback`` behaviors for producer and consumer nodes by using ``setup_operator_args`, as described below.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Overriding ``operator_args``
@@ -369,45 +393,34 @@ Using Custom Args for the Producer and Watcher
 
 If you need to override ``operator_args`` for the ``DbtProducerWatcherOperator``, you can do so using ``setup_operator_args``.
 
-When using ``ExecutionMode.WATCHER``, you may want to run the **DbtProducerWatcherOperator** task on a **different worker queue** than the sensor tasks. This can be useful for several reasons:
+When using ``ExecutionMode.WATCHER``, you may want to configure specific properties, such as `retries` specifically for the ``DbtProducerWatcherOperator`` task. This can be useful for several reasons:
+- Improved resilience - transient issues (e.g., temporary database or network failures) can be automatically retried.
+- Reduced manual intervention - failed producer runs can recover without requiring operator restarts.
+- Better reliability — retry behaviour can be tuned independently from sensor tasks.
 
-- **Isolating workloads** — the producer may require different CPU or memory resources than the sensors.
-- **Independent scaling** — you can scale producer workers separately if producer tasks are heavier or more frequent.
-- **Improved reliability** — separating these workloads reduces the chance of resource contention between producer and sensor tasks.
-
-**Example:** Run the producer task using the ``dbt_producer_task_queue`` worker queue.
+Example: Configure the producer task with custom retry settings.
 
 .. code-block:: python
 
-   from datetime import timedelta
-   from cosmos.config import ExecutionConfig
-   from cosmos.constants import ExecutionMode
+    from datetime import timedelta
+    from cosmos.config import ExecutionConfig
+    from cosmos.constants import ExecutionMode
 
-   execution_config = ExecutionConfig(
-       execution_mode=ExecutionMode.WATCHER,
-       setup_operator_args={
-           "queue": "dbt_producer_task_queue",
-       },
-   )
+    execution_config = ExecutionConfig(
+    execution_mode=ExecutionMode.WATCHER,
+        setup_operator_args={
+            "retries": 0,
+            "retry_delay": timedelta(minutes=5),
+        },
+    )
 
-This allows you to customize ``DbtProducerWatcherOperator`` behavior without affecting the arguments used by the other sensor tasks.
+This allows you to customize ``DbtProducerWatcherOperator`` retry behavior without affecting the arguments used by the other sensor tasks.
+
+If configuring queues, we suggest using the previously mentioned ``watcher_dbt_execution_queue`` configuration instead of the ``setup_operator_args``.
 
 .. note::
-   Please note that ``setup_operator_args`` is specific to Cosmos and is not related to Airflow ``setup`` or ``teardown`` task.
+Please note that setup_operator_args is specific to Cosmos and is not related to Airflow setup or teardown task.
 
-For information on configuring worker queues in Astronomer, see the Astronomer `documentation <https://www.astronomer.io/docs/astro/configure-worker-queues>`_ on worker queues.
-
-~~~~~~~~~~~~~
-Test behavior
-~~~~~~~~~~~~~
-
-By default, the watcher mode runs tests alongside models via the ``dbt build`` command being executed by the producer ``DbtProducerWatcherOperator`` operator.
-
-As a starting point, this execution mode does not support the ``TestBehavior.AFTER_EACH`` behaviour, since the tests are not run as individual tasks. Since this is the default ``TestBehavior`` in Cosmos, we are injecting ``EmptyOperator`` as a starting point to ensure a seamless transition to the new mode.
-
-The ``TestBehavior.BUILD`` behaviour is embedded to the producer ``DbtProducerWatcherOperator`` operator.
-
-Users can still use the ``TestBehaviour.NONE`` and ``TestBehaviour.AFTER_ALL``.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Sensor slot allocation and polling
@@ -435,24 +448,6 @@ To disable asynchronous execution, set the ``deferrable`` flag to ``False`` in t
    :start-after: [START example_watcher_synchronous]
    :end-before: [END example_watcher_synchronous]
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Airflow Datasets and Assets
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-While the ``ExecutionMode.WATCHER`` supports the ``emit_datasets`` parameter, the Airflow Datasets and Assets are emitted from the ``DbtProducerWatcherOperator`` task instead of the consumer tasks, as done for other Cosmos' execution modes.
-
-~~~~~~~~~~~~~~~~~~~~~~
-Source freshness nodes
-~~~~~~~~~~~~~~~~~~~~~~
-
-Since Cosmos 1.6, it `supports the rendering of source nodes <https://www.astronomer.io/blog/native-support-for-source-node-rendering-in-cosmos/>`_.
-
-We noticed some Cosmos users use this feature alongside `overriding Cosmos source nodes <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#customizing-how-nodes-are-rendered-experimental>`_ as sensors or another operator that allows them to skip the following branch of the DAG if the source is not fresh.
-
-This use-case is not currently supported by the ``ExecutionMode.WATCHER``, since the ``dbt build`` command does not run `source freshness checks <https://docs.getdbt.com/reference/commands/build#source-freshness-checks>`_.
-
-We have a follow up ticket to `further investigate this use-case <https://github.com/astronomer/astronomer-cosmos/issues/2053>`_.
-
 -------------------------------------------------------------------------------
 
 Troubleshooting
@@ -472,6 +467,6 @@ Summary
 * ✅ Enables **smarter resource allocation**
 * ✅ Built on proven Cosmos rendering techniques
 
-This is an experimental feature and we are looking for feedback from the community.
+This is an experimental feature, and we are looking for feedback from the community.
 
 Stay tuned for further documentation and base image support for the ``ExecutionMode.WATCHER`` in upcoming releases.

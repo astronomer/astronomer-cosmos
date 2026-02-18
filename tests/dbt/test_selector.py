@@ -959,6 +959,176 @@ def test_select_nodes_by_exposure_name():
     assert selected == expected
 
 
+def test_select_nodes_by_select_package():
+    """
+    Test selecting nodes by package name using 'package:package_name'.
+    Used when loading from manifest to include only nodes from a given package.
+    """
+    local_nodes = dict(sample_nodes)
+    # Add nodes from dbt_artifacts package (package_name is set when loading from manifest)
+    artifact_node_1 = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    artifact_node_2 = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_2",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_2.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    local_nodes[artifact_node_1.unique_id] = artifact_node_1
+    local_nodes[artifact_node_2.unique_id] = artifact_node_2
+
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["package:dbt_artifacts"],
+    )
+    expected = {artifact_node_1.unique_id: artifact_node_1, artifact_node_2.unique_id: artifact_node_2}
+    assert selected == expected
+
+
+def test_select_nodes_by_exclude_package():
+    """
+    Test excluding nodes by package name using 'package:package_name'.
+    This fixes manifest load mode not respecting exclude for packages (e.g. dbt_artifacts).
+    """
+    local_nodes = dict(sample_nodes)
+    # Add nodes from dbt_artifacts package
+    artifact_node_1 = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    local_nodes[artifact_node_1.unique_id] = artifact_node_1
+
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        exclude=["package:dbt_artifacts"],
+    )
+    # All original sample_nodes remain; artifact nodes are excluded
+    assert artifact_node_1.unique_id not in selected
+    assert set(selected.keys()) == set(sample_nodes.keys())
+
+
+def test_select_nodes_by_package_plus_descendants():
+    """package:name+ selects all nodes in that package and their descendants (e.g. project models that use them)."""
+    pkg_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_utils.uppercase",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_utils/macros/uppercase.sql",
+        tags=[],
+        config={},
+        package_name="dbt_utils",
+    )
+    # Project model that depends on the package macro/model
+    downstream = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.uses_utils",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[pkg_node.unique_id],
+        file_path=SAMPLE_PROJ_PATH / "models/uses_utils.sql",
+        tags=[],
+        config={},
+    )
+    local_nodes = {pkg_node.unique_id: pkg_node, downstream.unique_id: downstream}
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["package:dbt_utils+"],
+    )
+    assert selected.keys() == {pkg_node.unique_id, downstream.unique_id}
+
+
+def test_select_nodes_raises_on_empty_package_selector():
+    """Empty package: (e.g. select=['package:']) would match all nodes with package_name None; we raise instead."""
+    with pytest.raises(CosmosValueError) as err_info:
+        select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["package:"])
+    assert "package: selector requires a non-empty package name" in err_info.value.args[0]
+
+    with pytest.raises(CosmosValueError) as err_info:
+        select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["package:"])
+    assert "package: selector requires a non-empty package name" in err_info.value.args[0]
+
+
+def test_select_nodes_by_exclude_bare_package_name():
+    """
+    Bare package name (no 'package:' prefix) is equivalent to 'package:name', matching dbt behavior.
+    So exclude=['dbt_artifacts'] works the same as exclude=['package:dbt_artifacts'].
+    """
+    local_nodes = dict(sample_nodes)
+    artifact_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    local_nodes[artifact_node.unique_id] = artifact_node
+
+    selected_bare = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        exclude=["dbt_artifacts"],
+    )
+    selected_explicit = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        exclude=["package:dbt_artifacts"],
+    )
+    assert artifact_node.unique_id not in selected_bare
+    assert artifact_node.unique_id not in selected_explicit
+    assert set(selected_bare.keys()) == set(selected_explicit.keys()) == set(sample_nodes.keys())
+
+
+def test_select_nodes_by_bare_folder_name():
+    """
+    Bare identifier as folder name (path segment) matches nodes under that folder.
+    Ensures select=['folder_a'] / exclude=['folder_a'] work with manifest load mode.
+    """
+    # gen1 contains grandparent, another_grandparent; gen3 contains child, sibling1, sibling2, sibling3, orphaned
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=sample_nodes,
+        select=["gen1"],
+    )
+    assert set(selected.keys()) == {grandparent_node.unique_id, another_grandparent_node.unique_id}
+
+
+def test_exclude_nodes_by_bare_folder_name():
+    """Exclude by folder name (path segment) excludes all nodes under that folder."""
+    excluded = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=sample_nodes,
+        exclude=["gen3"],
+    )
+    gen3_ids = {
+        child_node.unique_id,
+        sibling1_node.unique_id,
+        sibling2_node.unique_id,
+        sibling3_node.unique_id,
+        orphaned_node.unique_id,
+    }
+    assert gen3_ids.isdisjoint(excluded.keys())
+    assert grandparent_node.unique_id in excluded
+    assert parent_node.unique_id in excluded
+
+
 def test_select_exposure_nodes_by_graph_ancestry():
     """
     Test selecting an exposure node and its directs ancestors using the syntax '+exposure:exposure_name'.

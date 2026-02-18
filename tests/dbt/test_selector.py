@@ -1024,6 +1024,35 @@ def test_select_nodes_by_exclude_package():
     assert set(selected.keys()) == set(sample_nodes.keys())
 
 
+def test_select_nodes_by_package_plus_descendants():
+    """package:name+ selects all nodes in that package and their descendants (e.g. project models that use them)."""
+    pkg_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_utils.uppercase",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_utils/macros/uppercase.sql",
+        tags=[],
+        config={},
+        package_name="dbt_utils",
+    )
+    # Project model that depends on the package macro/model
+    downstream = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.uses_utils",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[pkg_node.unique_id],
+        file_path=SAMPLE_PROJ_PATH / "models/uses_utils.sql",
+        tags=[],
+        config={},
+    )
+    local_nodes = {pkg_node.unique_id: pkg_node, downstream.unique_id: downstream}
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["package:dbt_utils+"],
+    )
+    assert selected.keys() == {pkg_node.unique_id, downstream.unique_id}
+
+
 def test_select_nodes_raises_on_empty_package_selector():
     """Empty package: (e.g. select=['package:']) would match all nodes with package_name None; we raise instead."""
     with pytest.raises(CosmosValueError) as err_info:

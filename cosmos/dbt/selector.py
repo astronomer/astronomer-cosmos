@@ -249,6 +249,13 @@ class GraphSelector:
                 }
             )
 
+        elif self.node_name.startswith(PACKAGE_SELECTOR):
+            package_selection = self.node_name[len(PACKAGE_SELECTOR) :].strip()
+            if package_selection:
+                root_nodes.update(
+                    {node_id for node_id, node in nodes.items() if node.package_name == package_selection}
+                )
+
         elif CONFIG_SELECTOR in self.node_name:
             config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
             # currently tags, materialized, schema and meta are the only supported config keys
@@ -673,10 +680,7 @@ class NodeSelector:
         if (node.package_name or "") in self.config.bare_identifiers or node.name in self.config.bare_identifiers:
             return True
         # Match by path segment (folder name): e.g. "folder_a" matches nodes under .../folder_a/...
-        try:
-            path_parts = node.file_path.parts
-        except AttributeError:
-            path_parts = ()
+        path_parts = node.file_path.parts
         return any(bare in path_parts for bare in self.config.bare_identifiers)
 
     def _is_tags_subset(self, node: DbtNode) -> bool:

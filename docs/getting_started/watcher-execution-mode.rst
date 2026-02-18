@@ -370,7 +370,7 @@ We have a follow-up ticket to `further investigate this use-case <https://github
 
 
 Additional details
-------------------- 
+-------------------
 
 ~~~~~~~~~~~~~~~~
 Callback support
@@ -407,7 +407,7 @@ Example: Configure the producer task with custom retry settings.
     from cosmos.constants import ExecutionMode
 
     execution_config = ExecutionConfig(
-    execution_mode=ExecutionMode.WATCHER,
+        execution_mode=ExecutionMode.WATCHER,
         setup_operator_args={
             "retries": 0,
             "retry_delay": timedelta(minutes=5),

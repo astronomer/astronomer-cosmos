@@ -54,6 +54,7 @@ from cosmos.dbt.project import (
     copy_dbt_packages,
     create_symlinks,
     environ,
+    get_dbt_packages_subpath,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
 )
@@ -1111,7 +1112,8 @@ class DbtGraph:
 
         return self.parse_yaml_selectors(selector_definitions)
 
-    def load_from_dbt_manifest(self) -> None:
+    # TODO: Refactor this method to remove the noqa: C901 in a separate PR.
+    def load_from_dbt_manifest(self) -> None:  # noqa: C901
         """
         This approach accurately loads `dbt` projects using the `manifest.yml` file.
 
@@ -1137,9 +1139,15 @@ class DbtGraph:
             assert self.project.manifest_path is not None  # pragma: no cover
 
         with self.project.manifest_path.open() as fp:
-            manifest = json.load(fp)
+            manifest = json.load(fp) or {}
 
             resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
+            project_path = self.execution_config.project_path
+            packages_subpath = get_dbt_packages_subpath(project_path)
+            manifest_metadata = manifest.get("metadata")
+            manifest_project_name = (
+                manifest_metadata.get("project_name") if isinstance(manifest_metadata, dict) else None
+            )
             for unique_id, node_dict in resources.items():
                 # External nodes (e.g., from dbt-loom) may not have a file path - skip them
                 # Check for both None and empty string since dbt-loom may set either
@@ -1151,17 +1159,24 @@ class DbtGraph:
                     )
                     continue
 
+                package_name = node_dict.get("package_name")
+                is_root_project_node = manifest_project_name is None or (package_name == manifest_project_name)
+                if package_name and not is_root_project_node:
+                    resolved_path = project_path / packages_subpath / package_name / _normalize_path(original_file_path)
+                else:
+                    resolved_path = project_path / _normalize_path(original_file_path)
+                resource_type = DbtResourceType(node_dict["resource_type"])
                 node = DbtNode(
                     unique_id=unique_id,
-                    package_name=node_dict.get("package_name"),
-                    resource_type=DbtResourceType(node_dict["resource_type"]),
+                    package_name=package_name,
+                    resource_type=resource_type,
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.execution_config.project_path / _normalize_path(original_file_path),
+                    file_path=resolved_path,
                     tags=node_dict.get("tags") or [],
                     config=node_dict.get("config") or {},
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
-                        if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
+                        if resource_type == DbtResourceType.SOURCE
                         else False
                     ),
                     fqn=node_dict.get("fqn"),

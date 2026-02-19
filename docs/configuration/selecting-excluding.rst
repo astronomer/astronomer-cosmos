@@ -33,6 +33,10 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``source:my_source.my_table``: include/exclude nodes that have the source ``my_source`` and the table ``my_table``
 - ``exposure:my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and are of resource_type ``exposure``
 - ``exposure:+my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and their parents
+- ``package:package_name``: include/exclude all nodes that belong to the given package (e.g. ``package:dbt_artifacts``). The package name must be non-empty (use ``package:dbt_artifacts``, not ``package:``).
+- ``package:package_name+``: include/exclude all nodes in the package and their descendants (children).
+- ``+package:package_name``: include/exclude all nodes in the package and their ancestors (parents).
+- A bare name without a method prefix (e.g. ``dbt_artifacts`` or ``child``) is resolved like dbt: it matches nodes by package name, node name, or path segment (folder name). So ``select=['folder_a']`` or ``exclude=['folder_a']`` includes or excludes all models under a folder named ``folder_a``, including when using ``LoadMode.DBT_MANIFEST``.
 
 .. note::
 
@@ -111,6 +115,18 @@ Examples:
 
     jaffle_shop = DbtDag(
         render_config=RenderConfig(
+            exclude=[
+                "package:dbt_artifacts"
+            ],  # exclude all nodes from dbt_artifacts package (e.g. when using manifest load mode)
+        )
+    )
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+
+    jaffle_shop = DbtDag(
+        render_config=RenderConfig(
             select=["@my_model"],  # selects my_model, all its descendants,
             # and all ancestors needed to build those descendants
         )
@@ -180,3 +196,26 @@ Parsing of the ``default`` and ``indirect_selection`` keywords is not currently 
 In the event the dbt YAML selector specification changes, Cosmos will attempt to keep up to date with the changes, but there may be a lag between dbt releases and Cosmos releases.
 Once a new Cosmos version is released with the updated selector parsing logic, users should update their Cosmos version to ensure compatibility with the latest dbt selector specification.
 For subsequent updates to the YAML selector parser, existing YAML selector caches will be invalidated the next time the DAG is parsed.
+
+**Error Handling**
+
+Cosmos distinguishes between two types of errors when parsing YAML selectors:
+
+- **Structural YAML Errors** - These cause immediate failure during manifest parsing:
+
+  - Selector definition is not a dictionary
+  - Missing required ``name`` key
+  - Missing required ``definition`` key
+
+  These errors indicate malformed YAML structure and will raise a ``CosmosValueError`` immediately when calling ``YamlSelectors.parse()``.
+
+- **Selector Definition Errors** - These are isolated and surfaced when accessing the selector:
+
+  - Unsupported selector methods (e.g., ``method: "state"``, ``method: "package"``)
+  - Invalid graph operator configurations (e.g., non-integer depth values)
+  - Invalid selector logic (e.g., multiple root keys in a definition)
+
+  These errors are collected during parsing but only raised when you attempt to retrieve the selector using ``get_parsed(selector_name)``.
+  This allows the manifest to be loaded successfully even if some selectors have definition errors, enabling you to work with valid selectors while debugging invalid ones.
+
+If a selector has multiple definition errors, they will all be reported together in a formatted error message when accessing the selector.

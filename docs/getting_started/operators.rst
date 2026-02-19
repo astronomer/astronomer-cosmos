@@ -29,7 +29,7 @@ Seed
 
 The ``DbtSeedLocalOperator`` implements the `dbt seed <https://docs.getdbt.com/reference/commands/seed>`_ command.
 
-In this example, we're using the `DbtSeedLocalOperator` to seed ``raw_orders``.
+In this example, we're using the ``DbtSeedLocalOperator`` to seed ``raw_orders``.
 
 .. literalinclude:: ../../dev/dags/example_operators.py
     :language: python

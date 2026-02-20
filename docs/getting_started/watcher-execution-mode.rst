@@ -419,7 +419,7 @@ This allows you to customize ``DbtProducerWatcherOperator`` retry behavior witho
 If configuring queues, we suggest using the previously mentioned ``watcher_dbt_execution_queue`` configuration instead of the ``setup_operator_args``.
 
 .. note::
-Please note that setup_operator_args is specific to Cosmos and is not related to Airflow setup or teardown task.
+   Please note that setup_operator_args is specific to Cosmos and is not related to Airflow setup or teardown task.
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

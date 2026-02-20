@@ -369,7 +369,7 @@ This use case is not currently supported by the ``ExecutionMode.WATCHER``, since
 We have a follow-up ticket to `further investigate this use case <https://github.com/astronomer/astronomer-cosmos/issues/2053>`_.
 
 
-Additional details
+Advanced config
 -------------------
 
 ~~~~~~~~~~~~~~~~

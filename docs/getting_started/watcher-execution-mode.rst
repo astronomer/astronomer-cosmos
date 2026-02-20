@@ -310,7 +310,7 @@ Known Limitations
 Producer task implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The producer task is implemented as a ``DbtProducerWatcherOperator``and currently relies on dbt being installed alongside the Airflow deployment, as in the ``ExecutionMode.LOCAL`` implementation.
+The producer task is implemented as a ``DbtProducerWatcherOperator`` and currently relies on dbt being installed alongside the Airflow deployment, as in the ``ExecutionMode.LOCAL`` implementation.
 
 The alternative to this implementation is to use ``ExecutionMode.WATCHER_KUBERNETES``, which is built on top of ``ExecutionMode.KUBERNETES``. Check :ref:`watcher-kubernetes-execution-mode` for more information.
 

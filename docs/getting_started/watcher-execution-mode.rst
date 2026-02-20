@@ -348,7 +348,7 @@ As a starting point, this execution mode does not support the ``TestBehavior.AFT
 
 The ``TestBehavior.BUILD`` behavior is embedded to the producer ``DbtProducerWatcherOperator`` operator.
 
-The ``TestBehavior.NONE`` and ``TestBehavior.AFTER_ALL`` behave similar to ``ExecutionMode.LOCAL``.
+The ``TestBehavior.NONE`` and ``TestBehavior.AFTER_ALL`` behave similarly to ``ExecutionMode.LOCAL``.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Airflow Datasets and Assets

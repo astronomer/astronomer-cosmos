@@ -393,7 +393,7 @@ Using Custom Args for the Producer and Watcher
 
 If you need to override ``operator_args`` for the ``DbtProducerWatcherOperator``, you can do so using ``setup_operator_args``.
 
-When using ``ExecutionMode.WATCHER``, you may want to configure specific properties, such as `retries` specifically for the ``DbtProducerWatcherOperator`` task. This can be useful for several reasons:
+When using ``ExecutionMode.WATCHER``, you may want to configure specific properties, such as ``retries`` specifically for the ``DbtProducerWatcherOperator`` task. This can be useful for several reasons:
 - Improved resilience - transient issues (e.g., temporary database or network failures) can be automatically retried.
 - Reduced manual intervention - failed producer runs can recover without requiring operator restarts.
 - Better reliability - retry behaviour can be tuned independently from sensor tasks.

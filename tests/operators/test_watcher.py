@@ -261,11 +261,11 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
         ({"status": "success", "reason": "model_not_run"}, None),
         (
             {"status": "failed", "reason": "model_failed"},
-            "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher' logs for details.",
+            "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher_operator' logs for details.",
         ),
         (
             {"status": "failed", "reason": "producer_failed"},
-            "Watcher producer task 'dbt_producer_watcher' failed before reporting model results. Check its logs for the underlying error.",
+            "Watcher producer task 'dbt_producer_watcher_operator' failed before reporting model results. Check its logs for the underlying error.",
         ),
     ],
 )
@@ -790,7 +790,7 @@ class TestDbtConsumerWatcherSensor:
             task_id="model.my_model",
             project_dir="/tmp/project",
             profile_config=None,
-            deferrable=True,
+            deferrable=kwargs.pop("deferrable", True),
             **kwargs,
         )
 
@@ -1184,6 +1184,17 @@ class TestDbtConsumerWatcherSensor:
         context = {"run_id": "run_id", "task_instance": Mock()}
         sensor.execute(context=context)
         mock_poke.assert_called_once()
+
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor.poke")
+    def test_deferrable_false_via_constructor_does_not_defer(self, mock_poke):
+        """operator_args={'deferrable': False} is respected: sensor created with deferrable=False does not defer."""
+        mock_poke.return_value = True
+        sensor = self.make_sensor(deferrable=False)
+        assert sensor.deferrable is False
+        context = {"run_id": "run_id", "task_instance": Mock()}
+        sensor.execute(context=context)
+        mock_poke.assert_called_once()
+        # No TaskDeferred raised: sensor ran synchronously and completed
 
     @pytest.mark.parametrize(
         "mock_event",

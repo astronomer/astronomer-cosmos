@@ -9,6 +9,7 @@ import hashlib
 import json
 import warnings
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, fields
 from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
@@ -17,7 +18,6 @@ try:
     from airflow.sdk.bases.hook import BaseHook
 except ImportError:  # Since Airflow 3.1, the BaseHook is in the airflow.sdk.bases.hook module
     from airflow.hooks.base import BaseHook
-from pydantic import dataclasses
 
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
@@ -31,7 +31,10 @@ DBT_PROFILE_METHOD_FIELD = "method"
 logger = get_logger(__name__)
 
 
-@dataclasses.dataclass
+LOG_FORMAT_VALUES = ("text", "json", "default")
+
+
+@dataclass
 class DbtProfileConfigVars:
     send_anonymous_usage_stats: bool | None = False
     partial_parse: bool | None = None
@@ -45,13 +48,17 @@ class DbtProfileConfigVars:
     debug: bool | None = None
     version_check: bool | None = None
 
+    def __post_init__(self) -> None:
+        if self.send_anonymous_usage_stats is not None and not isinstance(self.send_anonymous_usage_stats, bool):
+            raise ValueError(
+                "send_anonymous_usage_stats must be a boolean or None, "
+                f"got {type(self.send_anonymous_usage_stats).__name__}"
+            )
+        if self.log_format is not None and self.log_format not in LOG_FORMAT_VALUES:
+            raise ValueError(f"log_format must be one of {LOG_FORMAT_VALUES}, got {self.log_format!r}")
+
     def as_dict(self) -> dict[str, Any] | None:
-        result = {
-            field.name: getattr(self, field.name)
-            # Look like the __dataclass_fields__ attribute is not recognized by mypy
-            for field in self.__dataclass_fields__.values()  # type: ignore[attr-defined]
-            if getattr(self, field.name) is not None
-        }
+        result = {f.name: getattr(self, f.name) for f in fields(self) if getattr(self, f.name) is not None}
         if result != {}:
             return result
         return None

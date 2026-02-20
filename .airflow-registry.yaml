@@ -1,0 +1,159 @@
+# .airflow-registry.yaml — metadata for the Apache Airflow Provider Registry
+# Place this file in the root of your provider repository.
+# Docs: https://github.com/apache/airflow/blob/main/dev/registry/README.md
+
+package-name: astronomer-cosmos
+display-name: Cosmos (dbt)
+description: Run dbt projects as Airflow DAGs and Task Groups
+logo: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos-logo.svg
+docs-url: https://astronomer.github.io/astronomer-cosmos
+source-url: https://github.com/astronomer/astronomer-cosmos
+
+operators:
+  # Local execution mode
+  - module: cosmos.operators.local.DbtRunLocalOperator
+    description: Run dbt run using a local dbt installation
+  - module: cosmos.operators.local.DbtTestLocalOperator
+    description: Run dbt test using a local dbt installation
+  - module: cosmos.operators.local.DbtSeedLocalOperator
+    description: Run dbt seed using a local dbt installation
+  - module: cosmos.operators.local.DbtSnapshotLocalOperator
+    description: Run dbt snapshot using a local dbt installation
+  - module: cosmos.operators.local.DbtCompileLocalOperator
+    description: Run dbt compile using a local dbt installation
+  - module: cosmos.operators.local.DbtLSLocalOperator
+    description: Run dbt ls using a local dbt installation
+  - module: cosmos.operators.local.DbtRunOperationLocalOperator
+    description: Run dbt run-operation using a local dbt installation
+  - module: cosmos.operators.local.DbtBuildLocalOperator
+    description: Run dbt build using a local dbt installation
+  - module: cosmos.operators.local.DbtCloneLocalOperator
+    description: Clone dbt models using a local dbt installation
+  - module: cosmos.operators.local.DbtDepsLocalOperator
+    description: Install dbt dependencies using a local dbt installation
+  - module: cosmos.operators.local.DbtSourceLocalOperator
+    description: Run dbt source freshness using a local dbt installation
+  - module: cosmos.operators.local.DbtDocsLocalOperator
+    description: Generate dbt docs using a local dbt installation
+  - module: cosmos.operators.local.DbtDocsS3LocalOperator
+    description: Upload dbt docs to S3
+  - module: cosmos.operators.local.DbtDocsAzureStorageLocalOperator
+    description: Upload dbt docs to Azure Blob Storage
+  - module: cosmos.operators.local.DbtDocsGCSLocalOperator
+    description: Upload dbt docs to Google Cloud Storage
+
+  # Docker execution mode
+  - cosmos.operators.docker.DbtBuildDockerOperator
+  - cosmos.operators.docker.DbtCloneDockerOperator
+  - cosmos.operators.docker.DbtLSDockerOperator
+  - cosmos.operators.docker.DbtRunDockerOperator
+  - cosmos.operators.docker.DbtRunOperationDockerOperator
+  - cosmos.operators.docker.DbtSeedDockerOperator
+  - cosmos.operators.docker.DbtSnapshotDockerOperator
+  - cosmos.operators.docker.DbtSourceDockerOperator
+  - cosmos.operators.docker.DbtTestDockerOperator
+
+  # Kubernetes execution mode
+  - cosmos.operators.kubernetes.DbtBuildKubernetesOperator
+  - cosmos.operators.kubernetes.DbtCloneKubernetesOperator
+  - cosmos.operators.kubernetes.DbtLSKubernetesOperator
+  - cosmos.operators.kubernetes.DbtRunKubernetesOperator
+  - cosmos.operators.kubernetes.DbtRunOperationKubernetesOperator
+  - cosmos.operators.kubernetes.DbtSeedKubernetesOperator
+  - cosmos.operators.kubernetes.DbtSnapshotKubernetesOperator
+  - cosmos.operators.kubernetes.DbtSourceKubernetesOperator
+  - cosmos.operators.kubernetes.DbtTestKubernetesOperator
+
+  # Virtualenv execution mode
+  - cosmos.operators.virtualenv.DbtBuildVirtualenvOperator
+  - cosmos.operators.virtualenv.DbtCloneVirtualenvOperator
+  - cosmos.operators.virtualenv.DbtDocsVirtualenvOperator
+  - cosmos.operators.virtualenv.DbtLSVirtualenvOperator
+  - cosmos.operators.virtualenv.DbtRunVirtualenvOperator
+  - cosmos.operators.virtualenv.DbtRunOperationVirtualenvOperator
+  - cosmos.operators.virtualenv.DbtSeedVirtualenvOperator
+  - cosmos.operators.virtualenv.DbtSnapshotVirtualenvOperator
+  - cosmos.operators.virtualenv.DbtSourceVirtualenvOperator
+  - cosmos.operators.virtualenv.DbtTestVirtualenvOperator
+
+  # Airflow async (deferrable) execution mode
+  - cosmos.operators.airflow_async.DbtBuildAirflowAsyncOperator
+  - cosmos.operators.airflow_async.DbtCloneAirflowAsyncOperator
+  - cosmos.operators.airflow_async.DbtCompileAirflowAsyncOperator
+  - cosmos.operators.airflow_async.DbtLSAirflowAsyncOperator
+  - cosmos.operators.airflow_async.DbtRunAirflowAsyncOperator
+  - cosmos.operators.airflow_async.DbtRunOperationAirflowAsyncOperator
+  - cosmos.operators.airflow_async.DbtSeedAirflowAsyncOperator
+  - cosmos.operators.airflow_async.DbtSnapshotAirflowAsyncOperator
+  - cosmos.operators.airflow_async.DbtSourceAirflowAsyncOperator
+  - cosmos.operators.airflow_async.DbtTestAirflowAsyncOperator
+
+  # AWS ECS execution mode
+  - cosmos.operators.aws_ecs.DbtBuildAwsEcsOperator
+  - cosmos.operators.aws_ecs.DbtLSAwsEcsOperator
+  - cosmos.operators.aws_ecs.DbtRunAwsEcsOperator
+  - cosmos.operators.aws_ecs.DbtRunOperationAwsEcsOperator
+  - cosmos.operators.aws_ecs.DbtSeedAwsEcsOperator
+  - cosmos.operators.aws_ecs.DbtSnapshotAwsEcsOperator
+  - cosmos.operators.aws_ecs.DbtSourceAwsEcsOperator
+  - cosmos.operators.aws_ecs.DbtTestAwsEcsOperator
+
+  # AWS EKS execution mode
+  - cosmos.operators.aws_eks.DbtBuildAwsEksOperator
+  - cosmos.operators.aws_eks.DbtCloneAwsEksOperator
+  - cosmos.operators.aws_eks.DbtLSAwsEksOperator
+  - cosmos.operators.aws_eks.DbtRunAwsEksOperator
+  - cosmos.operators.aws_eks.DbtRunOperationAwsEksOperator
+  - cosmos.operators.aws_eks.DbtSeedAwsEksOperator
+  - cosmos.operators.aws_eks.DbtSnapshotAwsEksOperator
+  - cosmos.operators.aws_eks.DbtTestAwsEksOperator
+
+  # Azure Container Instance execution mode
+  - cosmos.operators.azure_container_instance.DbtBuildAzureContainerInstanceOperator
+  - cosmos.operators.azure_container_instance.DbtCloneAzureContainerInstanceOperator
+  - cosmos.operators.azure_container_instance.DbtLSAzureContainerInstanceOperator
+  - cosmos.operators.azure_container_instance.DbtRunAzureContainerInstanceOperator
+  - cosmos.operators.azure_container_instance.DbtRunOperationAzureContainerInstanceOperator
+  - cosmos.operators.azure_container_instance.DbtSeedAzureContainerInstanceOperator
+  - cosmos.operators.azure_container_instance.DbtSnapshotAzureContainerInstanceOperator
+  - cosmos.operators.azure_container_instance.DbtSourceAzureContainerInstanceOperator
+  - cosmos.operators.azure_container_instance.DbtTestAzureContainerInstanceOperator
+
+  # GCP Cloud Run Job execution mode
+  - cosmos.operators.gcp_cloud_run_job.DbtBuildGcpCloudRunJobOperator
+  - cosmos.operators.gcp_cloud_run_job.DbtCloneGcpCloudRunJobOperator
+  - cosmos.operators.gcp_cloud_run_job.DbtLSGcpCloudRunJobOperator
+  - cosmos.operators.gcp_cloud_run_job.DbtRunGcpCloudRunJobOperator
+  - cosmos.operators.gcp_cloud_run_job.DbtRunOperationGcpCloudRunJobOperator
+  - cosmos.operators.gcp_cloud_run_job.DbtSeedGcpCloudRunJobOperator
+  - cosmos.operators.gcp_cloud_run_job.DbtSnapshotGcpCloudRunJobOperator
+  - cosmos.operators.gcp_cloud_run_job.DbtSourceGcpCloudRunJobOperator
+  - cosmos.operators.gcp_cloud_run_job.DbtTestGcpCloudRunJobOperator
+
+  # Watcher pattern (local)
+  - cosmos.operators.watcher.DbtBuildWatcherOperator
+  - cosmos.operators.watcher.DbtRunWatcherOperator
+  - cosmos.operators.watcher.DbtSeedWatcherOperator
+  - cosmos.operators.watcher.DbtSnapshotWatcherOperator
+  - cosmos.operators.watcher.DbtSourceWatcherOperator
+  - cosmos.operators.watcher.DbtTestWatcherOperator
+  - cosmos.operators.watcher.DbtProducerWatcherOperator
+
+  # Watcher pattern (Kubernetes)
+  - cosmos.operators.watcher_kubernetes.DbtBuildWatcherKubernetesOperator
+  - cosmos.operators.watcher_kubernetes.DbtRunWatcherKubernetesOperator
+  - cosmos.operators.watcher_kubernetes.DbtSeedWatcherKubernetesOperator
+  - cosmos.operators.watcher_kubernetes.DbtSnapshotWatcherKubernetesOperator
+  - cosmos.operators.watcher_kubernetes.DbtSourceWatcherKubernetesOperator
+  - cosmos.operators.watcher_kubernetes.DbtTestWatcherKubernetesOperator
+  - cosmos.operators.watcher_kubernetes.DbtProducerWatcherKubernetesOperator
+
+sensors:
+  - cosmos.operators.watcher.DbtConsumerWatcherSensor
+  - cosmos.operators.watcher_kubernetes.DbtConsumerWatcherKubernetesSensor
+
+other:
+  - module: cosmos.DbtDag
+    description: Render a complete dbt project as an Airflow DAG
+  - module: cosmos.DbtTaskGroup
+    description: Render a dbt project as an Airflow Task Group

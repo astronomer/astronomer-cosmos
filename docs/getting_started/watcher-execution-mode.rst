@@ -378,7 +378,7 @@ Callback support
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` will use the user-defined callback function similar to ``ExecutionMode.LOCAL`` mode.
 
-It is possible to define different ``callback`` behaviors for producer and consumer nodes by using ``setup_operator_args`, as described below.
+It is possible to define different ``callback`` behaviors for producer and consumer nodes by using ``setup_operator_args``, as described below.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Overriding ``operator_args``

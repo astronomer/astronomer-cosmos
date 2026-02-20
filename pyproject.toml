@@ -34,7 +34,6 @@ dependencies = [
     "Jinja2>=3.0.0",
     "msgpack",
     "packaging>=22.0",
-    "pydantic>=1.10.0",
     "virtualenv",
     "openlineage-integration-common",  # Without this dependency, Airflow datasets/assets don't work
 ]
@@ -215,7 +214,6 @@ dependencies = [
     "aenum",
     "msgpack",
     "apache-airflow",
-    "pydantic",
     "pydata-sphinx-theme",
     "sphinx",
     "sphinx-autoapi",

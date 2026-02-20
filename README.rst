@@ -1,3 +1,9 @@
+.. License badge
+.. |license| image:: https://img.shields.io/:license-Apache%202-blue.svg
+    :target: https://www.apache.org/licenses/LICENSE-2.0.txt
+    :alt: License
+
+.. PyPI badges
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
 

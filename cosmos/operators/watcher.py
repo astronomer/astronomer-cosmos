@@ -5,7 +5,6 @@ import json
 import zlib
 from collections.abc import Callable, Sequence
 from datetime import timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
@@ -26,7 +25,11 @@ from cosmos.constants import (
     InvocationMode,
 )
 from cosmos.log import get_logger
-from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
+from cosmos.operators._watcher.base import (
+    BaseConsumerSensor,
+    store_compiled_sql_for_model,
+    store_dbt_resource_status_from_log,
+)
 from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,
@@ -114,21 +117,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         ts_val = raw_ts.ToJsonString() if hasattr(raw_ts, "ToJsonString") else str(raw_ts)  # type: ignore[union-attr]
         startup_events.append({"name": info.name, "msg": info.msg, "ts": ts_val})
 
-    def _extract_compiled_sql_for_node_event(self, event_message: EventMsg) -> str | None:
-        if getattr(event_message.data.node_info, "resource_type", None) != "model":
-            return None
-        uid = event_message.data.node_info.unique_id
-        node_path = str(event_message.data.node_info.node_path)
-        package = uid.split(".")[1]
-        compiled_sql_path = Path.cwd() / "target" / "compiled" / package / "models" / node_path
-        if not compiled_sql_path.exists():
-            logger.warning(
-                "Compiled sql path %s does not exist and hence the rendered template field compiled_sql for the model will not be populated",
-                compiled_sql_path,
-            )
-            return None
-        return compiled_sql_path.read_text(encoding="utf-8").strip() or None
-
     def _handle_node_finished(
         self,
         event_message: EventMsg,
@@ -136,10 +124,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     ) -> None:
         logger.debug("DbtProducerWatcherOperator: handling node finished event: %s", event_message)
         uid = event_message.data.node_info.unique_id
+        node_path_val = getattr(event_message.data.node_info, "node_path", None)
+        node_path = str(node_path_val) if node_path_val is not None else None
+        resource_type = getattr(event_message.data.node_info, "resource_type", None)
         event_message_dict = self._serialize_event(event_message)
-        compiled_sql = self._extract_compiled_sql_for_node_event(event_message)
-        if compiled_sql:
-            event_message_dict["compiled_sql"] = compiled_sql
+        store_compiled_sql_for_model(context["ti"], self.project_dir, uid, node_path, resource_type)
         payload = base64.b64encode(zlib.compress(json.dumps(event_message_dict).encode())).decode()
         safe_xcom_push(task_instance=context["ti"], key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 
@@ -247,6 +236,8 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
             profile_config=profile_config,
             project_dir=project_dir,
             profiles_dir=profiles_dir,
+            producer_task_id=producer_task_id,
+            deferrable=deferrable,
             **kwargs,
         )
 
@@ -265,10 +256,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         event_json = _parse_compressed_xcom(compressed_b64_event_msg)
 
         logger.info("Node Info: %s", event_json)
-
-        self.compiled_sql = event_json.get("compiled_sql", "")
-        if self.compiled_sql:
-            self._override_rtif(context)
 
         return event_json.get("data", {}).get("run_result", {}).get("status")
 

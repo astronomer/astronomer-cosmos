@@ -65,6 +65,7 @@ repos:
           - --exclude-file=tests/sample/manifest_model_version.json
           - --skip=**/manifest.json,**.min.js,**/manifest_source.json
           - -L connexion,aci
+          - --ignore-words=.codespell-ignore-words
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:

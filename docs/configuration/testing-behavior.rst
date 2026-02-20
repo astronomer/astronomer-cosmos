@@ -172,7 +172,6 @@ The test will only run once after both models run, leading the DAG to succeed:
 
     from cosmos import DbtDag, RenderConfig
 
-
     example_multiple_parents_test = DbtDag(
         ...,
         render_config=RenderConfig(

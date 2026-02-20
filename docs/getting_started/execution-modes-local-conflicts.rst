@@ -109,7 +109,6 @@ The table was created by running  `nox <https://nox.thea.codes/en/stable/>`__ wi
 
     import nox
 
-
     nox.options.sessions = ["compatibility"]
     nox.options.reuse_existing_virtualenvs = True
 

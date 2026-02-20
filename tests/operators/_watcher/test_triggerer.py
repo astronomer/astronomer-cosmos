@@ -81,21 +81,40 @@ class TestWatcherTrigger:
                 assert none_result is None
 
     @pytest.mark.parametrize(
-        "use_event, xcom_val, expected_status",
+        "use_event, xcom_val, expected_status, expected_compiled_sql",
         [
-            (True, {"data": {"run_result": {"status": "success"}}}, "success"),
-            (True, None, None),
-            (False, "failed", "failed"),
+            # Event mode: status from event payload; compiled_sql from canonical *_compiled_sql key only
+            (True, {"data": {"run_result": {"status": "success"}}}, "success", "SELECT 1"),
+            (True, {"data": {"run_result": {"status": "success"}}}, "success", None),
+            (True, None, None, None),
+            # Subprocess mode: status from *_status key; compiled_sql from canonical key
+            (False, "failed", "failed", None),
+            (False, "success", "success", "SELECT * FROM table"),
         ],
     )
-    async def test_parse_node_status(self, use_event, xcom_val, expected_status):
+    async def test_parse_node_status_and_compiled_sql(
+        self, use_event, xcom_val, expected_status, expected_compiled_sql
+    ):
         self.trigger.use_event = use_event
+
+        async def mock_get_xcom_val(key):
+            # compiled_sql is always read from the canonical key (same for both modes)
+            if key.endswith("_compiled_sql"):
+                return expected_compiled_sql
+            if use_event:
+                return xcom_val if xcom_val else None
+            # Subprocess mode: status from per-model key
+            if key.endswith("_status"):
+                return xcom_val
+            return None
+
         with (
             patch("cosmos.operators._watcher.triggerer._parse_compressed_xcom", return_value=xcom_val),
-            patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=xcom_val)),
+            patch.object(self.trigger, "get_xcom_val", AsyncMock(side_effect=mock_get_xcom_val)),
         ):
-            status = await self.trigger._parse_node_status()
+            status, compiled_sql = await self.trigger._parse_node_status_and_compiled_sql()
             assert status == expected_status
+            assert compiled_sql == expected_compiled_sql
 
     @pytest.mark.parametrize(
         "airflow_version, expected_val",
@@ -127,6 +146,9 @@ class TestWatcherTrigger:
     async def test_run_various_outcomes(self, node_status, producer_state, expected):
 
         async def fake_get_xcom_val(key):
+            # Return None for compiled_sql key so payload matches expected (no compiled_sql)
+            if key.endswith("_compiled_sql"):
+                return None
             return "compressed_data"
 
         with (
@@ -210,13 +232,13 @@ class TestWatcherTrigger:
     async def test_run_producer_success_model_not_run(self, caplog):
         """Test that when producer succeeds but model has no status, trigger yields success with model_not_run reason."""
         get_producer_status_mock = AsyncMock(return_value="success")
-        parse_node_status_mock = AsyncMock(return_value=None)
+        parse_node_status_and_compiled_sql_mock = AsyncMock(return_value=(None, None))
 
         caplog.set_level("INFO")
 
         with (
             patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
-            patch.object(self.trigger, "_parse_node_status", parse_node_status_mock),
+            patch.object(self.trigger, "_parse_node_status_and_compiled_sql", parse_node_status_and_compiled_sql_mock),
         ):
             events = []
             async for event in self.trigger.run():
@@ -231,14 +253,16 @@ class TestWatcherTrigger:
     async def test_run_poke_interval_and_debug_log(self, caplog):
         get_xcom_val_mock = AsyncMock(side_effect=["compressed_data"])
         get_producer_status_mock = AsyncMock(side_effect=["running", "running", "running"])
-        parse_node_status_mock = AsyncMock(side_effect=[None, None, "success"])
+        parse_node_status_and_compiled_sql_mock = AsyncMock(
+            side_effect=[(None, None), (None, None), ("success", "SELECT 1")]
+        )
 
         caplog.set_level("DEBUG")
 
         with (
             patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock),
             patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
-            patch("cosmos.operators._watcher.triggerer.WatcherTrigger._parse_node_status", parse_node_status_mock),
+            patch.object(self.trigger, "_parse_node_status_and_compiled_sql", parse_node_status_and_compiled_sql_mock),
             patch("asyncio.sleep", new_callable=AsyncMock) as sleep_mock,
         ):
             events = []
@@ -248,3 +272,18 @@ class TestWatcherTrigger:
             sleep_mock.assert_awaited()
 
         assert events[0].payload["status"] == "success"
+        assert events[0].payload["compiled_sql"] == "SELECT 1"
+
+    @pytest.mark.asyncio
+    async def test_run_failed_model_includes_compiled_sql_in_event(self):
+        """When model fails and compiled_sql is available, event payload includes it."""
+        parse_mock = AsyncMock(return_value=("failed", "SELECT * FROM broken_model"))
+        with (
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="running")),
+            patch.object(self.trigger, "_parse_node_status_and_compiled_sql", parse_mock),
+        ):
+            events = [event async for event in self.trigger.run()]
+        assert len(events) == 1
+        assert events[0].payload["status"] == "failed"
+        assert events[0].payload["reason"] == "model_failed"
+        assert events[0].payload["compiled_sql"] == "SELECT * FROM broken_model"

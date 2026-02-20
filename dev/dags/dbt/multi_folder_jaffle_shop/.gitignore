@@ -1,0 +1,6 @@
+package-lock.yml
+target/
+dbt_packages/
+logs/
+!target/manifest.json
+dbt_internal_packages/

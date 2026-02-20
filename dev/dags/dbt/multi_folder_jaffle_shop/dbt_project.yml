@@ -1,0 +1,40 @@
+name: 'multi_folder_jaffle_shop'
+
+config-version: 2
+version: '0.1'
+
+profile: 'default'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+analysis-paths: ["analysis"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets:
+    - "target"
+    - "dbt_modules"
+    - "logs"
+
+require-dbt-version: [">=1.0.0", "<2.0.0"]
+
+# Custom folder dependencies: inject_folder_dependencies macro uses these to add ref() deps so dbt runs in order.
+# folder_dependencies: which folders this folder depends on (e.g. production depends on staging).
+# folder_models: model names per folder (avoids using graph in the macro for compatibility).
+vars:
+  folder_dependencies:
+    production: [staging]
+  folder_models:
+    staging: [stg_customers, stg_orders, stg_payments]
+    production: [customers, orders]
+
+models:
+  multi_folder_jaffle_shop:
+    +pre-hook: "{{ inject_folder_dependencies() }}"
+
+    +materialized: table
+    staging:
+      +materialized: view
+    production:
+      +materialized: table

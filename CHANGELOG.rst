@@ -7,12 +7,12 @@ Changelog
 Enhancements
 
 * Change Snowflake profile mappings to default to four threads by @tatiana in #2374
-* Populate ``compiled_sql`` for ``InvocationMode.SUBPROCESS`` in ``ExecutionMode.WATCHER`` by @pankajkoti in #2319
-* Preserve ``extra_context`` for watcher consumer task instances by @pankajkoti in #2381
 * Refactor to avoid potential future ``UnboundLocalError`` for ``producer_task`` in ``calculate_tasks_map`` by @rin in #2309
 
 Bug Fixes
 
+* Populate ``compiled_sql`` for ``InvocationMode.SUBPROCESS`` in ``ExecutionMode.WATCHER`` by @pankajkoti in #2319
+* Preserve ``extra_context`` for watcher consumer task instances by @pankajkoti in #2381
 * Fix watcher: respect ``deferrable=False`` from ``operator_args`` on consumer sensor by @pankajkoti in #2384
 * Error handle invalid YAML with ``LoadMode.DBT_MANIFEST`` and ``RenderConfig.selector`` by @jonbillings in #2316
 * Fix selecting model when it has the same name as folder by @pankajastro in #2328
@@ -27,6 +27,7 @@ Docs
 Others
 
 * Improve test coverage for PR #2307 by @tatiana in #2308
+
 
 1.13.0 (2026-01-30)
 ---------------------

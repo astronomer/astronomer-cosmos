@@ -241,6 +241,8 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
             profile_config=profile_config,
             project_dir=project_dir,
             profiles_dir=profiles_dir,
+            producer_task_id=producer_task_id,
+            deferrable=deferrable,
             **kwargs,
         )
 

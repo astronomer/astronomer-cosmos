@@ -1,19 +1,251 @@
-# TODO: Implement it
 from __future__ import annotations
 
-from typing import Any
+import base64
+import time
+import zlib
+from collections.abc import Sequence
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from airflow.utils.context import Context  # type: ignore[attr-defined]
+from cosmos.operators.base import _sanitize_xcom_key
 
 try:
-    from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
-except (ImportError, AttributeError):
-    from airflow.models import BaseOperator  # Airflow 2
+    from airflow.providers.databricks.operators.databricks_sql import DatabricksSqlOperator
+except ImportError:
+    raise ImportError(
+        "Could not import DatabricksSqlOperator. Ensure you've installed the Databricks provider separately or "
+        "with `pip install apache-airflow-providers-databricks`."
+    )
+
+try:  # Airflow 3
+    from airflow.sdk.definitions.asset import Asset
+except (ModuleNotFoundError, ImportError):  # Airflow 2
+    from airflow.datasets import Dataset as Asset  # type: ignore
+
+from airflow.utils.context import Context  # type: ignore
+from packaging.version import Version
+
+from cosmos import settings
+from cosmos.config import ProfileConfig
+from cosmos.constants import AIRFLOW_VERSION
+from cosmos.dataset import get_dataset_alias_name
+from cosmos.exceptions import CosmosValueError
+from cosmos.operators.local import AbstractDbtLocalBase
+from cosmos.settings import remote_target_path, remote_target_path_conn_id
+
+DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
 
 
-class DbtRunAirflowAsyncDatabricksOperator(BaseOperator):  # type: ignore[misc]
-    def __init__(self, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
+def _mock_databricks_adapter() -> None:
+    import agate
+    from dbt.adapters.databricks.connections import DatabricksAdapterResponse, DatabricksConnectionManager
 
-    def execute(self, context: Context) -> None:
-        raise NotImplementedError()
+    try:
+        from dbt_common.clients.agate_helper import empty_table
+    except (ModuleNotFoundError, ImportError):  # pragma: no cover
+        from dbt.clients.agate_helper import empty_table
+
+    def execute(  # type: ignore[no-untyped-def]
+        self, sql, auto_begin=False, fetch=None, limit: int | None = None
+    ) -> tuple[DatabricksAdapterResponse, agate.Table]:
+        return DatabricksAdapterResponse("mock_databricks_adapter_response"), empty_table()
+
+    DatabricksConnectionManager.execute = execute
+
+
+def _configure_databricks_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any:
+    sql = kwargs.get("sql")
+    if not sql:
+        raise CosmosValueError("Keyword argument 'sql' is required for Databricks Async operator")
+    async_op_obj.sql = sql
+    return async_op_obj
+
+
+class DbtRunAirflowAsyncDatabricksOperator(DatabricksSqlOperator, AbstractDbtLocalBase):  # type: ignore[misc]
+
+    template_fields: Sequence[str] = ("sql", "compiled_sql", "full_refresh", "http_path", "sql_warehouse_name", "catalog", "schema")
+    template_fields_renderers = {
+        "compiled_sql": "sql",
+        "sql": "sql",
+    }
+    producer_task_id: str = DEFAULT_PRODUCER_ASYNC_TASK_ID
+
+    def __init__(
+        self,
+        project_dir: str,
+        profile_config: ProfileConfig,
+        extra_context: dict[str, Any] | None = None,
+        dbt_kwargs: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ):
+        self.project_dir = project_dir
+        self.profile_config = profile_config
+        self.databricks_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore
+        self.extra_context = extra_context or {}
+        self.dbt_kwargs = dbt_kwargs or {}
+        task_id = self.dbt_kwargs.pop("task_id")
+        self.full_refresh = self.dbt_kwargs.pop("full_refresh", False)
+
+        AbstractDbtLocalBase.__init__(
+            self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
+        )
+        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
+            from airflow.datasets import DatasetAlias
+
+            # ignoring the type because older versions of Airflow raise the follow error in mypy
+            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
+            dag_id = kwargs.get("dag")
+            task_group_id = kwargs.get("task_group")
+            kwargs["outlets"] = [
+                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
+            ]  # type: ignore
+
+        # This is a workaround for Airflow 3 compatibility. In Airflow 2, the super().__init__() call worked correctly,
+        # but in Airflow 3, it attempts to re-initialize AbstractDbtLocalBase with filtered kwargs that only include
+        # DatabricksSqlOperator parameters and hence fails to initialise the operator due to missing arguments.
+        # To fix this, we temporarily set the base class to only DatabricksSqlOperator during initialization,
+        # then restore the full inheritance chain afterward.
+        DbtRunAirflowAsyncDatabricksOperator.__bases__ = (DatabricksSqlOperator,)
+        super().__init__(
+            databricks_conn_id=self.databricks_conn_id,
+            sql="",  # Will be set in execute
+            deferrable=True,
+            **kwargs,
+        )
+        self.async_context = extra_context or {}
+        self.async_context["profile_type"] = self.profile_config.get_profile_type()
+        self.async_context["async_operator"] = DatabricksSqlOperator
+        self.compiled_sql = ""
+        self.catalog = ""
+        self.schema = ""
+
+        # Restore the full inheritance chain after initialization that was temporarily set to DatabricksSqlOperator
+        # above for adding compatibility with Airflow 3 operator initialisation. This ensures that:
+        # 1. Subsequent class initializations have access to AbstractDbtLocalBase methods
+        # 2. Operator instances can properly access AbstractDbtLocalBase functionality during execution
+        DbtRunAirflowAsyncDatabricksOperator.__bases__ = (
+            DatabricksSqlOperator,
+            AbstractDbtLocalBase,
+        )
+
+    @property
+    def base_cmd(self) -> list[str]:
+        return ["run"]
+
+    def get_sql_from_xcom(self, context: Context) -> str:
+        start_time = time.time()
+        file_path = self.async_context["dbt_node_config"]["file_path"]
+        project_dir_parent = str(Path(self.project_dir).parent)
+        sql_model_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
+        compressed_b64_sql = context["ti"].xcom_pull(
+            task_ids=self.producer_task_id, key=_sanitize_xcom_key(sql_model_path)
+        )
+        compressed_b64_sql = base64.b64decode(compressed_b64_sql)
+        sql_query = zlib.decompress(compressed_b64_sql).decode("utf-8")
+
+        elapsed_time = time.time() - start_time
+        self.log.info("SQL file download completed in %.2f seconds.", elapsed_time)
+        return sql_query  # type: ignore
+
+    def get_remote_sql(self) -> str:
+        start_time = time.time()
+
+        try:
+            from airflow.sdk import ObjectStoragePath
+        except ImportError:
+            from airflow.io.path import ObjectStoragePath
+
+        file_path = self.async_context["dbt_node_config"]["file_path"]  # type: ignore
+        dbt_dag_task_group_identifier = self.async_context["dbt_dag_task_group_identifier"]
+        run_id = self.async_context["run_id"]
+
+        remote_target_path_str = str(remote_target_path).rstrip("/")
+
+        if TYPE_CHECKING:  # pragma: no cover
+            assert self.project_dir is not None
+
+        project_dir_parent = str(Path(self.project_dir).parent)
+        relative_file_path = str(file_path).replace(project_dir_parent, "").lstrip("/")
+        remote_model_path = (
+            f"{remote_target_path_str}/{dbt_dag_task_group_identifier}/{run_id}/run/{relative_file_path}"
+        )
+
+        object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
+        with object_storage_path.open() as fp:  # type: ignore
+            sql = fp.read()
+            elapsed_time = time.time() - start_time
+            self.log.info("SQL file download completed in %.2f seconds.", elapsed_time)
+            return sql  # type: ignore
+
+    def execute(self, context: Context, **kwargs: Any) -> None:
+        if self.async_context.get("run_id") is None:
+            self.async_context["run_id"] = context["run_id"]
+        if settings.enable_setup_async_task:
+
+            if settings.upload_sql_to_xcom:
+                sql_query = self.get_sql_from_xcom(context)
+            else:
+                sql_query = self.get_remote_sql()
+
+            self.sql = sql_query
+            super().execute(context=context)
+        else:
+            self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
+        self._store_template_fields(context=context)
+        if self.emit_datasets:
+            self._register_event(context)
+
+    def _store_template_fields(self, context: Context) -> None:
+        if not settings.enable_setup_async_task:
+            self.log.info("SQL cannot be made available, skipping registration of compiled_sql template field")
+            return
+        if settings.upload_sql_to_xcom:
+            sql = self.get_sql_from_xcom(context)
+        else:
+            sql = self.get_remote_sql().strip()
+        self.log.debug("Executed SQL is: %s", sql)
+        self.compiled_sql = sql
+
+        if self.profile_config.profile_mapping is not None:
+            profile = self.profile_config.profile_mapping.profile
+        else:
+            raise CosmosValueError(
+                "The `profile_config.profile_mapping` attribute must be defined to use `ExecutionMode.AIRFLOW_ASYNC`"
+            )
+        
+        # Databricks profile fields
+        self.catalog = profile.get("catalog", profile.get("database", ""))
+        self.schema = profile.get("schema", "")
+
+        self._override_rtif(context=context)
+
+    def execute_complete(self, context: Context, event: dict[str, Any]) -> Any:
+        """
+        Act as a callback for when the trigger fires.
+
+        This returns immediately. It relies on trigger to throw an exception,
+        otherwise it assumes execution was successful.
+        """
+        if self.async_context.get("run_id") is None:
+            self.async_context["run_id"] = context["run_id"]
+
+        result = super().execute_complete(context=context, event=event)
+        self.log.info("SQL executed: %s", str(self.sql))
+        self._store_template_fields(context=context)
+        if self.emit_datasets:
+            self._register_event(context)
+        return result
+
+    def _register_event(self, context: Context) -> None:
+        dbt_node_config = self.async_context.get("dbt_node_config", {})
+        unique_id = dbt_node_config.get("unique_id", f"unknown_model_{self.task_id}")
+        table_name = unique_id.split(".")[-1]
+
+        # Databricks uses Unity Catalog format: catalog.schema.table
+        if self.catalog:
+            asset_uri = f"databricks://{self.catalog}.{self.schema}.{table_name}"
+        else:
+            asset_uri = f"databricks://{self.schema}.{table_name}"
+
+        output = [Asset(uri=asset_uri)]
+        self.register_dataset([], output, context)

@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 
@@ -24,6 +24,8 @@ except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
     from airflow.utils.context import Context  # type: ignore[attr-defined]
 
+if TYPE_CHECKING:
+    from airflow.models.taskinstance import TaskInstance
 
 logger = get_logger(__name__)
 
@@ -86,6 +88,29 @@ def store_compiled_sql_for_model(
 
 
 def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
+    context = extra_kwargs.get("context")
+    assert context is not None  # Make MyPy happy
+    store_dbt_resource_status_to_xcom(line, context["ti"])
+
+    try:
+        log_line = json.loads(line)
+        node_info = log_line.get("data", {}).get("node_info", {})
+        node_status = node_info.get("node_status")
+        unique_id = node_info.get("unique_id")
+        if node_status in ["success", "failed"]:
+            project_dir = extra_kwargs.get("project_dir")
+
+            # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
+            # compiled_sql is available for both success and failed models - it's compiled before execution
+            if project_dir:
+                store_compiled_sql_for_model(
+                    context["ti"], project_dir, unique_id, node_info.get("node_path"), node_info.get("resource_type")
+                )
+    except json.JSONDecodeError:
+        pass
+
+
+def store_dbt_resource_status_to_xcom(line: str, task_instance: "TaskInstance") -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
 
@@ -108,17 +133,7 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
 
         # TODO: Handle and store all possible node statuses, not just the current success and failed
         if node_status in ["success", "failed"]:
-            context = extra_kwargs.get("context")
-            assert context is not None  # Make MyPy happy
-            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
-
-            # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
-            # compiled_sql is available for both success and failed models - it's compiled before execution
-            project_dir = extra_kwargs.get("project_dir")
-            if project_dir:
-                store_compiled_sql_for_model(
-                    context["ti"], project_dir, unique_id, node_info.get("node_path"), node_info.get("resource_type")
-                )
+            safe_xcom_push(task_instance=task_instance, key=f"{unique_id.replace('.', '__')}_status", value=node_status)
 
     # Additionally, log the message from dbt logs
     log_info = log_line.get("info", {})

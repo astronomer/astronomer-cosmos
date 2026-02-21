@@ -33,6 +33,7 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``source:my_source.my_table``: include/exclude nodes that have the source ``my_source`` and the table ``my_table``
 - ``exposure:my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and are of resource_type ``exposure``
 - ``exposure:+my_exposure``: include/exclude nodes that have the exposure ``my_exposure`` and their parents
+- ``fqn:some_model``: include/exclude nodes based on their fully qualified names (FQN), which consist of the project name, folder path, and model name. For example, ``fqn:my_dbt_project.analytics.tables.my_model`` selects the model ``my_model`` in the ``analytics/tables`` folder of the ``my_dbt_project`` project.
 - ``package:package_name``: include/exclude all nodes that belong to the given package (e.g. ``package:dbt_artifacts``). The package name must be non-empty (use ``package:dbt_artifacts``, not ``package:``).
 - ``package:package_name+``: include/exclude all nodes in the package and their descendants (children).
 - ``+package:package_name``: include/exclude all nodes in the package and their ancestors (parents).
@@ -77,7 +78,6 @@ Examples:
             select=["path:analytics/tables"],
         )
     )
-
 
 .. code-block:: python
 
@@ -129,6 +129,19 @@ Examples:
         render_config=RenderConfig(
             select=["@my_model"],  # selects my_model, all its descendants,
             # and all ancestors needed to build those descendants
+        )
+    )
+
+.. code-block:: python
+
+    from cosmos.airflow.dag import DbtDag
+    from cosmos.config import RenderConfig
+
+    jaffle_shop = DbtDag(
+        render_config=RenderConfig(
+            select=[
+                "fqn:jaffle_shop.analytics.tables.my_model"
+            ],  # selects models by fully qualified name
         )
     )
 

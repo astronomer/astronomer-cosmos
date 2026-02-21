@@ -959,6 +959,176 @@ def test_select_nodes_by_exposure_name():
     assert selected == expected
 
 
+def test_select_nodes_by_select_package():
+    """
+    Test selecting nodes by package name using 'package:package_name'.
+    Used when loading from manifest to include only nodes from a given package.
+    """
+    local_nodes = dict(sample_nodes)
+    # Add nodes from dbt_artifacts package (package_name is set when loading from manifest)
+    artifact_node_1 = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    artifact_node_2 = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_2",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_2.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    local_nodes[artifact_node_1.unique_id] = artifact_node_1
+    local_nodes[artifact_node_2.unique_id] = artifact_node_2
+
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["package:dbt_artifacts"],
+    )
+    expected = {artifact_node_1.unique_id: artifact_node_1, artifact_node_2.unique_id: artifact_node_2}
+    assert selected == expected
+
+
+def test_select_nodes_by_exclude_package():
+    """
+    Test excluding nodes by package name using 'package:package_name'.
+    This fixes manifest load mode not respecting exclude for packages (e.g. dbt_artifacts).
+    """
+    local_nodes = dict(sample_nodes)
+    # Add nodes from dbt_artifacts package
+    artifact_node_1 = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    local_nodes[artifact_node_1.unique_id] = artifact_node_1
+
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        exclude=["package:dbt_artifacts"],
+    )
+    # All original sample_nodes remain; artifact nodes are excluded
+    assert artifact_node_1.unique_id not in selected
+    assert set(selected.keys()) == set(sample_nodes.keys())
+
+
+def test_select_nodes_by_package_plus_descendants():
+    """package:name+ selects all nodes in that package and their descendants (e.g. project models that use them)."""
+    pkg_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_utils.uppercase",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_utils/macros/uppercase.sql",
+        tags=[],
+        config={},
+        package_name="dbt_utils",
+    )
+    # Project model that depends on the package macro/model
+    downstream = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.uses_utils",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[pkg_node.unique_id],
+        file_path=SAMPLE_PROJ_PATH / "models/uses_utils.sql",
+        tags=[],
+        config={},
+    )
+    local_nodes = {pkg_node.unique_id: pkg_node, downstream.unique_id: downstream}
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["package:dbt_utils+"],
+    )
+    assert selected.keys() == {pkg_node.unique_id, downstream.unique_id}
+
+
+def test_select_nodes_raises_on_empty_package_selector():
+    """Empty package: (e.g. select=['package:']) would match all nodes with package_name None; we raise instead."""
+    with pytest.raises(CosmosValueError) as err_info:
+        select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["package:"])
+    assert "package: selector requires a non-empty package name" in err_info.value.args[0]
+
+    with pytest.raises(CosmosValueError) as err_info:
+        select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["package:"])
+    assert "package: selector requires a non-empty package name" in err_info.value.args[0]
+
+
+def test_select_nodes_by_exclude_bare_package_name():
+    """
+    Bare package name (no 'package:' prefix) is equivalent to 'package:name', matching dbt behavior.
+    So exclude=['dbt_artifacts'] works the same as exclude=['package:dbt_artifacts'].
+    """
+    local_nodes = dict(sample_nodes)
+    artifact_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        tags=[],
+        config={},
+        package_name="dbt_artifacts",
+    )
+    local_nodes[artifact_node.unique_id] = artifact_node
+
+    selected_bare = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        exclude=["dbt_artifacts"],
+    )
+    selected_explicit = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        exclude=["package:dbt_artifacts"],
+    )
+    assert artifact_node.unique_id not in selected_bare
+    assert artifact_node.unique_id not in selected_explicit
+    assert set(selected_bare.keys()) == set(selected_explicit.keys()) == set(sample_nodes.keys())
+
+
+def test_select_nodes_by_bare_folder_name():
+    """
+    Bare identifier as folder name (path segment) matches nodes under that folder.
+    Ensures select=['folder_a'] / exclude=['folder_a'] work with manifest load mode.
+    """
+    # gen1 contains grandparent, another_grandparent; gen3 contains child, sibling1, sibling2, sibling3, orphaned
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=sample_nodes,
+        select=["gen1"],
+    )
+    assert set(selected.keys()) == {grandparent_node.unique_id, another_grandparent_node.unique_id}
+
+
+def test_exclude_nodes_by_bare_folder_name():
+    """Exclude by folder name (path segment) excludes all nodes under that folder."""
+    excluded = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=sample_nodes,
+        exclude=["gen3"],
+    )
+    gen3_ids = {
+        child_node.unique_id,
+        sibling1_node.unique_id,
+        sibling2_node.unique_id,
+        sibling3_node.unique_id,
+        orphaned_node.unique_id,
+    }
+    assert gen3_ids.isdisjoint(excluded.keys())
+    assert grandparent_node.unique_id in excluded
+    assert parent_node.unique_id in excluded
+
+
 def test_select_exposure_nodes_by_graph_ancestry():
     """
     Test selecting an exposure node and its directs ancestors using the syntax '+exposure:exposure_name'.
@@ -1421,11 +1591,12 @@ def test_valid_graph_operator_yaml_selectors(selector_name, selector_definition,
 )
 def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition, exception_msg):
     selectors = {selector_name: selector_definition}
+    yaml_selectors = YamlSelectors.parse(selectors)
 
     with pytest.raises(CosmosValueError) as err_info:
-        _ = YamlSelectors.parse(selectors)
+        _ = yaml_selectors.get_parsed(selector_name)
 
-    assert err_info.value.args[0] == exception_msg
+    assert exception_msg in str(err_info.value)
 
 
 @pytest.mark.parametrize(
@@ -1542,6 +1713,124 @@ def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition
             "Unsupported selector method: 'unknown_random'",
         ),
         (
+            "multiple_errors_non_int_depths",
+            {
+                "name": "multiple_errors_non_int_depths",
+                "definition": {
+                    "method": "tag",
+                    "value": "nightly",
+                    "parents": True,
+                    "parents_depth": "invalid",
+                    "children": True,
+                    "children_depth": "also_invalid",
+                },
+            },
+            ["parents_depth must be an integer", "children_depth must be an integer"],
+        ),
+        (
+            "union_with_multiple_errors",
+            {
+                "name": "union_with_multiple_errors",
+                "definition": {
+                    "union": [
+                        {"method": "unsupported_method1", "value": "test1"},
+                        {"method": "unsupported_method2", "value": "test2"},
+                        {"method": "tag", "value": "valid"},
+                    ]
+                },
+            },
+            [
+                "Unsupported selector method: 'unsupported_method1'",
+                "Unsupported selector method: 'unsupported_method2'",
+            ],
+        ),
+        (
+            "intersection_with_multiple_errors",
+            {
+                "name": "intersection_with_multiple_errors",
+                "definition": {
+                    "intersection": [
+                        {"method": "tag", "value": "nightly", "parents": True, "parents_depth": "invalid1"},
+                        {"method": "path", "value": "models/", "children": True, "children_depth": "invalid2"},
+                    ]
+                },
+            },
+            ["parents_depth must be an integer", "children_depth must be an integer"],
+        ),
+        (
+            "nested_errors",
+            {
+                "name": "nested_errors",
+                "definition": {
+                    "union": [
+                        {
+                            "method": "tag",
+                            "value": "nightly",
+                            "parents": True,
+                            "parents_depth": "not_an_int",
+                            "childrens_parents": True,
+                        },
+                        {"method": "unknown_method", "value": "test"},
+                    ]
+                },
+            },
+            ["parents_depth must be an integer", "Unsupported selector method: 'unknown_method'"],
+        ),
+        (
+            "errors_in_include_and_exclude",
+            {
+                "name": "errors_in_include_and_exclude",
+                "definition": {
+                    "method": "unknown_include_method",
+                    "value": "test",
+                    "exclude": [{"method": "unknown_exclude_method", "value": "test2"}],
+                },
+            },
+            [
+                "Unsupported selector method: 'unknown_include_method'",
+                "Unsupported selector method: 'unknown_exclude_method'",
+            ],
+        ),
+        (
+            "multiple_errors_complex",
+            {
+                "name": "multiple_errors_complex",
+                "definition": {
+                    "union": [
+                        {"method": "tag", "value": "nightly", "exclude": [{"method": "tag", "value": "deprecated"}]},
+                        {"method": "path", "value": "models/", "exclude": [{"method": "tag", "value": "archived"}]},
+                        {"method": "invalid_method", "value": "test"},
+                    ]
+                },
+            },
+            ["You cannot provide multiple exclude arguments", "Unsupported selector method: 'invalid_method'"],
+        ),
+        (
+            "list_and_method_errors",
+            {
+                "name": "list_and_method_errors",
+                "definition": {"union": [{"method": "unknown_method", "value": "test"}, "not_a_dict"]},
+            },
+            ["Unsupported selector method: 'unknown_method'", "Invalid value type", "not_a_dict"],
+        ),
+    ],
+)
+def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, exception_msg):
+    selectors = {selector_name: selector_definition}
+    yaml_selectors = YamlSelectors.parse(selectors)
+
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = yaml_selectors.get_parsed(selector_name)
+
+    error_message = str(err_info.value)
+    expected_messages = exception_msg if isinstance(exception_msg, list) else [exception_msg]
+    assert all(msg in error_message for msg in expected_messages)
+
+
+@pytest.mark.parametrize(
+    "selector_name, selector_definition, exception_msg",
+    [
+        (
             "non_dict_definition",
             "not_a_dict",
             "Invalid selector definition for 'non_dict_definition'. Expected a dict, got <class 'str'>: not_a_dict",
@@ -1558,13 +1847,14 @@ def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition
         ),
     ],
 )
-def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, exception_msg):
+def test_invalid_yaml_structure_raises_immediately(selector_name, selector_definition, exception_msg):
+    """Test that structural YAML errors (missing name/definition) raise immediately from parse()."""
     selectors = {selector_name: selector_definition}
 
     with pytest.raises(CosmosValueError) as err_info:
         _ = YamlSelectors.parse(selectors)
 
-    assert err_info.value.args[0] == exception_msg
+    assert exception_msg in str(err_info.value)
 
 
 @pytest.mark.parametrize(
@@ -1577,11 +1867,12 @@ def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, e
 )
 def test_invalid_value_type_for_list_keys(selector_name, definition_key, invalid_value, expected_error_fragment):
     selectors = {selector_name: {"name": selector_name, "definition": {definition_key: invalid_value}}}
+    yaml_selectors = YamlSelectors.parse(selectors)
 
     with pytest.raises(CosmosValueError) as err_info:
-        _ = YamlSelectors.parse(selectors)
+        _ = yaml_selectors.get_parsed(selector_name)
 
-    assert expected_error_fragment in err_info.value.args[0]
+    assert expected_error_fragment in str(err_info.value)
 
 
 @pytest.mark.parametrize(
@@ -1603,13 +1894,15 @@ def test_invalid_items_in_selector_lists(selector_name, definition_key, invalid_
         }
     }
 
-    with pytest.raises(CosmosValueError) as err_info:
-        _ = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors)
 
-    assert (
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = yaml_selectors.get_parsed(selector_name)
+
+    expected_error = (
         f'Invalid value type {item_type_str} in key "{definition_key}", expected dict (value: {invalid_list_item}).'
-        in err_info.value.args[0]
     )
+    assert expected_error in str(err_info.value)
 
 
 @pytest.mark.parametrize(
@@ -1630,11 +1923,19 @@ def test_non_string_keys_in_selector_dicts(selector_name, definition_key, non_st
         }
     }
 
-    with pytest.raises(CosmosValueError) as err_info:
-        _ = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors)
 
-    assert f'Expected all keys to "{definition_key}" dict to be strings' in err_info.value.args[0]
-    assert f'but "{non_string_key}" is a "{key_type_str}"' in err_info.value.args[0]
+    with pytest.raises(CosmosValueError) as err_info:
+        _ = yaml_selectors.get_parsed(selector_name)
+
+    error_message = str(err_info.value)
+    assert all(
+        part in error_message
+        for part in [
+            f'Expected all keys to "{definition_key}" dict to be strings',
+            f'but "{non_string_key}" is a "{key_type_str}"',
+        ]
+    )
 
 
 def test_selector_reference_resolves_from_cache():

@@ -157,9 +157,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         **kwargs: Any,
     ) -> None:
         self.compiled_sql = ""
-        extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
         kwargs.setdefault("priority_weight", CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
+
+        # We pop extra_context before super().__init__ because BaseSensorOperator does not accept it and
+        # would raise on unknown kwargs; we assign after so subclasses and user customisations can use it
+        # at runtime (e.g. in execute, poke, or callbacks).
+        extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
         super().__init__(
             poke_interval=poke_interval,
             timeout=timeout,
@@ -169,6 +173,8 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             profiles_dir=profiles_dir,
             **kwargs,
         )
+        self.extra_context = extra_context
+
         self.project_dir = project_dir
         self.producer_task_id = producer_task_id
         self.deferrable = deferrable

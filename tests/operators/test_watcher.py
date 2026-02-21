@@ -129,6 +129,47 @@ def test_dbt_producer_watcher_operator_queue(queue_override, expected_queue):
         assert op.queue == expected_queue
 
 
+@pytest.mark.integration
+def test_producer_queue_from_setup_operator_args_when_both_set():
+    """
+    When both setup_operator_args queue and watcher_dbt_execution_queue are set,
+    producer should use queue from setup_operator_args.
+    """
+    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", "watcher_queue"):
+        watcher_dag = DbtDag(
+            project_config=project_config,
+            profile_config=profile_config,
+            start_date=datetime(2023, 1, 1),
+            dag_id="watcher_dag_setup_queue",
+            execution_config=ExecutionConfig(
+                execution_mode=ExecutionMode.WATCHER,
+                setup_operator_args={"queue": "dbt_producer_task_queue"},
+            ),
+            render_config=RenderConfig(emit_datasets=False),
+        )
+    producer = watcher_dag.task_dict["dbt_producer_watcher"]
+    assert producer.queue == "dbt_producer_task_queue"
+
+
+@pytest.mark.integration
+def test_producer_queue_from_watcher_dbt_execution_queue_when_only_watcher_set():
+    """
+    When only watcher_dbt_execution_queue is set (no queue in setup_operator_args),
+    producer should use queue from watcher_dbt_execution_queue.
+    """
+    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", "watcher_only_queue"):
+        watcher_dag = DbtDag(
+            project_config=project_config,
+            profile_config=profile_config,
+            start_date=datetime(2023, 1, 1),
+            dag_id="watcher_dag_watcher_queue_only",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            render_config=RenderConfig(emit_datasets=False),
+        )
+    producer = watcher_dag.task_dict["dbt_producer_watcher"]
+    assert producer.queue == "watcher_only_queue"
+
+
 def test_dbt_producer_watcher_operator_priority_weight_override():
     """Test that DbtProducerWatcherOperator allows overriding priority_weight."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, priority_weight=100)
@@ -281,11 +322,11 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
         ({"status": "success", "reason": "model_not_run"}, None),
         (
             {"status": "failed", "reason": "model_failed"},
-            "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher' logs for details.",
+            "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher_operator' logs for details.",
         ),
         (
             {"status": "failed", "reason": "producer_failed"},
-            "Watcher producer task 'dbt_producer_watcher' failed before reporting model results. Check its logs for the underlying error.",
+            "Watcher producer task 'dbt_producer_watcher_operator' failed before reporting model results. Check its logs for the underlying error.",
         ),
     ],
 )
@@ -810,7 +851,7 @@ class TestDbtConsumerWatcherSensor:
             task_id="model.my_model",
             project_dir="/tmp/project",
             profile_config=None,
-            deferrable=True,
+            deferrable=kwargs.pop("deferrable", True),
             **kwargs,
         )
 
@@ -1204,6 +1245,17 @@ class TestDbtConsumerWatcherSensor:
         context = {"run_id": "run_id", "task_instance": Mock()}
         sensor.execute(context=context)
         mock_poke.assert_called_once()
+
+    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor.poke")
+    def test_deferrable_false_via_constructor_does_not_defer(self, mock_poke):
+        """operator_args={'deferrable': False} is respected: sensor created with deferrable=False does not defer."""
+        mock_poke.return_value = True
+        sensor = self.make_sensor(deferrable=False)
+        assert sensor.deferrable is False
+        context = {"run_id": "run_id", "task_instance": Mock()}
+        sensor.execute(context=context)
+        mock_poke.assert_called_once()
+        # No TaskDeferred raised: sensor ran synchronously and completed
 
     @pytest.mark.parametrize(
         "mock_event",

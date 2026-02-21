@@ -153,20 +153,7 @@ def test_node_fqn_str_returns_none_when_missing():
     assert _node_fqn_str(node) is None
 
 
-# from pathlib import Path
-#
-# from cosmos.dbt.selector import _node_fqn_str, select_nodes
-# from cosmos.dbt.graph import DbtNode
-# from cosmos.constants import DbtResourceType
-
-
 def test_select_nodes_with_fqn_selector():
-    """
-    Test that the FQN_SELECTOR branch is exercised.
-    - node_matching should be selected
-    - node_not_matching should be skipped
-    - node_without_fqn should be skipped
-    """
     project_name = SAMPLE_PROJ_PATH.stem
 
     # Node that should match the selector

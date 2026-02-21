@@ -63,7 +63,15 @@ def _configure_databricks_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any
 
 class DbtRunAirflowAsyncDatabricksOperator(DatabricksSqlOperator, AbstractDbtLocalBase):  # type: ignore[misc]
 
-    template_fields: Sequence[str] = ("sql", "compiled_sql", "full_refresh", "http_path", "sql_warehouse_name", "catalog", "schema")
+    template_fields: Sequence[str] = (
+        "sql",
+        "compiled_sql",
+        "full_refresh",
+        "http_path",
+        "sql_warehouse_name",
+        "catalog",
+        "schema",
+    )
     template_fields_renderers = {
         "compiled_sql": "sql",
         "sql": "sql",
@@ -212,7 +220,7 @@ class DbtRunAirflowAsyncDatabricksOperator(DatabricksSqlOperator, AbstractDbtLoc
             raise CosmosValueError(
                 "The `profile_config.profile_mapping` attribute must be defined to use `ExecutionMode.AIRFLOW_ASYNC`"
             )
-        
+
         # Databricks profile fields
         self.catalog = profile.get("catalog", profile.get("database", ""))
         self.schema = profile.get("schema", "")

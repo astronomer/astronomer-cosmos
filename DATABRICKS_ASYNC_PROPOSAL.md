@@ -66,7 +66,7 @@ Before implementation, I'd like guidance on:
    - `DatabricksSqlOperator` (for SQL execution)
    - `DatabricksSubmitRunOperator` (for job submissions)
    - `DatabricksRunNowOperator` (for existing jobs)
-   
+
 2. **Connection Handling**: Databricks has multiple auth methods (token, OAuth, etc.). Should we:
    - Support all auth methods from day 1?
    - Start with token-based auth (most common)?

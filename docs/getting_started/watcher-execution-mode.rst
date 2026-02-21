@@ -281,6 +281,10 @@ Or via environment variable:
 - For watcher consumer tasks (``DbtConsumerWatcherSensor``), from their first retry onwards, if ``watcher_dbt_execution_queue`` is configured, the task is automatically assigned to the specified queue
 - This behavior is enforced by Cosmos via an `Airflow cluster policy <https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html>`_ (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts
 
+.. note::
+
+   The queue for producer task execution can be set using the ``setup_operator_args`` parameter or via the ``watcher_dbt_execution_queue`` configuration option. The precedence order is: ``setup_operator_args`` > ``watcher_dbt_execution_queue`` > ``DEFAULT_QUEUE``.
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Installation of Airflow and dbt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

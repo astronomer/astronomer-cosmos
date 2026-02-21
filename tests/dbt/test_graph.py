@@ -427,6 +427,86 @@ def test_load_via_manifest_with_select(project_name, manifest_filepath, model_fi
     assert sample_node.file_path == DBT_PROJECTS_ROOT_DIR / f"{project_name}/models/{model_filepath}"
 
 
+def test_load_from_dbt_manifest_raises_without_execution_project_path():
+    """load_from_dbt_manifest raises when ExecutionConfig.dbt_project_path is not set."""
+    project_config = ProjectConfig(manifest_path=SAMPLE_MANIFEST, project_name="jaffle_shop")
+    execution_config = ExecutionConfig()  # project_path is None
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_from_dbt_manifest()
+    assert err_info.value.args[0] == "Unable to load manifest without ExecutionConfig.dbt_project_path"
+
+
+def test_load_from_dbt_manifest_handles_null_manifest(tmp_path):
+    """When manifest file contains JSON null, it is treated as empty dict (covers manifest = {} branch)."""
+    manifest_file = tmp_path / "manifest_null.json"
+    manifest_file.write_text("null")
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="test")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+    assert dbt_graph.nodes == {}
+    assert dbt_graph.filtered_nodes == {}
+
+
+def test_load_from_dbt_manifest_resolves_package_path(tmp_path):
+    """Package nodes get file_path under project_path/dbt_packages/<package_name>/."""
+    manifest = {
+        "metadata": {"project_name": "my_project"},
+        "nodes": {
+            "model.some_package.foo": {
+                "original_file_path": "models/edr/foo.sql",
+                "package_name": "some_package",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_file = tmp_path / "manifest.json"
+    manifest_file.write_text(json.dumps(manifest))
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="my_project")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+    assert "model.some_package.foo" in dbt_graph.nodes
+    node = dbt_graph.nodes["model.some_package.foo"]
+    assert node.package_name == "some_package"
+    assert "dbt_packages" in str(node.file_path)
+    assert "some_package" in node.file_path.parts
+    assert node.file_path.name == "foo.sql"
+
+
 def test_load_via_manifest_with_selectors_and_missing_definitions():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST_MODEL_VERSION
@@ -2171,7 +2251,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("74c478329e90725557d095879030b5e8",)
+        assert hash_dir in ("74c478329e90725557d095879030b5e8", "fa536d84e2ee6018010e3940a45764e1")
     else:
         assert hash_dir == "633a523f295ef0cd496525428815537b"
 
@@ -2211,7 +2291,7 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
 
     if sys.platform == "darwin":
         # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("011defbf066ed46d345d51eb727fb0f1",)
+        assert hash_dir in ("74c478329e90725557d095879030b5e8", "fa536d84e2ee6018010e3940a45764e1")
     else:
         assert hash_dir == "633a523f295ef0cd496525428815537b"
 

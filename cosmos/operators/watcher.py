@@ -103,7 +103,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         default_args["retries"] = 0
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
-        kwargs["queue"] = watcher_dbt_execution_queue or DEFAULT_QUEUE
+        kwargs["queue"] = kwargs.get("queue") or watcher_dbt_execution_queue or DEFAULT_QUEUE
         super().__init__(task_id=task_id, *args, **kwargs)
 
         if self.invocation_mode == InvocationMode.SUBPROCESS:
@@ -241,6 +241,8 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
             profile_config=profile_config,
             project_dir=project_dir,
             profiles_dir=profiles_dir,
+            producer_task_id=producer_task_id,
+            deferrable=deferrable,
             **kwargs,
         )
 

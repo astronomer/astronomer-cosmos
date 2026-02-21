@@ -24,6 +24,7 @@ CONFIG_META_PATH = "meta"
 SUPPORTED_CONFIG = ["materialized", "schema", "tags", CONFIG_META_PATH]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
+FQN_SELECTOR = "fqn:"
 CONFIG_SELECTOR = "config."
 SOURCE_SELECTOR = "source:"
 EXPOSURE_SELECTOR = "exposure:"
@@ -35,6 +36,26 @@ AT_SELECTOR = "@"
 GRAPH_SELECTOR_REGEX = r"^(@|[0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
 
 logger = get_logger(__name__)
+
+
+def _node_fqn_str(node: DbtNode) -> str | None:
+    """
+    Return the node's fully qualified name as a string (e.g. 'jaffle_shop.marts.customers').
+    FQN is project name, path segments, and file name without extension, joined by periods.
+    Returns None when node.fqn is not set.
+    See https://docs.getdbt.com/reference/node-selection/methods#fqn
+    """
+    if node.fqn:
+        return ".".join(node.fqn)
+    return None
+
+
+def _fqn_matches(node_fqn: str, fqn_selector_value: str) -> bool:
+    """
+    Return True if the node's fully qualified name exactly equals the selector value.
+    FQN is a fully qualified name (e.g. project.folder.model_name); no wildcards or partial matching.
+    """
+    return node_fqn == fqn_selector_value
 
 
 def _check_nested_value_in_dict(dict_: dict[Any, Any], pattern: str) -> bool:
@@ -84,6 +105,7 @@ class GraphSelector:
         @model_g
         +/path/to/model_g+
         path:/path/to/model_h+
+        fqn:project.folder.model_name
         +tag:nightly
         +config.materialized:view
         resource_type:resource_name
@@ -225,6 +247,13 @@ class GraphSelector:
             tag_selection = self.node_name[len(TAG_SELECTOR) :]
             root_nodes.update({node_id for node_id, node in nodes.items() if tag_selection in node.tags})
 
+        elif FQN_SELECTOR in self.node_name:
+            fqn_pattern = self.node_name[len(FQN_SELECTOR) :].strip()
+            for node_id, node in nodes.items():
+                node_fqn = _node_fqn_str(node)
+                if node_fqn and _fqn_matches(node_fqn, fqn_pattern):
+                    root_nodes.add(node_id)
+
         elif SOURCE_SELECTOR in self.node_name:
             source_selection = self.node_name[len(SOURCE_SELECTOR) :]
 
@@ -355,6 +384,7 @@ class SelectorConfig:
         self.project_dir = project_dir
         self.paths: list[Path] = []
         self.tags: list[str] = []
+        self.fqns: list[str] = []
         self.config: dict[str, str] = {}
         self.other: list[str] = []
         self.graph_selectors: list[GraphSelector] = []
@@ -373,6 +403,7 @@ class SelectorConfig:
         return not (
             self.paths
             or self.tags
+            or self.fqns
             or self.config
             or self.graph_selectors
             or self.other
@@ -428,6 +459,8 @@ class SelectorConfig:
             self._parse_resource_type_selector(item)
         elif node_name.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR):
             self._parse_exclude_resource_type_selector(item)
+        elif node_name.startswith(FQN_SELECTOR):
+            self._parse_fqn_selector(item)
         elif self._is_bare_identifier(node_name):
             self._parse_bare_identifier(node_name)
         else:
@@ -463,6 +496,11 @@ class SelectorConfig:
     def _parse_tag_selector(self, item: str) -> None:
         index = len(TAG_SELECTOR)
         self.tags.append(item[index:])
+
+    def _parse_fqn_selector(self, item: str) -> None:
+        """Parse fqn: selector; appends the fully qualified name (value after 'fqn:') to self.fqns."""
+        index = len(FQN_SELECTOR)
+        self.fqns.append(item[index:].strip())
 
     def _parse_path_selector(self, item: str) -> None:
         index = len(PATH_SELECTOR)
@@ -505,6 +543,7 @@ class SelectorConfig:
             "SelectorConfig("
             + f"paths={self.paths}, "
             + f"tags={self.tags}, "
+            + f"fqns={self.fqns}, "
             + f"config={self.config}, "
             + f"sources={self.sources}, "
             + f"resource={self.resource_types}, "
@@ -624,18 +663,23 @@ class NodeSelector:
         ) or not self._should_include_based_on_non_meta_and_non_tag_config(node, config_copy):
             return False
 
+        if not self._passes_selector_filters(node):
+            return False
+
+        return True
+
+    def _passes_selector_filters(self, node: DbtNode) -> bool:
+        """Return True if node matches all configured selector filters (path, fqn, resource_type, source, exposure)."""
         if self.config.paths and not self._is_path_matching(node):
             return False
-
+        if self.config.fqns and not self._is_fqn_matching(node):
+            return False
         if self.config.resource_types and not self._is_resource_type_matching(node):
             return False
-
         if self.config.exclude_resource_types and self._is_exclude_resource_type_matching(node):
             return False
-
         if self.config.sources and not self._is_source_matching(node):
             return False
-
         if self.config.exposures and not self._is_exposure_matching(node):
             return False
 
@@ -646,6 +690,13 @@ class NodeSelector:
             return False
 
         return True
+
+    def _is_fqn_matching(self, node: DbtNode) -> bool:
+        """Checks if the node's fully qualified name exactly matches any of the config's fqn selector values."""
+        node_fqn = _node_fqn_str(node)
+        if node_fqn is None:
+            return False
+        return any(_fqn_matches(node_fqn, fqn_value) for fqn_value in self.config.fqns)
 
     def _is_resource_type_matching(self, node: DbtNode) -> bool:
         """Checks if the node's resource type is a subset of the config's resource type."""
@@ -946,10 +997,11 @@ class YamlSelectors:
             - method="tag", value="nightly" -> ("tag:nightly", None)
             - method="path", value="models/" -> ("path:models/", None)
             - method="fqn", value="*" -> ("", None)
+            - method="fqn", value="jaffle_shop.customers" -> ("fqn:jaffle_shop.customers", None)
             - method="config.materialized", value="view" -> ("config.materialized:view", None)
         """
         if method == "fqn":
-            return ("" if value == "*" else value, None)
+            return "" if value == "*" else f"{FQN_SELECTOR}{value}", None
 
         method_mappings = {
             TAG_SELECTOR[:-1]: TAG_SELECTOR,
@@ -1416,6 +1468,7 @@ def validate_filters(exclude: list[str], select: list[str]) -> None:
             if (
                 filter_parameter.startswith(PATH_SELECTOR)
                 or filter_parameter.startswith(TAG_SELECTOR)
+                or filter_parameter.startswith(FQN_SELECTOR)
                 or filter_parameter.startswith(RESOURCE_TYPE_SELECTOR)
                 or filter_parameter.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR)
                 or filter_parameter.startswith(SOURCE_SELECTOR)

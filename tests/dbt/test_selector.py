@@ -574,6 +574,44 @@ def test_select_node_by_child_and_precursors_no_node():
     assert list(selected.keys()) == expected
 
 
+def test_select_nodes_by_precursors_with_external_dependency():
+    """Test that the + selector handles depends_on references to nodes not in the nodes dict.
+
+    When using dbt-loom for cross-project references, external nodes are filtered out during
+    manifest loading (they have no file path). However, local nodes may still have depends_on
+    entries pointing to these external nodes. The + selector should gracefully skip missing
+    nodes instead of raising a KeyError.
+    """
+    external_upstream_id = "model.upstream_project.external_model"
+
+    local_staging = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.local_staging",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[external_upstream_id],
+        file_path=SAMPLE_PROJ_PATH / "models/local_staging.sql",
+        tags=[],
+        config={},
+    )
+    local_marts = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.local_marts",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[local_staging.unique_id],
+        file_path=SAMPLE_PROJ_PATH / "models/local_marts.sql",
+        tags=[],
+        config={},
+    )
+
+    nodes_with_external_dep = {
+        local_staging.unique_id: local_staging,
+        local_marts.unique_id: local_marts,
+    }
+
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes_with_external_dep, select=["+local_marts"])
+    assert local_marts.unique_id in selected
+    assert local_staging.unique_id in selected
+    assert external_upstream_id not in selected
+
+
 def test_select_node_by_descendants():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["grandparent+"])
     expected = [

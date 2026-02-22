@@ -146,6 +146,8 @@ class WatcherTrigger(BaseTrigger):
         while True:
             producer_task_state = await self._get_producer_task_status()
             node_status, compiled_sql = await self._parse_node_status_and_compiled_sql()
+            if node_status:
+                logger.info("%-60s %s", self.model_unique_id, node_status.upper())
             if node_status == "success":
                 logger.info("Model '%s' succeeded", self.model_unique_id)
                 event_data: dict[str, Any] = {"status": "success"}
@@ -153,7 +155,7 @@ class WatcherTrigger(BaseTrigger):
                     event_data["compiled_sql"] = compiled_sql
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
-            elif node_status == "failed":
+            elif node_status in ["failed", "error"]:
                 logger.warning("Model '%s' failed", self.model_unique_id)
                 event_data = {"status": "failed", "reason": "model_failed"}
                 if compiled_sql:

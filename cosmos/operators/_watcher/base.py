@@ -106,8 +106,7 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
 
         logger.debug("Model: %s is in %s state", unique_id, node_status)
 
-        # TODO: Handle and store all possible node statuses, not just the current success and failed
-        if node_status in ["success", "failed"]:
+        if node_status:
             context = extra_kwargs.get("context")
             assert context is not None  # Make MyPy happy
             safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)

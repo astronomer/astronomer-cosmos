@@ -85,7 +85,7 @@ def test_send_sigterm(mock_killpg, mock_getpgid):
     [
         ("success", {"ti": MagicMock()}, True, False),
         ("failed", {"ti": MagicMock()}, True, False),
-        ("running", {"ti": MagicMock()}, False, False),
+        ("running", {"ti": MagicMock()}, True, False),
         (None, {"ti": MagicMock()}, False, False),
         ("success", None, False, True),
         ("failed", None, False, True),

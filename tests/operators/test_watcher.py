@@ -551,19 +551,6 @@ class TestStoreDbtStatusFromLog:
 
         assert ti.store.get("model__pkg__failed_model_status") == "failed"
 
-    def test_store_dbt_resource_status_from_log_ignores_other_statuses(self):
-        """Test that statuses other than success/failed are ignored."""
-        ti = _MockTI()
-        ctx = {"ti": ti}
-
-        log_line = json.dumps(
-            {"data": {"node_info": {"node_status": "running", "unique_id": "model.pkg.running_model"}}}
-        )
-
-        store_dbt_resource_status_from_log(log_line, {"context": ctx})
-
-        assert "model__pkg__running_model_status" not in ti.store
-
     def test_store_dbt_resource_status_from_log_handles_invalid_json(self, caplog):
         """Test that invalid JSON doesn't raise an exception."""
         ti = _MockTI()

@@ -14,6 +14,7 @@ from cosmos.constants import (
     WATCHER_TASK_WEIGHT_RULE,
 )
 from cosmos.log import get_logger
+from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
     build_producer_state_fetcher,
     get_xcom_val,
@@ -91,13 +92,27 @@ def store_compiled_sql_for_model(
         _push_compiled_sql_for_model(task_instance, unique_id, compiled_sql)
 
 
-def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
+def store_dbt_resource_status_from_log(
+    line: str,
+    extra_kwargs: Any,
+    *,
+    tests_per_model: dict[str, list[str]] | None = None,
+    test_results_per_model: dict[str, list[str]] | None = None,
+) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
 
     This method parses each log line from dbt when --log-format json is used,
     extracts node status information, and pushes it to XCom for consumption
     by downstream watcher sensors.
+
+    :param tests_per_model: Mapping of model unique_id to list of test unique_ids
+        associated with that model, as built by DbtGraph.update_node_dependency().
+        Empty dict when no tests exist.
+    :param test_results_per_model: Mutable accumulator dict. For each model that has
+        tests, collects the terminal statuses of those tests as they finish.
+        Keyed by model unique_id, values are lists of test statuses (e.g. ``["pass", "pass"]``).
+        Mutated in place by this function.
     """
     try:
         log_line = json.loads(line)
@@ -108,6 +123,7 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
         logger.debug("Log line: %s", log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
         dbt_node_status = node_info.get("node_status")
+        dbt_node_resource_type = node_info.get("resource_type")
         unique_id = node_info.get("unique_id")
 
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
@@ -117,9 +133,15 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
         if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
             assert context is not None  # Make MyPy happy
-            safe_xcom_push(
-                task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=dbt_node_status
-            )
+            if dbt_node_resource_type == "test" and tests_per_model and test_results_per_model is not None:
+                logger.debug("Test '%s' finished with status '%s'", unique_id, dbt_node_status)
+                push_test_result_or_aggregate(
+                    unique_id, dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
+                )
+            else:
+                safe_xcom_push(
+                    task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=dbt_node_status
+                )
 
             # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
             # compiled_sql is available for both success and failed models - it's compiled before execution

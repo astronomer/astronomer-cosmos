@@ -536,7 +536,7 @@ class TestStoreDbtStatusFromLog:
 
         log_line = json.dumps({"data": {"node_info": {"node_status": "success", "unique_id": "model.pkg.my_model"}}})
 
-        store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
         assert ti.store.get("model__pkg__my_model_status") == "success"
 
@@ -547,7 +547,7 @@ class TestStoreDbtStatusFromLog:
 
         log_line = json.dumps({"data": {"node_info": {"node_status": "failed", "unique_id": "model.pkg.failed_model"}}})
 
-        store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
         assert ti.store.get("model__pkg__failed_model_status") == "failed"
 
@@ -560,7 +560,7 @@ class TestStoreDbtStatusFromLog:
             {"data": {"node_info": {"node_status": "running", "unique_id": "model.pkg.running_model"}}}
         )
 
-        store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
         assert "model__pkg__running_model_status" not in ti.store
 
@@ -580,7 +580,7 @@ class TestStoreDbtStatusFromLog:
             }
         )
 
-        store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
         assert ti.store.get("test__pkg__my_test_status") == "pass"
 
@@ -600,7 +600,7 @@ class TestStoreDbtStatusFromLog:
             }
         )
 
-        store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
         assert ti.store.get("test__pkg__my_test_status") == "fail"
 
@@ -610,7 +610,9 @@ class TestStoreDbtStatusFromLog:
         ctx = {"ti": ti}
 
         # Should not raise an exception
-        store_dbt_resource_status_from_log("not valid json {{{", {"context": ctx})
+        store_dbt_resource_status_from_log(
+            "not valid json {{{", {"context": ctx}, tests_per_model={}, test_results_per_model={}
+        )
 
         # No status should be stored
         assert len(ti.store) == 0
@@ -623,7 +625,7 @@ class TestStoreDbtStatusFromLog:
         log_line = json.dumps({"data": {"other_key": "value"}})
 
         # Should not raise an exception
-        store_dbt_resource_status_from_log(log_line, {"context": ctx})
+        store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
         # No status should be stored
         assert len(ti.store) == 0
@@ -646,7 +648,9 @@ class TestStoreDbtStatusFromLog:
         log_line = json.dumps({"info": {"msg": msg, "level": level}})
         dynamic_level = getattr(logging, level.upper(), logging.INFO)
         with caplog.at_level(dynamic_level):
-            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+            store_dbt_resource_status_from_log(
+                log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={}
+            )
 
         assert msg in caplog.text
         assert any(record.levelname == logging.getLevelName(dynamic_level) for record in caplog.records)
@@ -660,7 +664,9 @@ class TestStoreDbtStatusFromLog:
         log_line = json.dumps({"info": {"msg": test_msg, "level": "info", "ts": "2025-01-29T13:16:05.123456Z"}})
 
         with caplog.at_level(logging.INFO):
-            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+            store_dbt_resource_status_from_log(
+                log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={}
+            )
 
         # Count how many times the message appears in log records
         message_count = sum(1 for record in caplog.records if test_msg in record.message)
@@ -675,7 +681,9 @@ class TestStoreDbtStatusFromLog:
         log_line = json.dumps({"info": {"msg": test_msg, "level": "info", "ts": "2025-01-29T13:16:05.123456Z"}})
 
         with caplog.at_level(logging.INFO):
-            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+            store_dbt_resource_status_from_log(
+                log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={}
+            )
 
         # Verify the timestamp is formatted as HH:MM:SS
         assert any("13:16:05" in record.message and test_msg in record.message for record in caplog.records)
@@ -691,15 +699,25 @@ class TestStoreDbtStatusFromLog:
         log_line = json.dumps({"info": {"msg": test_msg, "level": "info", "ts": invalid_ts}})
 
         with caplog.at_level(logging.INFO):
-            store_dbt_resource_status_from_log(log_line, {"context": ctx})
+            store_dbt_resource_status_from_log(
+                log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={}
+            )
 
         # Verify the raw timestamp is used when parsing fails
         assert any(invalid_ts in record.message and test_msg in record.message for record in caplog.records)
 
     def test_process_log_line_callable_integration_with_subprocess_pattern(self):
-        """Test the exact pattern used in subprocess.py: process_log_line(line, kwargs)."""
+        """Test the exact pattern used in subprocess.py: process_log_line(line, kwargs).
+
+        The production code uses functools.partial to bind tests_per_model,
+        so the subprocess hook can still call process_log_line(line, kwargs) with 2 positional args.
+        """
+        import functools
+
         op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-        op._process_log_line_callable = store_dbt_resource_status_from_log
+        op._process_log_line_callable = functools.partial(
+            store_dbt_resource_status_from_log, tests_per_model={}, test_results_per_model={}
+        )
 
         ti = _MockTI()
         ctx = {"ti": ti}
@@ -1366,7 +1384,7 @@ class TestWatcherTrigger:
         )
 
     @pytest.mark.asyncio
-    async def test_parse_node_status_and_compiled_sql_subprocess_mode(self):
+    async def test_parse_dbt_node_status_and_compiled_sql_subprocess_mode(self):
         """Test that compiled_sql is extracted from XCom in subprocess mode."""
         trigger = self.make_trigger(use_event=False)
 
@@ -1380,13 +1398,13 @@ class TestWatcherTrigger:
 
         trigger.get_xcom_val = mock_get_xcom_val
 
-        status, compiled_sql = await trigger._parse_node_status_and_compiled_sql()
+        status, compiled_sql = await trigger._parse_dbt_node_status_and_compiled_sql()
 
         assert status == "success"
         assert compiled_sql == "SELECT * FROM orders"
 
     @pytest.mark.asyncio
-    async def test_parse_node_status_and_compiled_sql_subprocess_no_compiled_sql(self):
+    async def test_parse_dbt_node_status_and_compiled_sql_subprocess_no_compiled_sql(self):
         """Test that missing compiled_sql is handled gracefully in subprocess mode."""
         trigger = self.make_trigger(use_event=False)
 
@@ -1398,13 +1416,13 @@ class TestWatcherTrigger:
 
         trigger.get_xcom_val = mock_get_xcom_val
 
-        status, compiled_sql = await trigger._parse_node_status_and_compiled_sql()
+        status, compiled_sql = await trigger._parse_dbt_node_status_and_compiled_sql()
 
         assert status == "success"
         assert compiled_sql is None
 
     @pytest.mark.asyncio
-    async def test_parse_node_status_and_compiled_sql_dbt_runner_mode(self):
+    async def test_parse_dbt_node_status_and_compiled_sql_dbt_runner_mode(self):
         """Test that in dbt_runner mode status comes from event payload and compiled_sql from canonical key."""
         trigger = self.make_trigger(use_event=True)
 
@@ -1421,7 +1439,7 @@ class TestWatcherTrigger:
 
         trigger.get_xcom_val = mock_get_xcom_val
 
-        status, compiled_sql = await trigger._parse_node_status_and_compiled_sql()
+        status, compiled_sql = await trigger._parse_dbt_node_status_and_compiled_sql()
 
         assert status == "success"
         assert compiled_sql == "SELECT id FROM users"

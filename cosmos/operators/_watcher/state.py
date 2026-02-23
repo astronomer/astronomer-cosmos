@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from enum import Enum
 from threading import Lock
 from typing import Any
 
@@ -17,6 +18,15 @@ ProducerStateFetcher = Callable[[], str | None]
 # dbt uses different status values for different node types (models/tests):"
 DBT_SUCCESS_STATUSES = frozenset({"success", "pass"})
 DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error"})
+
+
+class DbtTestStatus(str, Enum):
+    """Aggregated status of all tests for a given model."""
+
+    __test__ = False
+
+    PASS = "pass"
+    FAIL = "fail"
 
 
 def is_dbt_node_status_success(status: str | None) -> bool:

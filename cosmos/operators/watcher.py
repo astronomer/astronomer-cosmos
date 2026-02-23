@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import functools
 import json
 import zlib
 from collections.abc import Callable, Sequence
@@ -25,6 +26,7 @@ from cosmos.constants import (
     InvocationMode,
 )
 from cosmos.log import get_logger
+from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
     store_compiled_sql_for_model,
@@ -94,6 +96,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
+        self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
+        self.test_results_per_model: dict[str, list[str]] = {}
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
@@ -134,8 +138,14 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         resource_type = getattr(event_message.data.node_info, "resource_type", None)
         event_message_dict = self._serialize_event(event_message)
         store_compiled_sql_for_model(context["ti"], self.project_dir, uid, node_path, resource_type)
-        payload = base64.b64encode(zlib.compress(json.dumps(event_message_dict).encode())).decode()
-        safe_xcom_push(task_instance=context["ti"], key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
+
+        if resource_type == "test" and self.tests_per_model:
+            status: str = getattr(event_message.data.node_info, "node_status", None) or ""
+            logger.debug("Test '%s' finished with status '%s'", uid, status)
+            push_test_result_or_aggregate(uid, status, self.tests_per_model, self.test_results_per_model, context["ti"])
+        else:
+            payload = base64.b64encode(zlib.compress(json.dumps(event_message_dict).encode())).decode()
+            safe_xcom_push(task_instance=context["ti"], key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:
         # Only push startup events; per-model statuses are available via individual nodefinished_<uid> entries.
@@ -153,7 +163,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 "DbtProducerWatcherOperator: Setting log_format to json and process_log_line_callable to store_dbt_resource_status_from_log"
             )
             self.log_format = "json"
-            self._process_log_line_callable = store_dbt_resource_status_from_log
+            self._process_log_line_callable = functools.partial(
+                store_dbt_resource_status_from_log,
+                tests_per_model=self.tests_per_model,
+                test_results_per_model=self.test_results_per_model,
+            )
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         self._set_invocation_mode_if_not_set()

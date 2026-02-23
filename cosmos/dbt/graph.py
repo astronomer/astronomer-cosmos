@@ -373,6 +373,7 @@ class DbtGraph:
 
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
+    tests_per_model: dict[str, list[str]] = dict()
     load_method: LoadMode = LoadMode.AUTOMATIC
 
     def __init__(
@@ -1217,11 +1218,14 @@ class DbtGraph:
     def update_node_dependency(self) -> None:
         """
         This will update the property `has_test` if node has `dbt` test and update the property
-        `has_non_detached_test` if there's at least one non-detached `dbt` test
+        `has_non_detached_test` if there's at least one non-detached `dbt` test.
+        Also builds `tests_per_model`: a mapping of model unique_id to its associated test names.
 
         Updates in-place:
         * self.filtered_nodes
+        * self.tests_per_model
         """
+        tests_per_model: dict[str, list[str]] = {}
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
                 for node_id in node.depends_on:
@@ -1233,8 +1237,10 @@ class DbtGraph:
                             or self.render_config.should_detach_multiple_parents_tests is False
                         ):
                             self.filtered_nodes[node_id].has_non_detached_test = True
+                        tests_per_model.setdefault(node_id, []).append(node.unique_id)
             else:
                 for parent_node_id in node.depends_on:
                     parent_node = self.nodes.get(parent_node_id)
                     if parent_node is not None:
                         parent_node.downstream.append(node.unique_id)
+        self.tests_per_model = tests_per_model

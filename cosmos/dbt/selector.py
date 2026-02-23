@@ -191,9 +191,12 @@ class GraphSelector:
                 new_generation: set[str] = set()
                 for node_id in previous_generation:
                     if node_id not in processed_nodes:
+<<<<<<< fix/graph-selector-dbt-loom-external-nodes
                         # When using dbt-loom for cross-project references, external nodes are filtered out
                         # during manifest loading but local nodes may still reference them in depends_on.
                         # Skip missing nodes to gracefully stop traversal at project boundaries.
+=======
+>>>>>>> main
                         if node_id in nodes:
                             new_generation.update(set(nodes[node_id].depends_on))
                         processed_nodes.add(node_id)
@@ -591,9 +594,12 @@ class NodeSelector:
         if self.config.graph_selectors:
             graph_selected_nodes = self.select_by_graph_operator()
             for node_id in graph_selected_nodes:
+<<<<<<< fix/graph-selector-dbt-loom-external-nodes
                 # When using dbt-loom for cross-project references, external nodes are filtered out
                 # during manifest loading but may be collected during graph traversal via depends_on.
                 # Skip these external node IDs that don't exist in the nodes dict.
+=======
+>>>>>>> main
                 if node_id not in self.nodes:
                     continue
                 node = self.nodes[node_id]

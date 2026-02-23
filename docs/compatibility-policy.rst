@@ -159,12 +159,14 @@ Proposing Version Changes
 When proposing to add or remove version support:
 
 1. **Create a GitHub issue**: Start a discussion about the proposed change
+
 2. **Justify the change**:
-   - For removal: Provide evidence that the version meets removal criteria
-     (EOL announcement, dependency incompatibility, etc.)
-   - For addition: Explain the benefit and compatibility with existing supported
-     versions
+
+   - For removal: Provide evidence that the version meets removal criteria (EOL announcement, dependency incompatibility, etc.)
+   - For addition: Explain the benefit and compatibility with existing supported versions
+
 3. **Assess impact**: Evaluate how many users might be affected
+
 4. **Verify criteria**: Ensure removal proposals meet the criteria outlined in
    this policy
 
@@ -202,7 +204,7 @@ How do I know when a version will be removed?
   version removals
 
 Related Documentation
---------------------
+~~~~~~~~~~~~~~~~~~~~~~
 
 - `CHANGELOG.rst <https://github.com/astronomer/astronomer-cosmos/blob/main/CHANGELOG.rst>`_
   – Release notes and version removal notices

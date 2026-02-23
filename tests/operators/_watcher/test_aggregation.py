@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from unittest.mock import MagicMock, patch
 
 from cosmos.operators._watcher.aggregation import (
@@ -86,6 +87,15 @@ class TestGetAggregatedTestStatus:
         results = {"model.pkg.customers": ["fail"]}
         assert get_aggregated_test_status("model.pkg.customers", TESTS_PER_MODEL, results) == DbtTestStatus.FAIL
 
+    def test_returns_fail_when_test_has_error_status(self):
+        results = {"model.pkg.orders": ["pass", "error"]}
+        assert get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results) == DbtTestStatus.FAIL
+
+    def test_treats_success_status_as_pass(self):
+        """'success' is used by models; tests use 'pass' — both should be treated as success."""
+        results = {"model.pkg.orders": ["success", "pass"]}
+        assert get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results) == DbtTestStatus.PASS
+
 
 class TestPushTestResultOrAggregate:
     """Tests for push_test_result_or_aggregate."""
@@ -126,4 +136,41 @@ class TestPushTestResultOrAggregate:
             task_instance=ti,
             key="model__pkg__orders_tests_status",
             value=DbtTestStatus.FAIL,
+        )
+
+
+class TestPushTestResultOrAggregateConcurrency:
+    """Tests that push_test_result_or_aggregate is thread-safe."""
+
+    @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
+    def test_concurrent_threads_do_not_lose_results(self, mock_xcom_push: MagicMock):
+        """Simulate many concurrent dbt threads pushing test results for the same model.
+
+        Without the lock, setdefault+append interleaving can lose results and
+        the aggregated XCom may never fire or fire prematurely.
+        """
+        num_tests = 50
+        test_ids = [f"test.pkg.test_{i}" for i in range(num_tests)]
+        tests_per_model: dict[str, list[str]] = {"model.pkg.big_model": test_ids}
+        results: dict[str, list[str]] = {}
+        ti = MagicMock()
+        barrier = threading.Barrier(num_tests)
+
+        def worker(test_id: str) -> None:
+            barrier.wait()  # Force all threads to start at the same instant
+            push_test_result_or_aggregate(test_id, "pass", tests_per_model, results, ti)
+
+        threads = [threading.Thread(target=worker, args=(tid,)) for tid in test_ids]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # All 50 results must be recorded — none lost to races
+        assert len(results["model.pkg.big_model"]) == num_tests
+        # XCom should have been pushed exactly once
+        mock_xcom_push.assert_called_once_with(
+            task_instance=ti,
+            key="model__pkg__big_model_tests_status",
+            value=DbtTestStatus.PASS,
         )

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from threading import Lock
 from typing import Any
 
 from cosmos.log import get_logger
-from cosmos.operators._watcher.state import DbtTestStatus, safe_xcom_push
+from cosmos.operators._watcher.state import DbtTestStatus, is_dbt_node_status_success, safe_xcom_push
 
 logger = get_logger(__name__)
+
+# Protects all mutations of ``test_results_per_model`` so that concurrent
+# dbt threads cannot interleave ``setdefault`` / ``append`` / ``len`` checks.
+_test_results_lock = Lock()
 
 
 def get_tests_status_xcom_key(model_uid: str) -> str:
@@ -55,7 +60,7 @@ def get_aggregated_test_status(
         )
         return None
     aggregated_test_result = (
-        DbtTestStatus.PASS if all(s == DbtTestStatus.PASS for s in collected) else DbtTestStatus.FAIL
+        DbtTestStatus.PASS if all(is_dbt_node_status_success(s) for s in collected) else DbtTestStatus.FAIL
     )
     logger.debug("Model '%s' has all tests reported. Aggregated result: %s", model_uid, aggregated_test_result)
     return aggregated_test_result
@@ -76,12 +81,13 @@ def push_test_result_or_aggregate(
     :param test_results_per_model: Mutable accumulator, mutated in place.
     :param task_instance: The Airflow task instance used for XCom push.
     """
-    model_uid = accumulate_test_result(test_unique_id, status, tests_per_model, test_results_per_model)
-    if model_uid is not None:
-        aggregated = get_aggregated_test_status(model_uid, tests_per_model, test_results_per_model)
-        if aggregated is not None:
-            safe_xcom_push(
-                task_instance=task_instance,
-                key=get_tests_status_xcom_key(model_uid),
-                value=aggregated,
-            )
+    with _test_results_lock:
+        model_uid = accumulate_test_result(test_unique_id, status, tests_per_model, test_results_per_model)
+        if model_uid is not None:
+            aggregated = get_aggregated_test_status(model_uid, tests_per_model, test_results_per_model)
+            if aggregated is not None:
+                safe_xcom_push(
+                    task_instance=task_instance,
+                    key=get_tests_status_xcom_key(model_uid),
+                    value=aggregated,
+                )

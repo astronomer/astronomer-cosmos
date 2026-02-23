@@ -350,7 +350,7 @@ By default, the watcher mode runs tests alongside models via the ``dbt build`` c
 
 As a starting point, this execution mode does not support the ``TestBehavior.AFTER_EACH`` behavior, since the tests are not run as individual tasks. Since this is the default ``TestBehavior`` in Cosmos, we are injecting ``EmptyOperator`` as a starting point to ensure a seamless transition to the new mode.
 
-The ``TestBehavior.BUILD`` behavior is embedded to the producer ``DbtProducerWatcherOperator`` operator.
+The ``TestBehavior.BUILD`` behavior is embedded in the producer ``DbtProducerWatcherOperator`` operator.
 
 The ``TestBehavior.NONE`` and ``TestBehavior.AFTER_ALL`` behave similarly to ``ExecutionMode.LOCAL``.
 
@@ -382,7 +382,7 @@ Callback support
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` will use the user-defined callback function similar to ``ExecutionMode.LOCAL`` mode.
 
-It is possible to define different ``callback`` behaviors for producer and consumer nodes by using ``setup_operator_args``, as described below.
+You can define different ``callback`` behaviors for producer and consumer nodes by using ``operator_args`` to configure the consumer callback and ``setup_operator_args`` to override the callback for the producer, as described below.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Overriding ``operator_args``

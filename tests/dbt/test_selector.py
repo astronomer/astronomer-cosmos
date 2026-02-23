@@ -4,7 +4,7 @@ import pytest
 
 from cosmos.constants import DbtResourceType
 from cosmos.dbt.graph import DbtNode
-from cosmos.dbt.selector import NodeSelector, SelectorConfig, YamlSelectors, select_nodes
+from cosmos.dbt.selector import NodeSelector, SelectorConfig, YamlSelectors, _node_fqn_str, select_nodes
 from cosmos.exceptions import CosmosValueError
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
@@ -137,6 +137,73 @@ def test_select_nodes_by_select_config():
         sibling3_node.unique_id: sibling3_node,
     }
     assert selected == expected
+
+
+def test_node_fqn_str_returns_none_when_missing():
+    node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.no_fqn",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "models/no_fqn.sql",
+        tags=[],
+        config={},
+        fqn=None,
+    )
+
+    assert _node_fqn_str(node) is None
+
+
+def test_select_nodes_with_fqn_selector():
+    project_name = SAMPLE_PROJ_PATH.stem
+
+    # Node that should match the selector
+    node_matching = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{project_name}.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "models/my_model.sql",
+        tags=[],
+        config={},
+        fqn=[project_name, "models", "my_model"],
+    )
+
+    # Node that should not match
+    node_not_matching = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{project_name}.other_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "models/other_model.sql",
+        tags=[],
+        config={},
+        fqn=[project_name, "models", "other_model"],
+    )
+
+    # Node without FQN, should be skipped
+    node_without_fqn = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{project_name}.no_fqn",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path=SAMPLE_PROJ_PATH / "models/no_fqn.sql",
+        tags=[],
+        config={},
+        fqn=None,
+    )
+
+    nodes = {
+        node_matching.unique_id: node_matching,
+        node_not_matching.unique_id: node_not_matching,
+        node_without_fqn.unique_id: node_without_fqn,
+    }
+
+    # Non-empty select ensures config.is_empty == False
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=nodes,
+        select=[f"+fqn:{project_name}.models.my_model"],  # triggers FQN_SELECTOR
+    )
+
+    # Only the matching node should be returned
+    assert list(selected.keys()) == [node_matching.unique_id]
 
 
 def test_select_nodes_by_select_config_meta_nested_property():
@@ -505,6 +572,44 @@ def test_select_node_by_child_and_precursors_no_node():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+modelDoesntExist"])
     expected = []
     assert list(selected.keys()) == expected
+
+
+def test_select_nodes_by_precursors_with_external_dependency():
+    """Test that the + selector handles depends_on references to nodes not in the nodes dict.
+
+    When using dbt-loom for cross-project references, external nodes are filtered out during
+    manifest loading (they have no file path). However, local nodes may still have depends_on
+    entries pointing to these external nodes. The + selector should gracefully skip missing
+    nodes instead of raising a KeyError.
+    """
+    external_upstream_id = "model.upstream_project.external_model"
+
+    local_staging = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.local_staging",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[external_upstream_id],
+        file_path=SAMPLE_PROJ_PATH / "models/local_staging.sql",
+        tags=[],
+        config={},
+    )
+    local_marts = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.local_marts",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[local_staging.unique_id],
+        file_path=SAMPLE_PROJ_PATH / "models/local_marts.sql",
+        tags=[],
+        config={},
+    )
+
+    nodes_with_external_dep = {
+        local_staging.unique_id: local_staging,
+        local_marts.unique_id: local_marts,
+    }
+
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes_with_external_dep, select=["+local_marts"])
+    assert local_marts.unique_id in selected
+    assert local_staging.unique_id in selected
+    assert external_upstream_id not in selected
 
 
 def test_select_node_by_descendants():
@@ -1305,7 +1410,7 @@ def test_exposure_selector():
         (
             "fqn_method",
             {"name": "fqn_method", "definition": {"method": "fqn", "value": "customers"}},
-            {"select": ["customers"], "exclude": None},
+            {"select": ["fqn:customers"], "exclude": None},
         ),
         (
             "fqn_star_method",

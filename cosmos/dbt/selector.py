@@ -594,8 +594,6 @@ class NodeSelector:
                 # When using dbt-loom for cross-project references, external nodes are filtered out
                 # during manifest loading but may be collected during graph traversal via depends_on.
                 # Skip these external node IDs that don't exist in the nodes dict.
-=======
->>>>>>> main
                 if node_id not in self.nodes:
                     continue
                 node = self.nodes[node_id]

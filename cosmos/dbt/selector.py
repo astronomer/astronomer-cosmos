@@ -194,7 +194,6 @@ class GraphSelector:
                         # When using dbt-loom for cross-project references, external nodes are filtered out
                         # during manifest loading but local nodes may still reference them in depends_on.
                         # Skip missing nodes to gracefully stop traversal at project boundaries.
-=======
 >>>>>>> main
                         if node_id in nodes:
                             new_generation.update(set(nodes[node_id].depends_on))

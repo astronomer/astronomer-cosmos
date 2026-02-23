@@ -11,6 +11,7 @@ Enhancements
 
 Bug Fixes
 
+* Fix graph selector when using + selector with ``dbt-loom`` by @award1230 in #2389
 * Populate ``compiled_sql`` for ``InvocationMode.SUBPROCESS`` in ``ExecutionMode.WATCHER`` by @pankajkoti in #2319
 * Preserve ``extra_context`` for watcher consumer task instances by @pankajkoti in #2381
 * Fix watcher: respect ``deferrable=False`` from ``operator_args`` on consumer sensor by @pankajkoti in #2384
@@ -27,6 +28,7 @@ Docs
 Others
 
 * Improve test coverage for PR #2307 by @tatiana in #2308
+* Address feedback from code review #2389 by @evanvolgas in #2394
 
 
 1.13.0 (2026-01-30)

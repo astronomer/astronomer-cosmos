@@ -191,7 +191,6 @@ class GraphSelector:
                 new_generation: set[str] = set()
                 for node_id in previous_generation:
                     if node_id not in processed_nodes:
-<<<<<<< fix/graph-selector-dbt-loom-external-nodes
                         # When using dbt-loom for cross-project references, external nodes are filtered out
                         # during manifest loading but local nodes may still reference them in depends_on.
                         # Skip missing nodes to gracefully stop traversal at project boundaries.

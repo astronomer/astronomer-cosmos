@@ -162,7 +162,8 @@ When proposing to add or remove version support:
 
 2. **Justify the change**:
 
-   - For removal: Provide evidence that the version meets removal criteria (EOL announcement, dependency incompatibility, etc.)
+   - For removal: Provide evidence that the version meets removal criteria
+        (EOL announcement, dependency incompatibility, etc.)
    - For addition: Explain the benefit and compatibility with existing supported versions
 
 3. **Assess impact**: Evaluate how many users might be affected

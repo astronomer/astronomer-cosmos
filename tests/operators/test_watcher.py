@@ -604,7 +604,89 @@ class TestStoreDbtStatusFromLog:
 
         assert ti.store.get("test__pkg__my_test_status") == "fail"
 
-    def test_store_dbt_resource_status_from_log_handles_invalid_json(self, caplog):
+    def test_store_dbt_resource_status_from_log_aggregates_test_results_when_tests_per_model_provided(self):
+        """When tests_per_model is non-empty and a test node finishes, the function should
+        accumulate results and push a single aggregated *_tests_status XCom once all tests
+        for the model have reported — instead of pushing individual *_status keys per test.
+        """
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        tests_per_model = {
+            "model.pkg.orders": ["test.pkg.not_null_orders_id", "test.pkg.unique_orders_id"],
+        }
+        test_results_per_model: dict[str, list[str]] = {}
+
+        # First test passes — not all tests reported yet, no XCom push
+        log_line_1 = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "pass",
+                        "unique_id": "test.pkg.not_null_orders_id",
+                        "resource_type": "test",
+                    }
+                }
+            }
+        )
+        store_dbt_resource_status_from_log(
+            log_line_1,
+            {"context": ctx},
+            tests_per_model=tests_per_model,
+            test_results_per_model=test_results_per_model,
+        )
+        assert "test__pkg__not_null_orders_id_status" not in ti.store  # no per-test key
+        assert "model__pkg__orders_tests_status" not in ti.store  # not yet aggregated
+
+        # Second test passes — all tests reported, aggregated XCom should be pushed
+        log_line_2 = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "pass",
+                        "unique_id": "test.pkg.unique_orders_id",
+                        "resource_type": "test",
+                    }
+                }
+            }
+        )
+        store_dbt_resource_status_from_log(
+            log_line_2,
+            {"context": ctx},
+            tests_per_model=tests_per_model,
+            test_results_per_model=test_results_per_model,
+        )
+        assert "test__pkg__unique_orders_id_status" not in ti.store  # no per-test key
+        assert ti.store.get("model__pkg__orders_tests_status") == "pass"
+
+    def test_store_dbt_resource_status_from_log_aggregates_fail_when_any_test_fails(self):
+        """When at least one test fails, the aggregated status should be 'fail'."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        tests_per_model = {
+            "model.pkg.orders": ["test.pkg.not_null_orders_id", "test.pkg.unique_orders_id"],
+        }
+        test_results_per_model: dict[str, list[str]] = {}
+
+        for uid, status in [
+            ("test.pkg.not_null_orders_id", "pass"),
+            ("test.pkg.unique_orders_id", "fail"),
+        ]:
+            log_line = json.dumps(
+                {"data": {"node_info": {"node_status": status, "unique_id": uid, "resource_type": "test"}}}
+            )
+            store_dbt_resource_status_from_log(
+                log_line,
+                {"context": ctx},
+                tests_per_model=tests_per_model,
+                test_results_per_model=test_results_per_model,
+            )
+
+        assert ti.store.get("model__pkg__orders_tests_status") == "fail"
+        # No per-test status keys should exist
+        assert "test__pkg__not_null_orders_id_status" not in ti.store
+        assert "test__pkg__unique_orders_id_status" not in ti.store
         """Test that invalid JSON doesn't raise an exception."""
         ti = _MockTI()
         ctx = {"ti": ti}

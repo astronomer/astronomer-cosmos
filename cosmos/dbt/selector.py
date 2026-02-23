@@ -591,7 +591,6 @@ class NodeSelector:
         if self.config.graph_selectors:
             graph_selected_nodes = self.select_by_graph_operator()
             for node_id in graph_selected_nodes:
-<<<<<<< fix/graph-selector-dbt-loom-external-nodes
                 # When using dbt-loom for cross-project references, external nodes are filtered out
                 # during manifest loading but may be collected during graph traversal via depends_on.
                 # Skip these external node IDs that don't exist in the nodes dict.

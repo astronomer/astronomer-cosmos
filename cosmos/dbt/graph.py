@@ -1203,7 +1203,7 @@ class DbtGraph:
 
     def load_from_dbt_manifest(self) -> None:
         """
-        This approach accurately loads `dbt` projects using the `manifest.yml` file.
+        This approach accurately loads `dbt` projects using the `manifest.json` dbt manifest artifact.
 
         However, since the Manifest does not represent filters, it relies on the Custom Cosmos implementation
         to filter out the nodes relevant to the user (based on self.exclude and self.select).

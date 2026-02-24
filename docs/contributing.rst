@@ -155,16 +155,34 @@ To run the checks manually, run:
 Writing Docs
 ____________
 
-You can run the docs locally in a virtual environment with the following:
+If you already have your environment set up for local Cosmos development and have Hatch installed, you can run the docs locally in a virtual environment with the following:
+
+.. code-block:: bash
+    hatch run docs:serve
+
+
+If you're only working on docs, and don't need to set up your environment for local Cosmos development, you can use Hatch in a virtual environment to only build the docs. Note that it may take longer on the first run as it sets up the virtual environment, but will be quick on subsequent runs.
+
+1. Create your virtual environment and launch the docs server.
 
 .. code-block:: bash
 
+    # Creates a virtual environment called docs_env
     python3 -m venv docs_env
+    # Activates the virtual environment
     source docs_env/bin/activate
+    # Makes hatch available to your environment
     pip install hatch
+    # Creates a local instance of your docs
     hatch run docs:serve
 
-This will run the docs server in a virtual environment called ``docs_env`` with the right dependencies. Note that it may take longer on the first run as it sets up the virtual environment, but will be quick on subsequent runs.
+2. For future docs local builds, you can reactivate the virtual environment and launch hatch:
+
+.. code-block:: bash
+    # Activate the virtual environment
+    source docs_env/bin/activate
+    # Create a local instance of your docs
+    hatch run docs:serve
 
 Building
 ________

@@ -59,10 +59,10 @@ Run a simple Cosmos Dag
 4. After the Dag finishes executing. You can select one of the Dag tasks to look at the task **Logs**.
 5. In the task logs, you can identify the dbt actions that Cosmos initiates during the Dag.
 
-For example in the `stg_customers`, task, in the `run` sub-task, the logs include output like:
+For example in the ``stg_customers``, task, in the ``run`` sub-task, the logs include output like:
 
 .. code-block:: text
 
     ...Running command: ['/usr/local/airflow/dbt_venv/bin/dbt', 'run', '--select', 'stg_customers', '--project-dir', '/tmp/tmp8675309', '--profiles-dir', ...]
 
-This log indicates that the Dag triggers Cosmos to initiate the `dbt run` command following the sql actions in the `stg_customers.sql`.
+This log indicates that the Dag triggers Cosmos to initiate the ``dbt run`` command following the sql actions in the ``stg_customers.sql``.

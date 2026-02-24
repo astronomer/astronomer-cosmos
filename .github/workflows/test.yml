@@ -54,7 +54,7 @@ jobs:
           FILES=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
           CODE_CHANGED=false
           # If we can't determine changed files, run tests to be safe
-          if [ -z "$(echo "$FILES" | tr -d '\n')" ]; then
+          if [ -z "$FILES" ]; then
             CODE_CHANGED=true
           fi
           while IFS= read -r f; do

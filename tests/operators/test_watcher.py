@@ -157,7 +157,7 @@ def test_producer_queue_from_setup_operator_args():
     When only setup_operator_args is set (no queue in watcher_dbt_execution_queue),
     producer should use queue from setup_operator_args.
     """
-    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", "watcher_only_queue"):
+    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", None):
         watcher_dag = DbtDag(
             project_config=project_config,
             profile_config=profile_config,

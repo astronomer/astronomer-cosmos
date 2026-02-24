@@ -214,10 +214,6 @@ operators:
   - module: cosmos.operators.watcher_kubernetes.DbtTestWatcherOperator
     description: Runs `dbt test` using the Kubernetes execution pattern, or acts as an `EmptyOperator` for `TestBehavior.AFTER_EACH`.
 
-sensors:
-  - cosmos.operators.watcher.DbtConsumerWatcherSensor
-  - cosmos.operators.watcher_kubernetes.DbtConsumerWatcherKubernetesSensor
-
 other:
   - module: cosmos.DbtDag
     description: Render a complete dbt project as an Airflow DAG

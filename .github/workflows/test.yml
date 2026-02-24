@@ -51,7 +51,16 @@ jobs:
             BASE="${{ github.event.before }}"
             HEAD="${{ github.sha }}"
           fi
-          FILES=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
+          # Handle cases where BASE is missing or all zeros (e.g., first push, force push)
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Compute changed files; if git diff fails, assume code changed to be safe
+          if ! FILES=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null); then
+            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           CODE_CHANGED=false
           # If we can't determine changed files, run tests to be safe
           if [ -z "$FILES" ]; then

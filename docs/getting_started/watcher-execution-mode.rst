@@ -283,7 +283,11 @@ Or via environment variable:
 
 .. note::
 
-   For producer task execution, we encourage users to set ``watcher_dbt_execution_queue`` configuration. If, for any reason, users would rather have a different node pool for producer tasks, they can set the ``queue`` argument via either ``setup_operator_args``. The effective precedence is: an explicit ``queue`` on the producer (from ``setup_operator_args``) > ``watcher_dbt_execution_queue`` > ``operator_args`` >> your Airflow deployment's default queue.
+  For producer task execution, we encourage users to set the ``watcher_dbt_execution_queue`` configuration. If, for any reason, users prefer to use a different node pool for producer tasks, they can set the ``queue`` argument via ``setup_operator_args``.
+
+  The effective precedence is:
+
+  ``watcher_dbt_execution_queue`` > explicit ``queue`` on the producer (from ``setup_operator_args``) > ``operator_args`` > your Airflow deployment’s default queue.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Installation of Airflow and dbt

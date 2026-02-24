@@ -164,7 +164,7 @@ You can run the docs locally in a virtual environment with the following:
     pip install hatch
     hatch run docs:serve
 
-This will run the docs server in a virtual environment called `docs_env` with the right dependencies. Note that it may take longer on the first run as it sets up the virtual environment, but will be quick on subsequent runs.
+This will run the docs server in a virtual environment called ``docs_env`` with the right dependencies. Note that it may take longer on the first run as it sets up the virtual environment, but will be quick on subsequent runs.
 
 Building
 ________

@@ -20,7 +20,7 @@ Prerequisites
 
 - Permissions to install software on your machine
 - Clone the `cosmos-demo <https://github.com/astronomer/cosmos-demo>`_ repo to your machine.
-- Install the `Astro CLI <https://docs.astronomer.io/astro/cli/install-cli>`_. 
+- Install the `Astro CLI <https://docs.astronomer.io/astro/cli/install-cli>`_.
 
 Cosmos requires a container manager, like Docker or Podman, Airflow, and the Astro CLI to run. When you install the Astro CLI, it automatically installs Airflow and Podman, so you can immediately start working with Dags after installing the CLI. If you need to use Docker instead of Podman, see `Switch between Docker and Podman <https://www.astronomer.io/docs/astro/cli/switch-container-management>`_.
 
@@ -31,7 +31,7 @@ Start Airflow locally
 2. Run ``astro dev start`` to start your Aiflow instance.
 3. Open the Airflow UI at ``http://localhost:8080/`` to access the **Home** view. This view provides at-a-glance of your overall Airflow environment, including summary statistics about your Dags' performance.
 
-The `Airflow UI <https://www.astronomer.io/docs/learn/airflow-ui>`_ enables you to start, stop, troubleshoot, or manage your Dags. 
+The `Airflow UI <https://www.astronomer.io/docs/learn/airflow-ui>`_ enables you to start, stop, troubleshoot, or manage your Dags.
 
 Run a simple Cosmos Dag
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -59,7 +59,7 @@ Run a simple Cosmos Dag
 4. After the Dag finishes executing. You can select one of the Dag tasks to look at the task **Logs**.
 5. In the task logs, you can identify the dbt actions that Cosmos initiates during the Dag.
 
-For example in the `stg_customers`, task, in the `run` sub-task, the logs include output like: 
+For example in the `stg_customers`, task, in the `run` sub-task, the logs include output like:
 
 .. code-block:: text
 

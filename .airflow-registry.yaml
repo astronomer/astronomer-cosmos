@@ -4,149 +4,215 @@
 
 package-name: astronomer-cosmos
 display-name: Cosmos (dbt)
-description: Run dbt projects as Airflow DAGs and Task Groups
+description: Run dbt projects as Airflow DAGs and Task Groups. Supports both dbt Core and dbt Fusion.
 logo: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos-logo.svg
 docs-url: https://astronomer.github.io/astronomer-cosmos
 source-url: https://github.com/astronomer/astronomer-cosmos
 
 operators:
-  # Local execution mode
+  # Execute dbt commands using a local dbt installation, either within the Airflow Python virtual environment or as a standalone dbt binary.
   - module: cosmos.operators.local.DbtRunLocalOperator
-    description: Run dbt run using a local dbt installation
+    description: Run `dbt run` using a local dbt installation
   - module: cosmos.operators.local.DbtTestLocalOperator
-    description: Run dbt test using a local dbt installation
+    description: Run `dbt test` using a local dbt installation
   - module: cosmos.operators.local.DbtSeedLocalOperator
-    description: Run dbt seed using a local dbt installation
+    description: Run `dbt seed` using a local dbt installation
   - module: cosmos.operators.local.DbtSnapshotLocalOperator
-    description: Run dbt snapshot using a local dbt installation
+    description: Run `dbt snapshot` using a local dbt installation
   - module: cosmos.operators.local.DbtCompileLocalOperator
-    description: Run dbt compile using a local dbt installation
+    description: Run `dbt compile` using a local dbt installation
   - module: cosmos.operators.local.DbtLSLocalOperator
-    description: Run dbt ls using a local dbt installation
+    description: Run `dbt ls` using a local dbt installation
   - module: cosmos.operators.local.DbtRunOperationLocalOperator
-    description: Run dbt run-operation using a local dbt installation
+    description: Run `dbt run-operation` using a local dbt installation
   - module: cosmos.operators.local.DbtBuildLocalOperator
-    description: Run dbt build using a local dbt installation
+    description: Run `dbt build` using a local dbt installation
   - module: cosmos.operators.local.DbtCloneLocalOperator
-    description: Clone dbt models using a local dbt installation
+    description: Run `dbt clone` using a local dbt installation
   - module: cosmos.operators.local.DbtDepsLocalOperator
     description: Install dbt dependencies using a local dbt installation
   - module: cosmos.operators.local.DbtSourceLocalOperator
-    description: Run dbt source freshness using a local dbt installation
+    description: Run `dbt source freshness` using a local dbt installation
   - module: cosmos.operators.local.DbtDocsLocalOperator
-    description: Generate dbt docs using a local dbt installation
+    description: Run `dbt docs generate` using a local dbt installation
   - module: cosmos.operators.local.DbtDocsS3LocalOperator
-    description: Upload dbt docs to S3
+    description: Run `dbt docs generate` and upload the generated docs to AWS S3
   - module: cosmos.operators.local.DbtDocsAzureStorageLocalOperator
-    description: Upload dbt docs to Azure Blob Storage
+    description: Run `dbt docs generate` and upload the generated docs to Azure Blob Storage
   - module: cosmos.operators.local.DbtDocsGCSLocalOperator
-    description: Upload dbt docs to Google Cloud Storage
+    description: Run `dbt docs generate` and upload the generated docs to Google Cloud Storage (GCS)
 
-  # Docker execution mode
-  - cosmos.operators.docker.DbtBuildDockerOperator
-  - cosmos.operators.docker.DbtCloneDockerOperator
-  - cosmos.operators.docker.DbtLSDockerOperator
-  - cosmos.operators.docker.DbtRunDockerOperator
-  - cosmos.operators.docker.DbtRunOperationDockerOperator
-  - cosmos.operators.docker.DbtSeedDockerOperator
-  - cosmos.operators.docker.DbtSnapshotDockerOperator
-  - cosmos.operators.docker.DbtSourceDockerOperator
-  - cosmos.operators.docker.DbtTestDockerOperator
+  # Execute dbt commands by running each command in its own (local) Docker container.
+  - module: cosmos.operators.docker.DbtBuildDockerOperator
+    description: Run `dbt build` inside a Docker container.
+  - module: cosmos.operators.docker.DbtCloneDockerOperator
+    description: Run `dbt clone` inside a Docker container.
+  - module: cosmos.operators.docker.DbtLSDockerOperator
+    description: Run `dbt ls` inside a Docker container.
+  - module: cosmos.operators.docker.DbtRunDockerOperator
+    description: Run `dbt run` inside a Docker container.
+  - module: cosmos.operators.docker.DbtRunOperationDockerOperator
+    description: Run `dbt run-operation` inside a Docker container.
+  - module: cosmos.operators.docker.DbtSeedDockerOperator
+    description: Run `dbt seed` inside a Docker container.
+  - module: cosmos.operators.docker.DbtSnapshotDockerOperator
+    description: Run `dbt snapshot` inside a Docker container.
+  - module: cosmos.operators.docker.DbtSourceDockerOperator
+    description: Run `dbt source` inside a Docker container.
+  - module: cosmos.operators.docker.DbtTestDockerOperator
+    description: Run `dbt test` inside a Docker container.
 
-  # Kubernetes execution mode
-  - cosmos.operators.kubernetes.DbtBuildKubernetesOperator
-  - cosmos.operators.kubernetes.DbtCloneKubernetesOperator
-  - cosmos.operators.kubernetes.DbtLSKubernetesOperator
-  - cosmos.operators.kubernetes.DbtRunKubernetesOperator
-  - cosmos.operators.kubernetes.DbtRunOperationKubernetesOperator
-  - cosmos.operators.kubernetes.DbtSeedKubernetesOperator
-  - cosmos.operators.kubernetes.DbtSnapshotKubernetesOperator
-  - cosmos.operators.kubernetes.DbtSourceKubernetesOperator
-  - cosmos.operators.kubernetes.DbtTestKubernetesOperator
+  # Execute dbt commands via dedicated Kubernetes pods
+  - module: cosmos.operators.kubernetes.DbtBuildKubernetesOperator
+    description: Run `dbt build` in a Kubernetes pod.
+  - module: cosmos.operators.kubernetes.DbtCloneKubernetesOperator
+    description: Run `dbt clone` in a Kubernetes pod.
+  - module: cosmos.operators.kubernetes.DbtLSKubernetesOperator
+    description: Run `dbt ls` in a Kubernetes pod.
+  - module: cosmos.operators.kubernetes.DbtRunKubernetesOperator
+    description: Run `dbt run` in a Kubernetes pod.
+  - module: cosmos.operators.kubernetes.DbtRunOperationKubernetesOperator
+    description: Run `dbt run-operation` in a Kubernetes pod.
+  - module: cosmos.operators.kubernetes.DbtSeedKubernetesOperator
+    description: Run `dbt seed` in a Kubernetes pod.
+  - module: cosmos.operators.kubernetes.DbtSnapshotKubernetesOperator
+    description: Run `dbt snapshot` in a Kubernetes pod.
+  - module: cosmos.operators.kubernetes.DbtSourceKubernetesOperator
+    description: Run `dbt source` in a Kubernetes pod.
+  - module: cosmos.operators.kubernetes.DbtTestKubernetesOperator
+    description: Run `dbt test` in a Kubernetes pod.
 
-  # Virtualenv execution mode
-  - cosmos.operators.virtualenv.DbtBuildVirtualenvOperator
-  - cosmos.operators.virtualenv.DbtCloneVirtualenvOperator
-  - cosmos.operators.virtualenv.DbtDocsVirtualenvOperator
-  - cosmos.operators.virtualenv.DbtLSVirtualenvOperator
-  - cosmos.operators.virtualenv.DbtRunVirtualenvOperator
-  - cosmos.operators.virtualenv.DbtRunOperationVirtualenvOperator
-  - cosmos.operators.virtualenv.DbtSeedVirtualenvOperator
-  - cosmos.operators.virtualenv.DbtSnapshotVirtualenvOperator
-  - cosmos.operators.virtualenv.DbtSourceVirtualenvOperator
-  - cosmos.operators.virtualenv.DbtTestVirtualenvOperator
+  # Execute dbt commands via isolated Python virtual environments created and managed by Cosmos
+  - module: cosmos.operators.virtualenv.DbtBuildVirtualenvOperator
+    description: Run `dbt build` inside a Cosmos-managed Python virtual environment.
+  - module: cosmos.operators.virtualenv.DbtCloneVirtualenvOperator
+    description: Run `dbt clone` inside a Cosmos-managed  Python virtual environment.
+  - module: cosmos.operators.virtualenv.DbtDocsVirtualenvOperator
+    description: Run `dbt docs generate` inside a Cosmos-managed Python virtual environment.
+  - module: cosmos.operators.virtualenv.DbtLSVirtualenvOperator
+    description: Run `dbt ls` inside a Cosmos-managed Python virtual environment.
+  - module: cosmos.operators.virtualenv.DbtRunVirtualenvOperator
+    description: Run `dbt run` inside a Cosmos-managed Python virtual environment.
+  - module: cosmos.operators.virtualenv.DbtRunOperationVirtualenvOperator
+    description: Run `dbt run-operation` inside a Cosmos-managed Python virtual environment.
+  - module: cosmos.operators.virtualenv.DbtSeedVirtualenvOperator
+    description: Run `dbt seed` inside a Cosmos-managed Python virtual environment.
+  - module: cosmos.operators.virtualenv.DbtSnapshotVirtualenvOperator
+    description: Run `dbt snapshot` inside a Cosmos-managed Python virtual environment.
+  - module: cosmos.operators.virtualenv.DbtSourceVirtualenvOperator
+    description: Run `dbt source` inside a Cosmos-managed Python virtual environment.
+  - module: cosmos.operators.virtualenv.DbtTestVirtualenvOperator
+    description: Run `dbt test` inside a Cosmos-managed Python virtual environment.
 
-  # Airflow async (deferrable) execution mode
-  - cosmos.operators.airflow_async.DbtBuildAirflowAsyncOperator
-  - cosmos.operators.airflow_async.DbtCloneAirflowAsyncOperator
-  - cosmos.operators.airflow_async.DbtCompileAirflowAsyncOperator
-  - cosmos.operators.airflow_async.DbtLSAirflowAsyncOperator
-  - cosmos.operators.airflow_async.DbtRunAirflowAsyncOperator
-  - cosmos.operators.airflow_async.DbtRunOperationAirflowAsyncOperator
-  - cosmos.operators.airflow_async.DbtSeedAirflowAsyncOperator
-  - cosmos.operators.airflow_async.DbtSnapshotAirflowAsyncOperator
-  - cosmos.operators.airflow_async.DbtSourceAirflowAsyncOperator
-  - cosmos.operators.airflow_async.DbtTestAirflowAsyncOperator
+  # Pre-compile the project using dbt Core and use Airflow `BigQueryInsertJobOperator` to asynchronously run the transformations.
+  - module: cosmos.operators._asynchronous.SetupAsyncOperator
+    description: Mockey-patch `dbt run` command to pre-generate the dbt models SQL and export them to XCom
+  - module: cosmos.operators.airflow_async.DbtRunAirflowAsyncOperator
+    description: Retrieve the SQL from the setup task and execute each model natively to Airflow via a subclass of `BigQueryInsertJobOperator`
+  - module: cosmos.operators._asynchronous.TeardownAsyncOperator
+    description: Clear all the SQL files related to this DAG run from correspondent XComs
 
-  # AWS ECS execution mode
-  - cosmos.operators.aws_ecs.DbtBuildAwsEcsOperator
-  - cosmos.operators.aws_ecs.DbtLSAwsEcsOperator
-  - cosmos.operators.aws_ecs.DbtRunAwsEcsOperator
-  - cosmos.operators.aws_ecs.DbtRunOperationAwsEcsOperator
-  - cosmos.operators.aws_ecs.DbtSeedAwsEcsOperator
-  - cosmos.operators.aws_ecs.DbtSnapshotAwsEcsOperator
-  - cosmos.operators.aws_ecs.DbtSourceAwsEcsOperator
-  - cosmos.operators.aws_ecs.DbtTestAwsEcsOperator
+  # Run dbt commands as containers via the Amazon Elastic Container Service (AWS ECS)
+  - module: cosmos.operators.aws_ecs.DbtBuildAwsEcsOperator
+    description: Run `dbt build` as a task in AWS ECS.
+  - module: cosmos.operators.aws_ecs.DbtLSAwsEcsOperator
+    description: Run `dbt ls` as a task in AWS ECS.
+  - module: cosmos.operators.aws_ecs.DbtRunAwsEcsOperator
+    description: Run `dbt run` as a task in AWS ECS.
+  - module: cosmos.operators.aws_ecs.DbtRunOperationAwsEcsOperator
+    description: Run `dbt run-operation` as a task in AWS ECS.
+  - module: cosmos.operators.aws_ecs.DbtSeedAwsEcsOperator
+    description: Run `dbt seed` as a task in AWS ECS.
+  - module: cosmos.operators.aws_ecs.DbtSnapshotAwsEcsOperator
+    description: Run `dbt snapshot` as a task in AWS ECS.
+  - module: cosmos.operators.aws_ecs.DbtSourceAwsEcsOperator
+    description: Run `dbt source` as a task in AWS ECS.
+  - module: cosmos.operators.aws_ecs.DbtTestAwsEcsOperator
+    description: Run `dbt test` as a task in AWS ECS.
 
-  # AWS EKS execution mode
-  - cosmos.operators.aws_eks.DbtBuildAwsEksOperator
-  - cosmos.operators.aws_eks.DbtCloneAwsEksOperator
-  - cosmos.operators.aws_eks.DbtLSAwsEksOperator
-  - cosmos.operators.aws_eks.DbtRunAwsEksOperator
-  - cosmos.operators.aws_eks.DbtRunOperationAwsEksOperator
-  - cosmos.operators.aws_eks.DbtSeedAwsEksOperator
-  - cosmos.operators.aws_eks.DbtSnapshotAwsEksOperator
-  - cosmos.operators.aws_eks.DbtTestAwsEksOperator
+  # Run dbt commands as Kubernetes pods via the Amazon Elastic Kubernetes Service (AWS EKS).
+  - module: cosmos.operators.aws_eks.DbtBuildAwsEksOperator
+    description: Run `dbt build` in a pod on AWS EKS.
+  - module: cosmos.operators.aws_eks.DbtCloneAwsEksOperator
+    description: Run `dbt clone` in a pod on AWS EKS.
+  - module: cosmos.operators.aws_eks.DbtLSAwsEksOperator
+    description: Run `dbt ls` in a pod on AWS EKS.
+  - module: cosmos.operators.aws_eks.DbtRunAwsEksOperator
+    description: Run `dbt run` in a pod on AWS EKS.
+  - module: cosmos.operators.aws_eks.DbtRunOperationAwsEksOperator
+    description: Run `dbt run-operation` in a pod on AWS EKS.
+  - module: cosmos.operators.aws_eks.DbtSeedAwsEksOperator
+    description: Run `dbt seed` in a pod on AWS EKS.
+  - module: cosmos.operators.aws_eks.DbtSnapshotAwsEksOperator
+    description: Run `dbt snapshot` in a pod on AWS EKS.
+  - module: cosmos.operators.aws_eks.DbtTestAwsEksOperator
+    description: Run `dbt test` in a pod on AWS EKS.
 
-  # Azure Container Instance execution mode
-  - cosmos.operators.azure_container_instance.DbtBuildAzureContainerInstanceOperator
-  - cosmos.operators.azure_container_instance.DbtCloneAzureContainerInstanceOperator
-  - cosmos.operators.azure_container_instance.DbtLSAzureContainerInstanceOperator
-  - cosmos.operators.azure_container_instance.DbtRunAzureContainerInstanceOperator
-  - cosmos.operators.azure_container_instance.DbtRunOperationAzureContainerInstanceOperator
-  - cosmos.operators.azure_container_instance.DbtSeedAzureContainerInstanceOperator
-  - cosmos.operators.azure_container_instance.DbtSnapshotAzureContainerInstanceOperator
-  - cosmos.operators.azure_container_instance.DbtSourceAzureContainerInstanceOperator
-  - cosmos.operators.azure_container_instance.DbtTestAzureContainerInstanceOperator
+  # Run dbt commands as remote containers via the Azure Container Instance service.
+  - module: cosmos.operators.azure_container_instance.DbtBuildAzureContainerInstanceOperator
+    description: Run `dbt build` in an Azure Container Instance.
+  - module: cosmos.operators.azure_container_instance.DbtCloneAzureContainerInstanceOperator
+    description: Run `dbt clone` in an Azure Container Instance.
+  - module: cosmos.operators.azure_container_instance.DbtLSAzureContainerInstanceOperator
+    description: Run `dbt ls` in an Azure Container Instance.
+  - module: cosmos.operators.azure_container_instance.DbtRunAzureContainerInstanceOperator
+    description: Run `dbt run` in an Azure Container Instance.
+  - module: cosmos.operators.azure_container_instance.DbtRunOperationAzureContainerInstanceOperator
+    description: Run `dbt run-operation` in an Azure Container Instance.
+  - module: cosmos.operators.azure_container_instance.DbtSeedAzureContainerInstanceOperator
+    description: Run `dbt seed` in an Azure Container Instance.
+  - module: cosmos.operators.azure_container_instance.DbtSnapshotAzureContainerInstanceOperator
+    description: Run `dbt snapshot` in an Azure Container Instance.
+  - module: cosmos.operators.azure_container_instance.DbtSourceAzureContainerInstanceOperator
+    description: Run `dbt source` in an Azure Container Instance.
+  - module: cosmos.operators.azure_container_instance.DbtTestAzureContainerInstanceOperator
+    description: Run `dbt test` in an Azure Container Instance.
 
-  # GCP Cloud Run Job execution mode
-  - cosmos.operators.gcp_cloud_run_job.DbtBuildGcpCloudRunJobOperator
-  - cosmos.operators.gcp_cloud_run_job.DbtCloneGcpCloudRunJobOperator
-  - cosmos.operators.gcp_cloud_run_job.DbtLSGcpCloudRunJobOperator
-  - cosmos.operators.gcp_cloud_run_job.DbtRunGcpCloudRunJobOperator
-  - cosmos.operators.gcp_cloud_run_job.DbtRunOperationGcpCloudRunJobOperator
-  - cosmos.operators.gcp_cloud_run_job.DbtSeedGcpCloudRunJobOperator
-  - cosmos.operators.gcp_cloud_run_job.DbtSnapshotGcpCloudRunJobOperator
-  - cosmos.operators.gcp_cloud_run_job.DbtSourceGcpCloudRunJobOperator
-  - cosmos.operators.gcp_cloud_run_job.DbtTestGcpCloudRunJobOperator
+  # Run dbt commands as Google Cloud (GCP) Platform Cloud Run Jobs
+  - module: cosmos.operators.gcp_cloud_run_job.DbtBuildGcpCloudRunJobOperator
+    description: Run `dbt build` as a Google Cloud Run Job.
+  - module: cosmos.operators.gcp_cloud_run_job.DbtCloneGcpCloudRunJobOperator
+    description: Run `dbt clone` as a Google Cloud Run Job.
+  - module: cosmos.operators.gcp_cloud_run_job.DbtLSGcpCloudRunJobOperator
+    description: Run `dbt ls` as a Google Cloud Run Job.
+  - module: cosmos.operators.gcp_cloud_run_job.DbtRunGcpCloudRunJobOperator
+    description: Run `dbt run` as a Google Cloud Run Job.
+  - module: cosmos.operators.gcp_cloud_run_job.DbtRunOperationGcpCloudRunJobOperator
+    description: Run `dbt run-operation` as a Google Cloud Run Job.
+  - module: cosmos.operators.gcp_cloud_run_job.DbtSeedGcpCloudRunJobOperator
+    description: Run `dbt seed` as a Google Cloud Run Job.
+  - module: cosmos.operators.gcp_cloud_run_job.DbtSnapshotGcpCloudRunJobOperator
+    description: Run `dbt snapshot` as a Google Cloud Run Job.
+  - module: cosmos.operators.gcp_cloud_run_job.DbtSourceGcpCloudRunJobOperator
+    description: Run `dbt source` as a Google Cloud Run Job.
+  - module: cosmos.operators.gcp_cloud_run_job.DbtTestGcpCloudRunJobOperator
+    description: Run `dbt test` as a Google Cloud Run Job.
 
   # Watcher pattern (local)
-  - cosmos.operators.watcher.DbtBuildWatcherOperator
-  - cosmos.operators.watcher.DbtRunWatcherOperator
-  - cosmos.operators.watcher.DbtSeedWatcherOperator
-  - cosmos.operators.watcher.DbtSnapshotWatcherOperator
-  - cosmos.operators.watcher.DbtSourceWatcherOperator
-  - cosmos.operators.watcher.DbtTestWatcherOperator
-  - cosmos.operators.watcher.DbtProducerWatcherOperator
+  # Run a single local `dbt build` or `dbt run` command per pipeline, via a producer task, and have Airflow deferrable sensors (consumers) tracking progress for individual dbt nodes.
+  - module: cosmos.operators.watcher.DbtProducerWatcherOperator
+    description: Run a single dbt command (build or run) for the entire dbt project and produce one XCom containing the status of each dbt node (model, seed, snapshot).
+  - module: cosmos.operators.watcher.DbtRunWatcherOperator
+    description: Monitor a dbt model using Airflow deferrable XCom sensors. On retry, executes `dbt run` for the specific model via `DbtRunLocalOperator`.
+  - module: cosmos.operators.watcher.DbtSeedWatcherOperator
+    description: Monitor a dbt seed using Airflow deferrable XCom sensors. On retry, executes `dbt seed` for the specific seed via `DbtSeedLocalOperator`.
+  - module: cosmos.operators.watcher.DbtSnapshotWatcherOperator
+    description: Monitor a dbt snapshot using Airflow deferrable XCom sensors. On retry, executes `dbt snapshot` for the specific snapshot via `DbtSnapshotLocalOperator`.
+  - module: cosmos.operators.watcher.DbtTestWatcherOperator
+    description: Runs `dbt test` using the local execution pattern, or acts as an `EmptyOperator` for `TestBehavior.AFTER_EACH`.
 
-  # Watcher pattern (Kubernetes)
-  - cosmos.operators.watcher_kubernetes.DbtBuildWatcherKubernetesOperator
-  - cosmos.operators.watcher_kubernetes.DbtRunWatcherKubernetesOperator
-  - cosmos.operators.watcher_kubernetes.DbtSeedWatcherKubernetesOperator
-  - cosmos.operators.watcher_kubernetes.DbtSnapshotWatcherKubernetesOperator
-  - cosmos.operators.watcher_kubernetes.DbtSourceWatcherKubernetesOperator
-  - cosmos.operators.watcher_kubernetes.DbtTestWatcherKubernetesOperator
-  - cosmos.operators.watcher_kubernetes.DbtProducerWatcherKubernetesOperator
+  #  Watcher pattern (Kubernetes)
+  # Run a single `dbt build` or `dbt run` command per pipeline (producer), via a Kubernetes pod, and have Airflow deferrable sensors (consumers) tracking progress for individual dbt nodes.
+  - module: cosmos.operators.watcher_kubernetes.DbtProducerWatcherKubernetesOperator
+    description: Run a single dbt command (build or run) via a Kubernetes Pod Operator for the entire dbt project and produce one XCom containing the status of each dbt node (model, seed, snapshot).
+  - module: cosmos.operators.watcher_kubernetes.DbtRunWatcherOperator
+    description: Monitor a dbt model using Airflow deferrable XCom sensors. On retry, executes `dbt run` for the specific model via `DbtRunKubernetesOperator`.
+  - module: cosmos.operators.watcher_kubernetes.DbtSeedWatcherOperator
+    description: Monitor a dbt seed using Airflow deferrable XCom sensors. On retry, executes `dbt seed` for the specific seed via `DbtSeedKubernetesOperator`.
+  - module: cosmos.operators.watcher_kubernetes.DbtSnapshotWatcherOperator
+    description: Monitor a dbt snapshot using Airflow deferrable XCom sensors. On retry, executes `dbt snapshot` for the specific snapshot via `DbtSnapshotKubernetesOperator`.
+  - module: cosmos.operators.watcher_kubernetes.DbtTestWatcherOperator
+    description: Runs `dbt test` using the Kubernetes execution pattern, or acts as an `EmptyOperator` for `TestBehavior.AFTER_EACH`.
 
 sensors:
   - cosmos.operators.watcher.DbtConsumerWatcherSensor

@@ -163,7 +163,7 @@ If you already have your environment set up for local Cosmos development and hav
 
 If you're only working on docs, and don't need to set up your environment for local Cosmos development, you can use Hatch in a virtual environment to only build the docs. Note that it may take longer on the first run as it sets up the virtual environment, but will be quick on subsequent runs.
 
-#. Follow the setup instructions in the **Overview** to create your fork of the `astronomer-cosmos` project.
+#. Follow the setup instructions in the **Overview** to create your fork of the ``astronomer-cosmos`` project.
 
 #. Create your virtual environment and launch the docs server.
 

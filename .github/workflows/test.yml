@@ -60,7 +60,11 @@ jobs:
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             case "$f" in
-              README.md|CHANGELOG.rst|CODE_OF_CONDUCT.md|CONTRIBUTING.md|.github/pull_request_template.md) ;;
+              README.md) ;;
+              CHANGELOG.rst) ;;
+              CODE_OF_CONDUCT.md) ;;
+              CONTRIBUTING.md) ;;
+              .github/pull_request_template.md) ;;
               docs/*) ;;
               *) CODE_CHANGED=true; break ;;
             esac

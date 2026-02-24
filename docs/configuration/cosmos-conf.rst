@@ -38,6 +38,8 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS``
 
+.. _enable_cache_dbt_yaml_selectors:
+
 `enable_cache_dbt_yaml_selectors`_:
     Enable or disable caching of the YAML selectors in case using ``LoadMode.DBT_MANIFEST`` with ``RenderConfig.selector`` in an Airflow Variable.
 

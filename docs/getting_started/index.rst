@@ -4,6 +4,7 @@
    :hidden:
    :caption: Contents:
 
+   Quickstart <astro-quickstart>
    Astro <astro>
    MWAA <mwaa>
    GCC <gcc>

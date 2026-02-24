@@ -632,8 +632,7 @@ class NodeSelector:
             return False
         return True
 
-    # TODO: Refactor this method to remove the noqa: C901 in a separate PR.
-    def _should_include_node(self, node_id: str, node: DbtNode) -> bool:  # noqa: C901
+    def _should_include_node(self, node_id: str, node: DbtNode) -> bool:
         """
         Checks if a single node should be included. Only runs once per node with caching."""
         logger.debug("Inspecting if the node <%s> should be included.", node_id)

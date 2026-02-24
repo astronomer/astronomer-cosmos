@@ -29,8 +29,6 @@ operators:
     description: Run `dbt build` using a local dbt installation
   - module: cosmos.operators.local.DbtCloneLocalOperator
     description: Run `dbt clone` using a local dbt installation
-  - module: cosmos.operators.local.DbtDepsLocalOperator
-    description: Install dbt dependencies using a local dbt installation
   - module: cosmos.operators.local.DbtSourceLocalOperator
     description: Run `dbt source freshness` using a local dbt installation
   - module: cosmos.operators.local.DbtDocsLocalOperator

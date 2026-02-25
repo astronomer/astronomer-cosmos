@@ -27,6 +27,59 @@ jobs:
     steps:
       - run: true
 
+  # Skip unit/integration tests when only documentation changed (pre-commit/Type-Check still run).
+  Check-changed-files:
+    needs: Authorize
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code_changed: ${{ steps.check.outputs.code_changed }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - id: check
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.event_name }}" == "pull_request_target" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+          # Handle cases where BASE is missing or all zeros (e.g., first push, force push)
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Compute changed files; if git diff fails, assume code changed to be safe
+          if ! FILES=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null); then
+            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CODE_CHANGED=false
+          # If we can't determine changed files, run tests to be safe
+          if [ -z "$FILES" ]; then
+            CODE_CHANGED=true
+          fi
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              README.md) ;;
+              CHANGELOG.rst) ;;
+              CODE_OF_CONDUCT.md) ;;
+              CONTRIBUTING.md) ;;
+              .github/pull_request_template.md) ;;
+              docs/*) ;;
+              *) CODE_CHANGED=true; break ;;
+            esac
+          done <<< "$FILES"
+          echo "code_changed=$CODE_CHANGED" >> "$GITHUB_OUTPUT"
+
   Type-Check:
     needs: Authorize
     runs-on: ubuntu-latest
@@ -47,7 +100,8 @@ jobs:
       - run: hatch run tests.py3.10-2.10-1.9:type-check
 
   Run-Unit-Tests:
-    needs: Authorize
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -103,7 +157,8 @@ jobs:
           include-hidden-files: true
 
   Run-Integration-Tests:
-    needs: Authorize
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -199,7 +254,8 @@ jobs:
           include-hidden-files: true
 
   Run-Integration-Tests-Expensive:
-    needs: Authorize
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -285,7 +341,8 @@ jobs:
       DATABRICKS_CLUSTER_ID: ${{ secrets.DATABRICKS_CLUSTER_ID }}
 
   Run-Integration-Tests-DBT-1-5-4:
-    needs: Authorize
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -361,7 +418,8 @@ jobs:
           TEST_SINGLE_DAG: "basic_cosmos_task_group.py"  # There are circumstances when we only need to run a single DAG, but we were parsing all the DAGs. This change is to avoid parsing all the DAGs.
 
   Run-Integration-Tests-DBT-Async:
-    needs: Authorize
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -443,7 +501,8 @@ jobs:
       POSTGRES_PORT: 5432
 
   Run-Integration-dbt-fusion-Tests:
-    needs: Authorize
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -530,7 +589,8 @@ jobs:
 
 
   Run-Performance-Tests:
-    needs: Authorize
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -605,7 +665,8 @@ jobs:
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
   Run-Kubernetes-Tests:
-    needs: Authorize
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

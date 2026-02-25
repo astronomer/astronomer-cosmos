@@ -182,7 +182,7 @@ operators:
   - module: cosmos.operators.gcp_cloud_run_job.DbtSnapshotGcpCloudRunJobOperator
     description: Run `dbt snapshot` as a Google Cloud Run Job.
   - module: cosmos.operators.gcp_cloud_run_job.DbtSourceGcpCloudRunJobOperator
-    description: Run `dbt source` as a Google Cloud Run Job.
+    description: Run `dbt source freshness` as a Google Cloud Run Job.
   - module: cosmos.operators.gcp_cloud_run_job.DbtTestGcpCloudRunJobOperator
     description: Run `dbt test` as a Google Cloud Run Job.
 

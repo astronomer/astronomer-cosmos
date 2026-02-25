@@ -2,21 +2,40 @@
 
 .. toctree::
    :maxdepth: 1
-   :caption: Getting Started:
+   :caption: Cosmos Fundamentals
 
-
-   Run Cosmos <run-cosmos>
-   Execution Modes <execution-modes>
-   Operators <operators>
-   Custom Airflow Properties <custom-airflow-properties>
+   Cosmos fundamentals <cosmos-fundamentals>
    Similar dbt and Airflow <dbt-airflow-concepts>
 
 .. toctree::
    :maxdepth: 1
-   :caption: Cosmos Fundamentals:
+   :caption: Run Cosmos
 
-   Cosmos fundamentals <cosmos-fundamentals/index>
-   Test page <cosmos-fundamentals/test-page>
+   Run Cosmos <run-cosmos>
+   astro
+   aws-container-run-job
+   gcc
+   mwaa
+   open-source
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: To move
+
+   Execution Modes <execution-modes>
+   execution-modes-local-conflicts
+   Docker Execution Mode <docker>
+   Kubernetes Execution Mode <kubernetes>
+   Azure Container Instance Execution Mode <azure-container-instance>
+   AWS Container Run Job Execution Mode <aws-container-run-job>
+   GCP Cloud Run Job Execution Mode <gcp-cloud-run-job>
+   Airflow Async Execution Mode <async-execution-mode>
+   Watcher Execution Mode <watcher-execution-mode>
+   Watcher Kubernetes Execution Mode <watcher-kubernetes-execution-mode>
+   Operators <operators>
+   Custom Airflow Properties <custom-airflow-properties>
+
 
 
 Getting Started

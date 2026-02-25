@@ -29,7 +29,7 @@ Start Airflow locally
 
 1. Open a terminal at the root of the ``cosmos-demo`` repo.
 2. Run ``astro dev start`` to start your Aiflow instance.
-3. Open the Airflow UI at ``http://localhost:8080/``.
+3. Open the Airflow UI at ``http://localhost:8080/``. 
 4. Log in using ``Admin`` as both the user name and password to access the **Home** view. This view provides at-a-glance of your overall Airflow environment, including summary statistics about your Dags' performance.
 
 The `Airflow UI <https://www.astronomer.io/docs/learn/airflow-ui>`_ enables you to start, stop, troubleshoot, or manage your Dags.
@@ -75,22 +75,21 @@ Congratulations! You ran a dbt project successfully on Airflow! This quickstart 
 
 A ``dockerfile`` that defines
 - The Astro Runtime to use for the Airflow project
-- Defines the virtual environment where you want to run your dbt code
-- The connection to the postgres Airflow metadata database defined in the dbt project's ``profiles.yml`` file
+- The virtual environment where you want to run dbt code
+- The connection to the postgres Airflow metadata database 
 
 This demo repo also includes a dbt project with configurations that allow you to explore how Cosmos enables Airflow and dbt to work together. These files include:
 
 - ``constants.py``: Points to the dbt project root directory and to the virtual environment configured by the dockerfile that the dbt project uses to execute commands
-- ``profiles.py``: Contains the profile mappings that allow your dbt project to connect to the Airflow metadata database defined by the Airflow dockerfile
+- ``profiles.py``: Contains the profile mappings that allow your dbt project to connect to the Airflow metadata database defined in the Airflow ``dockerfile``
 
 Cosmos does not require you to use the specific project architecture shown in the ``cosmos-demo`` to run successfully. However, it can serve as a template or example for you to adapt your dbt or Airflow projects to work cohesively.
 
 Next steps
 ~~~~~~~~~~
 
-- Because this demo project does not include a database viewer. You can optionally connect a database viewer, such as `dbeaver <https://dbeaver.com/docs/dbeaver/Getting-started/>`_, to the Postgres database defined in the ``profiles.yml`` and ``dockerfile``.
 - Follow one of the Getting Started Guides where you can bring your own dbt projects and/or Dag code:
     - `Getting Started on Astro <astro.html>`__
     - `Getting Started on MWAA <mwaa.html>`__
     - `Getting Started on GCC <gcc.html>`__
-    - `Getting Started on Open-Source <open-source.html>`__
+    - `Getting Started on Open-Source <open-source.html>`__ 

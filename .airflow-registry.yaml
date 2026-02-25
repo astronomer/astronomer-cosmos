@@ -98,7 +98,7 @@ operators:
   - module: cosmos.operators.virtualenv.DbtSnapshotVirtualenvOperator
     description: Run `dbt snapshot` inside a Cosmos-managed Python virtual environment.
   - module: cosmos.operators.virtualenv.DbtSourceVirtualenvOperator
-    description: Run `dbt source` inside a Cosmos-managed Python virtual environment.
+    description: Run `dbt source freshness` inside a Cosmos-managed Python virtual environment.
   - module: cosmos.operators.virtualenv.DbtTestVirtualenvOperator
     description: Run `dbt test` inside a Cosmos-managed Python virtual environment.
 

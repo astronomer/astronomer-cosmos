@@ -224,7 +224,7 @@ dependencies = [
 build = "sphinx-build -b html docs docs/_build"
 serve = "sphinx-autobuild docs docs/_build"
 # Serve without auto-reload: build once, then serve static files on port 8000
-serve-no-reload = "sphinx-build -b html docs docs/_build && python -m http.server 8000 --directory docs/_build"
+serve-no-reload = "sphinx-build -b html docs docs/_build && python -m http.server 8000 --bind 127.0.0.1 --directory docs/_build"
 
 ######################################
 # THIRD PARTY TOOLS

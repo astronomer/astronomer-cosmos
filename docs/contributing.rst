@@ -165,30 +165,6 @@ If you don’t already have Hatch installed, please [install it](https://hatch.p
     hatch run docs:serve
 
 
-If you're only working on docs, and don't need to set up your environment for local Cosmos development, you can use Hatch in a virtual environment to only build the docs. Note that it may take longer on the first run as it sets up the virtual environment, but will be quick on subsequent runs.
-
-#. Follow the setup instructions in the **Overview** to create your fork of the ``astronomer-cosmos`` project.
-
-#. Create your virtual environment and launch the docs server.
-
-.. code-block:: bash
-
-    # Creates a virtual environment called docs_env
-    python3 -m venv docs_env
-    # Activates the virtual environment
-    source docs_env/bin/activate
-    # Makes hatch available to your environment
-    pip install hatch
-    # Creates a local instance of your docs
-    hatch run docs:serve
-
-#. For future docs local builds, you can reactivate the virtual environment and launch hatch:
-
-.. code-block:: bash
-    # Activate the virtual environment
-    source docs_env/bin/activate
-    # Create a local instance of your docs
-    hatch run docs:serve
 
 Building
 ________

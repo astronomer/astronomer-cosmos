@@ -203,13 +203,13 @@ operators:
   # Run a single `dbt build` or `dbt run` command per pipeline (producer), via a Kubernetes pod, and have Airflow deferrable sensors (consumers) tracking progress for individual dbt nodes.
   - module: cosmos.operators.watcher_kubernetes.DbtProducerWatcherKubernetesOperator
     description: Run a single dbt command (build or run) via a Kubernetes Pod Operator for the entire dbt project and produce one XCom containing the status of each dbt node (model, seed, snapshot).
-  - module: cosmos.operators.watcher_kubernetes.DbtRunWatcherOperator
+  - module: cosmos.operators.watcher_kubernetes.DbtRunWatcherKubernetesOperator
     description: Monitor a dbt model using Airflow deferrable XCom sensors. On retry, executes `dbt run` for the specific model via `DbtRunKubernetesOperator`.
-  - module: cosmos.operators.watcher_kubernetes.DbtSeedWatcherOperator
+  - module: cosmos.operators.watcher_kubernetes.DbtSeedWatcherKubernetesOperator
     description: Monitor a dbt seed using Airflow deferrable XCom sensors. On retry, executes `dbt seed` for the specific seed via `DbtSeedKubernetesOperator`.
-  - module: cosmos.operators.watcher_kubernetes.DbtSnapshotWatcherOperator
+  - module: cosmos.operators.watcher_kubernetes.DbtSnapshotWatcherKubernetesOperator
     description: Monitor a dbt snapshot using Airflow deferrable XCom sensors. On retry, executes `dbt snapshot` for the specific snapshot via `DbtSnapshotKubernetesOperator`.
-  - module: cosmos.operators.watcher_kubernetes.DbtTestWatcherOperator
+  - module: cosmos.operators.watcher_kubernetes.DbtTestWatcherKubernetesOperator
     description: Runs `dbt test` using the Kubernetes execution pattern, or acts as an `EmptyOperator` for `TestBehavior.AFTER_EACH`.
 
 other:

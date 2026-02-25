@@ -1,11 +1,11 @@
-.. _astro-quickstart:
+.. _astro-cli-quickstart:
 
-.. title:: Cosmos Quickstart
+.. title:: Run Cosmos with the Astro CLI
 
-Cosmos Quickstart
-=================
+Run Cosmos with the Astro CLI
+=============================
 
-Work locally with Airflow, dbt, and Astronomer Cosmos using the Astro CLI.
+Work locally with Airflow, dbt, and Astronomer Cosmos using the `Astro CLI <https://github.com/astronomer/astro-cli>`_. While Cosmos fully works with standard Airflow and independently of the Astro CLI, the Astro CLI can simplify creating and running Airflow projects. If you want to get started with Cosmos using only Airflow, see `Getting Started on Open Source Airflow <open-source.html>`_.
 
 This guide shows you how to run a simple Dag locally with Cosmos, using an example dbt project in Airflow.
 
@@ -29,7 +29,8 @@ Start Airflow locally
 
 1. Open a terminal at the root of the ``cosmos-demo`` repo.
 2. Run ``astro dev start`` to start your Aiflow instance.
-3. Open the Airflow UI at ``http://localhost:8080/`` to access the **Home** view. This view provides at-a-glance of your overall Airflow environment, including summary statistics about your Dags' performance.
+3. Open the Airflow UI at ``http://localhost:8080/``. 
+4. Log in using ``Admin`` as both the user name and password to access the **Home** view. This view provides at-a-glance of your overall Airflow environment, including summary statistics about your Dags' performance.
 
 The `Airflow UI <https://www.astronomer.io/docs/learn/airflow-ui>`_ enables you to start, stop, troubleshoot, or manage your Dags.
 
@@ -66,3 +67,30 @@ For example in the ``stg_customers``, task, in the ``run`` sub-task, the logs in
     ...Running command: ['/usr/local/airflow/dbt_venv/bin/dbt', 'run', '--select', 'stg_customers', '--project-dir', '/tmp/tmp8675309', '--profiles-dir', ...]
 
 This log indicates that the Dag triggers Cosmos to initiate the ``dbt run`` command following the sql actions in the ``stg_customers.sql``.
+
+Key Concepts
+~~~~~~~~~~~~
+
+Congratulations! You ran a dbt project successfully on Airflow! This quickstart includes the minimal steps required to get started working with Cosmos. Specifically it includes:
+
+A ``dockerfile`` that defines
+- The Astro Runtime to use for the Airflow project
+- Defines the virtual environment where you want to run your dbt code
+- The connection to the postgres Airflow metadata database defined in the dbt project's ``profiles.yml`` file
+
+This demo repo also includes a dbt project with configurations that allow you to explore how Cosmos enables Airflow and dbt to work together. These files include:
+
+- ``constants.py``: Points to the dbt project root directory and to the virtual environment configured by the dockerfile that the dbt project uses to execute commands
+- ``profiles.py``: Contains the profile mappings that allow your dbt project to connect to the Airflow metadata database defined by the Airflow dockerfile
+
+Cosmos does not require you to use the specific project architecture shown in the ``cosmos-demo`` to run successfully. However, it can serve as a template or example for you to adapt your dbt or Airflow projects to work cohesively.
+
+Next steps
+~~~~~~~~~~
+
+- Because this demo project does not include a database viewer. You can optionally connect a database viewer, such as `dbeaver <https://dbeaver.com/docs/dbeaver/Getting-started/>`_, to the Postgres database defined in the ``profiles.yml`` and ``dockerfile``.
+- Follow one of the Getting Started Guides where you can bring your own dbt projects and/or Dag code:
+    - `Getting Started on Astro <astro.html>`__
+    - `Getting Started on MWAA <mwaa.html>`__
+    - `Getting Started on GCC <gcc.html>`__
+    - `Getting Started on Open-Source <open-source.html>`__ 

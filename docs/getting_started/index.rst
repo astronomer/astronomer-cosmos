@@ -4,7 +4,7 @@
    :hidden:
    :caption: Contents:
 
-   Quickstart <astro-quickstart>
+   Astro CLI quickstart <astro-cli-quickstart>
    Astro <astro>
    MWAA <mwaa>
    GCC <gcc>

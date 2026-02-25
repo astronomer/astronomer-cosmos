@@ -49,6 +49,7 @@ html_theme_options = {
         "image_dark": "cosmos-icon.svg",
     },
     "footer_start": ["copyright"],
+    "show_nav_level": 0,
 }
 
 generate_mapping_docs()

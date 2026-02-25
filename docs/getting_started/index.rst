@@ -1,15 +1,22 @@
 .. _getting-started:
 
 .. toctree::
-   :hidden:
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: Getting Started:
 
-   Cosmos fundamentals <cosmos-fundamentals>
+
    Run Cosmos <run-cosmos>
    Execution Modes <execution-modes>
    Operators <operators>
    Custom Airflow Properties <custom-airflow-properties>
+   Similar dbt and Airflow <dbt-airflow-concepts>
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Cosmos Fundamentals:
+
+   Cosmos fundamentals <cosmos-fundamentals/index>
+   Test page <cosmos-fundamentals/test-page>
 
 
 Getting Started

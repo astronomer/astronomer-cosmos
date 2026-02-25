@@ -159,7 +159,11 @@ ____________
 
 If you don’t already have Hatch installed, please [install it](https://hatch.pypa.io/latest/install/)before proceeding. As an example, on macOS, you can do so with:
 
-``brew install hatch``
+.. code-block:: bash
+    brew install hatch
+
+
+You can run the docs locally by running the following:
 
 .. code-block:: bash
     hatch run docs:serve

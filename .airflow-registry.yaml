@@ -162,7 +162,7 @@ operators:
   - module: cosmos.operators.azure_container_instance.DbtSnapshotAzureContainerInstanceOperator
     description: Run `dbt snapshot` in an Azure Container Instance.
   - module: cosmos.operators.azure_container_instance.DbtSourceAzureContainerInstanceOperator
-    description: Run `dbt source` in an Azure Container Instance.
+    description: Run `dbt source freshness` in an Azure Container Instance.
   - module: cosmos.operators.azure_container_instance.DbtTestAzureContainerInstanceOperator
     description: Run `dbt test` in an Azure Container Instance.
 

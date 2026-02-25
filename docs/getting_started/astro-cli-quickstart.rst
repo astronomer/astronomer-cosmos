@@ -29,7 +29,7 @@ Start Airflow locally
 
 1. Open a terminal at the root of the ``cosmos-demo`` repo.
 2. Run ``astro dev start`` to start your Aiflow instance.
-3. Open the Airflow UI at ``http://localhost:8080/``. 
+3. Open the Airflow UI at ``http://localhost:8080/``.
 4. Log in using ``Admin`` as both the user name and password to access the **Home** view. This view provides at-a-glance of your overall Airflow environment, including summary statistics about your Dags' performance.
 
 The `Airflow UI <https://www.astronomer.io/docs/learn/airflow-ui>`_ enables you to start, stop, troubleshoot, or manage your Dags.
@@ -93,4 +93,4 @@ Next steps
     - `Getting Started on Astro <astro.html>`__
     - `Getting Started on MWAA <mwaa.html>`__
     - `Getting Started on GCC <gcc.html>`__
-    - `Getting Started on Open-Source <open-source.html>`__ 
+    - `Getting Started on Open-Source <open-source.html>`__

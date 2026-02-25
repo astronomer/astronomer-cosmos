@@ -108,7 +108,7 @@ operators:
   - module: cosmos.operators.airflow_async.DbtRunAirflowAsyncOperator
     description: Retrieve the SQL from the setup task and execute each model natively to Airflow via a subclass of `BigQueryInsertJobOperator`
   - module: cosmos.operators._asynchronous.TeardownAsyncOperator
-    description: Clear all the SQL files related to this DAG run from correspondent XComs
+    description: Clear all the SQL files related to this DAG run from corresponding XComs
 
   # Run dbt commands as containers via the Amazon Elastic Container Service (AWS ECS)
   - module: cosmos.operators.aws_ecs.DbtBuildAwsEcsOperator

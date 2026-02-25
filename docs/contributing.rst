@@ -155,7 +155,11 @@ To run the checks manually, run:
 Writing Docs
 ____________
 
-If you already have your environment set up for local Cosmos development and have Hatch installed, you can run the docs locally in a virtual environment with the following:
+[Hatch](https://hatch.pypa.io/latest/) is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatchto declare the dependencies required for the project itself, as well as for tests and documentation builds.
+
+If you don’t already have Hatch installed, please [install it](https://hatch.pypa.io/latest/install/)before proceeding. As an example, on macOS, you can do so with:
+
+`brew install hatch`
 
 .. code-block:: bash
     hatch run docs:serve

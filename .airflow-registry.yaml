@@ -76,7 +76,7 @@ operators:
   - module: cosmos.operators.kubernetes.DbtSnapshotKubernetesOperator
     description: Run `dbt snapshot` in a Kubernetes pod.
   - module: cosmos.operators.kubernetes.DbtSourceKubernetesOperator
-    description: Run `dbt source` in a Kubernetes pod.
+    description: Run `dbt source freshness` in a Kubernetes pod.
   - module: cosmos.operators.kubernetes.DbtTestKubernetesOperator
     description: Run `dbt test` in a Kubernetes pod.
 

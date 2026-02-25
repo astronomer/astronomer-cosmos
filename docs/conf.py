@@ -25,7 +25,7 @@ extensions = [
     # "autoapi.extension",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    "sphinx_reredirects"
+    "sphinx_reredirects",
 ]
 
 add_module_names = False

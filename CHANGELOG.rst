@@ -28,7 +28,6 @@ Docs
 Others
 
 * Add .airflow-registry.yaml for Airflow Provider Registry by @kaxil in #2387
-
 * Improve test coverage for PR #2307 by @tatiana in #2308
 * Address feedback from code review #2389 by @evanvolgas in #2394
 

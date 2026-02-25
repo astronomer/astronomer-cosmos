@@ -104,7 +104,7 @@ operators:
 
   # Pre-compile the project using dbt Core and use Airflow `BigQueryInsertJobOperator` to asynchronously run the transformations.
   - module: cosmos.operators._asynchronous.SetupAsyncOperator
-    description: Mockey-patch `dbt run` command to pre-generate the dbt models SQL and export them to XCom
+    description: Monkey-patch `dbt run` command to pre-generate the dbt models SQL and export them to XCom
   - module: cosmos.operators.airflow_async.DbtRunAirflowAsyncOperator
     description: Retrieve the SQL from the setup task and execute each model natively to Airflow via a subclass of `BigQueryInsertJobOperator`
   - module: cosmos.operators._asynchronous.TeardownAsyncOperator

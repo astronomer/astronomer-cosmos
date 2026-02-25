@@ -157,7 +157,7 @@ ____________
 
 [Hatch](https://hatch.pypa.io/latest/) is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatchto declare the dependencies required for the project itself, as well as for tests and documentation builds.
 
-If you don’t already have Hatch installed, please [install it](https://hatch.pypa.io/latest/install/)before proceeding. As an example, on macOS, you can do so with:
+If you don’t already have Hatch installed, please `install it <https://hatch.pypa.io/latest/install/>`_ before proceeding. As an example, on macOS, you can do so with:
 
 .. code-block:: bash
     brew install hatch

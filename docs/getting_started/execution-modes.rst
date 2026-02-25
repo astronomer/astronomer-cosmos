@@ -1,5 +1,19 @@
 .. _execution-modes:
 
+.. toctree::
+   :hidden:
+   :caption: Contents:
+
+   Docker Execution Mode <docker>
+   Kubernetes Execution Mode <kubernetes>
+   Azure Container Instance Execution Mode <azure-container-instance>
+   AWS Container Run Job Execution Mode <aws-container-run-job>
+   GCP Cloud Run Job Execution Mode <gcp-cloud-run-job>
+   Airflow Async Execution Mode <async-execution-mode>
+   Watcher Execution Mode <watcher-execution-mode>
+   Watcher Kubernetes Execution Mode <watcher-kubernetes-execution-mode>
+
+
 Execution Modes
 ===============
 

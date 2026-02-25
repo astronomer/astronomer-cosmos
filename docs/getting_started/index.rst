@@ -2,22 +2,12 @@
 
 .. toctree::
    :hidden:
+   :maxdepth: 2
    :caption: Contents:
 
-   Astro <astro>
-   MWAA <mwaa>
-   GCC <gcc>
-   Open-Source <open-source>
+   Cosmos fundamentals <cosmos-fundamentals>
+   Run Cosmos <run-cosmos>
    Execution Modes <execution-modes>
-   Docker Execution Mode <docker>
-   Kubernetes Execution Mode <kubernetes>
-   Azure Container Instance Execution Mode <azure-container-instance>
-   AWS Container Run Job Execution Mode <aws-container-run-job>
-   GCP Cloud Run Job Execution Mode <gcp-cloud-run-job>
-   Airflow Async Execution Mode <async-execution-mode>
-   Watcher Execution Mode <watcher-execution-mode>
-   Watcher Kubernetes Execution Mode <watcher-kubernetes-execution-mode>
-   dbt and Airflow Similar Concepts <dbt-airflow-concepts>
    Operators <operators>
    Custom Airflow Properties <custom-airflow-properties>
 

@@ -2,6 +2,7 @@
 
 .. toctree::
    :maxdepth: 1
+   :hidden:
    :caption: Cosmos Fundamentals
 
    Cosmos fundamentals <cosmos-fundamentals>
@@ -9,7 +10,8 @@
 
 .. toctree::
    :maxdepth: 1
-   :caption: Run Cosmos
+   :hidden:
+   :caption: Get started with Cosmos
 
    Run Cosmos <run-cosmos>
    astro
@@ -18,10 +20,10 @@
    mwaa
    open-source
 
-
 .. toctree::
    :maxdepth: 1
-   :caption: To move
+   :hidden:
+   :caption: Execution Modes
 
    Execution Modes <execution-modes>
    execution-modes-local-conflicts
@@ -33,10 +35,13 @@
    Airflow Async Execution Mode <async-execution-mode>
    Watcher Execution Mode <watcher-execution-mode>
    Watcher Kubernetes Execution Mode <watcher-kubernetes-execution-mode>
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :caption:
    Operators <operators>
    Custom Airflow Properties <custom-airflow-properties>
-
-
 
 Getting Started
 ===============

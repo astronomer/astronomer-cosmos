@@ -124,7 +124,7 @@ operators:
   - module: cosmos.operators.aws_ecs.DbtSnapshotAwsEcsOperator
     description: Run `dbt snapshot` as a task in AWS ECS.
   - module: cosmos.operators.aws_ecs.DbtSourceAwsEcsOperator
-    description: Run `dbt source` as a task in AWS ECS.
+    description: Run `dbt source freshness` as a task in AWS ECS.
   - module: cosmos.operators.aws_ecs.DbtTestAwsEcsOperator
     description: Run `dbt test` as a task in AWS ECS.
 

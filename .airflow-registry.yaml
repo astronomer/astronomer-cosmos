@@ -84,7 +84,7 @@ operators:
   - module: cosmos.operators.virtualenv.DbtBuildVirtualenvOperator
     description: Run `dbt build` inside a Cosmos-managed Python virtual environment.
   - module: cosmos.operators.virtualenv.DbtCloneVirtualenvOperator
-    description: Run `dbt clone` inside a Cosmos-managed  Python virtual environment.
+    description: Run `dbt clone` inside a Cosmos-managed Python virtual environment.
   - module: cosmos.operators.virtualenv.DbtDocsVirtualenvOperator
     description: Run `dbt docs generate` inside a Cosmos-managed Python virtual environment.
   - module: cosmos.operators.virtualenv.DbtLSVirtualenvOperator

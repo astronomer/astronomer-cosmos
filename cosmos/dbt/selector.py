@@ -443,28 +443,24 @@ class SelectorConfig:
                 else:
                     self._handle_no_precursors_or_descendants(item, node_name)
 
-    # TODO: Refactor this method to remove the noqa: C901 in a separate PR.
-    def _handle_no_precursors_or_descendants(self, item: str, node_name: str) -> None:  # noqa: C901
-        if node_name.startswith(PATH_SELECTOR):
-            self._parse_path_selector(item)
-        elif "/" in node_name:
+    def _handle_no_precursors_or_descendants(self, item: str, node_name: str) -> None:
+        prefix_handlers = {
+            PATH_SELECTOR: self._parse_path_selector,
+            TAG_SELECTOR: self._parse_tag_selector,
+            CONFIG_SELECTOR: self._parse_config_selector,
+            SOURCE_SELECTOR: self._parse_source_selector,
+            EXPOSURE_SELECTOR: self._parse_exposure_selector,
+            PACKAGE_SELECTOR: self._parse_package_selector,
+            RESOURCE_TYPE_SELECTOR: self._parse_resource_type_selector,
+            EXCLUDE_RESOURCE_TYPE_SELECTOR: self._parse_exclude_resource_type_selector,
+            FQN_SELECTOR: self._parse_fqn_selector,
+        }
+        for prefix, handler in prefix_handlers.items():
+            if node_name.startswith(prefix):
+                handler(item)
+                return
+        if "/" in node_name:
             self._parse_path_selector(f"{PATH_SELECTOR}{node_name}")
-        elif node_name.startswith(TAG_SELECTOR):
-            self._parse_tag_selector(item)
-        elif node_name.startswith(CONFIG_SELECTOR):
-            self._parse_config_selector(item)
-        elif node_name.startswith(SOURCE_SELECTOR):
-            self._parse_source_selector(item)
-        elif node_name.startswith(EXPOSURE_SELECTOR):
-            self._parse_exposure_selector(item)
-        elif node_name.startswith(PACKAGE_SELECTOR):
-            self._parse_package_selector(item)
-        elif node_name.startswith(RESOURCE_TYPE_SELECTOR):
-            self._parse_resource_type_selector(item)
-        elif node_name.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR):
-            self._parse_exclude_resource_type_selector(item)
-        elif node_name.startswith(FQN_SELECTOR):
-            self._parse_fqn_selector(item)
         elif self._is_bare_identifier(node_name):
             self._parse_bare_identifier(node_name)
         else:
@@ -636,8 +632,7 @@ class NodeSelector:
             return False
         return True
 
-    # TODO: Refactor this method to remove the noqa: C901 in a separate PR.
-    def _should_include_node(self, node_id: str, node: DbtNode) -> bool:  # noqa: C901
+    def _should_include_node(self, node_id: str, node: DbtNode) -> bool:
         """
         Checks if a single node should be included. Only runs once per node with caching."""
         logger.debug("Inspecting if the node <%s> should be included.", node_id)

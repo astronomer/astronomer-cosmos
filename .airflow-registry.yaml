@@ -56,7 +56,7 @@ operators:
   - module: cosmos.operators.docker.DbtSnapshotDockerOperator
     description: Run `dbt snapshot` inside a Docker container.
   - module: cosmos.operators.docker.DbtSourceDockerOperator
-    description: Run `dbt source` inside a Docker container.
+    description: Run `dbt source freshness` inside a Docker container.
   - module: cosmos.operators.docker.DbtTestDockerOperator
     description: Run `dbt test` inside a Docker container.
 

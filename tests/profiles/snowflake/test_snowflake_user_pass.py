@@ -126,6 +126,7 @@ def test_profile_args(
         "account": mock_snowflake_conn.extra_dejson.get("account"),
         "database": mock_snowflake_conn.extra_dejson.get("database"),
         "warehouse": mock_snowflake_conn.extra_dejson.get("warehouse"),
+        "threads": 4,
     }
 
 
@@ -151,6 +152,30 @@ def test_profile_args_overrides(
         "account": mock_snowflake_conn.extra_dejson.get("account"),
         "database": "my_db_override",
         "warehouse": mock_snowflake_conn.extra_dejson.get("warehouse"),
+        "threads": 4,
+    }
+
+
+def test_profile_args_overrides_threads(
+    mock_snowflake_conn: Connection,
+) -> None:
+    """
+    Tests that you can override the default threads value via profile_args.
+    """
+    profile_mapping = get_automatic_profile_mapping(
+        mock_snowflake_conn.conn_id,
+        profile_args={"threads": 8},
+    )
+
+    assert profile_mapping.profile == {
+        "type": mock_snowflake_conn.conn_type,
+        "user": mock_snowflake_conn.login,
+        "password": "{{ env_var('COSMOS_CONN_SNOWFLAKE_PASSWORD') }}",
+        "schema": mock_snowflake_conn.schema,
+        "account": mock_snowflake_conn.extra_dejson.get("account"),
+        "database": mock_snowflake_conn.extra_dejson.get("database"),
+        "warehouse": mock_snowflake_conn.extra_dejson.get("warehouse"),
+        "threads": 8,
     }
 
 
@@ -197,6 +222,7 @@ def test_old_snowflake_format() -> None:
             "account": conn.extra_dejson.get("account"),
             "database": conn.extra_dejson.get("database"),
             "warehouse": conn.extra_dejson.get("warehouse"),
+            "threads": 4,
         }
 
 
@@ -230,6 +256,7 @@ def test_appends_region() -> None:
             "account": f"{conn.extra_dejson.get('account')}.{conn.extra_dejson.get('region')}",
             "database": conn.extra_dejson.get("database"),
             "warehouse": conn.extra_dejson.get("warehouse"),
+            "threads": 4,
         }
 
 

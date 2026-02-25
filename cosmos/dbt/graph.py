@@ -95,6 +95,7 @@ class DbtNode:
     has_test: bool = False
     has_non_detached_test: bool = False
     downstream: list[str] = field(default_factory=lambda: [])
+    fqn: list[str] | None = None
 
     @property
     def meta(self) -> dict[str, Any]:
@@ -342,6 +343,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
                         else False
                     ),
+                    fqn=node_dict.get("fqn"),
                 )
             except (KeyError, TypeError):
                 logger.info("Could not parse following the dbt ls line even though it was a valid JSON `%s`", line)
@@ -568,6 +570,10 @@ class DbtGraph:
             if dbt_ls_compressed:
                 encoded_data = base64.b64decode(dbt_ls_compressed.encode())
                 cache_dict["dbt_ls"] = zlib.decompress(encoded_data).decode()
+            else:
+                # Missing 'dbt_ls_compressed' key indicates wrong cache type or corrupted cache
+                # Return empty dict to trigger cache miss and force fresh dbt ls run
+                cache_dict = {}
 
         return cache_dict
 
@@ -641,6 +647,7 @@ class DbtGraph:
                 "tags",
                 "config",
                 "freshness",
+                "fqn",
             ]
         else:
             ls_command = [
@@ -996,8 +1003,11 @@ class DbtGraph:
                 parsed_selectors = json.loads(zlib.decompress(encoded_parsed).decode())
 
                 cache_dict["yaml_selectors"] = YamlSelectors(raw_selectors, parsed_selectors)
-
-            return cache_dict
+            else:
+                # Missing selector keys indicates wrong cache type or corrupted cache
+                # Return empty dict to trigger cache miss and force fresh selector parsing
+                cache_dict = {}
+        return cache_dict
 
     def save_yaml_selectors_cache(self, yaml_selectors: YamlSelectors) -> None:
         """
@@ -1154,6 +1164,7 @@ class DbtGraph:
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
                         else False
                     ),
+                    fqn=node_dict.get("fqn"),
                 )
 
                 nodes[node.unique_id] = node

@@ -1,6 +1,37 @@
 Changelog
 =========
 
+1.13.1 (2026-02-25)
+-------------------
+
+Enhancements
+
+* Change Snowflake profile mappings to default to four threads by @tatiana in #2374
+* Refactor to avoid potential future ``UnboundLocalError`` for ``producer_task`` in ``calculate_tasks_map`` by @rin in #2309
+
+Bug Fixes
+
+* Fix graph selector when using + selector with ``dbt-loom`` by @award1230 in #2389
+* Populate ``compiled_sql`` for ``InvocationMode.SUBPROCESS`` in ``ExecutionMode.WATCHER`` by @pankajkoti in #2319
+* Preserve ``extra_context`` for watcher consumer task instances by @pankajkoti in #2381
+* Fix watcher: respect ``deferrable=False`` from ``operator_args`` on consumer sensor by @pankajkoti in #2384
+* Error handle invalid YAML with ``LoadMode.DBT_MANIFEST`` and ``RenderConfig.selector`` by @jonbillings in #2316
+* Fix selecting model when it has the same name as folder by @pankajastro in #2328
+* Handle Param Validation errors by @tatiana in #2358
+* Fix cache swap issue by @jonbillings in #2332
+* Fix leaked semaphore warnings in Airflow 3 by resetting dbt adapters by @pankajkoti in #2335
+
+Docs
+
+* Document ``ExecutionMode.KUBERNETES`` limitations by @tatiana in #2326
+
+Others
+
+* Add .airflow-registry.yaml for Airflow Provider Registry by @kaxil in #2387
+* Improve test coverage for PR #2307 by @tatiana in #2308
+* Address feedback from code review #2389 by @evanvolgas in #2394
+
+
 1.13.0 (2026-01-30)
 ---------------------
 

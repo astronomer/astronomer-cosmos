@@ -96,7 +96,9 @@ jobs:
           python-version: "3.10"
           architecture: "x64"
 
-      - run: pip3 install "hatch>=1.14.2"
+      # Pinning virtualenv because of https://github.com/pypa/hatch/issues/2193
+      # This should be removed when the issue is fixed.
+      - run: pip3 install "hatch>=1.14.2" "virtualenv<21"
       - run: hatch run tests.py3.10-2.10-1.9:type-check
 
   Run-Unit-Tests:
@@ -139,10 +141,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # Pinning virtualenv because of https://github.com/pypa/hatch/issues/2193
+      # This should be removed when the issue is fixed.
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
+          uv pip install --system "hatch>=1.14.2" "virtualenv<21"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -208,10 +212,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # Pinning virtualenv because of https://github.com/pypa/hatch/issues/2193
+      # This should be removed when the issue is fixed.
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
+          uv pip install --system "hatch>=1.14.2" "virtualenv<21"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -296,10 +302,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # Pinning virtualenv because of https://github.com/pypa/hatch/issues/2193
+      # This should be removed when the issue is fixed.
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
+          uv pip install --system "hatch>=1.14.2" "virtualenv<21"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -383,10 +391,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # Pinning virtualenv because of https://github.com/pypa/hatch/issues/2193
+      # This should be removed when the issue is fixed.
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
+          uv pip install --system "hatch>=1.14.2" "virtualenv<21"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.5.4
@@ -460,10 +470,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # Pinning virtualenv because of https://github.com/pypa/hatch/issues/2193
+      # This should be removed when the issue is fixed.
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
+          uv pip install --system "hatch>=1.14.2" "virtualenv<21"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -531,10 +543,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # Pinning virtualenv because of https://github.com/pypa/hatch/issues/2193
+      # This should be removed when the issue is fixed.
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
+          uv pip install --system "hatch>=1.14.2" "virtualenv<21"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Set RESOURCE_PREFIX without periods
@@ -631,10 +645,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # Pinning virtualenv because of https://github.com/pypa/hatch/issues/2193
+      # This should be removed when the issue is fixed.
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
+          uv pip install --system "hatch>=1.14.2" "virtualenv<21"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Run performance tests against against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
@@ -697,10 +713,12 @@ jobs:
       - name: Create KinD cluster
         uses: container-tools/kind-action@0ad70e2299366b0e1552c7240f4e4567148f723e  # v2.0.4
 
+      # Pinning virtualenv because of https://github.com/pypa/hatch/issues/2193
+      # This should be removed when the issue is fixed.
       - name: Install packages and dependencies
         run: |
           python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
+          uv pip install --system "hatch>=1.14.2" "virtualenv<21"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Run kubernetes tests

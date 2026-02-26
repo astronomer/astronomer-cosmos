@@ -51,10 +51,18 @@ SAMPLE_MANIFEST_SELECTORS = Path(__file__).parent.parent / "sample/manifest_sele
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
 
+# File and directory names to skip when copying dbt project trees in tests (keeps fixture output deterministic).
+_DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES = (".user.yml", ".DS_Store", "logs", "target")
+
 if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
     object_storage_path = "airflow.sdk.ObjectStoragePath"
 else:
     object_storage_path = "airflow.io.path.ObjectStoragePath"
+
+
+def _ignore_when_copying_dbt_project(directory: str, names: list[str]) -> list[str]:
+    """Names to skip in copytree so the fixture tree is deterministic."""
+    return [name for name in names if name in _DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES]
 
 
 @pytest.fixture
@@ -66,9 +74,7 @@ def tmp_dbt_project_dir():
 
     tmp_dir = Path(tempfile.mkdtemp())
     target_proj_dir = tmp_dir / DBT_PROJECT_NAME
-    shutil.copytree(source_proj_dir, target_proj_dir)
-    shutil.rmtree(target_proj_dir / "logs", ignore_errors=True)
-    shutil.rmtree(target_proj_dir / "target", ignore_errors=True)
+    shutil.copytree(source_proj_dir, target_proj_dir, ignore=_ignore_when_copying_dbt_project)
     yield tmp_dir
 
     shutil.rmtree(tmp_dir, ignore_errors=True)  # delete directory
@@ -83,9 +89,7 @@ def tmp_altered_dbt_project_dir():
 
     tmp_dir = Path(tempfile.mkdtemp())
     target_proj_dir = tmp_dir / ALTERED_DBT_PROJECT_NAME
-    shutil.copytree(source_proj_dir, target_proj_dir)
-    shutil.rmtree(target_proj_dir / "logs", ignore_errors=True)
-    shutil.rmtree(target_proj_dir / "target", ignore_errors=True)
+    shutil.copytree(source_proj_dir, target_proj_dir, ignore=_ignore_when_copying_dbt_project)
     yield tmp_dir
 
     shutil.rmtree(tmp_dir, ignore_errors=True)  # delete directory
@@ -2250,8 +2254,10 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("74c478329e90725557d095879030b5e8", "fa536d84e2ee6018010e3940a45764e1")
+        # Different macOS versions have produced different hashes for this directory. The first value below is a
+        # historical macOS-specific hash, while the second matches the Linux hash asserted in the else-branch. We
+        # allow both here so that the test is stable across macOS versions and when macOS hashing matches Linux.
+        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "633a523f295ef0cd496525428815537b")
     else:
         assert hash_dir == "633a523f295ef0cd496525428815537b"
 
@@ -2290,8 +2296,10 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     assert hash_impl == "4c93048c66ca45356e1677511447c7ba"
 
     if sys.platform == "darwin":
-        # We faced inconsistent hashing versions depending on the version of MacOS/Linux - the following line aims to address these.
-        assert hash_dir in ("74c478329e90725557d095879030b5e8", "fa536d84e2ee6018010e3940a45764e1")
+        # Some macOS versions compute a different directory hash than Linux, while others match the Linux behavior.
+        # The first value is the macOS-specific hash; the second value is the Linux hash, which certain macOS versions also produce.
+        # We allow both here to keep the test stable across macOS releases, while non-macOS platforms assert only the Linux hash.
+        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "633a523f295ef0cd496525428815537b")
     else:
         assert hash_dir == "633a523f295ef0cd496525428815537b"
 

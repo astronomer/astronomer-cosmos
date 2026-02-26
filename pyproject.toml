@@ -218,6 +218,7 @@ dependencies = [
     "sphinx",
     "sphinx-autoapi",
     "sphinx-autobuild",
+    "sphinx-reredirects",
 ]
 
 [tool.hatch.envs.docs.scripts]

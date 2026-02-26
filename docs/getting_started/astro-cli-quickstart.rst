@@ -159,4 +159,3 @@ Next steps
     - `Getting Started on GCC <gcc.html>`__
 
 .. - `Getting Started on Azure <azure.html>`_
-

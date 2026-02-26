@@ -129,7 +129,7 @@ You have several options to locate this kind of information in dbt projects. For
 7. **Customers** and **Orders** are the final Table views produced by the dbt code. But click any of these tables and then choose the **Data** tab to see the dbt output.
 
 .. image:: /_static/astro-cli-quickstart-dbeaver.png
-   :alt: dBeaver user interface displaying the Customers table view produced by the dbt code. This table includes data that has been joined together from three spearate raw database sources.
+   :alt: dBeaver user interface displaying the Customers table view produced by the dbt code. This table includes data that has been joined together from three separate raw database sources.
 
 Key Concepts
 ~~~~~~~~~~~~

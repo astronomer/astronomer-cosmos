@@ -1,7 +1,7 @@
 .. _open-source:
 
-Getting Started on Open Source Airflow
-======================================
+Getting Started with Cosmos on Open-source Airflow
+==================================================
 
 When running open-source Airflow, your setup may vary. This guide assumes you have access to edit the underlying image.
 

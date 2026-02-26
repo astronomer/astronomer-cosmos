@@ -1,6 +1,6 @@
-.. _cosmos-fundamentals:
+.. _cosmos-fundamentals-placeholder:
 
 Cosmos Fundamentals
 ===================
 
-Information about important cosmos concepts go here
+Information about important Cosmos concepts go here.

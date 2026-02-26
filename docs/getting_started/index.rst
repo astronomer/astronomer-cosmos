@@ -5,20 +5,19 @@
    :hidden:
    :caption: Cosmos Fundamentals
 
-   Cosmos fundamentals <cosmos-fundamentals>
-   Similar dbt and Airflow <dbt-airflow-concepts>
+   Cosmos fundamentals <cosmos-fundamentals-placehoder>
+   Similar dbt and Airflow concepts <dbt-airflow-concepts>
 
 .. toctree::
    :maxdepth: 1
    :hidden:
    :caption: Get started with Cosmos
 
-   Run Cosmos <run-cosmos>
-   astro
-   aws-container-run-job
-   gcc
-   mwaa
-   open-source
+   Open-source Airflow <open-source>
+   Astro <astro>
+   Google Cloud Composer (GCC) <gcc>
+   Amazon Managed Workflows for Apache Airflow (MWAA) <mwaa>
+
 
 .. toctree::
    :maxdepth: 1
@@ -30,7 +29,7 @@
    Docker Execution Mode <docker>
    Kubernetes Execution Mode <kubernetes>
    Azure Container Instance Execution Mode <azure-container-instance>
-   AWS Container Run Job Execution Mode <aws-container-run-job>
+   AWS Elastic Container Services (ECS) Execution Mode <aws-container-run-job>
    GCP Cloud Run Job Execution Mode <gcp-cloud-run-job>
    Airflow Async Execution Mode <async-execution-mode>
    Watcher Execution Mode <watcher-execution-mode>

@@ -51,6 +51,9 @@ SAMPLE_MANIFEST_SELECTORS = Path(__file__).parent.parent / "sample/manifest_sele
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
 
+# File and directory names to skip when copying dbt project trees in tests (keeps fixture output deterministic).
+_DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES = (".user.yml", ".DS_Store", "logs", "target")
+
 if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
     object_storage_path = "airflow.sdk.ObjectStoragePath"
 else:
@@ -58,8 +61,8 @@ else:
 
 
 def _ignore_when_copying_dbt_project(directory: str, names: list[str]) -> list[str]:
-    """Names to skip in copytree so the fixture tree is deterministic (no .user.yml, .DS_Store, logs, target)."""
-    return [name for name in names if name in (".user.yml", ".DS_Store", "logs", "target")]
+    """Names to skip in copytree so the fixture tree is deterministic."""
+    return [name for name in names if name in _DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES]
 
 
 @pytest.fixture

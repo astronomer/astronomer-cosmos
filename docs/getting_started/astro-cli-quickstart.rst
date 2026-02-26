@@ -110,22 +110,7 @@ To view the transformations completed by the Dag, you must use a database viewer
 You have several options to locate this kind of information in dbt projects. For example, the ``cosmos-demo`` project shares this port, username, and password information in the ``profiles.yaml`` file, and the Astro CLI prints it in your terminal after you run ``astro dev start``. When you create your own project, you can use the ``profiles.yml`` file to configure how your dbt project connects to your database.
 
 5. Click **Finish**. dBeaver asks for permission to download the necessary drivers to access and display the database information.
-6. After the connection is successful, dBeaver displays the postgres project directory. Navigate to **Tables** to view the different table views created by dbt.
-
-.. codeblock:: text
-
-    ├── postgres localhost:5432
-        └── Databases
-            └── postgres
-                └── schemas
-                    └── dbt
-                        └── tables
-                            ├── customers
-                            ├── orders
-                            ├── raw_customers
-                            ├── raw_orders
-                            └── raw_payments
-
+6. After the connection is successful, dBeaver displays the postgres project directory. Navigate to **Tables** at ``postgres/Databases/postgres/Schemas/dbt/Tables`` to view the different table views created by dbt.
 7. **Customers** and **Orders** are the final Table views produced by the dbt code. But click any of these tables and then choose the **Data** tab to see the dbt output.
 
 .. image:: /_static/astro-cli-quickstart-dbeaver.png

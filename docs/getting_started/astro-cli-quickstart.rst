@@ -19,10 +19,24 @@ Prerequisites
 ~~~~~~~~~~~~~~
 
 - Permissions to install software on your machine
-- Clone the `cosmos-demo <https://github.com/astronomer/cosmos-demo>`_ repo to your machine.
-- Install the `Astro CLI <https://docs.astronomer.io/astro/cli/install-cli>`_.
+- Install `git <https://git-scm.com/install/>`_
+- Install a database viewer this guide uses `dBeaver <https://dbeaver.io/download/>`_
+- Install the `Astro CLI <https://docs.astronomer.io/astro/cli/install-cli>`_
+- A container manager such as Podman, Docker, or Orbstack. Cosmos requires a container manager, like Docker or Podman, Airflow, and the Astro CLI to run. When you install the Astro CLI, it automatically installs Airflow and Podman, so you can immediately start working with Dags after installing the CLI. If you need to use Docker instead of Podman, see `Switch between Docker and Podman <https://www.astronomer.io/docs/astro/cli/switch-container-management>`_.
 
-Cosmos requires a container manager, like Docker or Podman, Airflow, and the Astro CLI to run. When you install the Astro CLI, it automatically installs Airflow and Podman, so you can immediately start working with Dags after installing the CLI. If you need to use Docker instead of Podman, see `Switch between Docker and Podman <https://www.astronomer.io/docs/astro/cli/switch-container-management>`_.
+To install this software, you might also need to set up:
+
+- An installation package manager like `Homebrew <https://brew.sh>`_ for MacOS, `Choclatey <https://chocolatey.org>` and/or `Winget for Windows.
+
+Clone the demo repo
+~~~~~~~~~~~~~~~~~~~
+
+1. Open a terminal in the directory where you want to clone your sample repo.
+2. Clone the ``cosmos-demo`` repo.
+
+.. code-block:: bash
+
+    git clone https://github.com/astronomer/cosmos-demo.git
 
 Start Airflow locally
 ~~~~~~~~~~~~~~~~~~~~~
@@ -30,7 +44,7 @@ Start Airflow locally
 1. Open a terminal at the root of the ``cosmos-demo`` repo.
 2. Run ``astro dev start`` to start your Aiflow instance.
 3. Open the Airflow UI at ``http://localhost:8080/``.
-4. Log in using ``Admin`` as both the user name and password to access the **Home** view. This view provides at-a-glance of your overall Airflow environment, including summary statistics about your Dags' performance.
+4. Log in using ``admin`` as both the user name and password to access the **Home** view. This view provides at-a-glance of your overall Airflow environment, including summary statistics about your Dags' performance.
 
 The `Airflow UI <https://www.astronomer.io/docs/learn/airflow-ui>`_ enables you to start, stop, troubleshoot, or manage your Dags.
 
@@ -66,7 +80,57 @@ For example in the ``stg_customers``, task, in the ``run`` sub-task, the logs in
 
     ...Running command: ['/usr/local/airflow/dbt_venv/bin/dbt', 'run', '--select', 'stg_customers', '--project-dir', '/tmp/tmp8675309', '--profiles-dir', ...]
 
-This log indicates that the Dag triggers Cosmos to initiate the ``dbt run`` command following the sql actions in the ``stg_customers.sql``.
+This log indicates that the Dag triggers Cosmos to initiate the ``dbt run`` command following the sql actions defined in the ``stg_customers.sql``.
+
+View results with a database viewer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To view the transformations completed by the Dag, you must use a database viewer to access the views and materializations completed by your dbt project.
+
+1. Open dBeaver.
+2. Click **Database** on the main menu and then **New database connection**.
+3. Select **PostgreSQL** from the list of database types.
+4. Add your database connection information. For this project, its defined in the ``profiles.yml`` file:
+
+.. code-block:: yaml
+
+    airflow_db:
+        target: dev
+        outputs:
+            dev:
+            type: postgres
+            host: postgres
+            user: postgres
+            password: postgres
+            port: 5432
+            dbname: postgres
+            schema: dbt
+            threads: 4
+
+
+There are a couple of ways to find this information in a dbt project. When you create your own project, you can use the ``profiles.yml`` file to configure how your dbt project connects to your database. You can use the port number, username, and password defined by this profile to connect to the database where Cosmos runs your dbt code.
+
+5. Click **Finish**. dBeaver asks for permission to download the necessary drivers to access and display the database information.
+6. After the connection is successful, dBeaver displays the postgres project directory. Navigate to **Tables** to view the different table views created by dbt.
+
+.. codeblock:: text
+
+    ├── postgres localhost:5432
+        └── Databases
+            └── postgres
+                └── schemas
+                    └── dbt
+                        └── tables
+                            ├── customers
+                            ├── orders
+                            ├── raw_customers
+                            ├── raw_orders
+                            └── raw_payments
+
+7. **Customers** and **Orders** are the final Table views produced by the dbt code. But click any of these tables and then choose the **Data** tab to see the dbt output.
+
+.. image:: /_static/astro-cli-quickstart-dbeaver.png
+   :alt: dBeaver user interface displaying the Customers table view produced by the dbt code. This table includes data that has been joined together from three spearate raw database sources.
 
 Key Concepts
 ~~~~~~~~~~~~
@@ -80,8 +144,8 @@ A ``dockerfile`` that defines
 
 This demo repo also includes a dbt project with configurations that allow you to explore how Cosmos enables Airflow and dbt to work together. These files include:
 
-- ``constants.py``: Points to the dbt project root directory and to the virtual environment configured by the dockerfile that the dbt project uses to execute commands
-- ``profiles.py``: Contains the profile mappings that allow your dbt project to connect to the Airflow metadata database defined in the Airflow ``dockerfile``
+- ``constants.py``: Points to the dbt project root directory and to the virtual environment configured by the dockerfile that the dbt project uses to execute commands.
+- ``profiles.py``: Contains the profile mappings that allow your dbt project to connect to the Airflow metadata database defined in the Airflow ``dockerfile``, where Cosmos runs dbt models for this project.
 
 Cosmos does not require you to use the specific project architecture shown in the ``cosmos-demo`` to run successfully. However, it can serve as a template or example for you to adapt your dbt or Airflow projects to work cohesively.
 
@@ -89,7 +153,10 @@ Next steps
 ~~~~~~~~~~
 
 - Follow one of the Getting Started Guides where you can bring your own dbt projects and/or Dag code:
+    - `Getting Started on Open-Source <open-source.html>`__
     - `Getting Started on Astro <astro.html>`__
     - `Getting Started on MWAA <mwaa.html>`__
     - `Getting Started on GCC <gcc.html>`__
-    - `Getting Started on Open-Source <open-source.html>`__
+
+.. - `Getting Started on Azure <azure.html>`_
+

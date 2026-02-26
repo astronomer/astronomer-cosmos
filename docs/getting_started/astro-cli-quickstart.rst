@@ -90,7 +90,7 @@ To view the transformations completed by the Dag, you must use a database viewer
 1. Open dBeaver.
 2. Click **Database** on the main menu and then **New database connection**.
 3. Select **PostgreSQL** from the list of database types.
-4. Add your database connection information. For this project, its defined in the ``profiles.yml`` file:
+4. Add your database connection information. The ``cosmos-demo`` project uses the postgreSQL container that also includes the Airflow metadata database to execute the dbt code. For this project, the postgres connection information is defined in the ``profiles.yml`` file:
 
 .. code-block:: yaml
 
@@ -108,7 +108,7 @@ To view the transformations completed by the Dag, you must use a database viewer
             threads: 4
 
 
-There are a couple of ways to find this information in a dbt project. When you create your own project, you can use the ``profiles.yml`` file to configure how your dbt project connects to your database. You can use the port number, username, and password defined by this profile to connect to the database where Cosmos runs your dbt code.
+You have several options to locate this kind of information in dbt projects. For example, the ``cosmos-demo`` project shares this port, username, and password information in the ``profiles.yaml`` file, and the Astro CLI prints it in your terminal after you run ``astro dev start``. When you create your own project, you can use the ``profiles.yml`` file to configure how your dbt project connects to your database.
 
 5. Click **Finish**. dBeaver asks for permission to download the necessary drivers to access and display the database information.
 6. After the connection is successful, dBeaver displays the postgres project directory. Navigate to **Tables** to view the different table views created by dbt.

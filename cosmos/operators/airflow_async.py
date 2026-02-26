@@ -4,7 +4,7 @@ import inspect
 from typing import Any
 
 from cosmos.config import ProfileConfig
-from cosmos.constants import BIGQUERY_PROFILE_TYPE
+from cosmos.constants import BIGQUERY_PROFILE_TYPE, DATABRICKS_PROFILE_TYPE
 from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator
 from cosmos.operators.base import AbstractDbtBase
 from cosmos.operators.local import (
@@ -21,7 +21,7 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 
-_SUPPORTED_DATABASES = [BIGQUERY_PROFILE_TYPE]
+_SUPPORTED_DATABASES = [BIGQUERY_PROFILE_TYPE, DATABRICKS_PROFILE_TYPE]
 
 
 class DbtBuildAirflowAsyncOperator(DbtBuildLocalOperator):

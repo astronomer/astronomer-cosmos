@@ -10,6 +10,7 @@ from cosmos.config import ProfileConfig
 from cosmos.constants import (
     AIRFLOW_VERSION,
     CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
+    DBT_STARTUP_EVENTS_XCOM_KEY,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
 )
@@ -85,6 +86,22 @@ def store_compiled_sql_for_model(
         _push_compiled_sql_for_model(task_instance, unique_id, compiled_sql)
 
 
+def _merge_startup_event_from_log(task_instance: Any, log_line: dict[str, Any]) -> None:
+    """
+    When dbt JSON log contains MainReportVersion or AdapterRegistered, append to
+    dbt_startup_events XCom (same shape as runner path) for trigger to log versions.
+    """
+    event_name = log_line.get("info", {}).get("name")
+    if event_name not in ("MainReportVersion", "AdapterRegistered"):
+        return
+    info = log_line.get("info", {})
+    msg = info.get("msg", "")
+    ts = info.get("ts", "")
+    current = list(task_instance.xcom_pull(key=DBT_STARTUP_EVENTS_XCOM_KEY) or [])
+    current.append({"name": event_name, "msg": msg, "ts": ts})
+    safe_xcom_push(task_instance=task_instance, key=DBT_STARTUP_EVENTS_XCOM_KEY, value=current)
+
+
 def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
@@ -100,6 +117,9 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
         log_line = {}
     else:
         logger.debug("Log line: %s", log_line)
+        context = extra_kwargs.get("context")
+        if context is not None:
+            _merge_startup_event_from_log(context["ti"], log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
         node_status = node_info.get("node_status")
         unique_id = node_info.get("unique_id")

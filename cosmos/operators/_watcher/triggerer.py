@@ -11,7 +11,7 @@ from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
 
-from cosmos.constants import AIRFLOW_VERSION
+from cosmos.constants import AIRFLOW_VERSION, DBT_STARTUP_EVENTS_XCOM_KEY
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import build_producer_state_fetcher
 
@@ -140,8 +140,26 @@ class WatcherTrigger(BaseTrigger):
 
         return await sync_to_async(fetch_state)()
 
+    async def _wait_and_log_startup_versions(self) -> None:
+        """Wait for dbt_startup_events from producer (pushed early in runner callback; from log in subprocess) and log versions."""
+        while True:
+            events = await self.get_xcom_val(DBT_STARTUP_EVENTS_XCOM_KEY)
+            if isinstance(events, list) and events:
+                for ev in events:
+                    name, msg = ev.get("name"), ev.get("msg") or ""
+                    if name == "MainReportVersion" and "dbt=" in msg:
+                        logger.info("%s", msg)
+                    elif name == "AdapterRegistered" and "Registered adapter: " in msg:
+                        logger.info("%s", msg)
+                return
+            producer_task_state = await self._get_producer_task_status()
+            if producer_task_state == "failed":
+                return
+            await asyncio.sleep(self.poke_interval)
+
     async def run(self) -> AsyncIterator[TriggerEvent]:
         logger.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
+        await self._wait_and_log_startup_versions()
 
         while True:
             producer_task_state = await self._get_producer_task_status()

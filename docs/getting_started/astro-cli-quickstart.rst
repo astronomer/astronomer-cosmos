@@ -19,14 +19,13 @@ Prerequisites
 ~~~~~~~~~~~~~~
 
 - Permissions to install software on your machine
+- `Python <https://www.python.org/downloads/>`_
 - Install `git <https://git-scm.com/install/>`_
-- Install a database viewer this guide uses `dBeaver <https://dbeaver.io/download/>`_
+- Install a database viewer. This guide uses `dBeaver <https://dbeaver.io/download/>`_
 - Install the `Astro CLI <https://docs.astronomer.io/astro/cli/install-cli>`_
 - A container manager such as Podman, Docker, or Orbstack. Cosmos requires a container manager, like Docker or Podman, Airflow, and the Astro CLI to run. When you install the Astro CLI, it automatically installs Airflow and Podman, so you can immediately start working with Dags after installing the CLI. If you need to use Docker instead of Podman, see `Switch between Docker and Podman <https://www.astronomer.io/docs/astro/cli/switch-container-management>`_.
 
-To install this software, you might also need to set up:
-
-- An installation package manager like `Homebrew <https://brew.sh>`_ for MacOS, `Choclatey <https://chocolatey.org>` and/or `Winget for Windows.
+Depending on your operating system, you might also need to install a separate installation manager like `Homebrew <https://brew.sh>`_ or `WinGet <https://learn.microsoft.com/en-us/windows/package-manager/winget/>`_.
 
 Clone the demo repo
 ~~~~~~~~~~~~~~~~~~~

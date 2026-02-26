@@ -53,3 +53,10 @@ html_theme_options = {
 }
 
 generate_mapping_docs()
+
+# -- Begin docs redirect section
+# - https://documatt.com/sphinx-reredirects/usage/
+redirects = {
+     "airflow3_compatibility/index": "../policy/airflow3-compatibility.html"
+}
+

@@ -19,15 +19,18 @@ clean-targets:
 
 require-dbt-version: [">=1.0.0", "<2.0.0"]
 
-# Custom folder dependencies: inject_folder_dependencies macro uses these to add ref() deps so dbt runs in order.
-# folder_dependencies: which folders this folder depends on (e.g. production depends on staging).
-# folder_models: model names per folder (avoids using graph in the macro for compatibility).
+
+
 vars:
+  # folder dependencies: inject_folder_dependencies macro uses these to add ref() deps so dbt runs in order.
+  # folder_dependencies: which folders this folder depends on (e.g. production depends on staging).
   folder_dependencies:
     production: [staging]
-  folder_models:
-    staging: [stg_customers, stg_orders, stg_payments]
-    production: [customers, orders]
+
+#  # folder_models: pass at runtime. One-liner (macOS): python scripts/generate_folder_vars.py . | xargs -I {} dbt run --vars '{}'
+#  folder_models:
+#    staging: [stg_customers, stg_orders, stg_payments]
+#    production: [customers, orders]
 
 models:
   multi_folder_jaffle_shop:

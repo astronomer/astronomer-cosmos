@@ -58,6 +58,8 @@ generate_mapping_docs()
 # - https://documatt.com/sphinx-reredirects/usage/
 redirects = {
      "airflow3_compatibility/index": "../policy/airflow3-compatibility.html",
-     "compatibility-policy": "../policy/compatibility-policy.html"
+     "compatibility-policy": "../policy/compatibility-policy.html",
+     "contributing": "../policy/contributing.html",
+     "contributors-roles": "../policy/contributors-roles.html"
 }
 

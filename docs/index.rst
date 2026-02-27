@@ -9,8 +9,7 @@
    Getting Started <getting_started/index>
    Configuration <configuration/index>
    Profiles <profiles/index>
-   Contributing <contributing>
-   Policies <policy/index>
+   Project Policies <policy/index>
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos

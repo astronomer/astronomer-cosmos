@@ -87,6 +87,3 @@ For specific guides, see the following:
 - `Executing dbt Dags with Watcher Kubernetes Mode <watcher-kubernetes-execution-mode.html>`__
 - `Executing dbt Dags with AzureContainerInstancesOperators <azure-container-instance.html>`__
 - `Executing dbt Dags with GcpCloudRunExecuteJobOperators <gcp-cloud-run-job.html>`__
-
-
-

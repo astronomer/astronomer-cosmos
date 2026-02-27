@@ -10,8 +10,8 @@ When using the `Local Execution Mode <execution-modes.html#local>`__, users may 
 
 If you find errors, we recommend users isolating the installation of dbt from the Airflow installation.
 With the `Local Execution Mode <execution-modes.html#local>`__, this can be accomplished by installing dbt in a separate
-Python virtualenv and setting the `ExecutionConfig.dbt_executable_path <../configuration/execution-config.html>`_  and
-`RenderConfig.dbt_executable_path <../configuration/render-config.html>`_ parameters.
+Python virtualenv and setting the `ExecutionConfig.dbt_executable_path <../guides/execution-config.html>`_  and
+`RenderConfig.dbt_executable_path <../guides/render-config.html>`_ parameters.
 
 The page `execution modes <execution-modes.html>`__ describes many other methods that support isolating dbt from Airflow.
 

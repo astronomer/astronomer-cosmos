@@ -1,7 +1,7 @@
-.. _configuration:
+.. _guides:
 
-Configuration
-=============
+Guides
+======
 
 Cosmos offers a number of configuration options to customize its behavior. For more info, check out the links on the left or the table of contents below.
 

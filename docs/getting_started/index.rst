@@ -87,11 +87,11 @@ For more customization, check out the different execution modes that Cosmos supp
 
 For specific guides, see the following:
 
-- `Executing dbt DAGs with Docker Operators <configuration/docker.html>`__
-- `Executing dbt DAGs with KubernetesPodOperators <configuration/kubernetes.html>`__
-- `Executing dbt DAGs with Watcher Kubernetes Mode <configuration/watcher-kubernetes-execution-mode.html>`__
-- `Executing dbt DAGs with AzureContainerInstancesOperators <configuration/azure-container-instance.html>`__
-- `Executing dbt DAGs with GcpCloudRunExecuteJobOperators <configuration/gcp-cloud-run-job.html>`__
+- `Executing dbt DAGs with Docker Operators <guides/docker.html>`__
+- `Executing dbt DAGs with KubernetesPodOperators <guides/kubernetes.html>`__
+- `Executing dbt DAGs with Watcher Kubernetes Mode <guides/watcher-kubernetes-execution-mode.html>`__
+- `Executing dbt DAGs with AzureContainerInstancesOperators <guides/azure-container-instance.html>`__
+- `Executing dbt DAGs with GcpCloudRunExecuteJobOperators <guides/gcp-cloud-run-job.html>`__
 
 
 Concepts Overview

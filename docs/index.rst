@@ -7,7 +7,7 @@
 
    Home <self>
    Getting Started <getting_started/index>
-   Configuration <configuration/index>
+   Guides <guides/index>
    Profiles <profiles/index>
    Project Policies <policy/index>
 

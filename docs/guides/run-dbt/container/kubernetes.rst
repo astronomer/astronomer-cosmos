@@ -161,7 +161,7 @@ The Kubernetes execution mode has the following limitations:
 - Does not emit Airflow datasets, assets, and dataset aliases (there is an `open ticket #2329 <https://github.com/astronomer/astronomer-cosmos/issues/2329>`__ to address this)
 - Does not handle installing dbt deps for users (there is an `open ticket #679 <https://github.com/astronomer/astronomer-cosmos/issues/679>`__ to address this)
 - Does not support `ProfileMapping <https://astronomer.github.io/astronomer-cosmos/profiles/index.html#using-a-profile-mapping>`_ (there is an `open ticket #749 <https://github.com/astronomer/astronomer-cosmos/issues/749>`__ to address this)
-- Does not support `Callbacks <https://astronomer.github.io/astronomer-cosmos/configuration/callbacks.html>`_ (there is an `open ticket #1575 <https://github.com/astronomer/astronomer-cosmos/issues/1575>`__ to address this)
-- Does not expose Compiled SQL as a `templated field <https://astronomer.github.io/astronomer-cosmos/configuration/compiled-sql.html>`_
-- Does not benefit from `Cosmos caching mechanisms <https://astronomer.github.io/astronomer-cosmos/configuration/caching.html>`_
-- Does not support `generating dbt docs & uploading to an object store <https://astronomer.github.io/astronomer-cosmos/configuration/generating-docs.html>`_ (there is a `PR <https://github.com/astronomer/astronomer-cosmos/pull/2058>`_ to solve this for S3)
+- Does not support `Callbacks <https://astronomer.github.io/astronomer-cosmos/guides/callbacks.html>`_ (there is an `open ticket #1575 <https://github.com/astronomer/astronomer-cosmos/issues/1575>`__ to address this)
+- Does not expose Compiled SQL as a `templated field <https://astronomer.github.io/astronomer-cosmos/guides/compiled-sql.html>`_
+- Does not benefit from `Cosmos caching mechanisms <https://astronomer.github.io/astronomer-cosmos/guides/caching.html>`_
+- Does not support `generating dbt docs & uploading to an object store <https://astronomer.github.io/astronomer-cosmos/guides/generating-docs.html>`_ (there is a `PR <https://github.com/astronomer/astronomer-cosmos/pull/2058>`_ to solve this for S3)

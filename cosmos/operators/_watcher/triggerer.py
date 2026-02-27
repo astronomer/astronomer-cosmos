@@ -98,13 +98,15 @@ class WatcherTrigger(BaseTrigger):
         else:
             return await self.get_xcom_val_af3(key)
 
-    async def _parse_node_status_and_compiled_sql(self) -> tuple[str | None, str | None]:
+    async def _parse_node_status_and_compiled_sql(
+        self,
+    ) -> tuple[str | None, str | None, str | None]:
         """
-        Parse node status and compiled_sql from XCom.
+        Parse node status, compiled_sql, and optional model error message from XCom.
 
-        Returns a tuple of (status, compiled_sql).
-        Status comes from mode-specific keys (nodefinished_* for event, *_status for subprocess).
-        compiled_sql is always read from the canonical per-model key (same for both modes).
+        Returns a tuple of (status, compiled_sql, model_error_message).
+        model_error_message is set when status is "failed" (from event payload in event mode,
+        or from run_results in subprocess mode when fetched separately).
         """
         status_key = (
             f"nodefinished_{self.model_unique_id.replace('.', '__')}"
@@ -112,18 +114,45 @@ class WatcherTrigger(BaseTrigger):
             else f"{self.model_unique_id.replace('.', '__')}_status"
         )
         compiled_sql_key = f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
+        model_error: str | None = None
 
         if self.use_event:
             compressed_xcom_val = await self.get_xcom_val(status_key)
             if not compressed_xcom_val:
-                return None, None
+                return None, None, None
             data_json = _parse_compressed_xcom(compressed_xcom_val)
-            status = data_json.get("data", {}).get("run_result", {}).get("status")
+            run_result = data_json.get("data", {}).get("run_result", {})
+            status = run_result.get("status")
+            if status == "failed":
+                model_error = run_result.get("message") or run_result.get("fail")
+                if model_error is not None and not isinstance(model_error, str):
+                    model_error = str(model_error)
         else:
             status = await self.get_xcom_val(status_key)
 
         compiled_sql = await self.get_xcom_val(compiled_sql_key) if status is not None else None
-        return status, compiled_sql
+        return status, compiled_sql, model_error
+
+    async def _get_model_error_from_run_results(self) -> str | None:
+        """When status is failed in subprocess mode, get the model error message from run_results XCom."""
+        compressed = await self.get_xcom_val("run_results")
+        if not compressed:
+            return None
+        try:
+            run_results = _parse_compressed_xcom(compressed)
+        except Exception:  # pragma: no cover
+            return None
+        results = run_results.get("results", [])
+        node_result = next(
+            (r for r in results if r.get("unique_id") == self.model_unique_id),
+            None,
+        )
+        if not node_result:
+            return None
+        msg = node_result.get("message")
+        if msg is None:
+            return None
+        return msg if isinstance(msg, str) else str(msg)
 
     async def _get_producer_task_status(self) -> str | None:
         """Retrieve the producer task state for both Airflow 2 and Airflow 3."""
@@ -142,22 +171,26 @@ class WatcherTrigger(BaseTrigger):
 
     async def run(self) -> AsyncIterator[TriggerEvent]:
         logger.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
-
+        event_data = {}
         while True:
             producer_task_state = await self._get_producer_task_status()
-            node_status, compiled_sql = await self._parse_node_status_and_compiled_sql()
+            node_status, compiled_sql, model_error_message = await self._parse_node_status_and_compiled_sql()
             if node_status == "success":
                 logger.info("Model '%s' succeeded", self.model_unique_id)
-                event_data: dict[str, Any] = {"status": "success"}
+                event_data["status"] = "success"
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif node_status == "failed":
                 logger.warning("Model '%s' failed", self.model_unique_id)
-                event_data = {"status": "failed", "reason": "model_failed"}
+                if not model_error_message and not self.use_event:
+                    model_error_message = await self._get_model_error_from_run_results()
+                event_data.update({"status": "failed", "reason": "model_failed"})
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
+                if model_error_message:
+                    event_data["model_error_message"] = model_error_message
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == "failed":
@@ -182,8 +215,21 @@ class WatcherTrigger(BaseTrigger):
             logger.debug("Polling again for model '%s' status...", self.model_unique_id)
 
 
+def _decompress_string_xcom(value: str) -> str:
+    """
+    Decode and decompress a base64-encoded, zlib-compressed string from XCom.
+    If decompression fails (e.g. legacy uncompressed value), return the value as-is.
+    """
+    if not value or not isinstance(value, str):
+        return value
+    try:
+        compressed_bytes = base64.b64decode(value)
+        return zlib.decompress(compressed_bytes).decode("utf-8")
+    except Exception:  # pragma: no cover - backward compat for uncompressed values
+        return value
+
+
 def _parse_compressed_xcom(compressed_b64_event_msg: str) -> Any:
-    """Decode and decompress a base64-encoded, zlib-compressed XCom payload."""
-    compressed_bytes = base64.b64decode(compressed_b64_event_msg)
-    event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")
-    return json.loads(event_json_str)
+    """Decode and decompress a base64-encoded, zlib-compressed JSON XCom payload."""
+    decompressed = _decompress_string_xcom(compressed_b64_event_msg)
+    return json.loads(decompressed)

@@ -313,6 +313,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return
 
         if reason == "model_failed":
+            model_error_message = event.get("model_error_message")
+            if model_error_message:
+                logger.error(
+                    "dbt model '%s' failed. Error from dbt:\n%s",
+                    self.model_unique_id,
+                    model_error_message,
+                )
             raise AirflowException(
                 f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
             )
@@ -381,4 +388,41 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         elif status == "success":
             return True
         else:
+            # status == "failed" (or other failure status)
+            model_error = None
+            if self.use_event():
+                compressed = get_xcom_val(
+                    ti,
+                    self.producer_task_id,
+                    f"nodefinished_{self.model_unique_id.replace('.', '__')}",
+                )
+                if compressed:
+                    try:
+                        data = _parse_compressed_xcom(compressed)
+                        run_result = data.get("data", {}).get("run_result", {})
+                        model_error = run_result.get("message") or run_result.get("fail")
+                    except Exception:  # pragma: no cover
+                        pass
+            else:
+                run_results_b64 = get_xcom_val(ti, self.producer_task_id, "run_results")
+                if run_results_b64:
+                    try:
+                        run_results = _parse_compressed_xcom(run_results_b64)
+                        results = run_results.get("results", [])
+                        node_result = next(
+                            (r for r in results if r.get("unique_id") == self.model_unique_id),
+                            None,
+                        )
+                        if node_result:
+                            model_error = node_result.get("message")
+                    except Exception:  # pragma: no cover
+                        pass
+            if model_error:
+                if not isinstance(model_error, str):
+                    model_error = str(model_error)
+                logger.error(
+                    "dbt model '%s' failed. Error from dbt:\n%s",
+                    self.model_unique_id,
+                    model_error,
+                )
             raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")

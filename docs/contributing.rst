@@ -155,17 +155,19 @@ To run the checks manually, run:
 Writing Docs
 ____________
 
-`Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatchto declare the dependencies required for the project itself, as well as for tests and documentation builds.
+`Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatch to declare the dependencies required for the project itself, as well as for tests and documentation builds.
 
 If you don’t already have Hatch installed, please `install it <https://hatch.pypa.io/latest/install/>`_ before proceeding. As an example, on macOS, you can do so with:
 
 .. code-block:: bash
+
     brew install hatch
 
 
 You can run the docs locally by running the following:
 
 .. code-block:: bash
+
     hatch run docs:serve
 
 

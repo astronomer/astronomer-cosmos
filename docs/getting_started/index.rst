@@ -5,7 +5,6 @@
    :hidden:
    :caption: Cosmos Fundamentals
 
-   Cosmos fundamentals <cosmos-fundamentals-placehoder>
    Similar dbt and Airflow concepts <dbt-airflow-concepts>
 
 .. toctree::
@@ -22,7 +21,7 @@
 .. toctree::
    :maxdepth: 1
    :hidden:
-   :caption: Execution Modes
+   :caption: Execution modes and customization
 
    Execution Modes <execution-modes>
    execution-modes-local-conflicts
@@ -34,11 +33,6 @@
    Airflow Async Execution Mode <async-execution-mode>
    Watcher Execution Mode <watcher-execution-mode>
    Watcher Kubernetes Execution Mode <watcher-kubernetes-execution-mode>
-
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-   :caption:
    Operators <operators>
    Custom Airflow Properties <custom-airflow-properties>
 

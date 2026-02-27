@@ -67,8 +67,8 @@ Have questions, need help, or interested in contributing? We welcome all contrib
 
 - Join the community on Slack! You can find us in the Airflow Slack workspace `#airflow-dbt <https://apache-airflow.slack.com/archives/C059CC42E9W>`_ channel. If you don't have an account, click `here <https://apache-airflow-slack.herokuapp.com/>`_ to sign up.
 - Report bugs, request features, or ask questions by creating an issue in the `GitHub repository <https://github.com/astronomer/astronomer-cosmos/issues/new/choose>`_.
-- Want to contribute new features, bug fixes or documentation enhancements? Please refer to our `Contributing Guide <https://astronomer.github.io/astronomer-cosmos/contributing>`_.`   `
-- Check out this `link <https://astronomer.github.io/astronomer-cosmos/contributors>`_. to learn more about our current contributors
+- Want to contribute new features, bug fixes or documentation enhancements? Please refer to our `Contributing Guide <https://astronomer.github.io/astronomer-cosmos/policy/contributing>`_.`   `
+- Check out this `link <https://astronomer.github.io/astronomer-cosmos/policy/contributors>`_. to learn more about our current contributors.
 
 Note that contributors and maintainers are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.

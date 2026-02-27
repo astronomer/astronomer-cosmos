@@ -60,5 +60,6 @@ redirects = {
     "airflow3_compatibility/index": "../policy/airflow3-compatibility.html",
     "compatibility-policy": "../policy/compatibility-policy.html",
     "contributing": "../policy/contributing.html",
+    "contributors": "../policy/contributors.html",
     "contributors-roles": "../policy/contributors-roles.html",
 }

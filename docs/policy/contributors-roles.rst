@@ -1,5 +1,3 @@
-:orphan:
-
 .. _contributors-roles:
 
 Contributor roles

@@ -873,6 +873,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             job_facets=job_facets,
         )
 
+    def invoke_interceptors(self, context: Context) -> None:
+        """
+        Run each callable in self.interceptors with (context, self).
+        Interceptors may modify self.vars and self.env before the dbt command is built.
+        """
+        for interceptor in self.interceptors:
+            interceptor(context, self)
+
     def build_and_run_cmd(
         self,
         context: Context,
@@ -888,6 +896,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             if "--full-refresh" not in cmd_flags:
                 cmd_flags.append("--full-refresh")
 
+        self.invoke_interceptors(context)
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(

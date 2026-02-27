@@ -185,6 +185,7 @@ WATCHER_TASK_WEIGHT_RULE = "absolute"
 CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT = 2
 PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT = 20
 PRODUCER_WATCHER_TASK_ID = "dbt_producer_watcher"
+PRODUCER_ERROR_XCOM_KEY = "producer_error"
 
 # Historical telemetry endpoints retained for reference:
 # • v1 (Cosmos 1.8.0–1.10.x)

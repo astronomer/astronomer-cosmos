@@ -3,6 +3,7 @@
 Cosmos project policies and compatibility
 =========================================
 
+
 .. toctree::
    :maxdepth: 1
    :caption: Contribute to Cosmos

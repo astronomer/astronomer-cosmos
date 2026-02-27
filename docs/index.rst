@@ -7,7 +7,7 @@
 
    Home <self>
    Getting Started <getting_started/index>
-   Configuration <configuration/index>
+   Guides <guides/index>
    Profiles <profiles/index>
    Contributing <contributing>
    Airflow 3 compatibility <airflow3_compatibility/index>

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import json
-import traceback
 import zlib
 from collections.abc import Callable, Sequence
 from datetime import timedelta
@@ -20,7 +19,6 @@ except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from cosmos.constants import (
-    PRODUCER_ERROR_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
@@ -215,21 +213,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             return return_value
 
-        except Exception as e:
+        except Exception:
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
-            error_msg = str(e)
-            if not error_msg:
-                error_msg = repr(e)
-            try:
-                error_msg = f"{error_msg}\n\nTraceback:\n{traceback.format_exc()}"
-            except Exception:  # pragma: no cover - defensive
-                pass
-            compressed_error = base64.b64encode(zlib.compress(error_msg.encode("utf-8"))).decode("utf-8")
-            safe_xcom_push(
-                task_instance=context["ti"],
-                key=PRODUCER_ERROR_XCOM_KEY,
-                value=compressed_error,
-            )
             raise
 
 

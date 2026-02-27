@@ -10,17 +10,12 @@ from cosmos.config import ProfileConfig
 from cosmos.constants import (
     AIRFLOW_VERSION,
     CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
-    PRODUCER_ERROR_XCOM_KEY,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
 )
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import build_producer_state_fetcher, get_xcom_val, safe_xcom_push
-from cosmos.operators._watcher.triggerer import (
-    WatcherTrigger,
-    _decompress_string_xcom,
-    _parse_compressed_xcom,
-)
+from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
@@ -330,13 +325,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             )
 
         if reason == "producer_failed":
-            producer_error_message = event.get("producer_error_message")
-            if producer_error_message:
-                logger.error(
-                    "Producer task '%s' failed. Error from producer:\n%s",
-                    self.producer_task_id,
-                    producer_error_message,
-                )
             raise AirflowException(
                 f"Watcher producer task '{self.producer_task_id}' failed before reporting model results. Check its logs for the underlying error."
             )
@@ -386,14 +374,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if status is None:
 
             if producer_task_state == "failed":
-                producer_error = get_xcom_val(ti, self.producer_task_id, PRODUCER_ERROR_XCOM_KEY)
-                if producer_error:
-                    producer_error = _decompress_string_xcom(producer_error)
-                    logger.error(
-                        "Producer task '%s' failed. Error from producer:\n%s",
-                        self.producer_task_id,
-                        producer_error,
-                    )
                 if self.poke_retry_number > 0:
                     raise AirflowException(
                         f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."

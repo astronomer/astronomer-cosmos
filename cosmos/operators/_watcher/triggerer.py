@@ -11,7 +11,7 @@ from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
 
-from cosmos.constants import AIRFLOW_VERSION, PRODUCER_ERROR_XCOM_KEY
+from cosmos.constants import AIRFLOW_VERSION
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import build_producer_state_fetcher
 
@@ -199,13 +199,7 @@ class WatcherTrigger(BaseTrigger):
                     self.producer_task_id,
                     self.model_unique_id,
                 )
-                producer_error_message = await self.get_xcom_val(PRODUCER_ERROR_XCOM_KEY)
-                if producer_error_message:
-                    producer_error_message = _decompress_string_xcom(producer_error_message)
-                event_data.update({"status": "failed", "reason": "producer_failed"})
-                if producer_error_message:
-                    event_data["producer_error_message"] = producer_error_message
-                yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
+                yield TriggerEvent({"status": "failed", "reason": "producer_failed"})  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == "success" and node_status is None:
                 logger.info(

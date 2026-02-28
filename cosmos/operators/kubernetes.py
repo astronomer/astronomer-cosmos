@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import re
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from os import PathLike
 from typing import TYPE_CHECKING, Any
@@ -416,3 +416,112 @@ class DbtCloneKubernetesOperator(DbtCloneMixin, DbtKubernetesBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
+
+
+class DbtDocsKubernetesOperator(DbtKubernetesBaseOperator):
+    """
+    Executes `dbt docs generate` command.
+    Use the `callback` parameter to specify a callback function to run after the command completes.
+    """
+
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields  # type: ignore[operator]
+
+    ui_color = "#8194E0"
+    required_files = ["index.html", "manifest.json", "catalog.json"]
+    base_cmd = ["docs", "generate"]
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.check_static_flag()
+
+    def check_static_flag(self) -> None:
+        if self.dbt_cmd_flags:
+            if "--static" in self.dbt_cmd_flags:
+                # For the --static flag we only upload the generated static_index.html file
+                self.required_files = ["static_index.html"]
+        if self.dbt_cmd_global_flags:
+            if "--no-write-json" in self.dbt_cmd_global_flags and "graph.gpickle" in self.required_files:
+                self.required_files.remove("graph.gpickle")
+
+
+class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
+    """
+    Executes `dbt docs generate` inside a Kubernetes Pod and uploads
+    the generated documentation to cloud storage *also inside the Pod*.
+    """
+
+    template_fields: Sequence[str] = DbtDocsKubernetesOperator.template_fields  # type: ignore[operator]
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
+        # In Kubernetes mode, we do NOT use callback-based upload on the Airflow worker.
+        self.callback = None  # type: ignore[assignment]
+
+    @abstractmethod
+    def build_upload_shell_command(self, docs_target: str) -> str:
+        """
+        Build the shell command that will upload the generated docs from
+        `docs_target` to cloud storage. Implemented by subclasses.
+        """
+
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        # Build base Kubernetes pod args (incl. dbt CLI command)
+        self.build_kube_args(context, cmd_flags)
+
+        # self.arguments holds the dbt CLI command as list or string
+        if isinstance(self.arguments, list):
+            dbt_cmd = [str(part) for part in self.arguments]
+        else:
+            dbt_cmd = [str(self.arguments)]
+
+        dbt_cmd_str = " ".join(dbt_cmd)
+        docs_target = f"{self.project_dir}/target"
+
+        upload_cmd = self.build_upload_shell_command(docs_target)
+        shell_cmd = f"{dbt_cmd_str} && {upload_cmd}"
+
+        # Override container command and arguments
+        self.cmds = ["/bin/bash", "-c"]
+        self.arguments = [shell_cmd]
+
+        self.log.info("Running command in Kubernetes Pod: %s", self.arguments)
+        result = KubernetesPodOperator.execute(self, context)
+        self.log.info(result)
+        return result
+
+
+class DbtDocsS3KubernetesOperator(DbtDocsCloudKubernetesOperator):
+    """
+    Executes `dbt docs generate` inside a Kubernetes Pod and uploads the generated
+    documentation to S3 *also inside that Pod* using `aws s3 sync`.
+        - Airflow S3Hook and `connection_id` are NOT used in Kubernetes mode.
+        - The Kubernetes Pod must have AWS credentials (IRSA, kube2iam, Secret env).
+    """
+
+    ui_color = "#FF9900"
+
+    def __init__(
+        self,
+        bucket_name: str,
+        folder_dir: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.bucket_name = bucket_name
+        self.folder_dir = folder_dir
+
+    def build_upload_shell_command(self, docs_target: str) -> str:
+        if self.folder_dir:
+            s3_prefix = f"s3://{self.bucket_name}/{self.folder_dir}".rstrip("/")
+        else:
+            s3_prefix = f"s3://{self.bucket_name}"
+
+        return f"aws s3 sync {docs_target} {s3_prefix}"

@@ -60,13 +60,11 @@ The Cosmos project includes Airflow as a dependency, so when you install Cosmos 
     mkdir -p dbt_project/micro_project
 
 
-Your project structure should look like this:
+Your project structure should look like this: ::
 
-oss-quickstart
-
-├── dags/
-
-└── dbt_project/micro_project/
+    oss-quickstart
+    ├── dags/
+    └── dbt_project/micro_project/
 
 3. Create a minimal dbt project
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

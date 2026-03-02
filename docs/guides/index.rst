@@ -10,44 +10,21 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :hidden:
    :caption: Translating dbt into Airflow
 
-   Source Nodes Rendering <source-nodes-rendering>
-   Post-rendering DAG customization <dag-customization>
+   translate_dbt_to_airflow/index
 
 .. toctree::
    :maxdepth: 3
    :hidden:
    :caption: How Cosmos runs dbt
 
-   execution-modes-local-conflicts
-   run-dbt/execution-modes
-
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-   :caption: Configure tests
-
-   configure-tests/testing-behavior
-
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-   :caption: Callbacks
-
-   callbacks/callbacks
+   run_dbt/index
 
 .. toctree::
    :maxdepth: 1
    :hidden:
    :caption: Multi-project Setups
 
-   Multi-Project Setups <multi-project>
-
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-   :caption: Operators
-
-   Operator Args <operator-args>
+   multi_project/multi-project
 
 .. toctree::
    :maxdepth: 1
@@ -60,20 +37,21 @@ Cosmos offers a number of configuration options to customize its behavior. For m
 .. toctree::
    :maxdepth: 1
    :hidden:
-   :caption: Optimizing Performance
+   :caption: Cosmos DevEx
 
-   Memory Optimization <memory_optimization>
-   dbt Fusion <dbt-fusion>
-   Selecting & Excluding <selecting-excluding>
-   Parsing Methods <parsing-methods>
-   Partial Parsing <partial-parsing>
-   Caching <caching>
-   Render Config <render-config>
+   cosmos_devex/index
 
 .. toctree::
    :maxdepth: 1
    :hidden:
-   :caption: Configurations
+   :caption: Optimizing Performance
+
+   optimize_performance/index
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :caption: Configuration References
 
    Project Config <project-config>
    Profile Config <profile-config>

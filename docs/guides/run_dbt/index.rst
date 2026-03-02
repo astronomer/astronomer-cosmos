@@ -1,10 +1,7 @@
 .. _execution-modes:
 
-
-
-
-Execution Modes
-===============
+How Cosmos runs dbt
+===================
 
 .. toctree::
    :maxdepth: 3
@@ -17,6 +14,24 @@ Execution Modes
    :caption: Run dbt in a container
 
    container/index
+
+.. toctree::
+   :maxdepth: 3
+   :caption: Callbacks
+
+   callbacks/callbacks
+
+.. toctree::
+   :maxdepth: 3
+   :caption: Operators
+
+   operators/operators
+
+.. toctree::
+   :maxdepth: 3
+   :caption: Customize Airflow
+
+   customization/index
 
 
 Cosmos can run ``dbt`` commands using several different approaches, called ``execution modes``:

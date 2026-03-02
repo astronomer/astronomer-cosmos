@@ -17,15 +17,6 @@
    Google Cloud Composer (GCC) <gcc>
    Amazon Managed Workflows for Apache Airflow (MWAA) <mwaa>
 
-
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-   :caption: Operators
-
-   Operators <operators>
-   Custom Airflow Properties <custom-airflow-properties>
-
 Getting Started
 ===============
 
@@ -49,11 +40,11 @@ For more customization, check out the different execution modes that Cosmos supp
 
 For specific guides, see the following:
 
-- `Executing dbt DAGs with Docker Operators <guides/docker.html>`__
-- `Executing dbt DAGs with KubernetesPodOperators <guides/kubernetes.html>`__
-- `Executing dbt DAGs with Watcher Kubernetes Mode <guides/watcher-kubernetes-execution-mode.html>`__
-- `Executing dbt DAGs with AzureContainerInstancesOperators <guides/azure-container-instance.html>`__
-- `Executing dbt DAGs with GcpCloudRunExecuteJobOperators <guides/gcp-cloud-run-job.html>`__
+- `Executing dbt DAGs with Docker Operators <guides/run_dbt/container/docker.html>`__
+- `Executing dbt DAGs with KubernetesPodOperators <guides/run_dbt/container/kubernetes.html>`__
+- `Executing dbt DAGs with Watcher Kubernetes Mode <guides/run_dbt/container/watcher-kubernetes-execution-mode.html>`__
+- `Executing dbt DAGs with AzureContainerInstancesOperators <guides/run_dbt/container/azure-container-instance.html>`__
+- `Executing dbt DAGs with GcpCloudRunExecuteJobOperators <guides/run_dbt/container/gcp-cloud-run-job.html>`__
 
 
 Concepts Overview

@@ -157,7 +157,6 @@ Now, in your ``dags`` directory, create an Airflow Dag with the following comman
 
 .. codeblock:: bash
 
-cd ../dags # move to dags directory
 touch dags/micro_project_dag.py
 
 Add the following Dag Python code to your new file. This Dag tells Airflow and Cosmos where to find the dbt project and profile configurations, which they use to execute the dbt code and write results to the database. This Dag does not include any scheduling information, so you might need to manually trigger Dag runs from the Airflow UI or CLI when you **Run Airflow** at a later step.
@@ -207,11 +206,18 @@ At this point, you've completed the following project setup steps:
 - Created an Airflow Dag that defines the ``profile_config`` and ``project_config``, which tells Cosmos the locations of the dbt project and ``profiles.yml`` file.
 - Defined the Airflow project home and configured environment variables that improve local Dag performance.
 
-Now you can run an Airflow Dag.
+1. Now you can run an Airflow Dag by using ``airflow standalone``, which initializes the database, creates a user, and starts all components at ``localhost: 8080``.
 
 .. codeblock:: bash
 
 airflow standalone
+
+2. Airflow autogenerates credentials when it launches that you must use to access the local Airflow UI.
+Open the ``simple_auth_manager_passwords.json.generated`` file in your ``oss-quickstart`` directory. This file contains the ``{"username": "password"}`` key-value pair for you to use to login to ``localhost:8080``.
+
+.. codeblock:: json
+
+{"admin": "exampl3-string"}
 
 Troubleshooting
 ~~~~~~~~~~~~~~~~~~

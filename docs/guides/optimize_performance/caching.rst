@@ -84,7 +84,7 @@ The method deletes the Cosmos cache stored in Airflow Variables based on the las
 
 As an example, the following clean-up DAG will delete any cache associated with Cosmos that has not been used for the last five days:
 
-.. literalinclude:: ../../dev/dags/example_cosmos_cleanup_dag.py
+.. literalinclude:: ../../../dev/dags/example_cosmos_cleanup_dag.py
     :language: python
     :start-after: [START cache_example]
     :end-before: [END cache_example]
@@ -161,7 +161,7 @@ The method deletes the Cosmos cache stored in Airflow Variables based on the las
 
 As an example, the following clean-up DAG will delete any cache associated with Cosmos that has not been used for the last five days:
 
-.. literalinclude:: ../../dev/dags/example_cosmos_cleanup_dag.py
+.. literalinclude:: ../../../dev/dags/example_cosmos_cleanup_dag.py
     :language: python
     :start-after: [START cache_example]
     :end-before: [END cache_example]

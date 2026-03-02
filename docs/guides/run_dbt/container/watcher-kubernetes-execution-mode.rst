@@ -183,7 +183,7 @@ Example DAG
 
 Below is a complete example of a DAG using ``ExecutionMode.WATCHER_KUBERNETES``:
 
-.. literalinclude:: ../../dev/dags/jaffle_shop_watcher_kubernetes.py
+.. literalinclude:: ../../../../dev/dags/jaffle_shop_watcher_kubernetes.py
     :language: python
 
 -------------------------------------------------------------------------------

@@ -144,7 +144,7 @@ Example 1 — Using ``DbtDag`` with ``ExecutionMode.WATCHER``
 You can enable WATCHER mode directly in your ``DbtDag`` configuration.
 This approach is best when your Airflow DAG is fully dedicated to a dbt project.
 
-.. literalinclude:: ../../dev/dags/example_watcher.py
+.. literalinclude:: ../../../../dev/dags/example_watcher.py
     :language: python
     :start-after: [START example_watcher]
     :end-before: [END example_watcher]
@@ -451,7 +451,7 @@ Asynchronous sensor execution
 
 To disable asynchronous execution, set the ``deferrable`` flag to ``False`` in the ``operator_args``.
 
-.. literalinclude:: ../../dev/dags/example_watcher.py
+.. literalinclude:: ../../../../dev/dags/example_watcher.py
    :language: python
    :start-after: [START example_watcher_synchronous]
    :end-before: [END example_watcher_synchronous]

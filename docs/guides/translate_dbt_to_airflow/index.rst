@@ -21,6 +21,6 @@ Translate dbt code into Airflow
    :maxdepth: 1
    :caption: Translate nodes
 
-   source-nodes-rendering
+   managing-sources
    render-config
    dag-customization

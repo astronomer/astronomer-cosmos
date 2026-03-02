@@ -702,7 +702,6 @@ class DbtGraph:
                 "ls",
                 "--output",
                 "json",
-              
             ]
 
         ls_args = self.dbt_ls_args
@@ -1173,8 +1172,8 @@ class DbtGraph:
             )
             if node is not None:
                 nodes[node.unique_id] = node
-        return nodes      
-      
+        return nodes
+
     def _apply_manifest_node_selection(self, nodes: dict[str, DbtNode], manifest: dict[str, Any]) -> None:
         """Set self.nodes and self.filtered_nodes using selector or render_config select/exclude."""
         project_dir = self.execution_config.project_path

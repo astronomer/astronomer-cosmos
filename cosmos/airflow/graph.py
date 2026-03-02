@@ -910,7 +910,6 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     parent_task_group = task_group
     producer_task: BaseOperator | None = None
 
-
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents
     detached_nodes: dict[str, DbtNode] = OrderedDict()
@@ -935,7 +934,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             render_config=render_config,
             execution_mode=execution_mode,
         )
-        
+
     for node_id, node in nodes.items():
         task_group = (
             generate_resource_task_group(dag, node, parent_task_group, task_groups)

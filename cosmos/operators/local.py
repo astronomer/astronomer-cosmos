@@ -873,14 +873,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             job_facets=job_facets,
         )
 
-    def invoke_interceptors(self, context: Context) -> None:
-        """
-        Run each callable in self.interceptors with (context, self).
-        Interceptors may modify self.vars and self.env before the dbt command is built.
-        """
-        for interceptor in self.interceptors:
-            interceptor(context, self)
-
     def build_and_run_cmd(
         self,
         context: Context,

@@ -233,6 +233,14 @@ class AbstractDbtBase(metaclass=ABCMeta):
 
         return filtered_env
 
+    def invoke_interceptors(self, context: Context) -> None:
+        """
+        Run each callable in self.interceptors with (context, self).
+        Interceptors may modify self.vars and self.env before the dbt command is built.
+        """
+        for interceptor in self.interceptors:
+            interceptor(context, self)
+
     @property
     def log(self) -> logging.Logger:
         return get_logger(__name__)

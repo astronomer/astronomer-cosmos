@@ -9,7 +9,7 @@
    Getting Started <getting_started/index>
    Configuration <configuration/index>
    Profiles <profiles/index>
-   Project policies <policy/index>
+   Project Policies <policy/index>
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
@@ -44,12 +44,12 @@ Astronomer Cosmos is an open-source library that bridges Apache Airflow and dbt,
 dbt projects into Airflow DAGs and manage everything seamlessly. With Cosmos, you can write your data transformations
 using dbt and then schedule and orchestrate them with Airflow, making the entire process smooth and straightforward.
 
-**Why Cosmos?**  Integrating dbt and Airflow can be complex, but Cosmos simplifies it by seamlessly connecting these
-powerful tools—letting you focus on what matters most: delivering impactful data models and results without getting
-bogged down by technical challenges.
-
 Why Should You Use Cosmos?
 ___________________________
+
+Integrating dbt and Airflow can be complex, but Cosmos simplifies it by seamlessly connecting these
+powerful tools—letting you focus on what matters most: delivering impactful data models and results without getting
+bogged down by technical challenges.
 
 Cosmos makes orchestrating dbt workflows:
 
@@ -67,8 +67,8 @@ Have questions, need help, or interested in contributing? We welcome all contrib
 
 - Join the community on Slack! You can find us in the Airflow Slack workspace `#airflow-dbt <https://apache-airflow.slack.com/archives/C059CC42E9W>`_ channel. If you don't have an account, click `here <https://apache-airflow-slack.herokuapp.com/>`_ to sign up.
 - Report bugs, request features, or ask questions by creating an issue in the `GitHub repository <https://github.com/astronomer/astronomer-cosmos/issues/new/choose>`_.
-- Want to contribute new features, bug fixes or documentation enhancements? Please refer to our `Contributing Guide <https://astronomer.github.io/astronomer-cosmos/policy/contributing>`_.`   `
-- Check out this `link <https://astronomer.github.io/astronomer-cosmos/policy/contributors>`_. to learn more about our current contributors.
+- Want to contribute new features, bug fixes or documentation enhancements? Please refer to our `Contributing Guide <https://astronomer.github.io/astronomer-cosmos/policy/contributing>`_.
+- Check out our `Current Contributors <https://astronomer.github.io/astronomer-cosmos/policy/contributors>`_.
 
 Note that contributors and maintainers are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.

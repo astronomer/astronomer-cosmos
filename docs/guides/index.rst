@@ -24,6 +24,7 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :hidden:
    :caption: How Cosmos runs dbt
 
+   run_dbt/execution-modes
    run_dbt/airflow-worker/index
    run_dbt/container/index
    run_dbt/callbacks/callbacks
@@ -52,12 +53,3 @@ Cosmos offers a number of configuration options to customize its behavior. For m
 
    cosmos_devex/index
 
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-   :caption: Configuration References
-
-   Project Config <project-config>
-   Profile Config <profile-config>
-   Execution Config <execution-config>
-   Cosmos Config <cosmos-conf>

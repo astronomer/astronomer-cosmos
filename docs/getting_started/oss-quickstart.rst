@@ -229,10 +229,6 @@ At this point, you've completed the following project setup steps:
 2. Airflow autogenerates credentials when it launches that you must use to access the local Airflow UI.
 Open the ``simple_auth_manager_passwords.json.generated`` file in your ``oss-quickstart`` directory. This file contains the ``{"username": "password"}`` key-value pair for you to use to login to ``localhost:8080``.
 
-.. code-block:: json
-
-    {"admin": "exampl3-string"}
-
 
 Troubleshooting
 ~~~~~~~~~~~~~~~~~~

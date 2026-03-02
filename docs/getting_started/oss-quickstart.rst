@@ -1,6 +1,6 @@
 .. _oss-quickstart:
 
-Run Cosmos on Open-source Airflow
+Run Cosmos in Open-source Airflow
 =================================
 
 Quickly get started working locally with Airflow, dbt, and Astronomer Cosmos using the `Open-source Airflow <https://airflow.apache.org/docs/apache-airflow/stable/index.html>`_.
@@ -109,8 +109,7 @@ Add the following content to your ``profiles.yml``:
         schema: main
 
 
-(Optional) Specify a database to access with a database viewer
---------------------------------------------------------------
+**(Optional) Specify a database to access with a database viewer**
 
 If you want to access the output results of your Cosmos dag, you can add a complete filepath and database name to your ``profiles.yml`` configuration. You can use this filepath later to access your dbt results.
 

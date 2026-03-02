@@ -4,7 +4,7 @@
    :hidden:
    :caption: Contents:
 
-   oss-quickstart
+   Open-source Airflow quickstart <oss-quickstart>
    Astro <astro>
    MWAA <mwaa>
    GCC <gcc>

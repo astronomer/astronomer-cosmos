@@ -52,4 +52,3 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :caption: Cosmos DevEx
 
    cosmos_devex/index
-

@@ -1,7 +1,7 @@
-.. _source-nodes-rendering:
+.. _managing-sources:
 
-Source Nodes Rendering
-======================
+Managing Sources
+================
 
 .. note::
     This feature is only available for dbt-core >= 1.5 and cosmos >= 1.6.0.

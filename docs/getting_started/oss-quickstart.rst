@@ -29,12 +29,14 @@ Prerequisites
     mkdir oss-quickstart
     cd oss-quickstart
 
+
 2. Create and activate a Python virtual environment in your demo directory.
 
 .. code-block:: bash
 
-python3 -m venv venv
-source venv/bin/activate
+    python3 -m venv venv
+    source venv/bin/activate
+
 
 If you exit your virtual environment, remember you can reactivate it by returning to your project directory and then using the ``source venv/bin/activate`` command.
 
@@ -44,7 +46,7 @@ The Cosmos project includes Airflow as a dependency, so when you install Cosmos 
 
 .. code-block:: python
 
-pip install astronomer-cosmos dbt-sqlite
+    pip install astronomer-cosmos dbt-sqlite
 
 
 2. Create your Cosmos project structure
@@ -54,14 +56,17 @@ pip install astronomer-cosmos dbt-sqlite
 
 .. code-block:: bash
 
-mkdir dags
-mkdir -p dbt_project/micro_project
+    mkdir dags
+    mkdir -p dbt_project/micro_project
+
 
 Your project structure should look like this:
 
 oss-quickstart
-    ├── dags/
-    └── dbt_project/micro_project/
+
+├── dags/
+
+└── dbt_project/micro_project/
 
 3. Create a minimal dbt project
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -72,55 +77,59 @@ For the demo dbt project, you need to make some essential components for your pr
 
 .. code-block:: bash
 
-touch dbt_project/micro_project/dbt_project.yml
+    touch dbt_project/micro_project/dbt_project.yml
 
 
 Add the following content to your new project definition.
 
 .. code-block:: yaml
 
-name: 'micro_project'
-version: '1.0'
-profile: 'micro_project'
-model-paths: ["models"]
+    name: 'micro_project'
+    version: '1.0'
+    profile: 'micro_project'
+    model-paths: ["models"]
+
 
 2. Create your dbt project's ``profiles.yml``. Cosmos can use this file to connect Airflow to your dbt database, without you needing to specify an Airflow connection.
 
-.. codeblock:: bash
+.. code-block:: bash
 
-touch dbt_project/micro_project/profiles.yml
+    touch dbt_project/micro_project/profiles.yml
+
 
 Add the following content to your ``profiles.yml``:
 
-.. codeblock:: yaml
+.. code-block:: yaml
 
-micro_project:
-  target: dev
-  outputs:
-    dev:
-      type: sqlite
-      threads: 1
-      database: "my_database.db"
-      schema: main
+    micro_project:
+    target: dev
+    outputs:
+        dev:
+        type: sqlite
+        threads: 1
+        database: "my_database.db"
+        schema: main
+
 
 (Optional) Specify a database to access with a database viewer
 --------------------------------------------------------------
 
 If you want to access the output results of your Cosmos dag, you can add a complete filepath and database name to your ``profiles.yml`` configuration. You can use this filepath later to access your dbt results.
 
-.. codeblock:: yaml
+.. code-block:: yaml
 
-micro_project:
-  target: dev
-  outputs:
-    dev:
-      type: sqlite
-      threads: 1
-      database: database
-      schema: main
-      schema_and_paths:
-            main: <explicit-path-to-demo-project>/oss-quickstart/my_database.db
-      schema_directory: <explicit-path-to-demo-project>/oss-quickstart
+    micro_project:
+    target: dev
+    outputs:
+        dev:
+        type: sqlite
+        threads: 1
+        database: database
+        schema: main
+        schema_and_paths:
+                main: <explicit-path-to-demo-project>/oss-quickstart/my_database.db
+        schema_directory: <explicit-path-to-demo-project>/oss-quickstart
+
 
 3. Create a base dbt model
 
@@ -128,61 +137,66 @@ Create a simple dbt model in the ``micro_project`` models.
 
 .. code-block:: bash
 
-mkdir -p dbt_project/micro_project/models
-echo "select 1 as id, 'hello' as greeting" > dbt_project/micro_project/models/base_model.sql
+    mkdir -p dbt_project/micro_project/models
+    echo "select 1 as id, 'hello' as greeting" > dbt_project/micro_project/models/base_model.sql
+
 
 4. Create an enriched dbt model
 
 Create your enriched dbt model using the following comands.
 
-.. codeblock:: bash
+.. code-block:: bash
 
-touch dbt_project/micro_project/models/enriched_model.sql
+    touch dbt_project/micro_project/models/enriched_model.sql
+
 
 Open the ``enriched_model.sql`` file and add the following commands:
 
-.. codeblock:: sql
+.. code-block:: sql
 
-select
-    id,
-    greeting,
-    upper(greeting) as greeting_upper,
-    length(greeting) as greeting_length
-from {{ ref('base_model') }}
+    select
+        id,
+        greeting,
+        upper(greeting) as greeting_upper,
+        length(greeting) as greeting_length
+    from {{ ref('base_model') }}
+
 
 4. Create an Airflow Dag
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 Now, in your ``dags`` directory, create an Airflow Dag with the following commands:
 
-.. codeblock:: bash
+.. code-block:: bash
 
-touch dags/micro_project_dag.py
+    touch dags/micro_project_dag.py
+
 
 Add the following Dag Python code to your new file. This Dag tells Airflow and Cosmos where to find the dbt project and profile configurations, which they use to execute the dbt code and write results to the database. This Dag does not include any scheduling information, so you might need to manually trigger Dag runs from the Airflow UI or CLI when you **Run Airflow** at a later step.
 
-.. codeblock:: python
+.. code-block:: python
 
-import pathlib
-import os
+    import pathlib
+    import os
 
-from cosmos import DbtDag, ProjectConfig, ProfileConfig
+    from cosmos import DbtDag, ProjectConfig, ProfileConfig
 
-DBT_PROJECT_PATH = pathlib.Path(
-    os.getenv("AIRFLOW_HOME", pathlib.Path(__file__).parent.parent)
-) / "dbt_project/micro_project"
+    DBT_PROJECT_PATH = pathlib.Path(
+        os.getenv("AIRFLOW_HOME", pathlib.Path(__file__).parent.parent)
+    ) / "dbt_project/micro_project"
 
-micro_project_dag = DbtDag(
-    dag_id="micro_project_dag",
-    project_config=ProjectConfig(
-        dbt_project_path=DBT_PROJECT_PATH,
-    ),
-    profile_config=ProfileConfig(
-        profile_name="micro_project",
-        target_name="dev",
-        profiles_yml_filepath=DBT_PROJECT_PATH / "profiles.yml",
+    micro_project_dag = DbtDag(
+        dag_id="micro_project_dag",
+        project_config=ProjectConfig(
+            dbt_project_path=DBT_PROJECT_PATH,
+        ),
+        profile_config=ProfileConfig(
+            profile_name="micro_project",
+            target_name="dev",
+            profiles_yml_filepath=DBT_PROJECT_PATH / "profiles.yml",
+        )
     )
-)
+
 
 5. Export environmental variables to Airflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -190,11 +204,12 @@ micro_project_dag = DbtDag(
 To successfully run your Dag, Airflow needs you to define the some environment variables.
 These identify the project home directory, ``AIRFLOW_HOME``, and disable additional Airflow and Cosmos features that are not required for local execution.
 
-.. codeblock:: bash
+.. code-block:: bash
 
-export AIRFLOW_HOME=`pwd`
-export AIRFLOW__CORE__LOAD_EXAMPLES=false
-export AIRFLOW__COSMOS__ENABLE_TELEMETRY=false
+    export AIRFLOW_HOME=`pwd`
+    export AIRFLOW__CORE__LOAD_EXAMPLES=false
+    export AIRFLOW__COSMOS__ENABLE_TELEMETRY=false
+
 
 6. Run Airflow
 ~~~~~~~~~~~~~~
@@ -206,25 +221,28 @@ At this point, you've completed the following project setup steps:
 - Created an Airflow Dag that defines the ``profile_config`` and ``project_config``, which tells Cosmos the locations of the dbt project and ``profiles.yml`` file.
 - Defined the Airflow project home and configured environment variables that improve local Dag performance.
 
+
 1. Now you can run an Airflow Dag by using ``airflow standalone``, which initializes the database, creates a user, and starts all components at ``localhost: 8080``.
 
-.. codeblock:: bash
+.. code-block:: bash
 
-airflow standalone
+    airflow standalone
+
 
 2. Airflow autogenerates credentials when it launches that you must use to access the local Airflow UI.
 Open the ``simple_auth_manager_passwords.json.generated`` file in your ``oss-quickstart`` directory. This file contains the ``{"username": "password"}`` key-value pair for you to use to login to ``localhost:8080``.
 
-.. codeblock:: json
+.. code-block:: json
 
-{"admin": "exampl3-string"}
+    {"admin": "exampl3-string"}
+
 
 Troubleshooting
 ~~~~~~~~~~~~~~~~~~
 
 If you encounter issues, like errror messages that say **Cosmos Dag not loading**, try resetting the Airflow database and reserializing with the following commands.
 
-.. codeblock:: bash
+.. code-block:: bash
 
-airflow db reset
-airflow dags reserialize
+    airflow db reset
+    airflow dags reserialize

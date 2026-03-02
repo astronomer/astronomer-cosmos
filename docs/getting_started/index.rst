@@ -4,6 +4,7 @@
    :hidden:
    :caption: Contents:
 
+   oss-quickstart
    Astro <astro>
    MWAA <mwaa>
    GCC <gcc>

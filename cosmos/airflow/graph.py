@@ -899,7 +899,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     and “test_results” of type List.
     :return: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
     """
-    enable_resource_grouping = render_config.enable_resource_grouping
+    group_nodes_by_folder = render_config.group_nodes_by_folder
     tasks_map: dict[str, TaskGroup | BaseOperator] = {}
     task_groups: dict[str, TaskGroup] = {}
     task_or_group: TaskGroup | BaseOperator | None
@@ -934,7 +934,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     for node_id, node in nodes.items():
         task_group = (
             generate_resource_task_group(dag, node, parent_task_group, task_groups)
-            if enable_resource_grouping
+            if group_nodes_by_folder
             else task_group
         )
         task_or_group_args = {

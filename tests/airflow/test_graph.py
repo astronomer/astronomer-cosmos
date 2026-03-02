@@ -163,7 +163,7 @@ def test_build_airflow_graph_with_after_each():
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
             render_config=RenderConfig(
-                enable_resource_grouping=True,
+                group_nodes_by_folder=True,
                 test_behavior=TestBehavior.AFTER_EACH,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
             ),
@@ -268,7 +268,7 @@ def test_build_airflow_graph_with_after_all():
         }
         render_config = RenderConfig(
             select=["tag:some"],
-            enable_resource_grouping=True,
+            group_nodes_by_folder=True,
             test_behavior=TestBehavior.AFTER_ALL,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         )
@@ -315,7 +315,7 @@ def test_build_airflow_graph_with_build():
             ),
         }
         render_config = RenderConfig(
-            enable_resource_grouping=True,
+            group_nodes_by_folder=True,
             test_behavior=TestBehavior.BUILD,
         )
         build_airflow_graph(
@@ -368,7 +368,7 @@ def test_build_airflow_graph_with_override_profile_config():
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
             dbt_project_name="astro_shop",
-            render_config=RenderConfig(enable_resource_grouping=True),
+            render_config=RenderConfig(group_nodes_by_folder=True),
         )
 
     generated_seed_profile_config = dag.task_dict["seed_parent_seed"].profile_config
@@ -1078,7 +1078,7 @@ def test_airflow_kwargs_generation():
         "project_dir": SAMPLE_PROJ_PATH,
         "conn_id": "fake_conn",
         "render_config": RenderConfig(
-            select=["fake-render"], enable_resource_grouping=True, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
+            select=["fake-render"], group_nodes_by_folder=True, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
         ),
         "default_args": {"retries": 2},
         "profile_config": ProfileConfig(
@@ -1208,7 +1208,7 @@ def test_custom_meta():
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
             render_config=RenderConfig(
-                enable_resource_grouping=True,
+                group_nodes_by_folder=True,
                 test_behavior=TestBehavior.AFTER_EACH,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
             ),

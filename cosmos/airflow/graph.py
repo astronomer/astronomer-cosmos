@@ -977,6 +977,8 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             "task_meta": test_meta,
             "resource_type": DbtResourceType.TEST,  # type: ignore
         }
+        # AFTER_ALL test is a single DAG-level task: place it at root so task_id stays e.g. "astro_shop_test"
+        test_task_args["task_group"] = parent_task_group
         test_task = generate_or_convert_task(**test_task_args)  # type: ignore[arg-type]
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:

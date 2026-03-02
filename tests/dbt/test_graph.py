@@ -117,7 +117,11 @@ def postgres_profile_config() -> ProfileConfig:
 )
 def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
     node = DbtNode(
-        unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="", original_file_path=""
+        unique_id=unique_id,
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
     )
     assert node.name == expected_name
     assert node.resource_name == expected_select
@@ -128,8 +132,8 @@ def test_dbt_node_meta():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
-        original_file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": {}}},
     )
     assert valid_node.meta == {}
@@ -138,8 +142,8 @@ def test_dbt_node_meta():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
-        original_file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": ""}},
     )
     with pytest.raises(CosmosLoadDbtException) as exc_info:
@@ -154,8 +158,8 @@ def test_dbt_node_operator_kwargs_to_override():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
-        original_file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": {"operator_kwargs": {}}}},
     )
     assert valid_node.operator_kwargs_to_override == {}
@@ -164,8 +168,8 @@ def test_dbt_node_operator_kwargs_to_override():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
-        original_file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": {"operator_kwargs": ""}}},
     )
     with pytest.raises(CosmosLoadDbtException) as exc_info:
@@ -180,8 +184,8 @@ def test_dbt_profile_config_to_override():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
-        original_file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": {"profile_config": {}}}},
     )
     assert valid_node.profile_config_to_override == {}
@@ -190,8 +194,8 @@ def test_dbt_profile_config_to_override():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
-        original_file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": {"profile_config": ""}}},
     )
     with pytest.raises(CosmosLoadDbtException) as exc_info:
@@ -210,8 +214,8 @@ def test_dbt_profile_config_to_override():
                 "unique_id": "model.my_project.customers",
                 "resource_type": "model",
                 "depends_on": [],
-                "file_path": "",
-                "original_file_path": "",
+                "file_path": ".",
+                "original_file_path": ".",
                 "tags": [],
                 "config": {},
                 "has_test": False,
@@ -226,8 +230,8 @@ def test_dbt_profile_config_to_override():
                 "unique_id": "model.my_project.customers.v1",
                 "resource_type": "model",
                 "depends_on": [],
-                "file_path": "",
-                "original_file_path": "",
+                "file_path": ".",
+                "original_file_path": ".",
                 "tags": [],
                 "config": {},
                 "has_test": False,
@@ -243,7 +247,11 @@ def test_dbt_node_context_dict(
     expected_dict,
 ):
     node = DbtNode(
-        unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="", original_file_path=""
+        unique_id=unique_id,
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
     )
     assert node.context_dict == expected_dict
 
@@ -1712,8 +1720,9 @@ Values returned by mac_get_values:
         "model.some_package.some_model": DbtNode(
             unique_id="model.some_package.some_model",
             resource_type=DbtResourceType.MODEL,
-            file_path=Path("some_package/models/some_model.sql"),
-            original_file_path="models/some_model.sql",
+            depends_on=["source.some_source"],
+            path_base=Path("some_package"),
+            original_file_path=Path("models/some_model.sql"),
             tags=[],
             config={
                 "access": "protected",
@@ -1746,7 +1755,6 @@ Values returned by mac_get_values:
                 "tags": [],
                 "unique_key": None,
             },
-            depends_on=["source.some_source"],
             package_name="some_package",
         ),
     }
@@ -1763,11 +1771,11 @@ def test_parse_dbt_ls_output():
         "fake-unique-id": DbtNode(
             unique_id="fake-unique-id",
             resource_type=DbtResourceType.MODEL,
-            file_path=Path("fake-project/fake-file-path.sql"),
-            original_file_path="fake-file-path.sql",
+            depends_on=[],
+            path_base=Path("fake-project"),
+            original_file_path=Path("fake-file-path.sql"),
             tags=[],
             config={},
-            depends_on=[],
             package_name="fake-project",
         ),
     }
@@ -1783,11 +1791,11 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
         "some-unique-id": DbtNode(
             unique_id="some-unique-id",
             resource_type=DbtResourceType.MODEL,
-            file_path=Path("some-project/some-file-path.sql"),
-            original_file_path="some-file-path.sql",
+            depends_on=[],
+            path_base=Path("some-project"),
+            original_file_path=Path("some-file-path.sql"),
             tags=[],
             config={},
-            depends_on=[],
             package_name="some-project",
         ),
     }
@@ -2272,7 +2280,12 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
         # Different macOS versions have produced different hashes for this directory. The first value below is a
         # historical macOS-specific hash, while the second matches the Linux hash asserted in the else-branch. We
         # allow both here so that the test is stable across macOS versions and when macOS hashing matches Linux.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "633a523f295ef0cd496525428815537b")
+        # 05b2f136b8c97298e60a15134aec1d2d observed after DbtNode path_base refactor.
+        assert hash_dir in (
+            "9d95cbf6529e2ab51fadd6a3f0a3971f",
+            "633a523f295ef0cd496525428815537b",
+            "05b2f136b8c97298e60a15134aec1d2d",
+        )
     else:
         assert hash_dir == "633a523f295ef0cd496525428815537b"
 
@@ -2314,7 +2327,12 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
         # Some macOS versions compute a different directory hash than Linux, while others match the Linux behavior.
         # The first value is the macOS-specific hash; the second value is the Linux hash, which certain macOS versions also produce.
         # We allow both here to keep the test stable across macOS releases, while non-macOS platforms assert only the Linux hash.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "633a523f295ef0cd496525428815537b")
+        # 05b2f136b8c97298e60a15134aec1d2d observed after DbtNode path_base refactor.
+        assert hash_dir in (
+            "9d95cbf6529e2ab51fadd6a3f0a3971f",
+            "633a523f295ef0cd496525428815537b",
+            "05b2f136b8c97298e60a15134aec1d2d",
+        )
     else:
         assert hash_dir == "633a523f295ef0cd496525428815537b"
 

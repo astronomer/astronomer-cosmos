@@ -8,6 +8,13 @@ Cosmos offers a number of configuration options to customize its behavior. For m
 .. toctree::
    :maxdepth: 1
    :hidden:
+   :caption: Set up dbt with Airflow
+
+   dbt_setup/dbt-fusion
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
    :caption: Translating dbt into Airflow
 
    translate_dbt_to_airflow/index
@@ -31,8 +38,8 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :hidden:
    :caption: Documentation
 
-   dbt-docs/generating-docs
-   dbt-docs/hosting-docs
+   dbt_docs/generating-docs
+   dbt_docs/hosting-docs
 
 .. toctree::
    :maxdepth: 1
@@ -56,16 +63,4 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Project Config <project-config>
    Profile Config <profile-config>
    Execution Config <execution-config>
-
-
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-   :caption: Customizing Airflow
-
-   Configuring in Airflow <cosmos-conf>
-   Configuring Lineage <lineage>
-   Scheduling <scheduling>
-   Compiled SQL <compiled-sql>
-   Logging <logging>
-   Task display name <task-display-name>
+   Cosmos Config <cosmos-conf>

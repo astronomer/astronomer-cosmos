@@ -899,11 +899,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     and “test_results” of type List.
     :return: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
     """
-    node_converters = render_config.node_converters or {}
-    test_behavior = render_config.test_behavior
     enable_resource_grouping = render_config.enable_resource_grouping
-    source_rendering_behavior = render_config.source_rendering_behavior
-    normalize_task_id = render_config.normalize_task_id
     tasks_map: dict[str, TaskGroup | BaseOperator] = {}
     task_groups: dict[str, TaskGroup] = {}
     task_or_group: TaskGroup | BaseOperator | None

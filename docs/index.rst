@@ -8,6 +8,7 @@
    Home <self>
    Getting Started <getting_started/index>
    Guides <guides/index>
+   Optimize Performance <optimize_performance/index>
    Profiles <profiles/index>
    Contributing <contributing>
    Airflow 3 compatibility <airflow3_compatibility/index>

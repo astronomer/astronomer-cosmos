@@ -28,7 +28,7 @@ Additional KubernetesPodOperator parameters can be added to the ``operator_args`
 
 For instance,
 
-.. literalinclude:: ../../dev/dags/jaffle_shop_kubernetes.py
+.. literalinclude:: ../../../../dev/dags/jaffle_shop_kubernetes.py
    :language: python
    :start-after: [START kubernetes_tg_example]
    :end-before: [END kubernetes_tg_example]

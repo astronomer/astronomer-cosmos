@@ -169,7 +169,7 @@ You can use either separate DAGs or a combined DAG with task groups.
 
 **Option 1: Combined DAG with Task Groups using dbt ls Load Mode (Recommended)**
 
-.. literalinclude:: ../../dev/dags/cross_project_dbt_ls_dag.py
+.. literalinclude:: ../../../dev/dags/cross_project_dbt_ls_dag.py
     :language: python
     :start-after: [START cross_project_dbt_ls_dag]
     :end-before: [END cross_project_dbt_ls_dag]
@@ -178,7 +178,7 @@ You can use either separate DAGs or a combined DAG with task groups.
 
 This option uses pre-generated ``manifest.json`` files for faster DAG parsing (no ``dbt ls`` execution required).
 
-.. literalinclude:: ../../dev/dags/cross_project_manifest_dag.py
+.. literalinclude:: ../../../dev/dags/cross_project_manifest_dag.py
     :language: python
     :start-after: [START cross_project_manifest_dag]
     :end-before: [END cross_project_manifest_dag]

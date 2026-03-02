@@ -127,7 +127,7 @@ When using the ``local`` execution mode, Cosmos converts Airflow Connections int
 
 Example of how to use, for instance, when ``dbt`` was installed together with Cosmos:
 
-.. literalinclude:: ../../dev/dags/basic_cosmos_dag.py
+.. literalinclude:: ../../../dev/dags/basic_cosmos_dag.py
     :language: python
     :start-after: [START local_example]
     :end-before: [END local_example]
@@ -153,7 +153,7 @@ Some drawbacks of this approach:
 
 Example of how to use:
 
-.. literalinclude:: ../../dev/dags/example_virtualenv.py
+.. literalinclude:: ../../../dev/dags/example_virtualenv.py
    :language: python
    :start-after: [START virtualenv_example]
    :end-before: [END virtualenv_example]
@@ -201,7 +201,7 @@ Check the step-by-step guide on using the ``kubernetes`` execution mode at :ref:
 
 Example DAG:
 
-.. literalinclude:: ../../dev/dags/jaffle_shop_kubernetes.py
+.. literalinclude:: ../../../dev/dags/jaffle_shop_kubernetes.py
    :language: python
    :start-after: [START kubernetes_seed_example]
    :end-before: [END kubernetes_seed_example]
@@ -345,7 +345,7 @@ as more dbt nodes will be run in parallel since they won't be blocking Airflow's
 
 Example DAG:
 
-.. literalinclude:: ../../dev/dags/simple_dag_async.py
+.. literalinclude:: ../../../dev/dags/simple_dag_async.py
    :language: python
    :start-after: [START airflow_async_execution_mode_example]
    :end-before: [END airflow_async_execution_mode_example]

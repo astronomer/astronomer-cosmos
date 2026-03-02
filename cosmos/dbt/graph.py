@@ -8,14 +8,25 @@ import json
 import os
 import platform
 import tempfile
+import warnings
 import zlib
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
+
+if TYPE_CHECKING:
+    try:
+        # Airflow 3 onwards
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        try:
+            from airflow.io.path import ObjectStoragePath
+        except ImportError:
+            pass
 
 import cosmos.dbt.runner as dbt_runner
 from cosmos import cache, settings
@@ -43,10 +54,11 @@ from cosmos.dbt.project import (
     copy_dbt_packages,
     create_symlinks,
     environ,
+    get_dbt_packages_subpath,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
 )
-from cosmos.dbt.selector import select_nodes
+from cosmos.dbt.selector import YamlSelectors, select_nodes
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -83,14 +95,18 @@ class DbtNode:
     config: dict[str, Any] = field(default_factory=lambda: {})
     has_freshness: bool = False
     has_test: bool = False
+    has_non_detached_test: bool = False
+    downstream: list[str] = field(default_factory=lambda: [])
+    fqn: list[str] | None = None
 
     @property
-    def meta(self) -> Dict[str, Any]:
+    def meta(self) -> dict[str, Any]:
         """
         Extract node-specific configuration declared in the model dbt YAML configuration.
         These will be used while instantiating Airflow tasks.
         """
-        value = self.config.get("meta", {}).get("cosmos", {})
+        meta_cfg = self.config.get("meta") or {}
+        value = meta_cfg.get("cosmos", {})
         if not isinstance(value, dict):
             raise CosmosLoadDbtException(
                 f"Error parsing dbt node <{self.unique_id}>. Invalid type: 'cosmos' in meta must be a dict."
@@ -98,7 +114,7 @@ class DbtNode:
         return value
 
     @property
-    def operator_kwargs_to_override(self) -> Dict[str, Any]:
+    def operator_kwargs_to_override(self) -> dict[str, Any]:
         """
         Extract the configuration that will be used to override, at a node level, the keyword arguments passed to create
         the correspondent Airflow task (named `operator_args` at the `DbtDag` or `DbtTaskGroup` level).
@@ -115,7 +131,7 @@ class DbtNode:
         return operator_kwargs
 
     @property
-    def profile_config_to_override(self) -> Dict[str, Any]:
+    def profile_config_to_override(self) -> dict[str, Any]:
         """
         Extract the configuration that will be used to override, at a node level, the profile configuration.
 
@@ -149,7 +165,9 @@ class DbtNode:
 
     @property
     def owner(self) -> str:
-        return str(self.config.get("meta", {}).get("owner", ""))
+        config_dict = self.config or {}
+        meta_cfg = config_dict.get("meta") or {}
+        return str(meta_cfg.get("owner", ""))
 
     @property
     def context_dict(self) -> dict[str, Any]:
@@ -166,12 +184,13 @@ class DbtNode:
             "tags": self.tags,
             "config": self.config,
             "has_test": self.has_test,
+            "has_non_detached_test": self.has_non_detached_test,
             "resource_name": self.resource_name,
             "name": self.name,
         }
 
 
-def is_freshness_effective(freshness: Optional[dict[str, Any]]) -> bool:
+def is_freshness_effective(freshness: dict[str, Any] | None) -> bool:
     """Function to find if a source has null freshness. Scenarios where freshness
     looks like:
     "freshness": {
@@ -263,12 +282,13 @@ def run_command(
 ) -> str:
     """Run a command either with dbtRunner or Python subprocess, returning the stdout."""
 
-    runner = "dbt Runner" if dbt_runner.is_available() else "Python subprocess"
+    use_dbt_runner = invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_available()
+    runner = "dbt Runner" if use_dbt_runner else "Python subprocess"
     command = [str(arg) if arg is not None else "<None>" for arg in command]
     logger.info("Running command with %s: `%s`", runner, " ".join(command))
     logger.debug("Environment variable keys: %s", env_vars.keys())
 
-    if invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_available():
+    if use_dbt_runner:
         stdout = run_command_with_dbt_runner(command, tmp_dir, env_vars)
     else:
         stdout = run_command_with_subprocess(command, tmp_dir, env_vars)
@@ -299,13 +319,26 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                 project_path.parent / node_dict["package_name"] if node_dict.get("package_name") else project_path  # type: ignore
             )
 
+            # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
+            # External nodes (e.g., from dbt-loom) may not have a file path - skip them
+            # dbt-loom injects upstream models with resource_type="model" and empty file path
+            # Check for both None and empty string since dbt-loom may set either
+            node_file_path = node_dict.get("original_file_path") or node_dict.get("path")
+            resource_type = node_dict.get("resource_type")
+            if not node_file_path and resource_type == "model" and node_dict.get("unique_id"):
+                logger.debug(
+                    "Skipping model `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
+                    node_dict.get("unique_id"),
+                )
+                continue
+
             try:
                 node = DbtNode(
                     unique_id=node_dict["unique_id"],
                     package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=base_path / node_dict["original_file_path"],
+                    file_path=base_path / node_file_path,  # type: ignore[arg-type]
                     original_file_path=node_dict["original_file_path"],
                     tags=node_dict.get("tags", []),
                     config=node_dict.get("config", {}),
@@ -314,13 +347,57 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
                         else False
                     ),
+                    fqn=node_dict.get("fqn"),
                 )
-            except KeyError:
+            except (KeyError, TypeError):
                 logger.info("Could not parse following the dbt ls line even though it was a valid JSON `%s`", line)
             else:
                 nodes[node.unique_id] = node
                 logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
     return nodes
+
+
+def _build_dbt_node_from_manifest_resource(
+    unique_id: str,
+    node_dict: dict[str, Any],
+    project_path: Path,
+    packages_subpath: str,
+    manifest_project_name: str | None,
+) -> DbtNode | None:
+    """
+    Build a DbtNode from a manifest resource entry, or None if the node should be skipped
+    (e.g. external nodes with no file path).
+    """
+    original_file_path = node_dict.get("original_file_path")
+    if not original_file_path:
+        logger.debug(
+            "Skipping node `%s` because it has no file path (likely an external reference from dbt-loom or similar)",
+            unique_id,
+        )
+        return None
+
+    package_name = node_dict.get("package_name")
+    is_root_project_node = manifest_project_name is None or (package_name == manifest_project_name)
+    if package_name and not is_root_project_node:
+        resolved_path = project_path / packages_subpath / package_name / _normalize_path(original_file_path)
+    else:
+        resolved_path = project_path / _normalize_path(original_file_path)
+
+    resource_type = DbtResourceType(node_dict["resource_type"])
+    return DbtNode(
+        unique_id=unique_id,
+        package_name=package_name,
+        resource_type=resource_type,
+        depends_on=node_dict.get("depends_on", {}).get("nodes", []),
+        file_path=resolved_path,
+        original_file_path=Path(node_dict["original_file_path"]),
+        tags=node_dict.get("tags") or [],
+        config=node_dict.get("config") or {},
+        has_freshness=(
+            is_freshness_effective(node_dict.get("freshness")) if resource_type == DbtResourceType.SOURCE else False
+        ),
+        fqn=node_dict.get("fqn"),
+    )
 
 
 class DbtGraph:
@@ -363,9 +440,9 @@ class DbtGraph:
         self.cache_dir = cache_dir
         self.airflow_metadata = airflow_metadata or {}
         if cache_identifier:
-            self.dbt_ls_cache_key = cache.create_cache_key(cache_identifier)
+            self.cache_key = cache.create_cache_key(cache_identifier)
         else:
-            self.dbt_ls_cache_key = ""
+            self.cache_key = ""
         self.dbt_vars = dbt_vars or {}
         self.operator_args = operator_args or {}
         self.log_dir: Path | None = None
@@ -440,7 +517,29 @@ class DbtGraph:
                 airflow_vars = [var_name, Variable.get(var_name, "")]
                 cache_args.extend(airflow_vars)
 
-        logger.debug(f"Value of `dbt_ls_cache_key_args` for <{self.dbt_ls_cache_key}>: {cache_args}")
+        logger.debug(f"Value of `dbt_ls_cache_key_args` for <{self.cache_key}>: {cache_args}")
+        return cache_args
+
+    @cached_property
+    def _yaml_selectors_airflow_vars(self) -> list[str]:
+        """
+        Cached Airflow variable values used for YAML selectors cache invalidation.
+        These are expensive to retrieve and don't change during a single DAG parse.
+        """
+        cache_args = []
+        if self.render_config.airflow_vars_to_purge_dbt_yaml_selectors_cache:
+            for var_name in self.render_config.airflow_vars_to_purge_dbt_yaml_selectors_cache:
+                airflow_vars = [var_name, Variable.get(var_name, "")]
+                cache_args.extend(airflow_vars)
+        return cache_args
+
+    def get_dbt_yaml_selectors_cache_key_args(self, impl_version: str) -> list[str]:
+        """
+        Values that are used to represent the dbt yaml selectors cache key. If any parts are changed, the manifest selectors
+        will be reparsed and the new value will be stored.
+        """
+        cache_args = [impl_version] + self._yaml_selectors_airflow_vars
+        logger.debug(f"Value of `dbt_yaml_selectors_cache_key` for <{self.cache_key}>: {cache_args}")
         return cache_args
 
     def save_dbt_ls_cache(self, dbt_ls_output: str) -> None:
@@ -460,7 +559,7 @@ class DbtGraph:
         dbt_ls_compressed = encoded_data.decode("utf-8")
         cache_dict = {
             "version": cache._calculate_dbt_ls_cache_current_version(
-                self.dbt_ls_cache_key, self.project_path, self.dbt_ls_cache_key_args
+                self.cache_key, self.project_path, self.dbt_ls_cache_key_args
             ),
             "dbt_ls_compressed": dbt_ls_compressed,
             "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -468,16 +567,16 @@ class DbtGraph:
         }
         remote_cache_dir = _configure_remote_cache_dir()
         if remote_cache_dir:
-            remote_cache_key_path = remote_cache_dir / self.dbt_ls_cache_key / "dbt_ls_cache.json"
+            remote_cache_key_path = remote_cache_dir / self.cache_key / "dbt_ls_cache.json"
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
-            Variable.set(self.dbt_ls_cache_key, cache_dict, serialize_json=True)
+            Variable.set(self.cache_key, cache_dict, serialize_json=True)
 
-    def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path) -> dict[str, str]:
+    def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, str]:
         """Loads the remote cache for dbt ls."""
         cache_dict: dict[str, str] = {}
-        remote_cache_key_path = remote_cache_dir / self.dbt_ls_cache_key / "dbt_ls_cache.json"
+        remote_cache_key_path = remote_cache_dir / self.cache_key / "dbt_ls_cache.json"
         if remote_cache_key_path.exists():
             with remote_cache_key_path.open("r") as fp:
                 cache_dict = json.load(fp)
@@ -509,7 +608,7 @@ class DbtGraph:
             cache_dict = (
                 self._get_dbt_ls_remote_cache(remote_cache_dir)
                 if remote_cache_dir
-                else Variable.get(self.dbt_ls_cache_key, deserialize_json=True)
+                else Variable.get(self.cache_key, deserialize_json=True)
             )
         except tuple(airflow_variable_exceptions):
             return cache_dict
@@ -518,6 +617,10 @@ class DbtGraph:
             if dbt_ls_compressed:
                 encoded_data = base64.b64decode(dbt_ls_compressed.encode())
                 cache_dict["dbt_ls"] = zlib.decompress(encoded_data).decode()
+            else:
+                # Missing 'dbt_ls_compressed' key indicates wrong cache type or corrupted cache
+                # Return empty dict to trigger cache miss and force fresh dbt ls run
+                cache_dict = {}
 
         return cache_dict
 
@@ -567,7 +670,16 @@ class DbtGraph:
         self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
-        if self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
+
+        # dbt fusion 2.0.0b26 `dbt ls --output json` returns, by default, less keys than dbt-core 1.10.
+        # Default keys returned by dbt-core: ['name', 'resource_type', 'package_name', 'original_file_path', 'unique_id', 'alias', 'config', 'tags', 'depends_on']
+        # Default keys returned by dbt fusion: ['name', 'package_name', 'path', 'resource_type', 'unique_id']
+        # Users can force previous Cosmos behaviour by setting pre_dbt_fusion to True.
+        specify_output_keys = (
+            not settings.pre_dbt_fusion or self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE
+        )
+
+        if specify_output_keys:
             ls_command = [
                 dbt_cmd,
                 "ls",
@@ -582,9 +694,16 @@ class DbtGraph:
                 "tags",
                 "config",
                 "freshness",
+                "fqn",
             ]
         else:
-            ls_command = [dbt_cmd, "ls", "--output", "json"]
+            ls_command = [
+                dbt_cmd,
+                "ls",
+                "--output",
+                "json",
+              
+            ]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)
@@ -606,38 +725,43 @@ class DbtGraph:
     @functools.lru_cache
     def should_use_dbt_ls_cache(self) -> bool:
         """Identify if Cosmos should use/store dbt ls cache or not."""
-        return settings.enable_cache and settings.enable_cache_dbt_ls and bool(self.dbt_ls_cache_key)
+        return settings.enable_cache and settings.enable_cache_dbt_ls and bool(self.cache_key)
+
+    @functools.lru_cache
+    def should_use_yaml_selectors_cache(self) -> bool:
+        """Identify if Cosmos should use/store YAML selectors cache or not."""
+        return settings.enable_cache and settings.enable_cache_dbt_yaml_selectors and bool(self.cache_key)
 
     def load_via_dbt_ls_cache(self) -> bool:
         """(Try to) load dbt ls cache from an Airflow Variable"""
-        logger.info(f"Trying to parse the dbt project using dbt ls cache {self.dbt_ls_cache_key}...")
+        logger.info(f"Trying to parse the dbt project using dbt ls cache {self.cache_key}...")
         if self.should_use_dbt_ls_cache():
             project_path = self.project_path
 
             cache_dict = self.get_dbt_ls_cache()
             if not cache_dict:
-                logger.info(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key}")
+                logger.info(f"Cosmos performance: Cache miss for {self.cache_key}")
                 return False
 
             cache_version = cache_dict.get("version")
             dbt_ls_cache = cache_dict.get("dbt_ls")
 
             current_version = cache._calculate_dbt_ls_cache_current_version(
-                self.dbt_ls_cache_key, project_path, self.dbt_ls_cache_key_args
+                self.cache_key, project_path, self.dbt_ls_cache_key_args
             )
 
             if dbt_ls_cache and not cache.was_project_modified(cache_version, current_version):
                 logger.info(
-                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.dbt_ls_cache_key} is {len(dbt_ls_cache)}"
+                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_key} is {len(dbt_ls_cache)}"
                 )
                 self.load_method = LoadMode.DBT_LS_CACHE
 
                 nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
                 self.nodes = nodes
                 self.filtered_nodes = nodes
-                logger.info(f"Cosmos performance: Cache hit for {self.dbt_ls_cache_key} - {current_version}")
+                logger.info(f"Cosmos performance: Cache hit for {self.cache_key} - {current_version}")
                 return True
-        logger.info(f"Cosmos performance: Cache miss for {self.dbt_ls_cache_key} - skipped")
+        logger.info(f"Cosmos performance: Cache miss for {self.cache_key} - skipped")
         return False
 
     def should_use_partial_parse_cache(self) -> bool:
@@ -742,10 +866,13 @@ class DbtGraph:
                 logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
                 cache._copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
 
-            with self.profile_config.ensure_profile(
-                use_mock_values=self.render_config.enable_mock_profile
-            ) as profile_values, environ(self.env_vars):
-                (profile_path, env_vars) = profile_values
+            with (
+                self.profile_config.ensure_profile(
+                    use_mock_values=self.render_config.enable_mock_profile
+                ) as profile_values,
+                environ(self.env_vars),
+            ):
+                profile_path, env_vars = profile_values
                 env = os.environ.copy()
                 env.update(env_vars)
 
@@ -820,6 +947,11 @@ class DbtGraph:
         * self.filtered_nodes
         """
         self.load_method = LoadMode.CUSTOM
+        warnings.warn(
+            "Using `load_method` = `LoadMode.CUSTOM` is deprecated in current version and will"
+            " be removed in Cosmos 2.0",
+            DeprecationWarning,
+        )
         logger.info("Trying to parse the dbt project `%s` using a custom Cosmos method...", self.project.project_name)
 
         if self.render_config.selector:
@@ -869,9 +1001,215 @@ class DbtGraph:
             exclude=self.render_config.exclude,
         )
 
+    def _get_yaml_selectors_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, Any]:
+        """Loads the remote cache for the yaml selectors."""
+        cache_dict: dict[str, Any] = {}
+        remote_cache_key_path = remote_cache_dir / self.cache_key / "yaml_selectors_cache.json"
+        if remote_cache_key_path.exists():
+            with remote_cache_key_path.open("r") as fp:
+                cache_dict = json.load(fp)
+        return cache_dict
+
+    def get_yaml_selectors_cache(self) -> dict[str, Any]:
+        """
+        Retrieve previously saved YAML selectors from an Airflow Variable, decompressing the selector data.
+
+        Outputs:
+        {
+            "version": "cache-version",
+            "yaml_selectors": YamlSelectors instance reconstructed from cached dictionaries,
+            "last_modified": "Isoformat timestamp"
+        }
+        """
+        cache_dict: dict[str, Any] = {}
+
+        airflow_variable_exceptions: list[type[BaseException]] = [json.decoder.JSONDecodeError, KeyError]
+        try:
+            from airflow.sdk.exceptions import AirflowRuntimeError
+        except ImportError:
+            pass
+        else:
+            airflow_variable_exceptions.append(AirflowRuntimeError)
+
+        try:
+            remote_cache_dir = _configure_remote_cache_dir()
+            cache_dict = (
+                self._get_yaml_selectors_remote_cache(remote_cache_dir)
+                if remote_cache_dir
+                else Variable.get(self.cache_key, deserialize_json=True)
+            )
+        except tuple(airflow_variable_exceptions):
+            return cache_dict
+        else:
+            raw_selectors_compressed = cache_dict.pop("raw_selectors_compressed", None)
+            parsed_selectors_compressed = cache_dict.pop("parsed_selectors_compressed", None)
+
+            if raw_selectors_compressed and parsed_selectors_compressed:
+                encoded_raw = base64.b64decode(raw_selectors_compressed.encode())
+                raw_selectors = json.loads(zlib.decompress(encoded_raw).decode())
+
+                encoded_parsed = base64.b64decode(parsed_selectors_compressed.encode())
+                parsed_selectors = json.loads(zlib.decompress(encoded_parsed).decode())
+
+                cache_dict["yaml_selectors"] = YamlSelectors(raw_selectors, parsed_selectors)
+            else:
+                # Missing selector keys indicates wrong cache type or corrupted cache
+                # Return empty dict to trigger cache miss and force fresh selector parsing
+                cache_dict = {}
+        return cache_dict
+
+    def save_yaml_selectors_cache(self, yaml_selectors: YamlSelectors) -> None:
+        """
+        Store compressed and encoded YAML selectors into an Airflow Variable.
+
+        Stores:
+        {
+            "version": "cache-version",
+            "raw_selectors_compressed": "compressed raw selector definitions",
+            "parsed_selectors_compressed": "compressed parsed selector definitions",
+            "last_modified": "Isoformat timestamp"
+        }
+        """
+        raw_selectors_json = json.dumps(yaml_selectors.raw, sort_keys=True)
+        compressed_raw = zlib.compress(raw_selectors_json.encode("utf-8"))
+        encoded_raw = base64.b64encode(compressed_raw)
+        raw_selectors_compressed = encoded_raw.decode("utf-8")
+
+        parsed_selectors_json = json.dumps(yaml_selectors.parsed, sort_keys=True)
+        compressed_parsed = zlib.compress(parsed_selectors_json.encode("utf-8"))
+        encoded_parsed = base64.b64encode(compressed_parsed)
+        parsed_selectors_compressed = encoded_parsed.decode("utf-8")
+
+        cache_dict = {
+            "version": cache._calculate_yaml_selectors_cache_current_version(
+                self.cache_key,
+                self.project_path,
+                yaml_selectors.raw,
+                self.get_dbt_yaml_selectors_cache_key_args(yaml_selectors.impl_version),
+            ),
+            "raw_selectors_compressed": raw_selectors_compressed,
+            "parsed_selectors_compressed": parsed_selectors_compressed,
+            "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            **self.airflow_metadata,
+        }
+        remote_cache_dir = _configure_remote_cache_dir()
+        if remote_cache_dir:
+            remote_cache_key_path = remote_cache_dir / self.cache_key / "yaml_selectors_cache.json"
+            with remote_cache_key_path.open("w") as fp:
+                json.dump(cache_dict, fp)
+        else:
+            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+
+    def parse_yaml_selectors(self, selector_definitions: dict[str, Any]) -> YamlSelectors:
+        """
+        Parse the YAML selectors definitions into a YamlSelectors instance.
+
+        Args:
+            selector_definitions (dict[str, Any]): The selector definitions from the dbt manifest.
+
+        Returns:
+            YamlSelectors: A YamlSelectors instance
+        """
+
+        yaml_selectors = YamlSelectors.parse(selector_definitions)
+
+        if self.should_use_yaml_selectors_cache():
+            self.save_yaml_selectors_cache(yaml_selectors)
+
+        return yaml_selectors
+
+    def load_parsed_selectors(self, selector_definitions: dict[str, Any]) -> YamlSelectors:
+        """
+        Load the YamlSelectors from cache if available, otherwise parse the YAML selectors definitions.
+
+        Args:
+            selector_definitions (dict[str, Any]): The selector definitions from the dbt manifest.
+
+        Returns:
+            YamlSelectors: A YamlSelectors instance
+        """
+        logger.info(f"Trying to parse the dbt yaml selectors using {self.cache_key}...")
+
+        if self.should_use_yaml_selectors_cache():
+            cache_dict = self.get_yaml_selectors_cache()
+
+            if not cache_dict:
+                logger.info(f"Cosmos performance: Cache miss for {self.cache_key}")
+
+                return self.parse_yaml_selectors(selector_definitions)
+
+            cache_version: str = cache_dict["version"]
+            yaml_selectors: YamlSelectors = cache_dict["yaml_selectors"]
+
+            current_version = cache._calculate_yaml_selectors_cache_current_version(
+                self.cache_key,
+                self.project_path,
+                selector_definitions,
+                self.get_dbt_yaml_selectors_cache_key_args(yaml_selectors.impl_version),
+            )
+
+            if cache_dict and not cache.were_yaml_selectors_modified(cache_version, current_version):
+                logger.info(
+                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_key} is {len(yaml_selectors.parsed)}"
+                )
+                logger.info(f"Cosmos performance: Cache hit for {self.cache_key} - {current_version}")
+
+                return yaml_selectors
+
+        logger.info(f"Cosmos performance: Cache miss for {self.cache_key} - skipped")
+
+        return self.parse_yaml_selectors(selector_definitions)
+
+    def _load_nodes_from_manifest_data(self, manifest: dict[str, Any], project_path: Path) -> dict[str, DbtNode]:
+        """Build a nodes dict from manifest resources (nodes, sources, exposures)."""
+        resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
+        packages_subpath = get_dbt_packages_subpath(project_path)
+        manifest_metadata = manifest.get("metadata")
+        manifest_project_name = manifest_metadata.get("project_name") if isinstance(manifest_metadata, dict) else None
+        nodes: dict[str, DbtNode] = {}
+        for unique_id, node_dict in resources.items():
+            node = _build_dbt_node_from_manifest_resource(
+                unique_id, node_dict, project_path, packages_subpath, manifest_project_name
+            )
+            if node is not None:
+                nodes[node.unique_id] = node
+        return nodes      
+      
+    def _apply_manifest_node_selection(self, nodes: dict[str, DbtNode], manifest: dict[str, Any]) -> None:
+        """Set self.nodes and self.filtered_nodes using selector or render_config select/exclude."""
+        project_dir = self.execution_config.project_path
+        if self.render_config.selector:
+            selector_definitions = manifest.get("selectors", {})
+            if not selector_definitions:
+                if TYPE_CHECKING:
+                    assert self.project.manifest_path is not None  # pragma: no cover
+                raise CosmosLoadDbtException(f"Selectors not found in manifest file `{self.project.manifest_path}`")
+
+            yaml_selectors = self.load_parsed_selectors(selector_definitions)
+            selections = yaml_selectors.get_parsed(self.render_config.selector)
+            if not selections:
+                raise CosmosLoadDbtException(
+                    f"Selector `{self.render_config.selector}` not found in parsed YAML selectors `{selector_definitions}`"
+                )
+            self.nodes = nodes
+            self.filtered_nodes = select_nodes(
+                project_dir=project_dir,
+                nodes=nodes,
+                select=selections["select"],
+                exclude=selections["exclude"],
+            )
+        else:
+            self.nodes = nodes
+            self.filtered_nodes = select_nodes(
+                project_dir=project_dir,
+                nodes=nodes,
+                select=self.render_config.select,
+                exclude=self.render_config.exclude,
+            )
+
     def load_from_dbt_manifest(self) -> None:
         """
-        This approach accurately loads `dbt` projects using the `manifest.yml` file.
+        This approach accurately loads `dbt` projects using the `manifest.json` dbt manifest artifact.
 
         However, since the Manifest does not represent filters, it relies on the Custom Cosmos implementation
         to filter out the nodes relevant to the user (based on self.exclude and self.select).
@@ -883,56 +1221,26 @@ class DbtGraph:
         self.load_method = LoadMode.DBT_MANIFEST
         logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
 
-        if self.render_config.selector:
-            raise CosmosLoadDbtException(
-                "RenderConfig.selector is not yet supported when loading dbt projects using the LoadMode.DBT_MANIFEST parser."
-            )
-
         if not self.project.is_manifest_available():
             raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
 
         if not self.execution_config.project_path:
             raise CosmosLoadDbtException("Unable to load manifest without ExecutionConfig.dbt_project_path")
 
-        nodes = {}
-
         if TYPE_CHECKING:
             assert self.project.manifest_path is not None  # pragma: no cover
 
         with self.project.manifest_path.open() as fp:
-            manifest = json.load(fp)
+            manifest = json.load(fp) or {}
 
-            resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
-            for unique_id, node_dict in resources.items():
-                node = DbtNode(
-                    unique_id=unique_id,
-                    package_name=node_dict.get("package_name"),
-                    resource_type=DbtResourceType(node_dict["resource_type"]),
-                    depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=self.execution_config.project_path / _normalize_path(node_dict["original_file_path"]),
-                    original_file_path=Path(node_dict["original_file_path"]),
-                    tags=node_dict["tags"],
-                    config=node_dict["config"],
-                    has_freshness=(
-                        is_freshness_effective(node_dict.get("freshness"))
-                        if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
-                        else False
-                    ),
-                )
-
-                nodes[node.unique_id] = node
-
-            self.nodes = nodes
-            self.filtered_nodes = select_nodes(
-                project_dir=self.execution_config.project_path,
-                nodes=nodes,
-                select=self.render_config.select,
-                exclude=self.render_config.exclude,
-            )
+        project_path = self.execution_config.project_path
+        nodes = self._load_nodes_from_manifest_data(manifest, project_path)
+        self._apply_manifest_node_selection(nodes, manifest)
 
     def update_node_dependency(self) -> None:
         """
-        This will update the property `has_test` if node has `dbt` test
+        This will update the property `has_test` if node has `dbt` test and update the property
+        `has_non_detached_test` if there's at least one non-detached `dbt` test
 
         Updates in-place:
         * self.filtered_nodes
@@ -943,3 +1251,13 @@ class DbtGraph:
                     if node_id in self.filtered_nodes:
                         self.filtered_nodes[node_id].has_test = True
                         self.filtered_nodes[node.unique_id] = node
+                        if (
+                            len(node.depends_on) == 1
+                            or self.render_config.should_detach_multiple_parents_tests is False
+                        ):
+                            self.filtered_nodes[node_id].has_non_detached_test = True
+            else:
+                for parent_node_id in node.depends_on:
+                    parent_node = self.nodes.get(parent_node_id)
+                    if parent_node is not None:
+                        parent_node.downstream.append(node.unique_id)

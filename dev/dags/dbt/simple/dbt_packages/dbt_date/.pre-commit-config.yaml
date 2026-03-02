@@ -1,7 +1,7 @@
 ---
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: check-json
@@ -20,7 +20,7 @@ repos:
       - id: prettier
         types_or: [json, markdown, yaml]
   - repo: https://github.com/tconbeer/sqlfmt
-    rev: v0.26.0
+    rev: v0.29.0
     hooks:
       - id: sqlfmt
         language_version: python

@@ -10,6 +10,8 @@
    Configuration <configuration/index>
    Profiles <profiles/index>
    Contributing <contributing>
+   Airflow 3 compatibility <airflow3_compatibility/index>
+   Compatibility Policy <compatibility-policy>
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos
@@ -105,6 +107,16 @@ as ``max_active_tasks``, ``max_active_runs`` and ``default_args``.
 With Cosmos, transitioning from a dbt workflow to a proper Airflow DAG is seamless, giving you the best of both tools
 for managing and scaling your data workflows.
 
+Getting Started with Airflow Async Execution Mode
+-------------------------------------------------
+
+See our :doc:`Getting Started with Airflow Async Execution Mode <getting_started/async-execution-mode>` for details.
+
+
+Airflow 3 compatibility
+-----------------------
+
+See our :doc:`Airflow 3 Compatibility <airflow3_compatibility/index>` for full details.
 
 Changelog
 _________
@@ -149,6 +161,22 @@ Read the `Privacy Notice <https://github.com/astronomer/astronomer-cosmos/blob/m
 .. raw:: html
 
     <img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=ac335a8b-a9f3-49e6-9e8e-a7ec614fb794" />
+
+
+Project Repositories and Subprojects
+____________________________________
+
+The following repositories constitute the codebases for the Astronomer Cosmos project for compliance purposes (OSPS-QA-04.01):
+
+**This repository**
+
+- `astronomer-cosmos <https://github.com/astronomer/astronomer-cosmos>`_ - The main Cosmos library (this repository)
+
+**Additional repositories / subprojects**
+
+- `cosmos-demo <https://github.com/astronomer/cosmos-demo>`_ - Example DAGs and demo project for Cosmos
+
+Note: There are no additional subproject codebases beyond the repositories listed above for OSPS-QA-04.01 compliance purposes.
 
 
 Security Policy

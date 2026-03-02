@@ -8,9 +8,9 @@ dynamic = ["version"]
 description = "Orchestrate your dbt projects in Airflow"
 readme = "README.rst"
 license = "Apache-2.0"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 authors = [{ name = "Astronomer", email = "humans@astronomer.io" }]
-keywords = ["airflow", "apache-airflow", "astronomer", "dags", "dbt"]
+keywords = ["airflow", "apache-airflow", "astronomer", "dags", "dbt", "dbt-core", "dbt-fusion"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Web Environment",
@@ -21,24 +21,21 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
     "aenum",
     "attrs",
-    "methodtools",
-    "apache-airflow>=2.4.0",
+    "apache-airflow>=2.9.0",
     "deprecation",  # Python 3.13 exposes a deprecated operator, we can remove this dependency in the future
-    "importlib-metadata; python_version < '3.8'",
     "Jinja2>=3.0.0",
     "msgpack",
     "packaging>=22.0",
-    "pydantic>=1.10.0",
     "virtualenv",
+    "openlineage-integration-common",  # Without this dependency, Airflow datasets/assets don't work
 ]
 
 [project.optional-dependencies]
@@ -52,12 +49,14 @@ dbt-all = [
     "dbt-databricks!=1.9.0",
     "dbt-duckdb",
     "dbt-exasol",
-    "dbt-duckdb",
+    "dbt-mysql",
     "dbt-oracle",
     "dbt-postgres",
     "dbt-redshift",
     "dbt-snowflake",
+    "dbt-starrocks",
     "dbt-spark",
+    "dbt-sqlserver",
     "dbt-teradata",
     "dbt-vertica",
 ]
@@ -67,11 +66,15 @@ dbt-clickhouse = ["dbt-clickhouse"]
 dbt-databricks = ["dbt-databricks"]
 dbt-duckdb = ["dbt-duckdb", "airflow-provider-duckdb>=0.2.0"]
 dbt-exasol = ["dbt-exasol"]
+dbt-loom = ["dbt-loom"]
+dbt-mysql = ["dbt-mysql"]
 dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]
 dbt-redshift = ["dbt-redshift"]
 dbt-snowflake = ["dbt-snowflake"]
+dbt-starrocks = ["dbt-starrocks"]
 dbt-spark = ["dbt-spark"]
+dbt-sqlserver = ["dbt-sqlserver"]
 dbt-teradata = ["dbt-teradata"]
 dbt-vertica = ["dbt-vertica<=1.5.4"]
 openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]
@@ -95,13 +98,13 @@ docs = [
     "pydata-sphinx-theme",
     "sphinx-autobuild",
     "sphinx-autoapi",
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-cncf-kubernetes>=7.14.0",
 ]
 docker = [
     "apache-airflow-providers-docker>=3.5.0",
 ]
 kubernetes = [
-    "apache-airflow-providers-cncf-kubernetes>=5.1.1",
+    "apache-airflow-providers-cncf-kubernetes>=7.14.0",
 ]
 aws_eks = [
     "apache-airflow-providers-amazon>=8.0.0",
@@ -117,7 +120,10 @@ gcp-cloud-run-job = [
 ]
 
 [project.entry-points.apache_airflow_provider]
-provider_info = "cosmos:get_provider_info"
+provider_info = "cosmos.provider_info:get_provider_info"
+
+[project.entry-points.'airflow.policy']
+watcher_retry_policy = 'cosmos.plugin.cluster_policy'
 
 [project.entry-points."airflow.plugins"]
 cosmos = "cosmos.plugin:CosmosPlugin"
@@ -148,6 +154,7 @@ dependencies = [
     "pytest>=6.0",
     "pytest-split",
     "pytest-dotenv",
+    "pytest-rerunfailures",
     "requests-mock",
     "pytest-cov",
     "pytest-describe",
@@ -159,41 +166,44 @@ dependencies = [
     "types-requests",
     "types-python-dateutil",
     "Werkzeug<3.0.0",
-    "dbt-core",
-    "methodtools",
+    "pytest-asyncio",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 
 [[tool.hatch.envs.tests.matrix]]
-python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
-airflow = ["2.4", "2.5", "2.6", "2.7", "2.8", "2.9", "2.10", "3.0"]
-dbt = ["1.5", "1.6", "1.7", "1.8", "1.9"]
+python = ["3.10", "3.11", "3.12", "3.13"]
+airflow = ["2.9", "2.10", "2.11", "3.0", "3.1"]
+dbt = ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "2.0"]
 
 [tool.hatch.envs.tests.overrides]
 matrix.airflow.dependencies = [
-    { value = "typing_extensions<4.6", if = ["2.6"] },
+    # Known issue: https://github.com/zmievsa/cadwyn/issues/283
+    { value = "typing-extensions!=4.14.0", if = ["3.0"] }
 ]
 
 [tool.hatch.envs.tests.scripts]
 freeze = "pip freeze"
 test = 'sh scripts/test/unit.sh'
 test-cov = 'sh scripts/test/unit-cov.sh'
+test-integration-setup = 'sh scripts/test/integration-setup.sh {matrix:dbt}'
 test-integration = 'sh scripts/test/integration.sh'
 test-kubernetes = "sh scripts/test/integration-kubernetes.sh"
-test-kubernetes-setup = "sh scripts/test/kubernetes-setup.sh"
+test-kubernetes-setup = "sh scripts/test/kubernetes-setup.sh {matrix:dbt}"
+test-integration-dbtf-setup = 'sh scripts/test/integration-dbtf-setup.sh'
+test-integration-dbtf = 'sh scripts/test/integration-dbtf.sh'
 test-integration-dbt-1-5-4 = 'sh scripts/test/integration-dbt-1-5-4.sh'
-test-integration-dbt-async = 'sh scripts/test/integration-dbt-async.sh  {matrix:dbt}'
+test-integration-dbt-async = 'sh scripts/test/integration-dbt-async.sh {matrix:dbt}'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
-test-integration-setup = 'sh scripts/test/integration-setup.sh'
+
 test-performance = 'sh scripts/test/performance.sh'
-test-performance-setup = 'sh scripts/test/performance-setup.sh'
+test-performance-setup = 'sh scripts/test/performance-setup.sh {matrix:dbt}'
 type-check = "pre-commit run mypy --files cosmos/**/*"
 
 [tool.pytest.ini_options]
 addopts = "--ignore-glob=**/dbt_packages/*"
 filterwarnings = ["ignore::DeprecationWarning"]
 minversion = "6.0"
-markers = ["integration", "perf"]
+markers = ["integration", "perf", "dbtfusion"]
 
 ######################################
 # DOCS
@@ -204,23 +214,30 @@ dependencies = [
     "aenum",
     "msgpack",
     "apache-airflow",
-    "pydantic",
     "pydata-sphinx-theme",
     "sphinx",
     "sphinx-autoapi",
     "sphinx-autobuild",
+    "sphinx-reredirects",
 ]
 
 [tool.hatch.envs.docs.scripts]
 build = "sphinx-build -b html docs docs/_build"
 serve = "sphinx-autobuild docs docs/_build"
+# Serve without auto-reload: build once, then serve static files on port 8000
+serve-no-reload = "sphinx-build -b html docs docs/_build && python -m http.server 8000 --bind 127.0.0.1 --directory docs/_build"
 
 ######################################
 # THIRD PARTY TOOLS
 ######################################
 [tool.black]
 line-length = 120
-target-version = ['py37', 'py38', 'py39', 'py310']
+target-version = ["py310", "py311", "py312", "py313"]
+
+[tool.coverage.run]
+omit = [
+    "cosmos/airflow/_override.py"
+]
 
 [tool.isort]
 profile = "black"

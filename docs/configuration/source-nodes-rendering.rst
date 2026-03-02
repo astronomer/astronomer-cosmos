@@ -1,7 +1,7 @@
 .. _source-nodes-rendering:
 
 Source Nodes Rendering
-================
+======================
 
 .. note::
     This feature is only available for dbt-core >= 1.5 and cosmos >= 1.6.0.
@@ -11,6 +11,7 @@ You can control this behavior using the ``source_rendering_behavior`` field in t
 
 - **all**:
   When set to ``all``, Cosmos renders all sources in the dbt project. It uses three different node types for this:
+
     - ``EmptyOperator``: For sources that do not have tests or freshness checks.
     - ``DbtSourceOperator``: For sources that have freshness checks.
     - ``DbtTestOperator``: For sources that have tests.
@@ -34,6 +35,32 @@ Example:
             source_rendering_behavior=SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
         )
     )
+
+
+Source Pruning
+~~~~~~~~~~~~~~
+
+The ``source_pruning`` is a boolean parameter available in the ``RenderConfig``.
+When set to ``True``, it automatically removes (or "prunes") any dbt source nodes from your Airflow DAG that do not have any downstream dependencies within the selected portion of the dbt graph.
+
+This is particularly useful for keeping your DAGs clean and focused, especially in large dbt projects where you might be selecting only a subset of models to run.
+
+By default, this option is set to ``False``.
+
+Example:
+
+.. code-block:: python
+
+    from cosmos import DbtTaskGroup, RenderConfig
+
+    jaffle_shop_pruned = DbtTaskGroup(
+        render_config=RenderConfig(
+            select=["+customers"],  # select only customers and its parents
+            source_pruning=True,
+        )
+    )
+
+In this example, if the ``jaffle_shop`` project has multiple sources, but only some of them are upstream of the ``customers`` model, Cosmos will only render the necessary sources and prune the rest.
 
 
 on_warning_callback Callback

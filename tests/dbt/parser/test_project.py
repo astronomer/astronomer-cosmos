@@ -4,7 +4,6 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import List
 from unittest.mock import patch
 
 import pytest
@@ -74,7 +73,7 @@ def test_LegacyDbtProject__handle_config_file():
 
     dbt_project._handle_config_file(SAMPLE_YML_PATH)
 
-    assert len(dbt_project.tests) == 10
+    assert len(dbt_project.tests) == 9
     assert "not_null_customer_id_customers" in dbt_project.tests
     sample_test = dbt_project.tests["not_null_customer_id_customers"]
     assert sample_test.type == DbtModelType.DBT_TEST
@@ -155,7 +154,7 @@ class KeywordArgValueStr(KeywordArgValue, str):
 @dataclass
 class KeywordArg:
     key: str
-    value: KeywordArgValue | List
+    value: KeywordArgValue | list
 
 
 def test_dbtmodelconfig_extract_config_non_kwarg():

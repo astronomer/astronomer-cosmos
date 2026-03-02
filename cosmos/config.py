@@ -6,12 +6,17 @@ import contextlib
 import shutil
 import tempfile
 import warnings
+from collections.abc import Callable, Iterator
 from dataclasses import InitVar, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any
 
 import yaml
-from airflow.version import version as airflow_version
+
+try:
+    from airflow.sdk import ObjectStoragePath
+except ImportError:
+    from airflow.io.path import ObjectStoragePath
 
 from cosmos import settings
 from cosmos.cache import create_cache_profile, get_cached_profile, is_profile_cache_enabled
@@ -57,6 +62,7 @@ class RenderConfig:
     :param selector: Name of a dbt YAML selector to use for parsing. Only supported when using ``load_method=LoadMode.DBT_LS``.
     :param dbt_deps: (deprecated) Configure to run dbt deps when using dbt ls for dag parsing
     :param node_converters: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
+    :param node_conversion_by_task_group: A boolean that allows users to do node conversion at the task group level instead of task level.  Defaults to True.
     :param dbt_executable_path: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
     :param env_vars: (Deprecated since Cosmos 1.3 use ProjectConfig.env_vars) A dictionary of environment variables for rendering. Only supported when using ``LoadMode.DBT_LS``.
     :param dbt_project_path: Configures the DBT project location accessible on the airflow controller for DAG rendering. Mutually Exclusive with ProjectConfig.dbt_project_path. Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``.
@@ -64,9 +70,13 @@ class RenderConfig:
     :param enable_mock_profile: Allows to enable/disable mocking profile. Enabled by default. Mock profiles are useful for parsing Cosmos DAGs in the CI, but should be disabled to benefit from partial parsing (since Cosmos 1.4).
     :param enable_resource_grouping: Allows to enable/disable resource grouping. Disabled by default. Resource grouping creates a ``TaskGroup`` per resource type and folder structure.
     :param source_rendering_behavior: Determines how source nodes are rendered when using cosmos default source node rendering (ALL, NONE, WITH_TESTS_OR_FRESHNESS). Defaults to "NONE" (since Cosmos 1.6).
+    :param source_pruning: Determines if source nodes without a corresponding downstream task should be removed or not. Default is False
     :param airflow_vars_to_purge_dbt_ls_cache: Specify Airflow variables that will affect the LoadMode.DBT_LS cache.
+    :param airflow_vars_to_purge_dbt_yaml_selectors_cache: Specify Airflow variables that will affect the parsed manifest YamlSelectors cache.
     :param normalize_task_id: A callable that takes a dbt node as input and returns the task ID. This allows users to assign a custom node ID separate from the display name.
+    :param normalize_task_display_name: A callable that takes a dbt node as input and returns the task display name. This allows users to assign a custom task display name separate from the node ID.
     :param should_detach_multiple_parents_tests: A boolean that allows users to decide whether to run tests with multiple parent dependencies in separate tasks.
+    :param enable_owner_inheritance: A boolean that allows users to enable the owner inheritance from dbt models to airflow tasks. Defaults to True.
     """
 
     emit_datasets: bool = True
@@ -78,6 +88,7 @@ class RenderConfig:
     selector: str | None = None
     dbt_deps: bool | None = None
     node_converters: dict[DbtResourceType, Callable[..., Any]] | None = None
+    node_conversion_by_task_group: bool | None = True
     dbt_executable_path: str | Path = get_system_dbt()
     env_vars: dict[str, str] | None = None
     dbt_project_path: InitVar[str | Path | None] = None
@@ -86,9 +97,13 @@ class RenderConfig:
     enable_mock_profile: bool = True
     enable_resource_grouping: bool = False
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE
+    source_pruning: bool = False
     airflow_vars_to_purge_dbt_ls_cache: list[str] = field(default_factory=list)
+    airflow_vars_to_purge_dbt_yaml_selectors_cache: list[str] = field(default_factory=list)
     normalize_task_id: Callable[..., Any] | None = None
+    normalize_task_display_name: Callable[..., Any] | None = None
     should_detach_multiple_parents_tests: bool = False
+    enable_owner_inheritance: bool | None = True
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:
@@ -152,8 +167,7 @@ class ProjectConfig:
     :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages (False by default).
     :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
     :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
-    :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to
-    snapshots
+    :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to snapshots
     :param manifest_path: The absolute path to the dbt manifest file. Defaults to None
     :param manifest_conn_id: Name of the Airflow connection used to access the manifest file if it is not stored locally. Defaults to None
     :param project_name: Allows the user to define the project name.
@@ -171,7 +185,7 @@ class ProjectConfig:
     dbt_project_path: Path | None = None
     install_dbt_deps: bool = True
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
-    manifest_path: Path | None = None
+    manifest_path: Path | ObjectStoragePath | None = None
     models_path: Path | None = None
     seeds_path: Path | None = None
     snapshots_path: Path | None = None
@@ -218,19 +232,7 @@ class ProjectConfig:
                 # Use the default Airflow connection ID for the scheme if it is not provided.
                 manifest_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(manifest_scheme, lambda: None)()
 
-            if manifest_conn_id is not None and not settings.AIRFLOW_IO_AVAILABLE:
-                raise CosmosValueError(
-                    f"The manifest path {manifest_path_str} uses a remote file scheme, but the required Object "
-                    f"Storage feature is unavailable in Airflow version {airflow_version}. Please upgrade to "
-                    f"Airflow 2.8 or later."
-                )
-
-            if settings.AIRFLOW_IO_AVAILABLE:
-                from airflow.io.path import ObjectStoragePath
-
-                self.manifest_path = ObjectStoragePath(manifest_path_str, conn_id=manifest_conn_id)
-            else:
-                self.manifest_path = Path(manifest_path_str)
+            self.manifest_path = ObjectStoragePath(manifest_path_str, conn_id=manifest_conn_id)
 
         self.env_vars = env_vars
         self.dbt_vars = dbt_vars
@@ -248,19 +250,20 @@ class ProjectConfig:
         If the project path is not provided, we have a scenario 2
         """
 
-        mandatory_paths = {}
+        mandatory_paths: dict[str, Path | ObjectStoragePath | None] = {}
         # We validate the existence of paths added to the `mandatory_paths` map by calling the `exists()` method on each
-        # one. Starting with Cosmos 1.6.0, if the Airflow version is `>= 2.8.0` and a `manifest_path` is provided, we
-        # cast it to an `airflow.io.path.ObjectStoragePath` instance during `ProjectConfig` initialisation, and it
-        # includes the `exists()` method. For the remaining paths in the `mandatory_paths` map, we cast them to
-        # `pathlib.Path` objects to ensure that the subsequent `exists()` call while iterating on the `mandatory_paths`
-        # map works correctly for all paths, thereby validating the project.
+        # one. If a `manifest_path` is provided, we cast it to an `airflow.io.path.ObjectStoragePath` instance during
+        # `ProjectConfig` initialisation, and it includes the `exists()` method. For the remaining paths in the
+        # `mandatory_paths` map, we cast them to `pathlib.Path` objects to ensure that the subsequent `exists()` call
+        # while iterating on the `mandatory_paths` map works correctly for all paths, thereby validating the project.
         if self.dbt_project_path:
             project_yml_path = self.dbt_project_path / "dbt_project.yml"
-            mandatory_paths = {
-                "dbt_project.yml": Path(project_yml_path) if project_yml_path else None,
-                "models directory ": Path(self.models_path) if self.models_path else None,
-            }
+            mandatory_paths.update(
+                {
+                    "dbt_project.yml": Path(project_yml_path) if project_yml_path else None,
+                    "models directory ": Path(self.models_path) if self.models_path else None,
+                }
+            )
         if self.manifest_path:
             mandatory_paths["manifest"] = self.manifest_path
 
@@ -339,6 +342,9 @@ class ProfileConfig:
         Check if profile object version is exist then reuse it
         Otherwise, create profile yml for requested object and return the profile path
         """
+        if self.profiles_yml_filepath:
+            return Path(self.profiles_yml_filepath)
+
         assert self.profile_mapping  # To satisfy MyPy
         current_profile_version = self.profile_mapping.version(self.profile_name, self.target_name, use_mock_values)
         cached_profile_path = get_cached_profile(current_profile_version)
@@ -407,8 +413,9 @@ class ExecutionConfig:
     :param dbt_project_path: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
     :param virtualenv_dir: Directory path to locate the (cached) virtual env that
     should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
-    :param async_py_requirements:  A list of Python packages to install when `ExecutionMode.AIRFLOW_ASYNC`(Experimental) is used. This parameter is required only if both `enable_setup_async_task` and `enable_teardown_async_task` are set to `True`.
+    :param async_py_requirements:  A list of Python packages to install when `ExecutionMode.AIRFLOW_ASYNC` is used. This parameter is required only if both `enable_setup_async_task` and `enable_teardown_async_task` are set to `True`.
     Example: `["dbt-postgres==1.5.0"]`
+    param setup_operator_args: A dictionary of producer operator parameters. These will override the values supplied in operator_args for producer operator.
     """
 
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
@@ -421,11 +428,16 @@ class ExecutionConfig:
 
     project_path: Path | None = field(init=False)
     async_py_requirements: list[str] | None = None
+    setup_operator_args: dict[str, Any] | None = None
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
-        if self.invocation_mode and self.execution_mode not in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV):
+        if self.invocation_mode and self.execution_mode not in (
+            ExecutionMode.WATCHER,
+            ExecutionMode.LOCAL,
+            ExecutionMode.VIRTUALENV,
+        ):
             raise CosmosValueError(
-                "ExecutionConfig.invocation_mode is only configurable for ExecutionMode.LOCAL and ExecutionMode.VIRTUALENV."
+                "ExecutionConfig.invocation_mode is only configurable for ExecutionMode.WATCHER, ExecutionMode.LOCAL, and ExecutionMode.VIRTUALENV."
             )
         if self.execution_mode == ExecutionMode.VIRTUALENV:
             if self.invocation_mode == InvocationMode.DBT_RUNNER:

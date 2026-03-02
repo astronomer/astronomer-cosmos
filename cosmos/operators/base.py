@@ -4,8 +4,9 @@ import inspect
 import logging
 import os
 from abc import ABCMeta, abstractmethod
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence, Tuple
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from airflow.utils.context import context_merge
@@ -23,8 +24,13 @@ except ImportError:  # pragma: no cover
 
 from airflow.utils.strings import to_boolean
 
+from cosmos import settings
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.log import get_logger
+
+
+def _sanitize_xcom_key(file_path: str) -> str:
+    return file_path.replace("/", "_").replace("\\", "_")
 
 
 class AbstractDbtBase(metaclass=ABCMeta):
@@ -76,7 +82,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
     :param extra_context: A dictionary of values to add to the TaskInstance's Context
     """
 
-    template_fields: Sequence[str] = ("env", "select", "exclude", "selector", "vars", "models")
+    template_fields: Sequence[str] = ("env", "select", "exclude", "selector", "vars", "models", "dbt_cmd_flags")
     global_flags = (
         "project_dir",
         "select",
@@ -148,7 +154,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         self.partial_parse = partial_parse
         self.cancel_query_on_kill = cancel_query_on_kill
         self.dbt_executable_path = dbt_executable_path
-        self.dbt_cmd_flags = dbt_cmd_flags
+        self.dbt_cmd_flags = dbt_cmd_flags or []
         self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
         self.cache_dir = cache_dir
         self.extra_context = extra_context or {}
@@ -266,7 +272,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         self,
         context: Context,
         cmd_flags: list[str] | None = None,
-    ) -> Tuple[list[str], dict[str, str | bytes | os.PathLike[Any]]]:
+    ) -> tuple[list[str], dict[str, str | bytes | os.PathLike[Any]]]:
         dbt_cmd = [self.dbt_executable_path]
 
         dbt_cmd.extend(self.dbt_cmd_global_flags)
@@ -287,7 +293,9 @@ class AbstractDbtBase(metaclass=ABCMeta):
 
         # add user-supplied args
         if self.dbt_cmd_flags:
-            dbt_cmd.extend(self.dbt_cmd_flags)
+            # Filter out empty strings that might result from template rendering
+            filtered_flags = [flag for flag in self.dbt_cmd_flags if flag and str(flag).strip()]
+            dbt_cmd.extend(filtered_flags)
 
         env = self.get_env(context)
 
@@ -300,6 +308,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         cmd_flags: list[str],
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> Any:
         """Override this method for the operator to execute the dbt command"""
 
@@ -307,19 +316,36 @@ class AbstractDbtBase(metaclass=ABCMeta):
         if self.extra_context:
             context_merge(context, self.extra_context)
 
-        self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
+        if settings.enable_debug_mode:
+            from cosmos.debug import start_memory_tracking, stop_memory_tracking
+
+            start_memory_tracking(context)
+            try:
+                self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
+                stop_memory_tracking(context)
+            except Exception:
+                stop_memory_tracking(context)
+                raise
+        else:
+            self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
 
 
 class DbtBuildMixin:
-    """Mixin for dbt build command."""
+    """
+    Mixin for dbt build command.
+
+    :param full_refresh: whether to add the flag --full-refresh to the dbt build command
+    :param log_format: format for dbt logs (e.g., 'json', 'text'). If provided, adds --log-format flag
+    """
 
     base_cmd = ["build"]
     ui_color = "#8194E0"
 
     template_fields: Sequence[str] = ("full_refresh",)
 
-    def __init__(self, full_refresh: bool | str = False, **kwargs: Any) -> None:
+    def __init__(self, full_refresh: bool | str = False, log_format: str | None = None, **kwargs: Any) -> None:
         self.full_refresh = full_refresh
+        self.log_format = log_format
         super().__init__(**kwargs)
 
     def add_cmd_flags(self) -> list[str]:
@@ -333,6 +359,10 @@ class DbtBuildMixin:
 
         if full_refresh is True:
             flags.append("--full-refresh")
+
+        if self.log_format:
+            flags.append("--log-format")
+            flags.append(self.log_format)
 
         return flags
 

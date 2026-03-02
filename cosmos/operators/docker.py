@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any
 
 try:
     from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
@@ -101,6 +102,7 @@ class DbtDockerBaseOperator(AbstractDbtBase, DockerOperator):  # type: ignore
         cmd_flags: list[str] | None = None,
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> Any:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")

@@ -1,5 +1,6 @@
 import importlib
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 def load_method_from_module(module_path: str, method_name: str) -> Callable[..., Any]:

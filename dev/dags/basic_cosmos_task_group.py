@@ -7,7 +7,11 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator
+
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import InvocationMode
@@ -15,6 +19,8 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).resolve().parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+DBT_PROJECT_NAME = os.getenv("DBT_PROJECT_NAME", "jaffle_shop")
+DBT_PROJECT_PATH = DBT_ROOT_PATH / DBT_PROJECT_NAME
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -43,7 +49,7 @@ with DAG(
 
     customers = DbtTaskGroup(
         group_id="customers",
-        project_config=ProjectConfig((DBT_ROOT_PATH / "jaffle_shop").as_posix(), dbt_vars={"var": "2"}),
+        project_config=ProjectConfig((DBT_PROJECT_PATH).as_posix(), dbt_vars={"var": "2"}),
         render_config=RenderConfig(
             select=["path:seeds/raw_customers.csv"],
             enable_mock_profile=False,
@@ -53,13 +59,13 @@ with DAG(
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
         profile_config=profile_config,
-        default_args={"retries": 2},
+        default_args={"retries": 0},
     )
 
     orders = DbtTaskGroup(
         group_id="orders",
         project_config=ProjectConfig(
-            (DBT_ROOT_PATH / "jaffle_shop").as_posix(),
+            (DBT_PROJECT_PATH).as_posix(),
         ),
         render_config=RenderConfig(
             select=["path:seeds/raw_orders.csv"],
@@ -68,7 +74,7 @@ with DAG(
         execution_config=shared_execution_config,
         operator_args={"install_deps": True},
         profile_config=profile_config,
-        default_args={"retries": 2},
+        default_args={"retries": 0},
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

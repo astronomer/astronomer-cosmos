@@ -8,6 +8,9 @@ Cosmos offers a number of configuration options to customize its behavior. For m
 .. toctree::
    :caption: Contents:
 
+   dbt Fusion <dbt-fusion>
+   Multi-Project Setups <multi-project>
+
    Project Config <project-config>
    Profile Config <profile-config>
    Execution Config <execution-config>
@@ -30,3 +33,4 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    Caching <caching>
    Task display name <task-display-name>
    Callbacks <callbacks>
+   Memory Optimization <memory_optimization>

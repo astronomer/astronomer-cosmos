@@ -1,6 +1,32 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
+default_language_version:
+  python: python3
+
 repos:
+  - repo: local
+    hooks:
+      - id: check-python-version
+        name: Ensure Python ≥ 3.10
+        language: python
+        pass_filenames: false
+        always_run: true
+        entry: python
+        args:
+          - -c
+          - |
+              import sys
+
+              required_major = 3
+              required_minor = 10
+              current_major, current_minor = sys.version_info[:2]
+
+              if (current_major, current_minor) < (required_major, required_minor):
+                  print(
+                      f"ERROR: Python {current_major}.{current_minor} is too old "
+                      f"(requires ≥ {required_major}.{required_minor})."
+                  )
+                  raise SystemExit(1)
   - repo: local
     hooks:
       - id: check-env-file
@@ -10,9 +36,10 @@ repos:
         types: [file]
         pass_filenames: false
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-added-large-files
+        exclude: ^dev/dags/dbt/cross_project/downstream/target/manifest.json$
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
@@ -38,43 +65,43 @@ repos:
           - --exclude-file=tests/sample/manifest_model_version.json
           - --skip=**/manifest.json,**.min.js,**/manifest_source.json
           - -L connexion,aci
+          - --ignore-words=.codespell-ignore-words
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:
       - id: rst-backticks
       - id: python-check-mock-methods
   - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.5.5
+    rev: v1.5.6
     hooks:
       - id: remove-crlf
       - id: remove-tabs
         exclude: ^docs/make.bat$|^docs/Makefile$|^dev/dags/dbt/jaffle_shop/seeds/raw_orders.csv$
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.19.1
+    rev: v3.21.2
     hooks:
       - id: pyupgrade
         args:
-          - --py37-plus
+          - --py310-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.7
+    rev: v0.15.2
     hooks:
-      - id: ruff
-        args:
-          - --fix
-  - repo: https://github.com/psf/black
-    rev: 25.1.0
+      - id: ruff-check
+        args: [ --fix ]
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 26.1.0
     hooks:
       - id: black
         args: ["--config", "./pyproject.toml"]
   - repo: https://github.com/asottile/blacken-docs
-    rev: 1.19.1
+    rev: 1.20.0
     hooks:
       - id: blacken-docs
         alias: black
         additional_dependencies: [black>=22.10.0]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.15.0"
+    rev: "v1.19.1"
 
     hooks:
       - id: mypy
@@ -88,7 +115,7 @@ repos:
             types-pytz,
             types-requests,
             types-python-dateutil,
-            apache-airflow,
+            apache-airflow<3.1, # TODO: https://github.com/astronomer/astronomer-cosmos/issues/2004
           ]
         files: ^cosmos
 exclude: "dev/dags/dbt/simple/dbt_packages/.*"

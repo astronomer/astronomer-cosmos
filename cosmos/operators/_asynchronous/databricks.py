@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from airflow.utils.context import Context
+from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 try:
     from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
-except ImportError:
+except (ImportError, AttributeError):
     from airflow.models import BaseOperator  # Airflow 2
 
 

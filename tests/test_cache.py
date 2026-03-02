@@ -25,20 +25,21 @@ from airflow.utils.db import create_session
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.cache import (
+    _calculate_yaml_selectors_cache_current_version,
     _configure_remote_cache_dir,
     _copy_partial_parse_to_project,
     _create_cache_identifier,
-    _create_folder_version_hash,
     _get_latest_cached_package_lockfile,
     _get_latest_partial_parse,
     _get_or_create_profile_cache_dir,
     _get_sha1_hash,
     _update_partial_parse_cache,
     create_cache_profile,
-    delete_unused_dbt_ls_cache,
+    delete_unused_dbt_cache,
     get_cached_profile,
     is_cache_package_lockfile_enabled,
     is_profile_cache_enabled,
+    were_yaml_selectors_modified,
 )
 from cosmos.constants import (
     DBT_PARTIAL_PARSE_FILE_NAME,
@@ -46,11 +47,12 @@ from cosmos.constants import (
     DEFAULT_PROFILES_FILE_NAME,
     _default_s3_conn,
 )
-from cosmos.exceptions import CosmosValueError
-from cosmos.settings import AIRFLOW_IO_AVAILABLE, dbt_profile_cache_dir_name
+from cosmos.settings import dbt_profile_cache_dir_name
 
 START_DATE = datetime(2024, 4, 16)
 example_dag = DAG("dag", start_date=START_DATE)
+example_dag_with_dots = DAG("dag.with.dots", start_date=START_DATE)
+
 SAMPLE_PARTIAL_PARSE_FILEPATH = Path(__file__).parent / "sample/partial_parse.msgpack"
 
 
@@ -58,6 +60,7 @@ SAMPLE_PARTIAL_PARSE_FILEPATH = Path(__file__).parent / "sample/partial_parse.ms
     "dag, task_group, result_identifier",
     [
         (example_dag, None, "dag"),
+        (example_dag_with_dots, None, "dag___with___dots"),
         (None, TaskGroup(dag=example_dag, group_id="inner_tg"), "dag__inner_tg"),
         (
             None,
@@ -121,38 +124,6 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
         _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
 
     assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text
-
-
-def test__create_folder_version_hash(tmp_path, caplog):
-    """
-    Test that Cosmos is still able to create the hash of a dbt project folder even when
-    there is a symbolic link referencing a no longer existing file.
-
-    This test addresses the issue:
-    https://github.com/astronomer/astronomer-cosmos/issues/1096
-    """
-    caplog.set_level(logging.INFO)
-
-    # Create a source folder with two files
-    source_dir = tmp_path / "original_dbt_folder"
-    source_dir.mkdir()
-    file_1 = Path(source_dir / "file_1.sql")
-    file_1.touch()
-    file_2 = Path(source_dir / "file_2.sql")
-    file_2.touch()
-
-    # Create a target folder with symbolic links to the two files in the source folder
-    target_dir = tmp_path / "cosmos_dbt_folder"
-    target_dir.mkdir()
-    file_1_symlink = Path(target_dir / "file_1.sql")
-    file_1_symlink.symlink_to(file_1)
-    file_2_symlink = Path(target_dir / "file_2.sql")
-    file_2_symlink.symlink_to(file_2)
-
-    # Delete one of the original files from the source folder
-    file_1.unlink()
-
-    _create_folder_version_hash(target_dir)
 
 
 @patch("cosmos.cache.shutil.copyfile")
@@ -227,18 +198,18 @@ def vars_session():
 
 
 @pytest.mark.integration
-def test_delete_unused_dbt_ls_cache_deletes_a_week_ago_cache(vars_session):
+def test_delete_unused_dbt_cache_deletes_a_week_ago_cache(vars_session):
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
-    assert delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(days=5), session=vars_session) == 1
+    assert delete_unused_dbt_cache(max_age_last_usage=timedelta(days=5), session=vars_session) == 1
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
 
 
 @pytest.mark.integration
-def test_delete_unused_dbt_ls_cache_deletes_all_cache_five_minutes_ago(vars_session):
+def test_delete_unused_dbt_cache_deletes_all_cache_five_minutes_ago(vars_session):
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_b").first()
     assert vars_session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").first()
-    assert delete_unused_dbt_ls_cache(max_age_last_usage=timedelta(minutes=5), session=vars_session) == 3
+    assert delete_unused_dbt_cache(max_age_last_usage=timedelta(minutes=5), session=vars_session) == 3
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_a").first()
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_b").first()
     assert not vars_session.query(Variable).filter_by(key="cosmos_cache__dag_c__task_group_1").first()
@@ -249,8 +220,9 @@ def test_delete_unused_dbt_ls_cache_deletes_all_cache_five_minutes_ago(vars_sess
     [(True, True, True), (True, False, False), (False, True, False), (False, False, False)],
 )
 def test_is_profile_cache_enabled(enable_cache, enable_cache_profile, expected_result):
-    with patch("cosmos.cache.enable_cache", enable_cache), patch(
-        "cosmos.cache.enable_cache_profile", enable_cache_profile
+    with (
+        patch("cosmos.cache.enable_cache", enable_cache),
+        patch("cosmos.cache.enable_cache_profile", enable_cache_profile),
     ):
         assert is_profile_cache_enabled() == expected_result
 
@@ -434,14 +406,6 @@ def test_remote_cache_path_initialization_no_remote_cache_dir():
 
 
 @patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
-@patch("cosmos.cache.AIRFLOW_IO_AVAILABLE", new=False)
-def test_remote_cache_path_initialization_object_storage_unavailable_on_earlier_airflow_versions():
-    with pytest.raises(CosmosValueError, match="Object Storage feature is unavailable"):
-        _configure_remote_cache_dir()
-
-
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
-@patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
 @patch("airflow.io.path.ObjectStoragePath")
 def test_remote_cache_path_initialization_path_available_default_connection(mock_object_storage_path):
     mock_cache_dir_path = MagicMock()
@@ -453,7 +417,6 @@ def test_remote_cache_path_initialization_path_available_default_connection(mock
     assert configured_remote_cache_dir == mock_cache_dir_path
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
 @patch("airflow.io.path.ObjectStoragePath")
 def test_remote_cache_dir_initialization_path_not_exist_creates_path(mock_object_storage_path):
@@ -465,7 +428,6 @@ def test_remote_cache_dir_initialization_path_not_exist_creates_path(mock_object
     mock_cache_dir_path.mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
 
-@pytest.mark.skipif(not AIRFLOW_IO_AVAILABLE, reason="Airflow did not have Object Storage until the 2.8 release")
 @patch("cosmos.cache.settings_remote_cache_dir", new="s3://some-bucket/cache")
 @patch("cosmos.cache.remote_cache_dir_conn_id", new="my_conn_id")
 @patch("airflow.io.path.ObjectStoragePath")
@@ -477,3 +439,40 @@ def test_remote_cache_path_initialization_with_conn_id(mock_object_storage_path)
     configured_remote_cache_dir = _configure_remote_cache_dir()
     mock_object_storage_path.assert_called_with("s3://some-bucket/cache", conn_id="my_conn_id")
     assert configured_remote_cache_dir == mock_cache_path
+
+
+def test_calculate_yaml_selectors_cache_current_version_equals():
+    mock_create_dbt_folder_version_hash = MagicMock()
+    mock_create_dbt_folder_version_hash.return_value = "dbt_project_hash_v1"
+    selector_definitions = {
+        "core_models": {
+            "definition": {"method": "tag", "value": "core"},
+            "description": "Select core business logic models (non-staging)",
+            "name": "core_models",
+        },
+    }
+
+    with patch("cosmos.cache._create_folder_version_hash", mock_create_dbt_folder_version_hash):
+        result = _calculate_yaml_selectors_cache_current_version(
+            "cosmos_cache__dag_a", Path("/path/to/project"), selector_definitions, ["yamlselectors_hash_v1"]
+        )
+
+        parts = result.split(",")
+
+        assert len(parts) == 3
+
+        assert parts[0] == "dbt_project_hash_v1"
+        assert parts[1] == "d424de5f9a889bd3afee43a5012f1c65"
+        assert parts[2] == "fbbaca69581c53891710fed3d53badcb"
+
+
+def test_were_yaml_selectors_modified_true():
+    previous_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
+    current_version = "dbt_project_hash_v1, yamlselectors_hash_v2, impl_hash_v1"
+    assert were_yaml_selectors_modified(previous_version, current_version) is True
+
+
+def test_were_yaml_selectors_modified_false():
+    previous_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
+    current_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
+    assert were_yaml_selectors_modified(previous_version, current_version) is False

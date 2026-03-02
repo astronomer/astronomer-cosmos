@@ -1,5 +1,6 @@
 """Tests for the Snowflake user/private key environmentvariable profile."""
 
+import base64
 import json
 from unittest.mock import patch
 
@@ -10,6 +11,34 @@ from cosmos.profiles import get_automatic_profile_mapping
 from cosmos.profiles.snowflake import (
     SnowflakeEncryptedPrivateKeyPemProfileMapping,
 )
+
+PLAIN_TEXT_KEY = "mocked-private-key-content"
+BASE64_ENCODED_KEY = base64.b64encode(PLAIN_TEXT_KEY.encode("utf-8")).decode("utf-8")
+
+
+@pytest.fixture()
+def mock_snowflake_conn_base64():  # type: ignore
+    """
+    Sets a connection with a base64 encoded private key as an environment variable.
+    """
+    conn = Connection(
+        conn_id="my_snowflake_pk_connection_base64",
+        conn_type="snowflake",
+        login="my_user",
+        schema="my_schema",
+        extra=json.dumps(
+            {
+                "account": "my_account",
+                "database": "my_database",
+                "warehouse": "my_warehouse",
+                "private_key_content": BASE64_ENCODED_KEY,
+                "private_key_passphrase": "my_private_key_passphrase",
+            }
+        ),
+    )
+
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        yield conn
 
 
 @pytest.fixture()
@@ -34,8 +63,26 @@ def mock_snowflake_conn():  # type: ignore
         ),
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
+
+
+@pytest.mark.parametrize(
+    "input_key, expected_key",
+    [
+        (BASE64_ENCODED_KEY, PLAIN_TEXT_KEY),
+        (PLAIN_TEXT_KEY, PLAIN_TEXT_KEY),
+    ],
+    ids=["base64_encoded", "plain_text"],
+)
+def test_decode_private_key_content(input_key: str, expected_key: str, mock_snowflake_conn_base64: Connection) -> None:
+    """
+    Tests that the private key content is decoded correctly.
+    """
+    profile_mapping = get_automatic_profile_mapping(
+        mock_snowflake_conn_base64.conn_id,
+    )
+    assert profile_mapping._decode_private_key_content(input_key) == expected_key
 
 
 def test_connection_claiming() -> None:
@@ -65,7 +112,7 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(
                 conn,
             )
@@ -75,7 +122,7 @@ def test_connection_claiming() -> None:
     conn = Connection(**potential_values)  # type: ignore
     conn.extra = '{"database": "my_database", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
@@ -83,7 +130,7 @@ def test_connection_claiming() -> None:
     conn = Connection(**potential_values)  # type: ignore
     conn.extra = '{"account": "my_account", "warehouse": "my_warehouse", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
@@ -91,13 +138,13 @@ def test_connection_claiming() -> None:
     conn = Connection(**potential_values)  # type: ignore
     conn.extra = '{"account": "my_account", "database": "my_database", "private_key_content": "my_private_key"}'
     print("testing with", conn.extra)
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
         assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
         assert profile_mapping.can_claim_connection()
 
@@ -136,6 +183,7 @@ def test_profile_args(
         "account": f"{mock_account}.{mock_region}",
         "database": mock_snowflake_conn.extra_dejson.get("database"),
         "warehouse": mock_snowflake_conn.extra_dejson.get("warehouse"),
+        "threads": 4,
     }
 
 
@@ -165,6 +213,7 @@ def test_profile_args_overrides(
         "account": f"{mock_account}.{mock_region}",
         "database": "my_db_override",
         "warehouse": mock_snowflake_conn.extra_dejson.get("warehouse"),
+        "threads": 4,
     }
 
 
@@ -180,6 +229,20 @@ def test_profile_env_vars(
     assert profile_mapping.env_vars == {
         "COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY": mock_snowflake_conn.extra_dejson.get("private_key_content"),
         "COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE": mock_snowflake_conn.password,
+    }
+
+
+def test_profile_env_vars_with_base64(
+    mock_snowflake_conn_base64: Connection,
+) -> None:
+    """
+    Tests that the environment variable get set correctly for a base64-encoded key.
+    """
+    profile_mapping = get_automatic_profile_mapping(
+        mock_snowflake_conn_base64.conn_id,
+    )
+    assert profile_mapping.env_vars == {
+        "COSMOS_CONN_SNOWFLAKE_PRIVATE_KEY": PLAIN_TEXT_KEY,
     }
 
 
@@ -203,7 +266,7 @@ def test_old_snowflake_format() -> None:
         ),
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
         assert profile_mapping.profile == {
             "type": conn.conn_type,
@@ -214,4 +277,5 @@ def test_old_snowflake_format() -> None:
             "account": conn.extra_dejson.get("account"),
             "database": conn.extra_dejson.get("database"),
             "warehouse": conn.extra_dejson.get("warehouse"),
+            "threads": 4,
         }

@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 import shutil
 import time
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any
 
 import psutil
 
@@ -94,11 +95,13 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         if not self.py_requirements:
             self.log.error("Cosmos virtualenv operators require the `py_requirements` parameter")
 
-    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str) -> FullOutputSubprocessResult:
+    def run_subprocess(
+        self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
+    ) -> FullOutputSubprocessResult:
         if self._py_bin is not None:
             self.log.info(f"Using Python binary from virtualenv: {self._py_bin}")
             command[0] = str(Path(self._py_bin).parent / "dbt")
-        return super().run_subprocess(command, env, cwd)
+        return super().run_subprocess(command, env, cwd, **kwargs)
 
     def run_command(
         self,
@@ -107,6 +110,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         context: Context,
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        push_run_results_to_xcom: bool = False,
     ) -> FullOutputSubprocessResult | dbtRunnerResult:
         # No virtualenv_dir set, so create a temporary virtualenv
         if self.virtualenv_dir is None or self.is_virtualenv_dir_temporary:
@@ -114,7 +118,14 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             with TemporaryDirectory(prefix="cosmos-venv") as tempdir:
                 self.virtualenv_dir = Path(tempdir)
                 self._py_bin = self._prepare_virtualenv()
-                return super().run_command(cmd, env, context, run_as_async=run_as_async, async_context=async_context)
+                return super().run_command(
+                    cmd,
+                    env,
+                    context,
+                    run_as_async=run_as_async,
+                    async_context=async_context,
+                    push_run_results_to_xcom=push_run_results_to_xcom,
+                )
 
         try:
             self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
@@ -126,7 +137,14 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             self.log.info("Acquiring the virtualenv lock")
             self._acquire_venv_lock()
             self._py_bin = self._prepare_virtualenv()
-            return super().run_command(cmd, env, context, run_as_async=run_as_async, async_context=async_context)
+            return super().run_command(
+                cmd,
+                env,
+                context,
+                run_as_async=run_as_async,
+                async_context=async_context,
+                push_run_results_to_xcom=push_run_results_to_xcom,
+            )
         finally:
             self.log.info("Releasing virtualenv lock")
             self._release_venv_lock()

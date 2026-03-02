@@ -19,7 +19,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 `cache_dir`_:
     The directory used for caching Cosmos data.
 
-    - Default: ``{TMPDIR}/cosmos_cache`` (where ``{TMPDIR}`` is the system temporary directory)
+    - Default: ``{TMPDIR}/cosmos`` (where ``{TMPDIR}`` is the system temporary directory)
     - Environment Variable: ``AIRFLOW__COSMOS__CACHE_DIR``
 
 .. _enable_cache:
@@ -37,6 +37,14 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS``
+
+.. _enable_cache_dbt_yaml_selectors:
+
+`enable_cache_dbt_yaml_selectors`_:
+    Enable or disable caching of the YAML selectors in case using ``LoadMode.DBT_MANIFEST`` with ``RenderConfig.selector`` in an Airflow Variable.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS``
 
 .. _enable_cache_partial_parse:
 
@@ -62,10 +70,37 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__PROPAGATE_LOGS``
 
+.. _dbt_docs_projects:
+
+`dbt_docs_projects`_:
+    (Introduced in Cosmos 1.11.0; applicable to Airflow >= 3.1): JSON mapping configuring one or more dbt docs projects for the Airflow 3 UI plugin.
+
+    Structure: mapping of slug to a dict with keys ``dir`` (required), ``index`` (optional, default ``index.html``),
+    ``name`` (optional, label in the menu), and ``conn_id`` (optional connection to read remote storage).
+    A "slug" here means a short, URL-safe identifier you choose for each docs project. It's used in the path segment
+    ``/cosmos/<slug>/…`` and in the UI menu label mapping. Prefer lowercase letters, numbers, and hyphens/underscores (e.g., core, mart, jaffle-shop).
+
+
+    Example:
+
+    .. code-block:: ini
+
+       [cosmos]
+       dbt_docs_projects = {
+         "core": {"dir": "/path/to/core/target", "index": "index.html", "name": "dbt Docs (Core)"},
+         "mart": {"dir": "s3://bucket/path/to/mart/target", "conn_id": "aws_default", "name": "dbt Docs (Mart)"}
+       }
+
+    Environment Variable: ``AIRFLOW__COSMOS__DBT_DOCS_PROJECTS``
+
+    .. code-block:: bash
+
+       export AIRFLOW__COSMOS__DBT_DOCS_PROJECTS='{"core":{"dir":"/path/to/core/target","index":"index.html","name":"dbt Docs (Core)"},"mart":{"dir":"s3://bucket/path/to/mart/target","conn_id":"aws_default","name":"dbt Docs (Mart)"}}'
+
 .. _dbt_docs_dir:
 
 `dbt_docs_dir`_:
-    The directory path for dbt documentation.
+    (Applicable to Airflow 2): The directory path for dbt documentation.
 
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__DBT_DOCS_DIR``
@@ -73,7 +108,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 .. _dbt_docs_conn_id:
 
 `dbt_docs_conn_id`_:
-    The connection ID for dbt documentation.
+    (Applicable to Airflow 2): The connection ID for dbt documentation.
 
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__DBT_DOCS_CONN_ID``
@@ -95,6 +130,15 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_PROFILE``
+
+.. _pre_dbt_fusion:
+
+`pre_dbt_fusion`_:
+    From Cosmos 1.11, we have introduced support for dbt Fusion. Some of the changes may not be compatible with legacy versions of dbt-core.
+    If you find any issues on how Cosmos interacts with older versions of dbt-core you can use this configuration.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__PRE_DBT_FUSION``
 
 .. _profile_cache_dir_name:
 
@@ -118,7 +162,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     in a remote location (an alternative to the Variable cache approach released previously since Cosmos 1.5.0)
     using this configuration. The value for the remote cache directory can be any of the schemes that are supported by
     the `Airflow Object Store <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`_
-    feature introduced in Airflow 2.8.0 (e.g. ``s3://your_s3_bucket/cache_dir/``, ``gs://your_gs_bucket/cache_dir/``,
+    feature (e.g. ``s3://your_s3_bucket/cache_dir/``, ``gs://your_gs_bucket/cache_dir/``,
     ``abfs://your_azure_container/cache_dir``, etc.)
 
     This is an experimental feature available since Cosmos 1.6 to gather user feedback and will be merged into the
@@ -147,7 +191,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     the target directory.
     The value for the remote target path can be any of the schemes that are supported by the
     `Airflow Object Store <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/objectstorage.html>`_
-    feature introduced in Airflow 2.8.0 (e.g. ``s3://your_s3_bucket/target_dir/``, ``gs://your_gs_bucket/target_dir/``,
+    feature (e.g. ``s3://your_s3_bucket/target_dir/``, ``gs://your_gs_bucket/target_dir/``,
     ``abfs://your_azure_container/cache_dir``, etc.)
 
     - Default: ``None``
@@ -178,6 +222,82 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_TEARDOWN_ASYNC_TASK``
 
+.. _upload_sql_to_xcom:
+
+`upload_sql_to_xcom`_:
+    (Introduced in Cosmos 1.11.0): Enable this if the setup async task is enabled for ``ExecutionMode.AIRFLOW_ASYNC`` and you want to upload the compiled SQL to Airflow XCom instead of a remote location (e.g., S3 or GCS).
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__UPLOAD_SQL_TO_XCOM``
+
+.. _use_dataset_airflow3_uri_standard:
+
+`use_dataset_airflow3_uri_standard`_:
+    (Introduced in Cosmos 1.10.0): Changes Cosmos Dataset (Asset) URIs to be Airflow 3 compliant. Since this would be a breaking change, it is False by default in Cosmos 1.x.
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD``
+
+.. _enable_memory_optimised_imports:
+
+`enable_memory_optimised_imports`_:
+    (Introduced in Cosmos 1.10.1): Eager imports in cosmos/__init__.py expose all Cosmos classes at the top level,
+    which can significantly increase memory usage—even when Cosmos is just installed but not actively used. This option allows
+    disabling those eager imports to reduce memory footprint. When enabled, users must access Cosmos classes via their full
+    module paths, avoiding the overhead of importing unused modules and classes.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS``
+
+    .. note::
+        This option will become the default behavior in Cosmos 2.0.0, where all eager imports will be removed from ``cosmos/__init__.py``.
+
+    As an example, when this option is enabled, the following is an example of specifying the imports with full module paths:
+
+    .. literalinclude:: ../../dev/dags/basic_cosmos_dag_full_module_path_imports.py
+        :language: python
+        :start-after: [START cosmos_explicit_imports]
+        :end-before: [END cosmos_explicit_imports]
+
+    as opposed to the following approach you might have when this option is disabled (default):
+
+    .. literalinclude:: ../../dev/dags/basic_cosmos_dag.py
+        :language: python
+        :start-after: [START cosmos_init_imports]
+        :end-before: [END cosmos_init_imports]
+
+.. _enable_debug_mode:
+
+`enable_debug_mode`_:
+    Enable or disable debug mode. When enabled, Cosmos will track memory utilization for its tasks and push the peak
+    memory usage (in MB) to XCom under the key ``cosmos_debug_max_memory_mb``. This is useful for profiling and
+    optimizing resource allocation for dbt tasks. Requires ``psutil`` to be installed.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_DEBUG_MODE``
+
+.. _debug_memory_poll_interval_seconds:
+
+`debug_memory_poll_interval_seconds`_:
+    The interval (in seconds) at which memory utilization is polled when debug mode is enabled. Lower values provide
+    more accurate peak memory measurements but may add slight overhead.
+
+    - Default: ``0.5``
+    - Environment Variable: ``AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS``
+
+.. _watcher_dbt_execution_queue:
+
+`watcher_dbt_execution_queue`_:
+    (Introduced in Cosmos 1.14.0) When using watcher execution mode, tasks may need to run dbt or not, depending on their type (producer vs. consumer) and the retry number. When running the dbt command, tasks use more resources (CPU and memory) than when behaving as sensors. The computational cost of running these tasks can vary widely. For example, a Cosmos watcher sensor consumes approximately 200MB, compared to 700MB consumed by a dbt build task running a project with almost 200 dbt models. This configuration allows users to define which queue to use when dbt commands are run, optimising their Airflow deployment. Internally, Cosmos leverages the [Airflow cluster policy feature](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html). As of now, this configuration will be used:
+    - for watcher producer tasks, during their first execution
+    - for watcher consumer tasks, from their first retry onwards
+    - it will automatically be assigned to the specified queue.
+
+    This behavior is enforced by Cosmos via an Airflow policy (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts.
+    As a result, the configured ``watcher_dbt_execution_queue`` can overwrite any queue set directly on the operator, but only for retries; the initial run continues to use the operator's original queue.
+
+    - Default: ``None``
+    - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE``
+
 [openlineage]
 ~~~~~~~~~~~~~
 
@@ -190,7 +310,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Environment Variable: ``AIRFLOW__OPENLINEAGE__NAMESPACE``
 
 .. note::
-    For more information, see `Openlieage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_.
+    For more information, see `OpenLineage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_.
 
 Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~

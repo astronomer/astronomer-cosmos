@@ -1,54 +1,35 @@
 from __future__ import annotations
 
-import sys
+from functools import cache
 from pathlib import Path
 
-try:
-    from functools import cache
-except ImportError:
-    from functools import lru_cache as cache
-
-import airflow
 import pytest
 from airflow.models.dagbag import DagBag
 from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
+from cosmos.constants import AIRFLOW_VERSION
+
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
-_PYTHON_VERSION = sys.version_info[:2]
 
-MIN_VER_DAG_FILE: dict[str, list[str]] = {
-    "2.4": ["cosmos_seed_dag.py"],
-    "2.8": ["cosmos_manifest_example.py"],
-}
-
-IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py"]
-
-# Sort descending based on Versions and convert string to an actual version
-MIN_VER_DAG_FILE_VER: dict[Version, list[str]] = {
-    Version(version): MIN_VER_DAG_FILE[version] for version in sorted(MIN_VER_DAG_FILE, key=Version, reverse=True)
-}
+IGNORED_DAG_FILES = [
+    "performance_dag.py",
+    "jaffle_shop_kubernetes.py",
+    "jaffle_shop_watcher_kubernetes.py",
+    "cosmos_manifest_selectors_example.py",
+    "cross_project_dbt_ls_dag.py",
+]
 
 
 @cache
 def get_dag_bag() -> DagBag:
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:
-        for min_version, files in MIN_VER_DAG_FILE_VER.items():
-            if Version(airflow.__version__) < min_version:
-                print(f"Adding {files} to .airflowignore")
-                file.writelines([f"{file_name}\n" for file_name in files])
-
         for dagfile in IGNORED_DAG_FILES:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
-
-        # Python 3.8 has reached its end of life (EOL), and dbt no longer supports this version.
-        # This results in an error, as outlined in https://github.com/duckdb/dbt-duckdb/issues/488
-        if _PYTHON_VERSION < (3, 9):
-            file.writelines(["example_duckdb_dag.py\n"])
 
         # Ignore Async DAG for dbt <=1.5
         if DBT_VERSION <= Version("1.5.0"):
@@ -65,6 +46,16 @@ def get_dag_bag() -> DagBag:
         for file_name in ["cosmos_profile_mapping.py"]:
             print(f"Adding {file_name} to .airflowignore")
             file.write(f"{file_name}\n")
+
+        if AIRFLOW_VERSION == Version("2.9.0"):
+            # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9.0
+            file.write("cosmos_example_manifest_dag.py\n")
+            # This DAG is taking too long to run in the CI (https://github.com/astronomer/astronomer-cosmos/actions/runs/21902660682/job/63234728594)
+            file.write("example_cosmos_python_models.py\n")
+
+        if AIRFLOW_VERSION >= Version("3.0.0"):
+            file.write("example_cosmos_cleanup_dag.py\n")
+
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)

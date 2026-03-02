@@ -16,7 +16,9 @@ ________
 To contribute to the cosmos project:
 
 #. Please create a `GitHub Issue <https://github.com/astronomer/astronomer-cosmos/issues>`_ describing your contribution
-#. Open a feature branch off of the ``main`` branch and create a Pull Request into the ``main`` branch from your feature branch
+#. `Fork the repository <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo>`_ and clone your fork locally.
+#. Open a feature branch off of the main branch in your fork
+#. Make your changes, push the branch to your fork, and open a Pull Request from your feature branch into the ``main`` branch of the upstream repository.
 #. Link your issue to the pull request
 #. Once developments are complete on your feature branch, request a review and it will be merged once approved.
 
@@ -91,11 +93,11 @@ We currently use `hatch <https://github.com/pypa/hatch>`_ for building and distr
 
 The tool can also be used for local development. The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file currently defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
 
-For instance, to run the tests using Python 3.9, `Apache Airflow® <https://airflow.apache.org/>`_ 2.10 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
+For instance, to run the tests using Python 3.11, `Apache Airflow® <https://airflow.apache.org/>`_ 2.10 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
 
 .. code-block:: bash
 
-    hatch run tests.py3.9-2.10-1.9:test-cov:test-cov
+    hatch run tests.py3.11-2.10-1.9:test-cov
 
 It is also possible to run the tests using all the matrix combinations, by using:
 
@@ -125,14 +127,14 @@ To run the integration tests for the first time, use:
     export POSTGRES_PASSWORD=postgres
     export POSTGRES_USER=postgres
     export POSTGRES_HOST=localhost
-    hatch run tests.py3.9-2.10-1.9:test-cov:test-integration-setup
-    hatch run tests.py3.9-2.10-1.9:test-cov:test-integration
+    hatch run tests.py3.11-2.10-1.9:test-cov:test-integration-setup
+    hatch run tests.py3.11-2.10-1.9:test-cov:test-integration
 
 If testing for the same Airflow and Python version, next runs of the integration tests can be:
 
 .. code-block:: bash
 
-    hatch run tests.py3.9-2.10-1.9:test-integration
+    hatch run tests.py3.11-2.10-1.9:test-integration
 
 Pre-Commit
 ----------
@@ -153,14 +155,19 @@ To run the checks manually, run:
 Writing Docs
 ____________
 
+`Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatchto declare the dependencies required for the project itself, as well as for tests and documentation builds.
+
+If you don’t already have Hatch installed, please `install it <https://hatch.pypa.io/latest/install/>`_ before proceeding. As an example, on macOS, you can do so with:
+
+.. code-block:: bash
+    brew install hatch
+
+
 You can run the docs locally by running the following:
 
 .. code-block:: bash
-
     hatch run docs:serve
 
-
-This will run the docs server in a virtual environment with the right dependencies. Note that it may take longer on the first run as it sets up the virtual environment, but will be quick on subsequent runs.
 
 
 Building

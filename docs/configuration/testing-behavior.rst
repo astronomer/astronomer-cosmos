@@ -54,7 +54,7 @@ Warning Behavior
 
 .. note::
 
-    As of now, this feature is only available for the default execution mode ``local`` and for ``virtualenv``
+    As of now, this feature is only available for the default execution mode ``local``, ``virtualenv`` and ``kubernetes``
 
 Cosmos enables you to receive warning notifications from tests and process them using a callback function.
 The ``on_warning_callback`` parameter adds two extra context variables to the callback function: ``test_names`` and ``test_results``.
@@ -171,7 +171,6 @@ The test will only run once after both models run, leading the DAG to succeed:
 .. code-block:: python
 
     from cosmos import DbtDag, RenderConfig
-
 
     example_multiple_parents_test = DbtDag(
         ...,

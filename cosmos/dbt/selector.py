@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import inspect
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import yaml
 
 from cosmos.constants import DbtResourceType
 from cosmos.exceptions import CosmosValueError
@@ -19,9 +24,11 @@ CONFIG_META_PATH = "meta"
 SUPPORTED_CONFIG = ["materialized", "schema", "tags", CONFIG_META_PATH]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
+FQN_SELECTOR = "fqn:"
 CONFIG_SELECTOR = "config."
 SOURCE_SELECTOR = "source:"
 EXPOSURE_SELECTOR = "exposure:"
+PACKAGE_SELECTOR = "package:"
 RESOURCE_TYPE_SELECTOR = "resource_type:"
 EXCLUDE_RESOURCE_TYPE_SELECTOR = "exclude_resource_type:"
 PLUS_SELECTOR = "+"
@@ -29,6 +36,26 @@ AT_SELECTOR = "@"
 GRAPH_SELECTOR_REGEX = r"^(@|[0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
 
 logger = get_logger(__name__)
+
+
+def _node_fqn_str(node: DbtNode) -> str | None:
+    """
+    Return the node's fully qualified name as a string (e.g. 'jaffle_shop.marts.customers').
+    FQN is project name, path segments, and file name without extension, joined by periods.
+    Returns None when node.fqn is not set.
+    See https://docs.getdbt.com/reference/node-selection/methods#fqn
+    """
+    if node.fqn:
+        return ".".join(node.fqn)
+    return None
+
+
+def _fqn_matches(node_fqn: str, fqn_selector_value: str) -> bool:
+    """
+    Return True if the node's fully qualified name exactly equals the selector value.
+    FQN is a fully qualified name (e.g. project.folder.model_name); no wildcards or partial matching.
+    """
+    return node_fqn == fqn_selector_value
 
 
 def _check_nested_value_in_dict(dict_: dict[Any, Any], pattern: str) -> bool:
@@ -78,6 +105,7 @@ class GraphSelector:
         @model_g
         +/path/to/model_g+
         path:/path/to/model_h+
+        fqn:project.folder.model_name
         +tag:nightly
         +config.materialized:view
         resource_type:resource_name
@@ -163,7 +191,11 @@ class GraphSelector:
                 new_generation: set[str] = set()
                 for node_id in previous_generation:
                     if node_id not in processed_nodes:
-                        new_generation.update(set(nodes[node_id].depends_on))
+                        # When using dbt-loom for cross-project references, external nodes are filtered out
+                        # during manifest loading but local nodes may still reference them in depends_on.
+                        # Skip missing nodes to gracefully stop traversal at project boundaries.
+                        if node_id in nodes:
+                            new_generation.update(set(nodes[node_id].depends_on))
                         processed_nodes.add(node_id)
                 selected_nodes.update(new_generation)
                 previous_generation = new_generation
@@ -219,6 +251,13 @@ class GraphSelector:
             tag_selection = self.node_name[len(TAG_SELECTOR) :]
             root_nodes.update({node_id for node_id, node in nodes.items() if tag_selection in node.tags})
 
+        elif FQN_SELECTOR in self.node_name:
+            fqn_pattern = self.node_name[len(FQN_SELECTOR) :].strip()
+            for node_id, node in nodes.items():
+                node_fqn = _node_fqn_str(node)
+                if node_fqn and _fqn_matches(node_fqn, fqn_pattern):
+                    root_nodes.add(node_id)
+
         elif SOURCE_SELECTOR in self.node_name:
             source_selection = self.node_name[len(SOURCE_SELECTOR) :]
 
@@ -242,6 +281,13 @@ class GraphSelector:
                     if node.resource_type == DbtResourceType.EXPOSURE and node.resource_name == exposure_selection
                 }
             )
+
+        elif self.node_name.startswith(PACKAGE_SELECTOR):
+            package_selection = self.node_name[len(PACKAGE_SELECTOR) :].strip()
+            if package_selection:
+                root_nodes.update(
+                    {node_id for node_id, node in nodes.items() if node.package_name == package_selection}
+                )
 
         elif CONFIG_SELECTOR in self.node_name:
             config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
@@ -342,11 +388,16 @@ class SelectorConfig:
         self.project_dir = project_dir
         self.paths: list[Path] = []
         self.tags: list[str] = []
+        self.fqns: list[str] = []
         self.config: dict[str, str] = {}
         self.other: list[str] = []
         self.graph_selectors: list[GraphSelector] = []
         self.sources: list[str] = []
         self.exposures: list[str] = []
+        self.packages: list[str] = []
+        self.bare_identifiers: list[str] = (
+            []
+        )  # bare strings: match by package_name, node name or folder name (dbt ls-like)
         self.resource_types: list[str] = []
         self.exclude_resource_types: list[str] = []
         self.load_from_statement(statement)
@@ -356,11 +407,14 @@ class SelectorConfig:
         return not (
             self.paths
             or self.tags
+            or self.fqns
             or self.config
             or self.graph_selectors
             or self.other
             or self.sources
             or self.exposures
+            or self.packages
+            or self.bare_identifiers
             or self.resource_types
             or self.exclude_resource_types
         )
@@ -390,24 +444,38 @@ class SelectorConfig:
                     self._handle_no_precursors_or_descendants(item, node_name)
 
     def _handle_no_precursors_or_descendants(self, item: str, node_name: str) -> None:
-        if node_name.startswith(PATH_SELECTOR):
-            self._parse_path_selector(item)
-        elif "/" in node_name:
+        prefix_handlers = {
+            PATH_SELECTOR: self._parse_path_selector,
+            TAG_SELECTOR: self._parse_tag_selector,
+            CONFIG_SELECTOR: self._parse_config_selector,
+            SOURCE_SELECTOR: self._parse_source_selector,
+            EXPOSURE_SELECTOR: self._parse_exposure_selector,
+            PACKAGE_SELECTOR: self._parse_package_selector,
+            RESOURCE_TYPE_SELECTOR: self._parse_resource_type_selector,
+            EXCLUDE_RESOURCE_TYPE_SELECTOR: self._parse_exclude_resource_type_selector,
+            FQN_SELECTOR: self._parse_fqn_selector,
+        }
+        for prefix, handler in prefix_handlers.items():
+            if node_name.startswith(prefix):
+                handler(item)
+                return
+        if "/" in node_name:
             self._parse_path_selector(f"{PATH_SELECTOR}{node_name}")
-        elif node_name.startswith(TAG_SELECTOR):
-            self._parse_tag_selector(item)
-        elif node_name.startswith(CONFIG_SELECTOR):
-            self._parse_config_selector(item)
-        elif node_name.startswith(SOURCE_SELECTOR):
-            self._parse_source_selector(item)
-        elif node_name.startswith(EXPOSURE_SELECTOR):
-            self._parse_exposure_selector(item)
-        elif node_name.startswith(RESOURCE_TYPE_SELECTOR):
-            self._parse_resource_type_selector(item)
-        elif node_name.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR):
-            self._parse_exclude_resource_type_selector(item)
+        elif self._is_bare_identifier(node_name):
+            self._parse_bare_identifier(node_name)
         else:
             self._parse_unknown_selector(item)
+
+    def _is_bare_identifier(self, value: str) -> bool:
+        """True if value is a bare selector: no : / + @ .
+        Resolved at selection time as package name or node name"""
+        return not any(c in value for c in ":/+@.")
+
+    def _parse_bare_identifier(self, value: str) -> None:
+        """Store bare identifier; at selection time match by node.package_name or node.name."""
+        name = value.strip()
+        if name:
+            self.bare_identifiers.append(name)
 
     def _parse_unknown_selector(self, item: str) -> None:
         if item:
@@ -428,6 +496,11 @@ class SelectorConfig:
     def _parse_tag_selector(self, item: str) -> None:
         index = len(TAG_SELECTOR)
         self.tags.append(item[index:])
+
+    def _parse_fqn_selector(self, item: str) -> None:
+        """Parse fqn: selector; appends the fully qualified name (value after 'fqn:') to self.fqns."""
+        index = len(FQN_SELECTOR)
+        self.fqns.append(item[index:].strip())
 
     def _parse_path_selector(self, item: str) -> None:
         index = len(PATH_SELECTOR)
@@ -456,15 +529,27 @@ class SelectorConfig:
         exposure_name = item[index:].strip()
         self.exposures.append(exposure_name)
 
+    def _parse_package_selector(self, item: str) -> None:
+        index = len(PACKAGE_SELECTOR)
+        package_name = item[index:].strip()
+        if not package_name:
+            raise CosmosValueError(
+                "package: selector requires a non-empty package name (e.g. select=['package:dbt_artifacts'])"
+            )
+        self.packages.append(package_name)
+
     def __repr__(self) -> str:
         return (
             "SelectorConfig("
             + f"paths={self.paths}, "
             + f"tags={self.tags}, "
+            + f"fqns={self.fqns}, "
             + f"config={self.config}, "
             + f"sources={self.sources}, "
             + f"resource={self.resource_types}, "
             + f"exposures={self.exposures}, "
+            + f"packages={self.packages}, "
+            + f"bare_identifiers={self.bare_identifiers}, "
             + f"exclude_resource={self.exclude_resource_types}, "
             + f"other={self.other}, "
             + f"graph_selectors={self.graph_selectors})"
@@ -502,6 +587,11 @@ class NodeSelector:
         if self.config.graph_selectors:
             graph_selected_nodes = self.select_by_graph_operator()
             for node_id in graph_selected_nodes:
+                # When using dbt-loom for cross-project references, external nodes are filtered out
+                # during manifest loading but may be collected during graph traversal via depends_on.
+                # Skip these external node IDs that don't exist in the nodes dict.
+                if node_id not in self.nodes:
+                    continue
                 node = self.nodes[node_id]
                 # Since the method below changes the tags of test nodes, it can lead to incorrect
                 # results during the application of graph selectors. Therefore, it is being run within
@@ -577,22 +667,40 @@ class NodeSelector:
         ) or not self._should_include_based_on_non_meta_and_non_tag_config(node, config_copy):
             return False
 
-        if self.config.paths and not self._is_path_matching(node):
-            return False
-
-        if self.config.resource_types and not self._is_resource_type_matching(node):
-            return False
-
-        if self.config.exclude_resource_types and self._is_exclude_resource_type_matching(node):
-            return False
-
-        if self.config.sources and not self._is_source_matching(node):
-            return False
-
-        if self.config.exposures and not self._is_exposure_matching(node):
+        if not self._passes_selector_filters(node):
             return False
 
         return True
+
+    def _passes_selector_filters(self, node: DbtNode) -> bool:
+        """Return True if node matches all configured selector filters (path, fqn, resource_type, source, exposure)."""
+        if self.config.paths and not self._is_path_matching(node):
+            return False
+        if self.config.fqns and not self._is_fqn_matching(node):
+            return False
+        if self.config.resource_types and not self._is_resource_type_matching(node):
+            return False
+        if self.config.exclude_resource_types and self._is_exclude_resource_type_matching(node):
+            return False
+        if self.config.sources and not self._is_source_matching(node):
+            return False
+        if self.config.exposures and not self._is_exposure_matching(node):
+            return False
+
+        if self.config.packages and not self._is_package_matching(node):
+            return False
+
+        if self.config.bare_identifiers and not self._is_bare_identifier_matching(node):
+            return False
+
+        return True
+
+    def _is_fqn_matching(self, node: DbtNode) -> bool:
+        """Checks if the node's fully qualified name exactly matches any of the config's fqn selector values."""
+        node_fqn = _node_fqn_str(node)
+        if node_fqn is None:
+            return False
+        return any(_fqn_matches(node_fqn, fqn_value) for fqn_value in self.config.fqns)
 
     def _is_resource_type_matching(self, node: DbtNode) -> bool:
         """Checks if the node's resource type is a subset of the config's resource type."""
@@ -619,6 +727,18 @@ class NodeSelector:
         if node.resource_name not in self.config.exposures:
             return False
         return True
+
+    def _is_package_matching(self, node: DbtNode) -> bool:
+        """Checks if the node's package is in the config's package list."""
+        return (node.package_name or "") in self.config.packages
+
+    def _is_bare_identifier_matching(self, node: DbtNode) -> bool:
+        """Bare identifiers match by package_name, node name, or path segment (e.g. folder name)."""
+        if (node.package_name or "") in self.config.bare_identifiers or node.name in self.config.bare_identifiers:
+            return True
+        # Match by path segment (folder name): e.g. "folder_a" matches nodes under .../folder_a/...
+        path_parts = node.file_path.parts
+        return any(bare in path_parts for bare in self.config.bare_identifiers)
 
     def _is_tags_subset(self, node: DbtNode) -> bool:
         """Checks if the node's tags are a subset of the config's tags."""
@@ -683,6 +803,613 @@ def retrieve_by_label(statement_list: list[str], label: str) -> set[str]:
     return label_values
 
 
+class YamlSelectors:
+    """
+    Parses and manages dbt YAML selector definitions from the manifest.
+
+    This class handles the parsing of selector definitions that come from a dbt manifest file,
+    converting them into syntax compatible with Cosmos node selection. The manifest provides
+    selectors in a preprocessed format (dict keyed by selector name) rather than the original
+    selectors.yml file format (list of selector objects).
+
+    **Important**: This parser expects the manifest's preprocessed selector format and was NOT
+    designed to support parsing selectors.yml files directly. Attempting to parse a selectors.yml
+    file may result in errors.
+
+    **Limitations**: This implementation does not support the `default` or `indirect_selection`
+    properties from the dbt selector specification. It focuses on the core selection logic:
+    union, intersection, and method-based selector definitions.
+
+    Instances of this class should be created using the `parse` class method.
+
+    :param raw_selectors: dict[str, dict[str, Any]] - The original, unparsed selector definitions from the manifest
+    :param parsed_selectors: dict[str, dict[str, Any]] - The processed selector definitions converted to Cosmos format
+
+    :property raw: dict[str, dict[str, Any]]
+        The original unparsed selector definitions from the manifest.
+    :property parsed: dict[str, dict[str, Any]]
+        The parsed selector definitions in Cosmos format.
+    :property impl_version: str
+        The source code of the YamlSelectors implementation, used for change detection.
+
+    References:
+        https://docs.getdbt.com/reference/node-selection/yaml-selectors
+    """
+
+    def __init__(self, raw_selectors: dict[str, dict[str, Any]], parsed_selectors: dict[str, dict[str, Any]]):
+        self._raw = raw_selectors
+        self._parsed = parsed_selectors
+
+    @property
+    def raw(self) -> dict[str, dict[str, Any]]:
+        """
+        Get the original unparsed selector definitions.
+
+        :return: dict[str, dict[str, Any]] - Dictionary containing the raw YAML structure
+        """
+        return self._raw
+
+    @property
+    def parsed(self) -> dict[str, dict[str, Any]]:
+        """
+        Get the parsed selector definitions in Cosmos format.
+
+        :return: dict[str, dict[str, Any]] - Dictionary mapping selector names to their parsed definitions with select/exclude lists
+        """
+        return self._parsed
+
+    @cached_property
+    def impl_version(self) -> str:
+        """
+        Get a hash of the YamlSelectors implementation for version detection.
+
+        This property retrieves the source code of the YamlSelectors class and returns its MD5 hash,
+        which can be used to detect changes in the selector parsing logic (e.g., for cache invalidation).
+        The hash is computed once and cached for the lifetime of the instance.
+
+        :return: str - MD5 hash (32 hex characters) of the YamlSelectors class source code
+        """
+        source_code = inspect.getsource(self.__class__)
+        return hashlib.md5(source_code.encode()).hexdigest()
+
+    def get_raw(self, selector_name: str, default: Any = None) -> dict[str, Any] | Any:
+        """
+        Retrieve a raw selector definition by name.
+
+        :param selector_name: str - Name of the selector to retrieve
+        :param default: Any - Default value to return if selector is not found
+        :return: dict[str, Any] | Any - The raw selector definition or the default value
+        """
+        return self.raw.get(selector_name, default)
+
+    def get_parsed(self, selector_name: str, default: Any = None) -> dict[str, Any] | Any:
+        """
+        Retrieve a parsed selector definition by name.
+
+        :param selector_name: str - Name of the selector to retrieve
+        :param default: Any - Default value to return if selector is not found
+        :return: dict[str, Any] | Any - The parsed selector definition or the default value
+        :raises CosmosValueError: If the selector has parsing errors
+        """
+        parsed_selector = self.parsed.get(selector_name, default)
+
+        if parsed_selector and isinstance(parsed_selector, dict):
+            errors = parsed_selector.get("errors", [])
+
+            if errors:
+                error_list = "\n  - ".join(errors)
+                error_message = f"Error(s) parsing selector '{selector_name}':\n  - {error_list}"
+                raise CosmosValueError(error_message)
+
+        return parsed_selector
+
+    @staticmethod
+    def _get_list_dicts(dct: dict[str, Any], key: str) -> tuple[list[dict[str, Any]], list[str]]:
+        """
+        Extract and validate a list of dictionaries from a given key in a dictionary.
+
+        This helper method retrieves a value from a dictionary and ensures it's a list containing
+        only dictionaries with string keys.
+
+        :param dct: dict[str, Any] - The dictionary to extract from
+        :param key: str - The key to look up in the dictionary
+        :return: tuple[list[dict[str, Any]], list[str]] - Tuple of (list of dictionaries, list of error messages)
+        """
+        values = dct[key]
+        if not isinstance(values, list):
+            return ([], [f"Invalid value for key '{key}'. Expected a list."])
+
+        result: list[dict[str, Any]] = []
+        errors: list[str] = []
+
+        for value in values:
+            if isinstance(value, dict):
+                if all(isinstance(value_key, str) for value_key in value):
+                    result.append(value)
+                else:
+                    for value_key in value:
+                        if not isinstance(value_key, str):
+                            errors.append(
+                                f'Expected all keys to "{key}" dict to be strings, '
+                                f'but "{value_key}" is a "{type(value_key)}"'
+                            )
+            else:
+                errors.append(f'Invalid value type {type(value)} in key "{key}", expected dict (value: {value}).')
+
+        return (result, errors)
+
+    @staticmethod
+    def _parse_selection_graph_operators(
+        selector: str | None,
+        parents: bool,
+        children: bool,
+        parents_depth: int,
+        children_depth: int,
+        childrens_parents: bool,
+    ) -> tuple[str | None, str | None]:
+        """
+        Apply graph operator syntax to a selector string.
+
+        Transforms a selector by adding graph operators (+, @) based on the specified parameters.
+        These operators control traversal of the DAG to include parents, children, or both.
+
+        :param selector: str | None - The base selector string to modify (None if there was a parse error)
+        :param parents: bool - Whether to include parent nodes
+        :param children: bool - Whether to include child nodes
+        :param parents_depth: int - Number of parent generations to include (0 for all)
+        :param children_depth: int - Number of child generations to include (0 for all)
+        :param childrens_parents: bool - Whether to use the @ operator (all ancestors of children)
+        :return: tuple[str | None, str | None] - Tuple of (selector string with graph operators or None, error message or None)
+
+        Examples:
+            - selector="my_model", parents=True, children=False -> ("+my_model", None)
+            - selector="my_model", parents=True, children=True, parents_depth=2 -> ("2+my_model+", None)
+            - selector="my_model", childrens_parents=True -> ("@my_model", None)
+        """
+        if not selector:
+            return (selector, None)
+
+        if childrens_parents and (parents_depth or children_depth):
+            return (selector, "childrens_parents cannot be combined with parents_depth or children_depth.")
+
+        if childrens_parents:
+            return (f"{AT_SELECTOR}{selector}", None)
+
+        if parents:
+            prefix = f"{parents_depth}{PLUS_SELECTOR}" if parents_depth > 0 else PLUS_SELECTOR
+            selector = f"{prefix}{selector}"
+
+        if children:
+            suffix = f"{PLUS_SELECTOR}{children_depth}" if children_depth > 0 else PLUS_SELECTOR
+            selector = f"{selector}{suffix}"
+
+        return (selector, None)
+
+    @staticmethod
+    def _parse_selection_from_cosmos_spec(method: str, value: str) -> tuple[str | None, str | None]:
+        """
+        Convert a dbt YAML selector method and value into Cosmos selector syntax.
+
+        Maps dbt's method-based selector definitions to Cosmos's string-based selector format.
+        For example, method="tag" and value="nightly" becomes "tag:nightly".
+
+        :param method: str - The selector method (e.g., "tag", "path", "config.materialized")
+        :param value: str - The value for the selector method
+        :return: tuple[str | None, str | None] - Tuple of (selector string or None, error message or None)
+
+        Examples:
+            - method="tag", value="nightly" -> ("tag:nightly", None)
+            - method="path", value="models/" -> ("path:models/", None)
+            - method="fqn", value="*" -> ("", None)
+            - method="fqn", value="jaffle_shop.customers" -> ("fqn:jaffle_shop.customers", None)
+            - method="config.materialized", value="view" -> ("config.materialized:view", None)
+        """
+        if method == "fqn":
+            return "" if value == "*" else f"{FQN_SELECTOR}{value}", None
+
+        method_mappings = {
+            TAG_SELECTOR[:-1]: TAG_SELECTOR,
+            PATH_SELECTOR[:-1]: PATH_SELECTOR,
+            SOURCE_SELECTOR[:-1]: SOURCE_SELECTOR,
+            EXPOSURE_SELECTOR[:-1]: EXPOSURE_SELECTOR,
+            RESOURCE_TYPE_SELECTOR[:-1]: RESOURCE_TYPE_SELECTOR,
+            EXCLUDE_RESOURCE_TYPE_SELECTOR[:-1]: EXCLUDE_RESOURCE_TYPE_SELECTOR,
+        }
+
+        for method_prefix, selector_prefix in method_mappings.items():
+            if method == method_prefix:
+                return (f"{selector_prefix}{value}", None)
+
+        if any(method.startswith(f"{CONFIG_SELECTOR}{config}") for config in SUPPORTED_CONFIG):
+            return (f"{method}:{value}", None)
+
+        return (None, f"Unsupported selector method: '{method}'")
+
+    @classmethod
+    def _parse_selector(cls, dct: dict[str, Any]) -> tuple[str | None, list[str]]:
+        """
+        Parse a single selector definition dictionary into a Cosmos selector string.
+
+        Processes a selector definition that includes method, value, and optional graph operators
+        (parents, children, etc.) and converts it to Cosmos selector syntax.
+
+        :param dct: dict[str, Any] - Dictionary containing selector definition with keys like 'method', 'value',
+                   'parents', 'children', 'parents_depth', 'children_depth', 'childrens_parents'
+        :return: tuple[str | None, list[str]] - Tuple of (selector string or None, list of error messages)
+
+        Example Input:
+            {
+                "method": "tag",
+                "value": "nightly",
+                "children": True,
+                "children_depth": 2
+            }
+
+        Example Output:
+            ("tag:nightly+2", [])
+        """
+        method = dct["method"]
+        value = dct["value"]
+        parents = dct.get("parents", False)
+        children = dct.get("children", False)
+        parents_depth = dct.get("parents_depth", 0)
+        children_depth = dct.get("children_depth", 0)
+        childrens_parents = dct.get("childrens_parents", False)
+
+        errors: list[str] = []
+
+        if not isinstance(parents_depth, int):
+            errors.append(f"parents_depth must be an integer, got {type(parents_depth)}: {parents_depth}")
+        if not isinstance(children_depth, int):
+            errors.append(f"children_depth must be an integer, got {type(children_depth)}: {children_depth}")
+
+        if errors:
+            return (None, errors)
+
+        selector, error = cls._parse_selection_from_cosmos_spec(method, value)
+        if error:
+            errors.append(error)
+            return (None, errors)
+
+        selector, error = cls._parse_selection_graph_operators(
+            selector, parents, children, parents_depth, children_depth, childrens_parents
+        )
+        if error:
+            errors.append(error)
+
+        return (selector, errors)
+
+    @classmethod
+    def _parse_exclusions(
+        cls, definition: dict[str, Any], cache: dict[str, tuple[list[str], list[str]]] | None = None
+    ) -> tuple[list[str], list[str]]:
+        """
+        Parse exclusion definitions from a selector definition.
+
+        Extracts and processes 'exclude' clauses from a selector definition, recursively
+        parsing any nested definitions.
+
+        :param definition: dict[str, Any] - Dictionary containing the selector definition with an 'exclude' key
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :return: tuple[list[str], list[str]] - Tuple of (exclusion selector strings, error messages)
+        """
+        cache = cache or {}
+        exclude: list[str] = []
+        errors: list[str] = []
+
+        exclusions, definition_errors = cls._get_list_dicts(definition, "exclude")
+        errors.extend(definition_errors)
+
+        for exclusion in exclusions:
+            excl, _, parse_errors = cls._parse_from_definition(exclusion, cache=cache)
+            exclude.extend(excl)
+            errors.extend(parse_errors)
+
+        return (exclude, errors)
+
+    @classmethod
+    def _parse_include_exclude_subdefs(
+        cls,
+        definitions: list[dict[str, Any]],
+        cache: dict[str, tuple[list[str], list[str]]],
+    ) -> tuple[list[str], list[str], list[str]]:
+        """
+        Parse a list of selector subdefinitions into include and exclude lists.
+
+        Processes a list of selector definitions, separating them into inclusions and exclusions.
+        Handles nested definitions and prevents multiple exclude clauses at the same level.
+
+        :param definitions: list[dict[str, Any]] - List of selector definition dictionaries
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :return: tuple[list[str], list[str], list[str]] - Tuple of (include_list, exclude_list, error messages)
+        """
+        include: list[str] = []
+        exclude: list[str] = []
+        errors: list[str] = []
+
+        for definition in definitions:
+            if isinstance(definition, dict) and "exclude" in definition:
+                # Do not allow multiple exclude: defs at the same level
+                if exclude:
+                    yaml_sel_cfg = yaml.dump(definition)
+                    errors.append(
+                        f"You cannot provide multiple exclude arguments to the "
+                        f"same selector set operator:\n{yaml_sel_cfg}"
+                    )
+                else:
+                    definition_exclude, excl_errors = cls._parse_exclusions(definition, cache=cache)
+                    exclude.extend(definition_exclude)
+                    errors.extend(excl_errors)
+            else:
+                definition_include, _, parse_errors = cls._parse_from_definition(definition, cache=cache)
+                include.extend(definition_include)
+                errors.extend(parse_errors)
+
+        return (include, exclude, errors)
+
+    @classmethod
+    def _parse_union_definition(
+        cls,
+        definition: dict[str, Any],
+        cache: dict[str, tuple[list[str], list[str]]] | None = None,
+    ) -> tuple[list[str], list[str], list[str]]:
+        """
+        Parse a union selector definition.
+
+        A union combines multiple selectors with OR logic - nodes matching any of the
+        subdefinitions will be included.
+
+        :param definition: dict[str, Any] - Dictionary containing a 'union' key with a list of selector definitions
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :return: tuple[list[str], list[str], list[str]] - Tuple of (include_list, exclude_list, error messages)
+
+        Example Input:
+            {
+                "union": [
+                    {"method": "tag", "value": "nightly"},
+                    {"method": "path", "value": "models/staging"}
+                ]
+            }
+
+        Example Output:
+            (["tag:nightly", "path:models/staging"], [], [])
+        """
+        cache = cache or {}
+        errors: list[str] = []
+
+        union_def_parts, definition_errors = cls._get_list_dicts(definition, "union")
+        errors.extend(definition_errors)
+
+        include, exclude, parse_errors = cls._parse_include_exclude_subdefs(union_def_parts, cache=cache)
+        errors.extend(parse_errors)
+
+        return (include, exclude, errors)
+
+    @classmethod
+    def _parse_intersection_definition(
+        cls,
+        definition: dict[str, Any],
+        cache: dict[str, tuple[list[str], list[str]]],
+    ) -> tuple[list[str], list[str], list[str]]:
+        """
+        Parse an intersection selector definition.
+
+        An intersection combines multiple selectors with AND logic - only nodes matching all
+        subdefinitions will be included. In Cosmos syntax, this is represented by joining
+        selectors with commas.
+
+        :param definition: dict[str, Any] - Dictionary containing an 'intersection' key with a list of selector definitions
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :return: tuple[list[str], list[str], list[str]] - Tuple of (include_list, exclude_list, error messages)
+
+        Example Input:
+            {
+                "intersection": [
+                    {"method": "tag", "value": "nightly"},
+                    {"method": "config.materialized", "value": "view"}
+                ]
+            }
+
+        Example Output:
+            (["tag:nightly,config.materialized:view"], [], [])
+        """
+        errors: list[str] = []
+
+        intersection_def_parts, definition_errors = cls._get_list_dicts(definition, "intersection")
+        errors.extend(definition_errors)
+
+        include, exclude, parse_errors = cls._parse_include_exclude_subdefs(intersection_def_parts, cache=cache)
+        errors.extend(parse_errors)
+
+        intersection = [",".join(include)] if include else []
+
+        return (intersection, exclude, errors)
+
+    @classmethod
+    def _parse_method_definition(
+        cls,
+        definition: dict[str, Any],
+        cache: dict[str, tuple[list[str], list[str]]],
+    ) -> tuple[list[str], list[str], list[str]]:
+        """
+        Parse a method-based selector definition.
+
+        Handles selector definitions that use the 'method' and 'value' keys, including
+        special handling for the 'selector' method which references other named selectors.
+
+        :param definition: dict[str, Any] - Dictionary containing 'method' and 'value' keys, and optionally 'exclude'
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :return: tuple[list[str], list[str], list[str]] - Tuple of (include_list, exclude_list, error messages)
+
+        Example Input (method-based):
+            {
+                "method": "tag",
+                "value": "nightly",
+                "exclude": [{"method": "path", "value": "models/archived"}]
+            }
+
+        Example Output:
+            (["tag:nightly"], ["path:models/archived"], [])
+
+        Example Input (selector reference):
+            {
+                "method": "selector",
+                "value": "my_existing_selector"
+            }
+
+        Example Output:
+            Returns the cached tuple of (include_list, exclude_list, []) from the referenced selector
+        """
+        exclude: list[str] = []
+        errors: list[str] = []
+
+        if definition.get("method") == "selector":
+            sel_def = definition.get("value")
+            if sel_def not in cache:
+                errors.append(f"Existing selector definition for {sel_def} not found.")
+                return ([], [], errors)
+            return (*cache[definition["value"]], [])
+        elif "method" in definition and "value" in definition:
+            dct = definition
+            if "exclude" in definition:
+                exclude, excl_errors = cls._parse_exclusions(definition, cache=cache)
+                errors.extend(excl_errors)
+                dct = {k: v for k, v in dct.items() if k != "exclude"}
+        else:
+            errors.append(f"Expected 'method' and 'value' keys, but got {list(definition)}")
+            return ([], [], errors)
+
+        selector, parse_errors = cls._parse_selector(dct)
+        errors.extend(parse_errors)
+
+        include = [selector] if selector else []
+
+        return (include, exclude, errors)
+
+    @classmethod
+    def _parse_from_definition(
+        cls,
+        definition: dict[str, Any],
+        cache: dict[str, tuple[list[str], list[str]]],
+        rootlevel: bool = False,
+    ) -> tuple[list[str], list[str], list[str]]:
+        """
+        Recursively parse a selector definition into include and exclude lists.
+
+        This is the main entry point for parsing selector definitions. It handles union,
+        intersection, and method-based definitions, delegating to the appropriate
+        specialized parsing method.
+
+        :param definition: dict[str, Any] - The selector definition dictionary to parse
+        :param cache: dict[str, tuple[list[str], list[str]]] - Cache of previously parsed selectors for reference resolution
+        :param rootlevel: bool - Whether this is a root-level selector (affects validation rules)
+        :return: tuple[list[str], list[str], list[str]] - Tuple of (include_list, exclude_list, error messages)
+
+        Note:
+            Root-level selectors can only have a single 'union' or 'intersection' key.
+            CLI-style string definitions and key-value pairs are not supported - use
+            method-based definitions instead.
+        """
+        errors: list[str] = []
+
+        if (
+            isinstance(definition, dict)
+            and ("union" in definition or "intersection" in definition)
+            and rootlevel
+            and len(definition) > 1
+        ):
+            keys = ",".join(definition.keys())
+            errors.append(
+                f"Only a single 'union' or 'intersection' key is allowed "
+                f"in a root level selector definition; found {keys}."
+            )
+            return ([], [], errors)
+
+        if "union" in definition:
+            select, exclude, parse_errors = cls._parse_union_definition(definition, cache=cache)
+            errors.extend(parse_errors)
+        elif "intersection" in definition:
+            select, exclude, parse_errors = cls._parse_intersection_definition(definition, cache=cache)
+            errors.extend(parse_errors)
+        elif "method" in definition:
+            select, exclude, parse_errors = cls._parse_method_definition(definition, cache=cache)
+            errors.extend(parse_errors)
+        else:
+            # Rejects CLI-style string definitions (e.g., definition: "tag:my_tag")
+            # These should be structured as method-value definitions instead
+            #
+            # Rejects key-value definitions (e.g., tag: my_tag, path: models/, etc.)
+            # These should be structured as method-value definitions instead
+            errors.append(
+                f"Expected to find union, intersection, or method definition, instead "
+                f"found {type(definition)}: {definition}"
+            )
+            return ([], [], errors)
+
+        return (select, exclude, errors)
+
+    @classmethod
+    def parse(cls, selectors: dict[str, dict[str, Any]]) -> YamlSelectors:
+        """
+        Parse selector definitions from a dbt manifest into a YamlSelectors instance.
+
+        This is the main entry point for parsing manifest selector definitions. It processes all
+        selector definitions from the manifest and converts them to Cosmos format.
+
+        :param selectors: dict[str, dict[str, Any]] - Dictionary of selector definitions from the manifest, keyed by selector name
+        :return: YamlSelectors - A YamlSelectors instance containing both raw and parsed selector definitions
+
+        Example Input:
+            {
+                "nightly_models": {
+                    "name": "nightly_models",
+                    "definition": {
+                        "method": "tag",
+                        "value": "nightly"
+                    }
+                }
+            }
+
+        Example Output:
+            YamlSelectors instance with parsed definitions:
+            {
+                "nightly_models": {
+                    "select": ["tag:nightly"],
+                    "exclude": None
+                }
+            }
+
+            Note: An "errors" key will only be present if parsing errors occurred
+        """
+        result: dict[str, dict[str, Any]] = {}
+        cache: dict[str, tuple[list[str], list[str]]] = {}
+
+        for name, definition in selectors.items():
+            if not isinstance(definition, dict):
+                raise CosmosValueError(
+                    f"Invalid selector definition for '{name}'. Expected a dict, got {type(definition)}: {definition}"
+                )
+
+            if not definition.get("name") or not definition.get("definition"):
+                raise CosmosValueError(f"Selector definition for '{name}' must contain 'name' and 'definition' keys.")
+
+            selector_name = definition["name"]
+            selector_definition = definition["definition"]
+
+            select, exclude, parse_errors = cls._parse_from_definition(selector_definition, cache=cache, rootlevel=True)
+
+            result[selector_name] = {
+                "select": select if select else None,
+                "exclude": exclude if exclude else None,
+            }
+            if parse_errors:
+                result[selector_name]["errors"] = parse_errors
+
+            cache[selector_name] = (select, exclude)
+
+        return cls(selectors, result)
+
+
 def select_nodes(
     project_dir: Path | None,
     nodes: dict[str, DbtNode],
@@ -745,10 +1472,12 @@ def validate_filters(exclude: list[str], select: list[str]) -> None:
             if (
                 filter_parameter.startswith(PATH_SELECTOR)
                 or filter_parameter.startswith(TAG_SELECTOR)
+                or filter_parameter.startswith(FQN_SELECTOR)
                 or filter_parameter.startswith(RESOURCE_TYPE_SELECTOR)
                 or filter_parameter.startswith(EXCLUDE_RESOURCE_TYPE_SELECTOR)
                 or filter_parameter.startswith(SOURCE_SELECTOR)
                 or filter_parameter.startswith(EXPOSURE_SELECTOR)
+                or filter_parameter.startswith(PACKAGE_SELECTOR)
                 or PLUS_SELECTOR in filter_parameter
                 or any([filter_parameter.startswith(CONFIG_SELECTOR + config) for config in SUPPORTED_CONFIG])
             ):

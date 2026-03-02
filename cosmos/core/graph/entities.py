@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
+from packaging.version import Version
+
+from cosmos.constants import AIRFLOW_VERSION
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -18,7 +21,7 @@ class CosmosEntity:
     """
 
     id: str
-    upstream_entity_ids: List[str] = field(default_factory=list)
+    upstream_entity_ids: list[str] = field(default_factory=list)
 
     def add_upstream(self, entity: CosmosEntity) -> None:
         """
@@ -35,7 +38,7 @@ class Group(CosmosEntity):
     A Group represents a collection of entities that are connected by dependencies.
     """
 
-    entities: List[CosmosEntity] = field(default_factory=list)
+    entities: list[CosmosEntity] = field(default_factory=list)
 
     def add_entity(self, entity: CosmosEntity) -> None:
         """
@@ -58,6 +61,10 @@ class Task(CosmosEntity):
     """
 
     owner: str = ""
-    operator_class: str = "airflow.operators.empty.EmptyOperator"
-    arguments: Dict[str, Any] = field(default_factory=dict)
-    extra_context: Dict[str, Any] = field(default_factory=dict)
+    operator_class: str = (
+        "airflow.operators.empty.EmptyOperator"
+        if AIRFLOW_VERSION < Version("3.0")
+        else "airflow.providers.standard.operators.empty.EmptyOperator"
+    )
+    arguments: dict[str, Any] = field(default_factory=dict)
+    extra_context: dict[str, Any] = field(default_factory=dict)

@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Set
+from typing import Any, ClassVar
 
 import jinja2
 import yaml
@@ -41,9 +41,9 @@ class DbtModelConfig:
     Represents a single model config.
     """
 
-    config_types: ClassVar[List[str]] = ["materialized", "schema", "tags"]
-    config_selectors: Set[str] = field(default_factory=set)
-    upstream_models: Set[str] = field(default_factory=set)
+    config_types: ClassVar[list[str]] = ["materialized", "schema", "tags"]
+    config_selectors: set[str] = field(default_factory=set)
+    upstream_models: set[str] = field(default_factory=set)
 
     def __add__(self, other_config: DbtModelConfig) -> DbtModelConfig:
         """
@@ -63,10 +63,10 @@ class DbtModelConfig:
 
     def _config_selector_ooo(
         self,
-        sql_configs: Set[str],
-        properties_configs: Set[str],
-        prefixes: List[str] | None = None,
-    ) -> Set[str]:
+        sql_configs: set[str],
+        properties_configs: set[str],
+        prefixes: list[str] | None = None,
+    ) -> set[str]:
         """
         this will force values from the sql files to override whatever is in the properties.yml. So ooo:
         # 1. model sql files
@@ -131,7 +131,7 @@ class DbtModel:
     name: str
     type: DbtModelType
     path: Path
-    dbt_vars: Dict[str, str] = field(default_factory=dict)
+    dbt_vars: dict[str, str] = field(default_factory=dict)
     config: DbtModelConfig = field(default_factory=DbtModelConfig)
 
     def __post_init__(self) -> None:
@@ -218,7 +218,7 @@ class DbtModel:
             for config_name in self.config.config_types:
                 if hasattr(kwarg, "key") and kwarg.key == config_name:
                     extracted_config = self._extract_config(kwarg, config_name)
-                    selector_config |= set(extracted_config) if isinstance(extracted_config, (str, List)) else set()
+                    selector_config |= set(extracted_config) if isinstance(extracted_config, (str, list)) else set()
         return selector_config
 
     # TODO following needs coverage:
@@ -227,7 +227,7 @@ class DbtModel:
             try:
                 # try to convert it to a constant and get the value
                 value = kwarg.value.as_const()
-                if isinstance(value, List):
+                if isinstance(value, list):
                     value = [f"{config_name}:{item}" for item in value]
 
                 if isinstance(value, str):
@@ -263,16 +263,16 @@ class LegacyDbtProject:
     dbt_seeds_dir: str | None = None
 
     # private instance variables for managing state
-    models: Dict[str, DbtModel] = field(default_factory=dict)
-    snapshots: Dict[str, DbtModel] = field(default_factory=dict)
-    seeds: Dict[str, DbtModel] = field(default_factory=dict)
-    tests: Dict[str, DbtModel] = field(default_factory=dict)
+    models: dict[str, DbtModel] = field(default_factory=dict)
+    snapshots: dict[str, DbtModel] = field(default_factory=dict)
+    seeds: dict[str, DbtModel] = field(default_factory=dict)
+    tests: dict[str, DbtModel] = field(default_factory=dict)
     project_dir: Path = field(init=False)
     models_dir: Path = field(init=False)
     snapshots_dir: Path = field(init=False)
     seeds_dir: Path = field(init=False)
 
-    dbt_vars: Dict[str, str] = field(default_factory=dict)
+    dbt_vars: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """

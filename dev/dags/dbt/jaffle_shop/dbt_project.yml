@@ -21,16 +21,6 @@ require-dbt-version: [">=1.0.0", "<2.0.0"]
 
 models:
   jaffle_shop:
-      materialized: table
+      +materialized: table
       staging:
-        materialized: view
-
-
-seeds:
-  jaffle_shop:
-      +meta:
-        cosmos:
-          profile_config:
-            profile_name: postgres_profile
-            profile_mapping:
-              threads: 2
+        +materialized: view

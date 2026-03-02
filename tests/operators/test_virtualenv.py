@@ -6,23 +6,30 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import airflow
 import pytest
 from airflow.models import DAG
 from airflow.models.connection import Connection
 from packaging.version import Version
 
 from cosmos.config import ProfileConfig
-from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, InvocationMode
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION, InvocationMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.virtualenv import DbtCloneVirtualenvOperator, DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-
-AIRFLOW_VERSION = Version(airflow.__version__)
+from tests.utils import test_dag as run_test_dag
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 
 DAGS_FOLDER = Path(__file__).parent.parent.parent / "dev/dags/"
+
+
+if AIRFLOW_VERSION >= Version("3.1"):
+    # Change introduced in Airflow 3.1.0
+    # https://github.com/apache/airflow/pull/55722/files
+    base_operator_get_connection_path = "airflow.sdk.BaseHook.get_connection"
+else:
+    base_operator_get_connection_path = "airflow.hooks.base.BaseHook.get_connection"
+
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -43,11 +50,32 @@ real_profile_config = ProfileConfig(
 )
 
 
+def _get_airflow3_venv_subprocess_patch_target():
+    """Resolve patch target for Airflow 3: providers-standard API varies by version.
+    Older versions expose execute_in_subprocess or _execute_in_subprocess.
+    providers-standard 1.11.0+ no longer exposes a separate subprocess function;
+    we patch prepare_virtualenv at use site instead.
+    """
+    import airflow.providers.standard.utils.python_virtualenv as pv  # noqa: PLC0415
+
+    if getattr(pv, "_execute_in_subprocess", None) is not None:
+        return "airflow.providers.standard.utils.python_virtualenv._execute_in_subprocess", "subprocess"
+    if getattr(pv, "execute_in_subprocess", None) is not None:
+        return "airflow.providers.standard.utils.python_virtualenv.execute_in_subprocess", "subprocess"
+    return "cosmos.operators.virtualenv.prepare_virtualenv", "prepare_virtualenv"
+
+
 def patch_execute_in_subprocess(func):
     if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
-        return patch("airflow.providers.standard.utils.python_virtualenv.execute_in_subprocess")(func)
-    else:
-        return patch("airflow.utils.python_virtualenv.execute_in_subprocess")(func)
+        patch_path, _ = _get_airflow3_venv_subprocess_patch_target()
+        if "prepare_virtualenv" in patch_path:
+            # Mock prepare_virtualenv so it returns the expected path without running subprocesses
+            return patch(
+                patch_path,
+                side_effect=lambda venv_directory, **kwargs: f"{venv_directory}/bin/python",
+            )(func)
+        return patch(patch_path)(func)
+    return patch("airflow.utils.python_virtualenv.execute_in_subprocess")(func)
 
 
 class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
@@ -64,7 +92,7 @@ class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
-@patch("airflow.hooks.base.BaseHook.get_connection")
+@patch(base_operator_get_connection_path)
 def test_run_command_without_virtualenv_dir(
     mock_get_connection,
     mock_subprocess_hook,
@@ -92,34 +120,41 @@ def test_run_command_without_virtualenv_dir(
         project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
         pip_install_options=["--test-flag"],
-        py_requirements=["dbt-postgres==1.6.0b1"],
+        py_requirements=["dbt-postgres==1.9"],
         emit_datasets=False,
         invocation_mode=InvocationMode.SUBPROCESS,
+        vars={"variable": "value"},
     )
     assert venv_operator.virtualenv_dir == None
-    venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock()})
+    venv_operator.run_command(
+        cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock(), "run_id": "test_run_id"}
+    )
     run_command_args = mock_subprocess_hook.run_command.call_args_list
     assert len(run_command_args) == 2
     dbt_deps = run_command_args[0].kwargs
     dbt_cmd = run_command_args[1].kwargs
     assert dbt_deps["command"][0] == dbt_cmd["command"][0]
     assert dbt_deps["command"][1] == "deps"
+    assert ["--vars", "variable: value\n"] not in dbt_deps["command"][-2:]
     assert dbt_cmd["command"][1] == "do-something"
-    assert mock_execute.call_count == 2
-    virtualenv_call, pip_install_call = mock_execute.call_args_list
-    if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
-        assert "python3" in virtualenv_call[0][0]
-        assert virtualenv_call[0][0][0] == "uv"
-        assert virtualenv_call[0][0][1] == "venv"
-        assert pip_install_call[0][0][0] == "uv"
-        assert pip_install_call[0][0][1] == "pip"
-        assert pip_install_call[0][0][2] == "install"
-    else:
-        assert "python" in virtualenv_call[0][0][0]
-        assert virtualenv_call[0][0][1] == "-m"
-        assert virtualenv_call[0][0][2] == "virtualenv"
-        assert "pip" in pip_install_call[0][0][0]
-        assert pip_install_call[0][0][1] == "install"
+    # When patching execute_in_subprocess (older providers-standard): 2 calls (venv + pip).
+    # When patching prepare_virtualenv (e.g. providers-standard 1.11.0+): 1 call.
+    assert mock_execute.call_count in (1, 2)
+    if mock_execute.call_count == 2:
+        virtualenv_call, pip_install_call = mock_execute.call_args_list
+        if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
+            assert "python3" in virtualenv_call[0][0]
+            assert virtualenv_call[0][0][0] == "uv"
+            assert virtualenv_call[0][0][1] == "venv"
+            assert pip_install_call[0][0][0] == "uv"
+            assert pip_install_call[0][0][1] == "pip"
+            assert pip_install_call[0][0][2] == "install"
+        else:
+            assert "python" in virtualenv_call[0][0][0]
+            assert virtualenv_call[0][0][1] == "-m"
+            assert virtualenv_call[0][0][2] == "virtualenv"
+            assert "pip" in pip_install_call[0][0][0]
+            assert pip_install_call[0][0][1] == "install"
     cosmos_venv_dirs = [
         f for f in os.listdir("/tmp") if os.path.isdir(os.path.join("/tmp", f)) and f.startswith("cosmos-venv")
     ]
@@ -136,7 +171,7 @@ def test_run_command_without_virtualenv_dir(
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.store_compiled_sql")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.handle_exception_subprocess")
 @patch("cosmos.operators.virtualenv.DbtLocalBaseOperator.subprocess_hook")
-@patch("airflow.hooks.base.BaseHook.get_connection")
+@patch(base_operator_get_connection_path)
 def test_run_command_with_virtualenv_dir(
     mock_get_connection,
     mock_subprocess_hook,
@@ -169,12 +204,14 @@ def test_run_command_with_virtualenv_dir(
         project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
         pip_install_options=["--test-flag"],
-        py_requirements=["dbt-postgres==1.6.0b1"],
+        py_requirements=["dbt-postgres==1.9"],
         emit_datasets=False,
         invocation_mode=InvocationMode.SUBPROCESS,
         virtualenv_dir=Path("mock-venv"),
     )
-    venv_operator.run_command(cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock()})
+    venv_operator.run_command(
+        cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock(), "run_id": "test_run_id"}
+    )
     assert str(venv_operator.virtualenv_dir) == "mock-venv"
     run_command_args = mock_subprocess_hook.run_command.call_args_list
     assert len(run_command_args) == 2
@@ -199,7 +236,7 @@ def test_virtualenv_operator_append_env_is_true_by_default():
         project_dir="./dev/dags/dbt/jaffle_shop",
         py_system_site_packages=False,
         pip_install_options=["--test-flag"],
-        py_requirements=["dbt-postgres==1.6.0b1"],
+        py_requirements=["dbt-postgres==1.9"],
         emit_datasets=False,
         invocation_mode=InvocationMode.SUBPROCESS,
     )
@@ -381,10 +418,6 @@ def test__release_venv_lock_current_process(tmpdir):
     assert not lockfile.exists()
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.5"),
-    reason="This error is only reproducible with dag.test, which was introduced in Airflow 2.5",
-)
 @pytest.mark.integration
 def test_integration_virtualenv_operator(caplog):
     """
@@ -395,10 +428,12 @@ def test_integration_virtualenv_operator(caplog):
     dag_bag = DagBag(dag_folder=DAGS_FOLDER, include_examples=False)
     dag = dag_bag.get_dag("example_virtualenv_mini")
 
-    dag.test()
-
-    assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'deps'" in caplog.text
-    assert "Trying to run the command:\n ['/tmp/persistent-venv2/bin/dbt', 'seed'" in caplog.text
+    dag_run = run_test_dag(dag)
+    if dag_run is not None:
+        assert dag_run.state == "success"
+    assert caplog.text.count("Trying to run the command") == 2
+    assert "/tmp/persistent-venv2/bin/dbt', 'deps'" in caplog.text
+    assert "/tmp/persistent-venv2/bin/dbt', 'seed'" in caplog.text
 
 
 def test_dbt_clone_virtualenv_operator_initialisation():

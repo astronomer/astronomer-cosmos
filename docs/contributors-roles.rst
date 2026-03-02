@@ -1,3 +1,5 @@
+:orphan:
+
 .. _contributors-roles:
 
 Contributor roles
@@ -52,5 +54,6 @@ General prerequisites that we look for in all candidates:
 2. Visibility on discussions on the Slack channel or GitHub issues/discussions
 3. Contributions to community health and project's sustainability for the long-term
 4. Understands the project's contributors guidelines :ref:`contributing`.
+
 Astronomer is responsible and accountable for releasing new versions of Cosmos in PyPI <https://pypi.org/project/astronomer-cosmos/>, following the milestones <https://github.com/astronomer/astronomer-cosmos/milestones>.
 Astronomer has the right to grant and revoke write access permissions to the project's official repository for any reason it sees fit.

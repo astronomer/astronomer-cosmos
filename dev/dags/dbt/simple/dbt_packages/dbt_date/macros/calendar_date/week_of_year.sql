@@ -20,4 +20,3 @@
 {# {%- macro spark__week_of_year(date) -%}
 weekofyear({{ date }})
 {%- endmacro %} #}
-

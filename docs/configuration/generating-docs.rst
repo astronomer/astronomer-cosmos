@@ -9,10 +9,6 @@ After generating the dbt docs, you can host them natively within Airflow via the
 
 Alternatively, many users choose to serve these docs on a separate static website. This is a great way to share your data models with a broad array of stakeholders.
 
-.. note::
-    The CosmosPlugin is not available for Airflow 3 yet as the compatibility is still being worked on. Hence, the dbt docs cannot be hosted and used in Airflow 3 yet.
-
-
 Cosmos offers two pre-built ways of generating and uploading dbt docs and a fallback option to run custom code after the docs are generated:
 
 - :class:`~cosmos.operators.DbtDocsS3Operator`: generates and uploads docs to a S3 bucket.
@@ -80,7 +76,7 @@ You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and up
     from cosmos.operators import DbtDocsGCSOperator
 
     # then, in your DAG code:
-    generate_dbt_docs_aws = DbtDocsGCSOperator(
+    generate_dbt_docs_gcs = DbtDocsGCSOperator(
         task_id="generate_dbt_docs_gcs",
         project_dir="path/to/jaffle_shop",
         profile_config=profile_config,
@@ -113,7 +109,7 @@ The following code snippet shows how to provide this flag with the default jaffl
     from cosmos.operators import DbtDocsGCSOperator
 
     # then, in your DAG code:
-    generate_dbt_docs_aws = DbtDocsGCSOperator(
+    generate_dbt_docs_gcs = DbtDocsGCSOperator(
         task_id="generate_dbt_docs_gcs",
         project_dir="path/to/jaffle_shop",
         profile_config=profile_config,

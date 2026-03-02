@@ -48,6 +48,6 @@ example_cosmos_python_models = DbtDag(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="example_cosmos_python_models",
-    default_args={"retries": 2},
+    default_args={"retries": 0},
 )
 # [END example_cosmos_python_models]

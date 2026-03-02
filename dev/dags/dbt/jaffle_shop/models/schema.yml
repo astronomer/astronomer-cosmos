@@ -51,12 +51,6 @@ models:
       - name: order_date
         description: Date (UTC) that the order was placed
 
-      - name: status
-        description: '{{ doc("orders_status") }}'
-        tests:
-          - accepted_values:
-              values: ['placed', 'shipped', 'completed', 'return_pending', 'returned']
-
       - name: amount
         description: Total amount (AUD) of the order
         tests:

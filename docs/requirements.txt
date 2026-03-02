@@ -1,9 +1,9 @@
 aenum
 deprecation
 msgpack
-apache-airflow
-pydantic
+apache-airflow>=2.9.0
 pydata-sphinx-theme
 sphinx
 sphinx-autoapi
 sphinx-autobuild
+sphinx-reredirects

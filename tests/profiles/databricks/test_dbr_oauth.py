@@ -22,7 +22,7 @@ def mock_databricks_conn():  # type: ignore
         extra='{"http_path": "my_http_path"}',
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -54,18 +54,26 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = DatabricksOauthProfileMapping(conn, {"schema": "my_schema"})
             assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = DatabricksOauthProfileMapping(conn, {})
         assert not profile_mapping.can_claim_connection()
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = DatabricksOauthProfileMapping(conn, {"schema": "my_schema"})
         assert profile_mapping.can_claim_connection()
+
+
+def test_mock_profile() -> None:
+    """
+    Tests that the Databricks mock profile is generated correctly.
+    """
+    profile_mapping = DatabricksOauthProfileMapping("conn_id", {"schema": "my_schema"})
+    assert profile_mapping.mock_profile.get("auth_type") == "oauth"

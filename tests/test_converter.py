@@ -1,9 +1,11 @@
+import logging
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from airflow.exceptions import ParamValidationError
 from airflow.models import DAG
 
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
@@ -12,12 +14,19 @@ from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
+from cosmos.telemetry import _decompress_telemetry_metadata
 
 SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
 SAMPLE_DBT_PROJECT = Path(__file__).parent / "sample/"
 SAMPLE_DBT_MANIFEST = Path(__file__).parent / "sample/manifest.json"
 MULTIPLE_PARENTS_TEST_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt/multiple_parents_test/"
 DBT_PROJECTS_PROJ_WITH_DEPS_DIR = Path(__file__).parent.parent / "dev/dags/dbt" / "jaffle_shop"
+
+sample_profile_config = ProfileConfig(
+    profile_name="my_profile_name",
+    target_name="my_target_name",
+    profiles_yml_filepath=SAMPLE_PROFILE_YML,
+)
 
 
 @pytest.mark.parametrize("argument_key", ["tags", "paths"])
@@ -143,6 +152,68 @@ def test_validate_user_config_fails_project_config_render_config_env_vars():
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
 
 
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=False)
+def test_validate_initial_user_config_dbt_runner_without_dbt_installed(mock_is_dbt_installed):
+    """Test that validation fails when using DBT_RUNNER but dbt is not installed in the same environment."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER)
+    profile_config = MagicMock()
+    operator_args = {}
+
+    expected_error_match = "RenderConfig.invocation_mode is set to InvocationMode.DBT_RUNNER, but dbt is not installed in the same environment as Airflow.*"
+    with pytest.raises(CosmosValueError, match=expected_error_match):
+        validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
+@patch("cosmos.converter.get_system_dbt", return_value="/usr/local/bin/dbt")
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=True)
+def test_validate_initial_user_config_dbt_runner_with_different_dbt_executable_path(
+    mock_is_dbt_installed, mock_get_system_dbt
+):
+    """Test that validation fails when using DBT_RUNNER with a custom dbt_executable_path that differs from system dbt."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER, dbt_executable_path="/custom/path/to/dbt")
+    profile_config = MagicMock()
+    operator_args = {}
+
+    expected_error_match = (
+        "RenderConfig.dbt_executable_path is set, but it is not the same as the system dbt executable path.*"
+    )
+    with pytest.raises(CosmosValueError, match=expected_error_match):
+        validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
+@patch("cosmos.converter.get_system_dbt", return_value="/usr/local/bin/dbt")
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=True)
+def test_validate_initial_user_config_dbt_runner_with_matching_dbt_executable_path(
+    mock_is_dbt_installed, mock_get_system_dbt
+):
+    """Test that validation passes when using DBT_RUNNER with a dbt_executable_path matching system dbt."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER, dbt_executable_path="/usr/local/bin/dbt")
+    profile_config = MagicMock()
+    operator_args = {}
+
+    # Should not raise any exception
+    validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
+@patch("cosmos.converter.is_dbt_installed_in_same_environment", return_value=True)
+def test_validate_initial_user_config_dbt_runner_without_dbt_executable_path(mock_is_dbt_installed):
+    """Test that validation passes when using DBT_RUNNER without setting dbt_executable_path."""
+    project_config = ProjectConfig()
+    execution_config = ExecutionConfig()
+    render_config = RenderConfig(invocation_mode=InvocationMode.DBT_RUNNER)
+    profile_config = MagicMock()
+    operator_args = {}
+
+    # Should not raise any exception
+    validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
+
+
 def test_validate_arguments_schema_in_task_args():
     execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL, dbt_project_path="/tmp/project-dir")
     render_config = RenderConfig()
@@ -238,14 +309,20 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
 
     # We exclude the test that depends on combined_model and model_a from their commands
     args = tasks["model.my_dbt_project.combined_model"].children["combined_model.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--exclude", "custom_test_combined_model_combined_model_", "--models", "combined_model"]
+    assert args[1:] == ["test", "--select", "combined_model", "--exclude", "custom_test_combined_model_combined_model_"]
 
     args = tasks["model.my_dbt_project.model_a"].children["model_a.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--exclude", "custom_test_combined_model_combined_model_", "--models", "model_a"]
+    assert args[1:] == [
+        "test",
+        "--select",
+        "model_a",
+        "--exclude",
+        "custom_test_combined_model_combined_model_",
+    ]
 
     # The test for model_b should not be changed, since it is not a parent of this test
     args = tasks["model.my_dbt_project.model_b"].children["model_b.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "model_b"]
+    assert args[1:] == ["test", "--select", "model_b"]
 
     # We should have a task dedicated to run the test with multiple parents
     args = tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].build_cmd({})[0]
@@ -287,14 +364,14 @@ def test_converter_creates_dag_with_test_with_multiple_parents_with_should_detac
 
     # We exclude the test that depends on combined_model and model_a from their commands
     args = tasks["model.my_dbt_project.combined_model"].children["combined_model.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "combined_model"]
+    assert args[1:] == ["test", "--select", "combined_model"]
 
     args = tasks["model.my_dbt_project.model_a"].children["model_a.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "model_a"]
+    assert args[1:] == ["test", "--select", "model_a"]
 
     # The test for model_b should not be changed, since it is not a parent of this test
     args = tasks["model.my_dbt_project.model_b"].children["model_b.test"].build_cmd({})[0]
-    assert args[1:] == ["test", "--models", "model_b"]
+    assert args[1:] == ["test", "--select", "model_b"]
 
 
 @pytest.mark.integration
@@ -334,6 +411,50 @@ def test_converter_creates_dag_with_test_with_multiple_parents_test_afterall():
     assert tasks["model.my_dbt_project.model_b"].downstream_task_ids == {"combined_model_run"}
     multiple_parents_test_test_args = tasks["model.my_dbt_project.combined_model"].downstream_list[0].build_cmd({})[0]
     assert multiple_parents_test_test_args[1:] == ["test"]
+
+
+@pytest.mark.integration
+def test_converter_creates_dag_with_after_all_test_uses_project_name_from_project_config():
+    """
+    Validate that when using LoadMode.DBT_MANIFEST with project_name set in ProjectConfig
+    but no dbt_project_path in RenderConfig, the test task name uses project_config.project_name
+    instead of falling back to an empty string.
+    """
+    project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST, project_name="jaffle_shop")
+    execution_config = ExecutionConfig(
+        execution_mode=ExecutionMode.LOCAL,
+        dbt_project_path=SAMPLE_DBT_PROJECT,  # Required for execution, but not used for project_name
+    )
+    render_config = RenderConfig(
+        test_behavior=TestBehavior.AFTER_ALL,
+        load_method=LoadMode.DBT_MANIFEST,
+        # Note: dbt_project_path is NOT set, so render_config.project_name will be empty
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    with DAG("sample_dag", start_date=datetime(2024, 4, 16)) as dag:
+        DbtToAirflowConverter(
+            dag=dag,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+        )
+
+    # Find the test task created with AFTER_ALL behavior
+    test_tasks = [task for task in dag.tasks if task.task_id.endswith("_test")]
+    assert len(test_tasks) == 1, "Expected exactly one test task with AFTER_ALL behavior"
+    test_task = test_tasks[0]
+
+    # Verify the test task name uses project_config.project_name instead of empty string
+    assert test_task.task_id == "jaffle_shop_test", (
+        f"Expected test task name to be 'jaffle_shop_test' but got '{test_task.task_id}'. "
+        "This validates that dbt_project_name falls back to project_config.project_name "
+        "when render_config.project_name is empty."
+    )
 
 
 @pytest.mark.integration
@@ -406,18 +527,24 @@ def test_converter_creates_dag_with_test_with_multiple_parents_and_build():
     args = tasks["model.my_dbt_project.combined_model"].build_cmd({})[0]
     assert args[1:] == [
         "build",
+        "--select",
+        "fqn:my_dbt_project.combined_model",
         "--exclude",
         "custom_test_combined_model_combined_model_",
-        "--models",
-        "combined_model",
     ]
 
     args = tasks["model.my_dbt_project.model_a"].build_cmd({})[0]
-    assert args[1:] == ["build", "--exclude", "custom_test_combined_model_combined_model_", "--models", "model_a"]
+    assert args[1:] == [
+        "build",
+        "--select",
+        "fqn:my_dbt_project.model_a",
+        "--exclude",
+        "custom_test_combined_model_combined_model_",
+    ]
 
-    # The test for model_b should not be changed, since it is not a parent of this test
+    # The command for model_b should not add any exclusions, since it is not a parent of this test
     args = tasks["model.my_dbt_project.model_b"].build_cmd({})[0]
-    assert args[1:] == ["build", "--models", "model_b"]
+    assert args[1:] == ["build", "--select", "fqn:my_dbt_project.model_b"]
 
     # We should have a task dedicated to run the test with multiple parents
     args = tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].build_cmd({})[0]
@@ -441,16 +568,11 @@ def test_converter_creates_dag_with_project_path_str(mock_load_dbt_graph, execut
     project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
     execution_config = ExecutionConfig(execution_mode=execution_mode)
     render_config = RenderConfig(emit_datasets=True)
-    profile_config = ProfileConfig(
-        profile_name="my_profile_name",
-        target_name="my_target_name",
-        profiles_yml_filepath=SAMPLE_PROFILE_YML,
-    )
     converter = DbtToAirflowConverter(
         dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
         nodes=nodes,
         project_config=project_config,
-        profile_config=profile_config,
+        profile_config=sample_profile_config,
         execution_config=execution_config,
         render_config=render_config,
         operator_args=operator_args,
@@ -475,27 +597,19 @@ def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualen
     project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
     execution_config = ExecutionConfig(execution_mode=execution_mode, virtualenv_dir=virtualenv_dir)
     render_config = RenderConfig(emit_datasets=True)
-    profile_config = ProfileConfig(
-        profile_name="my_profile_name",
-        target_name="my_target_name",
-        profiles_yml_filepath=SAMPLE_PROFILE_YML,
-    )
 
     DbtToAirflowConverter(
         dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
         nodes=nodes,
         project_config=project_config,
-        profile_config=profile_config,
+        profile_config=sample_profile_config,
         execution_config=execution_config,
         render_config=render_config,
         operator_args=operator_args,
     )
 
-    assert (
-        "`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
-        in caplog.text
-    )
+    assert "`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV." in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -515,16 +629,11 @@ def test_converter_fails_execution_config_no_project_dir(mock_load_dbt_graph, ex
     project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST.as_posix(), project_name="sample")
     execution_config = ExecutionConfig(execution_mode=execution_mode)
     render_config = RenderConfig(emit_datasets=True)
-    profile_config = ProfileConfig(
-        profile_name="my_profile_name",
-        target_name="my_target_name",
-        profiles_yml_filepath=SAMPLE_PROFILE_YML,
-    )
     with pytest.raises(CosmosValueError) as err_info:
         DbtToAirflowConverter(
             nodes=nodes,
             project_config=project_config,
-            profile_config=profile_config,
+            profile_config=sample_profile_config,
             execution_config=execution_config,
             render_config=render_config,
             operator_args=operator_args,
@@ -554,16 +663,11 @@ def test_converter_fails_project_config_path_and_execution_config_path(
     project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
     execution_config = ExecutionConfig(execution_mode=execution_mode, dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
     render_config = RenderConfig(emit_datasets=True)
-    profile_config = ProfileConfig(
-        profile_name="my_profile_name",
-        target_name="my_target_name",
-        profiles_yml_filepath=SAMPLE_PROFILE_YML,
-    )
     with pytest.raises(CosmosValueError) as err_info:
         DbtToAirflowConverter(
             nodes=nodes,
             project_config=project_config,
-            profile_config=profile_config,
+            profile_config=sample_profile_config,
             execution_config=execution_config,
             render_config=render_config,
             operator_args=operator_args,
@@ -591,16 +695,11 @@ def test_converter_fails_no_manifest_no_render_config(mock_load_dbt_graph, execu
     project_config = ProjectConfig()
     execution_config = ExecutionConfig(execution_mode=execution_mode, dbt_project_path=SAMPLE_DBT_PROJECT.as_posix())
     render_config = RenderConfig(emit_datasets=True)
-    profile_config = ProfileConfig(
-        profile_name="my_profile_name",
-        target_name="my_target_name",
-        profiles_yml_filepath=SAMPLE_PROFILE_YML,
-    )
     with pytest.raises(CosmosValueError) as err_info:
         DbtToAirflowConverter(
             nodes=nodes,
             project_config=project_config,
-            profile_config=profile_config,
+            profile_config=sample_profile_config,
             execution_config=execution_config,
             render_config=render_config,
             operator_args=operator_args,
@@ -625,14 +724,13 @@ def test_converter_project_config_dbt_vars_with_custom_load_mode(
     )
     execution_config = ExecutionConfig()
     render_config = RenderConfig(load_method=LoadMode.CUSTOM)
-    profile_config = MagicMock()
 
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         DbtToAirflowConverter(
             dag=dag,
             nodes=nodes,
             project_config=project_config,
-            profile_config=profile_config,
+            profile_config=sample_profile_config,
             execution_config=execution_config,
             render_config=render_config,
             operator_args={},
@@ -653,7 +751,6 @@ def test_converter_multiple_calls_same_operator_args(mock_dbt_graph, mock_build_
     )
     execution_config = ExecutionConfig()
     render_config = RenderConfig()
-    profile_config = MagicMock()
     operator_args = {
         "install_deps": True,
         "vars": {"key": "value"},
@@ -666,7 +763,7 @@ def test_converter_multiple_calls_same_operator_args(mock_dbt_graph, mock_build_
                 dag=dag,
                 nodes=nodes,
                 project_config=project_config,
-                profile_config=profile_config,
+                profile_config=sample_profile_config,
                 execution_config=execution_config,
                 render_config=render_config,
                 operator_args=operator_args,
@@ -694,7 +791,7 @@ def test_validate_converter_fetches_project_name_from_render_config(
     """
     execution_config = ExecutionConfig(dbt_project_path="/data/project1")
     project_config = ProjectConfig()
-    profile_config = MagicMock()
+
     render_config = RenderConfig(dbt_project_path="/home/usr/airflow/project1")
 
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -702,7 +799,7 @@ def test_validate_converter_fetches_project_name_from_render_config(
             dag=dag,
             nodes=nodes,
             project_config=project_config,
-            profile_config=profile_config,
+            profile_config=sample_profile_config,
             execution_config=execution_config,
             render_config=render_config,
         )
@@ -717,11 +814,14 @@ def test_validate_converter_fetches_project_name_from_render_config(
         (ExecutionMode.KUBERNETES, {}, False, None),
         (ExecutionMode.LOCAL, {}, False, False),
         (ExecutionMode.VIRTUALENV, {}, False, False),
+        (ExecutionMode.WATCHER, {}, False, False),
         (ExecutionMode.LOCAL, {}, True, True),
         (ExecutionMode.VIRTUALENV, {}, True, True),
+        (ExecutionMode.WATCHER, {}, True, True),
         (ExecutionMode.KUBERNETES, {"install_deps": True}, False, True),
         (ExecutionMode.LOCAL, {"install_deps": True}, False, True),
         (ExecutionMode.VIRTUALENV, {"install_deps": True}, False, True),
+        (ExecutionMode.WATCHER, {"install_deps": True}, False, True),
     ],
 )
 @patch("cosmos.config.ProjectConfig.validate_project")
@@ -739,20 +839,19 @@ def test_project_config_install_dbt_deps_overrides_operator_args(
     expected,
 ):
     """Tests that the value project_config.install_dbt_deps is used to define operator_args["install_deps"] if
-    execution mode is ExecutionMode.LOCAL or ExecutionMode.VIRTUALENV and operator_args["install_deps"] is not
+    execution mode is ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV, or ExecutionMode.WATCHER and operator_args["install_deps"] is not
     already defined.
     """
     project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
     project_config.install_dbt_deps = install_dbt_deps
     execution_config = ExecutionConfig(execution_mode=execution_mode)
     render_config = MagicMock()
-    profile_config = MagicMock()
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         DbtToAirflowConverter(
             dag=dag,
             nodes=nodes,
             project_config=project_config,
-            profile_config=profile_config,
+            profile_config=sample_profile_config,
             execution_config=execution_config,
             render_config=render_config,
             operator_args=operator_args,
@@ -774,14 +873,13 @@ def test_converter_invocation_mode_added_to_task_args(
     project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
     execution_config = ExecutionConfig(invocation_mode=invocation_mode)
     render_config = MagicMock()
-    profile_config = MagicMock()
 
     with DAG("test-id", start_date=datetime(2024, 1, 1)) as dag:
         DbtToAirflowConverter(
             dag=dag,
             nodes=nodes,
             project_config=project_config,
-            profile_config=profile_config,
+            profile_config=sample_profile_config,
             execution_config=execution_config,
             render_config=render_config,
             operator_args={},
@@ -807,14 +905,13 @@ def test_converter_uses_cache_dir(
     project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
     execution_config = ExecutionConfig()
     render_config = RenderConfig(enable_mock_profile=False)
-    profile_config = MagicMock()
 
     with DAG("test-id", start_date=datetime(2024, 1, 1)) as dag:
         DbtToAirflowConverter(
             dag=dag,
             nodes=nodes,
             project_config=project_config,
-            profile_config=profile_config,
+            profile_config=sample_profile_config,
             execution_config=execution_config,
             render_config=render_config,
             operator_args={},
@@ -843,14 +940,13 @@ def test_converter_disable_cache_sets_cache_dir_to_none(
     project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
     execution_config = ExecutionConfig()
     render_config = RenderConfig(enable_mock_profile=False)
-    profile_config = MagicMock()
 
     with DAG("test-id", start_date=datetime(2024, 1, 1)) as dag:
         DbtToAirflowConverter(
             dag=dag,
             nodes=nodes,
             project_config=project_config,
-            profile_config=profile_config,
+            profile_config=sample_profile_config,
             execution_config=execution_config,
             render_config=render_config,
             operator_args={},
@@ -924,3 +1020,326 @@ def test_converter_contains_tasks_map(mock_load_dbt_graph, execution_mode, opera
         operator_args=operator_args,
     )
     assert isinstance(converter.tasks_map, dict)
+
+
+sample_model = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL}.{SAMPLE_DBT_PROJECT.stem}.sample_model",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    file_path="",
+)
+nodes_with_model = {"sample_model": sample_model}
+
+
+@patch("cosmos.airflow.graph.settings.pre_dbt_fusion", True)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes_with_model)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_creates_model_with_pre_dbt_fusion(mock_load_dbt_graph):
+    """
+    This test validates that DbtToAirflowConverter contains and exposes a tasks map instance
+    """
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig(emit_datasets=True)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+
+    converter = DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 1, 1)),
+        nodes=nodes,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+        operator_args={},
+    )
+    assert isinstance(converter.tasks_map, dict)
+    assert converter.tasks_map["sample_model"].models == "sample.sample_model"
+    assert converter.tasks_map["sample_model"].select is None
+
+
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_hash_appended_to_empty_doc_md(mock_load_dbt_graph, mock_hash_func):
+    """Test that dbt project hash is appended to DAG doc_md when doc_md is initially empty."""
+    mock_hash_func.return_value = "abc123def456"
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
+    assert dag.doc_md is None  # Initially empty
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    assert dag.doc_md == "**dbt project hash:** `abc123def456`"
+    mock_hash_func.assert_called_once()
+
+
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_hash_appended_to_existing_doc_md(mock_load_dbt_graph, mock_hash_func):
+    """Test that dbt project hash is appended to existing DAG doc_md."""
+    mock_hash_func.return_value = "xyz789abc123"
+    existing_doc = "This is my existing DAG documentation.\n\nIt has multiple lines."
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1), doc_md=existing_doc)
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    expected_doc = existing_doc + "\n\n**dbt project hash:** `xyz789abc123`"
+    assert dag.doc_md == expected_doc
+    mock_hash_func.assert_called_once()
+
+
+@patch("cosmos.converter.logger")
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_hash_error_handling(mock_load_dbt_graph, mock_hash_func, mock_logger):
+    """Test that hash creation errors are properly handled and logged."""
+    mock_hash_func.side_effect = Exception("File system error")
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
+    original_doc_md = dag.doc_md  # Should be None
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    # DAG doc_md should remain unchanged when error occurs
+    assert dag.doc_md == original_doc_md
+
+    # Error should be logged as warning
+    mock_logger.warning.assert_called_once()
+    warning_call = mock_logger.warning.call_args[0][0]
+    assert "Failed to append dbt project hash to DAG documentation" in warning_call
+    assert "File system error" in warning_call
+
+
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_hash_with_special_characters(mock_load_dbt_graph, mock_hash_func):
+    """Test hash appending works correctly with special characters in existing doc_md."""
+    mock_hash_func.return_value = "hash_with_special_chars!@#$%"
+    existing_doc = "DAG with **markdown**, `code`, and [links](http://example.com)"
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1), doc_md=existing_doc)
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    expected_doc = existing_doc + "\n\n**dbt project hash:** `hash_with_special_chars!@#$%`"
+    assert dag.doc_md == expected_doc
+
+
+@patch("cosmos.converter.logger")
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, mock_logger):
+    """Test that successful hash appending is logged at debug level."""
+    mock_hash_func.return_value = "test_hash_123"
+    dag = DAG("test_dag_logging", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    # Check that the hash logging call was made (there are multiple debug calls now)
+    debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
+    assert any(
+        "Appended dbt project hash test_hash_123 to DAG test_dag_logging documentation" in call for call in debug_calls
+    )
+
+
+@patch("cosmos.converter.logger")
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_logs_parsing_group_order(mock_load_dbt_graph, mock_logger):
+    """Test that the converter logs group start before group end."""
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    # Get all info log calls
+    info_calls = [call[0][0] for call in mock_logger.info.call_args_list]
+
+    # Find the indices of group start and end
+    group_start_idx = info_calls.index("::group::Cosmos DAG parsing logs")
+    group_end_idx = info_calls.index("::endgroup::Cosmos DAG parsing logs")
+
+    # Verify that start comes before end
+    assert group_start_idx < group_end_idx
+
+
+@patch("cosmos.converter.should_emit", return_value=True)
+@patch("cosmos.converter.DbtGraph.load")
+def test_telemetry_metadata_storage(mock_load_dbt_graph, mock_should_emit):
+    """Test that telemetry metadata is stored correctly in DAG params."""
+    dag = DAG("test_dag_telemetry", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig()
+
+    _ = DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+    )
+
+    # Verify metadata is stored in dag.params
+    assert "__cosmos_telemetry_metadata__" in dag.params
+    compressed_metadata = dag.params["__cosmos_telemetry_metadata__"]
+
+    # Verify it's compressed (should be a string)
+    assert isinstance(compressed_metadata, str)
+
+    # Decompress to verify the contents
+    metadata = _decompress_telemetry_metadata(compressed_metadata)
+
+    # Verify expected metadata keys are present
+    assert "used_automatic_load_mode" in metadata
+    assert "invocation_mode" in metadata
+    assert "install_deps" in metadata
+    assert "uses_node_converter" in metadata
+    assert "test_behavior" in metadata
+    assert "source_behavior" in metadata
+    assert "profile_strategy" in metadata
+    assert "profile_mapping_class" in metadata
+    assert "database" in metadata
+
+
+@patch("cosmos.converter.Param", side_effect=ParamValidationError("Invalid param"))
+@patch("cosmos.converter.should_emit", return_value=True)
+@patch("cosmos.converter.DbtGraph.load")
+def test_telemetry_metadata_storage_handles_param_validation_error(
+    mock_load_dbt_graph, mock_should_emit, mock_param, caplog
+):
+    """Test that ParamValidationError during telemetry metadata storage is caught and logged as a warning."""
+    dag = DAG("test_dag_telemetry_param_error", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig()
+
+    with caplog.at_level(logging.WARNING, logger="cosmos.converter"):
+        # Should NOT raise, even though Param raises ParamValidationError
+        _ = DbtToAirflowConverter(
+            dag=dag,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+        )
+
+    # Verify a warning was logged
+    "Failed to store compressed Cosmos telemetry metadata in DAG test_dag_telemetry_param_error params" in caplog.text
+
+    # Verify metadata was NOT stored in dag.params (since the assignment failed)
+    assert "__cosmos_telemetry_metadata__" not in dag.params
+
+
+@patch("cosmos.converter.DbtGraph.load")
+@patch("cosmos.converter.should_emit", return_value=False)
+def test_telemetry_metadata_not_stored_when_disabled(mock_should_emit, mock_load_dbt_graph):
+    """Test that telemetry metadata is NOT stored when telemetry is disabled."""
+    dag = DAG("test_dag_telemetry_disabled", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig()
+
+    _ = DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+        render_config=render_config,
+    )
+
+    # Verify metadata is NOT stored when telemetry is disabled
+    assert "__cosmos_telemetry_metadata__" not in dag.params

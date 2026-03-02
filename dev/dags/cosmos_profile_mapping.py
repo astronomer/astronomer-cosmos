@@ -9,7 +9,11 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator
+
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator
 
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
 from cosmos.constants import InvocationMode
@@ -46,7 +50,7 @@ with DAG(
             ),
         ),
         operator_args={"install_deps": True},
-        default_args={"retries": 2},
+        default_args={"retries": 0},
     )
 
     post_dbt = EmptyOperator(task_id="post_dbt")

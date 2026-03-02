@@ -26,7 +26,7 @@ def mock_trino_conn():  # type: ignore
         ),
     )
 
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
 
@@ -61,13 +61,13 @@ def test_connection_claiming() -> None:
 
         print("testing with", values)
 
-        with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+        with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
             profile_mapping = TrinoJWTProfileMapping(conn, {"database": "my_database", "schema": "my_schema"})
             assert not profile_mapping.can_claim_connection()
 
     # also test when there's no schema
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = TrinoJWTProfileMapping(
             conn,
             {
@@ -78,7 +78,7 @@ def test_connection_claiming() -> None:
 
     # also test when there's no database
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = TrinoJWTProfileMapping(
             conn,
             {
@@ -89,7 +89,7 @@ def test_connection_claiming() -> None:
 
     # if we have them all, it should claim
     conn = Connection(**potential_values)  # type: ignore
-    with patch("airflow.hooks.base.BaseHook.get_connection", return_value=conn):
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = TrinoJWTProfileMapping(
             conn,
             {

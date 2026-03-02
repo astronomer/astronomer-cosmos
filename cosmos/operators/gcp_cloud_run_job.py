@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -122,6 +123,7 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
         cmd_flags: list[str] | None = None,
         run_as_async: bool = False,
         async_context: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> Any:
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
@@ -134,6 +136,17 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
         # to add that in the future
         self.dbt_executable_path = "dbt"
         dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
+
+        # Parse ProfileConfig and add additional arguments to the dbt_cmd
+        if self.profile_config:
+            if self.profile_config.profile_name:
+                dbt_cmd.extend(["--profile", self.profile_config.profile_name])
+            if self.profile_config.target_name:
+                dbt_cmd.extend(["--target", self.profile_config.target_name])
+
+        if self.project_dir:
+            dbt_cmd.extend(["--project-dir", str(self.project_dir)])
+
         self.environment_variables = {**env_vars, **self.environment_variables}
         self.command = dbt_cmd
         # Override Cloud Run Job default arguments with dbt command

@@ -31,5 +31,5 @@ dbt_deps_example_dag = DbtDag(
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="dbt_deps_example",
-    default_args={"retries": 2},
+    default_args={"retries": 0},
 )

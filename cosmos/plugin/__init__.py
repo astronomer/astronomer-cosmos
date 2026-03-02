@@ -8,12 +8,23 @@ from packaging import version
 from cosmos.constants import _AIRFLOW3_MAJOR_VERSION
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .plugin_impl import CosmosPlugin as _CosmosPluginType
+    from .airflow2 import CosmosPlugin as _CosmosPluginType
+    from .airflow3 import CosmosAF3Plugin as _CosmosAF3PluginType
 
-CosmosPlugin: _CosmosPluginType | None = None
-# The plugin is only loaded if the Airflow version is less than 3.0. This is because the plugin is incompatible with
-# Airflow 3.0 and above. Once the compatibility issue is resolved as part of
-# https://github.com/astronomer/astronomer-cosmos/issues/1587, the import statement can be moved outside of the
-# conditional block.
-if version.parse(airflow_version).major < _AIRFLOW3_MAJOR_VERSION:
-    from .plugin_impl import CosmosPlugin as CosmosPlugin  # type: ignore[assignment]
+_CosmosPlugin: _CosmosPluginType | _CosmosAF3PluginType | None = None
+
+
+def __getattr__(name: str) -> _CosmosPluginType | _CosmosAF3PluginType | None:
+    if name == "CosmosPlugin":
+        global _CosmosPlugin
+        if _CosmosPlugin is None:
+            if version.parse(airflow_version).major < _AIRFLOW3_MAJOR_VERSION:
+                from .airflow2 import CosmosPlugin  # type: ignore[assignment]  # noqa: F401
+
+                _CosmosPlugin = CosmosPlugin  # type: ignore[assignment]
+            else:
+                from .airflow3 import CosmosAF3Plugin  # type: ignore[assignment]  # noqa: F401
+
+                _CosmosPlugin = CosmosAF3Plugin  # type: ignore[assignment]
+        return _CosmosPlugin
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

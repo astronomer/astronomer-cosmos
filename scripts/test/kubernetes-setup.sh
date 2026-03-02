@@ -5,8 +5,13 @@
 set -x
 set -e
 
-pip install --force-reinstall 'dbt-postgres>=1.8'
-pip install --force-reinstall dbt-adapters
+DBT_VERSION="$1"
+echo "DBT_VERSION:"
+echo "$DBT_VERSION"
+NEXT_MINOR_VERSION=$(echo "$DBT_VERSION" | awk -F. '{print $1"."$2+1}')
+
+pip uninstall dbt-adapters dbt-common dbt-core dbt-extractor dbt-postgres dbt-semantic-interfaces -y
+pip install -U "dbt-core>=$DBT_VERSION,<$NEXT_MINOR_VERSION" dbt-postgres
 
 # Create a Kubernetes secret named 'postgres-secrets' with the specified literals for host and password
 kubectl create secret generic postgres-secrets \

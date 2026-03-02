@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Type
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -22,7 +21,7 @@ class Field:
     airflow_name: str | list[str] | None = None
 
 
-def get_fields_from_mapping(mapping: Type[BaseProfileMapping]) -> list[Field]:
+def get_fields_from_mapping(mapping: type[BaseProfileMapping]) -> list[Field]:
     """
     Generates Field objects from a profile mapping.
     """
@@ -73,6 +72,7 @@ def generate_mapping_docs(
                         "mapping_description": "\n\n".join(docstring.split("\n")),
                         "fields": [field.__dict__ for field in get_fields_from_mapping(mapping=mapping)],
                         "airflow_conn_type": mapping.airflow_connection_type,
+                        "profile_defaults": getattr(mapping, "profile_defaults", {}),
                     }
                 )
             )

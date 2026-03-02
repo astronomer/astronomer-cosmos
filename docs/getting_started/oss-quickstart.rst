@@ -188,7 +188,8 @@ micro_project_dag = DbtDag(
 5. Export environmental variables to Airflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To successfully run your Dag, Airflow needs you to define the following environment variables. These determine specific Airflow behavior and identify the project home directory.
+To successfully run your Dag, Airflow needs you to define the some environment variables.
+These identify the project home directory, ``AIRFLOW_HOME``, and disable additional Airflow and Cosmos features that are not required for local execution.
 
 .. codeblock:: bash
 
@@ -199,6 +200,15 @@ export AIRFLOW__COSMOS__ENABLE_TELEMETRY=false
 6. Run Airflow
 ~~~~~~~~~~~~~~
 
+At this point, you've completed the following project setup steps:
+
+- Installed Cosmos, dbt, and Airflow into your environment.
+- Created a lightweight dbt project and defined the ``profiles.yml`` file, which Cosmos can use to connect to the dbt database.
+- Created an Airflow Dag that defines the ``profile_config`` and ``project_config``, which tells Cosmos the locations of the dbt project and ``profiles.yml`` file.
+- Defined the Airflow project home and configured environment variables that improve local Dag performance.
+
+Now you can run an Airflow Dag.
+
 .. codeblock:: bash
 
 airflow standalone
@@ -206,7 +216,7 @@ airflow standalone
 Troubleshooting
 ~~~~~~~~~~~~~~~~~~
 
-If you encounter issues like "Cosmos DAG not loading," try resetting and reserializing:
+If you encounter issues, like errror messages that say **Cosmos Dag not loading**, try resetting the Airflow database and reserializing with the following commands.
 
 .. codeblock:: bash
 

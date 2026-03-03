@@ -20,9 +20,9 @@ Prerequisites
 
 - `Python <https://www.python.org/downloads/>`_
 - Install `git <https://git-scm.com/install/>`_
-- (Optional) Install a database viewer. This guide uses `dBeaver <https://dbeaver.io/download/>`_
 - Install the `Astro CLI <https://docs.astronomer.io/astro/cli/install-cli>`_
 - A container manager such as Podman, Docker, or Orbstack. When you install the Astro CLI, it automatically installs Airflow and Podman, so you can immediately start working with Dags after installing the CLI. If you need to use Docker instead of Podman, see `Switch between Docker and Podman <https://www.astronomer.io/docs/astro/cli/switch-container-management>`_.
+- (Optional) Install a database viewer. This guide uses `dBeaver <https://dbeaver.io/download/>`_
 
 Depending on your operating system, you might also need to install a separate installation manager like `Homebrew <https://brew.sh>`_ or `WinGet <https://learn.microsoft.com/en-us/windows/package-manager/winget/>`_.
 
@@ -40,7 +40,7 @@ Start Airflow locally
 ~~~~~~~~~~~~~~~~~~~~~
 
 1. Open a terminal at the root of the ``cosmos-demo`` repo.
-2. Run ``astro dev start --verbosity`` to start your Aiflow instance.
+2. Run ``astro dev start --verbosity debug`` to start your Aiflow instance. Including the ``--verbosity debug`` flag allows the command to display the steps the Astro CLI takes to set up your Airflow project.
 3. Open the Airflow UI at ``http://localhost:8080/``.
 4. Log in using ``admin`` as both the user name and password to access the **Home** view. This view provides at-a-glance of your overall Airflow environment, including summary statistics about your Dags' performance.
 
@@ -72,7 +72,7 @@ Run a simple Cosmos Dag
 4. After the Dag finishes executing. You can select one of the Dag tasks to look at the task **Logs**.
 5. In the task logs, you can identify the dbt actions that Cosmos initiates during the Dag.
 
-For example in the ``stg_customers``, task, in the ``run`` sub-task, the logs include output like:
+For example in the ``stg_customers``, task group, in the ``run`` task, the logs include output like:
 
 .. code-block:: text
 
@@ -140,5 +140,3 @@ Next steps
     - `Getting Started on Astro <astro.html>`__
     - `Getting Started on MWAA <mwaa.html>`__
     - `Getting Started on GCC <gcc.html>`__
-
-.. - `Getting Started on Azure <azure.html>`_

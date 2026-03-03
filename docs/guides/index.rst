@@ -54,4 +54,3 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :caption: Optimizing Performance
 
    optimize_performance/index
-

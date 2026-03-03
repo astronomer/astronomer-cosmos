@@ -15,8 +15,8 @@ into dbt profiles. To use this profile, import it from ``cosmos.profiles``:
     from cosmos.profiles import StandardSQLServerAuthProfileMapping
 
     profile = StandardSQLServerAuthProfileMapping(
-        conn_id = 'my_generic_connection',
-        profile_args = { ... },
+        conn_id="my_generic_connection",
+        profile_args={...},
     )
 
 While the profile mapping pulls fields from Airflow connections, you may need to supplement it
@@ -31,49 +31,49 @@ to the ``profile_args`` dict.
      - Required
      - Airflow Field Name
 
-   
+
    * - ``server``
      - True
-    
+
      - ``host``
-    
-    
+
+
    * - ``user``
      - True
-    
+
      - ``login``
-    
-    
+
+
    * - ``password``
      - True
-    
+
      - ``password``
-    
-    
+
+
    * - ``port``
      - False
-    
+
      - ``port``
-    
-    
+
+
    * - ``schema``
      - True
-    
+
      - ``schema``
-    
-    
+
+
    * - ``database``
      - True
-    
+
      - ``extra.database``
-    
-    
+
+
    * - ``driver``
      - True
-    
+
      - ``extra.driver``
-    
-    
+
+
 
 
 Some notes about the table above:

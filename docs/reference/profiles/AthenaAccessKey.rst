@@ -45,8 +45,8 @@ into dbt profiles. To use this profile, import it from ``cosmos.profiles``:
     from cosmos.profiles import AthenaAccessKeyProfileMapping
 
     profile = AthenaAccessKeyProfileMapping(
-        conn_id = 'my_aws_connection',
-        profile_args = { ... },
+        conn_id="my_aws_connection",
+        profile_args={...},
     )
 
 While the profile mapping pulls fields from Airflow connections, you may need to supplement it
@@ -61,97 +61,97 @@ to the ``profile_args`` dict.
      - Required
      - Airflow Field Name
 
-   
+
    * - ``aws_profile_name``
      - False
-    
+
      - ``extra.aws_profile_name``
-    
-    
+
+
    * - ``database``
      - True
-    
+
      - ``extra.database``
-    
-    
+
+
    * - ``debug_query_state``
      - False
-    
+
      - ``extra.debug_query_state``
-    
-    
+
+
    * - ``lf_tags_database``
      - False
-    
+
      - ``extra.lf_tags_database``
-    
-    
+
+
    * - ``num_retries``
      - False
-    
+
      - ``extra.num_retries``
-    
-    
+
+
    * - ``poll_interval``
      - False
-    
+
      - ``extra.poll_interval``
-    
-    
+
+
    * - ``region_name``
      - True
-    
+
      - ``extra.region_name``
-    
-    
+
+
    * - ``s3_data_dir``
      - False
-    
+
      - ``extra.s3_data_dir``
-    
-    
+
+
    * - ``s3_data_naming``
      - False
-    
+
      - ``extra.s3_data_naming``
-    
-    
+
+
    * - ``s3_staging_dir``
      - True
-    
+
      - ``extra.s3_staging_dir``
-    
-    
+
+
    * - ``schema``
      - True
-    
+
      - ``extra.schema``
-    
-    
+
+
    * - ``seed_s3_upload_args``
      - False
-    
+
      - ``extra.seed_s3_upload_args``
-    
-    
+
+
    * - ``work_group``
      - False
-    
+
      - ``extra.work_group``
-    
-    
+
+
    * - ``aws_access_key_id``
      - True
-    
+
      -
-    
-    
+
+
    * - ``aws_secret_access_key``
      - True
-    
+
      -
-    
-    
+
+
 
 
 Some notes about the table above:

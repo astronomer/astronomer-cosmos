@@ -125,4 +125,3 @@ them in ``profile_args``.
 
    * - ``threads``
      - ``4``
-

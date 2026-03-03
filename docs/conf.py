@@ -53,3 +53,36 @@ html_theme_options = {
 }
 
 generate_mapping_docs()
+
+# -- Begin docs redirect section
+# -- To test redirects in a local build, paste the redirect source, and append .html to the end.
+# -- For example, "airflow3_compatibility/index" redirect must be tested using "airflow3_compatibility/index.html"
+# --  https://documatt.com/sphinx-reredirects/usage/
+redirects = {
+    "profiles/AthenaAccessKey": "../reference/profiles/AthenaAccessKey.html",
+    "profiles/ClickhouseUserPassword": "../reference/profiles/ClickhouseUserPassword.html",
+    "profiles/DatabricksOauth": "../reference/profiles/DatabricksOauth.html",
+    "profiles/DatabricksToken": "../reference/profiles/DatabricksToken.html",
+    "profiles/DuckDBUserPassword": "../reference/profiles/DuckDBUserPassword.html",
+    "profiles/ExasolUserPassword": "../reference/profiles/ExasolUserPassword.html",
+    "profiles/GoogleCloudOauth": "../reference/profiles/GoogleCloudOauth.html",
+    "profiles/GoogleCloudServiceAccountDict": "../reference/profiles/GoogleCloudServiceAccountDict.html",
+    "profiles/GoogleCloudServiceAccountFile": "../reference/profiles/GoogleCloudServiceAccountFile.html",
+    "profiles/index": "../reference/profiles/index.html",
+    "profiles/MysqlUserPassword": "../reference/profiles/MysqlUserPassword.html",
+    "profiles/OracleUserPassword": "../reference/profiles/OracleUserPassword.html",
+    "profiles/PostgresUserPassword": "../reference/profiles/PostgresUserPassword.html",
+    "profiles/RedshiftUserPassword": "../reference/profiles/RedshiftUserPassword.html",
+    "profiles/SnowflakeEncryptedPrivateKeyFilePem": "../reference/profiles/SnowflakeEncryptedPrivateKeyFilePem.html",
+    "profiles/SnowflakeEncryptedPrivateKeyPem": "../reference/profiles/SnowflakeEncryptedPrivateKeyPem.html",
+    "profiles/SnowflakePrivateKeyPem": "../reference/profiles/SnowflakePrivateKeyPem.html",
+    "profiles/SnowflakeUserPassword": "../reference/profiles/SnowflakeUserPassword.html",
+    "profiles/SparkThrift": "../reference/profiles/SparkThrift.html",
+    "profiles/StandardSQLServerAuth": "../reference/profiles/StandardSQLServerAuth.html",
+    "profiles/StarrocksUserPassword": "../reference/profiles/StarrocksUserPassword.html",
+    "profiles/TeradataUserPassword": "../reference/profiles/TeradataUserPassword.html",
+    "profiles/TrinoCertificate": "../reference/profiles/TrinoCertificate.html",
+    "profiles/TrinoJWT": "../reference/profiles/TrinoJWT.html",
+    "profiles/TrinoLDAP": "../reference/profiles/TrinoLDAP.html",
+    "profiles/VerticaUserPassword": "../reference/profiles/VerticaUserPassword.html",
+}

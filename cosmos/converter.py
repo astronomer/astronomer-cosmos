@@ -365,6 +365,7 @@ class DbtToAirflowConverter:
             render_config=render_config,
             async_py_requirements=execution_config.async_py_requirements,
             execution_config=execution_config,
+            tests_per_model=self.dbt_graph.tests_per_model,
         )
 
         current_time = time.perf_counter()

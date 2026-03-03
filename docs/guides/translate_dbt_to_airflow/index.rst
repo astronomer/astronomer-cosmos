@@ -1,4 +1,4 @@
-.. _translate-dbt-to-airflow
+.. _translate-dbt-to-airflow:
 
 Translate dbt code into Airflow
 ===============================

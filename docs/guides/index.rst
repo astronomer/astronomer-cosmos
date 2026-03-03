@@ -55,12 +55,3 @@ Cosmos offers a number of configuration options to customize its behavior. For m
 
    optimize_performance/index
 
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-   :caption: Configuration References
-
-   Project Config <project-config>
-   Profile Config <profile-config>
-   Execution Config <execution-config>
-   Cosmos Config <cosmos-conf>

@@ -8,7 +8,7 @@
    Home <self>
    Getting Started <getting_started/index>
    Guides <guides/index>
-   Profiles <profiles/index>
+   Reference <reference/index>
    Contributing <contributing>
    Airflow 3 compatibility <airflow3_compatibility/index>
    Compatibility Policy <compatibility-policy>

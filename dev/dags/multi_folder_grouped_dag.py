@@ -4,9 +4,10 @@ An example airflow DAG that uses Cosmos to render the multi_folder dbt project w
 Uses RenderConfig.group_nodes_by_folder to create a TaskGroup per resource type and folder
 (e.g. models_a, models_b, seeds_a, seeds_b), organizing the DAG by the dbt folder structure.
 
-Contains two DAGs:
+Contains three DAGs:
 - multi_folder_grouped_dag: uses DbtDag (dbt project as the whole DAG).
 - multi_folder_grouped_task_group_dag: uses DbtTaskGroup (dbt project as a task group inside a DAG).
+- multi_folder_grouped_watcher_dag: uses DbtDag with ExecutionMode.WATCHER.
 """
 
 import os
@@ -16,6 +17,8 @@ from pathlib import Path
 from airflow import DAG
 
 from cosmos import DbtDag, DbtTaskGroup, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import ExecutionConfig
+from cosmos.constants import ExecutionMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -46,6 +49,23 @@ multi_folder_grouped_dag = DbtDag(
     start_date=datetime(2024, 1, 1),
     catchup=False,
     dag_id="multi_folder_grouped_dag",
+    default_args={"retries": 0},
+)
+
+# Same as above, but with ExecutionMode.WATCHER (watcher runs dbt in a subprocess and watches for changes)
+multi_folder_grouped_watcher_dag = DbtDag(
+    project_config=ProjectConfig(DBT_PROJECT_PATH),
+    profile_config=profile_config,
+    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+    render_config=RenderConfig(group_nodes_by_folder=True),
+    operator_args={
+        "install_deps": True,
+        "full_refresh": True,
+    },
+    schedule="@daily",
+    start_date=datetime(2024, 1, 1),
+    catchup=False,
+    dag_id="multi_folder_grouped_watcher_dag",
     default_args={"retries": 0},
 )
 

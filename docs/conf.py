@@ -53,3 +53,26 @@ html_theme_options = {
 }
 
 generate_mapping_docs()
+
+# -- Begin docs redirect section
+# -- To test redirects in a local build, paste the redirect source, and append .html to the end.
+# -- For example, "airflow3_compatibility/index" redirect must be tested using "airflow3_compatibility/index.html"
+# --  https://documatt.com/sphinx-reredirects/usage/
+redirects = {
+    "configuration/caching": "../optimize_performance/caching.html",
+    "configuration/memory_optimization": "../optimize_performance/memory_optimization.html",
+    "configuration/partial-parsing": "../optimize_performance/partial-parsing.html",
+    "configuration/selecting-excluding": "../optimize_performance/selecting-excluding.html",
+    "getting_started/async-execution-mode": "../guides/run_dbt/airflow-worker/async-execution-mode.html",
+    "getting_started/aws-container-run-job": "../guides/run_dbt/airflow-worker/async-execution-mode.html",
+    "getting_started/azure-container-instance": "../guides/run_dbt/container/azure-container-instance.html",
+    "getting_started/custom-airflow-properties": "../run_dbt/airflow-worker/custom-airflow-properties.html",
+    "getting_started/docker": "../guides/run_dbt/container/docker.html",
+    "getting_started/execution-modes-local-conflicts": "../guides/run_dbt/airflow-worker/execution-modes-local-conflicts.html",
+    "getting_started/execution-modes": "../guides/run_dbt/execution-modes.html",
+    "getting_started/gcp-cloud-run-job": "../guides/run_dbt/container/gcp-cloud-run-job.html",
+    "getting_started/kubernetes": "../guides/run_dbt/container/kubernetes.html",
+    "getting_started/operators": "../guides/run_dbt/operators/operators.html",
+    "getting_started/watcher-execution-mode": "../guides/run_dbt/airflow-worker/watcher-execution-mode.html",
+    "getting_started/watcher-kubernetes-execution-mode": "../guides/run_dbt/container/watcher-kubernetes-execution-mode.html",
+}

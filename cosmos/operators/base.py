@@ -4,7 +4,7 @@ import inspect
 import logging
 import os
 from abc import ABCMeta, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -80,6 +80,8 @@ class AbstractDbtBase(metaclass=ABCMeta):
     :param dbt_cmd_global_flags: List of dbt global flags to be passed to the dbt command
     :param cache_dir: Directory used to cache Cosmos/dbt artifacts in Airflow worker nodes
     :param extra_context: A dictionary of values to add to the TaskInstance's Context
+    :param interceptors: Optional list of callables run before building the dbt command. Each callable
+        receives (context, operator) and may modify operator.vars and operator.env.
     """
 
     template_fields: Sequence[str] = ("env", "select", "exclude", "selector", "vars", "models", "dbt_cmd_flags")
@@ -129,6 +131,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         dbt_cmd_global_flags: list[str] | None = None,
         cache_dir: Path | None = None,
         extra_context: dict[str, Any] | None = None,
+        interceptors: list[Callable[..., None]] | None = None,
         **kwargs: Any,
     ) -> None:
         self.project_dir = project_dir
@@ -158,6 +161,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         self.dbt_cmd_global_flags = dbt_cmd_global_flags or []
         self.cache_dir = cache_dir
         self.extra_context = extra_context or {}
+        self.interceptors = interceptors or []
         kwargs.pop("full_refresh", None)  # usage of this param should be implemented in child classes
 
     # The following is necessary so that dynamic mapped classes work since Cosmos 1.9.0 subclass changes
@@ -228,6 +232,14 @@ class AbstractDbtBase(metaclass=ABCMeta):
                     )
 
         return filtered_env
+
+    def invoke_interceptors(self, context: Context) -> None:
+        """
+        Run each callable in self.interceptors with (context, self).
+        Interceptors may modify self.vars and self.env before the dbt command is built.
+        """
+        for interceptor in self.interceptors:
+            interceptor(context, self)
 
     @property
     def log(self) -> logging.Logger:

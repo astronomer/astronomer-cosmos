@@ -82,7 +82,7 @@ For more customization, check out the different execution modes that Cosmos supp
 
 For specific guides, see the following:
 
-- `Executing dbt Dags with Docker Operators <docker.html>`__
+- `Executing dbt Dags with DockerOperators <docker.html>`__
 - `Executing dbt Dags with KubernetesPodOperators <kubernetes.html>`__
 - `Executing dbt Dags with Watcher Kubernetes Mode <watcher-kubernetes-execution-mode.html>`__
 - `Executing dbt Dags with AzureContainerInstancesOperators <azure-container-instance.html>`__

@@ -123,6 +123,7 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
         async_context: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Any:
+        self.invoke_interceptors(context)
         self.build_kube_args(context, cmd_flags)
         self.log.info(f"Running command: {self.arguments}")
         result = KubernetesPodOperator.execute(self, context)

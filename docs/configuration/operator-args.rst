@@ -89,6 +89,7 @@ dbt-related
 - ``dbt_executable_path``: Path to dbt executable.
 - ``env``: (Deprecated since Cosmos 1.3 use ``ProjectConfig.env_vars`` instead) Declare, using a Python dictionary, values to be set as environment variables when running ``dbt`` commands.
 - ``fail_fast``: ``dbt`` exits immediately if ``dbt`` fails to process a resource.
+- ``interceptors``: (new in v1.14) Optional list of callables run before building the dbt command. Each callable receives ``(context, operator)`` and may modify ``operator.vars`` and ``operator.env``; the modified values are then used when building and running the dbt command. Supported for all execution modes. Useful for injecting runtime vars or env (e.g. from Airflow connections or XCom) per task run.
 - ``models``: Specifies which nodes to include.
 - ``no_version_check``: If set, skip ensuring ``dbt``'s version matches the one specified in the ``dbt_project.yml``.
 - ``quiet``: run ``dbt`` in silent mode, only displaying its error logs.
@@ -132,6 +133,23 @@ Sample usage
             "output_enconding": "utf-8",
             "skip_exit_code": 1,
         }
+    )
+
+Example: using ``interceptors`` to set vars and env at runtime (e.g. from Airflow context or connections):
+
+.. code-block:: python
+
+    def set_runtime_vars(context, task):
+        task.vars = {
+            "run_id": context["run_id"],
+            "execution_date": str(context["data_interval_start"]),
+        }
+        task.env = {"MY_ENV": "value"}
+
+
+    DbtTaskGroup(
+        # ...
+        operator_args={"interceptors": [set_runtime_vars]},
     )
 
 

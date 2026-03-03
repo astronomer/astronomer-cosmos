@@ -31,8 +31,8 @@ into dbt profiles. To use this profile, import it from ``cosmos.profiles``:
     from cosmos.profiles import VerticaUserPasswordProfileMapping
 
     profile = VerticaUserPasswordProfileMapping(
-        conn_id="my_vertica_connection",
-        profile_args={...},
+        conn_id = 'my_vertica_connection',
+        profile_args = { ... },
     )
 
 While the profile mapping pulls fields from Airflow connections, you may need to supplement it
@@ -47,145 +47,145 @@ to the ``profile_args`` dict.
      - Required
      - Airflow Field Name
 
-
+   
    * - ``host``
      - True
-
+    
      - ``host``
-
-
+    
+    
    * - ``username``
      - True
-
+    
      - ``login``
-
-
+    
+    
    * - ``password``
      - True
-
+    
      - ``password``
-
-
+    
+    
    * - ``port``
      - False
-
+    
      - ``port``
-
-
+    
+    
    * - ``database``
      - True
-
+    
      - ``schema``
-
-
+    
+    
    * - ``autocommit``
      - False
-
+    
      - ``extra.autocommit``
-
-
+    
+    
    * - ``backup_server_node``
      - False
-
+    
      - ``extra.backup_server_node``
-
-
+    
+    
    * - ``binary_transfer``
      - False
-
+    
      - ``extra.binary_transfer``
-
-
+    
+    
    * - ``connection_load_balance``
      - False
-
+    
      - ``extra.connection_load_balance``
-
-
+    
+    
    * - ``connection_timeout``
      - False
-
+    
      - ``extra.connection_timeout``
-
-
+    
+    
    * - ``disable_copy_local``
      - False
-
+    
      - ``extra.disable_copy_local``
-
-
+    
+    
    * - ``kerberos_host_name``
      - False
-
+    
      - ``extra.kerberos_host_name``
-
-
+    
+    
    * - ``kerberos_service_name``
      - False
-
+    
      - ``extra.kerberos_service_name``
-
-
+    
+    
    * - ``log_level``
      - False
-
+    
      - ``extra.log_level``
-
-
+    
+    
    * - ``log_path``
      - False
-
+    
      - ``extra.log_path``
-
-
+    
+    
    * - ``oauth_access_token``
      - False
-
+    
      - ``extra.oauth_access_token``
-
-
+    
+    
    * - ``request_complex_types``
      - False
-
+    
      - ``extra.request_complex_types``
-
-
+    
+    
    * - ``session_label``
      - False
-
+    
      - ``extra.session_label``
-
-
+    
+    
    * - ``ssl``
      - False
-
+    
      - ``extra.ssl``
-
-
+    
+    
    * - ``unicode_error``
      - False
-
+    
      - ``extra.unicode_error``
-
-
+    
+    
    * - ``use_prepared_statements``
      - False
-
+    
      - ``extra.use_prepared_statements``
-
-
+    
+    
    * - ``workload``
      - False
-
+    
      - ``extra.workload``
-
-
+    
+    
    * - ``schema``
      - True
-
+    
      -
-
-
+    
+    
 
 
 Some notes about the table above:

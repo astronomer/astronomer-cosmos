@@ -23,8 +23,8 @@ into dbt profiles. To use this profile, import it from ``cosmos.profiles``:
     from cosmos.profiles import DuckDBUserPasswordProfileMapping
 
     profile = DuckDBUserPasswordProfileMapping(
-        conn_id="my_duckdb_connection",
-        profile_args={...},
+        conn_id = 'my_duckdb_connection',
+        profile_args = { ... },
     )
 
 While the profile mapping pulls fields from Airflow connections, you may need to supplement it
@@ -39,13 +39,13 @@ to the ``profile_args`` dict.
      - Required
      - Airflow Field Name
 
-
+   
    * - ``path``
      - True
-
+    
      - ``host``
-
-
+    
+    
 
 
 Some notes about the table above:

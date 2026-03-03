@@ -30,7 +30,7 @@
    TrinoJWT
    VerticaUserPassword
    StandardSQLServerAuth
-
+   
 
 Profiles Overview
 ==================
@@ -58,6 +58,7 @@ is set in the ``cosmos.config.ProfileConfig`` object, like so:
     profile_config = ProfileConfig(
         profile_name="my_profile_name",
         target_name="my_target_name",
+
         # choose one of the following
         profile_mapping=...,
         profiles_yml_filepath=...,
@@ -207,7 +208,7 @@ The parts of ``profiles.yml``, which aren't specific to a particular data platfo
                 write_json=True,
                 warn_error=True,
                 warn_error_options={"include": "all"},
-                log_format="text",
+                log_format='text',
                 debug=True,
                 version_check=True,
             ),

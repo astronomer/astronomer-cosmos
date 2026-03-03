@@ -787,7 +787,7 @@ def identify_detached_nodes(
                     detached_from_parent[parent_id].append(node)
 
 
-def generate_resource_task_group(
+def create_task_groups_based_on_folder(
     dag: DAG, node: DbtNode, parent_task_group: TaskGroup | None, task_groups: dict[str, TaskGroup]
 ) -> TaskGroup | None:
     """
@@ -933,7 +933,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
 
     for node_id, node in nodes.items():
         task_group = (
-            generate_resource_task_group(dag, node, parent_task_group, task_groups)
+            create_task_groups_based_on_folder(dag, node, parent_task_group, task_groups)
             if group_nodes_by_folder
             else task_group
         )

@@ -187,13 +187,15 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             if use_events:
 
                 def _callback(event_message: EventMsg) -> None:
+                    logger.info("event_message: %s", event_message)
                     try:
                         name = event_message.info.name
                         if name in {"MainReportVersion", "AdapterRegistered"}:
                             self._handle_startup_event(event_message, startup_events)
                         elif name == "NodeFinished":
                             self._handle_node_finished(event_message, context)
-                    except Exception:
+                    except Exception as e:
+                        logger.info("e.__str__: %s", e.__str__())
                         event_name = getattr(getattr(event_message, "info", None), "name", "unknown")
                         logger.exception(
                             "DbtProducerWatcherOperator: error while handling dbt event '%s'",
@@ -215,6 +217,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         except Exception:
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
+            # TODO: producer error
             raise
 
 
@@ -256,13 +259,13 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         compressed_b64_event_msg = ti.xcom_pull(task_ids=self.producer_task_id, key=node_finished_key)
 
         if not compressed_b64_event_msg:
-            return None
+            return None, None
 
         event_json = _parse_compressed_xcom(compressed_b64_event_msg)
 
         logger.info("Node Info: %s", event_json)
-
-        return event_json.get("data", {}).get("run_result", {}).get("status")
+        run_result = event_json.get("data", {}).get("run_result", {})
+        return run_result.get("status"), run_result.get("message")
 
     def use_event(self) -> bool:
         if not self.invocation_mode:

@@ -123,8 +123,8 @@ class WatcherTrigger(BaseTrigger):
             data_json = _parse_compressed_xcom(compressed_xcom_val)
             run_result = data_json.get("data", {}).get("run_result", {})
             status = run_result.get("status")
-            if status == "failed":
-                model_error = run_result.get("message") or run_result.get("fail")
+            if status in ["failed", "error"]:
+                model_error = run_result.get("message")
                 if model_error is not None and not isinstance(model_error, str):
                     model_error = str(model_error)
         else:
@@ -132,27 +132,6 @@ class WatcherTrigger(BaseTrigger):
 
         compiled_sql = await self.get_xcom_val(compiled_sql_key) if status is not None else None
         return status, compiled_sql, model_error
-
-    async def _get_model_error_from_run_results(self) -> str | None:
-        """When status is failed in subprocess mode, get the model error message from run_results XCom."""
-        compressed = await self.get_xcom_val("run_results")
-        if not compressed:
-            return None
-        try:
-            run_results = _parse_compressed_xcom(compressed)
-        except Exception:  # pragma: no cover
-            return None
-        results = run_results.get("results", [])
-        node_result = next(
-            (r for r in results if r.get("unique_id") == self.model_unique_id),
-            None,
-        )
-        if not node_result:
-            return None
-        msg = node_result.get("message")
-        if msg is None:
-            return None
-        return msg if isinstance(msg, str) else str(msg)
 
     async def _get_producer_task_status(self) -> str | None:
         """Retrieve the producer task state for both Airflow 2 and Airflow 3."""
@@ -171,26 +150,24 @@ class WatcherTrigger(BaseTrigger):
 
     async def run(self) -> AsyncIterator[TriggerEvent]:
         logger.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
-        event_data = {}
+
         while True:
             producer_task_state = await self._get_producer_task_status()
             node_status, compiled_sql, model_error_message = await self._parse_node_status_and_compiled_sql()
+            if model_error_message:
+                logger.error("%s", model_error_message)
             if node_status == "success":
                 logger.info("Model '%s' succeeded", self.model_unique_id)
-                event_data["status"] = "success"
+                event_data: dict[str, Any] = {"status": "success"}
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif node_status == "failed":
                 logger.warning("Model '%s' failed", self.model_unique_id)
-                if not model_error_message and not self.use_event:
-                    model_error_message = await self._get_model_error_from_run_results()
-                event_data.update({"status": "failed", "reason": "model_failed"})
+                event_data = {"status": "failed", "reason": "model_failed"}
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
-                if model_error_message:
-                    event_data["model_error_message"] = model_error_message
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == "failed":

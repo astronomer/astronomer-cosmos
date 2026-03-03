@@ -250,7 +250,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if self.compiled_sql and hasattr(self, "_override_rtif"):
             self._override_rtif(context)
 
-        return node_result.get("status")
+        return node_result.get("status"), node_result.get("message")
 
     def _get_producer_task_status(self, context: Context) -> str | None:
         """
@@ -313,13 +313,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return
 
         if reason == "model_failed":
-            model_error_message = event.get("model_error_message")
-            if model_error_message:
-                logger.error(
-                    "dbt model '%s' failed. Error from dbt:\n%s",
-                    self.model_unique_id,
-                    model_error_message,
-                )
             raise AirflowException(
                 f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
             )
@@ -335,7 +328,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
         raise NotImplementedError("Subclasses should implement this method if `use_event` may return True")
 
-    def poke(self, context: Context) -> bool:
+    def poke(self, context: Context) -> bool:  # noqa: C901
         """
         Checks the status of a dbt model run by pulling relevant XComs from the master task.
         Handles retries and checks for successful completion of the model execution.
@@ -357,9 +350,10 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         # We have assumption here that both the build producer and the sensor task will have same invocation mode
         producer_task_state = self._get_producer_task_status(context)
         if self.use_event():
-            status = self._get_status_from_events(ti, context)
+            status, log_msg = self._get_status_from_events(ti, context)
         else:
             status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+            log_msg = ""
 
         # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
         if status is not None:
@@ -389,40 +383,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return True
         else:
             # status == "failed" (or other failure status)
-            model_error = None
             if self.use_event():
-                compressed = get_xcom_val(
-                    ti,
-                    self.producer_task_id,
-                    f"nodefinished_{self.model_unique_id.replace('.', '__')}",
-                )
-                if compressed:
-                    try:
-                        data = _parse_compressed_xcom(compressed)
-                        run_result = data.get("data", {}).get("run_result", {})
-                        model_error = run_result.get("message") or run_result.get("fail")
-                    except Exception:  # pragma: no cover
-                        pass
+                logger.error("%s", log_msg)
             else:
-                run_results_b64 = get_xcom_val(ti, self.producer_task_id, "run_results")
-                if run_results_b64:
-                    try:
-                        run_results = _parse_compressed_xcom(run_results_b64)
-                        results = run_results.get("results", [])
-                        node_result = next(
-                            (r for r in results if r.get("unique_id") == self.model_unique_id),
-                            None,
-                        )
-                        if node_result:
-                            model_error = node_result.get("message")
-                    except Exception:  # pragma: no cover
-                        pass
-            if model_error:
-                if not isinstance(model_error, str):
-                    model_error = str(model_error)
-                logger.error(
-                    "dbt model '%s' failed. Error from dbt:\n%s",
-                    self.model_unique_id,
-                    model_error,
-                )
+                # TODO: Address this post PR: https://github.com/astronomer/astronomer-cosmos/pull/2318
+                pass
             raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")

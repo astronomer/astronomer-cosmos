@@ -18,7 +18,7 @@ from airflow import DAG
 
 from cosmos import DbtDag, DbtTaskGroup, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.config import ExecutionConfig
-from cosmos.constants import ExecutionMode
+from cosmos.constants import ExecutionMode, TestBehavior
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -57,7 +57,7 @@ multi_folder_grouped_watcher_dag = DbtDag(
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
     execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
-    render_config=RenderConfig(group_nodes_by_folder=True),
+    render_config=RenderConfig(group_nodes_by_folder=True, test_behavior=TestBehavior.AFTER_ALL),
     operator_args={
         "install_deps": True,
         "full_refresh": True,

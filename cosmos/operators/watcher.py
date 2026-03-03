@@ -215,7 +215,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         except Exception:
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
-            # TODO: producer error
             raise
 
 

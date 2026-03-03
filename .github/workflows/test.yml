@@ -779,7 +779,7 @@ jobs:
         run: |
           pip3 install coverage
       - name: Download all coverage artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
         with:
           path: ./coverage
       - name: Combine coverage

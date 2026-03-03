@@ -98,9 +98,7 @@ class WatcherTrigger(BaseTrigger):
         else:
             return await self.get_xcom_val_af3(key)
 
-    async def _parse_node_status_and_compiled_sql(
-        self,
-    ) -> tuple[str | None, str | None, str | None]:
+    async def _parse_node_status_and_compiled_sql(self) -> tuple[str | None, str | None, str | None]:
         """
         Parse node status, compiled_sql, and optional model error message from XCom.
 
@@ -192,7 +190,6 @@ class WatcherTrigger(BaseTrigger):
 
 
 def _parse_compressed_xcom(compressed_b64_event_msg: str) -> Any:
-    """Decode and decompress a base64-encoded, zlib-compressed JSON XCom payload."""
     """Decode and decompress a base64-encoded, zlib-compressed XCom payload."""
     compressed_bytes = base64.b64decode(compressed_b64_event_msg)
     event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")

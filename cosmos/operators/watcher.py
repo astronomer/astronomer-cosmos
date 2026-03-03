@@ -187,15 +187,13 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             if use_events:
 
                 def _callback(event_message: EventMsg) -> None:
-                    logger.info("event_message: %s", event_message)
                     try:
                         name = event_message.info.name
                         if name in {"MainReportVersion", "AdapterRegistered"}:
                             self._handle_startup_event(event_message, startup_events)
                         elif name == "NodeFinished":
                             self._handle_node_finished(event_message, context)
-                    except Exception as e:
-                        logger.info("e.__str__: %s", e.__str__())
+                    except Exception:
                         event_name = getattr(getattr(event_message, "info", None), "name", "unknown")
                         logger.exception(
                             "DbtProducerWatcherOperator: error while handling dbt event '%s'",

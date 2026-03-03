@@ -80,6 +80,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
+        use_run_command = kwargs.pop("use_run_command", False)
 
         # Disable retries on producer task
         default_args = dict(kwargs.get("default_args", {}) or {})
@@ -98,6 +99,9 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         kwargs["callbacks"] = normalized_callbacks
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
+
+        if use_run_command:
+            self.base_cmd = ["run"]
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:

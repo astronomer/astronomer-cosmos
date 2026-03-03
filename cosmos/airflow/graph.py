@@ -694,12 +694,17 @@ def _add_watcher_producer_task(
         producer_task_args["exclude"] = _convert_list_to_str(render_config.exclude)
 
         if render_config.test_behavior in [TestBehavior.NONE, TestBehavior.AFTER_ALL]:
-            additional_excludes = "resource_type:test resource_type:unit_test"
-            current_exclude = producer_task_args.get("exclude")
-            if current_exclude:
-                producer_task_args["exclude"] = f"{current_exclude} {additional_excludes}"
+            # Use `dbt run` instead of `dbt build` so tests are not executed by the
+            # producer (dbt ignores --exclude with --selector).
+            if render_config.selector:
+                producer_task_args["use_run_command"] = True
             else:
-                producer_task_args["exclude"] = additional_excludes
+                additional_excludes = "resource_type:test resource_type:unit_test"
+                current_exclude = producer_task_args.get("exclude")
+                if current_exclude:
+                    producer_task_args["exclude"] = f"{current_exclude} {additional_excludes}"
+                else:
+                    producer_task_args["exclude"] = additional_excludes
 
     class_name = calculate_operator_class(execution_mode, "DbtProducer")
 

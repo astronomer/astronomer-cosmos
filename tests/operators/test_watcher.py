@@ -1868,7 +1868,7 @@ def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
         )
 
     producer_operator = dag_dbt_task_group_watcher_flags.task_dict["dbt_task_group.dbt_producer_watcher"]
-    assert producer_operator.base_cmd == ["build"]
+    assert producer_operator.base_cmd == ["run"]
 
     cmd_flags = producer_operator.add_cmd_flags()
 
@@ -1876,7 +1876,7 @@ def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
     full_cmd, env = producer_operator.build_cmd(context=context, cmd_flags=cmd_flags)
 
     # Verify the command was built correctly
-    assert full_cmd[1] == "build"  # dbt build command
+    assert full_cmd[1] == "run"  # dbt run command (not build) when test_behavior is NONE
     assert "--full-refresh" in full_cmd
 
 
@@ -1923,12 +1923,12 @@ def test_dbt_task_group_with_watcher_has_correct_templated_dbt_cmd():
     # Basic check for producer task
     producer_operator = dag_dbt_task_group_watcher_flags.task_dict["dbt_task_group.dbt_producer_watcher"]
     producer_operator.render_template_fields(context=context)  # Render the templated fields
-    assert producer_operator.base_cmd == ["build"]
+    assert producer_operator.base_cmd == ["run"]
 
     # Build the command without executing it and verify it was built correctly
     cmd_flags = producer_operator.add_cmd_flags()
     full_cmd, _ = producer_operator.build_cmd(context=context, cmd_flags=cmd_flags)
-    assert full_cmd[1] == "build"  # dbt build command
+    assert full_cmd[1] == "run"  # dbt run command (not build) when test_behavior is NONE
 
     cmd = " ".join(full_cmd)
     assert "--full-refresh" in full_cmd

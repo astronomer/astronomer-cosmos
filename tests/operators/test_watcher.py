@@ -1150,7 +1150,7 @@ class TestDbtConsumerWatcherSensor:
         context = self.make_context(ti)
 
         result = sensor._get_status_from_events(ti, context)
-        assert result is None, None
+        assert result == (None, None)
 
     def test_get_status_from_events_does_not_set_compiled_sql_from_event(self):
         """compiled_sql is no longer in the event payload; it is read from the canonical XCom key in poke()."""

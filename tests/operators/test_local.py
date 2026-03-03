@@ -606,13 +606,13 @@ def test_dbt_dag_with_group_nodes_by_folder():
     # multi_folder has seeds_a (products), seeds_b (regions, region_managers), models_a (stg_products, dim_products), models_b (stg_regions)
     assert len(grouped_dag.dbt_graph.filtered_nodes) == 6  # 3 seeds + 3 models
     task_ids = set(grouped_dag.task_dict)
-    assert len(task_ids) == 9  # 3 seeds + 3 models * 2 (run + test)
-    assert "seeds.seeds_a.products" in task_ids
-    assert "seeds.seeds_b.regions" in task_ids
-    assert "seeds.seeds_b.region_managers" in task_ids
-    assert "models.models_a.stg_products.run" in task_ids
-    assert "models.models_a.dim_products.run" in task_ids
-    assert "models.models_b.stg_regions.run" in task_ids
+    assert len(task_ids) == 6  # 3 seeds + 3 model runs
+    assert "seeds.seeds_a.products_seed" in task_ids
+    assert "seeds.seeds_b.regions_seed" in task_ids
+    assert "seeds.seeds_b.region_managers_seed" in task_ids
+    assert "models.models_a.stg_products_run" in task_ids
+    assert "models.models_a.dim_products_run" in task_ids
+    assert "models.models_b.stg_regions_run" in task_ids
 
 
 @pytest.mark.integration
@@ -637,13 +637,13 @@ def test_dbt_task_group_with_group_nodes_by_folder():
     assert outcome.state == DagRunState.SUCCESS
 
     task_ids = set(dag.task_dict)
-    assert len(task_ids) == 9  # 3 seeds + 3 models * 2 (run + test)
-    assert "multi_folder_dbt.seeds.seeds_a.products" in task_ids
-    assert "multi_folder_dbt.seeds.seeds_b.regions" in task_ids
-    assert "multi_folder_dbt.seeds.seeds_b.region_managers" in task_ids
-    assert "multi_folder_dbt.models.models_a.stg_products.run" in task_ids
-    assert "multi_folder_dbt.models.models_a.dim_products.run" in task_ids
-    assert "multi_folder_dbt.models.models_b.stg_regions.run" in task_ids
+    assert len(task_ids) == 6  # 3 seeds + 3 model runs
+    assert "multi_folder_dbt.seeds.seeds_a.products_seed" in task_ids
+    assert "multi_folder_dbt.seeds.seeds_b.regions_seed" in task_ids
+    assert "multi_folder_dbt.seeds.seeds_b.region_managers_seed" in task_ids
+    assert "multi_folder_dbt.models.models_a.stg_products_run" in task_ids
+    assert "multi_folder_dbt.models.models_a.dim_products_run" in task_ids
+    assert "multi_folder_dbt.models.models_b.stg_regions_run" in task_ids
 
 
 @pytest.mark.skipif(

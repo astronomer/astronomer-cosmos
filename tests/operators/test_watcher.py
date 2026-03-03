@@ -1505,18 +1505,21 @@ def test_dbt_dag_with_watcher_and_group_nodes_by_folder(capsys):
     # 1 producer + 3 seeds + 3 model runs + 1 after_all test = 8
     assert len(task_ids) == 8
     assert "dbt_producer_watcher" in task_ids
-    assert "seeds.seeds_a.products" in task_ids
-    assert "seeds.seeds_b.regions" in task_ids
-    assert "seeds.seeds_b.region_managers" in task_ids
-    assert "models.models_a.stg_products.run" in task_ids
-    assert "models.models_a.dim_products.run" in task_ids
-    assert "models.models_b.stg_regions.run" in task_ids
+    assert "seeds.seeds_a.products_seed" in task_ids
+    assert "seeds.seeds_b.regions_seed" in task_ids
+    assert "seeds.seeds_b.region_managers_seed" in task_ids
+    assert "models.models_a.stg_products_run" in task_ids
+    assert "models.models_a.dim_products_run" in task_ids
+    assert "models.models_b.stg_regions_run" in task_ids
     assert "multi_folder_test" in task_ids
 
     assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
-    assert isinstance(watcher_dag.task_dict["seeds.seeds_a.products"], DbtSeedWatcherOperator)
-    assert isinstance(watcher_dag.task_dict["models.models_a.stg_products.run"], DbtRunWatcherOperator)
-    assert isinstance(watcher_dag.task_dict["multi_folder_test"], DbtTestWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["seeds.seeds_a.products_seed"], DbtSeedWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["models.models_a.stg_products_run"], DbtRunWatcherOperator)
+    # AFTER_ALL test task is rendered as DbtTestLocalOperator, not DbtTestWatcherOperator
+    from cosmos.operators.local import DbtTestLocalOperator
+
+    assert isinstance(watcher_dag.task_dict["multi_folder_test"], DbtTestLocalOperator)
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")

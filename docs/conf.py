@@ -59,6 +59,10 @@ generate_mapping_docs()
 # -- For example, "airflow3_compatibility/index" redirect must be tested using "airflow3_compatibility/index.html"
 # --  https://documatt.com/sphinx-reredirects/usage/
 redirects = {
+    "configuration/cosmos-conf": "../reference/configs/cosmos-conf.html",
+    "configuration/execution-config": "../reference/configs/execution-config.html",
+    "configuration/profile-config": "../reference/configs/profile-config.html",
+    "configuration/project-config": "../reference/configs/project-config.html",
     "profiles/AthenaAccessKey": "../reference/profiles/AthenaAccessKey.html",
     "profiles/ClickhouseUserPassword": "../reference/profiles/ClickhouseUserPassword.html",
     "profiles/DatabricksOauth": "../reference/profiles/DatabricksOauth.html",

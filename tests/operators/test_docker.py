@@ -160,3 +160,43 @@ def test_profile_config_without_profiles_yml_raises_error(base_operator):
     expected_err_msg = "For ExecutionMode.DOCKER, specifying ProfileConfig only works with profiles_yml_filepath method"
 
     assert expected_err_msg in error_message
+
+
+@patch("cosmos.operators.docker.DockerOperator.execute")
+def test_build_and_run_cmd_invokes_interceptors(mock_docker_execute):
+    """
+    Test that build_and_run_cmd calls interceptors before build_command and that modified vars/env are used.
+    """
+    context = {"run_id": "test_run", "data_interval_start": MagicMock(), "data_interval_end": MagicMock()}
+    interceptor_mock = MagicMock()
+
+    def interceptor_modify_vars_and_env(ctx, task):
+        interceptor_mock(ctx, task)
+        task.vars = {"new_var": "new_var_value"}
+        task.env = {"NEW_ENV_VAR": "new_env_var_value"}
+
+    from cosmos.operators.docker import DbtDockerBaseOperator
+
+    class ConcreteDbtDockerBaseOperator(DbtDockerBaseOperator):
+        base_cmd = ["run"]
+
+    operator = ConcreteDbtDockerBaseOperator(
+        conn_id="my_airflow_connection",
+        task_id="my-task",
+        image="my_image",
+        project_dir="my/dir",
+        vars=None,
+        env=None,
+        interceptors=[interceptor_modify_vars_and_env],
+    )
+
+    operator.build_and_run_cmd(context=context)
+
+    interceptor_mock.assert_called_once_with(context, operator)
+    assert operator.vars == {"new_var": "new_var_value"}
+    assert operator.env == {"NEW_ENV_VAR": "new_env_var_value"}
+
+    assert "--vars" in operator.command
+    vars_idx = operator.command.index("--vars")
+    assert "new_var: new_var_value" in operator.command[vars_idx + 1]
+    assert operator.environment.get("NEW_ENV_VAR") == "new_env_var_value"

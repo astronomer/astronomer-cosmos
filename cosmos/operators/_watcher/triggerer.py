@@ -123,10 +123,9 @@ class WatcherTrigger(BaseTrigger):
             data_json = _parse_compressed_xcom(compressed_xcom_val)
             run_result = data_json.get("data", {}).get("run_result", {})
             status = run_result.get("status")
-            if status in ["failed", "error"]:
-                model_error = run_result.get("message")
-                if model_error is not None and not isinstance(model_error, str):
-                    model_error = str(model_error)
+            model_error = run_result.get("message")
+            if model_error is not None:
+                model_error = str(model_error)
         else:
             status = await self.get_xcom_val(status_key)
 
@@ -192,21 +191,9 @@ class WatcherTrigger(BaseTrigger):
             logger.debug("Polling again for model '%s' status...", self.model_unique_id)
 
 
-def _decompress_string_xcom(value: str) -> str:
-    """
-    Decode and decompress a base64-encoded, zlib-compressed string from XCom.
-    If decompression fails (e.g. legacy uncompressed value), return the value as-is.
-    """
-    if not value or not isinstance(value, str):
-        return value
-    try:
-        compressed_bytes = base64.b64decode(value)
-        return zlib.decompress(compressed_bytes).decode("utf-8")
-    except Exception:  # pragma: no cover - backward compat for uncompressed values
-        return value
-
-
 def _parse_compressed_xcom(compressed_b64_event_msg: str) -> Any:
     """Decode and decompress a base64-encoded, zlib-compressed JSON XCom payload."""
-    decompressed = _decompress_string_xcom(compressed_b64_event_msg)
-    return json.loads(decompressed)
+    """Decode and decompress a base64-encoded, zlib-compressed XCom payload."""
+    compressed_bytes = base64.b64decode(compressed_b64_event_msg)
+    event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")
+    return json.loads(event_json_str)

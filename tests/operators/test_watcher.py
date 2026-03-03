@@ -1124,7 +1124,7 @@ class TestDbtConsumerWatcherSensor:
         ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
 
         result = sensor._get_status_from_run_results(ti, _MockContext(ti=ti))
-        assert result == "success"
+        assert result == ("success", None)
 
     def test_get_status_from_run_results_none(self):
         sensor = self.make_sensor()
@@ -1141,7 +1141,7 @@ class TestDbtConsumerWatcherSensor:
         context = self.make_context(ti)
 
         result = sensor._get_status_from_events(ti, context)
-        assert result == "success"
+        assert result == ("success", None)
 
     def test_get_status_from_events_none(self):
         sensor = self.make_sensor()
@@ -1150,7 +1150,7 @@ class TestDbtConsumerWatcherSensor:
         context = self.make_context(ti)
 
         result = sensor._get_status_from_events(ti, context)
-        assert result is None
+        assert result is None, None
 
     def test_get_status_from_events_does_not_set_compiled_sql_from_event(self):
         """compiled_sql is no longer in the event payload; it is read from the canonical XCom key in poke()."""
@@ -1162,7 +1162,7 @@ class TestDbtConsumerWatcherSensor:
         context = self.make_context(ti)
 
         result = sensor._get_status_from_events(ti, context)
-        assert result == "success"
+        assert result == ("success", None)
         assert sensor.compiled_sql == ""  # not set from event; poke() will get it from canonical key
 
     @patch("cosmos.operators._watcher.base.get_xcom_val")
@@ -1343,10 +1343,11 @@ class TestWatcherTrigger:
 
         trigger.get_xcom_val = mock_get_xcom_val
 
-        status, compiled_sql = await trigger._parse_node_status_and_compiled_sql()
+        status, compiled_sql, model_error = await trigger._parse_node_status_and_compiled_sql()
 
         assert status == "success"
         assert compiled_sql == "SELECT * FROM orders"
+        assert model_error is None
 
     @pytest.mark.asyncio
     async def test_parse_node_status_and_compiled_sql_subprocess_no_compiled_sql(self):
@@ -1361,10 +1362,11 @@ class TestWatcherTrigger:
 
         trigger.get_xcom_val = mock_get_xcom_val
 
-        status, compiled_sql = await trigger._parse_node_status_and_compiled_sql()
+        status, compiled_sql, model_error = await trigger._parse_node_status_and_compiled_sql()
 
         assert status == "success"
         assert compiled_sql is None
+        assert model_error is None
 
     @pytest.mark.asyncio
     async def test_parse_node_status_and_compiled_sql_dbt_runner_mode(self):
@@ -1384,10 +1386,11 @@ class TestWatcherTrigger:
 
         trigger.get_xcom_val = mock_get_xcom_val
 
-        status, compiled_sql = await trigger._parse_node_status_and_compiled_sql()
+        status, compiled_sql, model_error = await trigger._parse_node_status_and_compiled_sql()
 
         assert status == "success"
         assert compiled_sql == "SELECT id FROM users"
+        assert model_error is None
 
 
 @pytest.mark.integration

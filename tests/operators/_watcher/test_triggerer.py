@@ -112,7 +112,7 @@ class TestWatcherTrigger:
             patch("cosmos.operators._watcher.triggerer._parse_compressed_xcom", return_value=xcom_val),
             patch.object(self.trigger, "get_xcom_val", AsyncMock(side_effect=mock_get_xcom_val)),
         ):
-            status, compiled_sql = await self.trigger._parse_node_status_and_compiled_sql()
+            status, compiled_sql, model_error = await self.trigger._parse_node_status_and_compiled_sql()
             assert status == expected_status
             assert compiled_sql == expected_compiled_sql
 
@@ -232,7 +232,7 @@ class TestWatcherTrigger:
     async def test_run_producer_success_model_not_run(self, caplog):
         """Test that when producer succeeds but model has no status, trigger yields success with model_not_run reason."""
         get_producer_status_mock = AsyncMock(return_value="success")
-        parse_node_status_and_compiled_sql_mock = AsyncMock(return_value=(None, None))
+        parse_node_status_and_compiled_sql_mock = AsyncMock(return_value=(None, None, None))
 
         caplog.set_level("INFO")
 
@@ -254,7 +254,7 @@ class TestWatcherTrigger:
         get_xcom_val_mock = AsyncMock(side_effect=["compressed_data"])
         get_producer_status_mock = AsyncMock(side_effect=["running", "running", "running"])
         parse_node_status_and_compiled_sql_mock = AsyncMock(
-            side_effect=[(None, None), (None, None), ("success", "SELECT 1")]
+            side_effect=[(None, None, None), (None, None, None), ("success", "SELECT 1", None)]
         )
 
         caplog.set_level("DEBUG")
@@ -277,7 +277,7 @@ class TestWatcherTrigger:
     @pytest.mark.asyncio
     async def test_run_failed_model_includes_compiled_sql_in_event(self):
         """When model fails and compiled_sql is available, event payload includes it."""
-        parse_mock = AsyncMock(return_value=("failed", "SELECT * FROM broken_model"))
+        parse_mock = AsyncMock(return_value=("failed", "SELECT * FROM broken_model", None))
         with (
             patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="running")),
             patch.object(self.trigger, "_parse_node_status_and_compiled_sql", parse_mock),

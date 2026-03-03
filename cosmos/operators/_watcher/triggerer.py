@@ -122,8 +122,6 @@ class WatcherTrigger(BaseTrigger):
             run_result = data_json.get("data", {}).get("run_result", {})
             status = run_result.get("status")
             model_error = run_result.get("message")
-            if model_error is not None:
-                model_error = str(model_error)
         else:
             status = await self.get_xcom_val(status_key)
 

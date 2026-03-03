@@ -77,3 +77,10 @@ License
 _______
 
 `Apache License 2.0 <https://github.com/astronomer/astronomer-cosmos/blob/main/LICENSE>`_
+
+.. Tracking pixel for Scarf
+.. See https://github.com/astronomer/astronomer-cosmos/blob/main/docs/policy/security-privacy.rst for more info about Cosmos privacy policy
+
+.. raw:: html
+
+    <img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=ac335a8b-a9f3-49e6-9e8e-a7ec614fb794" />

@@ -36,11 +36,6 @@ The application and this website collect telemetry to support the project's deve
 
 Read the `Privacy Notice <https://github.com/astronomer/astronomer-cosmos/blob/main/PRIVACY_NOTICE.rst>`_ to learn more about it.
 
-.. Tracking pixel for Scarf
-.. raw:: html
-
-    <img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=ac335a8b-a9f3-49e6-9e8e-a7ec614fb794" />
-
 Security Policy
 ---------------
 

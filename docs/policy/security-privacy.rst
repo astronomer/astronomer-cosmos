@@ -1,12 +1,6 @@
 Cosmos security, compliance, and privacy policies
 =================================================
 
-License
-_______
-
-`Apache License 2.0 <https://github.com/astronomer/astronomer-cosmos/blob/main/LICENSE>`_
-
-
 Project Repositories and Subprojects
 ____________________________________
 

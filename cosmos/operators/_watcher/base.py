@@ -386,12 +386,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             )
 
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
-        dbt_events = get_xcom_val(
-            task_instance=context["ti"],
-            key=f"{self.model_unique_id.replace('.', '__')}_dbt_event",
-            task_ids=self.producer_task_id,
-        )
-        _log_dbt_event(dbt_events)
         status = event.get("status")
         reason = event.get("reason")
 
@@ -411,6 +405,12 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if status != "failed":
             return
 
+        dbt_events = get_xcom_val(
+            task_instance=context["ti"],
+            key=f"{self.model_unique_id.replace('.', '__')}_dbt_event",
+            task_ids=self.producer_task_id,
+        )
+        _log_dbt_event(dbt_events)
         if reason == "model_failed":
             raise AirflowException(
                 f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."

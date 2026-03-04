@@ -200,7 +200,7 @@ class WatcherTrigger(BaseTrigger):
             _log_dbt_event(dbt_log_event)
             dbt_node_status, compiled_sql = await self._parse_dbt_node_status_and_compiled_sql()
             if is_dbt_node_status_success(dbt_node_status):
-                logger.info("dbt node '%s' succeeded", self.model_unique_id)
+                logger.debug("dbt node '%s' succeeded", self.model_unique_id)
                 event_data: dict[str, Any] = {"status": EventStatus.SUCCESS}
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql

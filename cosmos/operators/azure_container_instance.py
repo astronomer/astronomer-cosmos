@@ -113,6 +113,7 @@ class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInsta
         async_context: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Any:
+        self.invoke_interceptors(context)
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
         result = AzureContainerInstancesOperator.execute(self, context)

@@ -31,7 +31,7 @@ The application and this website collect telemetry to support the project's deve
 Read the `Privacy Notice <https://github.com/astronomer/astronomer-cosmos/blob/main/PRIVACY_NOTICE.rst>`_ to learn more about it.
 
 Security Policy
----------------
+_______________
 
 Check the project's `Security Policy <https://github.com/astronomer/astronomer-cosmos/blob/main/SECURITY.rst>`_ to learn
 how to report security vulnerabilities in Astronomer Cosmos and how security issues reported to the Astronomer Cosmos

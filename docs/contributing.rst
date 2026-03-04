@@ -25,7 +25,7 @@ To contribute to the cosmos project:
 Setup local development on host machine
 ---------------------------------------
 
-This guide will setup astronomer development on host machine, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
+This guide will set up astronomer development on host machine, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
 
 .. code-block:: bash
 
@@ -40,16 +40,16 @@ Then install ``airflow`` and ``astronomer-cosmos`` using python-venv:
     pip3 install "apache-airflow[cncf.kubernetes,openlineage]"
     pip3 install -e ".[dbt-postgres,dbt-databricks]"
 
-Set airflow home to the ``dev/`` directory and disabled loading example DAGs:
+Set airflow home to the ``dev/`` directory and disable loading example DAGs:
 
 .. code-block:: bash
 
     export AIRFLOW_HOME=$(pwd)/dev/
     export AIRFLOW__CORE__LOAD_EXAMPLES=false
 
-Then, run airflow in standalone mode, command below will create a new user (if not exist) and run necessary airflow component (webserver, scheduler and triggerer):
+Then, run airflow in standalone mode, command below will create a new user (if one does not exist) and run necessary airflow component (webserver, scheduler and triggerer):
 
-    By default airflow will use sqlite as database, you can overwrite this by set variable ``AIRFLOW__DATABASE__SQL_ALCHEMY_CONN`` to the sql connection string.
+    By default airflow will use sqlite as database, you can overwrite this by setting the variable ``AIRFLOW__DATABASE__SQL_ALCHEMY_CONN`` to the sql connection string.
 
 .. code-block:: bash
 
@@ -90,6 +90,12 @@ Testing application with hatch
 ------------------------------
 
 We currently use `hatch <https://github.com/pypa/hatch>`_ for building and distributing ``astronomer-cosmos``.
+
+If you don't already have Hatch installed, `install it <https://hatch.pypa.io/latest/install/>`_ before proceeding. As an example, on macOS, you can do so with:
+
+.. code-block:: bash
+
+    brew install hatch
 
 The tool can also be used for local development. The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file currently defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
 
@@ -155,17 +161,12 @@ To run the checks manually, run:
 Writing Docs
 ____________
 
-`Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatchto declare the dependencies required for the project itself, as well as for tests and documentation builds.
-
-If you don’t already have Hatch installed, please `install it <https://hatch.pypa.io/latest/install/>`_ before proceeding. As an example, on macOS, you can do so with:
-
-.. code-block:: bash
-    brew install hatch
-
+`Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use Hatch to declare the dependencies required for the project itself, as well as for tests and documentation builds.
 
 You can run the docs locally by running the following:
 
 .. code-block:: bash
+
     hatch run docs:serve
 
 

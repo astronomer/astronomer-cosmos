@@ -5,8 +5,14 @@
    :hidden:
    :caption: Cosmos Fundamentals
 
-   Astro CLI quickstart <astro-cli-quickstart>
    Similar dbt and Airflow concepts <dbt-airflow-concepts>
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :caption: Quickstart
+
+   Astro CLI quickstart <astro-cli-quickstart>
 
 .. toctree::
    :maxdepth: 1
@@ -78,11 +84,11 @@ For more customization, check out the different execution modes that Cosmos supp
 
 For specific guides, see the following:
 
-- `Executing dbt DAGs with DockerOperators <guides/run_dbt/container/docker.html>`__
-- `Executing dbt DAGs with KubernetesPodOperators <guides/run_dbt/container/kubernetes.html>`__
-- `Executing dbt DAGs with Watcher Kubernetes Mode <guides/run_dbt/container/watcher-kubernetes-execution-mode.html>`__
-- `Executing dbt DAGs with AzureContainerInstancesOperators <guides/run_dbt/container/azure-container-instance.html>`__
-- `Executing dbt DAGs with GcpCloudRunExecuteJobOperators <guides/run_dbt/container/gcp-cloud-run-job.html>`__
+- `Executing dbt DAGs with DockerOperators <../../guides/run_dbt/container/docker.html>`__
+- `Executing dbt DAGs with KubernetesPodOperators <../../guides/run_dbt/container/kubernetes.html>`__
+- `Executing dbt DAGs with Watcher Kubernetes Mode <../../guides/run_dbt/container/watcher-kubernetes-execution-mode.html>`__
+- `Executing dbt DAGs with AzureContainerInstancesOperators <../../guides/run_dbt/container/azure-container-instance.html>`__
+- `Executing dbt DAGs with GcpCloudRunExecuteJobOperators <../../guides/run_dbt/container/gcp-cloud-run-job.html>`__
 
 
 Concepts Overview

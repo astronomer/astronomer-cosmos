@@ -100,7 +100,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 
-        self.execution_timeout = timedelta(seconds=2)
+        self.execution_timeout = timedelta(seconds=20)
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:

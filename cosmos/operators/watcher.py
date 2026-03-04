@@ -185,7 +185,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
                 try_number,
             )
-            return None
+            raise AirflowSkipException()
 
         self.log.info(
             "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "

@@ -117,7 +117,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
                 "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
                 try_number,
             )
-            return None
+            raise AirflowSkipException()
 
         # This global variable is used to make the task context available to the K8s callback.
         # While the callback is set during the operator initialization, the context is only created during the operator's execution.

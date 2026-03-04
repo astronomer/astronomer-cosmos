@@ -65,6 +65,7 @@ from cosmos.log import get_logger
 
 logger = get_logger(__name__)
 
+
 def _get_cached_manifest(manifest_path: Path) -> dict[str, Any]:
     """Load manifest JSON with a disk-based pickle cache.
 
@@ -91,6 +92,7 @@ def _get_cached_manifest(manifest_path: Path) -> dict[str, Any]:
     with open(cache_file, "wb") as f:
         pickle.dump(data, f)
     return data
+
 
 def _normalize_path(path: str) -> str:
     """

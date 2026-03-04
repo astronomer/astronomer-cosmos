@@ -102,6 +102,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
         self.image = "blah-blah:99999999"
         self.startup_timeout_seconds = 20
+        self.init_container_logs = None
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:

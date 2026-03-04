@@ -100,10 +100,6 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 
-        self.image = "blah-blah:99999999"
-        self.startup_timeout_seconds = 20
-        self.init_container_logs = None
-
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
         return CosmosKubernetesPodManager(kube_client=self.client, callbacks=self.callbacks)

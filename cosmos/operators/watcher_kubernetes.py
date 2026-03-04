@@ -99,7 +99,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 
-        self.image_pull_policy = "Never"
+        self.image = "blah-blah:999999999"
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:

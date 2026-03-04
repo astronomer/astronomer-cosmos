@@ -165,10 +165,11 @@ class WatcherTrigger(BaseTrigger):
                     event_data["compiled_sql"] = compiled_sql
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
-            elif producer_task_state == "failed":
+            elif producer_task_state == "failed" or producer_task_state == "skipped":
                 logger.error(
-                    "Watcher producer task '%s' failed before delivering results for node '%s'",
+                    "Watcher producer task '%s' %s before delivering results for node '%s'",
                     self.producer_task_id,
+                    producer_task_state,
                     self.model_unique_id,
                 )
                 yield TriggerEvent({"status": EventStatus.FAILED, "reason": "producer_failed"})  # type: ignore[no-untyped-call]

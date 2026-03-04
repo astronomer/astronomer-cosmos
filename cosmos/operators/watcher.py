@@ -217,14 +217,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 self._dbt_runner_callbacks = [_callback]
                 result = super().execute(context=context, **kwargs)
 
-
                 self._finalize(context, startup_events)
                 return_value = result
             else:
                 # Fallback – push run_results.json via base class helper
                 kwargs["push_run_results_to_xcom"] = True
                 return_value = super().execute(context=context, **kwargs)
-
 
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             return return_value

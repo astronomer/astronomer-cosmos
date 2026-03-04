@@ -17,6 +17,7 @@ from cosmos.constants import (
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
+    _log_dbt_event,
     build_producer_state_fetcher,
     get_xcom_val,
     is_dbt_node_status_success,
@@ -32,8 +33,46 @@ except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
     from airflow.utils.context import Context  # type: ignore[attr-defined]
 
+try:
+    from dbt_common.events.base_types import EventMsg
+except ImportError:  # pragma: no cover
+    EventMsg = None
 
 logger = get_logger(__name__)
+
+
+def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMsg) -> None:
+    logger.debug("dbt_log: %s", dbt_log)
+    sensitive_words = ["fail", "error"]
+    if isinstance(dbt_log, dict):  # Subprocess
+        data = dbt_log.get("data", {})
+        info = dbt_log.get("info", {})
+
+        node_info = data.get("node_info")
+        status = node_info.get("node_status") if node_info else None
+        unique_id = node_info.get("unique_id") if node_info else None
+        start_time = node_info.get("node_started_at") if node_info else None
+        finish_time = node_info.get("node_finished_at") if node_info else None
+        msg = data.get("msg") or info.get("msg") or None
+    else:  # Runner
+        node_info = getattr(dbt_log.data, "node_info", None)
+        unique_id = getattr(node_info, "unique_id") if node_info else None
+        status = getattr(node_info, "node_status", None) if node_info else None
+        start_time = getattr(node_info, "node_started_at", None) if node_info else None
+        finish_time = getattr(node_info, "node_finished_at", None) if node_info else None
+        msg = getattr(dbt_log.info, "msg", None)
+
+    if status in ["None"] and msg is not None:
+        # Check if there is error log message
+        for sensitive_word in sensitive_words:
+            if sensitive_word in msg.lower():
+                break
+        else:
+            return None
+
+    if unique_id:
+        dbt_event = {"status": status, "start_time": start_time, "finish_time": finish_time, "msg": msg}
+        safe_xcom_push(task_instance=task_instance, key=f"{unique_id.replace('.', '__')}_dbt_event", value=dbt_event)
 
 
 def _extract_compiled_sql(
@@ -135,6 +174,7 @@ def store_dbt_resource_status_from_log(
     """
     try:
         log_line = json.loads(line)
+        _process_dbt_log_event(extra_kwargs.get("context")["ti"], log_line)
     except json.JSONDecodeError:
         logger.debug("Failed to parse log: %s", line)
         log_line = {}
@@ -346,6 +386,12 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             )
 
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
+        dbt_events = get_xcom_val(
+            task_instance=context["ti"],
+            key=f"{self.model_unique_id.replace('.', '__')}_dbt_event",
+            task_ids=self.producer_task_id,
+        )
+        _log_dbt_event(dbt_events)
         status = event.get("status")
         reason = event.get("reason")
 
@@ -426,6 +472,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 self.compiled_sql = compiled_sql
                 if hasattr(self, "_override_rtif"):
                     self._override_rtif(context)
+
+        dbt_events = get_xcom_val(
+            task_instance=context["ti"],
+            key=f"{self.model_unique_id.replace('.', '__')}_dbt_event",
+            task_ids=self.producer_task_id,
+        )
+        _log_dbt_event(dbt_events)
 
         if status is None:
 

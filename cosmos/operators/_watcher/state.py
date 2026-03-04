@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import datetime
 from enum import Enum
 from threading import Lock
 from typing import Any
+
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
 
 try:
     from airflow.sdk.types import RuntimeTaskInstanceProtocol as TaskInstance
@@ -133,3 +138,20 @@ def build_producer_state_fetcher(
         return None
 
     return fetch_state_airflow3
+
+
+def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
+    if not dbt_event:
+        return
+
+    status = dbt_event.get("status", "NONE").upper()
+    msg = dbt_event.get("msg", "")
+    start_time = dbt_event.get("start_time")
+    finish_time = dbt_event.get("finish_time")
+
+    # Convert ISO string to readable format
+    start_str = datetime.fromisoformat(start_time).strftime("%Y-%m-%d %H:%M:%S") if start_time else "N/A"
+    finish_str = datetime.fromisoformat(finish_time).strftime("%Y-%m-%d %H:%M:%S") if finish_time else "N/A"
+
+    logger.info(f"[{status}] Start: {start_str}, Finish: {finish_str}")
+    logger.info("%s", msg)

@@ -30,6 +30,7 @@ from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
+    _process_dbt_log_event,
     store_compiled_sql_for_model,
     store_dbt_resource_status_from_log,
 )
@@ -207,6 +208,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
                 def _callback(event_message: EventMsg) -> None:
                     try:
+                        _process_dbt_log_event(context["ti"], event_message)
                         name = event_message.info.name
                         if name in {"MainReportVersion", "AdapterRegistered"}:
                             self._handle_startup_event(event_message, startup_events)

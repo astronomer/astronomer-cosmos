@@ -15,6 +15,7 @@ from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
+    _log_dbt_event,
     build_producer_state_fetcher,
     is_dbt_node_status_failed,
     is_dbt_node_status_success,
@@ -91,7 +92,7 @@ class WatcherTrigger(BaseTrigger):
         return await sync_to_async(_get_xcom_val)()
 
     async def get_xcom_val(self, key: str) -> Any | None:
-        logger.info(
+        logger.debug(
             "Trying to retrieve value using XCom key <%s> by task_id <%s>, dag_id <%s>, run_id <%s> and map_index <%s>",
             key,
             self.producer_task_id,
@@ -195,6 +196,8 @@ class WatcherTrigger(BaseTrigger):
 
         while True:
             producer_task_state = await self._get_producer_task_status()
+            dbt_log_event = await self.get_xcom_val(f"{self.model_unique_id.replace('.', '__')}_dbt_event")
+            _log_dbt_event(dbt_log_event)
             dbt_node_status, compiled_sql = await self._parse_dbt_node_status_and_compiled_sql()
             if is_dbt_node_status_success(dbt_node_status):
                 logger.info("dbt node '%s' succeeded", self.model_unique_id)

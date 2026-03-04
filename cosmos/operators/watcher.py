@@ -8,7 +8,7 @@ from collections.abc import Callable, Sequence
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 
 from cosmos.config import ProfileConfig
 from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
@@ -215,14 +215,20 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                         )
 
                 self._dbt_runner_callbacks = [_callback]
-                result = super().execute(context=context, **kwargs)
+                try:
+                    result = super().execute(context=context, **kwargs)
+                except AirflowException as e:
+                    raise AirflowSkipException() from e
 
                 self._finalize(context, startup_events)
                 return_value = result
             else:
                 # Fallback – push run_results.json via base class helper
                 kwargs["push_run_results_to_xcom"] = True
-                return_value = super().execute(context=context, **kwargs)
+                try:
+                    return_value = super().execute(context=context, **kwargs)
+                except AirflowException as e:
+                    raise AirflowSkipException() from e
 
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             return return_value

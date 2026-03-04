@@ -13,7 +13,7 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 import kubernetes.client as k8s
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
 
 try:
@@ -99,6 +99,8 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 
+        self.image_pull_policy = "Never"
+
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
         return CosmosKubernetesPodManager(kube_client=self.client, callbacks=self.callbacks)
@@ -124,7 +126,10 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         # While the callback is set during the operator initialization, the context is only created during the operator's execution.
         global producer_task_context
         producer_task_context = context
-        return super().execute(context, **kwargs)
+        try:
+            return super().execute(context, **kwargs)
+        except AirflowException as e:
+            raise AirflowSkipException() from e
 
 
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):

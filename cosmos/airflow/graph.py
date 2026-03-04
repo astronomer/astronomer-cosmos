@@ -6,15 +6,15 @@ from copy import deepcopy
 from typing import Any
 
 try:  # Airflow 3
-    from airflow.sdk.bases.operator import BaseOperator
     from airflow.providers.standard.operators.empty import EmptyOperator
+    from airflow.sdk.bases.operator import BaseOperator
 except ImportError:  # Airflow 2
     from airflow.models import BaseOperator
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
-from airflow.utils.trigger_rule import TriggerRule
 from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
+from airflow.utils.trigger_rule import TriggerRule
 
 try:
     # Airflow 3.1 onwards

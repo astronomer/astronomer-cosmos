@@ -89,7 +89,7 @@ Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080
 Testing application with hatch
 ------------------------------
 
-We currently use `hatch <https://github.com/pypa/hatch>`_ for building and distributing ``astronomer-cosmos``.
+`Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing Python dependencies and environment isolation. In Cosmos, we use it for building, distributing, running tests, and building documentation.
 
 If you don't already have Hatch installed, `install it <https://hatch.pypa.io/latest/install/>`_ before proceeding. As an example, on macOS, you can do so with:
 
@@ -97,7 +97,7 @@ If you don't already have Hatch installed, `install it <https://hatch.pypa.io/la
 
     brew install hatch
 
-The tool can also be used for local development. The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file currently defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
+The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
 
 For instance, to run the tests using Python 3.11, `Apache Airflow® <https://airflow.apache.org/>`_ 2.10 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
 
@@ -161,14 +161,11 @@ To run the checks manually, run:
 Writing Docs
 ____________
 
-`Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use Hatch to declare the dependencies required for the project itself, as well as for tests and documentation builds.
-
 You can run the docs locally by running the following:
 
 .. code-block:: bash
 
     hatch run docs:serve
-
 
 
 Building

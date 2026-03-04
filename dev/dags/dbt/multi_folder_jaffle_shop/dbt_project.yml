@@ -22,15 +22,16 @@ require-dbt-version: [">=1.0.0", "<2.0.0"]
 
 
 vars:
-  # folder dependencies: inject_folder_dependencies macro uses these to add ref() deps so dbt runs in order.
-  # folder_dependencies: which folders this folder depends on (e.g. production depends on staging).
+  # Which folder(s) each folder depends on. Keys and values use full path: models/<subdir> or seeds.
   folder_dependencies:
-    production: [staging]
+    models/production: [models/staging]
+    models/staging: [seeds]
+  # Node names per folder (for ref() in inject_folder_dependencies). Can be overridden at runtime via generate_folder_vars.py.
+  #dbt_nodes_by_folder:
+  #  seeds: [raw_customers, raw_orders, raw_payments]
+  #  models/staging: [stg_customers, stg_orders, stg_payments]
+  #  models/production: [customers, orders]
 
-#  # folder_models: pass at runtime. One-liner (macOS): python scripts/generate_folder_vars.py . | xargs -I {} dbt run --vars '{}'
-#  folder_models:
-#    staging: [stg_customers, stg_orders, stg_payments]
-#    production: [customers, orders]
 
 models:
   multi_folder_jaffle_shop:

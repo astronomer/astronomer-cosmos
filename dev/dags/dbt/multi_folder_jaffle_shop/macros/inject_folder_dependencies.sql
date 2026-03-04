@@ -1,17 +1,17 @@
 {% macro inject_folder_dependencies() %}
-  {# Extract folder name from path, e.g. "models/production/customers.sql" -> "production" #}
+  {# Current folder key from path, e.g. "models/staging/stg_customers.sql" -> "models/staging" #}
   {% set path_parts = model.original_file_path.split('/') %}
-  {% set folder_name = path_parts[-2] %}
+  {% set folder_key = path_parts[0] ~ '/' ~ path_parts[1] %}
 
-  {# Which folders this folder depends on (e.g. production -> [staging]) #}
-  {% set folder_deps = var('folder_dependencies', {}).get(folder_name, []) %}
-  {# Model names per folder (from vars; avoids using graph which can be dict vs object across dbt versions) #}
-  {% set folder_models = var('folder_models', {}) %}
+  {# Which folders this folder depends on (e.g. models/staging -> [seeds], models/production -> [models/staging]) #}
+  {% set folder_deps = var('folder_dependencies', {}).get(folder_key, []) %}
+  {# Node names per folder (seeds, models/staging, models/production) #}
+  {% set dbt_nodes_by_folder = var('dbt_nodes_by_folder', {}) %}
 
   {% set dep_refs = [] %}
   {% for dep_folder in folder_deps %}
-    {% for m in folder_models.get(dep_folder, []) %}
-      {% do dep_refs.append(m) %}
+    {% for node_name in dbt_nodes_by_folder.get(dep_folder, []) %}
+      {% do dep_refs.append(node_name) %}
     {% endfor %}
   {% endfor %}
 

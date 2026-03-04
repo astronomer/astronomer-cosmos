@@ -7,8 +7,10 @@ from typing import Any
 
 try:  # Airflow 3
     from airflow.sdk.bases.operator import BaseOperator
+    from airflow.providers.standard.operators.empty import EmptyOperator
 except ImportError:  # Airflow 2
     from airflow.models import BaseOperator
+    from airflow.operators.empty import EmptyOperator # type: ignore[no-redef]
 
 from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
@@ -913,6 +915,8 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             execution_mode=execution_mode,
             tests_per_model=tests_per_model,
         )
+
+        producer_task >> EmptyOperator(task_id=f"{producer_task.task_id}_gate", dag=dag, task_group=task_group, trigger_rule="always")
 
     for node_id, node in nodes.items():
         task_or_group_args = {

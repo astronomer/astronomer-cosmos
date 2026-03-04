@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
+from datetime import timedelta
 
 if TYPE_CHECKING:  # pragma: no cover
     from pendulum import DateTime
@@ -99,7 +100,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 
-        self.image = "blah-blah:999999999"
+        self.execution_timeout = timedelta(seconds=2)
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:

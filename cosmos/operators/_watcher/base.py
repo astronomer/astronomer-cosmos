@@ -396,7 +396,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     self._override_rtif(context)
 
         if status is None:
-
             if producer_task_state == "failed" or producer_task_state == "skipped":
                 if self.poke_retry_number > 0:
                     raise AirflowException(

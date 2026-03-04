@@ -24,7 +24,6 @@ logger = get_logger(__name__)
 
 
 class WatcherTrigger(BaseTrigger):
-
     def __init__(
         self,
         model_unique_id: str,

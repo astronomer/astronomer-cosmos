@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
-from datetime import timedelta
 
 if TYPE_CHECKING:  # pragma: no cover
     from pendulum import DateTime
@@ -14,9 +13,9 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 import kubernetes.client as k8s
-from kubernetes.client.exceptions import ApiException
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
+from kubernetes.client.exceptions import ApiException
 
 try:
     from airflow.providers.standard.operators.empty import EmptyOperator
@@ -46,7 +45,6 @@ producer_task_context = None
 
 
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
-
     @staticmethod
     def progress_callback(
         *,
@@ -76,7 +74,6 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
 
 
 class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
-
     template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
     _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = store_dbt_resource_status_from_log
 

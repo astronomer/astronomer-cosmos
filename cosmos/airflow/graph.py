@@ -10,7 +10,7 @@ try:  # Airflow 3
     from airflow.providers.standard.operators.empty import EmptyOperator
 except ImportError:  # Airflow 2
     from airflow.models import BaseOperator
-    from airflow.operators.empty import EmptyOperator # type: ignore[no-redef]
+    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from airflow.utils.trigger_rule import TriggerRule
 from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
@@ -916,7 +916,9 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             execution_mode=execution_mode,
             tests_per_model=tests_per_model,
         )
-        producer_task >> EmptyOperator(task_id=f"{PRODUCER_WATCHER_TASK_ID}_gate", dag=dag, task_group=task_group, trigger_rule=TriggerRule.ALWAYS)
+        producer_task >> EmptyOperator(
+            task_id=f"{PRODUCER_WATCHER_TASK_ID}_gate", dag=dag, task_group=task_group, trigger_rule=TriggerRule.ALWAYS
+        )
 
     for node_id, node in nodes.items():
         task_or_group_args = {

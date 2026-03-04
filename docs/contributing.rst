@@ -8,24 +8,24 @@ All contributions, bug reports, bug fixes, documentation improvements, enhanceme
 As contributors and maintainers to this project, you are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
 
-Learn more about the contributors roles in :ref:`contributors-roles`.
+Learn more about the contributors' roles in :ref:`contributors-roles`.
 
 Overview
 ________
 
-To contribute to the cosmos project:
+To contribute to the Cosmos project:
 
-#. Please create a `GitHub Issue <https://github.com/astronomer/astronomer-cosmos/issues>`_ describing your contribution
+#. Please create a `GitHub Issue <https://github.com/astronomer/astronomer-cosmos/issues>`_ describing your contribution.
 #. `Fork the repository <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo>`_ and clone your fork locally.
-#. Open a feature branch off of the main branch in your fork
+#. Open a feature branch off of the main branch in your fork.
 #. Make your changes, push the branch to your fork, and open a Pull Request from your feature branch into the ``main`` branch of the upstream repository.
-#. Link your issue to the pull request
+#. Link your issue to the pull request.
 #. Once developments are complete on your feature branch, request a review and it will be merged once approved.
 
-Setup local development on host machine
----------------------------------------
+Set up local development on the host machine
+---------------------------------------------
 
-This guide will set up astronomer development on host machine, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
+This guide will set up astronomer development on the host machine, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
 
 .. code-block:: bash
 
@@ -47,38 +47,38 @@ Set airflow home to the ``dev/`` directory and disable loading example DAGs:
     export AIRFLOW_HOME=$(pwd)/dev/
     export AIRFLOW__CORE__LOAD_EXAMPLES=false
 
-Then, run airflow in standalone mode, command below will create a new user (if one does not exist) and run necessary airflow component (webserver, scheduler and triggerer):
+Then, run airflow in standalone mode. The command below will create a new user (if one does not exist) and run the necessary Airflow components (webserver, scheduler and triggerer):
 
-    By default airflow will use sqlite as database, you can overwrite this by setting the variable ``AIRFLOW__DATABASE__SQL_ALCHEMY_CONN`` to the sql connection string.
+    By default, Airflow will use SQLite as its database. You can overwrite this by setting the variable ``AIRFLOW__DATABASE__SQL_ALCHEMY_CONN`` to the SQL connection string.
 
 .. code-block:: bash
 
     airflow standalone
 
-Once the airflow is up, you can access the Airflow UI at ``http://localhost:8080``.
+Once Airflow is up, you can access the Airflow UI at ``http://localhost:8080``.
 
-    Note: whenever you want to start the development server, you need to activate the ``virtualenv`` and set the ``environment variables``
+    Note: whenever you want to start the development server, you need to activate the ``virtualenv`` and set the ``environment variables``.
 
 Using Docker Compose for local development
 --------------------------------------------
 
-It is also possible to just build the development environment using docker compose
+It is also possible to just build the development environment using Docker Compose.
 
-To launch a local sandbox with docker compose, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
+To launch a local sandbox with Docker Compose, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
 
 .. code-block:: bash
 
     git clone https://github.com/astronomer/astronomer-cosmos.git
     cd astronomer-cosmos/
 
-To prevent permission error on **Linux**, you must create dags, logs, and plugins folders and change owner to the user ``astro`` with the user ID 50000. To do this, run the following command:
+To prevent permission errors on **Linux**, you must create dags, logs, and plugins folders and change owner to the user ``astro`` with the user ID 50000. To do this, run the following command:
 
 .. code-block:: bash
 
     mkdir -p dev/dags dev/logs dev/plugins
     sudo chown 50000:50000 -R dev/dags dev/logs dev/plugins
 
-Then, run the docker compose command:
+Then, run the Docker Compose command:
 
 .. code-block:: bash
 
@@ -86,8 +86,8 @@ Then, run the docker compose command:
 
 Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080``.
 
-Testing application with hatch
-------------------------------
+Testing the application with Hatch
+-----------------------------------
 
 `Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing Python dependencies and environment isolation. In Cosmos, we use it for building, distributing, running tests, and building documentation.
 
@@ -181,7 +181,7 @@ We use ``hatch`` to build the project. To build the project, run:
 Releasing
 _________
 
-We use GitHub actions to create and deploy new releases. To create a new release, first create a new version using:
+We use GitHub Actions to create and deploy new releases. To create a new release, first create a new version using:
 
 .. code-block:: bash
 

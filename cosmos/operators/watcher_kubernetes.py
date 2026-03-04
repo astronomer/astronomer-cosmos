@@ -131,6 +131,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         try:
             return super().execute(context, **kwargs)
         except AirflowException as e:
+            self.log.exception("Dbt execution failed")
             raise AirflowSkipException() from e
 
 

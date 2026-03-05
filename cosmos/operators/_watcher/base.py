@@ -226,7 +226,7 @@ def store_dbt_resource_status_from_log(
     ts = log_info.get("ts")
     if msg is not None:
         formatted_ts = _iso_to_string(ts)
-        if ts:
+        if formatted_ts:
             logger.log(getattr(logging, level, logging.INFO), "%s  %s", formatted_ts, msg)
         else:
             logger.log(getattr(logging, level, logging.INFO), msg)

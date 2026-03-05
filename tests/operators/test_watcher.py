@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
-from airflow.exceptions import AirflowException, TaskDeferred, AirflowSkipException
+from airflow.exceptions import AirflowException, AirflowSkipException, TaskDeferred
 from airflow.utils.state import DagRunState
 
 try:
@@ -311,11 +311,15 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
 
     with (
         patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
-        pytest.raises(AirflowSkipException, match="DbtProducerWatcherOperator does not support Airflow retries. Detected attempt #2; skipping execution to avoid running a second dbt build."),
+        pytest.raises(
+            AirflowSkipException,
+            match="DbtProducerWatcherOperator does not support Airflow retries. Detected attempt #2; skipping execution to avoid running a second dbt build.",
+        ),
     ):
         op.execute(context=context)
 
     mock_execute.assert_not_called()
+
 
 @pytest.mark.parametrize(
     "event, expected_message",
@@ -1827,7 +1831,9 @@ def test_dbt_task_group_with_watcher():
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.customers_run"], DbtRunWatcherOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.orders_run"], DbtRunWatcherOperator)
 
-    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set(["dbt_task_group.dbt_producer_watcher_gate"])
+    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == {
+        "dbt_task_group.dbt_producer_watcher_gate"
+    }
 
 
 @pytest.mark.integration

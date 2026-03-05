@@ -119,7 +119,10 @@ def test_skips_retry_attempt(mock_execute, caplog):
 
     with (
         caplog.at_level(logging.INFO),
-        pytest.raises(AirflowSkipException, match="DbtProducerWatcherKubernetesOperator does not support Airflow retries. Detected attempt #2; skipping execution to avoid running a second dbt build."),
+        pytest.raises(
+            AirflowSkipException,
+            match="DbtProducerWatcherKubernetesOperator does not support Airflow retries. Detected attempt #2; skipping execution to avoid running a second dbt build.",
+        ),
     ):
         op.execute(context=context)
 

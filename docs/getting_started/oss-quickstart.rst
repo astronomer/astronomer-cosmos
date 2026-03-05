@@ -18,7 +18,7 @@ Prerequisites
 ~~~~~~~~~~~~~
 
 - A Python version supported by `Airflow <https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html#prerequisites>`_.
-- (Optional) Install a database viewer. This guide uses `dBeaver <https://dbeaver.io/download/>`_
+- (Optional) Install a database viewer. This guide uses `dBeaver <https://dbeaver.io/download/>`_.
 
 1. Install Airflow, Cosmos, and dbt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -41,7 +41,7 @@ Prerequisites
 
 .. tip::
 
-    If you have multiple versions of Python on your machine, and need to use an older version of Python with Airflow, be sure to create your demo virtual enivonrment with the older Python version: ``python3.13 -m venv venv``.
+    If you have multiple versions of Python on your machine, and need to use an older version of Python with Airflow, be sure to create your demo virtual enivonrment with the older Python version. For example, ``python3.13 -m venv venv``.
 
 If you exit your virtual environment, remember you can reactivate it by returning to your project directory and then using the ``source venv/bin/activate`` command.
 
@@ -100,7 +100,7 @@ Add the following content to your new project definition.
     touch dbt_project/micro_project/profiles.yml
 
 
-Add the following content to your ``profiles.yml``. Be sure to replace ``<explicit-path-to-demo-project>`` with your path:
+3. Add the following content to your ``profiles.yml``, and be sure to replace ``<explicit-path-to-demo-project>`` with your path:
 
 .. code-block:: yaml
 
@@ -116,13 +116,8 @@ Add the following content to your ``profiles.yml``. Be sure to replace ``<explic
                 main: <explicit-path-to-demo-project>/oss-quickstart/my_database.db
         schema_directory: <explicit-path-to-demo-project>/oss-quickstart
 
-.. tip::
 
-    Find the path to your demo project by using ``pwd``
-
-3. Create a base dbt model
-
-Create a simple dbt model in the ``micro_project`` models.
+4. Create a simple dbt model in the ``micro_project`` models:
 
 .. code-block:: bash
 
@@ -130,16 +125,14 @@ Create a simple dbt model in the ``micro_project`` models.
     echo "select 1 as id, 'hello' as greeting" > dbt_project/micro_project/models/base_model.sql
 
 
-4. Create an enriched dbt model
-
-Create your enriched dbt model using the following comands.
+5. Create your enriched dbt model using the following comands:
 
 .. code-block:: bash
 
     touch dbt_project/micro_project/models/enriched_model.sql
 
 
-Open the ``enriched_model.sql`` file and add the following commands:
+6. Open the ``enriched_model.sql`` file and add the following commands:
 
 .. code-block:: sql
 
@@ -154,14 +147,16 @@ Open the ``enriched_model.sql`` file and add the following commands:
 4. Create an Airflow Dag
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Now, in your ``dags`` directory, create an Airflow Dag with the following commands:
+1. Now, in your ``dags`` directory, create an Airflow Dag with the following commands:
 
 .. code-block:: bash
 
     touch dags/micro_project_dag.py
 
 
-Add the following Dag Python code to your new file. This Dag tells Airflow and Cosmos where to find the dbt project and profile configurations, which they use to execute the dbt code and write results to the database. This Dag does not include any scheduling information, so you might need to manually trigger Dag runs from the Airflow UI or CLI when you **Run Airflow** at a later step.
+2. Add the following Dag Python code to your new file.
+
+This Dag tells Airflow and Cosmos where to find the dbt project and profile configurations, which they use to execute the dbt code and write results to the database. This Dag does not include any scheduling information, so you need to manually trigger Dag runs from the Airflow UI or CLI when you **Run Airflow** at a later step.
 
 .. code-block:: python
 
@@ -190,8 +185,7 @@ Add the following Dag Python code to your new file. This Dag tells Airflow and C
 5. Export environmental variables to Airflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To successfully run your Dag, Airflow needs you to define the some environment variables.
-These identify the project home directory, ``AIRFLOW_HOME``, and disable additional Airflow and Cosmos features that are not required for local execution.
+To successfully launch, Airflow needs you to define the some environment variables. These identify the project home directory, ``AIRFLOW_HOME``, and disable additional Airflow and Cosmos features that are not required for local execution.
 
 .. code-block:: bash
 
@@ -203,7 +197,7 @@ These identify the project home directory, ``AIRFLOW_HOME``, and disable additio
 6. Run Airflow
 ~~~~~~~~~~~~~~
 
-At this point, you've completed the following project setup steps:
+At this point, you have completed the following project setup steps:
 
 - Installed Cosmos, dbt, and Airflow into your environment.
 - Created a lightweight dbt project and defined the ``profiles.yml`` file, which Cosmos can use to connect to the dbt database.
@@ -211,14 +205,14 @@ At this point, you've completed the following project setup steps:
 - Defined the Airflow project home and configured environment variables that improve local Dag performance.
 
 
-1. Now you can run an Airflow Dag by using ``airflow standalone``, which initializes the database, creates a user, and starts all components at ``localhost: 8080``.
+1. Launch Airflow by using the ``airflow standalone`` command, which initializes the database, creates a user, and starts all components at ``localhost: 8080``.
 
 .. code-block:: bash
 
     airflow standalone
 
 
-2. Airflow autogenerates credentials when it launches that you must use to access the local Airflow UI. Open the ``simple_auth_manager_passwords.json.generated`` file in your ``oss-quickstart`` directory. This file contains the ``{"username": "password"}`` key-value pair for you to use to login to ``localhost:8080``.
+2. Airflow autogenerates credentials when it launches that you must use to access the local Airflow UI. Open the ``simple_auth_manager_passwords.json.generated`` file in your ``oss-quickstart`` directory. This file contains the ``{"username": "password"}`` key-value pair for you to use to login to ``localhost:8080``. Use this username and password to log in.
 
 7. Trigger your Dag
 ~~~~~~~~~~~~~~~~~~~
@@ -255,7 +249,7 @@ To view the transformations completed by the Dag, you must use a database viewer
 
 
 5. Click **Finish**. dBeaver asks for permission to download the necessary drivers to access and display the database information.
-6. After the connection is successful, dBeaver displays the SQLite project directory. Navigate to **Views** at ``mydatabase.db/viewss`` to view the different table views created by dbt.
+6. After the database onnection is successful, dBeaver displays the SQLite project directory. Navigate to **Views** at ``mydatabase.db/viewss`` to view the different table views created by dbt.
 7. **base_model** and **enriched_model** are the final Table views produced by the dbt code. But click any of these tables and then choose the **Data** tab to see the dbt output.
 
 .. image:: /_static/oss_quickstart_enriched_model.png
@@ -303,7 +297,7 @@ Example Dags stall
 
 If your ``base_model_run`` Dag gets stuck in **Running** mode, even though the **Logs** show that it completed successfully, and the next Dag does not automatically start.
 
-1. In the **Dag** view of the Airflow UI, click **Mark Dag as...** and choose **Failure**.
+1. In the **Dag** view of the Airflow UI, click **Mark Dag run as...** and choose **Failure**.
 
 2. Click **Trigger** to run the Dags again.
 

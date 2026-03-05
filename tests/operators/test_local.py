@@ -1734,6 +1734,44 @@ def test_build_and_run_cmd_with_full_refresh_in_async_mode():
                 assert "--full-refresh" in cmd_flags_arg
 
 
+@patch("cosmos.operators.local.DbtRunLocalOperator.run_command")
+def test_build_and_run_cmd_invokes_interceptors(mock_run_command):
+    """
+    Test that `build_and_run_cmd` calls interceptors before `build_cmd` and that modified vars/env are used.
+    """
+    context = {"run_id": "test_run", "data_interval_start": MagicMock(), "data_interval_end": MagicMock()}
+    interceptor_mock = MagicMock()
+
+    def interceptor_modify_vars_and_env(context, task):
+        interceptor_mock(context, task)
+        task.vars = {"new_var": "new_var_value"}
+        task.env = {"NEW_ENV_VAR": "new_env_var_value"}
+
+    operator = DbtRunLocalOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        vars=None,
+        env=None,
+        interceptors=[interceptor_modify_vars_and_env],
+    )
+
+    operator.build_and_run_cmd(context=context)
+
+    interceptor_mock.assert_called_once_with(context, operator)
+    assert operator.vars == {"new_var": "new_var_value"}
+    assert operator.env == {"NEW_ENV_VAR": "new_env_var_value"}
+
+    call_kwargs = mock_run_command.call_args[1]
+    cmd = call_kwargs["cmd"]
+    env = call_kwargs["env"]
+
+    assert "--vars" in cmd
+    assert "--vars" == cmd[2]
+    assert "new_var: new_var_value" in cmd[3]
+    assert env.get("NEW_ENV_VAR") == "new_env_var_value"
+
+
 def test_read_run_sql_from_target_dir():
     tmp_project_dir = "/tmp/project"
     sql_context = {"dbt_node_config": {"file_path": "/path/to/file.sql"}, "package_name": "package_name"}

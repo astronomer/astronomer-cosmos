@@ -1455,6 +1455,62 @@ def test_update_node_dependency_test_not_exist():
         assert nodes.has_non_detached_test is False
 
 
+def test_tests_per_model_populated():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+    dbt_graph.load()
+
+    # Every model that has_test should appear in tests_per_model
+    for node_id, node in dbt_graph.filtered_nodes.items():
+        if node.resource_type == DbtResourceType.MODEL and node.has_test:
+            assert node_id in dbt_graph.tests_per_model
+            assert len(dbt_graph.tests_per_model[node_id]) > 0
+
+    # Spot-check: customers model should have known tests
+    customers_id = "model.jaffle_shop.customers"
+    assert customers_id in dbt_graph.tests_per_model
+    customers_tests = dbt_graph.tests_per_model[customers_id]
+    assert any("not_null_customers_customer_id" in t for t in customers_tests)
+    assert any("unique_customers_customer_id" in t for t in customers_tests)
+
+
+def test_tests_per_model_empty_when_no_tests():
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(
+        exclude=["config.materialized:test"],
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load_from_dbt_manifest()
+
+    assert dbt_graph.tests_per_model == {}
+
+
 def test_tag_selected_node_test_exist():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST

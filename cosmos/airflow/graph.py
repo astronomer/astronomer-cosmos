@@ -678,12 +678,15 @@ def _add_watcher_producer_task(
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
     execution_mode: ExecutionMode = ExecutionMode.WATCHER,
+    tests_per_model: dict[str, list[str]] | None = None,
 ) -> BaseOperator:
     """
     Create the producer task for the watcher execution mode and add it to the tasks_map.
     The producer task is the task that will be used to produce the events for the watcher execution mode.
     """
     producer_task_args = task_args.copy()
+    if tests_per_model is not None:
+        producer_task_args["tests_per_model"] = tests_per_model
 
     if render_config is not None:
         producer_task_args["select"] = _convert_list_to_str(render_config.select)
@@ -855,6 +858,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
     async_py_requirements: list[str] | None = None,
     execution_config: ExecutionConfig | None = None,
+    tests_per_model: dict[str, list[str]] | None = None,
 ) -> dict[str, TaskGroup | BaseOperator]:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -907,6 +911,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             task_group=task_group,
             render_config=render_config,
             execution_mode=execution_mode,
+            tests_per_model=tests_per_model,
         )
 
     for node_id, node in nodes.items():

@@ -1,6 +1,7 @@
 
-References
-==========
+Reference
+=========
+
 
 .. toctree::
    :maxdepth: 1
@@ -16,3 +17,4 @@ References
    :caption: Profiles
 
    profiles/index
+

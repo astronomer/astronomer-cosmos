@@ -16,7 +16,7 @@ The following repositories constitute the codebases for the Astronomer Cosmos pr
 
 Note: There are no additional subproject codebases beyond the repositories listed above for OSPS-QA-04.01 compliance purposes.
 
-Changelog
+Versioning Policy
 _________
 
 We follow `Semantic Versioning <https://semver.org/>`_ for releases.

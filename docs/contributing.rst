@@ -91,8 +91,10 @@ Then, run the Docker Compose command:
 
 Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080``.
 
-Setting up Hatch
-----------------
+.. _setting-up-hatch:
+
+Working with Hatch
+------------------
 
 `Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing Python dependencies and environment isolation. In Cosmos, we use it for building, distributing, running tests, and building documentation.
 
@@ -105,9 +107,9 @@ If you don't already have Hatch installed, `install it <https://hatch.pypa.io/la
 The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
 
 Testing the application with Hatch
------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After following the steps described in "Setting up Hatch", you are ready to run Cosmos tests locally.
+After following the steps described in "Working with Hatch", you are ready to run Cosmos tests locally.
 For instance, to run the tests using Python 3.11, `Apache Airflow® <https://airflow.apache.org/>`_ 2.10 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
 
 .. code-block:: bash
@@ -151,6 +153,45 @@ If testing for the same Airflow and Python version, next runs of the integration
 
     hatch run tests.py3.11-2.10-1.9:test-integration
 
+Writing Docs
+~~~~~~~~~~~~
+
+After following the steps described in :ref:`setting-up-hatch`, you are ready to build and serve the documentation locally.
+
+You can run the docs locally by running the following:
+
+.. code-block:: bash
+
+    hatch run docs:serve
+
+Building
+~~~~~~~~
+
+After following the steps described in :ref:`setting-up-hatch`, you are ready to build the project.
+
+To build the project, run:
+
+.. code-block:: bash
+
+    hatch build
+
+Releasing
+~~~~~~~~~
+
+.. note::
+    This section is intended for Cosmos maintainers only.
+
+We use GitHub Actions to create and deploy new releases. To create a new release, first create a new version using:
+
+.. code-block:: bash
+
+    hatch version minor
+
+``hatch`` will automatically update the version for you. Then, create a new release on GitHub with the new version. The release will be automatically deployed to PyPI.
+
+.. note::
+    You can update the version in a few different ways. Check out the `hatch docs <https://hatch.pypa.io/latest/version/#updating>`_ to learn more.
+
 Pre-Commit
 ----------
 
@@ -165,43 +206,3 @@ To run the checks manually, run:
 .. code-block:: bash
 
     pre-commit run --all-files
-
-
-Writing Docs
-____________
-
-After following the steps described in :ref:`setting-up-cosmos-dev-env`, you are ready to build and serve the documentation locally.
-
-You can run the docs locally by running the following:
-
-.. code-block:: bash
-
-    hatch run docs:serve
-
-
-Building
-________
-
-After following the steps described in :ref:`setting-up-cosmos-dev-env`, you are ready to build the project.
-
-We use ``hatch`` to build the project. To build the project, run:
-
-.. code-block:: bash
-
-    hatch build
-
-
-Releasing
-_________
-
-We use GitHub Actions to create and deploy new releases. To create a new release, first create a new version using:
-
-.. code-block:: bash
-
-    hatch version minor
-
-
-``hatch`` will automatically update the version for you. Then, create a new release on GitHub with the new version. The release will be automatically deployed to PyPI.
-
-.. note::
-    You can update the version in a few different ways. Check out the `hatch docs <https://hatch.pypa.io/latest/version/#updating>`_ to learn more.

@@ -21,8 +21,9 @@
 
    Open-source Airflow <open-source>
    Astro <astro>
-   Google Cloud Composer (GCC) <gcc>
    Amazon Managed Workflows for Apache Airflow (MWAA) <mwaa>
+   Google Cloud Composer (GCC) <gcc>
+
 
 Getting Started
 ===============

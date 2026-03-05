@@ -30,7 +30,7 @@ _____________________________________________
 Set up local development on the host machine
 ---------------------------------------------
 
-This guide will set up astronomer development on the host machine, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
+This guide will set up Astronomer development on the host machine, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
 
 .. code-block:: bash
 
@@ -45,14 +45,14 @@ Then install ``airflow`` and ``astronomer-cosmos`` using python-venv:
     pip3 install "apache-airflow[cncf.kubernetes,openlineage]"
     pip3 install -e ".[dbt-postgres,dbt-databricks]"
 
-Set airflow home to the ``dev/`` directory and disable loading example DAGs:
+Set Airflow home to the ``dev/`` directory and disable loading example DAGs:
 
 .. code-block:: bash
 
     export AIRFLOW_HOME=$(pwd)/dev/
     export AIRFLOW__CORE__LOAD_EXAMPLES=false
 
-Then, run airflow in standalone mode. The command below will create a new user (if one does not exist) and run the necessary Airflow components (webserver, scheduler and triggerer):
+Then, run Airflow in standalone mode. The command below will create a new user (if one does not exist) and run the necessary Airflow components (webserver, scheduler and triggerer):
 
     By default, Airflow will use SQLite as its database. You can overwrite this by setting the variable ``AIRFLOW__DATABASE__SQL_ALCHEMY_CONN`` to the SQL connection string.
 
@@ -192,7 +192,7 @@ Hatch will automatically update the version for you. Then, create a new release 
 .. note::
     You can update the version in a few different ways. Check out the `Hatch docs <https://hatch.pypa.io/latest/version/#updating>`_ to learn more.
 
-Pre-Commit
+pre-commit
 ----------
 
 We use pre-commit to run a number of checks on the code before committing. To install pre-commit, run:

@@ -95,4 +95,3 @@ Concepts Overview
 -----------------
 
 How do dbt and Airflow concepts map to each other? Learn more `in this link <dbt-airflow-concepts.html>`__.
-

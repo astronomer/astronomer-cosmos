@@ -180,12 +180,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
-            self.log.info(
+            raise AirflowSkipException(
                 "Dbt WATCHER producer task does not support Airflow retries. "
-                "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
-                try_number,
+                f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
-            raise AirflowSkipException()
 
         self.log.info(
             "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "
@@ -229,7 +227,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         except Exception as e:
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
-            raise AirflowSkipException() from e
+            self.log.exception("DbtProducerWatcherOperator execution failed")
+            raise AirflowSkipException("Skipping execution due to task failure") from e
 
 
 class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type: ignore[misc]

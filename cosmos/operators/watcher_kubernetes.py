@@ -13,9 +13,8 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 import kubernetes.client as k8s
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException, AirflowSkipException, TaskDeferred
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
-from kubernetes.client.exceptions import ApiException
 
 try:
     from airflow.providers.standard.operators.empty import EmptyOperator
@@ -125,16 +124,20 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         producer_task_context = context
         try:
             return super().execute(context, **kwargs)
-        except (AirflowException, ApiException) as e:
+        except TaskDeferred:
+            raise
+        except BaseException as e:
             self.log.exception("Dbt execution failed")
-            raise AirflowSkipException() from e
+            raise AirflowSkipException("Skipping execution due to task failure") from e
 
     def trigger_reentry(self, **kwargs: Any) -> Any:
         try:
             return super().trigger_reentry(**kwargs)
-        except (AirflowException, ApiException) as e:
+        except TaskDeferred:
+            raise
+        except BaseException as e:
             self.log.exception("Dbt execution failed")
-            raise AirflowSkipException() from e
+            raise AirflowSkipException("Skipping execution due to task failure") from e
 
 
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):

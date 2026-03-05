@@ -682,7 +682,7 @@ def _add_watcher_producer_task(
     render_config: RenderConfig | None = None,
     execution_mode: ExecutionMode = ExecutionMode.WATCHER,
     tests_per_model: dict[str, list[str]] | None = None,
-) -> tuple[BaseOperator, BaseOperator]:
+) -> tuple[BaseOperator, EmptyOperator]:
     """
     Create the producer task for the watcher execution mode and add it to the tasks_map.
     The producer task is the task that will be used to produce the events for the watcher execution mode.
@@ -715,7 +715,7 @@ def _add_watcher_producer_task(
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
 
-    producer_task_gate = EmptyOperator(
+    producer_task_gate = EmptyOperator(  # type: ignore[no-untyped-call]
         task_id=f"{PRODUCER_WATCHER_TASK_ID}_gate", dag=dag, task_group=task_group, trigger_rule=TriggerRule.ALL_DONE
     )
     producer_airflow_task >> producer_task_gate
@@ -897,8 +897,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     """
     tasks_map: dict[str, TaskGroup | BaseOperator] = {}
     task_or_group: TaskGroup | BaseOperator | None
-    producer_task: BaseOperator | None = None
-    producer_gate: BaseOperator | None = None
+    producer_tasks: tuple[BaseOperator, EmptyOperator] | None = None
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents
@@ -916,7 +915,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         # We are intentionally creating the producer task ahead of the consumer tasks
         # Airflow priority weight is not being respected in multiple versions of the library, including 3.1
         # To instantiate the producer before helps having it before on the DAG topological order and scheduling this task before the consumer tasks
-        producer_task, producer_gate = _add_watcher_producer_task(
+        producer_tasks = _add_watcher_producer_task(
             dag=dag,
             task_args={**task_args, **setup_operator_args},
             tasks_map=tasks_map,
@@ -994,11 +993,11 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
 
     create_airflow_task_dependencies(nodes, tasks_map)
 
-    if producer_task:
+    if producer_tasks:
         _add_watcher_dependencies(
             dag=dag,
-            producer_airflow_task=producer_task,
-            producer_gate=producer_gate,
+            producer_airflow_task=producer_tasks[0],
+            producer_gate=producer_tasks[1],
             task_args=task_args,
             tasks_map=tasks_map,
             nodes=nodes,

@@ -18,10 +18,11 @@
    :maxdepth: 1
    :hidden:
    :caption: Get started with Cosmos
-
    Open-source Airflow <open-source>
    Astro <astro>
    Amazon Managed Workflows for Apache Airflow (MWAA) <mwaa>
+   Google Cloud Composer (GCC) <gcc>
+
    Google Cloud Composer (GCC) <gcc>
 
 

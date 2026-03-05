@@ -166,5 +166,5 @@ def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
     finish_str = finish_time if finish_time else "N/A"
     if status in ["NONE", "failed", "fail", "error"]:
         logger.error("%s", msg)
-    else:
-        logger.info(f"[{status}] Start: {start_str}, Finish: {finish_str}")
+
+    logger.info(f"[{status}] Start: {start_str}, Finish: {finish_str}")

@@ -165,9 +165,10 @@ This Dag tells Airflow and Cosmos where to find the dbt project and profile conf
 
     from cosmos import DbtDag, ProjectConfig, ProfileConfig
 
-    DBT_PROJECT_PATH = pathlib.Path(
-        os.getenv("AIRFLOW_HOME", pathlib.Path(__file__).parent.parent)
-    ) / "dbt_project/micro_project"
+    DBT_PROJECT_PATH = (
+        pathlib.Path(os.getenv("AIRFLOW_HOME", pathlib.Path(__file__).parent.parent))
+        / "dbt_project/micro_project"
+    )
 
     micro_project_dag = DbtDag(
         dag_id="micro_project_dag",
@@ -178,7 +179,7 @@ This Dag tells Airflow and Cosmos where to find the dbt project and profile conf
             profile_name="micro_project",
             target_name="dev",
             profiles_yml_filepath=DBT_PROJECT_PATH / "profiles.yml",
-        )
+        ),
     )
 
 

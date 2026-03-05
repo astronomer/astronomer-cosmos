@@ -136,7 +136,7 @@ Note that dbt-loom is installed as a Python package (``pip install dbt-loom``), 
 
 **Model using cross-project ref**:
 
-.. code-block:: sql
+.. code-block:: sql+jinja
 
     -- fct_revenue.sql
     select
@@ -366,7 +366,7 @@ Define sources in the upstream project and expose them via staging models:
 
 **stg_raw_orders.sql** (upstream):
 
-.. code-block:: sql
+.. code-block:: sql+jinja
 
     {{ config(materialized='view', access='public') }}
 
@@ -374,7 +374,7 @@ Define sources in the upstream project and expose them via staging models:
 
 Now the downstream project references the staging model instead of the source:
 
-.. code-block:: sql
+.. code-block:: sql+jinja
 
     -- downstream model
     select * from {{ ref('upstream_platform', 'stg_raw_orders') }}
@@ -438,7 +438,7 @@ Install in each project via **packages.yml** or **dependencies.yml**:
 
 Use the macro with the package prefix:
 
-.. code-block:: sql
+.. code-block:: sql+jinja
 
     select
         {{ company_shared_macros.cents_to_dollars('amount_cents') }} as amount_dollars
@@ -454,7 +454,7 @@ for a small number of macros but doesn't scale well.
 If you override dbt built-in macros (like ``generate_schema_name``), ensure the override
 is consistent across all projects:
 
-.. code-block:: sql
+.. code-block:: sql+jinja
 
     -- macros/generate_schema_name.sql (same in all projects)
     {% macro generate_schema_name(custom_schema_name, node) %}

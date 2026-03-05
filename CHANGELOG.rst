@@ -434,7 +434,7 @@ Others
 
 Features
 
-* Airflow 3 support. `More details here. <https://astronomer.github.io/astronomer-cosmos/airflow3_compatibility/>`_.
+* Airflow 3 support. `More details here. <https://astronomer.github.io/astronomer-cosmos/policy/airflow3_compatibility/>`_.
 * Support running ``dbt deps`` incrementally to pre-defined ``dbt_packages`` by @tatiana in #1668 and #1670
 * Add ``DuckDB`` profile mapping by @prithvijitguha and @pankajastro in #1553
 * Implement DBT exposure selector by ghjklw #1717
@@ -447,7 +447,7 @@ Bug Fixes
 
 Airflow 3 Support
 
-`Documentation about the current status <https://astronomer.github.io/astronomer-cosmos/airflow3_compatibility/>`_ and completed tasks:
+`Documentation about the current status <https://astronomer.github.io/astronomer-cosmos/policy/airflow3_compatibility/>`_ and completed tasks:
 
 * Support rendering DbtDag in Airflow 3 by @tatiana and @ashb in #1657
 * Refactor Rendered Task Instance Fields (RTIF) handling for Airflow 2.x and 3.x by @pankajkoti in #1661

@@ -53,3 +53,15 @@ html_theme_options = {
 }
 
 generate_mapping_docs()
+
+# -- Begin docs redirect section
+# -- To test redirects in a local build, paste the redirect source, and append .html to the end.
+# -- For example, "airflow3_compatibility/index" redirect must be tested using "airflow3_compatibility/index.html"
+# --  https://documatt.com/sphinx-reredirects/usage/
+redirects = {
+    "airflow3_compatibility/index": "../policy/airflow3-compatibility.html",
+    "compatibility-policy": "../policy/compatibility-policy.html",
+    "contributing": "../policy/contributing.html",
+    "contributors": "../policy/contributors.html",
+    "contributors-roles": "../policy/contributors-roles.html",
+}

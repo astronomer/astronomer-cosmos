@@ -5,7 +5,7 @@
 Run Cosmos with the Astro CLI
 =============================
 
-Work locally with Airflow, dbt, and Astronomer Cosmos using the `Astro CLI <https://github.com/astronomer/astro-cli>`_. While Cosmos fully works with standard Airflow and independently of the Astro CLI, the Astro CLI can simplify creating and running Airflow projects. If you want to get started with Cosmos using only Airflow, see `Getting Started on Open Source Airflow <open-source.html>`_.
+Work locally with Airflow, dbt, and Astronomer Cosmos using the `Astro CLI <https://github.com/astronomer/astro-cli>`__. While Cosmos fully works with standard Airflow and independently of the Astro CLI, the Astro CLI can simplify creating and running Airflow projects. If you want to get started with Cosmos using only Airflow, see `Getting Started on Open Source Airflow <open-source.html>`_.
 
 This guide shows you how to run a simple Dag locally with Cosmos, using an example dbt project in Airflow.
 
@@ -20,8 +20,8 @@ Prerequisites
 
 - `Python <https://www.python.org/downloads/>`_
 - Install `git <https://git-scm.com/install/>`_
-- Install the `Astro CLI <https://docs.astronomer.io/astro/cli/install-cli>`_
-- A container manager such as Podman, Docker, or Orbstack. When you install the Astro CLI, it automatically installs Airflow and Podman, so you can immediately start working with Dags after installing the CLI. If you need to use Docker instead of Podman, see `Switch between Docker and Podman <https://www.astronomer.io/docs/astro/cli/switch-container-management>`_.
+- Install the `Astro CLI <https://docs.astronomer.io/astro/cli/install-cli>`__
+- A container manager such as Podman, Docker, or Orbstack. When you install the Astro CLI, it automatically installs Airflow and Podman, so you can immediately start working with Dags after installing the CLI. If you need to use Docker instead of Podman, see `Switch between Docker and Podman <https://www.astronomer.io/docs/astro/cli/switch-container-management>`__.
 - (Optional) Install a database viewer. This guide uses `dBeaver <https://dbeaver.io/download/>`_
 
 Depending on your operating system, you might also need to install a separate installation manager like `Homebrew <https://brew.sh>`_ or `WinGet <https://learn.microsoft.com/en-us/windows/package-manager/winget/>`_.

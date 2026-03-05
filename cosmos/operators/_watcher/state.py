@@ -140,18 +140,30 @@ def build_producer_state_fetcher(
     return fetch_state_airflow3
 
 
+def _iso_to_string(ts: Any) -> str | None:
+    if ts:
+        # Format timestamp to match dbt runner format (HH:MM:SS)
+        try:
+            # Parse ISO format timestamp (e.g., "2025-01-29T13:16:05.123456Z")
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            formatted_ts = dt.strftime("%H:%M:%S")
+        except (ValueError, AttributeError):
+            formatted_ts = ts
+        return formatted_ts
+    return None
+
+
 def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
     if not dbt_event:
         return
 
     status = dbt_event.get("status", "NONE").upper()
     msg = dbt_event.get("msg", "")
-    start_time = dbt_event.get("start_time")
-    finish_time = dbt_event.get("finish_time")
+    start_time = _iso_to_string(dbt_event.get("start_time"))
+    finish_time = _iso_to_string(dbt_event.get("finish_time"))
 
-    # Convert ISO string to readable format
-    start_str = datetime.fromisoformat(start_time).strftime("%Y-%m-%d %H:%M:%S") if start_time else "N/A"
-    finish_str = datetime.fromisoformat(finish_time).strftime("%Y-%m-%d %H:%M:%S") if finish_time else "N/A"
+    start_str = start_time if start_time else "N/A"
+    finish_str = finish_time if finish_time else "N/A"
 
     logger.info(f"[{status}] Start: {start_str}, Finish: {finish_str}")
     logger.info("%s", msg)

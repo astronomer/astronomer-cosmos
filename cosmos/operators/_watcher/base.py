@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +17,7 @@ from cosmos.constants import (
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
+    _iso_to_string,
     _log_dbt_event,
     build_producer_state_fetcher,
     get_xcom_val,
@@ -71,7 +72,12 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
             return None
 
     if unique_id:
-        dbt_event = {"status": status, "start_time": start_time, "finish_time": finish_time, "msg": msg}
+        dbt_event = {
+            "status": status,
+            "start_time": _iso_to_string(start_time),
+            "finish_time": _iso_to_string(finish_time),
+            "msg": msg,
+        }
         safe_xcom_push(task_instance=task_instance, key=f"{unique_id.replace('.', '__')}_dbt_event", value=dbt_event)
 
 
@@ -219,14 +225,8 @@ def store_dbt_resource_status_from_log(
     level = log_info.get("level", "INFO").upper()
     ts = log_info.get("ts")
     if msg is not None:
+        formatted_ts = _iso_to_string(ts)
         if ts:
-            # Format timestamp to match dbt runner format (HH:MM:SS)
-            try:
-                # Parse ISO format timestamp (e.g., "2025-01-29T13:16:05.123456Z")
-                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                formatted_ts = dt.strftime("%H:%M:%S")
-            except (ValueError, AttributeError):
-                formatted_ts = ts
             logger.log(getattr(logging, level, logging.INFO), "%s  %s", formatted_ts, msg)
         else:
             logger.log(getattr(logging, level, logging.INFO), msg)

@@ -1,3 +1,5 @@
+.. _airflow3-compatibility:
+
 Airflow 3 Compatibility (First Iteration)
 =========================================
 

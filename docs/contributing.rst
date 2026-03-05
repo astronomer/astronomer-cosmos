@@ -180,6 +180,8 @@ You can run the docs locally by running the following:
 Building
 ________
 
+After following the steps described in "Setting up the Cosmos development environment", you are ready to build the project.
+
 We use ``hatch`` to build the project. To build the project, run:
 
 .. code-block:: bash

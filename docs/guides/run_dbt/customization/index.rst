@@ -5,5 +5,7 @@ Additional Customization
    :maxdepth: 1
    :caption: Additional Customization
 
-   operator-args
    scheduling
+   operator-args
+   partial-parsing
+

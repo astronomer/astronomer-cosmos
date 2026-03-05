@@ -1,7 +1,7 @@
 .. _optimize-performance:
 
-Optimize your Cosmos Performance
-================================
+Optimize the performance of your Cosmos Dags
+============================================
 
 .. toctree::
    :maxdepth: 1

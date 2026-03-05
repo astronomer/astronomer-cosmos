@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
-from airflow.exceptions import AirflowException, TaskDeferred
+from airflow.exceptions import AirflowException, TaskDeferred, AirflowSkipException
 from airflow.utils.state import DagRunState
 
 try:
@@ -234,8 +234,9 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
         mock_execute.side_effect = TestException("test error")
 
-        with pytest.raises(TestException):
+        with pytest.raises(AirflowSkipException) as exc:
             op.execute(context=context)
+        assert isinstance(exc.value.__cause__, TestException)
 
         # Verify completed status was pushed even in failure case
         assert mock_ti.store.get("task_status") == "completed"
@@ -308,15 +309,13 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     ti.try_number = 2
     context = {"ti": ti}
 
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
-        with caplog.at_level(logging.INFO):
-            result = op.execute(context=context)
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        pytest.raises(AirflowSkipException, match="DbtProducerWatcherOperator does not support Airflow retries. Detected attempt #2; skipping execution to avoid running a second dbt build."),
+    ):
+        op.execute(context=context)
 
     mock_execute.assert_not_called()
-    assert result is None
-    assert any("does not support Airflow retries" in message for message in caplog.messages)
-    assert any("skipping execution" in message for message in caplog.messages)
-
 
 @pytest.mark.parametrize(
     "event, expected_message",
@@ -1319,7 +1318,7 @@ class TestDbtConsumerWatcherSensor:
 
         with pytest.raises(
             AirflowException,
-            match="The dbt build command failed in producer task. Please check the log of task dbt_producer_watcher for details.",
+            match="The dbt build command was failed in producer task. Please check the log of task dbt_producer_watcher for details.",
         ):
             sensor.poke(context)
 
@@ -1797,7 +1796,7 @@ def test_dbt_task_group_with_watcher():
     # assert outcome.state == DagRunState.SUCCESS
     # Fortunately, when we trigger the DAG run manually, the weight is being respected and the producer task is being picked up in advance.
 
-    assert len(dag_dbt_task_group_watcher.task_dict) == 10
+    assert len(dag_dbt_task_group_watcher.task_dict) == 11
     tasks_names = [task.task_id for task in dag_dbt_task_group_watcher.topological_sort()]
 
     expected_task_names = [
@@ -1811,12 +1810,14 @@ def test_dbt_task_group_with_watcher():
         "dbt_task_group.stg_payments_run",
         "dbt_task_group.customers_run",
         "dbt_task_group.orders_run",
+        "dbt_task_group.dbt_producer_watcher_gate",
     ]
     assert tasks_names == expected_task_names
 
     assert isinstance(
         dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"], DbtProducerWatcherOperator
     )
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher_gate"], EmptyOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_customers_seed"], DbtSeedWatcherOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_orders_seed"], DbtSeedWatcherOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_payments_seed"], DbtSeedWatcherOperator)
@@ -1826,7 +1827,7 @@ def test_dbt_task_group_with_watcher():
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.customers_run"], DbtRunWatcherOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.orders_run"], DbtRunWatcherOperator)
 
-    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()
+    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set(["dbt_task_group.dbt_producer_watcher_gate"])
 
 
 @pytest.mark.integration

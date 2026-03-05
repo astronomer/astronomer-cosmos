@@ -181,7 +181,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         if try_number > 1:
             raise AirflowSkipException(
-                "Dbt WATCHER producer task does not support Airflow retries. "
+                "DbtProducerWatcherOperator does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
 

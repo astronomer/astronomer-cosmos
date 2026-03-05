@@ -3,7 +3,7 @@
 Cosmos Contributing Guide
 =========================
 
-All contributions, bug reports, bug fixes, documentation improvements, enhancements are welcome.
+All contributions, bug reports, bug fixes, documentation improvements and enhancements are welcome.
 
 As contributors and maintainers to this project, you are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
@@ -109,7 +109,7 @@ The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/p
 Testing the application with Hatch
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After following the steps described in "Working with Hatch", you are ready to run Cosmos tests locally.
+After following the steps described in :ref:`setting-up-hatch`, you are ready to run Cosmos tests locally.
 For instance, to run the tests using Python 3.11, `Apache Airflow® <https://airflow.apache.org/>`_ 2.10 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
 
 .. code-block:: bash
@@ -187,10 +187,10 @@ We use GitHub Actions to create and deploy new releases. To create a new release
 
     hatch version minor
 
-``hatch`` will automatically update the version for you. Then, create a new release on GitHub with the new version. The release will be automatically deployed to PyPI.
+Hatch will automatically update the version for you. Then, create a new release on GitHub with the new version. The release will be automatically deployed to PyPI.
 
 .. note::
-    You can update the version in a few different ways. Check out the `hatch docs <https://hatch.pypa.io/latest/version/#updating>`_ to learn more.
+    You can update the version in a few different ways. Check out the `Hatch docs <https://hatch.pypa.io/latest/version/#updating>`_ to learn more.
 
 Pre-Commit
 ----------

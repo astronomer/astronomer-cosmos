@@ -125,7 +125,7 @@ Add the following content to your new project definition.
     echo "select 1 as id, 'hello' as greeting" > dbt_project/micro_project/models/base_model.sql
 
 
-5. Create your enriched dbt model using the following comands:
+5. Create your enriched dbt model using the following commands:
 
 .. code-block:: bash
 

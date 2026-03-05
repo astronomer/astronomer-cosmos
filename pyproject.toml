@@ -95,7 +95,7 @@ all = [
 ]
 docs = [
     "sphinx",
-    "pydata-sphinx-theme",
+    "pydata-sphinx-theme>=0.16.0",
     "sphinx-autobuild",
     "sphinx-autoapi",
     "apache-airflow-providers-cncf-kubernetes>=7.14.0",
@@ -214,7 +214,7 @@ dependencies = [
     "aenum",
     "msgpack",
     "apache-airflow",
-    "pydata-sphinx-theme",
+    "pydata-sphinx-theme>=0.16.0",
     "sphinx",
     "sphinx-autoapi",
     "sphinx-autobuild",

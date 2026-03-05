@@ -220,7 +220,46 @@ At this point, you've completed the following project setup steps:
 
 2. Airflow autogenerates credentials when it launches that you must use to access the local Airflow UI. Open the ``simple_auth_manager_passwords.json.generated`` file in your ``oss-quickstart`` directory. This file contains the ``{"username": "password"}`` key-value pair for you to use to login to ``localhost:8080``.
 
+7. Trigger your Dag
+~~~~~~~~~~~~~~~~~~~
 
+1. Open the **Dags** view in Airflow.
+
+2. Click **Trigger** to run your Dags.
+
+3. After the Dag succesffuly finishes, you can explore the `Airflow UI Dag views <https://www.astronomer.io/docs/learn/airflow-ui#dag-views>`_ to view the logs or check the Dag code.
+
+8. (Optional) View results with a database viewer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To view the transformations completed by the Dag, you must use a database viewer to access the views and materializations completed by your dbt project.
+
+1. Open dBeaver.
+2. Click **Database** on the main menu and then **New database connection**.
+3. Select **SQLite** from the list of database types.
+4. Add your database connection information for the **Path**. This path is defined in the ``schema_and_paths.main`` configuration that you defined in your ``profiles.yml`` file:
+
+.. code-block::
+
+    micro_project:
+    target: dev
+    outputs:
+        dev:
+        type: sqlite
+        threads: 1
+        database: "my_database.db"
+        schema: main
+        schema_and_paths:
+                main: <explicit-path-to-demo-project>/oss-quickstart/my_database.db
+        schema_directory: <explicit-path-to-demo-project>/oss-quickstart
+
+
+5. Click **Finish**. dBeaver asks for permission to download the necessary drivers to access and display the database information.
+6. After the connection is successful, dBeaver displays the SQLite project directory. Navigate to **Views** at ``mydatabase.db/viewss`` to view the different table views created by dbt.
+7. **base_model** and **enriched_model** are the final Table views produced by the dbt code. But click any of these tables and then choose the **Data** tab to see the dbt output.
+
+.. image:: /_static/oss_quickstart_enriched_model.png
+   :alt: dBeaver user interface displaying the enriched_model table view produced by the dbt code. This table includes data that has been transformed from the base_model database you created.
 
 .. _troubleshoot-quickstart:
 

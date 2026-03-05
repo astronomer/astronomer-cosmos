@@ -17,7 +17,8 @@ By the end of this quickstart, you will:
 Prerequisites
 ~~~~~~~~~~~~~
 
-- Python
+- A Python version supported by `Airflow <https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html#prerequisites>`_.
+- (Optional) Install a database viewer. This guide uses `dBeaver <https://dbeaver.io/download/>`_
 
 1. Install Airflow, Cosmos, and dbt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -37,6 +38,10 @@ Prerequisites
     python3 -m venv venv
     source venv/bin/activate
 
+
+.. tip::
+
+    If you have multiple versions of Python on your machine, and need to use an older version of Python with Airflow, be sure to create your demo virtual enivonrment with the older Python version: ``python3.13 -m venv venv``.
 
 If you exit your virtual environment, remember you can reactivate it by returning to your project directory and then using the ``source venv/bin/activate`` command.
 
@@ -95,7 +100,7 @@ Add the following content to your new project definition.
     touch dbt_project/micro_project/profiles.yml
 
 
-Add the following content to your ``profiles.yml``:
+Add the following content to your ``profiles.yml``. Be sure to replace ``<explicit-path-to-demo-project>`` with your path:
 
 .. code-block:: yaml
 
@@ -107,26 +112,13 @@ Add the following content to your ``profiles.yml``:
         threads: 1
         database: "my_database.db"
         schema: main
-
-
-**(Optional) Specify a database to access with a database viewer**
-
-If you want to access the output results of your Cosmos dag, you can add a complete filepath and database name to your ``profiles.yml`` configuration. You can use this filepath later to access your dbt results.
-
-.. code-block:: yaml
-
-    micro_project:
-    target: dev
-    outputs:
-        dev:
-        type: sqlite
-        threads: 1
-        database: database
-        schema: main
         schema_and_paths:
                 main: <explicit-path-to-demo-project>/oss-quickstart/my_database.db
         schema_directory: <explicit-path-to-demo-project>/oss-quickstart
 
+.. tip::
+
+    Find the path to your demo project by using ``pwd``
 
 3. Create a base dbt model
 
@@ -226,16 +218,64 @@ At this point, you've completed the following project setup steps:
     airflow standalone
 
 
-2. Airflow autogenerates credentials when it launches that you must use to access the local Airflow UI.
-Open the ``simple_auth_manager_passwords.json.generated`` file in your ``oss-quickstart`` directory. This file contains the ``{"username": "password"}`` key-value pair for you to use to login to ``localhost:8080``.
+2. Airflow autogenerates credentials when it launches that you must use to access the local Airflow UI. Open the ``simple_auth_manager_passwords.json.generated`` file in your ``oss-quickstart`` directory. This file contains the ``{"username": "password"}`` key-value pair for you to use to login to ``localhost:8080``.
 
 
-Troubleshooting
-~~~~~~~~~~~~~~~~~~
 
-If you encounter issues, like errror messages that say **Cosmos Dag not loading**, try resetting the Airflow database and reserializing with the following commands.
+.. _troubleshoot-quickstart:
+
+Troubleshooting the quickstart
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Can't log in to the Airflow UI
+-------------------------------
+
+1. Confirm that you are using a version of Python that is supported by Airflow. These versions are usually included in the `Airflow installation guide <https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html#prerequisites>`_.
+
+2. If you try to log in to the Airflow UI and see a **500 Internal Server Error** or **Invalid credentials**, open your ``profiles.yml`` file and confirm that you correctly included:
+
+- ``schema_and_paths:`` attribute
+- The path you used to define the location of your schema and database
+
+3. If these are correctly formatted, go to your terminal and confirm that you set the ``AIRFLOW_HOME`` environment variable.
+
+.. code-block:: bash
+
+    echo $AIRFLOW_HOME
+
+.. _no-quickstart-dags:
+
+Dags do not load
+-----------------
+
+If you encounter issues, like error messages that say **Cosmos Dag not loading** or the **Dags** page on your Airflow UI does not show your Dags, try resetting the Airflow database and reserializing with the following commands.
 
 .. code-block:: bash
 
     airflow db reset
     airflow dags reserialize
+
+Then, relaunch Airflow with ``airflow standalone``.
+
+.. _quickstart-dags-stall:
+
+Example Dags stall
+-------------------
+
+If your ``base_model_run`` Dag gets stuck in **Running** mode, even though the **Logs** show that it completed successfully, and the next Dag does not automatically start.
+
+1. In the **Dag** view of the Airflow UI, click **Mark Dag as...** and choose **Failure**.
+
+2. Click **Trigger** to run the Dags again.
+
+.. image:: /_static/oss_quickstart_mark_dag_failure.png
+   :alt: Airflow Dag view showing one Dag run marked as "Failure" and a second run that completed successfully.
+
+3. If this does not work, reset the Airflow database and reserialize the Dags using the following code:
+
+.. code-block:: bash
+
+    airflow db reset
+    airflow dags reserialize
+
+4. Try running the Dags again from the Airflow UI.

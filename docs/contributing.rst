@@ -22,6 +22,9 @@ To contribute to the Cosmos project:
 #. Link your issue to the pull request.
 #. Once developments are complete on your feature branch, request a review and it will be merged once approved.
 
+Setting up the Cosmos development environment
+_____________________________________________
+
 Set up local development on the host machine
 ---------------------------------------------
 
@@ -86,8 +89,8 @@ Then, run the Docker Compose command:
 
 Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080``.
 
-Setting up the Cosmos development environment
------------------------------------
+Setting up Hatch
+----------------
 
 `Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing Python dependencies and environment isolation. In Cosmos, we use it for building, distributing, running tests, and building documentation.
 
@@ -98,10 +101,11 @@ If you don't already have Hatch installed, `install it <https://hatch.pypa.io/la
     brew install hatch
 
 The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
-Testing the application with Hatch
-----------------------------------
 
-After following the steps described in "Setting up the Cosmos development environment", you are ready to run Cosmos tests locally.
+Testing the application with Hatch
+-----------------------------------
+
+After following the steps described in "Setting up Hatch", you are ready to run Cosmos tests locally.
 For instance, to run the tests using Python 3.11, `Apache Airflow® <https://airflow.apache.org/>`_ 2.10 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
 
 .. code-block:: bash
@@ -163,6 +167,8 @@ To run the checks manually, run:
 
 Writing Docs
 ____________
+
+After following the steps described in "Setting up the Cosmos development environment", you are ready to build and serve the documentation locally.
 
 You can run the docs locally by running the following:
 

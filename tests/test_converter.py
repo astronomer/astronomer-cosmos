@@ -238,7 +238,8 @@ parent_seed = DbtNode(
     unique_id=f"{DbtResourceType.SEED}.{SAMPLE_DBT_PROJECT.stem}.seed_parent",
     resource_type=DbtResourceType.SEED,
     depends_on=[],
-    file_path="",
+    path_base=Path("."),
+    original_file_path=Path("."),
 )
 nodes = {"seed_parent": parent_seed}
 
@@ -1025,7 +1026,8 @@ sample_model = DbtNode(
     unique_id=f"{DbtResourceType.MODEL}.{SAMPLE_DBT_PROJECT.stem}.sample_model",
     resource_type=DbtResourceType.MODEL,
     depends_on=[],
-    file_path="",
+    path_base=Path("."),
+    original_file_path=Path("."),
 )
 nodes_with_model = {"sample_model": sample_model}
 

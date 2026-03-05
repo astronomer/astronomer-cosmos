@@ -88,7 +88,8 @@ class DbtNode:
     unique_id: str
     resource_type: DbtResourceType
     depends_on: list[str]
-    file_path: Path
+    path_base: Path
+    original_file_path: Path
     package_name: str | None = None
     tags: list[str] = field(default_factory=lambda: [])
     config: dict[str, Any] = field(default_factory=lambda: {})
@@ -97,6 +98,11 @@ class DbtNode:
     has_non_detached_test: bool = False
     downstream: list[str] = field(default_factory=lambda: [])
     fqn: list[str] | None = None
+
+    @property
+    def file_path(self) -> Path:
+        """Resolved absolute path to the node's file (path_base / original_file_path)."""
+        return self.path_base / self.original_file_path
 
     @property
     def meta(self) -> dict[str, Any]:
@@ -179,6 +185,7 @@ class DbtNode:
             "resource_type": self.resource_type.value,  # convert enum to value
             "depends_on": self.depends_on,
             "file_path": str(self.file_path),  # convert path to string
+            "original_file_path": str(self.original_file_path),  # convert original path to string
             "tags": self.tags,
             "config": self.config,
             "has_test": self.has_test,
@@ -313,8 +320,10 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
         except json.decoder.JSONDecodeError:
             logger.debug("Skipped dbt ls line: %s", line)
         else:
-            base_path = (
-                project_path.parent / node_dict["package_name"] if node_dict.get("package_name") else project_path  # type: ignore
+            if project_path is None:
+                continue
+            base_path: Path = (
+                project_path.parent / node_dict["package_name"] if node_dict.get("package_name") else project_path  # type: ignore[arg-type]
             )
 
             # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
@@ -336,9 +345,10 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     package_name=node_dict.get("package_name"),
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-                    file_path=base_path / node_file_path,  # type: ignore[arg-type]
-                    tags=node_dict.get("tags") or [],
-                    config=node_dict.get("config") or {},
+                    path_base=base_path,
+                    original_file_path=Path(node_file_path),
+                    tags=node_dict.get("tags", []),
+                    config=node_dict.get("config", {}),
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
@@ -376,9 +386,9 @@ def _build_dbt_node_from_manifest_resource(
     package_name = node_dict.get("package_name")
     is_root_project_node = manifest_project_name is None or (package_name == manifest_project_name)
     if package_name and not is_root_project_node:
-        resolved_path = project_path / packages_subpath / package_name / _normalize_path(original_file_path)
+        path_base = project_path / packages_subpath / package_name
     else:
-        resolved_path = project_path / _normalize_path(original_file_path)
+        path_base = project_path
 
     resource_type = DbtResourceType(node_dict["resource_type"])
     return DbtNode(
@@ -386,7 +396,8 @@ def _build_dbt_node_from_manifest_resource(
         package_name=package_name,
         resource_type=resource_type,
         depends_on=node_dict.get("depends_on", {}).get("nodes", []),
-        file_path=resolved_path,
+        path_base=path_base,
+        original_file_path=Path(_normalize_path(original_file_path)),
         tags=node_dict.get("tags") or [],
         config=node_dict.get("config") or {},
         has_freshness=(
@@ -978,11 +989,8 @@ class DbtGraph:
                 unique_id=f"{model.type.value}.{self.project.project_name}.{model_name}",
                 resource_type=DbtResourceType(model.type.value),
                 depends_on=list(model.config.upstream_models),
-                file_path=Path(
-                    model.path.as_posix().replace(
-                        self.render_config.project_path.as_posix(), self.execution_config.project_path.as_posix()
-                    )
-                ),
+                path_base=self.execution_config.project_path,
+                original_file_path=model.path.relative_to(self.render_config.project_path),
                 tags=tags or [],
                 config=config,
             )

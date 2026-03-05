@@ -89,7 +89,7 @@ Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080
 Testing application with hatch
 ------------------------------
 
-We currently use `hatch <https://github.com/pypa/hatch>`_ for building and distributing ``astronomer-cosmos``.
+We currently use `hatch <https://github.com/pypa/hatch>`__ for building and distributing ``astronomer-cosmos``.
 
 The tool can also be used for local development. The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file currently defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
 
@@ -155,7 +155,7 @@ To run the checks manually, run:
 Writing Docs
 ____________
 
-`Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatchto declare the dependencies required for the project itself, as well as for tests and documentation builds.
+`Hatch <https://hatch.pypa.io/latest/>`__ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatchto declare the dependencies required for the project itself, as well as for tests and documentation builds.
 
 If you don’t already have Hatch installed, please `install it <https://hatch.pypa.io/latest/install/>`_ before proceeding. As an example, on macOS, you can do so with:
 
@@ -195,4 +195,4 @@ We use GitHub actions to create and deploy new releases. To create a new release
 ``hatch`` will automatically update the version for you. Then, create a new release on GitHub with the new version. The release will be automatically deployed to PyPI.
 
 .. note::
-    You can update the version in a few different ways. Check out the `hatch docs <https://hatch.pypa.io/latest/version/#updating>`_ to learn more.
+    You can update the version in a few different ways. Check out the `hatch docs <https://hatch.pypa.io/latest/version/#updating>`__ to learn more.

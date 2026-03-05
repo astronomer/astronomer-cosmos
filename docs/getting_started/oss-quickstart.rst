@@ -49,7 +49,7 @@ If you exit your virtual environment, remember you can reactivate it by returnin
 
 The Cosmos project includes Airflow as a dependency, so when you install Cosmos into your virtual environment, it automatically installs Airflow as well.
 
-.. code-block:: python
+.. code-block:: bash
 
     pip install astronomer-cosmos dbt-sqlite
 

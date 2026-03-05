@@ -111,12 +111,10 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
-            self.log.info(
+            raise AirflowSkipException(
                 "DbtProducerWatcherKubernetesOperator does not support Airflow retries. "
-                "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
-                try_number,
+                f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
-            raise AirflowSkipException()
 
         # This global variable is used to make the task context available to the K8s callback.
         # While the callback is set during the operator initialization, the context is only created during the operator's execution.

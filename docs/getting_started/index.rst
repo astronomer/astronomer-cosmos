@@ -5,10 +5,11 @@
    :caption: Contents:
 
    Astro CLI quickstart <astro-cli-quickstart>
+   Open-source quickstart <oss-quickstart>
    Astro <astro>
    MWAA <mwaa>
    GCC <gcc>
-   Open-Source <open-source>
+   Open-source <open-source>
    Execution Modes <execution-modes>
    Docker Execution Mode <docker>
    Kubernetes Execution Mode <kubernetes>

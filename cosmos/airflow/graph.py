@@ -714,6 +714,13 @@ def _add_watcher_producer_task(
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
+
+    producer_airflow_task >> EmptyOperator(
+        task_id=f"{PRODUCER_WATCHER_TASK_ID}_gate",
+        dag=dag, task_group=task_group,
+        trigger_rule=TriggerRule.ALL_DONE
+    )
+
     return producer_airflow_task
 
 
@@ -915,9 +922,6 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             render_config=render_config,
             execution_mode=execution_mode,
             tests_per_model=tests_per_model,
-        )
-        producer_task >> EmptyOperator(
-            task_id=f"{PRODUCER_WATCHER_TASK_ID}_gate", dag=dag, task_group=task_group, trigger_rule=TriggerRule.ALWAYS
         )
 
     for node_id, node in nodes.items():

@@ -1557,7 +1557,7 @@ def test_dbt_dag_with_watcher(capsys):
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 23
 
-    assert len(watcher_dag.task_dict) == 14
+    assert len(watcher_dag.task_dict) == 15
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
     expected_task_names = [
         "dbt_producer_watcher",
@@ -1574,6 +1574,7 @@ def test_dbt_dag_with_watcher(capsys):
         "customers.test",
         "orders.run",
         "orders.test",
+        "dbt_producer_watcher_gate",
     ]
     assert tasks_names == expected_task_names
 
@@ -1596,6 +1597,7 @@ def test_dbt_dag_with_watcher(capsys):
         "raw_payments_seed",
         "raw_orders_seed",
         "raw_customers_seed",
+        "dbt_producer_watcher_gate",
     }
 
     # dbt runner logs are not captured by caplog, so we need to capture them using capsys
@@ -1641,9 +1643,9 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 1
 
-    assert len(watcher_dag.task_dict) == 3
+    assert len(watcher_dag.task_dict) == 4
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
-    expected_task_names = ["dbt_producer_watcher", "raw_orders_seed", "jaffle_shop_test"]
+    expected_task_names = ["dbt_producer_watcher", "raw_orders_seed", "jaffle_shop_test", "dbt_producer_watcher_gate"]
     assert tasks_names == expected_task_names
     # Confirm that the dbt command was successfully run using the given dbt executable path:
     assert "venv-subprocess/bin/dbt'), 'build'" in caplog.text

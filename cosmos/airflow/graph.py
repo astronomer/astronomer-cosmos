@@ -716,7 +716,7 @@ def _add_watcher_producer_task(
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
 
     producer_task_gate = EmptyOperator(  # type: ignore[no-untyped-call]
-        task_id=f"{PRODUCER_WATCHER_TASK_ID}_gate", dag=dag, task_group=task_group, trigger_rule=TriggerRule.ALL_DONE
+        task_id=f"{PRODUCER_WATCHER_TASK_ID}_gate", dag=dag, task_group=task_group, trigger_rule=TriggerRule.NONE_FAILED
     )
     producer_airflow_task >> producer_task_gate
     return producer_airflow_task, producer_task_gate

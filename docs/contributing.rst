@@ -22,6 +22,8 @@ To contribute to the Cosmos project:
 #. Link your issue to the pull request.
 #. Once developments are complete on your feature branch, request a review and it will be merged once approved.
 
+.. _setting-up-cosmos-dev-env:
+
 Setting up the Cosmos development environment
 _____________________________________________
 
@@ -168,7 +170,7 @@ To run the checks manually, run:
 Writing Docs
 ____________
 
-After following the steps described in "Setting up the Cosmos development environment", you are ready to build and serve the documentation locally.
+After following the steps described in :ref:`setting-up-cosmos-dev-env`, you are ready to build and serve the documentation locally.
 
 You can run the docs locally by running the following:
 
@@ -180,7 +182,7 @@ You can run the docs locally by running the following:
 Building
 ________
 
-After following the steps described in "Setting up the Cosmos development environment", you are ready to build the project.
+After following the steps described in :ref:`setting-up-cosmos-dev-env`, you are ready to build the project.
 
 We use ``hatch`` to build the project. To build the project, run:
 

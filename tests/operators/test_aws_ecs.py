@@ -220,3 +220,40 @@ def test_dbt_aws_ecs_build_and_run_cmd(mock_execute):
 
     mock_build_command.assert_called_with(mock_context, None)
     mock_execute.assert_called_once_with(dbt_base_operator, mock_context)
+
+
+@patch("cosmos.operators.aws_ecs.EcsRunTaskOperator.execute")
+def test_build_and_run_cmd_invokes_interceptors(mock_ecs_execute):
+    """
+    Test that build_and_run_cmd calls interceptors before build_command and that modified vars/env are used.
+    """
+    context = {"run_id": "test_run", "data_interval_start": MagicMock(), "data_interval_end": MagicMock()}
+    interceptor_mock = MagicMock()
+
+    def interceptor_modify_vars_and_env(ctx, task):
+        interceptor_mock(ctx, task)
+        task.vars = {"new_var": "new_var_value"}
+        task.env = {"NEW_ENV_VAR": "new_env_var_value"}
+
+    operator = ConcreteDbtAwsEcsOperator(
+        task_id="my-task",
+        aws_conn_id="my-aws-conn-id",
+        cluster="my-ecs-cluster",
+        task_definition="my-dbt-task-definition",
+        container_name="my-dbt-container-name",
+        project_dir="my/dir",
+        vars=None,
+        env=None,
+        interceptors=[interceptor_modify_vars_and_env],
+    )
+
+    operator.build_and_run_cmd(context=context)
+
+    interceptor_mock.assert_called_once_with(context, operator)
+    assert operator.vars == {"new_var": "new_var_value"}
+    assert operator.env == {"NEW_ENV_VAR": "new_env_var_value"}
+
+    assert "--vars" in operator.command
+    vars_idx = operator.command.index("--vars")
+    assert "new_var: new_var_value" in operator.command[vars_idx + 1]
+    assert operator.environment_variables.get("NEW_ENV_VAR") == "new_env_var_value"

@@ -1,6 +1,37 @@
 Changelog
 =========
 
+1.13.1 (2026-02-25)
+-------------------
+
+Enhancements
+
+* Change Snowflake profile mappings to default to four threads by @tatiana in #2374
+* Refactor to avoid potential future ``UnboundLocalError`` for ``producer_task`` in ``calculate_tasks_map`` by @rin in #2309
+
+Bug Fixes
+
+* Fix graph selector when using + selector with ``dbt-loom`` by @award1230 in #2389
+* Populate ``compiled_sql`` for ``InvocationMode.SUBPROCESS`` in ``ExecutionMode.WATCHER`` by @pankajkoti in #2319
+* Preserve ``extra_context`` for watcher consumer task instances by @pankajkoti in #2381
+* Fix watcher: respect ``deferrable=False`` from ``operator_args`` on consumer sensor by @pankajkoti in #2384
+* Error handle invalid YAML with ``LoadMode.DBT_MANIFEST`` and ``RenderConfig.selector`` by @YourRoyalLinus in #2316
+* Fix selecting model when it has the same name as folder by @pankajastro in #2328
+* Handle Param Validation errors by @tatiana in #2358
+* Fix cache swap issue by @YourRoyalLinus in #2332
+* Fix leaked semaphore warnings in Airflow 3 by resetting dbt adapters by @pankajkoti in #2335
+
+Docs
+
+* Document ``ExecutionMode.KUBERNETES`` limitations by @tatiana in #2326
+
+Others
+
+* Add .airflow-registry.yaml for Airflow Provider Registry by @kaxil in #2387
+* Improve test coverage for PR #2307 by @tatiana in #2308
+* Address feedback from code review #2389 by @evanvolgas in #2394
+
+
 1.13.0 (2026-01-30)
 ---------------------
 
@@ -403,7 +434,7 @@ Others
 
 Features
 
-* Airflow 3 support. `More details here. <https://astronomer.github.io/astronomer-cosmos/airflow3_compatibility/>`_.
+* Airflow 3 support. `More details here. <https://astronomer.github.io/astronomer-cosmos/policy/airflow3_compatibility/>`_.
 * Support running ``dbt deps`` incrementally to pre-defined ``dbt_packages`` by @tatiana in #1668 and #1670
 * Add ``DuckDB`` profile mapping by @prithvijitguha and @pankajastro in #1553
 * Implement DBT exposure selector by ghjklw #1717
@@ -416,7 +447,7 @@ Bug Fixes
 
 Airflow 3 Support
 
-`Documentation about the current status <https://astronomer.github.io/astronomer-cosmos/airflow3_compatibility/>`_ and completed tasks:
+`Documentation about the current status <https://astronomer.github.io/astronomer-cosmos/policy/airflow3_compatibility/>`_ and completed tasks:
 
 * Support rendering DbtDag in Airflow 3 by @tatiana and @ashb in #1657
 * Refactor Rendered Task Instance Fields (RTIF) handling for Airflow 2.x and 3.x by @pankajkoti in #1661

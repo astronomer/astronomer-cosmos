@@ -14,7 +14,7 @@ from packaging.version import Version
 from cosmos.config import ProfileConfig
 from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION, InvocationMode
 from cosmos.exceptions import CosmosValueError
-from cosmos.operators.virtualenv import DbtCloneVirtualenvOperator, DbtVirtualenvBaseOperator
+from cosmos.operators.virtualenv import DbtCloneVirtualenvOperator, DbtRunVirtualenvOperator, DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 from tests.utils import test_dag as run_test_dag
 
@@ -50,11 +50,32 @@ real_profile_config = ProfileConfig(
 )
 
 
+def _get_airflow3_venv_subprocess_patch_target():
+    """Resolve patch target for Airflow 3: providers-standard API varies by version.
+    Older versions expose execute_in_subprocess or _execute_in_subprocess.
+    providers-standard 1.11.0+ no longer exposes a separate subprocess function;
+    we patch prepare_virtualenv at use site instead.
+    """
+    import airflow.providers.standard.utils.python_virtualenv as pv  # noqa: PLC0415
+
+    if getattr(pv, "_execute_in_subprocess", None) is not None:
+        return "airflow.providers.standard.utils.python_virtualenv._execute_in_subprocess", "subprocess"
+    if getattr(pv, "execute_in_subprocess", None) is not None:
+        return "airflow.providers.standard.utils.python_virtualenv.execute_in_subprocess", "subprocess"
+    return "cosmos.operators.virtualenv.prepare_virtualenv", "prepare_virtualenv"
+
+
 def patch_execute_in_subprocess(func):
     if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
-        return patch("airflow.providers.standard.utils.python_virtualenv.execute_in_subprocess")(func)
-    else:
-        return patch("airflow.utils.python_virtualenv.execute_in_subprocess")(func)
+        patch_path, _ = _get_airflow3_venv_subprocess_patch_target()
+        if "prepare_virtualenv" in patch_path:
+            # Mock prepare_virtualenv so it returns the expected path without running subprocesses
+            return patch(
+                patch_path,
+                side_effect=lambda venv_directory, **kwargs: f"{venv_directory}/bin/python",
+            )(func)
+        return patch(patch_path)(func)
+    return patch("airflow.utils.python_virtualenv.execute_in_subprocess")(func)
 
 
 class ConcreteDbtVirtualenvBaseOperator(DbtVirtualenvBaseOperator):
@@ -116,21 +137,24 @@ def test_run_command_without_virtualenv_dir(
     assert dbt_deps["command"][1] == "deps"
     assert ["--vars", "variable: value\n"] not in dbt_deps["command"][-2:]
     assert dbt_cmd["command"][1] == "do-something"
-    assert mock_execute.call_count == 2
-    virtualenv_call, pip_install_call = mock_execute.call_args_list
-    if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
-        assert "python3" in virtualenv_call[0][0]
-        assert virtualenv_call[0][0][0] == "uv"
-        assert virtualenv_call[0][0][1] == "venv"
-        assert pip_install_call[0][0][0] == "uv"
-        assert pip_install_call[0][0][1] == "pip"
-        assert pip_install_call[0][0][2] == "install"
-    else:
-        assert "python" in virtualenv_call[0][0][0]
-        assert virtualenv_call[0][0][1] == "-m"
-        assert virtualenv_call[0][0][2] == "virtualenv"
-        assert "pip" in pip_install_call[0][0][0]
-        assert pip_install_call[0][0][1] == "install"
+    # When patching execute_in_subprocess (older providers-standard): 2 calls (venv + pip).
+    # When patching prepare_virtualenv (e.g. providers-standard 1.11.0+): 1 call.
+    assert mock_execute.call_count in (1, 2)
+    if mock_execute.call_count == 2:
+        virtualenv_call, pip_install_call = mock_execute.call_args_list
+        if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
+            assert "python3" in virtualenv_call[0][0]
+            assert virtualenv_call[0][0][0] == "uv"
+            assert virtualenv_call[0][0][1] == "venv"
+            assert pip_install_call[0][0][0] == "uv"
+            assert pip_install_call[0][0][1] == "pip"
+            assert pip_install_call[0][0][2] == "install"
+        else:
+            assert "python" in virtualenv_call[0][0][0]
+            assert virtualenv_call[0][0][1] == "-m"
+            assert virtualenv_call[0][0][2] == "virtualenv"
+            assert "pip" in pip_install_call[0][0][0]
+            assert pip_install_call[0][0][1] == "install"
     cosmos_venv_dirs = [
         f for f in os.listdir("/tmp") if os.path.isdir(os.path.join("/tmp", f)) and f.startswith("cosmos-venv")
     ]
@@ -423,3 +447,42 @@ def test_dbt_clone_virtualenv_operator_initialisation():
     )
 
     assert "clone" in operator.base_cmd
+
+
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.run_command")
+def test_build_and_run_cmd_invokes_interceptors(mock_run_command):
+    """
+    Test that build_and_run_cmd calls interceptors before build_cmd and that modified vars/env are used.
+    Virtualenv operators inherit build_and_run_cmd from local, so interceptors work the same way.
+    """
+    context = {"run_id": "test_run", "data_interval_start": MagicMock(), "data_interval_end": MagicMock()}
+    interceptor_mock = MagicMock()
+
+    def interceptor_modify_vars_and_env(context, task):
+        interceptor_mock(context, task)
+        task.vars = {"new_var": "new_var_value"}
+        task.env = {"NEW_ENV_VAR": "new_env_var_value"}
+
+    operator = DbtRunVirtualenvOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        vars=None,
+        env=None,
+        py_requirements=["dbt-postgres==1.5.0"],
+        interceptors=[interceptor_modify_vars_and_env],
+    )
+
+    operator.build_and_run_cmd(context=context)
+
+    interceptor_mock.assert_called_once_with(context, operator)
+    assert operator.vars == {"new_var": "new_var_value"}
+    assert operator.env == {"NEW_ENV_VAR": "new_env_var_value"}
+
+    call_kwargs = mock_run_command.call_args[1]
+    cmd = call_kwargs["cmd"]
+    env = call_kwargs["env"]
+
+    assert "--vars" in cmd
+    assert "new_var: new_var_value" in cmd[cmd.index("--vars") + 1]
+    assert env.get("NEW_ENV_VAR") == "new_env_var_value"

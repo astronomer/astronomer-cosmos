@@ -51,6 +51,9 @@ DBT_DOWNSTREAM_PROJECT_PATH = DBT_ROOT_PATH / "cross_project" / "downstream"
 UPSTREAM_MANIFEST_PATH = DBT_UPSTREAM_PROJECT_PATH / "target" / "manifest.json"
 DOWNSTREAM_MANIFEST_PATH = DBT_DOWNSTREAM_PROJECT_PATH / "target" / "manifest.json"
 
+# dbt executable path, that contains dbt loom adapter
+DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess" / "bin" / "dbt"
+
 # =============================================================================
 # Alternative: Remote Manifest Paths (S3/GCS/Azure) - Uncomment to use
 # =============================================================================
@@ -97,7 +100,7 @@ with DAG(
         ),
         profile_config=upstream_profile_config,
         execution_config=ExecutionConfig(
-            dbt_project_path=DBT_UPSTREAM_PROJECT_PATH, dbt_executable_path="/usr/local/bin/dbt"
+            dbt_project_path=DBT_UPSTREAM_PROJECT_PATH, dbt_executable_path=DBT_EXECUTABLE_PATH
         ),
         render_config=RenderConfig(
             # Use manifest-based parsing (no dbt ls required)

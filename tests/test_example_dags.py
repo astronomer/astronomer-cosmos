@@ -20,7 +20,12 @@ EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
-IGNORED_DAG_FILES = ["performance_dag.py", "jaffle_shop_kubernetes.py", "jaffle_shop_watcher_kubernetes.py"]
+IGNORED_DAG_FILES = [
+    "performance_dag.py",
+    "jaffle_shop_kubernetes.py",
+    "jaffle_shop_watcher_kubernetes.py",
+    "cross_project_dbt_ls_dag.py",
+]
 
 
 @provide_session
@@ -55,6 +60,12 @@ def get_dag_bag() -> DagBag:  # noqa: C901
 
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.writelines("example_cosmos_cleanup_dag.py\n")
+
+        if AIRFLOW_VERSION == Version("2.9.0"):
+            # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9
+            file.writelines("cosmos_example_manifest_dag.py\n")
+            # This DAG is taking too long to run int the CI (https://github.com/astronomer/astronomer-cosmos/actions/runs/21902660682/job/63234728594)
+            file.writelines("example_cosmos_python_models.py\n")
 
         # Disabling these DAGs temporarily due to an Airflow 3 bug on processing DatasetAlias that contain non-ASCII characters:
         # https://github.com/apache/airflow/issues/51566

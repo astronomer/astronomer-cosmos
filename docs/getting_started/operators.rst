@@ -22,3 +22,16 @@ Example of how to use
     :language: python
     :start-after: [START clone_example]
     :end-before: [END clone_example]
+
+
+Seed
+----
+
+The ``DbtSeedLocalOperator`` implements the `dbt seed <https://docs.getdbt.com/reference/commands/seed>`_ command.
+
+In this example, we're using the ``DbtSeedLocalOperator`` to seed ``raw_orders``.
+
+.. literalinclude:: ../../dev/dags/example_operators.py
+    :language: python
+    :start-after: [START seed_local_example]
+    :end-before: [END seed_local_example]

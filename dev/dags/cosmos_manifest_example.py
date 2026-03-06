@@ -57,21 +57,25 @@ with DAG(
     )
     # [END local_example]
 
-    # [START aws_s3_example]
-    aws_s3_example = DbtTaskGroup(
-        group_id="aws_s3_example",
-        project_config=ProjectConfig(
-            manifest_path="s3://cosmos-manifest-test/manifest.json",
-            manifest_conn_id="aws_s3_conn",
-            # `manifest_conn_id` is optional. If not provided, the default connection ID `aws_default` is used.
-            project_name="jaffle_shop",
-        ),
-        profile_config=profile_config,
-        render_config=render_config,
-        execution_config=execution_config,
-        operator_args={"install_deps": True},
-    )
-    # [END aws_s3_example]
+    try:
+        # [START aws_s3_example]
+        aws_s3_example = DbtTaskGroup(
+            group_id="aws_s3_example",
+            project_config=ProjectConfig(
+                manifest_path="s3://cosmos-manifest-test/manifest.json",
+                manifest_conn_id="aws_s3_conn",
+                # `manifest_conn_id` is optional. If not provided, the default connection ID `aws_default` is used.
+                project_name="jaffle_shop",
+            ),
+            profile_config=profile_config,
+            render_config=render_config,
+            execution_config=execution_config,
+            operator_args={"install_deps": True},
+        )
+        # [END aws_s3_example]
+    except ModuleNotFoundError:
+        print("aws_s3_example is not available in Airflow 2.9")
+        aws_s3_example = None
 
     # [START gcp_gs_example]
     gcp_gs_example = DbtTaskGroup(
@@ -107,4 +111,7 @@ with DAG(
 
     post_dbt = EmptyOperator(task_id="post_dbt")
 
-    (pre_dbt >> local_example >> aws_s3_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)
+    if aws_s3_example is not None:
+        (pre_dbt >> local_example >> aws_s3_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)
+    else:
+        (pre_dbt >> local_example >> gcp_gs_example >> azure_abfs_example >> post_dbt)

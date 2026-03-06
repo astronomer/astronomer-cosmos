@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from airflow.exceptions import AirflowException
@@ -13,7 +14,14 @@ from cosmos.constants import (
     WATCHER_TASK_WEIGHT_RULE,
 )
 from cosmos.log import get_logger
-from cosmos.operators._watcher.state import build_producer_state_fetcher, get_xcom_val, safe_xcom_push
+from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
+from cosmos.operators._watcher.state import (
+    build_producer_state_fetcher,
+    get_xcom_val,
+    is_dbt_node_status_success,
+    is_dbt_node_status_terminal,
+    safe_xcom_push,
+)
 from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
 
 try:
@@ -27,13 +35,84 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 
-def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
+def _extract_compiled_sql(
+    project_dir: str, unique_id: str, node_path: str | None, resource_type: str | None
+) -> str | None:
+    """
+    Extract compiled SQL from the target directory for a given dbt node.
+
+    Used by both the subprocess strategy (via store_dbt_resource_status_from_log)
+    and the node-event strategy (via DbtProducerWatcherOperator._handle_node_finished);
+    both consume from the same target/compiled layout under project_dir.
+
+    Assumes inputs come from dbt (relative node_path, unique_id like model.package.name).
+    """
+    if resource_type != "model" or not node_path:
+        return None
+
+    package = unique_id.split(".", 2)[1]
+    compiled_sql_path = Path(project_dir) / "target" / "compiled" / package / "models" / node_path
+    if not compiled_sql_path.exists():
+        logger.warning(
+            "Compiled sql path %s does not exist and hence the rendered template field compiled_sql for the model will not be populated",
+            compiled_sql_path,
+        )
+        return None
+    return compiled_sql_path.read_text(encoding="utf-8").strip() or None
+
+
+def _push_compiled_sql_for_model(task_instance: Any, unique_id: str, compiled_sql: str) -> None:
+    """
+    Push compiled SQL for a model to XCom under the canonical key.
+
+    Single place where both subprocess and node-event producer paths set compiled_sql.
+    Consumers (sensor poke and trigger) always read from this key.
+    """
+    safe_xcom_push(
+        task_instance=task_instance,
+        key=f"{unique_id.replace('.', '__')}_compiled_sql",
+        value=compiled_sql,
+    )
+
+
+def store_compiled_sql_for_model(
+    task_instance: Any,
+    project_dir: str,
+    unique_id: str,
+    node_path: str | None,
+    resource_type: str | None,
+) -> None:
+    """
+    Read compiled SQL from the target directory and store to XCom if present.
+
+    Single sequence used by both subprocess and node-event producer paths.
+    """
+    compiled_sql = _extract_compiled_sql(project_dir, unique_id, node_path, resource_type)
+    if compiled_sql:
+        _push_compiled_sql_for_model(task_instance, unique_id, compiled_sql)
+
+
+def store_dbt_resource_status_from_log(
+    line: str,
+    extra_kwargs: Any,
+    *,
+    tests_per_model: dict[str, list[str]] | None = None,
+    test_results_per_model: dict[str, list[str]] | None = None,
+) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
 
     This method parses each log line from dbt when --log-format json is used,
     extracts node status information, and pushes it to XCom for consumption
     by downstream watcher sensors.
+
+    :param tests_per_model: Mapping of model unique_id to list of test unique_ids
+        associated with that model, as built by DbtGraph.update_node_dependency().
+        Empty dict when no tests exist.
+    :param test_results_per_model: Mutable accumulator dict. For each model that has
+        tests, collects the terminal statuses of those tests as they finish.
+        Keyed by model unique_id, values are lists of test statuses (e.g. ``["pass", "pass"]``).
+        Mutated in place by this function.
     """
     try:
         log_line = json.loads(line)
@@ -43,16 +122,34 @@ def store_dbt_resource_status_from_log(line: str, extra_kwargs: Any) -> None:
     else:
         logger.debug("Log line: %s", log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
-        node_status = node_info.get("node_status")
+        dbt_node_status = node_info.get("node_status")
+        dbt_node_resource_type = node_info.get("resource_type")
         unique_id = node_info.get("unique_id")
 
-        logger.debug("Model: %s is in %s state", unique_id, node_status)
+        logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
-        # TODO: Handle and store all possible node statuses, not just the current success and failed
-        if node_status in ["success", "failed"]:
+        # Handle terminal statuses for both models (success/failed) and tests (pass/fail)
+        # TODO: handle all possible statuses including skipped, warn, etc.
+        if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
             assert context is not None  # Make MyPy happy
-            safe_xcom_push(task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=node_status)
+            if dbt_node_resource_type == "test" and tests_per_model and test_results_per_model is not None:
+                logger.debug("Test '%s' finished with status '%s'", unique_id, dbt_node_status)
+                push_test_result_or_aggregate(
+                    unique_id, dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
+                )
+            else:
+                safe_xcom_push(
+                    task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=dbt_node_status
+                )
+
+            # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
+            # compiled_sql is available for both success and failed models - it's compiled before execution
+            project_dir = extra_kwargs.get("project_dir")
+            if project_dir:
+                store_compiled_sql_for_model(
+                    context["ti"], project_dir, unique_id, node_info.get("node_path"), node_info.get("resource_type")
+                )
 
     # Additionally, log the message from dbt logs
     log_info = log_line.get("info", {})
@@ -91,9 +188,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         **kwargs: Any,
     ) -> None:
         self.compiled_sql = ""
-        extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
         kwargs.setdefault("priority_weight", CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
+
+        # We pop extra_context before super().__init__ because BaseSensorOperator does not accept it and
+        # would raise on unknown kwargs; we assign after so subclasses and user customisations can use it
+        # at runtime (e.g. in execute, poke, or callbacks).
+        extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
         super().__init__(
             poke_interval=poke_interval,
             timeout=timeout,
@@ -103,6 +204,8 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             profiles_dir=profiles_dir,
             **kwargs,
         )
+        self.extra_context = extra_context
+
         self.project_dir = project_dir
         self.producer_task_id = producer_task_id
         self.deferrable = deferrable
@@ -175,8 +278,8 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         logger.info("Node Info: %s", run_results_json)
         self.compiled_sql = node_result.get("compiled_code")
-        if self.compiled_sql:
-            self._override_rtif(context)  # type: ignore[attr-defined]
+        if self.compiled_sql and hasattr(self, "_override_rtif"):
+            self._override_rtif(context)
 
         return node_result.get("status")
 
@@ -230,6 +333,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 self.model_unique_id,
             )
 
+        # Extract and store compiled_sql from the event if available
+        compiled_sql = event.get("compiled_sql")
+        if compiled_sql:
+            self.compiled_sql = compiled_sql
+            if hasattr(self, "_override_rtif"):
+                self._override_rtif(context)
+
         if status != "failed":
             return
 
@@ -275,6 +385,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         else:
             status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
 
+        # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
+        if status is not None:
+            compiled_sql = get_xcom_val(
+                ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
+            )
+            if compiled_sql:
+                self.compiled_sql = compiled_sql
+                if hasattr(self, "_override_rtif"):
+                    self._override_rtif(context)
+
         if status is None:
 
             if producer_task_state == "failed":
@@ -289,7 +409,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             self.poke_retry_number += 1
 
             return False
-        elif status == "success":
+        elif is_dbt_node_status_success(status):
             return True
         else:
             raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")

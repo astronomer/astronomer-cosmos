@@ -103,7 +103,7 @@ def test_retries_overridden_even_if_user_sets_them():
 
 
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_skips_retry_attempt(mock_execute, caplog):
+def test_skips_retry_attempt(mock_execute):
     """
     Test that the operator skips execution when a retry is attempted (try_number > 1).
     """
@@ -117,13 +117,10 @@ def test_skips_retry_attempt(mock_execute, caplog):
     ti.try_number = 2
     context = {"ti": ti}
 
-    with (
-        caplog.at_level(logging.INFO),
-        pytest.raises(
+    with pytest.raises(
             AirflowSkipException,
             match="DbtProducerWatcherKubernetesOperator does not support Airflow retries. Detected attempt #2; skipping execution to avoid running a second dbt build.",
-        ),
-    ):
+        ):
         op.execute(context=context)
 
     mock_execute.assert_not_called()

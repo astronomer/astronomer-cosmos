@@ -303,7 +303,7 @@ def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
     assert any("forces Airflow retries to 0" in message for message in caplog.messages)
 
 
-def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
+def test_dbt_producer_watcher_operator_skips_retry_attempt():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
     ti.try_number = 2
@@ -1322,7 +1322,7 @@ class TestDbtConsumerWatcherSensor:
 
         with pytest.raises(
             AirflowException,
-            match="The dbt build command was failed in producer task. Please check the log of task dbt_producer_watcher for details.",
+            match="The dbt build command has failed in producer task. Please check the log of task dbt_producer_watcher for details.",
         ):
             sensor.poke(context)
 

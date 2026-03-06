@@ -1600,6 +1600,10 @@ def test_dbt_dag_with_watcher(capsys):
         "dbt_producer_watcher_gate",
     }
 
+    assert watcher_dag.task_dict["dbt_producer_watcher"].depends_on_past and watcher_dag.task_dict["dbt_producer_watcher"].wait_for_downstream
+    assert watcher_dag.task_dict["customers.run"].depends_on_past and watcher_dag.task_dict["customers.run"].wait_for_downstream
+    assert watcher_dag.task_dict["dbt_producer_watcher_gate"].depends_on_past and not watcher_dag.task_dict["dbt_producer_watcher_gate"].wait_for_downstream
+
     # dbt runner logs are not captured by caplog, so we need to capture them using capsys
     capsys_output = capsys.readouterr()
     stdout = capsys_output.out

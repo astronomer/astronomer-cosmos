@@ -10,6 +10,7 @@ from packaging.version import Version
 AIRFLOW_VERSION = Version(airflow.__version__)
 
 BIGQUERY_PROFILE_TYPE = "bigquery"
+DATABRICKS_PROFILE_TYPE = "databricks"
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DBT_PROJECT_FILENAME = "dbt_project.yml"
 DEFAULT_DBT_PROFILE_NAME = "cosmos_profile"

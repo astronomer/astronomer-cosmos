@@ -1133,7 +1133,7 @@ def test_test_behavior_for_watcher_mode(test_behavior):
     tasks = dag.tasks
     if test_behavior == TestBehavior.NONE:
         for task in tasks:
-            assert not isinstance(task, DbtTestWatcherOperator or DbtTestLocalOperator)
+            assert not isinstance(task, (DbtTestWatcherOperator, DbtTestLocalOperator))
         assert len(tasks) == 6
     if test_behavior == TestBehavior.AFTER_EACH:
         assert len(tasks) == 7

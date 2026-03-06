@@ -15,6 +15,13 @@ Cosmos offers a number of configuration options to customize its behavior. For m
 .. toctree::
    :maxdepth: 1
    :hidden:
+   :caption: Connect to your database
+
+   connect_database/use-your-profiles-yml
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
    :caption: Translating dbt into Airflow
 
    translate_dbt_to_airflow/parsing-methods

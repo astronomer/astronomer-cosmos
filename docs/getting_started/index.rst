@@ -75,4 +75,3 @@ as ``max_active_tasks``, ``max_active_runs``, and ``default_args``.
 
 With Cosmos, transitioning from a dbt workflow to an Airflow Dag is seamless, giving you the best of both tools
 for managing and scaling your data workflows.
-

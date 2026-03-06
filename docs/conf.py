@@ -77,7 +77,7 @@ redirects = {
     "configuration/operator-args": "../guides/run_dbt/customization/operator-args.html",
     "configuration/parsing-methods": "../guides/translate_dbt_to_airflow/parsing-methods.html",
     "configuration/partial-parsing": "../guides/run_dbt/customization/partial-parsing.html",
-    "configuratoin/profile-config": "../reference/configs/profile-config.html",
+    "configuration/profile-config": "../reference/configs/profile-config.html",
     "configuration/project-config": "../reference/configs/project-config.html",
     "configuration/render-config": "../guides/translate_dbt_to_airflow/render-config.html",
     "configuration/scheduling": "../guides/run_dbt/customization/scheduling.html",

@@ -1550,7 +1550,11 @@ def test_dbt_dag_with_watcher(capsys):
             invocation_mode=InvocationMode.DBT_RUNNER,
         ),
         render_config=RenderConfig(emit_datasets=False),
-        operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120), "depends_on_past": True},
+        operator_args={
+            "trigger_rule": "all_success",
+            "execution_timeout": timedelta(seconds=120),
+            "depends_on_past": True,
+        },
     )
     outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS
@@ -1600,9 +1604,18 @@ def test_dbt_dag_with_watcher(capsys):
         "dbt_producer_watcher_gate",
     }
 
-    assert watcher_dag.task_dict["dbt_producer_watcher"].depends_on_past and watcher_dag.task_dict["dbt_producer_watcher"].wait_for_downstream
-    assert watcher_dag.task_dict["customers.run"].depends_on_past and watcher_dag.task_dict["customers.run"].wait_for_downstream
-    assert watcher_dag.task_dict["dbt_producer_watcher_gate"].depends_on_past and not watcher_dag.task_dict["dbt_producer_watcher_gate"].wait_for_downstream
+    assert (
+        watcher_dag.task_dict["dbt_producer_watcher"].depends_on_past
+        and watcher_dag.task_dict["dbt_producer_watcher"].wait_for_downstream
+    )
+    assert (
+        watcher_dag.task_dict["customers.run"].depends_on_past
+        and watcher_dag.task_dict["customers.run"].wait_for_downstream
+    )
+    assert (
+        watcher_dag.task_dict["dbt_producer_watcher_gate"].depends_on_past
+        and not watcher_dag.task_dict["dbt_producer_watcher_gate"].wait_for_downstream
+    )
 
     # dbt runner logs are not captured by caplog, so we need to capture them using capsys
     capsys_output = capsys.readouterr()

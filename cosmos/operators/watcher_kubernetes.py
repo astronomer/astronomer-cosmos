@@ -100,7 +100,6 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         if self.depends_on_past:
             self.wait_for_downstream = True
 
-
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
         return CosmosKubernetesPodManager(kube_client=self.client, callbacks=self.callbacks)

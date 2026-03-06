@@ -113,6 +113,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         if self.invocation_mode == InvocationMode.SUBPROCESS:
             self.log_format = "json"
 
+        if self.depends_on_past:
+            self.wait_for_downstream = True
+
     @staticmethod
     def _serialize_event(event_message: EventMsg) -> dict[str, Any]:
         """Convert structured dbt EventMsg to plain dict."""

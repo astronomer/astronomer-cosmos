@@ -211,6 +211,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         self.deferrable = deferrable
         self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
 
+        if self.depends_on_past:
+            self.wait_for_downstream = True
+
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
         """Filters out dbt flags that are incompatible with retry (e.g., --select, --exclude)."""

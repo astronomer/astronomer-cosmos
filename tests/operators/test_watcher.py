@@ -1550,7 +1550,7 @@ def test_dbt_dag_with_watcher(capsys):
             invocation_mode=InvocationMode.DBT_RUNNER,
         ),
         render_config=RenderConfig(emit_datasets=False),
-        operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
+        operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120), "depends_on_past": True},
     )
     outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS

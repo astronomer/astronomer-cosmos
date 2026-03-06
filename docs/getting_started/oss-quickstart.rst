@@ -20,7 +20,7 @@ Prerequisites
 - A Python version supported by `Airflow <https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html#prerequisites>`_.
 - (Optional) Install a database viewer. This guide uses `dBeaver <https://dbeaver.io/download/>`_.
 
-1. Install Airflow, Cosmos, and dbt
+1. Set up your project environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Create your demo project directory.

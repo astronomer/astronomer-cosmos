@@ -36,7 +36,7 @@ Configure your Cosmos project to allow Airflow Dags to initiate dbt commands, an
 You can customize how Cosmos parses your dbt workflows into Airflow Dags. Choosing how you want your dbt nodes to map to Airflow tasks within Dags can affect the time required for Cosmos to parse the dbt workflows and for Airflow to execute the resulting Dags.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Translating dbt into Airflow
 
    translate_dbt_to_airflow/parsing-methods
@@ -53,7 +53,7 @@ You can customize how Cosmos parses your dbt workflows into Airflow Dags. Choosi
 You can specify more details about how Cosmos runs both dbt commands and Airflow Dags. This includes `choosing an execution mode <../getting_started/execution-modes.html>`_ , either one that runs dbt on an Airflow worker node or one that runs in a container. You can customize additional aspects of how your dbt code runs, like using particular operators that correspond to dbt commands. And, you can leverage Airflow's scheduling capabilities in your Cosmos Dags.
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 1
    :caption: How Cosmos runs dbt
 
    run_dbt/execution-modes

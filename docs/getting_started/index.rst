@@ -35,7 +35,7 @@ The recommended way to install and run Cosmos depends on how you run Airflow. Fo
 - `Getting Started on MWAA <mwaa.html>`__
 - `Getting Started on GCC <gcc.html>`__
 
-You might require a different setup depending on your particular configuration. See :ref:`exec-methods`.
+You might require a different setup depending on your particular configuration. See :ref:`execution-modes`.
 
 Example Demo: Jaffle Shop Project
 __________________________________
@@ -76,23 +76,3 @@ as ``max_active_tasks``, ``max_active_runs``, and ``default_args``.
 With Cosmos, transitioning from a dbt workflow to an Airflow Dag is seamless, giving you the best of both tools
 for managing and scaling your data workflows.
 
-.. _exec-methods:
-
-Execution Methods
------------------
-
-For more customization, check out the different execution modes that Cosmos supports on the `Execution Modes <execution-modes.html>`__ page.
-
-For specific guides, see the following:
-
-- `Executing dbt DAGs with DockerOperators <../../guides/run_dbt/container/docker.html>`__
-- `Executing dbt DAGs with KubernetesPodOperators <../../guides/run_dbt/container/kubernetes.html>`__
-- `Executing dbt DAGs with Watcher Kubernetes Mode <../../guides/run_dbt/container/watcher-kubernetes-execution-mode.html>`__
-- `Executing dbt DAGs with AzureContainerInstancesOperators <../../guides/run_dbt/container/azure-container-instance.html>`__
-- `Executing dbt DAGs with GcpCloudRunExecuteJobOperators <../../guides/run_dbt/container/gcp-cloud-run-job.html>`__
-
-
-Concepts Overview
------------------
-
-How do dbt and Airflow concepts map to each other? Learn more `in this link <dbt-airflow-concepts.html>`__.

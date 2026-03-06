@@ -90,7 +90,7 @@ The parts of ``profiles.yml``, which aren't specific to a particular data platfo
 
 
 Disabling dbt event tracking
-++++++++++++++++++++++++++++
+----------------------------
 
 .. note:
    Deprecated in v.1.4 and will be removed in v2.0.0. Use dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=False) instead.

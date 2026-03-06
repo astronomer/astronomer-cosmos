@@ -51,7 +51,7 @@ Examples
 --------
 
 Always Render Seeds (Default)
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 

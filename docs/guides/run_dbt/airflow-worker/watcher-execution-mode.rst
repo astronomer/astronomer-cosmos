@@ -1,7 +1,7 @@
 .. _watcher-execution-mode:
 
-Introducing ``ExecutionMode.WATCHER``: Experimental High-Performance dbt Execution in Cosmos
-============================================================================================
+Watcher execution mode (Experimental)
+======================================
 
 With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in Airflow.
 

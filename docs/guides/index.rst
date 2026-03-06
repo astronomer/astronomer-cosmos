@@ -14,10 +14,10 @@ Cosmos offers a number of configuration options to customize how Airflow dags an
 To set up a project, you follow the same general set of steps.
 
 
-1. Set up dbt with Airflow
+Set up dbt with Airflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You must make your dbt projects available to Airflow and install dbt into the environment where your dbt code runs.
+Make your dbt projects available to Airflow and install dbt into the environment where your dbt code runs.
 
 .. toctree::
    :maxdepth: 1
@@ -25,12 +25,12 @@ You must make your dbt projects available to Airflow and install dbt into the en
 
    dbt_setup/dbt-fusion
 
-2. Connect to your dbt database
+Connect to your dbt database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Configure your Cosmos project to allow Airflow Dags to initiate dbt commands, and make data transformations and udpates in your data warehouses. You can creae these connections with your ``profiles.yml`` file in the dbt project, using profile mappings, or customizing ``ProfileConfig`` per dbt configuration.
 
-3. Translate your dbt code into Airflow Dags
+Translate your dbt code into Airflow Dags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can customize how Cosmos parses your dbt workflows into Airflow Dags. Choosing how you want your dbt nodes to map to Airflow tasks within Dags can affect the time required for Cosmos to parse the dbt workflows and for Airflow to execute the resulting Dags.
@@ -47,10 +47,10 @@ You can customize how Cosmos parses your dbt workflows into Airflow Dags. Choosi
    Customize node conversion <translate_dbt_to_airflow/dag-customization>
 
 
-4. Run dbt
+Run dbt
 ~~~~~~~~~~~~~
 
-You can specify more details about how Cosmos runs both dbt commands and Airflow Dags. This includes `choosing an execution mode <../getting_started/execution-modes.html>`_ , either one that runs dbt on an Airflow worker node or one that runs in a container. You can customize additional aspects of how your dbt code runs, like using particular operators that correspond to dbt commands. And, you can leverage Airflow's scheduling capabilities in your Cosmos Dags.
+Specify more details about how Cosmos runs both dbt commands and Airflow Dags. This includes `choosing an execution mode <../getting_started/execution-modes.html>`_ , either one that runs dbt on an Airflow worker node or one that runs in a container. You can customize additional aspects of how your dbt code runs, like using particular operators that correspond to dbt commands. And, you can leverage Airflow's scheduling capabilities in your Cosmos Dags.
 
 .. toctree::
    :maxdepth: 1

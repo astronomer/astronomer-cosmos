@@ -22,7 +22,7 @@ Cosmos supports the following test behaviors:
 Example of the standard behavior of ``TestBehavior.AFTER_EACH``,
 when using the example DAG available in ``dev/dags/basic_cosmos_dag.py``:
 
-.. image:: ../_static/test_behavior_after_each.png
+.. image:: ../../_static/test_behavior_after_each.png
 
 Example when changing the behavior to use ``TestBehavior.AFTER_ALL``:
 
@@ -37,17 +37,17 @@ Example when changing the behavior to use ``TestBehavior.AFTER_ALL``:
         )
     )
 
-.. image:: ../_static/test_behavior_after_all.png
+.. image:: ../../_static/test_behavior_after_all.png
 
 
 Finally, an example DAG and how it is rendered in the Airflow UI when using ``TestBehavior.BUILD`` (available since Cosmos 1.8):
 
-.. literalinclude::  ../../dev/dags/example_cosmos_dbt_build.py
+.. literalinclude::  ../../../dev/dags/example_cosmos_dbt_build.py
     :language: python
     :start-after: [START build_example]
     :end-before: [END build_example]
 
-.. image:: ../_static/test_behavior_build.png
+.. image:: ../../_static/test_behavior_build.png
 
 Warning Behavior
 ----------------
@@ -138,7 +138,7 @@ It renders a dbt project named `multiple_parents_test <https://github.com/astron
 
 By default, Cosmos will error:
 
-.. image:: ../_static/test_with_multiple_parents_failure.png
+.. image:: ../../_static/test_with_multiple_parents_failure.png
 
 .. code-block::
 
@@ -179,4 +179,4 @@ The test will only run once after both models run, leading the DAG to succeed:
         ),
     )
 
-.. image:: ../_static/test_with_multiple_parents_success.png
+.. image:: ../../_static/test_with_multiple_parents_success.png

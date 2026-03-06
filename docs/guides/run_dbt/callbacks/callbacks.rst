@@ -34,7 +34,7 @@ Example: Using Callbacks with a Single Operator
 To demonstrate how to specify a callback function for uploading files from the target directory, here’s an example
 using a single operator in an Airflow DAG:
 
-.. literalinclude:: ../../dev/dags/example_operators.py
+.. literalinclude:: ../../../../dev/dags/example_operators.py
     :language: python
     :start-after: [START single_operator_callback]
     :end-before: [END single_operator_callback]
@@ -46,7 +46,7 @@ You can leverage the :ref:`remote_target_path` configuration to upload files
 from the target directory to a remote storage. Below is an example of how to define a callback helper function in your
 ``DbtDag`` that utilizes this configuration:
 
-.. literalinclude:: ../../dev/dags/cosmos_callback_dag.py
+.. literalinclude:: ../../../../dev/dags/cosmos_callback_dag.py
     :language: python
     :start-after: [START cosmos_callback_example]
     :end-before: [END cosmos_callback_example]

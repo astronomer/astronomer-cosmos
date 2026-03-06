@@ -1,7 +1,5 @@
 .. _async-execution-mode:
 
-.. title:: Getting Started with Deferrable Operator
-
 Airflow Async Execution Mode
 ============================
 

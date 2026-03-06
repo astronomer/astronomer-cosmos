@@ -1,27 +1,29 @@
 .. _getting-started:
 
 .. toctree::
+   :maxdepth: 1
    :hidden:
-   :caption: Contents:
+   :caption: Cosmos Fundamentals
 
-   Astro CLI quickstart <astro-cli-quickstart>
+   Similar dbt and Airflow concepts <dbt-airflow-concepts>
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :caption: Quickstart
+
    Open-source quickstart <oss-quickstart>
+   Astro CLI quickstart <astro-cli-quickstart>
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :caption: Get started with Cosmos
+
+   Open-source Airflow <open-source>
    Astro <astro>
-   MWAA <mwaa>
-   GCC <gcc>
-   Open-source <open-source>
-   Execution Modes <execution-modes>
-   Docker Execution Mode <docker>
-   Kubernetes Execution Mode <kubernetes>
-   Azure Container Instance Execution Mode <azure-container-instance>
-   AWS Container Run Job Execution Mode <aws-container-run-job>
-   GCP Cloud Run Job Execution Mode <gcp-cloud-run-job>
-   Airflow Async Execution Mode <async-execution-mode>
-   Watcher Execution Mode <watcher-execution-mode>
-   Watcher Kubernetes Execution Mode <watcher-kubernetes-execution-mode>
-   dbt and Airflow Similar Concepts <dbt-airflow-concepts>
-   Operators <operators>
-   Custom Airflow Properties <custom-airflow-properties>
+   Amazon Managed Workflows for Apache Airflow (MWAA) <mwaa>
+   Google Cloud Composer (GCC) <gcc>
 
 
 Getting Started
@@ -84,8 +86,14 @@ For more customization, check out the different execution modes that Cosmos supp
 
 For specific guides, see the following:
 
-- `Executing dbt Dags with DockerOperators <docker.html>`__
-- `Executing dbt Dags with KubernetesPodOperators <kubernetes.html>`__
-- `Executing dbt Dags with Watcher Kubernetes Mode <watcher-kubernetes-execution-mode.html>`__
-- `Executing dbt Dags with AzureContainerInstancesOperators <azure-container-instance.html>`__
-- `Executing dbt Dags with GcpCloudRunExecuteJobOperators <gcp-cloud-run-job.html>`__
+- `Executing dbt DAGs with DockerOperators <../../guides/run_dbt/container/docker.html>`__
+- `Executing dbt DAGs with KubernetesPodOperators <../../guides/run_dbt/container/kubernetes.html>`__
+- `Executing dbt DAGs with Watcher Kubernetes Mode <../../guides/run_dbt/container/watcher-kubernetes-execution-mode.html>`__
+- `Executing dbt DAGs with AzureContainerInstancesOperators <../../guides/run_dbt/container/azure-container-instance.html>`__
+- `Executing dbt DAGs with GcpCloudRunExecuteJobOperators <../../guides/run_dbt/container/gcp-cloud-run-job.html>`__
+
+
+Concepts Overview
+-----------------
+
+How do dbt and Airflow concepts map to each other? Learn more `in this link <dbt-airflow-concepts.html>`__.

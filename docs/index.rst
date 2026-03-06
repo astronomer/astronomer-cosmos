@@ -2,14 +2,17 @@
 
 .. toctree::
    :hidden:
-   :maxdepth: 2
+   :maxdepth: 0
    :caption: Contents:
 
    Home <self>
    Getting Started <getting_started/index>
-   Configuration <configuration/index>
+   Guides <guides/index>
+   Optimize Performance <optimize_performance/index>
    Profiles <profiles/index>
+   Reference <reference/index>
    Project Policies <policy/index>
+
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg
     :target: https://badge.fury.io/py/astronomer-cosmos

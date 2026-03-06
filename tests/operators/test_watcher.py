@@ -115,6 +115,12 @@ def test_dbt_producer_watcher_operator_priority_weight_default():
     assert op.priority_weight == PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT
 
 
+def test_dbt_producer_watcher_operator_does_not_store_compiled_sql_on_template():
+    """Producer does not publish compiled_sql to its rendered_template; sensors show it per model."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    assert op.should_store_compiled_sql is False
+
+
 @pytest.mark.parametrize(
     "queue_override, expected_queue",
     [

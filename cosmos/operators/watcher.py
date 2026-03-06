@@ -98,6 +98,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self.test_results_per_model: dict[str, list[str]] = {}
+        # Do not publish compiled_sql to the producer's rendered_template: it would contain SQL for
+        # all models run by the producer, is often truncated in the UI due to size, and is of no use
+        # there; individual sensor tasks show the corresponding rendered_template per model.
+        kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer

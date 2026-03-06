@@ -18,6 +18,7 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :caption: Connect to your database
 
    connect_database/use-your-profiles-yml
+   connect_database/use-profile-mapping
 
 .. toctree::
    :maxdepth: 1

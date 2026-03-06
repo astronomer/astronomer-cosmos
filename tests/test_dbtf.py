@@ -102,5 +102,6 @@ def test_dbt_fusion(dag_id, execution_config, profile_config):
     ]
     if execution_config.execution_mode == ExecutionMode.WATCHER:
         expected_task_names.insert(0, "dbt_producer_watcher")
+        expected_task_names.append("dbt_producer_watcher_gate")
 
     assert tasks_names == expected_task_names

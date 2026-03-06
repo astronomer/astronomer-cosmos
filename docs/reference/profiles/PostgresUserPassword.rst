@@ -23,8 +23,8 @@ into dbt profiles. To use this profile, import it from ``cosmos.profiles``:
     from cosmos.profiles import PostgresUserPasswordProfileMapping
 
     profile = PostgresUserPasswordProfileMapping(
-        conn_id = 'my_postgres_connection',
-        profile_args = { ... },
+        conn_id="my_postgres_connection",
+        profile_args={...},
     )
 
 While the profile mapping pulls fields from Airflow connections, you may need to supplement it
@@ -39,49 +39,49 @@ to the ``profile_args`` dict.
      - Required
      - Airflow Field Name
 
-   
+
    * - ``host``
      - True
-    
+
      - ``host``
-    
-    
+
+
    * - ``user``
      - True
-    
+
      - ``login``
-    
-    
+
+
    * - ``password``
      - True
-    
+
      - ``password``
-    
-    
+
+
    * - ``port``
      - False
-    
+
      - ``port``
-    
-    
+
+
    * - ``dbname``
      - True
-    
+
      - ``schema``
-    
-    
+
+
    * - ``keepalives_idle``
      - False
-    
+
      - ``extra.keepalives_idle``
-    
-    
+
+
    * - ``sslmode``
      - False
-    
+
      - ``extra.sslmode``
-    
-    
+
+
 
 
 Some notes about the table above:

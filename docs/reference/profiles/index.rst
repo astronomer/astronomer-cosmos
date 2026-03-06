@@ -31,7 +31,7 @@
    TrinoJWT
    VerticaUserPassword
    StandardSQLServerAuth
-   
+
 
 Profiles Overview
 ==================

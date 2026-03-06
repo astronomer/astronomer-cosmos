@@ -38,5 +38,3 @@ but override the ``database`` and ``schema`` values:
 
 Note that when using a profile mapping, the profiles.yml file gets generated with the profile name and target name
 you specify in ``ProfileConfig``.
-
-

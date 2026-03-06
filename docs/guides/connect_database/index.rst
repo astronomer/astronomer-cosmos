@@ -26,11 +26,9 @@ is set in the ``cosmos.config.ProfileConfig`` object, like so:
     profile_config = ProfileConfig(
         profile_name="my_profile_name",
         target_name="my_target_name",
-
         # choose one of the following
         profile_mapping=...,
         profiles_yml_filepath=...,
     )
 
     dag = DbtDag(profile_config=profile_config, ...)
-

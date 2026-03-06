@@ -79,7 +79,7 @@ The parts of ``profiles.yml``, which aren't specific to a particular data platfo
                 write_json=True,
                 warn_error=True,
                 warn_error_options={"include": "all"},
-                log_format='text',
+                log_format="text",
                 debug=True,
                 version_check=True,
             ),

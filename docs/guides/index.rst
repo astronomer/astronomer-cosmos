@@ -38,7 +38,7 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :hidden:
    :caption: Multi-project Setups
 
-   multi_project/multi-project
+   Handle cross-project references <multi_project/multi-project>
 
 .. toctree::
    :maxdepth: 1

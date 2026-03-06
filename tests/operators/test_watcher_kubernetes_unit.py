@@ -3,9 +3,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException, AirflowSkipException, TaskDeferred
 from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
 from airflow.providers.cncf.kubernetes.secret import Secret
+from kubernetes.client import ApiException
 from packaging.version import Version
 
 from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig
@@ -362,3 +363,38 @@ def test_callbacks_included_in_producer_operator():
     )
     callback_classes = [callback.__name__ for callback in op.callbacks]
     assert "WatcherKubernetesCallback" in callback_classes
+
+
+def test_exceptions_converted_to_airflow_skip_exception():
+    """
+    Test that if exceptions are raised during execute, they are converted to an AirflowSkipException.
+    """
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+    ti = MagicMock()
+    ti.try_number = 1
+    context = make_context(ti)
+
+    with patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.execute") as mock_execute:
+        mock_execute.side_effect = ApiException("Kubernetes API error")
+
+        with pytest.raises(AirflowSkipException, match="Skipping execution due to task failure") as execinfo:
+            op.execute(context=context)
+
+        assert execinfo.value.__cause__ == mock_execute.side_effect
+
+    with patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.execute") as mock_execute:
+        mock_execute.side_effect = AirflowException("Airflow exception during execution")
+        with pytest.raises(AirflowSkipException, match="Skipping execution due to task failure") as execinfo:
+            op.execute(context=context)
+        assert execinfo.value.__cause__ == mock_execute.side_effect
+
+    # Ensure deferred exceptions are not caught and converted to AirflowSkipException
+    with patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.execute") as mock_execute:
+        mock_execute.side_effect = TaskDeferred(trigger="some_trigger", method_name="trigger_reentry")
+
+        with pytest.raises(TaskDeferred) as execinfo:
+            op.execute(context=context)

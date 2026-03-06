@@ -41,7 +41,8 @@ grandparent_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.grandparent",
     resource_type=DbtResourceType.MODEL,
     depends_on=[],
-    file_path=SAMPLE_PROJ_PATH / "gen1/models/grandparent.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/grandparent.sql"),
     tags=["has_child"],
     config={"materialized": "view", "tags": ["has_child"]},
 )
@@ -50,7 +51,8 @@ another_grandparent_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.another_grandparent_node",
     resource_type=DbtResourceType.MODEL,
     depends_on=[],
-    file_path=SAMPLE_PROJ_PATH / "gen1/models/another_grandparent_node.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/another_grandparent_node.sql"),
     tags=[],
     config={"meta": {"frequency": "daily"}},
 )
@@ -59,7 +61,8 @@ parent_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent",
     resource_type=DbtResourceType.MODEL,
     depends_on=[grandparent_node.unique_id, another_grandparent_node.unique_id],
-    file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen2/models/parent.sql"),
     tags=["has_child", "is_child"],
     config={"materialized": "view", "tags": ["has_child", "is_child"]},
 )
@@ -69,7 +72,8 @@ child_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child",
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
-    file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen3/models/child.sql"),
     tags=["nightly", "is_child"],
     config={"materialized": "table", "tags": ["nightly", "is_child"]},
 )
@@ -78,7 +82,8 @@ sibling1_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.sibling1",
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
-    file_path=SAMPLE_PROJ_PATH / "gen3/models/sibling1.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen3/models/sibling1.sql"),
     tags=["nightly", "deprecated", "test"],
     config={"materialized": "table", "tags": ["nightly", "deprecated", "test"]},
 )
@@ -87,7 +92,8 @@ sibling2_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.sibling2",
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
-    file_path=SAMPLE_PROJ_PATH / "gen3/models/sibling2.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen3/models/sibling2.sql"),
     tags=["nightly", "deprecated", "test2"],
     config={"materialized": "table", "tags": ["nightly", "deprecated", "test2"]},
 )
@@ -96,7 +102,8 @@ sibling3_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.public.sibling3",
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
-    file_path=SAMPLE_PROJ_PATH / "gen3/models/public.sibling3.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen3/models/public.sibling3.sql"),
     tags=["nightly", "deprecated", "test3"],
     config={"materialized": "table", "tags": ["nightly", "deprecated", "test3"]},
 )
@@ -105,7 +112,8 @@ orphaned_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.orphaned",
     resource_type=DbtResourceType.MODEL,
     depends_on=[],
-    file_path=SAMPLE_PROJ_PATH / "gen3/models/orphaned.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen3/models/orphaned.sql"),
     tags=[],
     config={},
 )
@@ -144,7 +152,8 @@ def test_node_fqn_str_returns_none_when_missing():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.no_fqn",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "models/no_fqn.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/no_fqn.sql"),
         tags=[],
         config={},
         fqn=None,
@@ -161,7 +170,8 @@ def test_select_nodes_with_fqn_selector():
         unique_id=f"{DbtResourceType.MODEL.value}.{project_name}.my_model",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "models/my_model.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/my_model.sql"),
         tags=[],
         config={},
         fqn=[project_name, "models", "my_model"],
@@ -172,7 +182,8 @@ def test_select_nodes_with_fqn_selector():
         unique_id=f"{DbtResourceType.MODEL.value}.{project_name}.other_model",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "models/other_model.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/other_model.sql"),
         tags=[],
         config={},
         fqn=[project_name, "models", "other_model"],
@@ -183,7 +194,8 @@ def test_select_nodes_with_fqn_selector():
         unique_id=f"{DbtResourceType.MODEL.value}.{project_name}.no_fqn",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "models/no_fqn.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/no_fqn.sql"),
         tags=[],
         config={},
         fqn=None,
@@ -231,7 +243,8 @@ def test_select_nodes_by_select_config_meta_nested_property_two_meta_values():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.someone_else",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "gen1/models/someone_else.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen1/models/someone_else.sql"),
         tags=[],
         config={"meta": {"frequency": "daily", "dbt_environment": "dev"}},
     )
@@ -331,7 +344,8 @@ def test_select_nodes_by_intersection_and_tag_ancestry():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent_sibling",
         resource_type=DbtResourceType.MODEL,
         depends_on=[grandparent_node.unique_id, another_grandparent_node.unique_id],
-        file_path=SAMPLE_PROJ_PATH / "gen2/models/parent_sibling.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/parent_sibling.sql"),
         tags=["is_adopted"],
         config={"materialized": "view", "tags": ["is_adopted"]},
     )
@@ -352,7 +366,8 @@ def test_select_nodes_by_tag_ancestry():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent_sibling",
         resource_type=DbtResourceType.MODEL,
         depends_on=[grandparent_node.unique_id, another_grandparent_node.unique_id],
-        file_path=SAMPLE_PROJ_PATH / "gen2/models/parent_sibling.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/parent_sibling.sql"),
         tags=["is_adopted"],
         config={"materialized": "view", "tags": ["is_adopted"]},
     )
@@ -374,7 +389,8 @@ def test_select_nodes_with_test_by_intersection_and_tag_ancestry():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent_sibling",
         resource_type=DbtResourceType.MODEL,
         depends_on=[grandparent_node.unique_id, another_grandparent_node.unique_id],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=["is_adopted"],
         config={"materialized": "view", "tags": ["is_adopted"]},
     )
@@ -382,7 +398,8 @@ def test_select_nodes_with_test_by_intersection_and_tag_ancestry():
         unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.test",
         resource_type=DbtResourceType.TEST,
         depends_on=[parent_node.unique_id, parent_sibling_node.unique_id],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={},
     )
     new_sample_nodes = dict(sample_nodes)
@@ -588,7 +605,8 @@ def test_select_nodes_by_precursors_with_external_dependency():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.local_staging",
         resource_type=DbtResourceType.MODEL,
         depends_on=[external_upstream_id],
-        file_path=SAMPLE_PROJ_PATH / "models/local_staging.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/local_staging.sql"),
         tags=[],
         config={},
     )
@@ -596,7 +614,8 @@ def test_select_nodes_by_precursors_with_external_dependency():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.local_marts",
         resource_type=DbtResourceType.MODEL,
         depends_on=[local_staging.unique_id],
-        file_path=SAMPLE_PROJ_PATH / "models/local_marts.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/local_marts.sql"),
         tags=[],
         config={},
     )
@@ -701,7 +720,8 @@ def test_node_without_depends_on_with_tag_selector_should_not_raise_exception():
         depends_on=[],
         tags=[],
         config={},
-        file_path=SAMPLE_PROJ_PATH / "tests/generic/builtin.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("tests/generic/builtin.sql"),
     )
     nodes = {standalone_test_node.unique_id: standalone_test_node}
     assert not select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["tag:some-tag"])
@@ -714,7 +734,8 @@ def test_should_include_node_without_depends_on(selector_config):
         depends_on=None,
         tags=[],
         config={},
-        file_path=SAMPLE_PROJ_PATH / "tests/generic/builtin.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("tests/generic/builtin.sql"),
     )
     selector = NodeSelector({}, selector_config)
     selector.visited_nodes = set()
@@ -947,7 +968,8 @@ def test_select_nodes_by_resource_type_source():
         unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source.my_table",
         resource_type=DbtResourceType.SOURCE,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("sources/my_source.yml"),
         tags=[],
         config={},
     )
@@ -957,7 +979,8 @@ def test_select_nodes_by_resource_type_source():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.model_from_source",
         resource_type=DbtResourceType.MODEL,
         depends_on=[source_node.unique_id],
-        file_path=SAMPLE_PROJ_PATH / "models/model_from_source.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/model_from_source.sql"),
         tags=["depends_on_source"],
         config={"materialized": "table", "tags": ["depends_on_source"]},
     )
@@ -984,7 +1007,8 @@ def test_select_nodes_by_exclude_resource_type_model():
         unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source.my_table",
         resource_type=DbtResourceType.SOURCE,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("sources/my_source.yml"),
         tags=[],
         config={},
     )
@@ -994,7 +1018,8 @@ def test_select_nodes_by_exclude_resource_type_model():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.model_from_source",
         resource_type=DbtResourceType.MODEL,
         depends_on=[source_node.unique_id],
-        file_path=SAMPLE_PROJ_PATH / "models/model_from_source.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/model_from_source.sql"),
         tags=["depends_on_source"],
         config={"materialized": "table", "tags": ["depends_on_source"]},
     )
@@ -1023,7 +1048,8 @@ def test_select_nodes_by_source_name():
         unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source.my_table",
         resource_type=DbtResourceType.SOURCE,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("sources/my_source.yml"),
         tags=[],
         config={},
     )
@@ -1049,7 +1075,8 @@ def test_select_nodes_by_exposure_name():
         unique_id=f"{DbtResourceType.EXPOSURE.value}.{SAMPLE_PROJ_PATH.stem}.exposure_name",
         resource_type=DbtResourceType.EXPOSURE,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "exposures/my_exposure.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("exposures/my_exposure.yml"),
         tags=[],
         config={},
     )
@@ -1075,7 +1102,8 @@ def test_select_nodes_by_select_package():
         unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("dbt_packages/dbt_artifacts/models/artifact_model_1.sql"),
         tags=[],
         config={},
         package_name="dbt_artifacts",
@@ -1084,7 +1112,8 @@ def test_select_nodes_by_select_package():
         unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_2",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_2.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("dbt_packages/dbt_artifacts/models/artifact_model_2.sql"),
         tags=[],
         config={},
         package_name="dbt_artifacts",
@@ -1112,7 +1141,8 @@ def test_select_nodes_by_exclude_package():
         unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("dbt_packages/dbt_artifacts/models/artifact_model_1.sql"),
         tags=[],
         config={},
         package_name="dbt_artifacts",
@@ -1135,7 +1165,8 @@ def test_select_nodes_by_package_plus_descendants():
         unique_id=f"{DbtResourceType.MODEL.value}.dbt_utils.uppercase",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_utils/macros/uppercase.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("dbt_packages/dbt_utils/macros/uppercase.sql"),
         tags=[],
         config={},
         package_name="dbt_utils",
@@ -1145,7 +1176,8 @@ def test_select_nodes_by_package_plus_descendants():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.uses_utils",
         resource_type=DbtResourceType.MODEL,
         depends_on=[pkg_node.unique_id],
-        file_path=SAMPLE_PROJ_PATH / "models/uses_utils.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/uses_utils.sql"),
         tags=[],
         config={},
     )
@@ -1179,7 +1211,8 @@ def test_select_nodes_by_exclude_bare_package_name():
         unique_id=f"{DbtResourceType.MODEL.value}.dbt_artifacts.artifact_model_1",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "dbt_packages/dbt_artifacts/models/artifact_model_1.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("dbt_packages/dbt_artifacts/models/artifact_model_1.sql"),
         tags=[],
         config={},
         package_name="dbt_artifacts",
@@ -1244,7 +1277,8 @@ def test_select_exposure_nodes_by_graph_ancestry():
         unique_id=f"{DbtResourceType.EXPOSURE.value}.{SAMPLE_PROJ_PATH.stem}.exposure_name",
         resource_type=DbtResourceType.EXPOSURE,
         depends_on=[parent_node.unique_id],
-        file_path=SAMPLE_PROJ_PATH / "exposures/my_exposure.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("exposures/my_exposure.yml"),
         tags=[],
         config={},
     )
@@ -1275,7 +1309,8 @@ def test_exclude_nodes_by_resource_type_seed():
         depends_on=[],
         tags=[],
         config={},
-        file_path=SAMPLE_PROJ_PATH / "seeds/seed.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("seeds/seed.yml"),
     )
 
     local_nodes[seed_node.unique_id] = seed_node
@@ -1296,7 +1331,8 @@ def test_exclude_nodes_by_exclude_resource_type_seed():
         depends_on=[],
         tags=[],
         config={},
-        file_path=SAMPLE_PROJ_PATH / "models/my_seed.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/my_seed.yml"),
     )
 
     local_nodes[seed_node.unique_id] = seed_node
@@ -1320,7 +1356,8 @@ def test_source_selector():
         unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.my_source",
         resource_type=DbtResourceType.SOURCE,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "sources/my_source.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("sources/my_source.yml"),
         tags=[],
         config={},
     )
@@ -1328,7 +1365,8 @@ def test_source_selector():
         unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.another_source",
         resource_type=DbtResourceType.SOURCE,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "sources/another_source.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("sources/another_source.yml"),
         tags=[],
         config={},
     )
@@ -1364,7 +1402,8 @@ def test_exposure_selector():
         unique_id=f"{DbtResourceType.EXPOSURE.value}.{SAMPLE_PROJ_PATH.stem}.my_exposure",
         resource_type=DbtResourceType.EXPOSURE,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "exposures/my_exposure.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("exposures/my_exposure.yml"),
         tags=[],
         config={},
     )
@@ -1372,7 +1411,8 @@ def test_exposure_selector():
         unique_id=f"{DbtResourceType.EXPOSURE.value}.{SAMPLE_PROJ_PATH.stem}.another_exposure",
         resource_type=DbtResourceType.EXPOSURE,
         depends_on=[],
-        file_path=SAMPLE_PROJ_PATH / "exposures/another_exposure.yml",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("exposures/another_exposure.yml"),
         tags=[],
         config={},
     )

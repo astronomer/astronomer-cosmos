@@ -57,7 +57,8 @@ parent_seed = DbtNode(
     unique_id=f"{DbtResourceType.SEED.value}.{SAMPLE_PROJ_PATH.stem}.seed_parent",
     resource_type=DbtResourceType.SEED,
     depends_on=[],
-    file_path="",
+    path_base=Path("."),
+    original_file_path=Path("."),
     config={
         "meta": {
             "cosmos": {
@@ -73,7 +74,8 @@ parent_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent",
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_seed.unique_id],
-    file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen2/models/parent.sql"),
     tags=["has_child"],
     config={"materialized": "view", "meta": {"owner": "parent_node"}},
     has_test=True,
@@ -83,13 +85,15 @@ test_parent_node = DbtNode(
     unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.test_parent",
     resource_type=DbtResourceType.TEST,
     depends_on=[parent_node.unique_id],
-    file_path="",
+    path_base=Path("."),
+    original_file_path=Path("."),
 )
 child_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child",
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
-    file_path=SAMPLE_PROJ_PATH / "gen3/models/child.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen3/models/child.sql"),
     tags=["nightly"],
     config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"queue": "custom_queue"}}}},
 )
@@ -98,7 +102,8 @@ child2_node = DbtNode(
     unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child2.v2",
     resource_type=DbtResourceType.MODEL,
     depends_on=[parent_node.unique_id],
-    file_path=SAMPLE_PROJ_PATH / "gen3/models/child2_v2.sql",
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen3/models/child2_v2.sql"),
     tags=["nightly"],
     config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"pool": "custom_pool"}}}},
 )
@@ -112,7 +117,8 @@ def test_calculate_datached_node_name_under_is_under_250():
         unique_id="model.my_dbt_project.a_very_short_name",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
     )
     assert calculate_detached_node_name(node) == "a_very_short_name_test"
 
@@ -120,7 +126,8 @@ def test_calculate_datached_node_name_under_is_under_250():
         unique_id="model.my_dbt_project." + "this_is_a_very_long_name" * 20,  # 24 x 20 = 480 characters
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
     )
     assert calculate_detached_node_name(node) == "detached_0_test"
 
@@ -128,7 +135,8 @@ def test_calculate_datached_node_name_under_is_under_250():
         unique_id="model.my_dbt_project." + "this_is_another_very_long_name" * 20,
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
     )
     assert calculate_detached_node_name(node) == "detached_1_test"
 
@@ -202,7 +210,8 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
         node = DbtNode(
             unique_id=f"{node_type.value}.{SAMPLE_PROJ_PATH.stem}.dbt_node",
             resource_type=node_type,
-            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/parent.sql"),
             tags=["has_child"],
             config={"materialized": "view"},
             depends_on=[],
@@ -364,7 +373,8 @@ def test_calculate_leaves():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.grandparent",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -372,7 +382,8 @@ def test_calculate_leaves():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent1",
         resource_type=DbtResourceType.MODEL,
         depends_on=[grandparent_node.unique_id],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -380,7 +391,8 @@ def test_calculate_leaves():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.parent2",
         resource_type=DbtResourceType.MODEL,
         depends_on=[parent1_node.unique_id],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -388,7 +400,8 @@ def test_calculate_leaves():
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child",
         resource_type=DbtResourceType.MODEL,
         depends_on=[parent1_node.unique_id, parent2_node.unique_id],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -406,7 +419,8 @@ def test_create_task_metadata_unsupported(caplog):
         unique_id=f"unsupported.{SAMPLE_PROJ_PATH.stem}.unsupported",
         resource_type="unsupported",
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -503,7 +517,8 @@ def test_create_task_metadata_model(
         unique_id=unique_id,
         resource_type=resource_type,
         depends_on=[],
-        file_path=Path(""),
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
         has_freshness=True,
@@ -524,7 +539,8 @@ def test_create_task_metadata_model_with_versions(caplog):
         unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model.v1",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -541,7 +557,8 @@ def test_create_task_metadata_model_use_task_group(caplog):
         unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path=Path(""),
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -595,7 +612,8 @@ def test_create_task_metadata_source_with_rendering_options(
         unique_id=unique_id,
         resource_type=resource_type,
         depends_on=[],
-        file_path=Path(""),
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
         has_freshness=has_freshness,
@@ -621,7 +639,8 @@ def test_create_task_metadata_seed(caplog, use_task_group):
         unique_id=f"{DbtResourceType.SEED.value}.my_folder.my_seed",
         resource_type=DbtResourceType.SEED,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -652,7 +671,8 @@ def test_create_task_metadata_snapshot(caplog):
         unique_id=f"{DbtResourceType.SNAPSHOT.value}.my_folder.my_snapshot",
         resource_type=DbtResourceType.SNAPSHOT,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -898,7 +918,8 @@ def test_create_task_metadata_normalize_task_id(
         unique_id=node_id,
         resource_type=node_type,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -1000,7 +1021,8 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
         unique_id=node_unique_id,
         resource_type=node_type,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -1066,7 +1088,8 @@ def test_owner(dbt_extra_config, expected_owner):
         node = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
             resource_type=DbtResourceType.MODEL,
-            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/parent.sql"),
             tags=["has_child"],
             config={"materialized": "view", **dbt_extra_config},
             depends_on=[],
@@ -1209,7 +1232,8 @@ def test_create_task_metadata_disable_owner_inheritance(enable_owner_inheritance
     node = DbtNode(
         unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
         resource_type=DbtResourceType.MODEL,
-        file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/parent.sql"),
         tags=["has_child"],
         config={"materialized": "view", "meta": {"owner": node_owner}},
         depends_on=[],
@@ -1243,7 +1267,8 @@ def test_create_test_task_metadata_disable_owner_inheritance(enable_owner_inheri
     node = DbtNode(
         unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
         resource_type=DbtResourceType.MODEL,
-        file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/parent.sql"),
         tags=["has_child"],
         config={"materialized": "view", "meta": {"owner": node_owner}},
         depends_on=[],
@@ -1290,7 +1315,8 @@ def test_generate_task_or_group_disable_owner_inheritance(enable_owner_inheritan
         node = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_model",
             resource_type=DbtResourceType.MODEL,
-            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/parent.sql"),
             tags=["has_child"],
             config={"materialized": "view", "meta": {"owner": node_owner}},
             depends_on=[],
@@ -1343,7 +1369,8 @@ def test_build_airflow_graph_disable_owner_inheritance(test_behavior, enable_own
         node_with_owner = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.model_with_owner",
             resource_type=DbtResourceType.MODEL,
-            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/parent.sql"),
             tags=["has_child"],
             config={"materialized": "view", "meta": {"owner": "test-owner"}},
             depends_on=[],
@@ -1408,7 +1435,8 @@ def test_build_airflow_graph_disable_owner_inheritance_with_detached_tests():
         parent_node1 = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent1",
             resource_type=DbtResourceType.MODEL,
-            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent1.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/parent1.sql"),
             config={"materialized": "view", "meta": {"owner": "parent1-owner"}},
             depends_on=[],
         )
@@ -1416,7 +1444,8 @@ def test_build_airflow_graph_disable_owner_inheritance_with_detached_tests():
         parent_node2 = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent2",
             resource_type=DbtResourceType.MODEL,
-            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent2.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/parent2.sql"),
             config={"materialized": "view", "meta": {"owner": "parent2-owner"}},
             depends_on=[],
         )
@@ -1424,7 +1453,8 @@ def test_build_airflow_graph_disable_owner_inheritance_with_detached_tests():
         test_node = DbtNode(
             unique_id=f"{DbtResourceType.TEST.value}.my_folder.test_both_parents",
             resource_type=DbtResourceType.TEST,
-            file_path=SAMPLE_PROJ_PATH / "gen2/tests/test_both_parents.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/tests/test_both_parents.sql"),
             config={"meta": {"owner": "test-owner"}},
             depends_on=[parent_node1.unique_id, parent_node2.unique_id],
         )
@@ -1612,7 +1642,8 @@ def test_skip_test_task_when_only_detached_tests_exist():
         parent_node1 = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent1",
             resource_type=DbtResourceType.MODEL,
-            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent1.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/parent1.sql"),
             config={"materialized": "view", "meta": {"owner": "parent1-owner"}},
             depends_on=[],
         )
@@ -1620,7 +1651,8 @@ def test_skip_test_task_when_only_detached_tests_exist():
         parent_node2 = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent2",
             resource_type=DbtResourceType.MODEL,
-            file_path=SAMPLE_PROJ_PATH / "gen2/models/parent2.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/parent2.sql"),
             config={"materialized": "view", "meta": {"owner": "parent2-owner"}},
             depends_on=[],
         )
@@ -1628,7 +1660,8 @@ def test_skip_test_task_when_only_detached_tests_exist():
         parent1_test_node = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.test_parent1",
             resource_type=DbtResourceType.MODEL,
-            file_path=SAMPLE_PROJ_PATH / "gen2/models/test_parent1.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/test_parent1.sql"),
             config={"materialized": "view", "meta": {"owner": "parent1-owner"}},
             depends_on=[parent_node1.unique_id],
         )
@@ -1636,7 +1669,8 @@ def test_skip_test_task_when_only_detached_tests_exist():
         detached_test_node = DbtNode(
             unique_id=f"{DbtResourceType.TEST.value}.my_folder.test_both_parents",
             resource_type=DbtResourceType.TEST,
-            file_path=SAMPLE_PROJ_PATH / "gen2/tests/test_both_parents.sql",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/tests/test_both_parents.sql"),
             config={"meta": {"owner": "test-owner"}},
             depends_on=[parent_node1.unique_id, parent_node2.unique_id],
         )
@@ -1737,13 +1771,15 @@ class TestExcludeDetachedTestsIfNeeded:
             unique_id="model.my_folder.my_model",
             resource_type=DbtResourceType.MODEL,
             depends_on=[],
-            file_path="",
+            path_base=Path("."),
+            original_file_path=Path("."),
         )
         detached_test = DbtNode(
             unique_id="test.my_folder.test_detached",
             resource_type=DbtResourceType.TEST,
             depends_on=["model.my_folder.my_model", "model.my_folder.other_model"],
-            file_path="",
+            path_base=Path("."),
+            original_file_path=Path("."),
         )
         task_args: dict = {}
         detached_from_parent = {"model.my_folder.my_model": [detached_test]}
@@ -1759,13 +1795,15 @@ class TestExcludeDetachedTestsIfNeeded:
             unique_id="model.my_folder.my_model",
             resource_type=DbtResourceType.MODEL,
             depends_on=[],
-            file_path="",
+            path_base=Path("."),
+            original_file_path=Path("."),
         )
         detached_test = DbtNode(
             unique_id="test.my_folder.test_detached",
             resource_type=DbtResourceType.TEST,
             depends_on=["model.my_folder.my_model", "model.my_folder.other_model"],
-            file_path="",
+            path_base=Path("."),
+            original_file_path=Path("."),
         )
         task_args: dict = {"exclude": "existing_exclude"}
         detached_from_parent = {"model.my_folder.my_model": [detached_test]}
@@ -1781,13 +1819,15 @@ class TestExcludeDetachedTestsIfNeeded:
             unique_id="model.my_folder.my_model",
             resource_type=DbtResourceType.MODEL,
             depends_on=[],
-            file_path="",
+            path_base=Path("."),
+            original_file_path=Path("."),
         )
         detached_test = DbtNode(
             unique_id="test.my_folder.test_detached",
             resource_type=DbtResourceType.TEST,
             depends_on=["model.my_folder.my_model", "model.my_folder.other_model"],
-            file_path="",
+            path_base=Path("."),
+            original_file_path=Path("."),
         )
         task_args: dict = {"exclude": ["existing_exclude"]}
         detached_from_parent = {"model.my_folder.my_model": [detached_test]}
@@ -1803,7 +1843,8 @@ class TestExcludeDetachedTestsIfNeeded:
             unique_id="model.my_folder.my_model",
             resource_type=DbtResourceType.MODEL,
             depends_on=[],
-            file_path="",
+            path_base=Path("."),
+            original_file_path=Path("."),
         )
         task_args: dict = {}
         exclude_detached_tests_if_needed(node, task_args, {})

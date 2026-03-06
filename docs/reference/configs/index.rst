@@ -9,5 +9,4 @@
 
    cosmos-conf
    execution-config
-   profile-config
    project-config

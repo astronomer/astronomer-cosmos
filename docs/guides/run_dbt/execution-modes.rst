@@ -83,7 +83,7 @@ The type of execution mode that you choose directly affects how fast your Cosmos
      - Slow
      - High
      - No
-  * - Watcher Kubernetes
+   * - Watcher Kubernetes
      - Fast
      - High
      - No

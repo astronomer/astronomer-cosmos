@@ -1,4 +1,3 @@
-import logging
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -118,9 +117,9 @@ def test_skips_retry_attempt(mock_execute):
     context = {"ti": ti}
 
     with pytest.raises(
-            AirflowSkipException,
-            match="DbtProducerWatcherKubernetesOperator does not support Airflow retries. Detected attempt #2; skipping execution to avoid running a second dbt build.",
-        ):
+        AirflowSkipException,
+        match="DbtProducerWatcherKubernetesOperator does not support Airflow retries. Detected attempt #2; skipping execution to avoid running a second dbt build.",
+    ):
         op.execute(context=context)
 
     mock_execute.assert_not_called()

@@ -9,3 +9,4 @@ Run dbt in an Airflow worker
    watcher-execution-mode
    cosmos-managed-venv
    async-execution-mode
+   execution-modes-local-conflicts

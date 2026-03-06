@@ -98,6 +98,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self.test_results_per_model: dict[str, list[str]] = {}
+        use_run_command = kwargs.pop("use_run_command", False)
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
@@ -109,6 +110,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["retries"] = 0
         kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
         super().__init__(task_id=task_id, *args, **kwargs)
+
+        if use_run_command:
+            # Override the base command to use the run command
+            self.base_cmd = ["run"]
 
         if self.invocation_mode == InvocationMode.SUBPROCESS:
             self.log_format = "json"

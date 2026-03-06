@@ -9,5 +9,7 @@ Run dbt in a container
    kubernetes
    watcher-kubernetes-execution-mode
    aws-container-run-job
+   aws-eks
    azure-container-instance
    gcp-cloud-run-job
+

@@ -116,7 +116,7 @@ def test_dbt_dag_with_watcher_kubernetes():
         "stg_payments_run",
         "customers_run",
         "orders_run",
-        "dbt_producer_watcher_gate"
+        "dbt_producer_watcher_gate",
     ]
     assert tasks_names == expected_task_names
 

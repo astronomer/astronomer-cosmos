@@ -17,7 +17,7 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :hidden:
    :caption: Connect to your database
 
-   connect_database/index
+   Connection options <connect_database/index>
    connect_database/use-your-profiles-yml
    connect_database/use-profile-mapping
    connect_database/profile-customise-per-node

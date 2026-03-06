@@ -28,7 +28,7 @@ Make your dbt projects available to Airflow and install dbt into the environment
 Connect to your dbt database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Configure your Cosmos project to allow Airflow Dags to initiate dbt commands, and make data transformations and udpates in your data warehouses. You can creae these connections with your ``profiles.yml`` file in the dbt project, using profile mappings, or customizing ``ProfileConfig`` per dbt configuration.
+Configure your Cosmos project to allow Airflow Dags to initiate dbt commands, and make data transformations and updates in your data warehouses. You can create these connections with your ``profiles.yml`` file in the dbt project, using profile mappings, or customizing ``ProfileConfig`` per dbt configuration.
 
 Translate your dbt code into Airflow Dags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -77,7 +77,7 @@ If you have a multi-project architecture where you have multiple dbt projects th
 Add your dbt documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Cosmos supports dbt's documetnation capabilities.
+Cosmos supports dbt's documentation capabilities.
 
 .. toctree::
    :maxdepth: 1

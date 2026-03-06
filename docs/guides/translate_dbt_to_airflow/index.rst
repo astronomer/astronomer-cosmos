@@ -9,6 +9,7 @@ Translate dbt code into Airflow
 
    parsing-methods
    custom-airflow-properties
+   selecting-excluding
 
 
 .. toctree::

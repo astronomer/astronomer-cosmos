@@ -41,7 +41,7 @@ Cosmos offers a number of configuration options to customize its behavior. For m
 .. toctree::
    :maxdepth: 1
    :hidden:
-   :caption: Documentation
+   :caption: dbt Documentation
 
    dbt_docs/generating-docs
    dbt_docs/hosting-docs

@@ -8,3 +8,4 @@ Additional Customization
    scheduling
    operator-args
    partial-parsing
+   custom-airflow-properties

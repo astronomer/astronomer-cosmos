@@ -17,9 +17,12 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :hidden:
    :caption: Translating dbt into Airflow
 
-   translate_dbt_to_airflow/map_dbt_to_dags/index
-   translate_dbt_to_airflow/testing-behavior
-   translate_dbt_to_airflow/translate_nodes/index
+   translate_dbt_to_airflow/parsing-methods
+   Selecting what to run <translate_dbt_to_airflow/selecting-excluding>
+   Configure tests <translate_dbt_to_airflow/testing-behavior>
+   translate_dbt_to_airflow/managing-sources
+   translate_dbt_to_airflow/render-config
+   Customize node conversion <translate_dbt_to_airflow/dag-customization>
 
 .. toctree::
    :maxdepth: 3

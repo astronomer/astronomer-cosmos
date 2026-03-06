@@ -41,7 +41,7 @@ Prerequisites
 
 .. tip::
 
-    If you have multiple versions of Python on your machine, and need to use an older version of Python with Airflow, be sure to create your demo virtual enivonrment with the older Python version. For example, ``python3.13 -m venv venv``.
+    If you have multiple versions of Python on your machine, and need to use an older version of Python with Airflow, be sure to create your demo virtual environment with the older Python version. For example, ``python3.13 -m venv venv``.
 
 If you exit your virtual environment, remember you can reactivate it by returning to your project directory and then using the ``source venv/bin/activate`` command.
 
@@ -74,7 +74,7 @@ Your project structure should look like this: ::
 3. Create a minimal dbt project
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For the demo dbt project, you need to make some essential components for your project. The dbt commands for this demo take two SQL files, a ``base_model`` that creates a database with greetings, and an ``enriched_model`` that transforms the greetings in the base model.
+For the demo dbt project, you need to make some essential components for your project. The dbt commands for this demo take two SQL files, a ``base_model`` that creates a table with greetings in your database, and an ``enriched_model`` table that has transformed values for greetings in the base model.
 
 1. Create your ``dbt_project.yml``
 
@@ -183,7 +183,7 @@ This Dag tells Airflow and Cosmos where to find the dbt project and profile conf
     )
 
 
-5. Export environmental variables to Airflow
+5. Set environment variables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To successfully launch, Airflow needs you to define the some environment variables. These identify the project home directory, ``AIRFLOW_HOME``, and disable additional Airflow and Cosmos features that are not required for local execution.
@@ -202,11 +202,11 @@ At this point, you have completed the following project setup steps:
 
 - Installed Cosmos, dbt, and Airflow into your environment.
 - Created a lightweight dbt project and defined the ``profiles.yml`` file, which Cosmos can use to connect to the dbt database.
-- Created an Airflow Dag that defines the ``profile_config`` and ``project_config``, which tells Cosmos the locations of the dbt project and ``profiles.yml`` file.
-- Defined the Airflow project home and configured environment variables that improve local Dag performance.
+- Created an Airflow Dag that defines the ``project_config`` and ``profile_config``, which tells Cosmos the locations of the dbt project and ``profiles.yml`` file.
+- Defined the Airflow project home and configured environment variables.
 
 
-1. Launch Airflow by using the ``airflow standalone`` command, which initializes the database, creates a user, and starts all components at ``localhost: 8080``.
+1. Launch Airflow by using the ``airflow standalone`` command, which initializes the database, creates a user, and starts all components at ``localhost:8080``.
 
 .. code-block:: bash
 
@@ -222,7 +222,7 @@ At this point, you have completed the following project setup steps:
 
 2. Click **Trigger** to run your Dags.
 
-3. After the Dag succesffuly finishes, you can explore the `Airflow UI Dag views <https://www.astronomer.io/docs/learn/airflow-ui#dag-views>`_ to view the logs or check the Dag code.
+3. After the Dag successfully finishes, you can explore the `Airflow UI Dag views <https://www.astronomer.io/docs/learn/airflow-ui#dag-views>`_ to view the logs or check the Dag code.
 
 8. (Optional) View results with a database viewer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -250,8 +250,8 @@ To view the transformations completed by the Dag, you must use a database viewer
 
 
 5. Click **Finish**. dBeaver asks for permission to download the necessary drivers to access and display the database information.
-6. After the database onnection is successful, dBeaver displays the SQLite project directory. Navigate to **Views** at ``mydatabase.db/viewss`` to view the different table views created by dbt.
-7. **base_model** and **enriched_model** are the final Table views produced by the dbt code. But click any of these tables and then choose the **Data** tab to see the dbt output.
+6. After the database connection is successful, dBeaver displays the SQLite project directory. Navigate to **Views** at ``mydatabase.db/views`` to view the different table views created by dbt.
+7. **base_model** and **enriched_model** are the final Table views produced by the dbt code. Click any of these tables and then choose the **Data** tab to see the dbt output.
 
 .. image:: /_static/oss_quickstart_enriched_model.png
    :alt: dBeaver user interface displaying the enriched_model table view produced by the dbt code. This table includes data that has been transformed from the base_model database you created.

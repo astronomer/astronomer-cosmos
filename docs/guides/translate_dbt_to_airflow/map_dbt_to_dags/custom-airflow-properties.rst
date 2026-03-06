@@ -29,5 +29,5 @@ By adding Airflow configurations under **cosmos** in the **meta** field, you can
 For example, in the YAML above, the **pool** setting is applied to the specific dbt task.
 This approach allows for more granular control over Airflow settings per task within your dbt model definitions.
 
-.. image:: ../../_static/custom_airflow_pool.png
+.. image:: ../../../_static/custom_airflow_pool.png
    :alt: Result of applying Custom Airflow Pool

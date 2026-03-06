@@ -56,7 +56,7 @@ Examples of how to supply ``manifest.json`` using ``manifest_path`` argument:
 
 - Local path:
 
-.. literalinclude:: ../../../dev/dags/cosmos_manifest_example.py
+.. literalinclude:: ../../../../dev/dags/cosmos_manifest_example.py
     :language: python
     :start-after: [START local_example]
     :end-before: [END local_example]
@@ -66,7 +66,7 @@ Examples of how to supply ``manifest.json`` using ``manifest_path`` argument:
 Ensure that you have the required dependencies installed to use the S3 URL. You can install the required dependencies
 using the following command: ``pip install "astronomer-cosmos[amazon]"``
 
-.. literalinclude:: ../../../dev/dags/cosmos_manifest_example.py
+.. literalinclude:: ../../../../dev/dags/cosmos_manifest_example.py
     :language: python
     :start-after: [START aws_s3_example]
     :end-before: [END aws_s3_example]
@@ -76,7 +76,7 @@ using the following command: ``pip install "astronomer-cosmos[amazon]"``
 Ensure that you have the required dependencies installed to use the GCS URL. You can install the required dependencies
 using the following command: ``pip install "astronomer-cosmos[google]"``
 
-.. literalinclude:: ../../../dev/dags/cosmos_manifest_example.py
+.. literalinclude:: ../../../../dev/dags/cosmos_manifest_example.py
     :language: python
     :start-after: [START gcp_gs_example]
     :end-before: [END gcp_gs_example]
@@ -86,7 +86,7 @@ using the following command: ``pip install "astronomer-cosmos[google]"``
 Ensure that you have the required dependencies installed to use the Azure blob URL. You can install the required
 dependencies using the following command: ``pip install "astronomer-cosmos[microsoft]"``
 
-.. literalinclude:: ../../../dev/dags/cosmos_manifest_example.py
+.. literalinclude:: ../../../../dev/dags/cosmos_manifest_example.py
     :language: python
     :start-after: [START azure_abfs_example]
     :end-before: [END azure_abfs_example]

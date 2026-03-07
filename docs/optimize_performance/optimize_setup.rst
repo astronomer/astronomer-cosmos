@@ -27,7 +27,6 @@ By default, Cosmos uses:
 .. code-block:: python
 
    FROM quay.io/astronomer/astro-runtime:13.4.0
-
    RUN python -m venv dbt_venv && \
       source dbt_venv/bin/activate && \
       pip install --no-cache-dir<your-dbt-adapter> && \
@@ -45,7 +44,6 @@ To use a dedicated Python virtual environment, you might need to configure two a
 .. code-block:: python
 
    FROM quay.io/astronomer/astro-runtime:13.4.0
-
    RUN python -m venv dbt_venv && \
       source dbt_venv/bin/activate && \
       pip install --no-cache-dir<your-dbt-adapter> && \
@@ -66,7 +64,6 @@ If you want to install dbt in Airflow nodes, Cosmos can create and manage the db
 .. code-block:: python
 
    FROM quay.io/astronomer/astro-runtime:13.4.0
-
    RUN python -m venv dbt_venv && \
       source dbt_venv/bin/activate && \
       pip install --no-cache-dir<your-dbt-adapter> && \
@@ -87,7 +84,6 @@ You don’t have to use dbt in the Airflow nodes to benefit from Cosmos. Instead
 .. code-block:: python
 
    FROM quay.io/astronomer/astro-runtime:13.4.0
-
    RUN python -m venv dbt_venv && \
       source dbt_venv/bin/activate && \
       pip install --no-cache-dir<your-dbt-adapter> && \
@@ -111,10 +107,10 @@ If you can, this is the most efficient approach. You can tell Cosmos to ignore t
 .. code-block:: python
 
    DbtDag(
-  ...,
-  render_config=RenderConfig(dbt_deps=False),
-  execution_config=ExecutionConfig(
-      operator_args={"install_deps": False}
+      ...,
+      render_config=RenderConfig(dbt_deps=False),
+      execution_config=ExecutionConfig(
+            operator_args={"install_deps": False}
   ))
 
 If you can't pre-install dbt dependencies, Cosmos automatically runs dbt deps before running any dbt command, and does not require any additional configuration.

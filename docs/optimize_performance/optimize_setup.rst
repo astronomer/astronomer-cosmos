@@ -1,7 +1,7 @@
-.. _optimize-set-up:
+.. _optimize_setup:
 
-Optimize your Cosmos project set up
-===================================
+Optimize your Cosmos project
+==============================
 
 How you set up your Cosmos project can impact your the overall performance of how Airflow runs your dbt project by addressing the following questions:
 

@@ -7,8 +7,8 @@ Optimize the performance of your Cosmos Dags
    :maxdepth: 1
    :caption: Optimize Performance
 
-   optimize-setup
-   optimize-rendering
+   optimize_setup
+   optimize_rendering
    memory_optimization
    caching
    troubleshooting

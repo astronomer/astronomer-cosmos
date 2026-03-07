@@ -1,4 +1,4 @@
-.. _optimize-rendering:
+.. _optimize_rendering:
 
 Optimize rendering
 ===================

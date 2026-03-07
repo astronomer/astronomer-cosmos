@@ -8,6 +8,7 @@ Optimize the performance of your Cosmos Dags
    :caption: Optimize Performance
 
    optimize-setup
+   optimize-rendering
    memory_optimization
    caching
    troubleshooting

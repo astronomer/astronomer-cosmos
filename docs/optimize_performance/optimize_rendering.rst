@@ -20,10 +20,9 @@ Pre-compiling your project can help the Airflow Dag processor save time running 
 .. code-block:: python
 
     DbtDag(
-        project_config=ProjectConfig(
-            manifest_path="/path/to/manifest.json"),
-        render_config=RenderConfig(
-                load_method=LoadMode.DBT_MANIFEST))
+        project_config=ProjectConfig(manifest_path="/path/to/manifest.json"),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
 
 Make dbt available in the Airflow scheduler
 -------------------------------------------
@@ -45,12 +44,7 @@ If you use ``dbt ls`` to parse your project, you can use any selector flag avail
 
 .. code-block:: python
 
-    DbtDag(
-        render_config=RenderConfig(
-            load_method=LoadMode.DBT_LS,
-            selector="my_selector"
-            )
-        )
+    DbtDag(render_config=RenderConfig(load_method=LoadMode.DBT_LS, selector="my_selector"))
 
 If you do not use ``dbt ls`` to parse your project, Cosmos uses a custom implementation of dbt selectors to ``exclude`` and ``select`` nodes.
 
@@ -77,7 +71,7 @@ For example, the followingexample:
 .. code-block:: python
 
     DbtDag(
-        render_config=RenderConfig( # intersection
+        render_config=RenderConfig(  # intersection
             select=["tag:include_tag1,tag:include_tag2"]
         )
     )
@@ -130,11 +124,15 @@ You can choose how to render dbt by using the ``DbtTaskGroup``, which allows you
 
         customers = DbtTaskGroup(
             group_id="customers",
-            project_config=ProjectConfig((DBT_ROOT_PATH / "jaffle_shop").as_posix(), dbt_vars={"var": "2"}),
+            project_config=ProjectConfig(
+                (DBT_ROOT_PATH / "jaffle_shop").as_posix(), dbt_vars={"var": "2"}
+            ),
             profile_config=profile_config,
             default_args={"retries": 2},
         )
         pre_dbt >> customers
+
+
     basic_cosmos_task_group()
 
 
@@ -150,11 +148,14 @@ Cosmos allows you to define how you want to convert dbt nodes into Airflow. For 
         """
         Return an instance of a desired operator to represent a dbt "source" node.
         """
-        return EmptyOperator(dag=dag, task_group=task_group, task_id=f"{node.name}_source"
-        )
+        return EmptyOperator(dag=dag, task_group=task_group, task_id=f"{node.name}_source")
+
+
     render_config = RenderConfig(
         node_converters={
-            DbtResourceType("source"): convert_source,  # known dbt node type to Cosmos (part of DbtResourceType)
+            DbtResourceType(
+                "source"
+            ): convert_source,  # known dbt node type to Cosmos (part of DbtResourceType)
         }
     )
     project_config = ProjectConfig(
@@ -167,5 +168,3 @@ Cosmos allows you to define how you want to convert dbt nodes into Airflow. For 
         profile_config=profile_config,
         render_config=render_config,
     )
-
-

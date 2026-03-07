@@ -169,12 +169,12 @@ def test_old_dag(
 
 def add_logger_if_needed(dag: DAG, ti: TaskInstance):
     """
-    Add a formatted logger to the taskinstance so all logs are surfaced to the command line instead
+    Add a formatted logger to the task instance so all logs are surfaced to the command line instead
     of into a task file. Since this is a local test run, it is much better for the user to see logs
     in the command line, rather than needing to search for a log file.
-    Args:
-        ti: The taskinstance that will receive a logger
 
+    :param dag: The DAG that will receive a logger
+    :param ti: The task instance that will receive a logger
     """
     logging_format = logging.Formatter("[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s")
     handler = logging.StreamHandler(sys.stdout)

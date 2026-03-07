@@ -45,7 +45,3 @@ class DatabricksTokenProfileMapping(BaseProfileMapping):
             # token should always get set as env var
             "token": self.get_env_var_format("token"),
         }
-
-    def transform_host(self, host: str) -> str:
-        """Removes the https:// prefix."""
-        return host.replace("https://", "")

@@ -32,7 +32,7 @@ Cosmos can use the ``dbt ls`` command to identify the pipeline topology when the
 Use built-in project parser
 ---------------------------
 
-Cosmos has a built-in dbt project parser, which it uses to process the dbt project when the dbt project is not accessible to the Airflow scheduler or possilbe to pre-compile.
+Cosmos has a built-in dbt project parser, which it uses to process the dbt project when the dbt project is not accessible to the Airflow scheduler or possible to pre-compile.
 
 Select a subset of nodes
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -40,7 +40,7 @@ Select a subset of nodes
 Choose whether or not to use dbt ls
 ------------------------------------
 
-If you use ``dbt ls`` to parse your project, you can use any selector flag availabe in the version of dbt: ``select``, ``exclude``, or ``selector``.
+If you use ``dbt ls`` to parse your project, you can use any selector flag available in the version of dbt: ``select``, ``exclude``, or ``selector``.
 
 .. code-block:: python
 

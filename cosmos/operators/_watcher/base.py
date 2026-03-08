@@ -14,7 +14,7 @@ from cosmos.constants import (
     WATCHER_TASK_WEIGHT_RULE,
 )
 from cosmos.log import get_logger
-from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
+from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
     build_producer_state_fetcher,
     get_xcom_val,
@@ -22,7 +22,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_terminal,
     safe_xcom_push,
 )
-from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
+from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger, _parse_compressed_xcom
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
@@ -211,6 +211,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         self.deferrable = deferrable
         self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
 
+    @property
+    def is_test_sensor(self) -> bool:
+        """Whether this sensor watches aggregated test results instead of individual node results."""
+        return False
+
+    @property
+    def _resource_label(self) -> str:
+        """Human-readable label for log and error messages."""
+        return "Tests for model" if self.is_test_sensor else "Model"
+
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
         """Filters out dbt flags that are incompatible with retry (e.g., --select, --exclude)."""
@@ -233,7 +243,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         Handles logic for retrying a failed dbt model execution.
         Reconstructs the dbt command by cloning the project and re-running the model
         with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
+
+        For test sensors, re-execution is not supported in watcher mode; retries are skipped.
         """
+        if self.is_test_sensor:
+            logger.info(
+                "Test sensor retry detected (try #%s). Skipping — test re-execution is not supported in watcher mode.",
+                try_number,
+            )
+            return True
+
         logger.info(
             f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
             try_number - 1,
@@ -318,6 +337,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     map_index=context["task_instance"].map_index,
                     use_event=self.use_event(),
                     poke_interval=self.poke_interval,
+                    is_test_sensor=self.is_test_sensor,
                 ),
                 timeout=self.execution_timeout,
                 method_name=self.execute_complete.__name__,
@@ -327,9 +347,10 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         status = event.get("status")
         reason = event.get("reason")
 
-        if status == "success" and reason == "model_not_run":
+        if status == "success" and reason == WatcherEventReason.NODE_NOT_RUN:
             logger.info(
-                "Model '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
+                "%s '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
+                self._resource_label,
                 self.model_unique_id,
             )
 
@@ -343,14 +364,14 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if status != "failed":
             return
 
-        if reason == "model_failed":
+        if reason == WatcherEventReason.NODE_FAILED:
             raise AirflowException(
-                f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
+                f"dbt {self._resource_label.lower()} '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
             )
 
-        if reason == "producer_failed":
+        if reason == WatcherEventReason.PRODUCER_FAILED:
             raise AirflowException(
-                f"Watcher producer task '{self.producer_task_id}' failed before reporting model results. Check its logs for the underlying error."
+                f"Watcher producer task '{self.producer_task_id}' failed before reporting results for {self._resource_label.lower()} '{self.model_unique_id}'. Check its logs for the underlying error."
             )
 
     def use_event(self) -> bool:
@@ -359,19 +380,33 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
         raise NotImplementedError("Subclasses should implement this method if `use_event` may return True")
 
+    def _get_node_status(self, ti: Any, context: Context) -> Any:
+        """Return the current status of the watched dbt node from XCom.
+
+        For test sensors, reads the aggregated ``_tests_status`` key.
+        For model sensors, reads from event-based or subprocess-based keys.
+        """
+        if self.is_test_sensor:
+            xcom_key = get_tests_status_xcom_key(self.model_unique_id)
+            return get_xcom_val(ti, self.producer_task_id, xcom_key)
+        if self.use_event():
+            return self._get_status_from_events(ti, context)
+        return get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+
     def poke(self, context: Context) -> bool:
         """
-        Checks the status of a dbt model run by pulling relevant XComs from the master task.
-        Handles retries and checks for successful completion of the model execution.
+        Checks the status of a dbt node (model or aggregated tests) by pulling relevant XComs from the producer task.
+        Handles retries and checks for successful completion.
         """
         ti = context["ti"]
         try_number = ti.try_number
 
         logger.info(
-            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for model '%s'",
+            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for %s '%s'",
             try_number,
             self.poke_retry_number,
             self.producer_task_id,
+            self._resource_label.lower(),
             self.model_unique_id,
         )
 
@@ -380,10 +415,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         # We have assumption here that both the build producer and the sensor task will have same invocation mode
         producer_task_state = self._get_producer_task_status(context)
-        if self.use_event():
-            status = self._get_status_from_events(ti, context)
-        else:
-            status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+        status = self._get_node_status(ti, context)
 
         # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
         if status is not None:
@@ -412,4 +444,4 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         elif is_dbt_node_status_success(status):
             return True
         else:
-            raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")
+            raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")

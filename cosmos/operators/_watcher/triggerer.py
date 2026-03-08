@@ -5,6 +5,7 @@ import base64
 import json
 import zlib
 from collections.abc import AsyncIterator
+from enum import Enum
 from typing import Any
 
 from airflow.triggers.base import BaseTrigger, TriggerEvent
@@ -23,6 +24,14 @@ from cosmos.operators._watcher.state import (
 logger = get_logger(__name__)
 
 
+class WatcherEventReason(str, Enum):
+    """Reason codes used in TriggerEvent payloads between WatcherTrigger and BaseConsumerSensor.execute_complete."""
+
+    NODE_FAILED = "node_failed"
+    PRODUCER_FAILED = "producer_failed"
+    NODE_NOT_RUN = "node_not_run"
+
+
 class WatcherTrigger(BaseTrigger):
 
     def __init__(
@@ -34,6 +43,7 @@ class WatcherTrigger(BaseTrigger):
         map_index: int | None,
         use_event: bool,
         poke_interval: float = 5.0,
+        is_test_sensor: bool = False,
     ):
         self.model_unique_id = model_unique_id
         self.producer_task_id = producer_task_id
@@ -42,6 +52,7 @@ class WatcherTrigger(BaseTrigger):
         self.map_index = map_index
         self.use_event = use_event
         self.poke_interval = poke_interval
+        self.is_test_sensor = is_test_sensor
 
     def serialize(self) -> tuple[str, dict[str, Any]]:
         return (
@@ -54,6 +65,7 @@ class WatcherTrigger(BaseTrigger):
                 "map_index": self.map_index,
                 "use_event": self.use_event,
                 "poke_interval": self.poke_interval,
+                "is_test_sensor": self.is_test_sensor,
             },
         )
 
@@ -108,9 +120,21 @@ class WatcherTrigger(BaseTrigger):
         Parse node status and compiled_sql from XCom.
 
         Returns a tuple of (status, compiled_sql).
-        Status comes from mode-specific keys (nodefinished_* for event, *_status for subprocess).
+
+        For test sensors (``is_test_sensor=True``), the aggregated test status is
+        read from the ``<model_uid>_tests_status`` key. No compiled_sql is relevant.
+
+        For regular sensors, status comes from mode-specific keys
+        (nodefinished_* for event, *_status for subprocess).
         compiled_sql is always read from the canonical per-model key (same for both modes).
         """
+        if self.is_test_sensor:
+            from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key
+
+            status_key = get_tests_status_xcom_key(self.model_unique_id)
+            status = await self.get_xcom_val(status_key)
+            return status, None
+
         status_key = (
             f"nodefinished_{self.model_unique_id.replace('.', '__')}"
             if self.use_event
@@ -160,7 +184,7 @@ class WatcherTrigger(BaseTrigger):
                 return
             elif is_dbt_node_status_failed(dbt_node_status):
                 logger.warning("dbt node '%s' failed", self.model_unique_id)
-                event_data = {"status": EventStatus.FAILED, "reason": "model_failed"}
+                event_data = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
@@ -171,7 +195,7 @@ class WatcherTrigger(BaseTrigger):
                     self.producer_task_id,
                     self.model_unique_id,
                 )
-                yield TriggerEvent({"status": EventStatus.FAILED, "reason": "producer_failed"})  # type: ignore[no-untyped-call]
+                yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_FAILED})  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == "success" and dbt_node_status is None:
                 logger.info(
@@ -179,7 +203,7 @@ class WatcherTrigger(BaseTrigger):
                     self.producer_task_id,
                     self.model_unique_id,
                 )
-                yield TriggerEvent({"status": EventStatus.SUCCESS, "reason": "model_not_run"})  # type: ignore[no-untyped-call]
+                yield TriggerEvent({"status": EventStatus.SUCCESS, "reason": WatcherEventReason.NODE_NOT_RUN})  # type: ignore[no-untyped-call]
                 return
 
             # Sleep briefly before re-polling

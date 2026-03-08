@@ -11,14 +11,6 @@ from typing import TYPE_CHECKING, Any
 from airflow.exceptions import AirflowException
 
 from cosmos.config import ProfileConfig
-from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
-from cosmos.settings import watcher_dbt_execution_queue
-
-try:
-    from airflow.providers.standard.operators.empty import EmptyOperator
-except ImportError:  # pragma: no cover
-    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
-
 from cosmos.constants import (
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
@@ -26,6 +18,7 @@ from cosmos.constants import (
     InvocationMode,
 )
 from cosmos.log import get_logger
+from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
 from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
@@ -43,6 +36,7 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
+from cosmos.settings import watcher_dbt_execution_queue
 
 try:
     from dbt_common.events.base_types import EventMsg
@@ -331,13 +325,28 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
         super().__init__(*args, **kwargs)
 
 
-class DbtTestWatcherOperator(EmptyOperator):
-    """
-    As a starting point, this operator does nothing.
-    We'll be implementing this operator as part of: https://github.com/astronomer/astronomer-cosmos/issues/1974
+class DbtTestWatcherOperator(DbtConsumerWatcherSensor):  # type: ignore[misc]
+    """Sensor that watches the aggregated test status for a dbt model in watcher execution mode.
+
+    The producer task (``DbtProducerWatcherOperator``) collects individual test
+    results as they finish and, once every test for a given model has reported,
+    pushes a single aggregated XCom (``"pass"`` or ``"fail"``) under the key
+    ``<model_unique_id>_tests_status``.
+
+    This sensor polls that key and:
+    * returns success when the value is ``"pass"``,
+    * raises ``AirflowException`` when the value is ``"fail"``.
+
+    Deferral is fully supported: the ``WatcherTrigger`` receives
+    ``is_test_sensor=True`` and polls the correct aggregated key.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any):
-        desired_keys = ("dag", "task_group", "task_id")
-        new_kwargs = {key: value for key, value in kwargs.items() if key in desired_keys}
-        super().__init__(**new_kwargs)  # type: ignore[no-untyped-call]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields  # type: ignore[operator]
+
+    @property
+    def is_test_sensor(self) -> bool:
+        return True
+
+    def use_event(self) -> bool:
+        """This sensor relies on the producer task pushing aggregated test results to XCom, so it does not use real-time events."""
+        return False

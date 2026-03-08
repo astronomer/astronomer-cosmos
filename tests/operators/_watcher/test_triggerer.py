@@ -4,7 +4,7 @@ import pytest
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION
-from cosmos.operators._watcher.triggerer import WatcherTrigger
+from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 
 _real_import = __import__
 
@@ -138,9 +138,9 @@ class TestWatcherTrigger:
         "dbt_node_status, producer_state, expected",
         [
             ("success", "running", {"status": "success"}),
-            ("failed", "running", {"status": "failed", "reason": "model_failed"}),
-            (None, "failed", {"status": "failed", "reason": "producer_failed"}),
-            (None, "success", {"status": "success", "reason": "model_not_run"}),
+            ("failed", "running", {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}),
+            (None, "failed", {"status": "failed", "reason": WatcherEventReason.PRODUCER_FAILED}),
+            (None, "success", {"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}),
         ],
     )
     async def test_run_various_outcomes(self, dbt_node_status, producer_state, expected):
@@ -230,7 +230,7 @@ class TestWatcherTrigger:
 
     @pytest.mark.asyncio
     async def test_run_producer_success_model_not_run(self, caplog):
-        """Test that when producer succeeds but model has no status, trigger yields success with model_not_run reason."""
+        """Test that when producer succeeds but model has no status, trigger yields success with node_not_run reason."""
         get_producer_status_mock = AsyncMock(return_value="success")
         parse_dbt_node_status_and_compiled_sql_mock = AsyncMock(return_value=(None, None))
 
@@ -247,7 +247,7 @@ class TestWatcherTrigger:
                 events.append(event)
 
         assert len(events) == 1
-        assert events[0].payload == {"status": "success", "reason": "model_not_run"}
+        assert events[0].payload == {"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}
         assert "The producer task 'task_1' succeeded" in caplog.text
         assert "There is no information about the node 'model.test' execution" in caplog.text
 
@@ -289,5 +289,5 @@ class TestWatcherTrigger:
             events = [event async for event in self.trigger.run()]
         assert len(events) == 1
         assert events[0].payload["status"] == "failed"
-        assert events[0].payload["reason"] == "model_failed"
+        assert events[0].payload["reason"] == WatcherEventReason.NODE_FAILED
         assert events[0].payload["compiled_sql"] == "SELECT * FROM broken_model"

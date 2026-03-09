@@ -347,5 +347,5 @@ class DbtTestWatcherOperator(EmptyOperator):
         default_args = kwargs.get("default_args", {})
         desired_keys = ("dag", "task_group", "task_id")
         new_kwargs = {key: value for key, value in kwargs.items() if key in desired_keys}
-        depends_on_past=kwargs.get("depends_on_past", False) or default_args.get("depends_on_past", False)
+        depends_on_past = kwargs.get("depends_on_past", False) or default_args.get("depends_on_past", False)
         super().__init__(depends_on_past=depends_on_past, wait_for_downstream=depends_on_past, **new_kwargs)  # type: ignore[no-untyped-call]

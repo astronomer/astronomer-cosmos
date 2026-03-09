@@ -266,9 +266,11 @@ Can't log in to the Airflow UI
 
 1. Confirm that you are using a version of Python that is supported by Airflow. These versions are usually included in the `Airflow installation guide <https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html#prerequisites>`_.
 
-2. If you try to log in to the Airflow UI and see a **500 Internal Server Error** or **Invalid credentials**, open your ``profiles.yml`` file and confirm that you correctly included:
+2. If you try to log in to the Airflow UI and see a **500 Internal Server Error** or **Invalid credentials**, this can be caused by using the wrong configuration for your `SQLite setup <https://docs.getdbt.com/docs/core/connect-data-platform/sqlite-setup>`_.
 
-- ``schema_and_paths:`` attribute
+To resolve, open your ``profiles.yml`` file and confirm that you correctly included:
+
+- The ``schema_and_paths:`` attribute
 - The path you used to define the location of your schema and database
 
 3. If these are correctly formatted, go to your terminal and confirm that you set the ``AIRFLOW_HOME`` environment variable.

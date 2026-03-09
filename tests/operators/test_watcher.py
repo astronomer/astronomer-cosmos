@@ -1197,7 +1197,8 @@ class TestDbtConsumerWatcherSensor:
         result = sensor.poke(context)
         assert result is False
 
-    def test_poke_success_from_run_results(self):
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+    def test_poke_success_from_run_results(self, mock_startup_events):
         sensor = self.make_sensor()
         sensor.invocation_mode = "SUBPROCESS"
 
@@ -1210,7 +1211,8 @@ class TestDbtConsumerWatcherSensor:
         assert result is True
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
-    def test_poke_subprocess_mode_extracts_compiled_sql_from_xcom(self, mock_override_rtif):
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+    def test_poke_subprocess_mode_extracts_compiled_sql_from_xcom(self, mock_startup_events, mock_override_rtif):
         """Test that in subprocess mode, poke extracts compiled_sql from per-model XCom key when status is success."""
         sensor = self.make_sensor()
         sensor.invocation_mode = "SUBPROCESS"
@@ -1262,7 +1264,8 @@ class TestDbtConsumerWatcherSensor:
         result = sensor.poke(context)
         assert result is True
 
-    def test_poke_failure_from_run_results(self):
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+    def test_poke_failure_from_run_results(self, mock_startup_events):
         sensor = self.make_sensor()
         sensor.invocation_mode = "OTHER_MODE"
 
@@ -1368,7 +1371,8 @@ class TestDbtConsumerWatcherSensor:
         assert sensor.compiled_sql == ""  # not set from event; poke() will get it from canonical key
 
     @patch("cosmos.operators._watcher.base.get_xcom_val")
-    def test_producer_state_failed(self, mock_get_xcom_val):
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+    def test_producer_state_failed(self, mock_startup_events, mock_get_xcom_val):
         sensor = self.make_sensor()
         sensor._get_producer_task_status.return_value = "failed"
         ti = MagicMock()
@@ -1387,8 +1391,9 @@ class TestDbtConsumerWatcherSensor:
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._fallback_to_non_watcher_run")
     @patch("cosmos.operators._watcher.base.get_xcom_val")
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
     def test_producer_state_does_not_fail_if_previously_upstream_failed(
-        self, mock_get_xcom_val, mock_fallback_to_non_watcher_run
+        self, mock_startup_events, mock_get_xcom_val, mock_fallback_to_non_watcher_run
     ):
         """
         Attempt to run the task using ExecutionMode.LOCAL if State.UPSTREAM_FAILED happens.

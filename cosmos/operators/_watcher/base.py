@@ -380,7 +380,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         raise NotImplementedError("Subclasses should implement this method if `use_event` may return True")
 
     def _log_startup_events(self, ti: Any) -> None:
-        dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key=_DBT_STARTUP_EVENTS_XCOM_KEY)
+        dbt_startup_events: list[dict[str, Any]] = ti.xcom_pull(
+            task_ids=self.producer_task_id, key=_DBT_STARTUP_EVENTS_XCOM_KEY
+        )
         if dbt_startup_events:  # pragma: no cover
             for event in dbt_startup_events:
                 # Adding debug level to avoid redundant logs for non-deferrable mode

@@ -145,7 +145,8 @@ class TestWatcherTrigger:
             (None, "success", {"status": "success", "reason": "model_not_run"}),
         ],
     )
-    async def test_run_various_outcomes(self, dbt_node_status, producer_state, expected):
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    async def test_run_various_outcomes(self, mock_tartup_events, dbt_node_status, producer_state, expected):
 
         async def fake_get_xcom_val(key):
             if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
@@ -259,7 +260,8 @@ class TestWatcherTrigger:
         assert "There is no information about the node 'model.test' execution" in caplog.text
 
     @pytest.mark.asyncio
-    async def test_run_poke_interval_and_debug_log(self, caplog):
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    async def test_run_poke_interval_and_debug_log(self, mock_startup_events, caplog):
         async def get_xcom_val_side_effect(key):
             if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
                 return _STARTUP_EVENTS
@@ -293,7 +295,8 @@ class TestWatcherTrigger:
         assert events[0].payload["compiled_sql"] == "SELECT 1"
 
     @pytest.mark.asyncio
-    async def test_run_failed_model_includes_compiled_sql_in_event(self):
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    async def test_run_failed_model_includes_compiled_sql_in_event(self, mock_startup_events):
         """When model fails and compiled_sql is available, event payload includes it."""
 
         async def get_xcom_val_side_effect(key):

@@ -1,7 +1,7 @@
 .. _astro:
 
-Getting Started on Astro
-========================
+Getting Started with Cosmos on Astro
+====================================
 
 While it is possible to use Cosmos on Astro with all :ref:`Execution Modes <execution-modes>`, we recommend using the ``local`` execution mode. It's the simplest to set up and use.
 

@@ -63,7 +63,7 @@ Your pipeline may even have specific node types not part of the standard dbt def
 
 The following example illustrates how it is possible to tell Cosmos how to convert two different types of nodes (``source`` and ``exposure``) into Airflow:
 
-.. literalinclude::  ../../dev/dags/example_cosmos_sources.py
+.. literalinclude::  ../../../dev/dags/example_cosmos_sources.py
     :language: python
     :start-after: [START custom_dbt_nodes]
     :end-before: [END custom_dbt_nodes]

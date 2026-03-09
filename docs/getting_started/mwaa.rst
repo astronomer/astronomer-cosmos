@@ -1,7 +1,7 @@
 .. _mwaa:
 
-Getting Started on MWAA
-=======================
+Getting Started with Cosmos on Amazon Managed Workflows
+=======================================================
 
 Users can face Python dependency issues when trying to use the Cosmos `Local Execution Mode <execution-modes.html#local>`_ in Amazon Managed Workflows for `Apache Airflow® <https://airflow.apache.org/>`_ (MWAA).
 

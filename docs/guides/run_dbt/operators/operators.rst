@@ -18,7 +18,7 @@ The ``DbtCloneLocalOperator`` implement `dbt clone <https://docs.getdbt.com/refe
 
 Example of how to use
 
-.. literalinclude:: ../../dev/dags/example_operators.py
+.. literalinclude:: ../../../../dev/dags/example_operators.py
     :language: python
     :start-after: [START clone_example]
     :end-before: [END clone_example]
@@ -31,7 +31,7 @@ The ``DbtSeedLocalOperator`` implements the `dbt seed <https://docs.getdbt.com/r
 
 In this example, we're using the ``DbtSeedLocalOperator`` to seed ``raw_orders``.
 
-.. literalinclude:: ../../dev/dags/example_operators.py
+.. literalinclude:: ../../../../dev/dags/example_operators.py
     :language: python
     :start-after: [START seed_local_example]
     :end-before: [END seed_local_example]

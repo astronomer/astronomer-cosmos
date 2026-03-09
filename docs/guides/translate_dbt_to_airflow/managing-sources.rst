@@ -1,7 +1,7 @@
-.. _source-nodes-rendering:
+.. _managing-sources:
 
-Source Nodes Rendering
-======================
+Managing Sources
+================
 
 .. note::
     This feature is only available for dbt-core >= 1.5 and cosmos >= 1.6.0.
@@ -70,7 +70,7 @@ The ``on_warning_callback`` is a callback parameter available on the ``DbtSource
 
 Example:
 
-.. literalinclude:: ../../dev/dags/example_source_rendering.py/
+.. literalinclude:: ../../../dev/dags/example_source_rendering.py
     :language: python
     :start-after: [START cosmos_source_node_example]
     :end-before: [END cosmos_source_node_example]

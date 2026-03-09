@@ -144,7 +144,7 @@ Example 1 — Using ``DbtDag`` with ``ExecutionMode.WATCHER``
 You can enable WATCHER mode directly in your ``DbtDag`` configuration.
 This approach is best when your Airflow DAG is fully dedicated to a dbt project.
 
-.. literalinclude:: ../../dev/dags/example_watcher.py
+.. literalinclude:: ../../../../dev/dags/example_watcher.py
     :language: python
     :start-after: [START example_watcher]
     :end-before: [END example_watcher]
@@ -370,7 +370,7 @@ Source freshness nodes
 
 Since Cosmos 1.6, it `supports the rendering of source nodes <https://www.astronomer.io/blog/native-support-for-source-node-rendering-in-cosmos/>`_.
 
-We noticed some Cosmos users use this feature alongside `overriding Cosmos source nodes <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#customizing-how-nodes-are-rendered-experimental>`_ as sensors or another operator that allows them to skip the following branch of the DAG if the source is not fresh.
+We noticed some Cosmos users use this feature alongside `overriding Cosmos source nodes <https://astronomer.github.io/astronomer-cosmos/guides/render-config.html#customizing-how-nodes-are-rendered-experimental>`_ as sensors or another operator that allows them to skip the following branch of the DAG if the source is not fresh.
 
 This use case is not currently supported by the ``ExecutionMode.WATCHER``, since the ``dbt build`` command does not run `source freshness checks <https://docs.getdbt.com/reference/commands/build#source-freshness-checks>`_.
 
@@ -451,7 +451,7 @@ Asynchronous sensor execution
 
 To disable asynchronous execution, set the ``deferrable`` flag to ``False`` in the ``operator_args``.
 
-.. literalinclude:: ../../dev/dags/example_watcher.py
+.. literalinclude:: ../../../../dev/dags/example_watcher.py
    :language: python
    :start-after: [START example_watcher_synchronous]
    :end-before: [END example_watcher_synchronous]

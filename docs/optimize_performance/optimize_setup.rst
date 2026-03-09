@@ -63,7 +63,7 @@ Decide if you want to install dbt in Airflow nodes
 
 If you want to install dbt in Airflow nodes, Cosmos can create and manage the dbt Python virtualenv for you with ``ExecutionMode.VIRTUALENV``.
 
-.. code-block:: python
+.. code-block:: docker
 
    FROM quay.io/astronomer/astro-runtime:13.4.0
    RUN python -m venv dbt_venv && \
@@ -83,7 +83,7 @@ Use Cosmos without dbt in the Airflow nodes
 
 You don’t have to use dbt in the Airflow nodes to benefit from Cosmos. Instead you can leverage ``LoadMode.DBT_MANIFEST`` or ``ExecutionMode.KUBERNETES``.
 
-.. code-block:: python
+.. code-block:: docker
 
    FROM quay.io/astronomer/astro-runtime:13.4.0
    RUN python -m venv dbt_venv && \

@@ -46,3 +46,7 @@ class TrinoBaseProfileMapping(BaseProfileMapping):
         mock_profile = super().mock_profile
         mock_profile["port"] = 99999
         return mock_profile
+
+    def transform_host(self, host: str) -> str:
+        """Replaces http:// or https:// with nothing."""
+        return host.replace("http://", "").replace("https://", "")

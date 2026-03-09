@@ -12,7 +12,9 @@ Reference
    :hidden:
    :caption: Configurations
 
-   configs/index
+   configs/project-conf
+   configs/execution-config
+   configs/project-config
 
 .. toctree::
    :maxdepth: 1

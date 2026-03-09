@@ -60,3 +60,4 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    cosmos_devex/compiled-sql
    cosmos_devex/logging
    cosmos_devex/task-display-name
+   cosmos_devex/troubleshooting

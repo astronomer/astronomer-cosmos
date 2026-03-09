@@ -11,4 +11,3 @@ Optimize the performance of your Cosmos Dags
    optimize_rendering
    memory_optimization
    caching
-   troubleshooting

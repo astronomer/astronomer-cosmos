@@ -1669,7 +1669,7 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
 
     assert len(watcher_dag.task_dict) == 4
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
-    expected_task_names = ["dbt_producer_watcher", "raw_orders_seed", "jaffle_shop_test", "dbt_producer_watcher_gate"]
+    expected_task_names = ["dbt_producer_watcher", "dbt_producer_watcher_gate", "raw_orders_seed", "jaffle_shop_test"]
     assert tasks_names == expected_task_names
     # Confirm that the dbt command was successfully run using the given dbt executable path:
     assert "venv-subprocess/bin/dbt'), 'build'" in caplog.text
@@ -1748,10 +1748,11 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 2
 
-    assert len(watcher_dag.task_dict) == 3
+    assert len(watcher_dag.task_dict) == 4
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
     expected_task_names = [
         "dbt_producer_watcher",
+        "dbt_producer_watcher_gate",
         "add_row_run",
         "empty_model_run",
     ]
@@ -1764,6 +1765,7 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
     assert watcher_dag.task_dict["dbt_producer_watcher"].downstream_task_ids == {
         "add_row_run",
         "empty_model_run",
+        "dbt_producer_watcher_gate",
     }
 
     assert "Total filtered nodes: 2" in caplog.text
@@ -1832,6 +1834,7 @@ def test_dbt_task_group_with_watcher():
     expected_task_names = [
         "pre_dbt",
         "dbt_task_group.dbt_producer_watcher",
+        "dbt_task_group.dbt_producer_watcher_gate",
         "dbt_task_group.raw_customers_seed",
         "dbt_task_group.raw_orders_seed",
         "dbt_task_group.raw_payments_seed",
@@ -1840,7 +1843,6 @@ def test_dbt_task_group_with_watcher():
         "dbt_task_group.stg_payments_run",
         "dbt_task_group.customers_run",
         "dbt_task_group.orders_run",
-        "dbt_task_group.dbt_producer_watcher_gate",
     ]
     assert tasks_names == expected_task_names
 

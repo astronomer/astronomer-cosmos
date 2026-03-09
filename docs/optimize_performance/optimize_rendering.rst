@@ -12,6 +12,23 @@ When you approach improving the rendering of your Cosmos implementation, you sho
 Parse the dbt project
 ~~~~~~~~~~~~~~~~~~~~~
 
+In order to turn a dbt project into an Airflow Dag (DbtDag) or task group (DbtTaskGroup), Cosmos needs to
+understand the dbt project and changes made to it.
+
+The Dag processor component of Airflow also regularly parses the Airflow Dag code to pick up changes and newly
+added Dags. Individual Dags are parsed again every time one of their tasks gets scheduled. That is a lot of
+parsing which means taht improving parsing performance can lead to significant speed improvements of your
+Cosmos Dags.
+
+Cosmos executes a parsing process every time the Dag file is parsed:
+
+- If a dbt manifest is given, the manifest JSON is parsed and checked for changes.
+- If no manifest is given, Cosmos runs ``dbt ls`` and by default caches the output. On a subsequent run it compares the checksum of the dbt project files in combination with a set of DbtDag parameters, and uses the cache instead of executing a full reparse if the values have not changed compared to the previous run that created the cached output.
+
+The following sections can help you improve different parts of this parsing behavior.
+
+For more information about how to optimize the caching behavior, see :ref:`caching`.
+
 Pre-compile your dbt project
 ----------------------------
 

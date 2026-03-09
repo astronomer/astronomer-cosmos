@@ -109,12 +109,10 @@ If you can, this is the most efficient approach. You can tell Cosmos to ignore t
 .. code-block:: python
 
    DbtDag(
-      ...,
-      render_config=RenderConfig(dbt_deps=False),
-      execution_config=ExecutionConfig(
-            operator_args={"install_deps": False}
-         )
-      )
+       ...,
+       render_config=RenderConfig(dbt_deps=False),
+       execution_config=ExecutionConfig(operator_args={"install_deps": False}),
+   )
 
 If you can't pre-install dbt dependencies, Cosmos automatically runs dbt deps before running any dbt command, and does not require any additional configuration.
 
@@ -128,18 +126,18 @@ If you manage Airflow database credentials, Cosmos has an extensible set of ``Pr
 .. code-block:: python
 
    profile_config = ProfileConfig(
-    profile_name="my_profile_name",
-    target_name="my_target_name",
-    profile_mapping=SnowflakeUserPasswordProfileMapping(
-        conn_id="my_snowflake_conn_id",
-        profile_args={
-            "database": "my_snowflake_database",
-            "schema": "my_snowflake_schema",
-            },
-      ),
+       profile_name="my_profile_name",
+       target_name="my_target_name",
+       profile_mapping=SnowflakeUserPasswordProfileMapping(
+           conn_id="my_snowflake_conn_id",
+           profile_args={
+               "database": "my_snowflake_database",
+               "schema": "my_snowflake_schema",
+           },
+       ),
    )
    dag = DbtDag(
-      profile_config=profile_config,
+       profile_config=profile_config,
    )
 
 If you don't manage Airflow database credentials, Cosmos also allows you to define your own profiles.yml.
@@ -147,7 +145,7 @@ If you don't manage Airflow database credentials, Cosmos also allows you to defi
 .. code-block:: python
 
    profile_config = ProfileConfig(
-    profile_name="my_snowflake_profile",
-    target_name="dev",
-    profiles_yml_filepath="/path/to/profiles.yml",
+       profile_name="my_snowflake_profile",
+       target_name="dev",
+       profiles_yml_filepath="/path/to/profiles.yml",
    )

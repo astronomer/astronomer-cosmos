@@ -92,4 +92,4 @@ By default, Cosmos adds a dbt test after it completes a model. However, you can 
 Select and exclude
 ++++++++++++++++++++
 
-You can filter your dbt project to only parse a subset of your dbt project by using the RenderConfig, and define the `select` and `exclude` parameters. See `Selecting and excluding <../guides/translate_dbt_to_airflow/selecting-excluding.html>`_.
+You can filter your dbt project to only parse a subset of your dbt project by using the RenderConfig, and define the ``select`` and ``exclude`` parameters. See `Selecting and excluding <../guides/translate_dbt_to_airflow/selecting-excluding.html>`_.

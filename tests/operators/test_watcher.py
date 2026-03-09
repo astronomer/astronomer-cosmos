@@ -1592,8 +1592,8 @@ class TestWatcherTrigger:
         assert compiled_sql == "SELECT id FROM users"
 
     @pytest.mark.asyncio
-    async def test_wait_and_log_startup_versions_returns_when_events_available(self, caplog):
-        """Test that _wait_and_log_startup_versions returns once dbt_startup_events is available and logs."""
+    async def test_log_startup_events_returns_when_events_available(self, caplog):
+        """Test that _log_startup_events returns once dbt_startup_events is available and logs."""
         trigger = self.make_trigger()
         events = [
             {"name": "MainReportVersion", "msg": "Running with dbt=1.10.0", "ts": "2025-01-01T12:00:00Z"},
@@ -1615,15 +1615,15 @@ class TestWatcherTrigger:
         trigger._get_producer_task_status = mock_producer_running
 
         with caplog.at_level(logging.INFO):
-            await trigger._wait_and_log_startup_versions()
+            await trigger._log_startup_event()
 
         assert "Running with dbt=1.10.0" in caplog.text
         assert "Registered adapter: postgres=1.10.0" in caplog.text
         assert call_count >= 1
 
     @pytest.mark.asyncio
-    async def test_wait_and_log_startup_versions_returns_when_producer_failed(self):
-        """Test that _wait_and_log_startup_versions returns without blocking when producer task failed."""
+    async def test_wait_and_log_startup_event_returns_when_producer_failed(self):
+        """Test that _log_startup_event returns without blocking when producer task failed."""
         trigger = self.make_trigger()
         call_count = 0
 
@@ -1638,7 +1638,7 @@ class TestWatcherTrigger:
         trigger.get_xcom_val = mock_get_xcom_val
         trigger._get_producer_task_status = mock_producer_failed
 
-        await trigger._wait_and_log_startup_versions()
+        await trigger._log_startup_event()
 
         assert call_count >= 1
 

@@ -93,7 +93,7 @@ def store_compiled_sql_for_model(
         _push_compiled_sql_for_model(task_instance, unique_id, compiled_sql)
 
 
-def _merge_startup_event_from_log(task_instance: Any, log_line: dict[str, Any]) -> None:
+def _store_startup_event_from_log(task_instance: Any, log_line: dict[str, Any]) -> None:
     """
     When dbt JSON log contains MainReportVersion or AdapterRegistered, append to
     dbt_startup_events XCom (same shape as runner path) for trigger to log versions.
@@ -140,7 +140,7 @@ def store_dbt_resource_status_from_log(
         logger.debug("Log line: %s", log_line)
         context = extra_kwargs.get("context")
         if context is not None:
-            _merge_startup_event_from_log(context["ti"], log_line)
+            _store_startup_event_from_log(context["ti"], log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
         dbt_node_status = node_info.get("node_status")
         dbt_node_resource_type = node_info.get("resource_type")

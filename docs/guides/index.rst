@@ -24,6 +24,7 @@ Make your dbt projects available to Airflow and install dbt into the environment
    :caption: Set up dbt with Airflow
 
    dbt_setup/dbt-fusion
+   dbt_setup/execution-modes-local-conflicts
 
 Connect to your dbt database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

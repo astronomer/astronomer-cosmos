@@ -24,3 +24,8 @@ The performance is suboptimal due to latency or resource utilization
 3. For very large dbt pipelines, use recommended ``LoadMode.DBT_MANIFEST``.
 4. Pre-install dbt deps in your Airflow environment.
 5. If possible, use ``ExecutionMode.LOCAL`` or ``InvocationMode.DBT_RUNNER``.
+
+I'm getting out of memory (OOM) errors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+See :ref:`memory_optimization`.

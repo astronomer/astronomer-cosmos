@@ -1562,6 +1562,7 @@ def test_dbt_dag_with_watcher(capsys):
             "depends_on_past": True,
         },
     )
+
     outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS
 

@@ -716,7 +716,7 @@ def _add_watcher_producer_task(
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
 
     producer_task_gate = EmptyOperator(  # type: ignore[no-untyped-call]
-        task_id=f"{PRODUCER_WATCHER_TASK_ID}_gate", dag=dag, task_group=task_group, trigger_rule=TriggerRule.NONE_FAILED
+        task_id=f"{PRODUCER_WATCHER_TASK_ID}_gate", dag=dag, task_group=task_group, trigger_rule=TriggerRule.NONE_FAILED, depends_on_past=producer_airflow_task.depends_on_past
     )
     producer_airflow_task >> producer_task_gate
     return producer_airflow_task, producer_task_gate
@@ -767,7 +767,9 @@ def _add_watcher_dependencies(
                 for task in always_run_tasks:
                     task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[attr-defined]
 
-        task_or_taskgroup >> producer_gate
+        #If depends_on_past isn't true then gating all the tasks isn't really needed.
+        if producer_airflow_task.wait_for_downstream and not task_or_taskgroup.downstream_task_ids:
+            task_or_taskgroup >> producer_gate
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:

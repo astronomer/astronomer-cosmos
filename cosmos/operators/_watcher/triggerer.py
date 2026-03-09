@@ -147,19 +147,31 @@ class WatcherTrigger(BaseTrigger):
 
     async def _wait_and_log_startup_versions(self) -> None:
         """Wait for dbt_startup_events from producer (pushed early in runner callback; from log in subprocess) and log versions."""
+        main_logged = False
+        adapter_logged = False
+
         while True:
             events = await self.get_xcom_val(DBT_STARTUP_EVENTS_XCOM_KEY)
+
             if isinstance(events, list) and events:
                 for ev in events:
                     name, msg = ev.get("name"), ev.get("msg") or ""
-                    if name == "MainReportVersion" and "dbt=" in msg:
+
+                    if not main_logged and name == "MainReportVersion":
                         logger.info("%s", msg)
-                    elif name == "AdapterRegistered" and "Registered adapter: " in msg:
+                        main_logged = True
+                    elif not adapter_logged and name == "AdapterRegistered":
                         logger.info("%s", msg)
-                return
+                        adapter_logged = True
+
+                # exit only when both events were found
+                if main_logged and adapter_logged:
+                    return
+
             producer_task_state = await self._get_producer_task_status()
             if producer_task_state == "failed":
                 return
+
             await asyncio.sleep(self.poke_interval)
 
     async def run(self) -> AsyncIterator[TriggerEvent]:

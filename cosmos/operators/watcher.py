@@ -126,7 +126,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         return MessageToDict(event_message, preserving_proto_field_name=True)  # type: ignore[no-any-return]
 
     def _handle_startup_event(self, event_message: EventMsg, startup_events: list[dict[str, Any]]) -> None:
-        # TODO: get dbt version
         info = event_message.info  # type: ignore[attr-defined]
         raw_ts = getattr(info, "ts", None)
         ts_val = raw_ts.ToJsonString() if hasattr(raw_ts, "ToJsonString") else str(raw_ts)  # type: ignore[union-attr]

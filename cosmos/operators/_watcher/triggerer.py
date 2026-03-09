@@ -145,7 +145,7 @@ class WatcherTrigger(BaseTrigger):
 
         return await sync_to_async(fetch_state)()
 
-    async def _log_startup_event(self) -> None:
+    async def _log_startup_events(self) -> None:
         """Wait for dbt_startup_events from producer (pushed early in runner callback; from log in subprocess) and log versions."""
         main_logged = False
         adapter_logged = False
@@ -181,7 +181,7 @@ class WatcherTrigger(BaseTrigger):
 
     async def run(self) -> AsyncIterator[TriggerEvent]:
         logger.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
-        await self._log_startup_event()
+        await self._log_startup_events()
 
         while True:
             producer_task_state = await self._get_producer_task_status()

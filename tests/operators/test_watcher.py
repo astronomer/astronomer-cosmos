@@ -24,7 +24,7 @@ from packaging.version import Version
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
 from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
-from cosmos.operators._watcher.base import _merge_startup_event_from_log, store_compiled_sql_for_model
+from cosmos.operators._watcher.base import _store_startup_event_from_log, store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
@@ -724,9 +724,9 @@ class TestStoreDbtStatusFromLog:
         # No status should be stored
         assert len(ti.store) == 0
 
-    def test_merge_startup_event_from_log_appends_to_dbt_startup_events(self):
-        """Test that _merge_startup_event_from_log appends MainReportVersion/AdapterRegistered to dbt_startup_events."""
-        # Use a minimal mock with xcom_pull (needed by _merge_startup_event_from_log); _MockTI does not have it.
+    def test_store_startup_event_from_log_appends_to_dbt_startup_events(self):
+        """Test that _store_startup_event_from_log appends MainReportVersion/AdapterRegistered to dbt_startup_events."""
+        # Use a minimal mock with xcom_pull (needed by _store_startup_event_from_log); _MockTI does not have it.
         store = {}
 
         class _TIMock:
@@ -737,7 +737,7 @@ class TestStoreDbtStatusFromLog:
                 return store.get(key) if key else None
 
         ti = _TIMock()
-        _merge_startup_event_from_log(
+        _store_startup_event_from_log(
             ti,
             {"info": {"name": "MainReportVersion", "msg": "Running with dbt=1.10.0", "ts": "2025-01-01T12:00:00Z"}},
         )
@@ -747,7 +747,7 @@ class TestStoreDbtStatusFromLog:
         assert events[0]["name"] == "MainReportVersion"
         assert events[0]["msg"] == "Running with dbt=1.10.0"
 
-        _merge_startup_event_from_log(
+        _store_startup_event_from_log(
             ti,
             {
                 "info": {
@@ -762,8 +762,8 @@ class TestStoreDbtStatusFromLog:
         assert events[1]["name"] == "AdapterRegistered"
         assert events[1]["msg"] == "Registered adapter: postgres=1.10.0"
 
-    def test_merge_startup_event_from_log_ignores_other_events(self):
-        """Test that _merge_startup_event_from_log ignores events other than MainReportVersion/AdapterRegistered."""
+    def test_store_startup_event_from_log_ignores_other_events(self):
+        """Test that _store_startup_event_from_log ignores events other than MainReportVersion/AdapterRegistered."""
         store = {}
 
         class _TIMock:
@@ -774,7 +774,7 @@ class TestStoreDbtStatusFromLog:
                 return store.get(key) if key else None
 
         ti = _TIMock()
-        _merge_startup_event_from_log(ti, {"info": {"name": "NodeFinished", "msg": "Done"}})
+        _store_startup_event_from_log(ti, {"info": {"name": "NodeFinished", "msg": "Done"}})
         assert _DBT_STARTUP_EVENTS_XCOM_KEY not in store
 
     @pytest.mark.parametrize(

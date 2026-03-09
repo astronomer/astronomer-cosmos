@@ -7,6 +7,10 @@ import zlib
 from collections.abc import AsyncIterator
 from typing import Any
 
+# Max time to wait for startup events before proceeding to node-status polling.
+# Prevents blocking forever if producer never pushes _DBT_STARTUP_EVENTS_XCOM_KEY.
+_STARTUP_WAIT_TIMEOUT_SECONDS = 60 * 60  # 1 hour
+
 from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
@@ -155,8 +159,8 @@ class WatcherTrigger(BaseTrigger):
             events = await self.get_xcom_val(_DBT_STARTUP_EVENTS_XCOM_KEY)
 
             if isinstance(events, list) and events:
-                producer_task_state = await self._get_producer_task_status()
-
+                # Process the full events list so we log both MainReportVersion and
+                # AdapterRegistered when present, then decide whether to return.
                 for ev in events:
                     name, msg = ev.get("name"), ev.get("msg") or ""
 
@@ -167,12 +171,15 @@ class WatcherTrigger(BaseTrigger):
                         logger.info("%s", msg)
                         adapter_logged = True
 
-                    if producer_task_state in ["failed", "success"]:
-                        return
-
-                # exit only when both events were found
                 if main_logged and adapter_logged:
                     return
+
+            # Check producer status after processing events so we never return before
+            # logging the full list. Also ensures we exit if producer finishes before
+            # ever pushing _DBT_STARTUP_EVENTS_XCOM_KEY.
+            producer_task_state = await self._get_producer_task_status()
+            if producer_task_state in ("failed", "success"):
+                return
 
             await asyncio.sleep(self.poke_interval)
 

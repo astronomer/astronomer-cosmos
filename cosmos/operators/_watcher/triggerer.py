@@ -7,10 +7,6 @@ import zlib
 from collections.abc import AsyncIterator
 from typing import Any
 
-# Max time to wait for startup events before proceeding to node-status polling.
-# Prevents blocking forever if producer never pushes _DBT_STARTUP_EVENTS_XCOM_KEY.
-_STARTUP_WAIT_TIMEOUT_SECONDS = 60 * 60  # 1 hour
-
 from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version

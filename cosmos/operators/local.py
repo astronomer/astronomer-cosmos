@@ -888,6 +888,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             if "--full-refresh" not in cmd_flags:
                 cmd_flags.append("--full-refresh")
 
+        self.invoke_interceptors(context)
         dbt_cmd, env = self.build_cmd(context=context, cmd_flags=cmd_flags)
         dbt_cmd = dbt_cmd or []
         result = self.run_command(

@@ -17,7 +17,7 @@ understand the dbt project and changes made to it.
 
 The Dag processor component of Airflow also regularly parses the Airflow Dag code to pick up changes and newly
 added Dags. Individual Dags are parsed again every time one of their tasks gets scheduled. That is a lot of
-parsing which means taht improving parsing performance can lead to significant speed improvements of your
+parsing which means that improving parsing performance can lead to significant speed improvements of your
 Cosmos Dags.
 
 Cosmos executes a parsing process every time the Dag file is parsed:

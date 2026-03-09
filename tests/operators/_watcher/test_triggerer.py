@@ -3,7 +3,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import pytest
 from packaging.version import Version
 
-from cosmos.constants import AIRFLOW_VERSION, DBT_STARTUP_EVENTS_XCOM_KEY
+from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
 from cosmos.operators._watcher.triggerer import WatcherTrigger
 
 _STARTUP_EVENTS = [{"name": "MainReportVersion", "msg": "Running with dbt=1.0.0", "ts": ""}]
@@ -148,7 +148,7 @@ class TestWatcherTrigger:
     async def test_run_various_outcomes(self, dbt_node_status, producer_state, expected):
 
         async def fake_get_xcom_val(key):
-            if key == DBT_STARTUP_EVENTS_XCOM_KEY:
+            if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
                 return _STARTUP_EVENTS
             if key.endswith("_compiled_sql"):
                 return None
@@ -235,7 +235,7 @@ class TestWatcherTrigger:
     async def test_run_producer_success_model_not_run(self, caplog):
         """Test that when producer succeeds but model has no status, trigger yields success with model_not_run reason."""
         get_xcom_val_mock = AsyncMock(
-            side_effect=lambda key: _STARTUP_EVENTS if key == DBT_STARTUP_EVENTS_XCOM_KEY else None
+            side_effect=lambda key: _STARTUP_EVENTS if key == _DBT_STARTUP_EVENTS_XCOM_KEY else None
         )
         get_producer_status_mock = AsyncMock(return_value="success")
         parse_dbt_node_status_and_compiled_sql_mock = AsyncMock(return_value=(None, None))
@@ -261,7 +261,7 @@ class TestWatcherTrigger:
     @pytest.mark.asyncio
     async def test_run_poke_interval_and_debug_log(self, caplog):
         async def get_xcom_val_side_effect(key):
-            if key == DBT_STARTUP_EVENTS_XCOM_KEY:
+            if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
                 return _STARTUP_EVENTS
             if key.endswith("_compiled_sql"):
                 return "SELECT 1"
@@ -297,7 +297,7 @@ class TestWatcherTrigger:
         """When model fails and compiled_sql is available, event payload includes it."""
 
         async def get_xcom_val_side_effect(key):
-            if key == DBT_STARTUP_EVENTS_XCOM_KEY:
+            if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
                 return _STARTUP_EVENTS
             return None
 

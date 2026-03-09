@@ -11,7 +11,7 @@ from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
 
-from cosmos.constants import AIRFLOW_VERSION, DBT_STARTUP_EVENTS_XCOM_KEY
+from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
@@ -152,7 +152,7 @@ class WatcherTrigger(BaseTrigger):
 
         while True:
 
-            events = await self.get_xcom_val(DBT_STARTUP_EVENTS_XCOM_KEY)
+            events = await self.get_xcom_val(_DBT_STARTUP_EVENTS_XCOM_KEY)
 
             if isinstance(events, list) and events:
                 producer_task_state = await self._get_producer_task_status()

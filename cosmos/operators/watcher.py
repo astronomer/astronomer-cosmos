@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from cosmos.constants import (
-    DBT_STARTUP_EVENTS_XCOM_KEY,
+    _DBT_STARTUP_EVENTS_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
@@ -154,7 +154,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:
         if startup_events:
-            safe_xcom_push(task_instance=context["ti"], key=DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events)
+            safe_xcom_push(task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events)
 
     def _set_invocation_mode_if_not_set(self) -> None:
         if not self.invocation_mode:
@@ -210,7 +210,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                         if name in {"MainReportVersion", "AdapterRegistered"}:
                             self._handle_startup_event(event_message, startup_events)
                             safe_xcom_push(
-                                task_instance=context["ti"], key=DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events
+                                task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events
                             )
                         elif name == "NodeFinished":
                             self._handle_node_finished(event_message, context)

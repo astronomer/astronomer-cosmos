@@ -23,7 +23,7 @@ from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
-from cosmos.constants import DBT_STARTUP_EVENTS_XCOM_KEY, PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
+from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
 from cosmos.operators._watcher.base import _merge_startup_event_from_log, store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherTrigger
 from cosmos.operators.watcher import (
@@ -462,8 +462,8 @@ def test_execute_streaming_mode():
     ):
         op.execute(context=ctx)
 
-    assert DBT_STARTUP_EVENTS_XCOM_KEY in ti.store
-    startup_events = ti.store[DBT_STARTUP_EVENTS_XCOM_KEY]
+    assert _DBT_STARTUP_EVENTS_XCOM_KEY in ti.store
+    startup_events = ti.store[_DBT_STARTUP_EVENTS_XCOM_KEY]
     assert isinstance(startup_events, list) and len(startup_events) == 1
     assert startup_events[0]["name"] == "MainReportVersion"
 
@@ -741,8 +741,8 @@ class TestStoreDbtStatusFromLog:
             ti,
             {"info": {"name": "MainReportVersion", "msg": "Running with dbt=1.10.0", "ts": "2025-01-01T12:00:00Z"}},
         )
-        assert DBT_STARTUP_EVENTS_XCOM_KEY in store
-        events = store[DBT_STARTUP_EVENTS_XCOM_KEY]
+        assert _DBT_STARTUP_EVENTS_XCOM_KEY in store
+        events = store[_DBT_STARTUP_EVENTS_XCOM_KEY]
         assert len(events) == 1
         assert events[0]["name"] == "MainReportVersion"
         assert events[0]["msg"] == "Running with dbt=1.10.0"
@@ -757,7 +757,7 @@ class TestStoreDbtStatusFromLog:
                 }
             },
         )
-        events = store[DBT_STARTUP_EVENTS_XCOM_KEY]
+        events = store[_DBT_STARTUP_EVENTS_XCOM_KEY]
         assert len(events) == 2
         assert events[1]["name"] == "AdapterRegistered"
         assert events[1]["msg"] == "Registered adapter: postgres=1.10.0"
@@ -775,7 +775,7 @@ class TestStoreDbtStatusFromLog:
 
         ti = _TIMock()
         _merge_startup_event_from_log(ti, {"info": {"name": "NodeFinished", "msg": "Done"}})
-        assert DBT_STARTUP_EVENTS_XCOM_KEY not in store
+        assert _DBT_STARTUP_EVENTS_XCOM_KEY not in store
 
     @pytest.mark.parametrize(
         "msg, level",
@@ -1604,7 +1604,7 @@ class TestWatcherTrigger:
         async def mock_get_xcom_val(key):
             nonlocal call_count
             call_count += 1
-            if key == DBT_STARTUP_EVENTS_XCOM_KEY:
+            if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
                 return events
             return None
 

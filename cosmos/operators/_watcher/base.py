@@ -8,9 +8,9 @@ from airflow.exceptions import AirflowException
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
+    _DBT_STARTUP_EVENTS_XCOM_KEY,
     AIRFLOW_VERSION,
     CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
-    DBT_STARTUP_EVENTS_XCOM_KEY,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
 )
@@ -104,9 +104,9 @@ def _merge_startup_event_from_log(task_instance: Any, log_line: dict[str, Any]) 
     info = log_line.get("info", {})
     msg = info.get("msg", "")
     ts = info.get("ts", "")
-    current = list(task_instance.xcom_pull(key=DBT_STARTUP_EVENTS_XCOM_KEY) or [])
+    current = list(task_instance.xcom_pull(key=_DBT_STARTUP_EVENTS_XCOM_KEY) or [])
     current.append({"name": event_name, "msg": msg, "ts": ts})
-    safe_xcom_push(task_instance=task_instance, key=DBT_STARTUP_EVENTS_XCOM_KEY, value=current)
+    safe_xcom_push(task_instance=task_instance, key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=current)
 
 
 def store_dbt_resource_status_from_log(
@@ -380,7 +380,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         raise NotImplementedError("Subclasses should implement this method if `use_event` may return True")
 
     def _log_startup_event(self, ti: Any) -> None:
-        dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key=DBT_STARTUP_EVENTS_XCOM_KEY)
+        dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key=_DBT_STARTUP_EVENTS_XCOM_KEY)
         if dbt_startup_events:  # pragma: no cover
             for event in dbt_startup_events:
                 # Adding debug level to avoid redundant logs for non-deferrable mode

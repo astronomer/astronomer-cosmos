@@ -268,9 +268,8 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         )
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-        dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key=DBT_STARTUP_EVENTS_XCOM_KEY)
-        if dbt_startup_events:  # pragma: no cover
-            logger.info("Dbt Startup Event: %s", dbt_startup_events)
+
+        self._log_startup_event(ti)
 
         node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
         logger.info("Pulling from producer task_id: %s, key: %s", self.producer_task_id, node_finished_key)

@@ -379,6 +379,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
         raise NotImplementedError("Subclasses should implement this method if `use_event` may return True")
 
+    def _log_startup_event(self, ti: Any) -> None:
+        dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key=DBT_STARTUP_EVENTS_XCOM_KEY)
+        if dbt_startup_events:  # pragma: no cover
+            for event in dbt_startup_events:
+                # Adding debug level to avoid redundant logs for non-deferrable mode
+                logger.debug("%s", event.get("msg"))
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt model run by pulling relevant XComs from the master task.
@@ -403,6 +410,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if self.use_event():
             status = self._get_status_from_events(ti, context)
         else:
+            self._log_startup_event(ti)
             status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
 
         # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)

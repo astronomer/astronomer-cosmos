@@ -151,9 +151,12 @@ class WatcherTrigger(BaseTrigger):
         adapter_logged = False
 
         while True:
+
             events = await self.get_xcom_val(DBT_STARTUP_EVENTS_XCOM_KEY)
 
             if isinstance(events, list) and events:
+                producer_task_state = await self._get_producer_task_status()
+
                 for ev in events:
                     name, msg = ev.get("name"), ev.get("msg") or ""
 
@@ -164,13 +167,12 @@ class WatcherTrigger(BaseTrigger):
                         logger.info("%s", msg)
                         adapter_logged = True
 
+                    if producer_task_state in ["failed", "success"]:
+                        return
+
                 # exit only when both events were found
                 if main_logged and adapter_logged:
                     return
-
-            producer_task_state = await self._get_producer_task_status()
-            if producer_task_state == "failed":
-                return
 
             await asyncio.sleep(self.poke_interval)
 

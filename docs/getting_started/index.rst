@@ -18,7 +18,7 @@
 .. toctree::
    :maxdepth: 1
    :hidden:
-   :caption: Get started with Cosmos
+   :caption: Bring your own project
 
    Open-source Airflow <open-source>
    Astro <astro>

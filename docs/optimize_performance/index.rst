@@ -16,7 +16,7 @@ Optimize Cosmos performance
 
    optimize_setup
    optimize_rendering
-   memory_optimization
+   Memory optimization <memory_optimization>
    caching
 
 
@@ -42,3 +42,5 @@ Sometimes, running dbt pipelines with Cosmos can require high memory resources. 
 
 Caching
 ~~~~~~~
+
+Cosmos can cache many artifacts, like the output of ``dbt ls`` or dbt profiles generated from Airflow connections, to speed up parsing and execution. See :ref:`caching`.

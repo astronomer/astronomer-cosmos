@@ -38,5 +38,7 @@ See :ref:`optimize_rendering`.
 Memory optimization
 ~~~~~~~~~~~~~~~~~~~
 
+Sometimes, running dbt pipelines with Cosmos can require high memory resources. If you experience Out of Memory (OOM) errors or zombie Airflow tasks during high-memory scenarios, you can make changes to your configuration options and execution modes to improve performance in :ref:`memory_optimization`.
+
 Caching
 ~~~~~~~

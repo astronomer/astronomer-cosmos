@@ -1,11 +1,9 @@
-import logging
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from airflow.exceptions import ParamValidationError
 from airflow.models import DAG
 
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
@@ -14,7 +12,10 @@ from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
-from cosmos.telemetry import _decompress_telemetry_metadata
+from cosmos.telemetry import (
+    _decompress_telemetry_metadata,
+    get_cosmos_telemetry_variable_key,
+)
 
 SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
 SAMPLE_DBT_PROJECT = Path(__file__).parent / "sample/"
@@ -1238,9 +1239,10 @@ def test_converter_logs_parsing_group_order(mock_load_dbt_graph, mock_logger):
 
 
 @patch("cosmos.converter.should_emit", return_value=True)
+@patch("cosmos.telemetry.Variable.set")
 @patch("cosmos.converter.DbtGraph.load")
-def test_telemetry_metadata_storage(mock_load_dbt_graph, mock_should_emit):
-    """Test that telemetry metadata is stored correctly in DAG params."""
+def test_telemetry_metadata_storage(mock_load_dbt_graph, mock_variable_set, mock_should_emit):
+    """Test that telemetry metadata is stored in an Airflow Variable."""
     dag = DAG("test_dag_telemetry", start_date=datetime(2024, 1, 1))
 
     project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
@@ -1260,11 +1262,11 @@ def test_telemetry_metadata_storage(mock_load_dbt_graph, mock_should_emit):
         render_config=render_config,
     )
 
-    # Verify metadata is stored in dag.params
-    assert "__cosmos_telemetry_metadata__" in dag.params
-    compressed_metadata = dag.params["__cosmos_telemetry_metadata__"]
-
-    # Verify it's compressed (should be a string)
+    # Verify Variable.set was called with the correct key and compressed value
+    assert mock_variable_set.call_count == 1
+    call_args = mock_variable_set.call_args
+    assert call_args[0][0] == get_cosmos_telemetry_variable_key("test_dag_telemetry")
+    compressed_metadata = call_args[0][1]
     assert isinstance(compressed_metadata, str)
 
     # Decompress to verify the contents
@@ -1282,14 +1284,14 @@ def test_telemetry_metadata_storage(mock_load_dbt_graph, mock_should_emit):
     assert "database" in metadata
 
 
-@patch("cosmos.converter.Param", side_effect=ParamValidationError("Invalid param"))
 @patch("cosmos.converter.should_emit", return_value=True)
+@patch("cosmos.telemetry.Variable.set", side_effect=Exception("DB unavailable"))
 @patch("cosmos.converter.DbtGraph.load")
-def test_telemetry_metadata_storage_handles_param_validation_error(
-    mock_load_dbt_graph, mock_should_emit, mock_param, caplog
+def test_telemetry_metadata_storage_variable_set_failure_propagates(
+    mock_load_dbt_graph, mock_variable_set, mock_should_emit
 ):
-    """Test that ParamValidationError during telemetry metadata storage is caught and logged as a warning."""
-    dag = DAG("test_dag_telemetry_param_error", start_date=datetime(2024, 1, 1))
+    """Test that failure to set the telemetry Variable propagates (no try/except in telemetry)."""
+    dag = DAG("test_dag_telemetry_var_error", start_date=datetime(2024, 1, 1))
 
     project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
     profile_config = ProfileConfig(
@@ -1300,8 +1302,7 @@ def test_telemetry_metadata_storage_handles_param_validation_error(
     execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
     render_config = RenderConfig()
 
-    with caplog.at_level(logging.WARNING, logger="cosmos.converter"):
-        # Should NOT raise, even though Param raises ParamValidationError
+    with pytest.raises(Exception, match="DB unavailable"):
         _ = DbtToAirflowConverter(
             dag=dag,
             project_config=project_config,
@@ -1310,16 +1311,11 @@ def test_telemetry_metadata_storage_handles_param_validation_error(
             render_config=render_config,
         )
 
-    # Verify a warning was logged
-    "Failed to store compressed Cosmos telemetry metadata in DAG test_dag_telemetry_param_error params" in caplog.text
-
-    # Verify metadata was NOT stored in dag.params (since the assignment failed)
-    assert "__cosmos_telemetry_metadata__" not in dag.params
-
 
 @patch("cosmos.converter.DbtGraph.load")
 @patch("cosmos.converter.should_emit", return_value=False)
-def test_telemetry_metadata_not_stored_when_disabled(mock_should_emit, mock_load_dbt_graph):
+@patch("cosmos.telemetry.Variable.set")
+def test_telemetry_metadata_not_stored_when_disabled(mock_variable_set, mock_should_emit, mock_load_dbt_graph):
     """Test that telemetry metadata is NOT stored when telemetry is disabled."""
     dag = DAG("test_dag_telemetry_disabled", start_date=datetime(2024, 1, 1))
 
@@ -1340,5 +1336,5 @@ def test_telemetry_metadata_not_stored_when_disabled(mock_should_emit, mock_load
         render_config=render_config,
     )
 
-    # Verify metadata is NOT stored when telemetry is disabled
-    assert "__cosmos_telemetry_metadata__" not in dag.params
+    # Variable.set should not be called when telemetry is disabled
+    mock_variable_set.assert_not_called()

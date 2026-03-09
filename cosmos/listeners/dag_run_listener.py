@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import binascii
 import hashlib
-import json
-import zlib
 from typing import TYPE_CHECKING, Any
 
 from airflow.listeners import hookimpl
@@ -15,7 +12,7 @@ if TYPE_CHECKING:
 from cosmos import telemetry
 from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION
 from cosmos.log import get_logger
-from cosmos.telemetry import _decompress_telemetry_metadata
+from cosmos.telemetry import get_cosmos_telemetry_metadata_from_variable
 
 AIRFLOW_VERSION_MAJOR = AIRFLOW_VERSION.major
 
@@ -63,21 +60,12 @@ def get_execution_modes(dag: DAG) -> str:
 
 def get_cosmos_telemetry_metadata(dag: DAG) -> dict[str, Any]:
     """
-    Extract Cosmos telemetry metadata from a DAG.
+    Extract Cosmos telemetry metadata for a DAG.
 
-    Returns the metadata dictionary stored by the converter in dag.params, or an empty dict if not present.
+    Reads from the Airflow Variable set by the converter (key cosmos_telemetry__<dag_id>).
+    Returns an empty dict if the variable is missing or invalid.
     """
-    # Metadata is stored as compressed string in dag.params to survive serialization
-    compressed_metadata = dag.params.get("__cosmos_telemetry_metadata__")
-
-    if not compressed_metadata:
-        return {}
-
-    try:
-        return _decompress_telemetry_metadata(compressed_metadata)
-    except (binascii.Error, zlib.error, json.JSONDecodeError, UnicodeDecodeError) as e:
-        logger.warning(f"Failed to decompress telemetry metadata: {type(e).__name__}: {e}")
-        return {}
+    return get_cosmos_telemetry_metadata_from_variable(dag.dag_id)
 
 
 @hookimpl

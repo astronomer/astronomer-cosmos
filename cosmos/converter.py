@@ -12,14 +12,7 @@ from collections.abc import Callable
 from typing import Any
 from warnings import warn
 
-from airflow.exceptions import ParamValidationError
 from airflow.models.dag import DAG
-
-try:
-    # Airflow 3.0 onwards
-    from airflow.sdk.definitions.param import Param
-except ImportError:  # pragma: no cover
-    from airflow.models.param import Param
 
 try:
     # Airflow 3.1 onwards
@@ -40,7 +33,7 @@ from cosmos.exceptions import CosmosValueError
 # TODO: Move _get_profile_config_attribute at common place
 from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
 from cosmos.log import get_logger
-from cosmos.telemetry import _compress_telemetry_metadata, should_emit
+from cosmos.telemetry import _compress_telemetry_metadata, set_cosmos_telemetry_metadata_variable, should_emit
 from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
@@ -452,17 +445,10 @@ class DbtToAirflowConverter:
                 }
             )
 
-        # Store metadata in dag.params which is preserved during serialization
-        # Using a key that's unlikely to conflict with user params
+        # Store metadata in an Airflow Variable (per-DAG key) so the listener can read it.
         compressed_metadata = _compress_telemetry_metadata(metadata)
-        stored_metadata = False
-        try:
-            dag.params["__cosmos_telemetry_metadata__"] = Param(default=compressed_metadata, const=compressed_metadata)
-            stored_metadata = True
-        except ParamValidationError as e:
-            logger.warning(f"Failed to store compressed Cosmos telemetry metadata in DAG {dag.dag_id} params: {e}")
-
-        if stored_metadata:
-            logger.debug(
-                f"Stored compressed Cosmos telemetry metadata in DAG {dag.dag_id} params (original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
-            )
+        set_cosmos_telemetry_metadata_variable(dag.dag_id, compressed_metadata)
+        logger.debug(
+            f"Stored Cosmos telemetry metadata in Variable for DAG {dag.dag_id} "
+            f"(original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
+        )

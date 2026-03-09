@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import binascii
 import json
 import platform
 import zlib
@@ -10,6 +11,7 @@ from urllib.parse import urlencode
 
 import httpx
 from airflow import __version__ as airflow_version
+from airflow.models import Variable
 
 import cosmos
 from cosmos import constants, settings
@@ -117,3 +119,54 @@ def _decompress_telemetry_metadata(compressed_data: str) -> dict[str, Any]:
     json_bytes = zlib.decompress(compressed_bytes)
     result: dict[str, Any] = json.loads(json_bytes.decode("utf-8"))
     return result
+
+
+# Variable key prefix for Cosmos telemetry metadata (per-DAG, same pattern as cosmos_cache__)
+COSMOS_TELEMETRY_VAR_PREFIX = "cosmos_telemetry__"
+
+
+def get_cosmos_telemetry_variable_key(dag_id: str) -> str:
+    """Return the Airflow Variable key used to store telemetry metadata for a DAG."""
+    return f"{COSMOS_TELEMETRY_VAR_PREFIX}{dag_id}"
+
+
+def get_cosmos_telemetry_metadata_from_variable(dag_id: str) -> dict[str, Any]:
+    """
+    Load Cosmos telemetry metadata from an Airflow Variable.
+
+    Returns an empty dict if the variable is missing, invalid, or decompression fails.
+
+    :param dag_id: DAG ID (used to build the variable key)
+    :returns: Telemetry metadata dict, or {} if not present or on any error
+    """
+    variable_exceptions: tuple[type[BaseException], ...] = (json.decoder.JSONDecodeError, KeyError)
+    try:
+        from airflow.sdk.exceptions import AirflowRuntimeError
+    except ImportError:
+        pass
+    else:
+        variable_exceptions = (*variable_exceptions, AirflowRuntimeError)
+
+    key = get_cosmos_telemetry_variable_key(dag_id)
+    try:
+        raw = Variable.get(key, default_var=None)
+    except variable_exceptions:
+        return {}
+    if not raw or not isinstance(raw, str):
+        return {}
+    try:
+        return _decompress_telemetry_metadata(raw)
+    except (binascii.Error, zlib.error, json.JSONDecodeError, UnicodeDecodeError) as e:
+        logger.warning("Failed to decompress Cosmos telemetry metadata from Variable %s: %s", key, e)
+        return {}
+
+
+def set_cosmos_telemetry_metadata_variable(dag_id: str, compressed_metadata: str) -> None:
+    """
+    Store compressed telemetry metadata in an Airflow Variable.
+
+    :param dag_id: DAG ID (used to build the variable key)
+    :param compressed_metadata: Base64-encoded zlib-compressed JSON string
+    """
+    key = get_cosmos_telemetry_variable_key(dag_id)
+    Variable.set(key, compressed_metadata)

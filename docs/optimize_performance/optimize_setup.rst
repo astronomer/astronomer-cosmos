@@ -24,7 +24,7 @@ By default, Cosmos uses:
 - ``ExecutionMode.LOCAL``
 - ``InvocationMode.DBT_RUNNER``
 
-.. code-block:: python
+.. code-block:: docker
 
    FROM quay.io/astronomer/astro-runtime:13.4.0
    RUN python -m venv dbt_venv && \
@@ -41,19 +41,21 @@ To use a dedicated Python virtual environment, you might need to configure two a
 1. If using Astro, create the virtualenv as part of your Docker image build.
 2. Define where the dbt binary for Cosmos to use. This still uses the default ``ExecutionMode.LOCAL``:
 
-.. code-block:: python
+.. code-block:: docker
 
    FROM quay.io/astronomer/astro-runtime:13.4.0
    RUN python -m venv dbt_venv && \
       source dbt_venv/bin/activate && \
       pip install --no-cache-dir<your-dbt-adapter> && \
       deactivate
+
    DbtDag(
    ...,
    execution_config=ExecutionConfig(
          dbt_executable_path=Path("/usr/local/airflow/dbt_venv/bin/dbt")
          operator_args={“py_requirements": ["dbt-postgres==1.6.0b1"]}
-   ))
+         )
+      )
 
 
 Decide if you want to install dbt in Airflow nodes
@@ -72,7 +74,7 @@ If you want to install dbt in Airflow nodes, Cosmos can create and manage the db
    ...,
    execution_config=ExecutionConfig(
          execution_mode=ExecutionMode.VIRTUALENV,
-   )
+      )
    )
 
 
@@ -92,7 +94,7 @@ You don’t have to use dbt in the Airflow nodes to benefit from Cosmos. Instead
    ...,
    execution_config=ExecutionConfig(
          execution_mode=ExecutionMode.VIRTUALENV,
-   )
+      )
    )
 
 .. _optimize-dbt-deps:
@@ -111,7 +113,8 @@ If you can, this is the most efficient approach. You can tell Cosmos to ignore t
       render_config=RenderConfig(dbt_deps=False),
       execution_config=ExecutionConfig(
             operator_args={"install_deps": False}
-  ))
+         )
+      )
 
 If you can't pre-install dbt dependencies, Cosmos automatically runs dbt deps before running any dbt command, and does not require any additional configuration.
 
@@ -122,7 +125,7 @@ Set up database connections
 
 If you manage Airflow database credentials, Cosmos has an extensible set of ``ProfileMapping`` classes, that can automatically create the dbt ``profiles.yml`` from Airflow Connections.
 
-.. code-block:: yaml
+.. code-block:: python
 
    profile_config = ProfileConfig(
     profile_name="my_profile_name",
@@ -132,7 +135,7 @@ If you manage Airflow database credentials, Cosmos has an extensible set of ``Pr
         profile_args={
             "database": "my_snowflake_database",
             "schema": "my_snowflake_schema",
-         },
+            },
       ),
    )
    dag = DbtDag(
@@ -141,7 +144,7 @@ If you manage Airflow database credentials, Cosmos has an extensible set of ``Pr
 
 If you don't manage Airflow database credentials, Cosmos also allows you to define your own profiles.yml.
 
-.. code-block:: yaml
+.. code-block:: python
 
    profile_config = ProfileConfig(
     profile_name="my_snowflake_profile",

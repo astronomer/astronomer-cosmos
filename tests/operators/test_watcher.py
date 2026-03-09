@@ -339,7 +339,8 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
         ),
     ],
 )
-def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
+@patch("cosmos.operators._watcher.base._log_dbt_event")
+def test_dbt_consumer_watcher_sensor_execute_complete(mock_dbt_event, event, expected_message):
     sensor = DbtConsumerWatcherSensor(
         project_dir=".",
         profiles_dir=".",
@@ -351,7 +352,7 @@ def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
     )
     sensor.model_unique_id = "model.pkg.m"
 
-    context = {"dag_run": MagicMock()}
+    context = {"dag_run": MagicMock(), "ti": MagicMock()}
 
     if expected_message is None:
         sensor.execute_complete(context, event)
@@ -1475,13 +1476,19 @@ class TestDbtConsumerWatcherSensor:
             {"status": "success"},
         ],
     )
-    def test_execute_complete(self, mock_event):
+    @patch("cosmos.operators._watcher.base._log_dbt_event")
+    def test_execute_complete(self, mock_log_dbt_event, mock_event):
         sensor = self.make_sensor()
+
+        ti = MagicMock()
+        context = {"ti": ti}
+
         if mock_event.get("status") == "failed":
             with pytest.raises(AirflowException):
-                sensor.execute_complete(context=Mock(), event=mock_event)
+                sensor.execute_complete(context=context, event=mock_event)
         else:
-            assert sensor.execute_complete(context=Mock(), event=mock_event) is None
+            result = sensor.execute_complete(context=context, event=mock_event)
+            assert result is None
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
     def test_execute_complete_extracts_compiled_sql(self, mock_override_rtif):

@@ -180,7 +180,11 @@ def store_dbt_resource_status_from_log(
     """
     try:
         log_line = json.loads(line)
-        _process_dbt_log_event(extra_kwargs.get("context")["ti"], log_line)
+        context = extra_kwargs.get("context") if extra_kwargs else None
+        ti = context.get("ti") if context else None
+
+        if ti:
+            _process_dbt_log_event(ti, log_line)
     except json.JSONDecodeError:
         logger.debug("Failed to parse log: %s", line)
         log_line = {}

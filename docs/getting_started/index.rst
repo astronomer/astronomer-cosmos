@@ -5,6 +5,7 @@
    :hidden:
    :caption: Cosmos Fundamentals
 
+   How Cosmos works <how-cosmos-works>
    Similar dbt and Airflow concepts <dbt-airflow-concepts>
 
 .. toctree::

@@ -1141,6 +1141,7 @@ def test_test_behavior_for_watcher_mode(test_behavior):
         assert any(isinstance(task, DbtTestLocalOperator) for task in tasks)
         assert len(tasks) == 7
 
+
 @pytest.mark.parametrize("depends_on_past", [False, True])
 @pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_EACH, TestBehavior.AFTER_ALL])
 def test_watcher_dependency_wiring(test_behavior, depends_on_past):
@@ -1176,13 +1177,22 @@ def test_watcher_dependency_wiring(test_behavior, depends_on_past):
 
     assert all(task.wait_for_downstream is True for task in dag.tasks if task.task_id != "dbt_producer_watcher_gate")
     if test_behavior == TestBehavior.NONE:
-        assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {'child_run', 'dbt_producer_watcher', 'child2_v2_run'}
+        assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {
+            "child_run",
+            "dbt_producer_watcher",
+            "child2_v2_run",
+        }
     if test_behavior == TestBehavior.AFTER_EACH:
-        assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {'child_run', 'dbt_producer_watcher', 'child2_v2_run'}
+        assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {
+            "child_run",
+            "dbt_producer_watcher",
+            "child2_v2_run",
+        }
     if test_behavior == TestBehavior.AFTER_ALL:
-        assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {'dbt_producer_watcher', 'astro_shop_test'}
-
-
+        assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {
+            "dbt_producer_watcher",
+            "astro_shop_test",
+        }
 
 
 def test_custom_meta():

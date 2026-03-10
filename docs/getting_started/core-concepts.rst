@@ -29,6 +29,8 @@ During the dbt code parsing phase, you can choose how you want your dbt workflow
 - **DbtDag**: Renders one dbt project as a complete Dag.
 - **DbtTaskGroup**: Renders one dbt project as an Airflow task group within a regular Dag.
 
+You can see example Dags for both a simple `DbtDag <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/basic_cosmos_dag.py>`_ and `DbtTaskGroup <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/basic_cosmos_task_group.py>`_ in the Cosmos `dev/dags directory <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_.
+
 ProjectConfig
 ~~~~~~~~~~~~~
 
@@ -55,17 +57,22 @@ See `Profiles reference <../profiles/index.html>`_ for more information about th
 Execution Modes
 ~~~~~~~~~~~~~~~
 
-You define the execution mode for your project by using the ExecutionConfig class, which defines where and how the dbt commands are run within Cosmos.
 
-There are two types of execution modes:
+You define the execution mode for your project by using the ExecutionConfig class, which determines where and how dbt commands are run within Cosmos.
 
-1. **Executing dbt commands on the Airflow worker or triggerer.** These execution modes offer faster
-execution times, since no extra container needs to be spun up, but no or limited environment isolation.
+There are two main categories of execution modes:
 
-2. **Executing dbt commands in a container outside of your Airflow environment.** The Docker or
-Kubernetes containers can be spun up in various cloud or on-premises environments
+1. **Executing dbt commands on the Airflow worker.**
+   In these execution modes, dbt commands run directly on the Airflow worker. These modes typically offer faster execution because no additional container needs to be created, but they provide limited environment isolation.
 
-See `Execution modes <../guides/run_dbt/execution-modes.html>`_ and `ExectuionConfig Reference <../reference/configs/execution-config.html>`_.
+   Examples include:
+   - **Local execution**, where dbt runs directly in the worker environment.
+   - **Virtualenv execution**, where Cosmos creates an isolated Python virtual environment on the worker to run dbt with its own dependencies.
+
+2. **Executing dbt commands in a container outside of the Airflow worker environment.**
+   In these modes, Cosmos runs dbt commands inside Docker or Kubernetes containers. This provides stronger environment isolation and allows you to run dbt in environments with different dependencies or system configurations.
+
+See `Execution modes <../guides/run_dbt/execution-modes.html>`_ and `ExecutionConfig Reference <../reference/configs/execution-config.html>`_.
 
 Parsing
 ~~~~~~~

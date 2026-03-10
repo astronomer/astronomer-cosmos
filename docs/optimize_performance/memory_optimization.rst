@@ -135,8 +135,8 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Configuration**
 
-- `Getting Started with ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/getting_started/watcher-execution-mode.html>`_
-- `Configure a Custom Queue for Producer and Watcher Tasks in ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/getting_started/watcher-execution-mode.html#watcher-dbt-execution-queue>`_
+- `Getting Started with ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html>`_
+- `Configure a Custom Queue for Producer and Watcher Tasks in ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html#watcher-dbt-execution-queue>`_
 
 -------------------------------------------------------------------------------
 

@@ -11,10 +11,10 @@ This DAG uses Cosmos in a way that there is a clear split between Airflow and db
 This allows users to not have to install dbt in their Airflow deployment.
 
 This approach is a hybrid between the Cosmos ExecutionMode.KUBERNETES:
-https://astronomer.github.io/astronomer-cosmos/getting_started/kubernetes.html#kubernetes
+https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/container/kubernetes.html
 
 And the Cosmos ExecutionMode.WATCHER:
-https://astronomer.github.io/astronomer-cosmos/getting_started/watcher-execution-mode.html
+https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html
 """
 
 import os

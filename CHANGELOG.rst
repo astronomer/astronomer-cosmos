@@ -274,7 +274,7 @@ Features
   * Fix ``ExecutionMode.WATCHER`` behaviour with ``DbtTaskGroup`` by @tatiana in #2044
   * Fix Cosmos behaviour when using watcher with ``InvocationMode.DBT_RUNNER`` by @tatiana in #2048
 
-* Add Airflow 3 plugin for dbt docs with multiple dbt projects support by @pankajkoti in #2009, check the `documentation <https://astronomer.github.io/astronomer-cosmos/dbt_docs/hosting-docs.html>`_.
+* Add Airflow 3 plugin for dbt docs with multiple dbt projects support by @pankajkoti in #2009, check the `documentation <https://astronomer.github.io/astronomer-cosmos/guides/dbt_docs/hosting-docs.html>`_.
 * Initial support to ``dbt Fusion`` by @tatiana in #1803. `More details here. <https://astronomer.github.io/astronomer-cosmos/guides/dbt_setup/dbt-fusion.html>`_.
 * Support to prune sources without downstream references in dbt projects by @corsettigyg in #1988
 * Allow to set task display name as a user-defined function by @corsettigyg in #1761
@@ -562,7 +562,7 @@ Breaking changes
   While this represents significant performance improvements (half the vCPU usage and some memory consumption improvement), this may not work in
   scenarios where users had multiple Python virtual environments to manage different versions of dbt and its adaptors. In those cases,
   please, set ``RenderConfig(invocation_mode=InvocationMode.SUBPROCESS)`` to have the same behaviour Cosmos had in previous versions.
-  Additional information `here <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow.html#dbt-ls>`_ and `here <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
+  Additional information `here <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/parsing-methods.html#dbt-ls>`_ and `here <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
 
 Features
 
@@ -1073,7 +1073,7 @@ Others
 
 Features
 
-* Add new parsing method ``LoadMode.DBT_LS_FILE`` by @woogakoki in #733 (`documentation <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow.html#dbt-ls-file>`_).
+* Add new parsing method ``LoadMode.DBT_LS_FILE`` by @woogakoki in #733 (`documentation <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/parsing-methods.html#dbt-ls-file>`_).
 * Add support to select using (some) graph operators when using ``LoadMode.CUSTOM`` and ``LoadMode.DBT_MANIFEST`` by @tatiana in #728 (`documentation <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/selecting-excluding.html#using-select-and-exclude>`_)
 * Add support for dbt ``selector`` arg for DAG parsing by @jbandoro in #755 (`documentation <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/render-config.html#render-config>`_).
 * Add ``ProfileMapping`` for Vertica by @perttus in #540, #688 and #741 (`documentation <https://astronomer.github.io/astronomer-cosmos/profiles/VerticaUserPassword.html>`_).

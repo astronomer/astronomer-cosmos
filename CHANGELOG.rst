@@ -663,7 +663,7 @@ Others
 New Features
 
 * Support customizing Airflow operator arguments per dbt node by @wornjs in #1339. `More information <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/customization/custom-airflow-properties.html>`_.
-* Support uploading dbt artifacts to remote cloud storages via callback by @pankajkoti in #1389. `Read more <https://astronomer.github.io/astronomer-cosmos/guides/callbacks/callbacks.html>`_.
+* Support uploading dbt artifacts to remote cloud storages via callback by @pankajkoti in #1389. `Read more <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/callbacks/callbacks.html>`_.
 * Add support to ``TestBehavior.BUILD`` by @tatiana in #1377. `Documentation <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/testing-behavior.html>`_.
 * Add support for the "at" operator when using ``LoadMode.DBT_MANIFEST`` or ``CUSTOM`` by @benjy44 in #1372
 * Add dbt clone operator by @pankajastro in #1326, as documented in `here <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/operators/operators.html>`_.
@@ -773,7 +773,7 @@ New Features
 
 * Support using ``DatasetAlias`` and fix orphaning unreferenced dataset by @tatiana in #1217 #1240
 
-  Documentation: https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/scheduling.html#data-aware-scheduling
+  Documentation: https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/customization/scheduling.html#data-aware-scheduling
 
 * Add GCP_CLOUD_RUN_JOB execution mode by @ags-de #1153
 

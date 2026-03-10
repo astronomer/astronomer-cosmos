@@ -25,8 +25,9 @@ Check out the available :ref:`execution-modes` and the detailed :ref:`execution-
 Running dbt commands
 ~~~~~~~~~~~~~~~~~~~~
 
-After specifying where you want Cosmos to run dbt commands, you can additionally specify the commands you want to run, how you want
+After specifying where you want Cosmos to run dbt commands, you can additionally specify the following:
 
-
-Running Airflow
-~~~~~~~~~~~~~~~
+- :ref:`callbacks`: Tell Cosmos how to handle artifacts produced by dbt while executing dbt code.
+- :ref:`operator-args`: Pass specific operator arguments, ``operator_args``, in your Dag that can directly correspond to dbt commands, Cosmos operations, or to define Airflow behavior.
+- :ref:`scheduling`: Leverage Airflow to schedule your dbt worfklows with cron-based scheduling, timetables, and data-aware scheduling.
+- :ref:`partial-parsing`: Configure Cosmos to use dbt's partial parsing capabilities, improving dbt and Dag parsing, which speeds up execution times.

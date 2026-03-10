@@ -1,6 +1,6 @@
 .. _operators:
 
-dbt command Operators
+dbt command operators
 =====================
 
 Cosmos exposes individual operators that correspond to specific dbt commands, which can be used just like traditional

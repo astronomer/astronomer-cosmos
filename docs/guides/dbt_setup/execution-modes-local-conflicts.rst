@@ -3,8 +3,8 @@
 Airflow and dbt dependencies conflicts
 ======================================
 
-When using the `Local Execution Mode <../../guides/run_dbt/airflow-worker/local-execution-mode.html>`__ users may face dependency conflicts between
-`Apache Airflow® <https://airflow.apache.org/>`_ and dbt. The conflicts may increase depending on the Airflow providers and dbt adapters being used.
+When using the `Local Execution Mode <../../guides/run_dbt/airflow-worker/local-execution-mode.html>`__ without defining a custom ``ExecutionConfig.dbt_executable_path``, you might have dependency conflicts between
+`Apache Airflow® <https://airflow.apache.org/>`_ and dbt. The number of conflicts can increase depending on the Airflow providers and dbt adapters you use.
 
 If you find errors, we recommend users isolating the installation of dbt from the Airflow installation.
 With the `Local Execution Mode <../../guides/run_dbt/airflow-worker/local-execution-mode.html>`__, this can be accomplished by installing dbt in a separate

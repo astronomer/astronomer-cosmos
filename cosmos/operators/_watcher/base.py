@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 from datetime import timedelta
@@ -78,7 +80,14 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
             "finish_time": _iso_to_string(finish_time),
             "msg": msg,
         }
-        safe_xcom_push(task_instance=task_instance, key=f"{unique_id.replace('.', '__')}_dbt_event", value=dbt_event)
+
+        xcom_key = f"{unique_id.replace('.', '__')}_dbt_event"
+        # Avoid redundant XCom writes (and global lock contention) by only pushing
+        # when the event payload has changed.
+        existing_event = get_xcom_val(task_instance=task_instance, key=xcom_key, task_ids=PRODUCER_WATCHER_TASK_ID)
+        if existing_event == dbt_event:
+            return None
+        safe_xcom_push(task_instance=task_instance, key=xcom_key, value=dbt_event)
 
 
 def _extract_compiled_sql(

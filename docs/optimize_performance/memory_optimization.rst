@@ -166,7 +166,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **What it does**:
 
-- **``concurrency``**: The maximum number of task instances allowed to run concurrently across all active DAG runs for a given DAG
+- ``concurrency``: The maximum number of task instances allowed to run concurrently across all active DAG runs for a given DAG
 - Allows different DAGs to have different concurrency limits (e.g., one DAG runs 32 tasks at once, another runs 16)
 - If not defined, defaults to the environment-level setting ``max_active_tasks_per_dag`` (default: 16)
 - Works in combination with ``max_active_runs`` to control both task and DAG run concurrency

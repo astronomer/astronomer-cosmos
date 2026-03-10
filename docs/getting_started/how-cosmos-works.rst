@@ -4,7 +4,7 @@ How Cosmos works
 =================
 
 Cosmos is an open-source Python package developed by Astronomer under the Apache License 2.0. The
-package includes classes that automatically turn dbt Core and dbt Fusion projects into Apache Airflow®
+package includes classes that automatically turn dbt Core and dbt Fusion projects into `Apache Airflow® <https://airflow.apache.org/>`_
 workflows.
 
 When using Cosmos you can write your data transformations using dbt and then use Airflow’s

@@ -27,6 +27,8 @@ def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) 
     Get the Airflow Operator class for a Task.
 
     :param task: The Task to get the Operator for
+    :param dag: The DAG to get the Operator for
+    :param task_group: The TaskGroup to get the Operator for
 
     :return: The Operator class
     :rtype: BaseOperator

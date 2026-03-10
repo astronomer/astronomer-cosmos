@@ -123,6 +123,8 @@ def store_dbt_resource_status_from_log(
     extracts node status information, and pushes it to XCom for consumption
     by downstream watcher sensors.
 
+    :param line: A single line from dbt JSON logs.
+    :param extra_kwargs: Additional keywords arguments.
     :param tests_per_model: Mapping of model unique_id to list of test unique_ids
         associated with that model, as built by DbtGraph.update_node_dependency().
         Empty dict when no tests exist.

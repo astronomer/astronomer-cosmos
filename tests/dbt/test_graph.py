@@ -1939,7 +1939,7 @@ def test_profile_created_correctly_with_profile_mapping(
         profile_config=profile_config,
     )
 
-    assert dbt_graph.load_via_dbt_ls() == None
+    assert dbt_graph.load_via_dbt_ls() is None
 
 
 @patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)

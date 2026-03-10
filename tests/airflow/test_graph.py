@@ -102,7 +102,6 @@ child2_node = DbtNode(
     tags=["nightly"],
     config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"pool": "custom_pool"}}}},
 )
-
 sample_nodes_list = [parent_seed, parent_node, test_parent_node, child_node, child2_node]
 sample_nodes = {node.unique_id: node for node in sample_nodes_list}
 
@@ -1159,8 +1158,25 @@ def test_watcher_dependency_wiring(test_behavior, depends_on_past):
             ),
         }
 
+    child_2b = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child2.v2_b",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[parent_node.unique_id],
+        file_path=SAMPLE_PROJ_PATH / "gen3/models/child2_v2.sql",
+        tags=["nightly"],
+        config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"pool": "custom_pool"}}}},
+        has_test=True,
+        has_non_detached_test=True,
+    )
+    child_2b_test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.child2.test_v2_b",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[child_2b.unique_id],
+        file_path="",
+    )
+
     build_airflow_graph(
-        nodes=sample_nodes,
+        nodes={child_2b.unique_id: child_2b, child_2b_test.unique_id: child_2b_test, **sample_nodes},
         dag=dag,
         execution_mode=ExecutionMode.WATCHER,
         test_indirect_selection=TestIndirectSelection.EAGER,
@@ -1181,12 +1197,14 @@ def test_watcher_dependency_wiring(test_behavior, depends_on_past):
             "child_run",
             "dbt_producer_watcher",
             "child2_v2_run",
+            "child2_v2_b_run",
         }
     if test_behavior == TestBehavior.AFTER_EACH:
         assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {
             "child_run",
             "dbt_producer_watcher",
             "child2_v2_run",
+            "child2_v2_b.test",
         }
     if test_behavior == TestBehavior.AFTER_ALL:
         assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {

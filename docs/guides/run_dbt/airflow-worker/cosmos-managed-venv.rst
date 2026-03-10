@@ -18,7 +18,7 @@ Also similar to the ``local`` execution mode, Cosmos will by default attempt to 
 
 Some drawbacks of the ``virtualenv`` approach:
 
-- It is slower than ``local`` because it may create and update a new Python virtual environment for each Cosmos dbt task run, depending on the Airflow executor and if you set the `ExecutionConfig.virtualenv_dir` configuration.
+- It is slower than ``local`` because it may create and update a new Python virtual environment for each Cosmos dbt task run, depending on the Airflow executor and if you set the ``ExecutionConfig.virtualenv_dir`` configuration.
 - If dbt is unavailable in the Airflow scheduler, the default ``LoadMode.DBT_LS`` will not work. In this scenario, you must use a :ref:`parsing-methods` that does not rely on dbt, such as ``LoadMode.MANIFEST``.
 - Only ``InvocationMode.SUBPROCESS`` is supported currently, attempt to use ``InvocationMode.DBT_RUNNER`` will raise error.
 

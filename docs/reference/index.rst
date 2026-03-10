@@ -12,7 +12,7 @@ Reference
    :hidden:
    :caption: Configurations
 
-   configs/project-conf
+   configs/cosmos-conf
    configs/execution-config
    configs/project-config
 

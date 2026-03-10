@@ -1597,8 +1597,8 @@ class TestWatcherTrigger:
         assert compiled_sql == "SELECT id FROM users"
 
     @pytest.mark.asyncio
-    async def test_log_startup_eventss_returns_when_events_available(self, caplog):
-        """Test that _log_startup_eventss returns once dbt_startup_events is available and logs."""
+    async def test_log_startup_events_returns_when_events_available(self, caplog):
+        """Test that _log_startup_events returns once dbt_startup_events is available and logs."""
         trigger = self.make_trigger()
         events = [
             {"name": "MainReportVersion", "msg": "Running with dbt=1.10.0", "ts": "2025-01-01T12:00:00Z"},

@@ -177,6 +177,7 @@ def make_context(ti_mock, *, run_id: str = "test-run", map_index: int = 0):
     }
 
 
+@patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
 def test_first_execution_behaves_as_base_consumer_sensor():
     """
     On the first execution (try_number == 1), the sensor should poke for status

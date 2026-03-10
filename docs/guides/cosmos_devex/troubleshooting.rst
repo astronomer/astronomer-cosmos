@@ -3,18 +3,12 @@
 Troubleshoot Cosmos
 ============================
 
-I cannot see my DbtDag
-~~~~~~~~~~~~~~~~~~~~~~
-
-1. Check to see if your Dag files contain the words ``Dag`` and ``Airflow``.
-2. Set the Airflow environment variable, ``AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE=False``.
-
 I still cannot see my DbtDags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. Find if you are using ``LoadMode.AUTOMATIC`` (default) or ``LoadMode.DBT_LS``.
-2. Increase the ``AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT``.
-3. Check the Dag processor/ scheduler logs for errors.
+1. Increase the ``AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT``.
+2. Check the Dag processor and scheduler logs for errors
+3. Find if you are using ``LoadMode.AUTOMATIC`` (default) or ``LoadMode.DBT_LS``.
 
 The performance is suboptimal due to latency or resource utilization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

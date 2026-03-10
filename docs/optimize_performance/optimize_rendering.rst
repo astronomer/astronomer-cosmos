@@ -114,7 +114,7 @@ You can choose whether or not to render tests by using the parameter ``TestBehav
 Decide if you want to run all dbt tests
 ----------------------------------------
 
-You can run all dbt tests by the end of the Dag run by using ``Test.Behavior.After_All``.
+You can run all dbt tests by the end of the Dag run by using ``TestBehavior.AFTER_ALL``.
 
 .. code-block:: python
 

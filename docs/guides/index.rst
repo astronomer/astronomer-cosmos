@@ -29,11 +29,12 @@ Cosmos offers a number of configuration options to customize its behavior. For m
    :hidden:
    :caption: How Cosmos runs dbt
 
+   run_dbt/index
    run_dbt/execution-modes
    run_dbt/airflow-worker/index
    run_dbt/container/index
    run_dbt/callbacks/callbacks
-   run_dbt/operators/operators
+   run_dbt/operators/index
    run_dbt/customization/index
 
 .. toctree::

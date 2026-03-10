@@ -27,3 +27,6 @@ Running dbt commands
 
 After specifying where you want Cosmos to run dbt commands, you can additionally specify the commands you want to run, how you want
 
+
+Running Airflow
+~~~~~~~~~~~~~~~

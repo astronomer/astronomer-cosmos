@@ -1,7 +1,7 @@
 .. _operators:
 
-Operators
-=========
+dbt command Operators
+=====================
 
 Cosmos exposes individual operators that correspond to specific dbt commands, which can be used just like traditional
 `Apache Airflow® <https://airflow.apache.org/>`_ operators. Cosmos names these operators using the format ``Dbt<dbt-command><execution-mode>Operator``. For example, ``DbtBuildLocalOperator``.

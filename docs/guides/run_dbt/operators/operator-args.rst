@@ -36,47 +36,6 @@ Example of setting a Cosmos-specific operator argument:
     )
 
 
-.. _operator-args-per-node:
-
-Overriding operator arguments per dbt node (or group of nodes)
---------------------------------------------------------------
-
-.. versionadded:: 1.8.0
-
-Cosmos 1.8 introduced the capability for users to customise the operator arguments per dbt node, or per group of dbt nodes.
-This can be done by defining the arguments via a dbt meta property alongside other dbt project configurations.
-
-Let's say there is a DbtTaskGroup that sets a default pool to run all the dbt tasks, but a user would like the model expensive
-to run a separate pool.
-
-Users could either use ``operator_args`` or ``default args`` for defining the default behavior:
-
-.. code-block:: python
-
-    dbt_task_group = DbtTaskGroup(
-        # ...
-        profile_config=ProfileConfig,
-        default_args={"pool": "default_pool"},
-    )
-
-While configuring in the ``dbt_project.yml`` a different behaviour for the model "expensive", that should use the "expensive-pool":
-
-.. code-block::
-
-    version: 2
-        models:
-          - name: expensive
-            description: description
-            meta:
-              cosmos:
-                operator_kwargs:
-                  pool: expensive-pool
-
-
-More information about this feature can be found in :ref:`custom-airflow-properties`.
-
-To learn how to customise the profile per dbt model or Cosmos task, check :ref:`profile-customise-per-node`.
-
 Summary of Cosmos-specific arguments
 ------------------------------------
 
@@ -200,8 +159,8 @@ The following template fields are only selectable when using the operators in a 
 - ``selector``
 - ``models``
 
-Since Airflow resolves template fields during Airflow DAG execution and not DAG parsing,  the args above cannot be templated via ``DbtDag`` and ``DbtTaskGroup`` because both need to select dbt nodes during DAG parsing.
+Since Airflow resolves template fields during Airflow DAG execution and not DAG parsing, the args above cannot be templated via ``DbtDag`` and ``DbtTaskGroup`` because both need to select dbt nodes during DAG parsing.
 
 Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
 This is provided for telemetry on task execution, and is not an operator arg.
-For more information about this, see the `Compiled SQL <compiled-sql.html>`_ docs.
+For more information about this, see the `Compiled SQL <../../cosmos_devex/compiled-sql.html>`_ docs.

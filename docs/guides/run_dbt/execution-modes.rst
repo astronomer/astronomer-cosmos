@@ -7,14 +7,9 @@ The ```ExecutionConfig`` class defines your execution mode, which determines whe
 
 There are two categories of execution modes:
 
-1. **Execute dbt commands on the Airflow worker.** These execution modes offer faster execution times, since no extra container needs to be spun up, but no or limited environment isolation. There are four options for this type of execution mode: ``watcher``, ``local``, ``virtualenv``, and ``airflow_async``. ``airflow_async`` is available for BigQuery as of Cosmos 1.9 and ``watcher`` is available as of Cosmos 1.11.
+1. **Execute dbt commands on the Airflow worker.** These execution modes offer faster execution times, since no extra container needs to be spun up. But, they also don't offer environment isolation, or only provide limited isolation. There are four options for this type of execution mode: ``watcher``, ``local``, ``virtualenv``, and ``airflow_async``. ``airflow_async`` is available for BigQuery as of Cosmos 1.9 and ``watcher`` is available as of Cosmos 1.11.
 
 2. **Execute dbt commands in a container** This type of execution mode offers high levels of environment isolation and also allows you to run dbt from either containers or external jobs, in both on-premises environments and various cloud services. There are multiple options for this type of execution mode: ``docker``, ``kubernetes``, ``watcher_kubernetes``, ``aws_ecs``, ``aws_eks``, ``azure_container_instance``, and ``gcp_cloud_run_job``.
-
-The following diagram shows a decision tree to help you select the right execution mode for your project needs.
-
-.. image:: ../../_static/execution_mode_map.png
-   :alt: A diagram illustrating the details about each execution mode in the two categories, "On the Airflow worker or trigger" and "in a container".
 
 
 On the Airflow worker
@@ -35,7 +30,7 @@ There are four execution mode options that run on the Airflow worker:
   - **Can't install dbt directly**: If you can't install dbt in the Airflow environment (either in the same environment or a dedicated one).
   - **Multiple dbt installations are required**: If you require multiple dbt installations and you prefer Cosmos to manage them without modifying the Airflow deployment.
 
-  In most cases, the local execution mode with ``ExecutionConfig.dbt_executable_path`` is the preferred option instead of ``virtualenv``, as it allows you to manage the dbt environment while keeping the Airflow deployment simpler.
+  In most cases, the local execution mode with ``ExecutionConfig.dbt_executable_path`` is the preferred option instead of ``virtualenv``, because local mode with ``ExecutionConfig.dbt_executable_path`` allows you to manage the dbt environment while keeping the Airflow deployment simpler.
 
 - `airflow_async <./airflow-worker/async-execution-mode.html>`_: (Stable since Cosmos 1.9.0) Optimized for worker efficiency if you have long-running dbt commands. Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 

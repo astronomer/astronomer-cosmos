@@ -106,5 +106,3 @@ The type of execution mode that you choose directly affects how fast your Cosmos
      - Slow
      - High
      - No
-
-

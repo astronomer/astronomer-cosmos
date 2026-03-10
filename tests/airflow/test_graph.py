@@ -1141,6 +1141,49 @@ def test_test_behavior_for_watcher_mode(test_behavior):
         assert any(isinstance(task, DbtTestLocalOperator) for task in tasks)
         assert len(tasks) == 7
 
+@pytest.mark.parametrize("depends_on_past", [False, True])
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_EACH, TestBehavior.AFTER_ALL])
+def test_watcher_dependency_wiring(test_behavior, depends_on_past):
+    with DAG("test-id", start_date=datetime(2022, 1, 1), default_args={"depends_on_past": depends_on_past}) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    build_airflow_graph(
+        nodes=sample_nodes,
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=RenderConfig(
+            test_behavior=test_behavior,
+        ),
+        dbt_project_name="astro_shop",
+    )
+    if not depends_on_past:
+        assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {"dbt_producer_watcher"}
+        assert all(task.wait_for_downstream is False for task in dag.tasks)
+        return
+
+    assert all(task.wait_for_downstream is True for task in dag.tasks if task.task_id != "dbt_producer_watcher_gate")
+    if test_behavior == TestBehavior.NONE:
+        assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {'child_run', 'dbt_producer_watcher', 'child2_v2_run'}
+    if test_behavior == TestBehavior.AFTER_EACH:
+        assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {'child_run', 'dbt_producer_watcher', 'child2_v2_run'}
+    if test_behavior == TestBehavior.AFTER_ALL:
+        assert dag.task_dict["dbt_producer_watcher_gate"].upstream_task_ids == {'dbt_producer_watcher', 'astro_shop_test'}
+
+
+
 
 def test_custom_meta():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:

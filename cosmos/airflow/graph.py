@@ -975,6 +975,9 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
+        if producer_tasks and producer_tasks[0].depends_on_past:
+            test_task >> producer_tasks[1]
+            test_task.wait_for_downstream = True
     elif render_config.test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH):
         # Handle detached test nodes
         for node_id, node in detached_nodes.items():

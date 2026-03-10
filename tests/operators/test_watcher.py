@@ -1328,7 +1328,7 @@ class TestDbtConsumerWatcherSensor:
 
         with pytest.raises(
             AirflowException,
-            match="The dbt build command has failed in producer task. Please check the log of task dbt_producer_watcher for details.",
+            match="The dbt build command failed in the producer task. Please check the log of task dbt_producer_watcher for details.",
         ):
             sensor.poke(context)
 

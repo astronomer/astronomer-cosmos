@@ -43,7 +43,7 @@ Prerequisites
 
     If you have multiple versions of Python on your machine, and need to use an older version of Python with Airflow, be sure to create your demo virtual environment with the older Python version. For example, ``python3.13 -m venv venv``.
 
-If you exit your virtual environment, remember you can reactivate it by returning to your project directory and then using the ``source venv/bin/activate`` command.
+    If you exit your virtual environment, remember you can reactivate it by returning to your project directory and then using the ``source venv/bin/activate`` command.
 
 3. Install Cosmos and SQLite into your virtual environment.
 
@@ -99,7 +99,6 @@ Add the following content to your new project definition.
 
     touch dbt_project/micro_project/profiles.yml
 
-
 3. Add the following content to your ``profiles.yml``, and be sure to replace ``<explicit-path-to-demo-project>`` with your path:
 
 .. code-block:: yaml
@@ -115,6 +114,10 @@ Add the following content to your new project definition.
         schema_and_paths:
                 main: <explicit-path-to-demo-project>/oss-quickstart/my_database.db
         schema_directory: <explicit-path-to-demo-project>/oss-quickstart
+
+.. tip::
+
+    You can check the formatting and structure of your dbt SQLite connection with the `dbt-sqlite reference docs  <https://docs.getdbt.com/docs/local/connect-data-platform/sqlite-setup?version=1.11#connecting-to-sqlite-with-dbt-sqlite>`_.
 
 
 4. Create a simple dbt model in the ``micro_project`` models:
@@ -134,7 +137,7 @@ Add the following content to your new project definition.
 
 6. Open the ``enriched_model.sql`` file and add the following commands:
 
-.. code-block:: sql
+.. code-block:: SQL
 
     select
         id,
@@ -234,7 +237,7 @@ To view the transformations completed by the Dag, you must use a database viewer
 3. Select **SQLite** from the list of database types.
 4. Add your database connection information for the **Path**. This path is defined in the ``schema_and_paths.main`` configuration that you defined in your ``profiles.yml`` file:
 
-.. code-block::
+.. code-block:: yaml
 
     micro_project:
     target: dev

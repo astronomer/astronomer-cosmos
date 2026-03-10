@@ -156,6 +156,8 @@ def _iso_to_string(ts: Any) -> str | None:
 def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
     if not dbt_event:
         return
+    if not isinstance(dbt_event, dict):
+        return
 
     raw_status = dbt_event.get("status")
     if isinstance(raw_status, str):
@@ -174,4 +176,4 @@ def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
     if status in ["NONE", "FAILED", "FAIL", "ERROR"]:
         logger.error("%s", msg)
 
-    logger.info(f"[{status}] Start: {start_str}, Finish: {finish_str}")
+    logger.info("[%s] Start: %s, Finish: %s", status, start_str, finish_str)

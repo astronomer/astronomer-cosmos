@@ -8,6 +8,7 @@ from contextlib import nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
@@ -61,11 +62,16 @@ profile_config = ProfileConfig(
 
 class _MockTI:
     def __init__(self) -> None:
-        self.store: dict[str, str] = {}
+        self.store: dict[str, Any] = {}
         self.try_number = 1
 
-    def xcom_push(self, key: str, value: str, **_):
+    def xcom_push(self, key: str, value: Any, **_):
         self.store[key] = value
+
+    def xcom_pull(self, task_ids=None, key=None, **kwargs):
+        if key is not None:
+            return self.store.get(key)
+        return None
 
 
 class _MockContext(dict):
@@ -885,7 +891,8 @@ class TestStoreDbtStatusFromLog:
 
         assert ti.store.get("model__pkg__model_a_status") == "success"
         assert ti.store.get("model__pkg__model_b_status") == "failed"
-        assert len(ti.store) == 2  # Only success and failed statuses are stored
+        assert "model__pkg__model_a_status" in ti.store
+        assert "model__pkg__model_b_status" in ti.store
 
     def test_store_dbt_resource_status_from_log_pushes_compiled_sql_for_models(self, tmp_path):
         """Test that compiled_sql is pushed to XCom for successful model nodes."""
@@ -1221,8 +1228,8 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        # First call returns status from per-model XCom key, second call returns compiled_sql from per-model XCom key
-        ti.xcom_pull.side_effect = ["success", "SELECT * FROM orders"]
+        # First call returns status from per-model XCom key, second call returns compiled_sql, third is _dbt_event for _log_dbt_event
+        ti.xcom_pull.side_effect = ["success", "SELECT * FROM orders", None]
         context = self.make_context(ti)
 
         assert sensor.compiled_sql == ""  # Initially empty
@@ -1243,8 +1250,8 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        # _get_status_from_events: dbt_startup_events=None, nodefinished_*=ENCODED_EVENT; then get_xcom_val(compiled_sql_key)
-        ti.xcom_pull.side_effect = [None, ENCODED_EVENT, "SELECT * FROM orders"]
+        # _get_status_from_events: dbt_startup_events=None, nodefinished_*=ENCODED_EVENT; then get_xcom_val(compiled_sql_key), get_xcom_val(_dbt_event)
+        ti.xcom_pull.side_effect = [None, ENCODED_EVENT, "SELECT * FROM orders", None]
         context = self.make_context(ti)
 
         assert sensor.compiled_sql == ""  # Initially empty

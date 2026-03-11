@@ -36,7 +36,7 @@ ProjectConfig
 
 The ProjectConfig contains information about which dbt project a Cosmos Dag or task group  executes, as well as configurations that apply to both, rendering and execution.
 
-See `ProjectConfig reference <../reference/configs/project-config.html>`_.
+See :ref:`project-config`.
 
 ProfileConfig
 ~~~~~~~~~~~~~
@@ -47,16 +47,14 @@ profiles.yml and profile mapping
 ++++++++++++++++++++++++++++++++
 
 There are two ways to connect Cosmos projects to the data warehouse used by your dbt project:
-1. Use an existing ``profiles.yml`` file, by providing the filepath in the ``profiles_yml_filepath`` parameter. Each dbt project contains a ``profiles.yml`` file, which defines how dbt connects to data warehouses and other environments.
-2. Use an Airflow connection in your Dag by defining the ``profile_mapping`` and ``conn_id`` key. Airflow connections can be set in various ways, including in the Airflow UI,
-as environment variable, or in a secrets backend. Airflow uses connections across its environment in hooks
-and operators.
 
-See `Profiles reference <../profiles/index.html>`_ for more information about the ProfileConfig, ``profiles.yml``, and ``profile_mapping``.
+1. Use an existing ``profiles.yml`` file, by providing the filepath in the ``profiles_yml_filepath`` parameter. Each dbt project contains a ``profiles.yml`` file, which defines how dbt connects to data warehouses and other environments.
+2. Use an Airflow connection in your Dag by defining the ``profile_mapping`` and ``conn_id`` key. Airflow connections can be set in various ways, including in the Airflow UI, as environment variable, or in a secrets backend. Airflow uses connections across its environment in hooks and operators.
+
+See :ref:`profile-config` for more information about the ProfileConfig, ``profiles.yml``, and ``profile_mapping``.
 
 Execution Modes
 ~~~~~~~~~~~~~~~
-
 
 You define the execution mode for your project by using the ExecutionConfig class, which determines where and how dbt commands are run within Cosmos.
 
@@ -72,12 +70,12 @@ There are two main categories of execution modes:
 2. **Executing dbt commands in a container outside of the Airflow worker environment.**
    In these modes, Cosmos runs dbt commands inside Docker or Kubernetes containers. This provides stronger environment isolation and allows you to run dbt in environments with different dependencies or system configurations.
 
-See `Execution modes <../guides/run_dbt/execution-modes.html>`_ and `ExecutionConfig Reference <../reference/configs/execution-config.html>`_.
+See :ref:`execution-modes` and :ref:`execution-config`.
 
 Parsing
 ~~~~~~~
 
-Parsing generally refers to the processes and configurations that Cosmos uses to parse your dbt project. See `Parsing Methods <../guides/translate_dbt_to_airflow/parsing-methods.html>`_
+Parsing generally refers to the processes and configurations that Cosmos uses to parse your dbt project. See :ref:`parsing-methods`.
 
 Invocation Mode
 ~~~~~~~~~~~~~~~
@@ -93,10 +91,10 @@ After parsing your dbt project, Cosmos *renders* the project as an Airflow Dag o
 Testing Strategy
 ++++++++++++++++
 
-By default, Cosmos adds a dbt test after it completes a model. However, you can change this behavior by configuring the test behavior in the RenderConfig. Learn more in `Testing behavior <../guides/translate_dbt_to_airflow/testing-behavior.html>`_.
+By default, Cosmos adds a dbt test after it completes a model. However, you can change this behavior by configuring the test behavior in the RenderConfig. Learn more in :ref:`testing-behavior`.
 
 
 Select and exclude
 ++++++++++++++++++++
 
-You can filter your dbt project to only parse a subset of your dbt project by using the RenderConfig, and define the ``select`` and ``exclude`` parameters. See `Selecting and excluding <../guides/translate_dbt_to_airflow/selecting-excluding.html>`_.
+You can filter your dbt project to only parse a subset of your dbt project by using the RenderConfig, and define the ``select`` and ``exclude`` parameters. See :ref:`selecting-excluding`.

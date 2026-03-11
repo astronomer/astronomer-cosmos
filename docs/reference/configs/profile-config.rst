@@ -1,3 +1,5 @@
+.. _profile-config:
+
 Profile Config
 ================
 

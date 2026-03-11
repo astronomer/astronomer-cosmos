@@ -415,3 +415,16 @@ def test_exceptions_converted_to_airflow_skip_exception():
 
         with pytest.raises(TaskDeferred):
             op.trigger_reentry(context=context)
+
+@pytest.mark.parametrize("depends_on_past", [False, True])
+def test_depends_on_past_sets_wait_for_downstream(depends_on_past):
+    """
+    Test that if depends_on_past is True, wait_for_downstream is also set to True.
+    """
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        depends_on_past=depends_on_past,
+    )
+    assert op.wait_for_downstream == depends_on_past

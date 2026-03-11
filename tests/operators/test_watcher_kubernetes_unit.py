@@ -399,14 +399,18 @@ def test_exceptions_converted_to_airflow_skip_exception():
         with pytest.raises(TaskDeferred) as execinfo:
             op.execute(context=context)
 
-    with patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.trigger_reentry") as mock_trigger_reentry:
+    with patch(
+        "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.trigger_reentry"
+    ) as mock_trigger_reentry:
         mock_trigger_reentry.side_effect = ApiException("Kubernetes API error")
         with pytest.raises(AirflowSkipException, match="Skipping execution due to task failure") as execinfo:
             op.trigger_reentry(context=context)
 
         assert execinfo.value.__cause__ == mock_trigger_reentry.side_effect
 
-    with patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.trigger_reentry") as mock_trigger_reentry:
+    with patch(
+        "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.trigger_reentry"
+    ) as mock_trigger_reentry:
         mock_trigger_reentry.side_effect = TaskDeferred(trigger="some_trigger", method_name="trigger_reentry")
 
         with pytest.raises(TaskDeferred) as execinfo:

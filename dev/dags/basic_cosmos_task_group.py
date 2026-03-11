@@ -49,7 +49,10 @@ with DAG(
 
     customers = DbtTaskGroup(
         group_id="customers",
-        project_config=ProjectConfig((DBT_PROJECT_PATH).as_posix(), dbt_vars={"var": "2"}),
+        project_config=ProjectConfig(
+            dbt_project_path=DBT_PROJECT_PATH.as_posix(),
+            dbt_vars={"var": "2"},
+        ),
         render_config=RenderConfig(
             select=["path:seeds/raw_customers.csv"],
             enable_mock_profile=False,
@@ -64,9 +67,7 @@ with DAG(
 
     orders = DbtTaskGroup(
         group_id="orders",
-        project_config=ProjectConfig(
-            (DBT_PROJECT_PATH).as_posix(),
-        ),
+        project_config=ProjectConfig(DBT_PROJECT_PATH.as_posix()),
         render_config=RenderConfig(
             select=["path:seeds/raw_orders.csv"],
             enable_mock_profile=False,  # This is necessary to benefit from partial parsing when using ProfileMapping

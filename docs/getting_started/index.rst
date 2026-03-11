@@ -1,7 +1,6 @@
 .. _getting-started:
 
 Getting started with Cosmos
-===========================
 
 .. toctree::
    :maxdepth: 0
@@ -52,7 +51,8 @@ These guides are an ideal place to start if you don't have a particular project 
 .. toctree::
    :maxdepth: 1
    :caption: Quickstart
-
+   
+   Open-source quickstart <oss-quickstart>
    Astro CLI quickstart <astro-cli-quickstart>
 
 Bring your own project

@@ -416,6 +416,7 @@ def test_exceptions_converted_to_airflow_skip_exception():
         with pytest.raises(TaskDeferred):
             op.trigger_reentry(context=context)
 
+
 @pytest.mark.parametrize("depends_on_past", [False, True])
 def test_depends_on_past_sets_wait_for_downstream(depends_on_past):
     """

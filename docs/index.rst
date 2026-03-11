@@ -9,7 +9,6 @@
    Getting Started <getting_started/index>
    Guides <guides/index>
    Optimize Performance <optimize_performance/index>
-   Profiles <profiles/index>
    Reference <reference/index>
    Project Policies <policy/index>
 

@@ -396,7 +396,7 @@ def test_exceptions_converted_to_airflow_skip_exception():
     with patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.execute") as mock_execute:
         mock_execute.side_effect = TaskDeferred(trigger="some_trigger", method_name="trigger_reentry")
 
-        with pytest.raises(TaskDeferred) as execinfo:
+        with pytest.raises(TaskDeferred):
             op.execute(context=context)
 
     with patch(
@@ -413,5 +413,5 @@ def test_exceptions_converted_to_airflow_skip_exception():
     ) as mock_trigger_reentry:
         mock_trigger_reentry.side_effect = TaskDeferred(trigger="some_trigger", method_name="trigger_reentry")
 
-        with pytest.raises(TaskDeferred) as execinfo:
+        with pytest.raises(TaskDeferred):
             op.trigger_reentry(context=context)

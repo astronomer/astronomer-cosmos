@@ -31,6 +31,17 @@ Connect to your dbt database
 
 Configure your Cosmos project to allow Airflow Dags to initiate dbt commands, and make data transformations and updates in your data warehouses. You can create these connections with your ``profiles.yml`` file in the dbt project, using profile mappings, or customizing ``ProfileConfig`` per dbt configuration.
 
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :caption: Connect to your database
+
+   Connection options <connect_database/index>
+   connect_database/use-your-profiles-yml
+   connect_database/use-profile-mapping
+   connect_database/profile-customise-per-node
+   
+
 Translate your dbt code into Airflow Dags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -38,6 +49,7 @@ You can customize how Cosmos parses your dbt workflows into Airflow Dags. Choosi
 
 .. toctree::
    :maxdepth: 1
+   :hidden:
    :caption: Translating dbt into Airflow
 
    translate_dbt_to_airflow/parsing-methods

@@ -108,7 +108,7 @@ def run_command(
 
 
 def extract_message_by_status(
-    result: dbtRunnerResult, status_levels: list[str] = ["warn"]
+    result: dbtRunnerResult, status_levels: list[str] | None = None
 ) -> tuple[list[str], list[str]]:
     """
     Extracts messages from the dbt runner result and returns them as a formatted string.
@@ -121,6 +121,8 @@ def extract_message_by_status(
     :return: two lists of strings, the first one containing the node names and the second one
         containing the node result message.
     """
+    status_levels = ["warn"] if status_levels is None else status_levels
+
     node_names = []
     node_results = []
 

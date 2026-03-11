@@ -97,11 +97,11 @@ def validate_arguments(
     Validate that mutually exclusive selectors filters have not been given.
     Validate deprecated arguments.
 
-    :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
-    :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
-    :param profile_config: ProfileConfig Object
+    :param render_config: Render configuration
+    :param profile_config: Profile configuration
     :param task_args: Arguments to be used to instantiate an Airflow Task
-    :param execution_mode: the current execution mode
+    :param execution_config: Execution configuration
+    :param project_config: Project configuration
     """
     for field in ("tags", "paths"):
         select_items = retrieve_by_label(render_config.select, field)

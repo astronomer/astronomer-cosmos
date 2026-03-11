@@ -40,7 +40,7 @@ Configure your Cosmos project to allow Airflow Dags to initiate dbt commands, an
    connect_database/use-your-profiles-yml
    connect_database/use-profile-mapping
    connect_database/profile-customise-per-node
-   
+
 
 Translate your dbt code into Airflow Dags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

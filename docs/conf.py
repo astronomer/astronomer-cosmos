@@ -70,6 +70,7 @@ redirects = {
     "configuration/execution-config": "../reference/configs/execution-config.html",
     "configuration/generating-docs": "../guides/dbt_docs/generating-docs.html",
     "configuration/hosting-docs": "../guides/dbt_docs/hosting-docs.html",
+    "configuration/index": "../reference/index.html",
     "configuration/lineage": "../guides/cosmos_devex/lineage.html",
     "configuration/logging": "../guides/cosmos_devex/logging.html",
     "configuration/memory_optimization": "../optimize_performance/memory_optimization.html",

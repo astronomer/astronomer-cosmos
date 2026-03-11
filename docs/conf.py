@@ -56,7 +56,7 @@ generate_mapping_docs()
 
 # -- Begin docs redirect section
 # -- To test redirects in a local build, paste the redirect source, and append .html to the end.
-# -- For example, "airflow3_compatibility/index" redirect must be tested using "airflow3_compatibility/index.html"
+# -- For example, "airflow3_compatibility/index" source redirect must be tested using "airflow3_compatibility/index.html"
 # --  https://documatt.com/sphinx-reredirects/usage/
 redirects = {
     "airflow3_compatibility/index": "../policy/airflow3-compatibility.html",
@@ -77,7 +77,7 @@ redirects = {
     "configuration/operator-args": "../guides/run_dbt/customization/operator-args.html",
     "configuration/parsing-methods": "../guides/translate_dbt_to_airflow/parsing-methods.html",
     "configuration/partial-parsing": "../guides/run_dbt/customization/partial-parsing.html",
-    "configuration/profile-config": "../reference/configs/profile-config.html",
+    "configuration/profile-config": "../guides/connect_database/index.html",
     "configuration/project-config": "../reference/configs/project-config.html",
     "configuration/render-config": "../guides/translate_dbt_to_airflow/render-config.html",
     "configuration/scheduling": "../guides/run_dbt/customization/scheduling.html",
@@ -100,4 +100,30 @@ redirects = {
     "getting_started/operators": "../guides/run_dbt/operators/operators.html",
     "getting_started/watcher-execution-mode": "../guides/run_dbt/airflow-worker/watcher-execution-mode.html",
     "getting_started/watcher-kubernetes-execution-mode": "../guides/run_dbt/container/watcher-kubernetes-execution-mode.html",
+    "profiles/AthenaAccessKey": "../reference/profiles/AthenaAccessKey.html",
+    "profiles/ClickhouseUserPassword": "../reference/profiles/ClickhouseUserPassword.html",
+    "profiles/DatabricksOauth": "../reference/profiles/DatabricksOauth.html",
+    "profiles/DatabricksToken": "../reference/profiles/DatabricksToken.html",
+    "profiles/DuckDBUserPassword": "../reference/profiles/DuckDBUserPassword.html",
+    "profiles/ExasolUserPassword": "../reference/profiles/ExasolUserPassword.html",
+    "profiles/GoogleCloudOauth": "../reference/profiles/GoogleCloudOauth.html",
+    "profiles/GoogleCloudServiceAccountDict": "../reference/profiles/GoogleCloudServiceAccountDict.html",
+    "profiles/GoogleCloudServiceAccountFile": "../reference/profiles/GoogleCloudServiceAccountFile.html",
+    "profiles/index": "../reference/profiles/index.html",
+    "profiles/MysqlUserPassword": "../reference/profiles/MysqlUserPassword.html",
+    "profiles/OracleUserPassword": "../reference/profiles/OracleUserPassword.html",
+    "profiles/PostgresUserPassword": "../reference/profiles/PostgresUserPassword.html",
+    "profiles/RedshiftUserPassword": "../reference/profiles/RedshiftUserPassword.html",
+    "profiles/SnowflakeEncryptedPrivateKeyFilePem": "../reference/profiles/SnowflakeEncryptedPrivateKeyFilePem.html",
+    "profiles/SnowflakeEncryptedPrivateKeyPem": "../reference/profiles/SnowflakeEncryptedPrivateKeyPem.html",
+    "profiles/SnowflakePrivateKeyPem": "../reference/profiles/SnowflakePrivateKeyPem.html",
+    "profiles/SnowflakeUserPassword": "../reference/profiles/SnowflakeUserPassword.html",
+    "profiles/SparkThrift": "../reference/profiles/SparkThrift.html",
+    "profiles/StandardSQLServerAuth": "../reference/profiles/StandardSQLServerAuth.html",
+    "profiles/StarrocksUserPassword": "../reference/profiles/StarrocksUserPassword.html",
+    "profiles/TeradataUserPassword": "../reference/profiles/TeradataUserPassword.html",
+    "profiles/TrinoCertificate": "../reference/profiles/TrinoCertificate.html",
+    "profiles/TrinoJWT": "../reference/profiles/TrinoJWT.html",
+    "profiles/TrinoLDAP": "../reference/profiles/TrinoLDAP.html",
+    "profiles/VerticaUserPassword": "../reference/profiles/VerticaUserPassword.html",
 }

@@ -14,6 +14,8 @@ Using ``docker`` requires that you ensure the Docker container you use has up-to
 
 Also, the Docker execution mode approach can be significantly slower than ``virtualenv``, since it might require building the ``Docker`` container before executing dbt commands, which is slower than creating a Virtualenv with ``dbt-core``.
 
+Finally, if you run Airflow in a container - such as in an Astro deployment - you may encounter challenges when attempting to use Cosmos ``ExecutionMode.DOCKER``. Unless you have a strong reason to pursue this setup, we generally advise against running a container inside another container, as discussed in the article `Do not use Docker-in-Docker for CI <https://jpetazzo.github.io/2015/09/03/do-not-use-docker-in-docker-for-ci/>`_.
+
 
 Set up Docker execution mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -23,15 +25,15 @@ The following procedure illustrates how to run the Cosmos dbt Docker Operators a
 Requirements
 ------------
 
-- Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
+- Docker with Docker Desktop (Docker Desktop on MacOS) or equivalent (such as `Orbstack <https://orbstack.dev/>`__). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
 
 The following example setup steps include setting up the following:
 
 - Airflow
 - Astronomer-cosmos package containing the dbt Docker operators
-- Postgres docker container
+- Postgres Docker container
 - Docker image built with required dbt project and dbt DAG
-- dbt DAG with dbt docker operators in the Airflow DAGs directory to run in Airflow
+- dbt DAG with dbt Docker operators in the Airflow DAGs directory to run in Airflow
 
 1. Install Airflow and Cosmos
 -----------------------------
@@ -49,7 +51,7 @@ Create a python virtualenv, activate it, upgrade pip to the latest version, and 
 2. Set up Postgres database
 ---------------------------
 
-You will need a postgres database running to use as the database for the dbt project. Run the following command to run and expose a postgres database:
+You will need a PostgreSQL database running to use as the database for the dbt project. Run the following command to run and expose a postgres database:
 
 .. code-block:: bash
 
@@ -58,7 +60,7 @@ You will need a postgres database running to use as the database for the dbt pro
 3. Build the dbt Docker image
 -----------------------------
 
-For the Docker operators to work, you need to create a docker image that will be supplied as image parameter to the dbt docker operators used in the DAG.
+For the Docker operators to work, you need to create a Docker image that will be supplied as image parameter to the dbt Docker operators used in the DAG.
 
 1. Clone the `cosmos-example <https://github.com/astronomer/cosmos-example.git>`_ repo
 
@@ -67,7 +69,7 @@ For the Docker operators to work, you need to create a docker image that will be
     git clone https://github.com/astronomer/cosmos-example.git
     cd cosmos-example
 
-2. Create a docker image containing the dbt project files and dbt profile by using the `Dockerfile <https://github.com/astronomer/cosmos-example/blob/main/Dockerfile.postgres_profile_docker_k8s>`_, which will be supplied to the Docker operators.
+2. Create a Docker image containing the dbt project files and dbt profile by using the `Dockerfile <https://github.com/astronomer/cosmos-example/blob/main/Dockerfile.postgres_profile_docker_k8s>`_, which will be supplied to the Docker operators.
 
 .. code-block:: bash
 
@@ -75,7 +77,7 @@ For the Docker operators to work, you need to create a docker image that will be
 
 .. note::
 
-    If running on M1, you may need to set the following environment variables for running the docker build command, in case it fails.
+    If running on M1, you may need to set the following environment variables for running the Docker build command, in case it fails.
 
     .. code-block:: bash
 
@@ -109,7 +111,7 @@ This directory contains a Docker-specific example Dag.
 
 .. note::
 
-    You might need to run airflow standalone with ``sudo`` if your Airflow user is not able to access the docker socket URL or pull the images in the ``Kind`` cluster.
+    You might need to run airflow standalone with ``sudo`` if your Airflow user is not able to access the Docker socket URL or pull the images in the ``Kind`` cluster.
 
 3. Log in to Airflow through a web browser, ``http://localhost:8080/``, using the user ``airflow`` and the password described in the ``standalone_admin_password.txt`` file.
 

@@ -63,7 +63,7 @@ You can customize how Cosmos parses your dbt workflows into Airflow Dags. Choosi
 Run dbt
 ~~~~~~~~~~~~~
 
-Specify more details about how Cosmos runs both dbt commands and Airflow Dags. This includes `choosing an execution mode <../getting_started/execution-modes.html>`_ , either one that runs dbt on an Airflow worker node or one that runs in a container. You can customize additional aspects of how your dbt code runs, like using particular operators that correspond to dbt commands. And, you can leverage Airflow's scheduling capabilities in your Cosmos Dags.
+Specify more details about how Cosmos runs both dbt commands and Airflow Dags. This includes :ref:`execution-mode` , either one that runs dbt on an Airflow worker node or one that runs in a container. You can customize additional aspects of how your dbt code runs, like using particular operators that correspond to dbt commands. And, you can leverage Airflow's scheduling capabilities in your Cosmos Dags.
 
 .. toctree::
    :maxdepth: 1

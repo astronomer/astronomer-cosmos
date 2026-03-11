@@ -19,33 +19,33 @@ These execution modes offer faster execution times, since you don't need to spin
 
 There are four execution mode options that run on the Airflow worker:
 
-- `local <./airflow-worker/local-execution-mode.html>`_: Default execution mode in Cosmos 1.x. In this mode, a dbt command is executed for each dbt node (one dbt command per Airflow task). The dbt project is reparsed during every task execution. By default, each task runs a single dbt node and relies on a user-preinstalled dbt. This mode can operate in two ways:
+- :ref:`local <local-execution>`: Default execution mode in Cosmos 1.x. In this mode, a dbt command is executed for each dbt node (one dbt command per Airflow task). The dbt project is reparsed during every task execution. By default, each task runs a single dbt node and relies on a user-preinstalled dbt. This mode can operate in two ways:
 
   - **No isolation**: dbt is installed in the same Python virtual environment as Airflow. In this case, Cosmos can invoke dbt commands as a library rather than as a subprocess, leading to performance gains.
   - **Partial isolation**: Create a dedicated Python virtual environment in the Airflow deployment, install dbt there, and configure Cosmos to use it by setting ``ExecutionConfig.dbt_executable_path``. This provides a good solution for dependency conflicts.
 
-- `watcher <./airflow-worker/watcher-execution-mode.html>`_: (Experimental since Cosmos 1.11.0) Optimized for execution speed. Run a single ``dbt build`` command from a producer task and have sensor tasks to watch the progress of the producer, with improved DAG run time while maintaining the tasks lineage in the Airflow UI, and ability to retry failed tasks.
-- `virtualenv <./airflow-worker/cosmos-managed-venv.html>`_: Runs dbt commands from Python virtual environments created and managed by Cosmos. This mode removes the need to create a virtual environment at build time, unlike ``ExecutionMode.LOCAL``, while avoiding package conflicts. It is intended for cases where:
+- :ref:`watcher <watcher-execution-mode>`: (Experimental since Cosmos 1.11.0) Optimized for execution speed. Run a single ``dbt build`` command from a producer task and have sensor tasks to watch the progress of the producer, with improved DAG run time while maintaining the tasks lineage in the Airflow UI, and ability to retry failed tasks.
+- :ref:`virtualenv <cosmos-managed-venv>`: Runs dbt commands from Python virtual environments created and managed by Cosmos. This mode removes the need to create a virtual environment at build time, unlike ``ExecutionMode.LOCAL``, while avoiding package conflicts. It is intended for cases where:
 
   - **Can't install dbt directly**: If you can't install dbt in the Airflow environment (either in the same environment or a dedicated one).
   - **Multiple dbt installations are required**: If you require multiple dbt installations and you prefer Cosmos to manage them without modifying the Airflow deployment.
 
   In most cases, the local execution mode with ``ExecutionConfig.dbt_executable_path`` is the preferred option instead of ``virtualenv``, because local mode with ``ExecutionConfig.dbt_executable_path`` allows you to manage the dbt environment while keeping the Airflow deployment simpler.
 
-- `airflow_async <./airflow-worker/async-execution-mode.html>`_: (Stable since Cosmos 1.9.0) Optimized for worker efficiency if you have long-running dbt commands. Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
+- :ref:`airflow_async <async-execution-mode>`: (Stable since Cosmos 1.9.0) Optimized for worker efficiency if you have long-running dbt commands. Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 
 In a container
 ~~~~~~~~~~~~~~
 
 You can also execute dbt commands in a container. Choosing these kinds of execution modes provides a high degree of isolation. However, they come with limitations where you can only create Airflow connections with the dbt ``profiles.yml`` file and it has slower run times because of container provisioning. They all also require a pre-existing Docker image.
 
-- `docker <./container/docker.html>`_ : Run ``dbt`` commands from Docker containers managed by Cosmos.
-- `kubernetes <./container/kubernetes.html>`_: Run ``dbt`` commands within Kubernetes Pods managed by Cosmos.
-- `watcher_kubernetes <./container/watcher-kubernetes-execution-mode.html>`_: (experimental since Cosmos 1.13.0) Combines the speed of the watcher execution mode with the isolation of Kubernetes. Check the :ref:`watcher-kubernetes-execution-mode` for more details.
-- `aws_ecs <./container/aws-container-run-job.html>`_: Run ``dbt`` commands in containers via AWS ECS.
-- `aws_eks <./container/aws-eks.html>`_: Run ``dbt`` commands from AWS EKS Pods managed by Cosmos.
-- `azure_container_instance <./container/azure-container-instance.html>`_: Run ``dbt`` commands in Azure Container Instances.
-- `gcp_cloud_run_job <./container/gcp-cloud-run-job.html>`_: Run ``dbt`` commands via a container managed by GCP Cloud Run Job.
+- :ref:`docker <docker>` : Run ``dbt`` commands from Docker containers managed by Cosmos.
+- :ref:`kubernetes <kubernetes>`: Run ``dbt`` commands within Kubernetes Pods managed by Cosmos.
+- :ref:`watcher_kubernetes <watcher-kubernetes-execution-mode>`: (experimental since Cosmos 1.13.0) Combines the speed of the watcher execution mode with the isolation of Kubernetes.
+- :ref:`aws_ecs <aws-container-run-job>`: Run ``dbt`` commands in containers via AWS ECS.
+- :ref:`aws_eks <aws-eks>`: Run ``dbt`` commands from AWS EKS Pods managed by Cosmos.
+- :ref:`azure_container_instance <azure-container-instance>`: Run ``dbt`` commands in Azure Container Instances.
+- :ref:`gcp_cloud_run_job <gcp-cloud-run-job>`: Run ``dbt`` commands via a container managed by GCP Cloud Run Job.
 
 .. _execution-modes-comparison:
 

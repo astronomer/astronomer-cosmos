@@ -1,3 +1,5 @@
+.. _invocation-mode:
+
 Invocation Modes
 ================
 .. versionadded:: 1.4

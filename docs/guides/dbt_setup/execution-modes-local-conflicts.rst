@@ -3,15 +3,15 @@
 Airflow and dbt dependencies conflicts
 ======================================
 
-When using the `Local Execution Mode <../../guides/run_dbt/airflow-worker/local-execution-mode.html>`__ without defining a custom ``ExecutionConfig.dbt_executable_path``, you might have dependency conflicts between
+When using the :ref:`local-execution` without defining a custom ``ExecutionConfig.dbt_executable_path``, you might have dependency conflicts between
 `Apache Airflow® <https://airflow.apache.org/>`_ and dbt. The number of conflicts can increase depending on the Airflow providers and dbt adapters you use.
 
 If you find errors, we recommend users isolating the installation of dbt from the Airflow installation.
-With the `Local Execution Mode <../../guides/run_dbt/airflow-worker/local-execution-mode.html>`__, this can be accomplished by installing dbt in a separate
+With the ``local`` execution mode, this can be accomplished by installing dbt in a separate
 Python virtualenv and setting the `ExecutionConfig.dbt_executable_path <../../reference/configs/execution-config.html>`_  and
 `RenderConfig.dbt_executable_path <../../guides/translate_dbt_to_airflow/render-config.html>`_ parameters.
 
-The page `execution modes <../../guides/run_dbt/execution-modes.html>`__ describes many other methods that support isolating dbt from Airflow.
+The page, :ref:`execution-modes` describes many other methods that support isolating dbt from Airflow.
 
 In the following table, ``x`` represents combinations that lead to conflicts (vanilla ``apache-airflow`` and ``dbt-core`` packages):
 

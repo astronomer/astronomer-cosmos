@@ -315,3 +315,48 @@ class TestWatcherTrigger:
         assert events[0].payload["status"] == "failed"
         assert events[0].payload["reason"] == "model_failed"
         assert events[0].payload["compiled_sql"] == "SELECT * FROM broken_model"
+
+    @patch("cosmos.operators._watcher.triggerer.logger")
+    @patch("cosmos.operators._watcher.triggerer.asyncio.sleep", new_callable=AsyncMock)
+    @patch("cosmos.operators._watcher.triggerer.is_dbt_node_status_terminal", return_value=True)
+    @pytest.mark.asyncio
+    async def test_log_startup_events_returns_when_node_terminal(self, mock_terminal, mock_sleep, mock_logger):
+        self.trigger.get_xcom_val = AsyncMock(return_value=None)
+        self.trigger._get_producer_task_status = AsyncMock(return_value="running")
+        self.trigger._get_node_status = AsyncMock(return_value="error")
+
+        self.trigger.poke_interval = 0
+
+        await self.trigger._log_startup_events()
+
+        self.trigger._get_node_status.assert_awaited()
+        mock_terminal.assert_called_with("error")
+
+        mock_sleep.assert_not_called()
+        mock_logger.info.assert_not_called()
+
+    @patch("cosmos.operators._watcher.triggerer.asyncio.sleep", new_callable=AsyncMock)
+    @patch("cosmos.operators._watcher.triggerer.is_dbt_node_status_terminal", side_effect=[False, True])
+    @pytest.mark.asyncio
+    async def test_log_startup_events_waits_and_sleeps(self, mock_terminal, mock_sleep):
+        """
+        First iteration: no events and node is not terminal, so the loop sleeps.
+        Second iteration: node becomes terminal, causing the method to exit.
+        """
+        self.trigger.get_xcom_val = AsyncMock(side_effect=[None, None])
+        self.trigger._get_producer_task_status = AsyncMock(side_effect=["running", "running"])
+        self.trigger._get_node_status = AsyncMock(side_effect=["running", "error"])
+
+        self.trigger.poke_interval = 1
+
+        await self.trigger._log_startup_events()
+
+        # ensure sleep happened once
+        mock_sleep.assert_awaited_once_with(1)
+
+        # ensure node status checked twice
+        assert self.trigger._get_node_status.await_count == 2
+
+        # ensure terminal check was called
+        mock_terminal.assert_any_call("running")
+        mock_terminal.assert_any_call("error")

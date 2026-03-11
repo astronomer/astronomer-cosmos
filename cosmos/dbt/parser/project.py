@@ -411,7 +411,7 @@ class LegacyDbtProject:
                     type=DbtModelType.DBT_TEST,
                     path=path,
                     dbt_vars=self.dbt_vars,
-                    config=DbtModelConfig(upstream_models=set({model_name})),
+                    config=DbtModelConfig(upstream_models={model_name}),
                 )
                 tests[test_model.name] = test_model
         return tests

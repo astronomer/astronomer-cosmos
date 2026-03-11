@@ -125,7 +125,7 @@ def test_run_command_without_virtualenv_dir(
         invocation_mode=InvocationMode.SUBPROCESS,
         vars={"variable": "value"},
     )
-    assert venv_operator.virtualenv_dir == None
+    assert venv_operator.virtualenv_dir is None
     venv_operator.run_command(
         cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock(), "run_id": "test_run_id"}
     )

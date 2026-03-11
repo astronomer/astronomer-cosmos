@@ -131,9 +131,9 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             self.log.exception("Dbt execution failed")
             raise AirflowSkipException("Skipping execution due to task failure") from e
 
-    def trigger_reentry(self, **kwargs: Any) -> Any:
+    def trigger_reentry(self, *args: Any, **kwargs: Any) -> Any:
         try:
-            return super().trigger_reentry(**kwargs)
+            return super().trigger_reentry(*args, **kwargs)
         except (AirflowSkipException, TaskDeferred):
             raise
         except Exception as e:

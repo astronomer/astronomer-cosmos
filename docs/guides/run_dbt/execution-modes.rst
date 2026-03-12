@@ -39,7 +39,7 @@ In a container
 
 You can also execute dbt commands in a container. Choosing these kinds of execution modes provides a high degree of isolation. However, they come with limitations where you can only create Airflow connections with the dbt ``profiles.yml`` file and it has slower run times because of container provisioning. They all also require a pre-existing Docker image.
 
-- :ref:`docker <docker>` : Run ``dbt`` commands from Docker containers managed by Cosmos.
+- :ref:`docker <docker>` : Run ``dbt`` commands via Docker containers inside the Airflow worker node.
 - :ref:`kubernetes <kubernetes>`: Run ``dbt`` commands within Kubernetes Pods managed by Cosmos.
 - :ref:`watcher_kubernetes <watcher-kubernetes-execution-mode>`: (experimental since Cosmos 1.13.0) Combines the speed of the watcher execution mode with the isolation of Kubernetes.
 - :ref:`aws_ecs <aws-container-run-job>`: Run ``dbt`` commands in containers via AWS ECS.

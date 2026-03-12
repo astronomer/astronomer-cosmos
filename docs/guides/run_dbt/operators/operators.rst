@@ -4,7 +4,9 @@ dbt command operators
 =====================
 
 Cosmos exposes individual operators that correspond to specific dbt commands, which can be used just like traditional
-`Apache Airflow® <https://airflow.apache.org/>`_ operators. Cosmos names these operators using the format ``Dbt<dbt-command><execution-mode>Operator``. For example, ``DbtBuildLocalOperator``.
+`Apache Airflow® <https://airflow.apache.org/>`_ operators. Cosmos names these operators using the format ``Dbt<dbt-command><execution-mode>Operator``.
+
+The following examples show ``DbtCloneLocalOperator`` and ``DbtSeedLocalOperator``. You can see the full ``example_operator`` Dag in the `dev/dags directory <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/example_operators.py>`_.
 
 Clone
 -----

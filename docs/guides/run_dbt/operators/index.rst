@@ -10,6 +10,7 @@ Learn how to use operators with Cosmos.
    :maxdepth: 1
    :caption: Operators
 
+   operators
    operator-args
    overriding-operator-args
-   operators
+

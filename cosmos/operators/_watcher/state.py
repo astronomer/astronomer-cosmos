@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import datetime
 from enum import Enum
 from threading import Lock
 from typing import Any
+
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
 
 try:
     from airflow.sdk.types import RuntimeTaskInstanceProtocol as TaskInstance
@@ -17,7 +22,7 @@ ProducerStateFetcher = Callable[[], str | None]
 
 # dbt uses different status values for different node types (models/tests):"
 DBT_SUCCESS_STATUSES = frozenset({"success", "pass"})
-DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error"})
+DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error", "runtime error"})
 
 
 class DbtTestStatus(str, Enum):
@@ -133,3 +138,42 @@ def build_producer_state_fetcher(
         return None
 
     return fetch_state_airflow3
+
+
+def _iso_to_string(ts: Any) -> str | None:
+    if ts:
+        # Format timestamp to match dbt runner format (HH:MM:SS)
+        try:
+            # Parse ISO format timestamp (e.g., "2025-01-29T13:16:05.123456Z")
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            formatted_ts = dt.strftime("%H:%M:%S")
+        except (ValueError, AttributeError, TypeError):
+            formatted_ts = str(ts)
+        return formatted_ts
+    return None
+
+
+def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
+    if not dbt_event:
+        return
+    if not isinstance(dbt_event, dict):
+        return
+
+    raw_status = dbt_event.get("status")
+    if isinstance(raw_status, str):
+        status = raw_status
+    elif raw_status is None:
+        status = "None"
+    else:
+        status = str(raw_status)
+
+    msg = dbt_event.get("msg", "")
+    start_time = _iso_to_string(dbt_event.get("start_time"))
+    finish_time = _iso_to_string(dbt_event.get("finish_time"))
+
+    start_str = start_time if start_time else "N/A"
+    finish_str = finish_time if finish_time else "N/A"
+    if status in {"None"} | DBT_FAILED_STATUSES:
+        logger.error("%s", msg)
+
+    logger.info("[%s] Start: %s, Finish: %s", status.upper(), start_str, finish_str)

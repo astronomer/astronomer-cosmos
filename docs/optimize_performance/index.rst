@@ -9,3 +9,4 @@ Optimize the performance of your Cosmos Dags
 
    memory_optimization
    caching
+   invocation_mode

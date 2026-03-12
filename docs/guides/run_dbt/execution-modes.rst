@@ -32,7 +32,7 @@ There are four execution mode options that run on the Airflow worker:
 
   In most cases, the local execution mode with ``ExecutionConfig.dbt_executable_path`` is the preferred option instead of ``virtualenv``, because local mode with ``ExecutionConfig.dbt_executable_path`` allows you to manage the dbt environment while keeping the Airflow deployment simpler.
 
-- :ref:`airflow_async <async-execution-mode>`: (Stable since Cosmos 1.9.0) Optimized for worker efficiency if you have long-running dbt commands. Run the dbt resources from your dbt project asynchronously, by submitting the corresponding compiled SQLs to Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
+- :ref:`airflow_async <async-execution-mode>`: (Stable since Cosmos 1.9.0) Optimized for worker efficiency if you have long-running dbt commands. Currently only works with BigQuery. Pre-compile the SQL transformations with dbt in a setup task and execute them asynchronously using Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 
 In a container
 ~~~~~~~~~~~~~~

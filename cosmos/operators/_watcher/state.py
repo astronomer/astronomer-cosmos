@@ -161,11 +161,11 @@ def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
 
     raw_status = dbt_event.get("status")
     if isinstance(raw_status, str):
-        status = raw_status.upper()
+        status = raw_status
     elif raw_status is None:
-        status = "NONE"
+        status = "None"
     else:
-        status = str(raw_status).upper()
+        status = str(raw_status)
 
     msg = dbt_event.get("msg", "")
     start_time = _iso_to_string(dbt_event.get("start_time"))
@@ -173,7 +173,7 @@ def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
 
     start_str = start_time if start_time else "N/A"
     finish_str = finish_time if finish_time else "N/A"
-    if status in {"NONE"} | DBT_FAILED_STATUSES:
+    if status in {"None"} | DBT_FAILED_STATUSES:
         logger.error("%s", msg)
 
-    logger.info("[%s] Start: %s, Finish: %s", status, start_str, finish_str)
+    logger.info("[%s] Start: %s, Finish: %s", status.upper(), start_str, finish_str)

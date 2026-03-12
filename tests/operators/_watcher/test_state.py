@@ -48,10 +48,10 @@ class TestNodeStatusHelpers:
         (None, False, None),
         ("not_a_dict", False, None),
         ({}, False, None),  # empty dict returns early
-        ({"status": "success", "msg": "ok"}, False, "SUCCESS"),
-        ({"status": "failed", "msg": "boom"}, True, "FAILED"),
-        ({"status": "error", "msg": "boom"}, True, "ERROR"),
-        ({"status": None, "msg": "empty"}, True, "NONE"),
+        ({"status": "success", "msg": "ok"}, False, "success"),
+        ({"status": "failed", "msg": "boom"}, True, "failed"),
+        ({"status": "error", "msg": "boom"}, True, "error"),
+        ({"status": None, "msg": "empty"}, True, "None"),
         ({"status": 123, "msg": "num"}, False, "123"),
     ],
 )

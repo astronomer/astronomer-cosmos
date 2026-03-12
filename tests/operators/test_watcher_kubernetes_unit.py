@@ -1,12 +1,12 @@
-import logging
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException, TaskDeferred
 from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
 from airflow.providers.cncf.kubernetes.secret import Secret
+from kubernetes.client import ApiException
 from packaging.version import Version
 
 from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig
@@ -103,7 +103,7 @@ def test_retries_overridden_even_if_user_sets_them():
 
 
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_skips_retry_attempt(mock_execute, caplog):
+def test_skips_retry_attempt(mock_execute):
     """
     Test that the operator skips execution when a retry is attempted (try_number > 1).
     """
@@ -117,13 +117,13 @@ def test_skips_retry_attempt(mock_execute, caplog):
     ti.try_number = 2
     context = {"ti": ti}
 
-    with caplog.at_level(logging.INFO):
-        result = op.execute(context=context)
+    with pytest.raises(
+        AirflowSkipException,
+        match="DbtProducerWatcherKubernetesOperator does not support Airflow retries. Detected attempt #2; skipping execution to avoid running a second dbt build.",
+    ):
+        op.execute(context=context)
 
     mock_execute.assert_not_called()
-    assert result is None
-    assert any("does not support Airflow retries" in message for message in caplog.messages)
-    assert any("skipping execution" in message for message in caplog.messages)
 
 
 def test_raises_exception_when_task_instance_missing():
@@ -363,3 +363,69 @@ def test_callbacks_included_in_producer_operator():
     )
     callback_classes = [callback.__name__ for callback in op.callbacks]
     assert "WatcherKubernetesCallback" in callback_classes
+
+
+def test_exceptions_converted_to_airflow_skip_exception():
+    """
+    Test that if exceptions are raised during execute, they are converted to an AirflowSkipException.
+    """
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+    ti = MagicMock()
+    ti.try_number = 1
+    context = make_context(ti)
+
+    with patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.execute") as mock_execute:
+        mock_execute.side_effect = ApiException("Kubernetes API error")
+
+        with pytest.raises(AirflowSkipException, match="Skipping execution due to task failure") as execinfo:
+            op.execute(context=context)
+
+        assert execinfo.value.__cause__ == mock_execute.side_effect
+
+    with patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.execute") as mock_execute:
+        mock_execute.side_effect = AirflowException("Airflow exception during execution")
+        with pytest.raises(AirflowSkipException, match="Skipping execution due to task failure") as execinfo:
+            op.execute(context=context)
+        assert execinfo.value.__cause__ == mock_execute.side_effect
+
+    # Ensure deferred exceptions are not caught and converted to AirflowSkipException
+    with patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.execute") as mock_execute:
+        mock_execute.side_effect = TaskDeferred(trigger="some_trigger", method_name="trigger_reentry")
+
+        with pytest.raises(TaskDeferred):
+            op.execute(context=context)
+
+    with patch(
+        "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.trigger_reentry"
+    ) as mock_trigger_reentry:
+        mock_trigger_reentry.side_effect = ApiException("Kubernetes API error")
+        with pytest.raises(AirflowSkipException, match="Skipping execution due to task failure") as execinfo:
+            op.trigger_reentry(context=context)
+
+        assert execinfo.value.__cause__ == mock_trigger_reentry.side_effect
+
+    with patch(
+        "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.trigger_reentry"
+    ) as mock_trigger_reentry:
+        mock_trigger_reentry.side_effect = TaskDeferred(trigger="some_trigger", method_name="trigger_reentry")
+
+        with pytest.raises(TaskDeferred):
+            op.trigger_reentry(context=context)
+
+
+@pytest.mark.parametrize("depends_on_past", [False, True])
+def test_depends_on_past_sets_wait_for_downstream(depends_on_past):
+    """
+    Test that if depends_on_past is True, wait_for_downstream is also set to True.
+    """
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        depends_on_past=depends_on_past,
+    )
+    assert op.wait_for_downstream == depends_on_past

@@ -213,6 +213,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         self.deferrable = deferrable
         self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
 
+        if self.depends_on_past:
+            self.wait_for_downstream = True
+
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
         """Filters out dbt flags that are incompatible with retry (e.g., --select, --exclude)."""
@@ -398,11 +401,10 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     self._override_rtif(context)
 
         if status is None:
-
-            if producer_task_state == "failed":
+            if producer_task_state == "failed" or producer_task_state == "skipped":
                 if self.poke_retry_number > 0:
                     raise AirflowException(
-                        f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
+                        f"The dbt build command {producer_task_state} in the producer task. Please check the log of task {self.producer_task_id} for details."
                     )
                 else:
                     # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`

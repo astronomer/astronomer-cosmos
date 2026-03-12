@@ -13,7 +13,7 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 import kubernetes.client as k8s
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException, TaskDeferred
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
 
 try:
@@ -44,7 +44,6 @@ producer_task_context = None
 
 
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
-
     @staticmethod
     def progress_callback(
         *,
@@ -74,7 +73,6 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
 
 
 class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
-
     template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
     _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = store_dbt_resource_status_from_log
 
@@ -99,6 +97,9 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 
+        if self.depends_on_past:
+            self.wait_for_downstream = True
+
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
         return CosmosKubernetesPodManager(kube_client=self.client, callbacks=self.callbacks)
@@ -113,18 +114,31 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
-            self.log.info(
+            raise AirflowSkipException(
                 "DbtProducerWatcherKubernetesOperator does not support Airflow retries. "
-                "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
-                try_number,
+                f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
-            return None
 
         # This global variable is used to make the task context available to the K8s callback.
         # While the callback is set during the operator initialization, the context is only created during the operator's execution.
         global producer_task_context
         producer_task_context = context
-        return super().execute(context, **kwargs)
+        try:
+            return super().execute(context, **kwargs)
+        except (AirflowSkipException, TaskDeferred):
+            raise
+        except Exception as e:
+            self.log.exception("Dbt execution failed")
+            raise AirflowSkipException("Skipping execution due to task failure") from e
+
+    def trigger_reentry(self, *args: Any, **kwargs: Any) -> Any:
+        try:
+            return super().trigger_reentry(*args, **kwargs)
+        except (AirflowSkipException, TaskDeferred):
+            raise
+        except Exception as e:
+            self.log.exception("Dbt execution failed")
+            raise AirflowSkipException("Skipping execution due to task failure") from e
 
 
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):

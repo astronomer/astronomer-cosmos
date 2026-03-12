@@ -6,12 +6,15 @@ from copy import deepcopy
 from typing import Any
 
 try:  # Airflow 3
+    from airflow.providers.standard.operators.empty import EmptyOperator
     from airflow.sdk.bases.operator import BaseOperator
 except ImportError:  # Airflow 2
     from airflow.models import BaseOperator
+    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
 from airflow.models.dag import DAG
+from airflow.utils.trigger_rule import TriggerRule
 
 try:
     # Airflow 3.1 onwards
@@ -679,7 +682,7 @@ def _add_watcher_producer_task(
     render_config: RenderConfig | None = None,
     execution_mode: ExecutionMode = ExecutionMode.WATCHER,
     tests_per_model: dict[str, list[str]] | None = None,
-) -> BaseOperator:
+) -> tuple[BaseOperator, EmptyOperator]:
     """
     Create the producer task for the watcher execution mode and add it to the tasks_map.
     The producer task is the task that will be used to produce the events for the watcher execution mode.
@@ -711,12 +714,22 @@ def _add_watcher_producer_task(
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
-    return producer_airflow_task
+
+    producer_task_gate = EmptyOperator(  # type: ignore[no-untyped-call]
+        task_id=f"{PRODUCER_WATCHER_TASK_ID}_gate",
+        dag=dag,
+        task_group=task_group,
+        trigger_rule=TriggerRule.NONE_FAILED,
+        depends_on_past=producer_airflow_task.depends_on_past,
+    )
+    producer_airflow_task >> producer_task_gate
+    return producer_airflow_task, producer_task_gate
 
 
 def _add_watcher_dependencies(
     dag: DAG,
     producer_airflow_task: BaseOperator,
+    producer_gate: BaseOperator,
     task_args: dict[str, Any],
     tasks_map: dict[str, Any],
     nodes: dict[str, DbtNode] | None = None,
@@ -728,7 +741,7 @@ def _add_watcher_dependencies(
     """
     for node_id, task_or_taskgroup in tasks_map.items():
         # We do not want to set a dependency between the producer task and itself
-        if node_id == PRODUCER_WATCHER_TASK_ID:
+        if node_id == PRODUCER_WATCHER_TASK_ID or node_id == f"{PRODUCER_WATCHER_TASK_ID}_gate":
             continue
 
         node_tasks = (
@@ -757,6 +770,10 @@ def _add_watcher_dependencies(
                     always_run_tasks = [task_or_taskgroup]
                 for task in always_run_tasks:
                     task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[attr-defined]
+
+        # If depends_on_past isn't true then gating all the tasks isn't really needed.
+        if producer_airflow_task.wait_for_downstream and not task_or_taskgroup.downstream_task_ids:
+            task_or_taskgroup >> producer_gate
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:
@@ -886,7 +903,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     """
     tasks_map: dict[str, TaskGroup | BaseOperator] = {}
     task_or_group: TaskGroup | BaseOperator | None
-    producer_task: BaseOperator | None = None
+    producer_tasks: tuple[BaseOperator, EmptyOperator] | None = None
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
     # have multiple parents
@@ -904,7 +921,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         # We are intentionally creating the producer task ahead of the consumer tasks
         # Airflow priority weight is not being respected in multiple versions of the library, including 3.1
         # To instantiate the producer before helps having it before on the DAG topological order and scheduling this task before the consumer tasks
-        producer_task = _add_watcher_producer_task(
+        producer_tasks = _add_watcher_producer_task(
             dag=dag,
             task_args={**task_args, **setup_operator_args},
             tasks_map=tasks_map,
@@ -958,6 +975,9 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
+        if producer_tasks and producer_tasks[0].depends_on_past:
+            test_task >> producer_tasks[1]
+            test_task.wait_for_downstream = True
     elif render_config.test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH):
         # Handle detached test nodes
         for node_id, node in detached_nodes.items():
@@ -982,10 +1002,11 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
 
     create_airflow_task_dependencies(nodes, tasks_map)
 
-    if producer_task:
+    if producer_tasks:
         _add_watcher_dependencies(
             dag=dag,
-            producer_airflow_task=producer_task,
+            producer_airflow_task=producer_tasks[0],
+            producer_gate=producer_tasks[1],
             task_args=task_args,
             tasks_map=tasks_map,
             nodes=nodes,

@@ -90,7 +90,7 @@ docker compose -f dev/docker-compose.yaml up -d --build
 | `cosmos/profiles/` | Database-specific dbt profile generators (Postgres, Snowflake, BigQuery, Databricks, etc.) |
 | `cosmos/cache.py` | Caches manifest parsing and `dbt ls` results to speed up DAG generation |
 | `cosmos/listeners/` | Airflow event listeners for DAG run and task instance lifecycle events |
-| `cosmos/plugin/` | Registers Cosmos as an Airflow provider plugin; includes cluster retry policy |
+| `cosmos/plugin/` | Registers Cosmos as an Airflow provider plugin; includes cluster retry policy, dbt docs plugin etc |
 
 ### Execution Modes
 

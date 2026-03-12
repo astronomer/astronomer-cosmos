@@ -1,7 +1,7 @@
 .. _watcher-execution-mode:
 
-Introducing ``ExecutionMode.WATCHER``: Experimental High-Performance dbt Execution in Cosmos
-============================================================================================
+Watcher execution mode (Experimental)
+======================================
 
 With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in Airflow.
 
@@ -149,7 +149,7 @@ This approach is best when your Airflow DAG is fully dedicated to a dbt project.
     :start-after: [START example_watcher]
     :end-before: [END example_watcher]
 
-As it can be observed, the only difference with the default ``ExecutionMode.LOCAL`` is the addition of the ``execution_config`` parameter with the ``execution_mode`` set to ``ExecutionMode.WATCHER``. The ``ExecutionMode`` enum can be imported from ``cosmos.constants``. For more information on the ``ExecutionMode.LOCAL``, please, check the `dedicated page <execution-modes.html#local>`__
+As it can be observed, the only difference with the default ``ExecutionMode.LOCAL`` is the addition of the ``execution_config`` parameter with the ``execution_mode`` set to ``ExecutionMode.WATCHER``. The ``ExecutionMode`` enum can be imported from ``cosmos.constants``. For more information on the ``ExecutionMode.LOCAL``, please, check the :ref:`local-execution` documentation.
 
 **How it works:**
 

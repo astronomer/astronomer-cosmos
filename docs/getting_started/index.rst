@@ -6,6 +6,7 @@
    :caption: Cosmos Fundamentals
 
    Similar dbt and Airflow concepts <dbt-airflow-concepts>
+   Cosmos core concepts <core-concepts>
 
 .. toctree::
    :maxdepth: 1

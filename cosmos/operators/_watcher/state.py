@@ -22,7 +22,7 @@ ProducerStateFetcher = Callable[[], str | None]
 
 # dbt uses different status values for different node types (models/tests):"
 DBT_SUCCESS_STATUSES = frozenset({"success", "pass"})
-DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error"})
+DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error", "runtime error"})
 
 
 class DbtTestStatus(str, Enum):

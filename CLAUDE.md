@@ -52,8 +52,9 @@ mypy cosmos/
 
 ```bash
 python3 -m venv env && source env/bin/activate
-pip install "apache-airflow[cncf.kubernetes,openlineage]"
-pip install -e ".[dbt-postgres,dbt-databricks]"
+pip install ".[test]"
+pip install -e ".[dbt-postgres,dbt-bigquery]"
+source venv/bin/activate
 export AIRFLOW_HOME=$(pwd)/dev/
 export AIRFLOW__CORE__LOAD_EXAMPLES=false
 airflow standalone
@@ -94,10 +95,13 @@ docker compose -f dev/docker-compose.yaml up -d --build
 ### Execution Modes
 
 Each mode in `ExecutionMode` enum corresponds to an operator subclass:
-- `LOCAL` → `cosmos/operators/local.py` — runs dbt on the Airflow worker
+- `LOCAL` → `cosmos/operators/local.py` — runs dbt on the Airflow worker either in the same venv as Airflow or in a dedicated one
+- `WATCHER` → `cosmos/operators/watcher.py` - more efficient than local, tries to run a single dbt command, while keeping models lineage and granularity in Airflow
+- `AIRFLOW_ASYNC` → `cosmos/operators/airflow_async.py` - uses dbt to pre-compile the SQL transformations and leverage Airflow tasks to execute them (BigQuery only)
 - `VIRTUALENV` → `cosmos/operators/virtualenv.py` — subprocess venv per task
 - `DOCKER` → `cosmos/operators/docker.py`
 - `KUBERNETES` → `cosmos/operators/kubernetes.py`
+- `WATCHER_KUBERNETES` → `cosmos/operators/watcher_kubernetes.py` - a combination of `WATCHER` and `KUBERNETES`
 - `AWS_EKS`, `AWS_ECS`, `AZURE_CONTAINER_INSTANCE`, `GCP_CLOUD_RUN_JOB` — cloud variants
 
 Operators use lazy loading (`cosmos/operators/lazy_load.py`) so optional dependencies (Docker SDK, Kubernetes client) are only imported when the corresponding mode is used.
@@ -107,12 +111,13 @@ Operators use lazy loading (`cosmos/operators/lazy_load.py`) so optional depende
 How the dbt project is parsed, controlled by `LoadMode`:
 - `DBT_LS` — runs `dbt ls` at DAG parse time
 - `DBT_MANIFEST` — reads a pre-compiled `manifest.json`
-- `CUSTOM` — user provides a custom loader
+- `CUSTOM` — (deprecated!) Cosmos custom loader
 
 ### Test Behavior
 
 Controlled by `TestBehavior` enum:
-- `AFTER_EACH` — dbt test task after each model task
+- `AFTER_EACH` — create a task group for each dbt model that has tests, dbt test task after each model task
+- `BUILD` - each dbt node represents both the dbt node and the tests associated to it
 - `AFTER_ALL` — single test task at the end
 - `NONE` — no test tasks
 

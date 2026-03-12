@@ -54,7 +54,6 @@ mypy cosmos/
 python3 -m venv env && source env/bin/activate
 pip install ".[test]"
 pip install -e ".[dbt-postgres,dbt-bigquery]"
-source venv/bin/activate
 export AIRFLOW_HOME=$(pwd)/dev/
 export AIRFLOW__CORE__LOAD_EXAMPLES=false
 airflow standalone

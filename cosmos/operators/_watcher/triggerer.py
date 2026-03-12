@@ -92,7 +92,7 @@ class WatcherTrigger(BaseTrigger):
         return await sync_to_async(_get_xcom_val)()
 
     async def get_xcom_val(self, key: str) -> Any | None:
-        logger.debug(
+        logger.info(
             "Trying to retrieve value using XCom key <%s> by task_id <%s>, dag_id <%s>, run_id <%s> and map_index <%s>",
             key,
             self.producer_task_id,

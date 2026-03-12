@@ -247,7 +247,6 @@ class TestWatcherTrigger:
 
         with (
             patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock),
-            patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=None)),
             patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
             patch.object(
                 self.trigger, "_parse_dbt_node_status_and_compiled_sql", parse_dbt_node_status_and_compiled_sql_mock
@@ -304,7 +303,6 @@ class TestWatcherTrigger:
         parse_mock = AsyncMock(return_value=("failed", "SELECT * FROM broken_model"))
         with (
             patch.object(self.trigger, "get_xcom_val", AsyncMock(side_effect=get_xcom_val_side_effect)),
-            patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=None)),
             patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="running")),
             patch.object(self.trigger, "_parse_dbt_node_status_and_compiled_sql", parse_mock),
         ):

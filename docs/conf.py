@@ -25,6 +25,7 @@ extensions = [
     # "autoapi.extension",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinxcontrib.mermaid",
     "sphinx_reredirects",
 ]
 

@@ -66,7 +66,7 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         finish_time = getattr(node_info, "node_finished_at", None) if node_info else None
         msg = getattr(dbt_log.info, "msg", None)
 
-    # Special case when node status is None and msg contain error or fail work
+    # Special case when node status is the string "None"; only process messages that contain an error or fail word
     if status in ["None"] and msg is not None:
         # Check if there is error log message
         for sensitive_word in sensitive_words:

@@ -107,8 +107,11 @@ Operators use lazy loading (`cosmos/operators/lazy_load.py`) so optional depende
 
 ### Load Modes
 
-How the dbt project is parsed, controlled by `LoadMode`:
+How the dbt project is parsed, controlled by `LoadMode` (see the `LoadMode` enum for full details):
+- `AUTOMATIC` — lets Cosmos choose an appropriate loading strategy based on available artifacts and configuration
 - `DBT_LS` — runs `dbt ls` at DAG parse time
+- `DBT_LS_FILE` — uses previously generated `dbt ls` output from a file
+- `DBT_LS_CACHE` — uses cached `dbt ls` results across parses
 - `DBT_MANIFEST` — reads a pre-compiled `manifest.json`
 - `CUSTOM` — (deprecated!) Cosmos custom loader
 

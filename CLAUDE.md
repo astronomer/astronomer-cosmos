@@ -36,7 +36,7 @@ Other available matrix versions: Python `3.10`, `3.11`, `3.12`, `3.13` × Airflo
 
 ### Linting and Formatting
 
-Pre-commit runs Black (formatter), Ruff (linter), mypy, isort, and codespell:
+Pre-commit runs the configured linters/formatters (e.g., Black (formatter), Ruff (linter), mypy, codespell). See `.pre-commit-config.yaml` for the full list:
 ```bash
 pre-commit run --all-files
 ```

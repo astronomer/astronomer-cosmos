@@ -67,7 +67,7 @@ You can also explore more examples in `/dev/dags <https://github.com/astronomer/
 or in the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
 
 Join the Community
-__________________
+~~~~~~~~~~~~~~~~~~
 
 Have questions, need help, or interested in contributing? We welcome all contributions and feedback!
 
@@ -80,7 +80,7 @@ Note that contributors and maintainers are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
 
 License
-_______
+~~~~~~~
 
 `Apache License 2.0 <https://github.com/astronomer/astronomer-cosmos/blob/main/LICENSE>`_
 

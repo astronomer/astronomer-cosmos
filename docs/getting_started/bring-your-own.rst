@@ -8,15 +8,15 @@ While the Quickstart Guides allow you to get Cosmos Dags running quickly, their 
 If you have a sample project that you want to use to test out Cosmos functionality, or, you want to see how to set up a more custom project, check out the Bring your Own project guides.
 These guides provide the general structure for how to set up a dbt project in Cosmos.
 
-- `Open-Source <open-source.html>`__
-- `Astro <astro.html>`__
-- `MWAA <mwaa.html>`__
-- `GCC <gcc.html>`__
+- :ref:`Open-source Airflow <open-source>`
+- :ref:`Astro <astro>`
+- :ref:`AWS MWAA <mwaa>`
+- :ref:`Google Cloud Composer <gcc>`
 
 Example Demo: Jaffle Shop Project
 __________________________________
 
-If you won't have your own project that you want to set up as a demo, you can explore a practical example in the **Bring your own project** guides to see how Cosmos can convert the dbt workflow into an Airflow Dag.
+If you don't have your own project that you want to set up as a demo, you can explore a practical example in the **Bring your own project** guides to see how Cosmos can convert the dbt workflow into an Airflow Dag.
 
 The `jaffle_shop project <https://github.com/dbt-labs/jaffle_shop>`_ is a sample dbt project that simulates an e-commerce store's data.
 The project includes a series of dbt models that transform raw data into structured tables, such as sales, customers, and products.

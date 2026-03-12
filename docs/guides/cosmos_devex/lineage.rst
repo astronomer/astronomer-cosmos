@@ -18,7 +18,7 @@ Known limitations
 -----------------
 
 This feature is only available for the local
-and virtualenv execution methods (read `execution modes <../getting_started/execution-modes.html>`_ for more information).
+and virtualenv execution methods (read `execution modes <../run_dbt/execution-modes.html>`_ for more information).
 
 Additionally, since Cosmos uses the open-source `openlineage-integration-common <https://github.com/OpenLineage/OpenLineage/tree/main/integration/common>`_, it relies on this library to support specific dbt adapters. As of 27 December 2024, the version 1.26.0 of this package supports:
 

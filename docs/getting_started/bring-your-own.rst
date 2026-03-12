@@ -3,7 +3,7 @@
 Bring your own project
 ======================
 
-While the Quickstart Guides allow you to get Cosmos Dags running quickly, their structure intentionally uses simple example data and the default execution method.
+While the Quickstart Guides allow you to get Cosmos Dags running quickly, their structure intentionally uses simple example data and the ``LOCAL`` execution method..
 
 If you have a sample project that you want to use to test out Cosmos functionality, or, you want to see how to set up a more custom project, check out the Bring your Own project guides.
 These guides provide the general structure for how to set up a dbt project in Cosmos.
@@ -12,6 +12,8 @@ These guides provide the general structure for how to set up a dbt project in Co
 - :ref:`Astro <astro>`
 - :ref:`AWS MWAA <mwaa>`
 - :ref:`Google Cloud Composer <gcc>`
+
+When you're ready to set up and customize your Cosmos project, see the :ref:`guides`.
 
 Example Demo: Jaffle Shop Project
 __________________________________

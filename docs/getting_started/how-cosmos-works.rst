@@ -11,19 +11,16 @@ When using Cosmos you can write your data transformations using dbt and then use
 advanced orchestration capabilities to integrate your dbt projects into your end to end workflows, scheduled to
 run automatically.
 
-Workflow overview
-~~~~~~~~~~~~~~~~~
+Overview
+~~~~~~~~~
 
 Cosmos creates an interface between a dbt project and Airflow, allowing you to translate your dbt project into a Dag. Then, your Cosmos configuration provides the necessary configurations to Airflow so that it can schedule and initiate running your dbt code when you want.
 
 You have a number of configuration options, but fundamentally, Cosmos provides the following two functions:
 
 - **Parse your dbt project**: Cosmos parses your dbt project, and translates it into an Airflow Dag. This process uses the `ProjectConfig <../reference/configs/project-config.html>`_ and `RenderConfig <../guides/translate_dbt/render-config.html>`_ to customize specific behavior, allowing you to optimize how your dbt project is represented as a Dag.
+
 - **Execute the dbt commands**: Cosmos then executes the Dag, using the execution options in your `ExecutionConfig <../reference/configs/execution-config.html>`_ and `ProjectConfig <../reference/configs/project-config.html>`_ to run dbt commands with the appropriate dbt adapter, finally resulting in your dbt SQL running in your data warehouse. Cosmos uses a connection defined in the `ProfileConfig <../profiles/index.html>`_ to execute your SQL in your data warehouse.
-
-.. image:: ../_static/how-cosmos-works.png
-   :alt: Diagram showing that Cosmos parses dbt projects, with options defined by the ProfileConfig and RenderConfig. Then, Cosmos executes the resulting Dag, with options defined by ExecutionConfig and ProjectConfig.
-
 
 Quickstart
 ~~~~~~~~~~~

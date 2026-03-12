@@ -3,9 +3,11 @@ from __future__ import annotations
 import base64
 import datetime
 import functools
+import hashlib
 import itertools
 import json
 import os
+import pickle
 import platform
 import tempfile
 import warnings
@@ -62,6 +64,34 @@ from cosmos.dbt.selector import YamlSelectors, select_nodes
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
+
+
+def _get_cached_manifest(manifest_path: Path) -> dict[str, Any]:
+    """Load manifest JSON with a disk-based pickle cache.
+
+    On the first call, parses the JSON manifest and writes a pickle cache file.
+    Subsequent calls (even from different processes) deserialize from pickle,
+    which is significantly faster than re-parsing large JSON manifests.
+
+    The cache is invalidated when the manifest file is modified.
+    """
+    path_str = str(manifest_path)
+    mtime = os.path.getmtime(path_str)
+    cache_file = f"/tmp/cosmos_cache_manifest__{hashlib.md5(path_str.encode()).hexdigest()}.pkl"
+
+    if os.path.exists(cache_file):
+        cache_mtime = os.path.getmtime(cache_file)
+        if cache_mtime > mtime:
+            logger.info("Manifest pickle cache hit for %s", path_str)
+            with open(cache_file, "rb") as f:
+                return pickle.load(f)
+
+    logger.info("Manifest pickle cache miss for %s, parsing JSON and writing cache", path_str)
+    with open(path_str) as f:
+        data = json.load(f) or {}
+    with open(cache_file, "wb") as f:
+        pickle.dump(data, f)
+    return data
 
 
 def _normalize_path(path: str) -> str:
@@ -1225,8 +1255,7 @@ class DbtGraph:
         if TYPE_CHECKING:
             assert self.project.manifest_path is not None  # pragma: no cover
 
-        with self.project.manifest_path.open() as fp:
-            manifest = json.load(fp) or {}
+        manifest = _get_cached_manifest(self.project.manifest_path)
 
         project_path = self.execution_config.project_path
         nodes = self._load_nodes_from_manifest_data(manifest, project_path)

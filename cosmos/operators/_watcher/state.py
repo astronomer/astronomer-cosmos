@@ -173,7 +173,7 @@ def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
 
     start_str = start_time if start_time else "N/A"
     finish_str = finish_time if finish_time else "N/A"
-    if status in ["NONE", "FAILED", "FAIL", "ERROR"]:
+    if status in {"NONE"} | DBT_FAILED_STATUSES:
         logger.error("%s", msg)
 
     logger.info("[%s] Start: %s, Finish: %s", status, start_str, finish_str)

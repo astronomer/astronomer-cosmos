@@ -19,6 +19,7 @@ from cosmos.constants import (
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
+    DBT_FAILED_STATUSES,
     _iso_to_string,
     _log_dbt_event,
     build_producer_state_fetcher,
@@ -65,6 +66,7 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         finish_time = getattr(node_info, "node_finished_at", None) if node_info else None
         msg = getattr(dbt_log.info, "msg", None)
 
+    # Special case when node status is None and msg contain error or fail work
     if status in ["None"] and msg is not None:
         # Check if there is error log message
         for sensitive_word in sensitive_words:
@@ -352,11 +354,17 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return None
 
         logger.info("Node Info: %s", run_results_json)
+
+        status = node_result.get("status")
+
+        if status in DBT_FAILED_STATUSES:
+            logger.error("%s", node_result.get("message"))
+
         self.compiled_sql = node_result.get("compiled_code")
         if self.compiled_sql and hasattr(self, "_override_rtif"):
             self._override_rtif(context)
 
-        return node_result.get("status")
+        return status
 
     def _get_producer_task_status(self, context: Context) -> str | None:
         """

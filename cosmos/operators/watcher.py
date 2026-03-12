@@ -12,6 +12,7 @@ from airflow.exceptions import AirflowException
 
 from cosmos.config import ProfileConfig
 from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
+from cosmos.operators._watcher.state import DBT_FAILED_STATUSES
 from cosmos.settings import watcher_dbt_execution_queue
 
 try:
@@ -284,8 +285,12 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         event_json = _parse_compressed_xcom(compressed_b64_event_msg)
 
         logger.info("Node Info: %s", event_json)
+        node_result = event_json.get("data", {}).get("run_result", {})
+        status = node_result.get("status")
+        if status in DBT_FAILED_STATUSES:
+            logger.error("%s", node_result.get("message"))
 
-        return event_json.get("data", {}).get("run_result", {}).get("status")
+        return status
 
     def use_event(self) -> bool:
         if not self.invocation_mode:

@@ -11,13 +11,14 @@ from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
 from packaging.version import Version
 
-from cosmos.constants import AIRFLOW_VERSION
+from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
     build_producer_state_fetcher,
     is_dbt_node_status_failed,
     is_dbt_node_status_success,
+    is_dbt_node_status_terminal,
 )
 
 logger = get_logger(__name__)
@@ -103,6 +104,23 @@ class WatcherTrigger(BaseTrigger):
         else:
             return await self.get_xcom_val_af3(key)
 
+    async def _get_node_status(self) -> Any | None:
+        status_key = (
+            f"nodefinished_{self.model_unique_id.replace('.', '__')}"
+            if self.use_event
+            else f"{self.model_unique_id.replace('.', '__')}_status"
+        )
+
+        if self.use_event:
+            compressed_xcom_val = await self.get_xcom_val(status_key)
+            if not compressed_xcom_val:
+                return None
+            data_json = _parse_compressed_xcom(compressed_xcom_val)
+            status = data_json.get("data", {}).get("run_result", {}).get("status")
+        else:
+            status = await self.get_xcom_val(status_key)
+        return status
+
     async def _parse_dbt_node_status_and_compiled_sql(self) -> tuple[str | None, str | None]:
         """
         Parse node status and compiled_sql from XCom.
@@ -111,22 +129,9 @@ class WatcherTrigger(BaseTrigger):
         Status comes from mode-specific keys (nodefinished_* for event, *_status for subprocess).
         compiled_sql is always read from the canonical per-model key (same for both modes).
         """
-        status_key = (
-            f"nodefinished_{self.model_unique_id.replace('.', '__')}"
-            if self.use_event
-            else f"{self.model_unique_id.replace('.', '__')}_status"
-        )
         compiled_sql_key = f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
 
-        if self.use_event:
-            compressed_xcom_val = await self.get_xcom_val(status_key)
-            if not compressed_xcom_val:
-                return None, None
-            data_json = _parse_compressed_xcom(compressed_xcom_val)
-            status = data_json.get("data", {}).get("run_result", {}).get("status")
-        else:
-            status = await self.get_xcom_val(status_key)
-
+        status = await self._get_node_status()
         compiled_sql = await self.get_xcom_val(compiled_sql_key) if status is not None else None
         return status, compiled_sql
 
@@ -145,8 +150,48 @@ class WatcherTrigger(BaseTrigger):
 
         return await sync_to_async(fetch_state)()
 
+    async def _log_startup_events(self) -> None:
+        """Wait for dbt_startup_events from producer (pushed early in runner callback; from log in subprocess) and log versions."""
+        main_logged = False
+        adapter_logged = False
+
+        while True:
+
+            events = await self.get_xcom_val(_DBT_STARTUP_EVENTS_XCOM_KEY)
+
+            if isinstance(events, list) and events:
+                # Process the full events list so we log both MainReportVersion and
+                # AdapterRegistered when present, then decide whether to return.
+                for ev in events:
+                    name, msg = ev.get("name"), ev.get("msg") or ""
+
+                    if not main_logged and name == "MainReportVersion":
+                        logger.info("%s", msg)
+                        main_logged = True
+                    elif not adapter_logged and name == "AdapterRegistered":
+                        logger.info("%s", msg)
+                        adapter_logged = True
+
+                if main_logged and adapter_logged:
+                    return
+
+            # Check producer status after processing events so we never return before
+            # logging the full list. Also ensures we exit if producer finishes before
+            # ever pushing _DBT_STARTUP_EVENTS_XCOM_KEY.
+            producer_task_state = await self._get_producer_task_status()
+            if producer_task_state in ("failed", "success"):
+                return
+
+            # Return if dbt node is in terminal state
+            status = await self._get_node_status()
+            if is_dbt_node_status_terminal(status):
+                return
+
+            await asyncio.sleep(self.poke_interval)
+
     async def run(self) -> AsyncIterator[TriggerEvent]:
         logger.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
+        await self._log_startup_events()
 
         while True:
             producer_task_state = await self._get_producer_task_status()

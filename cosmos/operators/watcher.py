@@ -20,6 +20,7 @@ except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from cosmos.constants import (
+    _DBT_STARTUP_EVENTS_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
@@ -154,7 +155,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:
         # Only push startup events; per-model statuses are available via individual nodefinished_<uid> entries.
         if startup_events:
-            safe_xcom_push(task_instance=context["ti"], key="dbt_startup_events", value=startup_events)
+            safe_xcom_push(task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events)
 
     def _set_invocation_mode_if_not_set(self) -> None:
         if not self.invocation_mode:
@@ -209,6 +210,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                         name = event_message.info.name
                         if name in {"MainReportVersion", "AdapterRegistered"}:
                             self._handle_startup_event(event_message, startup_events)
+                            safe_xcom_push(
+                                task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events
+                            )
                         elif name == "NodeFinished":
                             self._handle_node_finished(event_message, context)
                     except Exception:
@@ -265,9 +269,8 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         )
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-        dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
-        if dbt_startup_events:  # pragma: no cover
-            logger.info("Dbt Startup Event: %s", dbt_startup_events)
+
+        self._log_startup_events(ti)
 
         node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
         logger.info("Pulling from producer task_id: %s, key: %s", self.producer_task_id, node_finished_key)

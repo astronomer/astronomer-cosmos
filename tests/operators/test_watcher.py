@@ -23,8 +23,8 @@ from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
-from cosmos.constants import PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
-from cosmos.operators._watcher.base import store_compiled_sql_for_model
+from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
+from cosmos.operators._watcher.base import _store_startup_event_from_log, store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
@@ -462,7 +462,10 @@ def test_execute_streaming_mode():
     ):
         op.execute(context=ctx)
 
-    assert "dbt_startup_events" in ti.store
+    assert _DBT_STARTUP_EVENTS_XCOM_KEY in ti.store
+    startup_events = ti.store[_DBT_STARTUP_EVENTS_XCOM_KEY]
+    assert isinstance(startup_events, list) and len(startup_events) == 1
+    assert startup_events[0]["name"] == "MainReportVersion"
 
     node_key = "nodefinished_model__pkg__x"
     assert node_key in ti.store
@@ -720,6 +723,59 @@ class TestStoreDbtStatusFromLog:
 
         # No status should be stored
         assert len(ti.store) == 0
+
+    def test_store_startup_event_from_log_appends_to_dbt_startup_events(self):
+        """Test that _store_startup_event_from_log appends MainReportVersion/AdapterRegistered to dbt_startup_events."""
+        # Use a minimal mock with xcom_pull (needed by _store_startup_event_from_log); _MockTI does not have it.
+        store = {}
+
+        class _TIMock:
+            def xcom_push(self, key, value, **_):
+                store[key] = value
+
+            def xcom_pull(self, task_ids=None, key=None, **_):
+                return store.get(key) if key else None
+
+        ti = _TIMock()
+        _store_startup_event_from_log(
+            ti,
+            {"info": {"name": "MainReportVersion", "msg": "Running with dbt=1.10.0", "ts": "2025-01-01T12:00:00Z"}},
+        )
+        assert _DBT_STARTUP_EVENTS_XCOM_KEY in store
+        events = store[_DBT_STARTUP_EVENTS_XCOM_KEY]
+        assert len(events) == 1
+        assert events[0]["name"] == "MainReportVersion"
+        assert events[0]["msg"] == "Running with dbt=1.10.0"
+
+        _store_startup_event_from_log(
+            ti,
+            {
+                "info": {
+                    "name": "AdapterRegistered",
+                    "msg": "Registered adapter: postgres=1.10.0",
+                    "ts": "2025-01-01T12:00:01Z",
+                }
+            },
+        )
+        events = store[_DBT_STARTUP_EVENTS_XCOM_KEY]
+        assert len(events) == 2
+        assert events[1]["name"] == "AdapterRegistered"
+        assert events[1]["msg"] == "Registered adapter: postgres=1.10.0"
+
+    def test_store_startup_event_from_log_ignores_other_events(self):
+        """Test that _store_startup_event_from_log ignores events other than MainReportVersion/AdapterRegistered."""
+        store = {}
+
+        class _TIMock:
+            def xcom_push(self, key, value, **_):
+                store[key] = value
+
+            def xcom_pull(self, task_ids=None, key=None, **_):
+                return store.get(key) if key else None
+
+        ti = _TIMock()
+        _store_startup_event_from_log(ti, {"info": {"name": "NodeFinished", "msg": "Done"}})
+        assert _DBT_STARTUP_EVENTS_XCOM_KEY not in store
 
     @pytest.mark.parametrize(
         "msg, level",
@@ -1141,7 +1197,8 @@ class TestDbtConsumerWatcherSensor:
         result = sensor.poke(context)
         assert result is False
 
-    def test_poke_success_from_run_results(self):
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+    def test_poke_success_from_run_results(self, mock_startup_events):
         sensor = self.make_sensor()
         sensor.invocation_mode = "SUBPROCESS"
 
@@ -1154,7 +1211,8 @@ class TestDbtConsumerWatcherSensor:
         assert result is True
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
-    def test_poke_subprocess_mode_extracts_compiled_sql_from_xcom(self, mock_override_rtif):
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+    def test_poke_subprocess_mode_extracts_compiled_sql_from_xcom(self, mock_startup_events, mock_override_rtif):
         """Test that in subprocess mode, poke extracts compiled_sql from per-model XCom key when status is success."""
         sensor = self.make_sensor()
         sensor.invocation_mode = "SUBPROCESS"
@@ -1206,7 +1264,8 @@ class TestDbtConsumerWatcherSensor:
         result = sensor.poke(context)
         assert result is True
 
-    def test_poke_failure_from_run_results(self):
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+    def test_poke_failure_from_run_results(self, mock_startup_events):
         sensor = self.make_sensor()
         sensor.invocation_mode = "OTHER_MODE"
 
@@ -1312,7 +1371,8 @@ class TestDbtConsumerWatcherSensor:
         assert sensor.compiled_sql == ""  # not set from event; poke() will get it from canonical key
 
     @patch("cosmos.operators._watcher.base.get_xcom_val")
-    def test_producer_state_failed(self, mock_get_xcom_val):
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+    def test_producer_state_failed(self, mock_startup_events, mock_get_xcom_val):
         sensor = self.make_sensor()
         sensor._get_producer_task_status.return_value = "failed"
         ti = MagicMock()
@@ -1331,8 +1391,9 @@ class TestDbtConsumerWatcherSensor:
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._fallback_to_non_watcher_run")
     @patch("cosmos.operators._watcher.base.get_xcom_val")
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
     def test_producer_state_does_not_fail_if_previously_upstream_failed(
-        self, mock_get_xcom_val, mock_fallback_to_non_watcher_run
+        self, mock_startup_events, mock_get_xcom_val, mock_fallback_to_non_watcher_run
     ):
         """
         Attempt to run the task using ExecutionMode.LOCAL if State.UPSTREAM_FAILED happens.
@@ -1534,6 +1595,57 @@ class TestWatcherTrigger:
 
         assert status == "success"
         assert compiled_sql == "SELECT id FROM users"
+
+    @pytest.mark.asyncio
+    async def test_log_startup_events_returns_when_events_available(self, caplog):
+        """Test that _log_startup_events returns once dbt_startup_events is available and logs."""
+        trigger = self.make_trigger()
+        events = [
+            {"name": "MainReportVersion", "msg": "Running with dbt=1.10.0", "ts": "2025-01-01T12:00:00Z"},
+            {"name": "AdapterRegistered", "msg": "Registered adapter: postgres=1.10.0", "ts": "2025-01-01T12:00:01Z"},
+        ]
+        call_count = 0
+
+        async def mock_get_xcom_val(key):
+            nonlocal call_count
+            call_count += 1
+            if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
+                return events
+            return None
+
+        async def mock_producer_running():
+            return None  # not failed
+
+        trigger.get_xcom_val = mock_get_xcom_val
+        trigger._get_producer_task_status = mock_producer_running
+
+        with caplog.at_level(logging.INFO):
+            await trigger._log_startup_events()
+
+        assert "Running with dbt=1.10.0" in caplog.text
+        assert "Registered adapter: postgres=1.10.0" in caplog.text
+        assert call_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_wait_and_log_startup_events_returns_when_producer_failed(self):
+        """Test that _log_startup_events returns without blocking when producer task failed."""
+        trigger = self.make_trigger()
+        call_count = 0
+
+        async def mock_get_xcom_val(key):
+            nonlocal call_count
+            call_count += 1
+            return None  # no events yet
+
+        async def mock_producer_failed():
+            return "failed"
+
+        trigger.get_xcom_val = mock_get_xcom_val
+        trigger._get_producer_task_status = mock_producer_failed
+
+        await trigger._log_startup_events()
+
+        assert call_count >= 1
 
 
 @pytest.mark.integration

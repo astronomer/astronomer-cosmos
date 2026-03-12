@@ -27,7 +27,7 @@ Quickstart
 
 Even though Cosmos is highly extensible, and you have many advanced customization options, you can run a demo with the `Astro CLI <astro-cli-quickstart.html>`_ in just a few minutes. This demo introduces you to the key elements required for Cosmos to parse dbt projects and run Dags.
 
-Get started with Cosmos
+Bring your own project
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you have existing resources for Airflow or dbt, and want to start exploring how to get started with a project more similar to your use case, check out the **Get started with Cosmos** guides. These resources provide more general recommendations for how to create a new project.

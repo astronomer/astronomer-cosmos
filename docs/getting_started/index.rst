@@ -1,6 +1,7 @@
 .. _getting_started:
 
 Getting started with Cosmos
+===========================
 
 .. toctree::
    :maxdepth: 0

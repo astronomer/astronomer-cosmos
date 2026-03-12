@@ -147,7 +147,9 @@ class TestWatcherTrigger:
     )
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
     @patch("cosmos.operators._watcher.triggerer._log_dbt_event")
-    async def test_run_various_outcomes(self, mock_dbt_event, mock_startup_events, dbt_node_status, producer_state, expected):
+    async def test_run_various_outcomes(
+        self, mock_dbt_event, mock_startup_events, dbt_node_status, producer_state, expected
+    ):
         async def fake_get_xcom_val(key):
             if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
                 return _STARTUP_EVENTS

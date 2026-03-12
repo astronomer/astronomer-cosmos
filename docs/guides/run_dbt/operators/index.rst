@@ -13,4 +13,3 @@ Learn how to use operators with Cosmos.
    operators
    operator-args
    overriding-operator-args
-

@@ -8,6 +8,7 @@ from airflow.exceptions import AirflowException
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
+    _DBT_STARTUP_EVENTS_XCOM_KEY,
     AIRFLOW_VERSION,
     CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
@@ -92,6 +93,22 @@ def store_compiled_sql_for_model(
         _push_compiled_sql_for_model(task_instance, unique_id, compiled_sql)
 
 
+def _store_startup_event_from_log(task_instance: Any, log_line: dict[str, Any]) -> None:
+    """
+    When dbt JSON log contains MainReportVersion or AdapterRegistered, append to
+    dbt_startup_events XCom (same shape as runner path) for trigger to log versions.
+    """
+    event_name = log_line.get("info", {}).get("name")
+    if event_name not in ("MainReportVersion", "AdapterRegistered"):
+        return
+    info = log_line.get("info", {})
+    msg = info.get("msg", "")
+    ts = info.get("ts", "")
+    current = list(task_instance.xcom_pull(key=_DBT_STARTUP_EVENTS_XCOM_KEY) or [])
+    current.append({"name": event_name, "msg": msg, "ts": ts})
+    safe_xcom_push(task_instance=task_instance, key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=current)
+
+
 def store_dbt_resource_status_from_log(
     line: str,
     extra_kwargs: Any,
@@ -106,6 +123,8 @@ def store_dbt_resource_status_from_log(
     extracts node status information, and pushes it to XCom for consumption
     by downstream watcher sensors.
 
+    :param line: A single line from dbt JSON logs.
+    :param extra_kwargs: Additional keywords arguments.
     :param tests_per_model: Mapping of model unique_id to list of test unique_ids
         associated with that model, as built by DbtGraph.update_node_dependency().
         Empty dict when no tests exist.
@@ -121,6 +140,9 @@ def store_dbt_resource_status_from_log(
         log_line = {}
     else:
         logger.debug("Log line: %s", log_line)
+        context = extra_kwargs.get("context")
+        if context is not None:
+            _store_startup_event_from_log(context["ti"], log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
         dbt_node_status = node_info.get("node_status")
         dbt_node_resource_type = node_info.get("resource_type")
@@ -359,6 +381,15 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
         raise NotImplementedError("Subclasses should implement this method if `use_event` may return True")
 
+    def _log_startup_events(self, ti: Any) -> None:
+        dbt_startup_events: list[dict[str, Any]] = ti.xcom_pull(
+            task_ids=self.producer_task_id, key=_DBT_STARTUP_EVENTS_XCOM_KEY
+        )
+        if dbt_startup_events:  # pragma: no cover
+            for event in dbt_startup_events:
+                # Adding debug level to avoid redundant logs for non-deferrable mode
+                logger.debug("%s", event.get("msg"))
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt model run by pulling relevant XComs from the master task.
@@ -383,6 +414,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if self.use_event():
             status = self._get_status_from_events(ti, context)
         else:
+            self._log_startup_events(ti)
             status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
 
         # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)

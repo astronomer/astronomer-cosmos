@@ -1,16 +1,30 @@
 .. _azure-container-instance:
 
-Azure Container Instance Execution Mode
+
+Azure Container Instance execution mode
 =======================================
 .. versionadded:: 1.4
 
-This tutorial will guide you through the steps required to use Azure Container Instance as the Execution Mode for your dbt code with Astronomer Cosmos. Schematically, the guide will walk you through the steps required to build the following architecture:
+Using ``Azure Container Instances`` as the execution mode provides an isolated way of running ``dbt``, since the ``dbt`` run itself occurs within a container running in an Azure Container Instance.
+
+Performance and maintenance considerations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This execution mode requires you to have an Azure environment that can be used to run Azure Container Groups. Similar to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available that contains up-to-date ``dbt`` pipelines and profiles.
+
+Each task creates a new container on Azure, giving full isolation. This, however, comes at the cost of speed, as this separation of tasks introduces some overhead.
+
+Setup
+~~~~~
+
+This tutorial guides you through the steps required to use Azure Container Instance as the execution mode for your dbt code with Astronomer Cosmos. Schematically, the guide demonstrates how to build the following architecture:
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/cosmos_aci_schematic.png
     :width: 800
 
 Prerequisites
-+++++++++++++
+~~~~~~~~~~~~~
+
 1. Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
 2. Airflow
 3. Azure CLI (install guide here: `Azure CLI <https://docs.microsoft.com/en-us/cli/azure/install-azure-cli>`_)
@@ -28,7 +42,7 @@ More information on how to achieve 2-6 is detailed below.
 Note that the steps below will walk you through an example, for which the code can be found HERE
 
 Step-by-step guide
-++++++++++++++++++
+~~~~~~~~~~~~~~~~~~
 
 **Install Airflow and Cosmos**
 
@@ -103,7 +117,7 @@ Take a read of the Dockerfile to understand what it does so that you could use i
     - The dags directory containing the `dbt project jaffle_shop <https://github.com/astronomer/cosmos-example/tree/main/dags/dbt/jaffle_shop>`_ is added to the image
     - The dbt_project.yml is replaced with `postgres_profile_dbt_project.yml <https://github.com/astronomer/cosmos-example/blob/main/postgres_profile_dbt_project.yml>`_ which contains the profile key pointing to postgres_profile as profile creation is not handled at the moment for K8s operators like in local mode.
 
-**Setup Airflow Connections**
+**Set up Airflow Connections**
 Now you have the required Azure infrastructure, you still need to add configuration to Airflow to ensure the infrastructure can be used. You'll need 3 connections:
 
 1. ``aci_db``: a Postgres connection to your Azure Postgres instance.
@@ -112,7 +126,7 @@ Now you have the required Azure infrastructure, you still need to add configurat
 
 Check out the ``airflow-settings.yml`` file `here <https://github.com/astronomer/cosmos-example/blob/main/airflow_settings.yaml>`_ for an example. If you are using Astro CLI, filling in the right values here will be enough for this to work.
 
-**Setup and Trigger the DAG with Airflow**
+**Set up and trigger the Dag with Airflow**
 
 Copy the dags directory from cosmos-example repo to your Airflow home
 

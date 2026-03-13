@@ -3,8 +3,10 @@ from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import pytest
 from packaging.version import Version
 
-from cosmos.constants import AIRFLOW_VERSION
+from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
 from cosmos.operators._watcher.triggerer import WatcherTrigger
+
+_STARTUP_EVENTS = [{"name": "MainReportVersion", "msg": "Running with dbt=1.0.0", "ts": ""}]
 
 _real_import = __import__
 
@@ -143,10 +145,12 @@ class TestWatcherTrigger:
             (None, "success", {"status": "success", "reason": "model_not_run"}),
         ],
     )
-    async def test_run_various_outcomes(self, dbt_node_status, producer_state, expected):
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    async def test_run_various_outcomes(self, mock_startup_events, dbt_node_status, producer_state, expected):
 
         async def fake_get_xcom_val(key):
-            # Return None for compiled_sql key so payload matches expected (no compiled_sql)
+            if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
+                return _STARTUP_EVENTS
             if key.endswith("_compiled_sql"):
                 return None
             return "compressed_data"
@@ -231,12 +235,16 @@ class TestWatcherTrigger:
     @pytest.mark.asyncio
     async def test_run_producer_success_model_not_run(self, caplog):
         """Test that when producer succeeds but model has no status, trigger yields success with model_not_run reason."""
+        get_xcom_val_mock = AsyncMock(
+            side_effect=lambda key: _STARTUP_EVENTS if key == _DBT_STARTUP_EVENTS_XCOM_KEY else None
+        )
         get_producer_status_mock = AsyncMock(return_value="success")
         parse_dbt_node_status_and_compiled_sql_mock = AsyncMock(return_value=(None, None))
 
         caplog.set_level("INFO")
 
         with (
+            patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock),
             patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
             patch.object(
                 self.trigger, "_parse_dbt_node_status_and_compiled_sql", parse_dbt_node_status_and_compiled_sql_mock
@@ -252,8 +260,16 @@ class TestWatcherTrigger:
         assert "There is no information about the node 'model.test' execution" in caplog.text
 
     @pytest.mark.asyncio
-    async def test_run_poke_interval_and_debug_log(self, caplog):
-        get_xcom_val_mock = AsyncMock(side_effect=["compressed_data"])
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    async def test_run_poke_interval_and_debug_log(self, mock_startup_events, caplog):
+        async def get_xcom_val_side_effect(key):
+            if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
+                return _STARTUP_EVENTS
+            if key.endswith("_compiled_sql"):
+                return "SELECT 1"
+            return "compressed_data"
+
+        get_xcom_val_mock = AsyncMock(side_effect=get_xcom_val_side_effect)
         get_producer_status_mock = AsyncMock(side_effect=["running", "running", "running"])
         parse_dbt_node_status_and_compiled_sql_mock = AsyncMock(
             side_effect=[(None, None), (None, None), ("success", "SELECT 1")]
@@ -279,10 +295,18 @@ class TestWatcherTrigger:
         assert events[0].payload["compiled_sql"] == "SELECT 1"
 
     @pytest.mark.asyncio
-    async def test_run_failed_model_includes_compiled_sql_in_event(self):
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    async def test_run_failed_model_includes_compiled_sql_in_event(self, mock_startup_events):
         """When model fails and compiled_sql is available, event payload includes it."""
+
+        async def get_xcom_val_side_effect(key):
+            if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
+                return _STARTUP_EVENTS
+            return None
+
         parse_mock = AsyncMock(return_value=("failed", "SELECT * FROM broken_model"))
         with (
+            patch.object(self.trigger, "get_xcom_val", AsyncMock(side_effect=get_xcom_val_side_effect)),
             patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="running")),
             patch.object(self.trigger, "_parse_dbt_node_status_and_compiled_sql", parse_mock),
         ):
@@ -291,3 +315,48 @@ class TestWatcherTrigger:
         assert events[0].payload["status"] == "failed"
         assert events[0].payload["reason"] == "model_failed"
         assert events[0].payload["compiled_sql"] == "SELECT * FROM broken_model"
+
+    @patch("cosmos.operators._watcher.triggerer.logger")
+    @patch("cosmos.operators._watcher.triggerer.asyncio.sleep", new_callable=AsyncMock)
+    @patch("cosmos.operators._watcher.triggerer.is_dbt_node_status_terminal", return_value=True)
+    @pytest.mark.asyncio
+    async def test_log_startup_events_returns_when_node_terminal(self, mock_terminal, mock_sleep, mock_logger):
+        self.trigger.get_xcom_val = AsyncMock(return_value=None)
+        self.trigger._get_producer_task_status = AsyncMock(return_value="running")
+        self.trigger._get_node_status = AsyncMock(return_value="error")
+
+        self.trigger.poke_interval = 0
+
+        await self.trigger._log_startup_events()
+
+        self.trigger._get_node_status.assert_awaited()
+        mock_terminal.assert_called_with("error")
+
+        mock_sleep.assert_not_called()
+        mock_logger.info.assert_not_called()
+
+    @patch("cosmos.operators._watcher.triggerer.asyncio.sleep", new_callable=AsyncMock)
+    @patch("cosmos.operators._watcher.triggerer.is_dbt_node_status_terminal", side_effect=[False, True])
+    @pytest.mark.asyncio
+    async def test_log_startup_events_waits_and_sleeps(self, mock_terminal, mock_sleep):
+        """
+        First iteration: no events and node is not terminal, so the loop sleeps.
+        Second iteration: node becomes terminal, causing the method to exit.
+        """
+        self.trigger.get_xcom_val = AsyncMock(side_effect=[None, None])
+        self.trigger._get_producer_task_status = AsyncMock(side_effect=["running", "running"])
+        self.trigger._get_node_status = AsyncMock(side_effect=["running", "error"])
+
+        self.trigger.poke_interval = 1
+
+        await self.trigger._log_startup_events()
+
+        # ensure sleep happened once
+        mock_sleep.assert_awaited_once_with(1)
+
+        # ensure node status checked twice
+        assert self.trigger._get_node_status.await_count == 2
+
+        # ensure terminal check was called
+        mock_terminal.assert_any_call("running")
+        mock_terminal.assert_any_call("error")

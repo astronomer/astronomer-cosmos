@@ -5,5 +5,7 @@ Run dbt in an Airflow worker
    :maxdepth: 1
    :caption: Run dbt in an Airflow worker
 
-   async-execution-mode
+   local-execution-mode
    watcher-execution-mode
+   cosmos-managed-venv
+   async-execution-mode

@@ -6,7 +6,7 @@ parser to generate an Airflow TaskGroup from the dbt project folder.
 
 
 The step-by-step to run this DAG are described in:
-https://astronomer.github.io/astronomer-cosmos/getting_started/kubernetes.html#kubernetes
+https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/container/kubernetes.html
 
 """
 

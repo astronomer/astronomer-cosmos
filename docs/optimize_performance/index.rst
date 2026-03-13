@@ -18,6 +18,7 @@ Optimize Cosmos performance
    optimize_rendering
    Memory optimization <memory_optimization>
    caching
+   invocation_mode
 
 
 Improve your Cosmos project setup

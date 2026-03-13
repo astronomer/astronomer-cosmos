@@ -53,6 +53,16 @@ Airflow connection ID containing the credentials to access the remote path. If y
 ``manifest_conn_id``, Cosmos will use the default connection ID specific to the scheme, identified using the Airflow
 hook's ``default_conn_id`` corresponding to the URL's scheme.
 
+To generate a ``manifest.json`` file within a dbt project, you can use a number of `dbt commands <https://docs.getdbt.com/reference/artifacts/manifest-json?version=1.12>`_ depending on your needs.
+
+For example, you can use the following to create a ``manifest.json`` file in your dbt project.
+
+1. Open a terminal at the root directory of your dbt project.
+
+2. Run ``dbt ls``.
+
+3. Make the ``target/manifest.json`` available to Cosmos. The following section shows examples for different scenarios.
+
 Examples of how to supply ``manifest.json`` using ``manifest_path`` argument:
 
 - Local path:
@@ -96,6 +106,8 @@ Package models (e.g. from the Elementary package) are included in the DAG when t
 Generate the manifest **after** installing and enabling packages: run ``dbt deps`` then ``dbt compile`` (or ``dbt run``)
 from your project directory. If the manifest was built before a package was added or enabled, package models will not
 appear in the DAG until you regenerate the manifest.
+
+
 
 .. _dbt_ls_parsing-method:
 

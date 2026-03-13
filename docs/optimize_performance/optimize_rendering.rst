@@ -3,13 +3,22 @@
 Optimize rendering
 ===================
 
+Rendering your dbt project into an Airflow Dag can affect Cosmos' overall performance. You have several options to address how Cosmos renders the dbt project as an Airflow Dag.
 
-To reduce Dag parsing time
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Optimize LoadMode
+~~~~~~~~~~~~~~~~~~
 
-Depending on your Cosmos project configuration and dbt project setup, you can make a number of adjustments to your configurations to improve the rate that Cosmos parses your dbt project into an Airflow Dag.
 
-1. Pre-compute the ``manifest.json`` as part of the CI. See :ref:`dbt_manifest_load_mode` and :ref:`dbt_manifest_parsing_method`. You can generate the manifest using ``dbt ls``. Note that this might not be applicable to some projects.
+
+Use LoadMode.MANIFEST
++++++++++++++++++++++
+
+You can use ``LoadMode.MANIFEST`` as a way to improve rendering the dbt project into Dags. This method pre-computes the dbt project ``manifest.json`` as part of the CI, so that Cosmos does not need to generate the manifest.
+
+See :ref:`dbt_manifest_load_mode` and :ref:`dbt_manifest_parsing_method` for more information about how to generate the ``manifest.json`` file and configure Cosmos to use it.
+
+
+
 2. Run ``dbt deps`` as part of your CI, and disable running it in Cosmos. See :ref:`pre-install-dbt-deps`.
 3. Select a subset of nodes for large projects, instead of parsing the entire project. See :ref:`selecting-excluding`.
 4. Consider using the :ref:`build test behavior <testing-behavior>` to have a single node per model and its tests.

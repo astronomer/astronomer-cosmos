@@ -35,6 +35,7 @@ When you don't supply an argument to the ``load_mode`` parameter (or you supply 
 
 To use this method, you don't need to supply any additional config. This is the default.
 
+.. _dbt_manifest_parsing_method:
 
 ``dbt_manifest``
 ----------------

@@ -19,6 +19,8 @@ By default, Cosmos uses:
 - :ref:`InvocationMode.DBT_RUNNER <invocation-mode>`
 
 
+.. _pre-install-dbt-deps:
+
 Pre-install dbt dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

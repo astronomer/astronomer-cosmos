@@ -51,3 +51,11 @@ Caching
 ~~~~~~~
 
 Cosmos can cache many artifacts, like the output of ``dbt ls`` or dbt profiles generated from Airflow connections, to speed up parsing and execution. See :ref:`caching`.
+
+Invocation modes
+~~~~~~~~~~~~~~~~
+
+For ``ExecutionMode.LOCAL`` execution mode, Cosmos supports two invocation modes for running dbt, ``subprocess`` and ``dbt_runner``.
+Depending on the invocation mode you choose to use, Cosmos can run dbt commands as subprocesses or as dbt programmatic invocations.
+
+See :ref:`invocation-mode`

@@ -60,7 +60,7 @@ Execution modes and Dag run performance
 
 The :ref:`execution mode <execution-modes>` you select can directly impact the speed that your Dag runs complete. Some execution modes invoke dbt multiple times while executing the Dag, which can add time.
 
-``ExecutionMode.WATCHER`` and ``ExecutionMode.AIRFLOW_ASYNC`` both address this kind of performance slowdown.
+Consider using ``ExecutionMode.WATCHER`` and ``ExecutionMode.AIRFLOW_ASYNC`` to optimize for how the Dag invokes dbt.
 
 See:
 

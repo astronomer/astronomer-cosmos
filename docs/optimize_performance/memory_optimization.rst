@@ -1,6 +1,6 @@
 .. _memory_optimization:
 
-Memory optimization objectsptions for Astronomer Cosmos
+Memory optimization options for Astronomer Cosmos
 =======================================================
 
 When running dbt pipelines with Astronomer Cosmos, the framework executes dbt commands that can consume significant memory resources. In high-memory scenarios, tasks may reach a zombie state or workers may be killed due to Out of Memory (OOM) errors, leading to pipeline failures and reduced reliability.
@@ -133,7 +133,7 @@ Use ExecutionMode.WATCHER
 
 **Configuration**
 
-- :ref:`ExecutionMode.WATCHER <watcher-execution-mode.html>`
+- :ref:`ExecutionMode.WATCHER <watcher-execution-mode>`
 - `Configure a Custom Queue for Producer and Watcher Tasks in ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html#watcher-dbt-execution-queue>`_
 
 

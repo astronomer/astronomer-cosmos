@@ -8,7 +8,7 @@ This page explains the caching strategies in ``astronomer-cosmos`` Astronomer Co
 All Cosmos caching mechanisms can be enabled or turned off in the ``airflow.cfg`` file or using environment variables.
 
 .. note::
-    For more information, see `configuring a Cosmos project <../../reference/configs/project-config.html>`_.
+    For more information, see :ref:`configuring a Cosmos project <project-config>`.
 
 Depending on the Cosmos version, it creates a cache for three types of data:
 
@@ -215,7 +215,7 @@ Users can customize where to store the cache using the setting ``AIRFLOW__COSMOS
 
 It is possible to switch off this feature by exporting the environment variable ``AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE=0``.
 
-For more information, read the `Cosmos partial parsing documentation <../../guides/run_dbt/customization/partial-parsing.html>`_
+For more information, read the :ref:`Cosmos partial parsing documentation <partial-parsing>`.
 
 
 Caching the profiles

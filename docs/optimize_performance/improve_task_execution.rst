@@ -7,28 +7,36 @@ The dbt project that you use and the Cosmos configurations you choose directly a
 because both of these factors determine your resource needs.
 
 Track task memory utilization with debug mode
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you are experiencing performance issues during task execution related to memory resource issues, and you can track memory use during tasks by entering debug mode using :ref:`enable_debug_mode`.
 When enabled, Cosmos creates an XCom entry per task, named ``cosmos_debug_max_memory_mb``. This contains the maximum amount of RSS memory tracked by the Airflow operator. Memory tracking is polled by default at a ``0.5`` seconds frequency.
 
-1. Enable debug mode by configuring the following environment variable:
+1. Enable debug mode by configuring the following, in either the Airflow Config or with environment vairables:
 
-    .. code-block:: bash
+.. code-block:: bash
 
-        export AIRFLOW__COSMOS__ENABLE_DEBUG_MODE=True
+   # In airflow.cfg
+   [cosmos]
+   enable_debug_mode = True
+
+.. code-block:: bash
+
+    # Or via environment variable
+    export AIRFLOW__COSMOS__ENABLE_DEBUG_MODE=True
 
 2. (Optional) If you want to change the polling rate from the default ``0.5s`` to a different rate, you can use ``AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS``. The following example shows the CLI commands to set it to ``2`` seconds:
 
 .. code-block:: bash
 
+   # In airflow.cfg this decreases the poll interval to 0.25 seconds
+   [cosmos]
+   debug_memory_poll_interval_seconds = 0.25
+
+.. code-block:: bash
+
+   # Or via environment variable. This increases the poll interval to 2 seconds
    export AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS=2
-
-
-You can also configure debug mode at the task-level using :ref:`Airflow config overrides <custom-airflow-properties>`.
-
-- To enable debug mode: ``[cosmos] enable_debug_mode = True``
-- To change the polling rate. This example shows changing polling from ``0.5`` to ``0.25`` seconds: ``[cosmos] debug_memory_poll_interval_seconds = 0.25``
 
 
 Reduce task execution time

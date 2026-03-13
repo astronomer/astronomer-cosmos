@@ -26,10 +26,10 @@ Let's say the user configures the profile at a ``DbtDag`` or ``DbtTaskGroup`` le
 
 But that for a specific node or group of nodes, the user would like to replace:
 
-- ``profile_name`` to be "non_default_profile" as opposed to "default_profile"
-- ``target_name`` to be "stage" as opposed to "default_target"
-- ``conn_id`` to be "non_default_connection" as opposed to "default_conn"
-- ``schema`` to be "non_default_schema" as opposed to "default_schema"
+- ``profile_name`` to be ``"non_default_profile"`` as opposed to ``"default_profile"``
+- ``target_name`` to be ``"stage"`` as opposed to ``"default_target"``
+- ``conn_id`` to be ``"non_default_connection"`` as opposed to ``"default_conn"``
+- ``schema`` to be ``"non_default_schema"`` as opposed to ``"default_schema"``
 
 They could apply this different configuration to all the project seeds by doing:
 

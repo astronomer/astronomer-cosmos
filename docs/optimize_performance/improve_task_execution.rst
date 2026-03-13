@@ -12,7 +12,7 @@ Track task memory utilization with debug mode
 If you are experiencing performance issues during task execution related to memory resource issues, and you can track memory use during tasks by entering debug mode using :ref:`enable_debug_mode`.
 When enabled, Cosmos creates an XCom entry per task, named ``cosmos_debug_max_memory_mb``. This contains the maximum amount of RSS memory tracked by the Airflow operator. Memory tracking is polled by default at a ``0.5`` seconds frequency.
 
-1. Enable debug mode by configuring the following, in either the Airflow Config or with environment vairables:
+1. Enable debug mode by configuring the following, in either the Airflow Config or with environment variables:
 
 .. code-block:: bash
 

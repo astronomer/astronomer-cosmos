@@ -55,6 +55,8 @@ When you :ref:`use-profile-mapping`, Cosmos uses an Airflow Connection for your 
 See :ref:`connect_database` for more information about both options.
 
 
+.. _improve-execution-mode-dag-run:
+
 Execution modes and Dag run performance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

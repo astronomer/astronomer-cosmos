@@ -11,7 +11,7 @@ Check to see if your ``Dag`` files contain the words ``Dag`` and ``Airflow``.
 I still cannot see my DbtDags
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you can't see your Dags, then there might be a timeout error occuring as Cosmos tries to parse the dbt project.
+If you can't see your Dags, then there might be a timeout error occurring as Cosmos tries to parse the dbt project.
 
 1. Check the Dag processor and scheduler logs for parsing times or errors.
 

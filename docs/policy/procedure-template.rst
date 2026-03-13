@@ -1,6 +1,6 @@
 :orphan:
 
-.. _porcedure-template:
+.. _procedure-docs-template:
 
 Procedure template
 ==================

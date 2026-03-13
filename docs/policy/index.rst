@@ -11,6 +11,7 @@ Cosmos project policies and compatibility
    contributing
    contributors-roles
    contributors
+   contributing-docs
 
 .. toctree::
    :maxdepth: 2

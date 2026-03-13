@@ -19,13 +19,15 @@ Depending on the Cosmos version, it creates a cache for three types of data:
 It is possible to turn off any cache in Cosmos by exporting the environment variable ``AIRFLOW__COSMOS__ENABLE_CACHE=0``.
 Disabling individual types of cache in Cosmos is also possible, as explained below.
 
+.. _caching_dbt_ls:
+
 Caching the dbt ls output
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (Introduced in Cosmos 1.5)
 
-While parsing a dbt project using `LoadMode.DBT_LS <../../guides/translate_dbt_to_airflow/parsing-methods.html#dbt-ls>`_, Cosmos uses subprocess to run ``dbt ls``.
-This operation can be very costly; it can increase the DAG parsing times and affect not only the scheduler DAG processing but
+While parsing a dbt project using `LoadMode.DBT_LS <../../guides/translate_dbt_to_airflow/parsing-methods.html#dbt-ls>`_, Cosmos uses subprocesses to run ``dbt ls``.
+This operation can be very costly; it can increase the Dag parsing times and affect not only the scheduler Dag processing but
 also the tasks queueing time.
 
 Cosmos 1.5 introduced a feature to mitigate the performance issue associated with ``LoadMode.DBT_LS`` by caching the output

@@ -5,22 +5,38 @@ Optimize rendering
 
 Rendering your dbt project into an Airflow Dag can affect Cosmos' overall performance. You have several options to address how Cosmos renders the dbt project as an Airflow Dag.
 
-Optimize LoadMode
+Optimize load mode
 ~~~~~~~~~~~~~~~~~~
 
+The ``LoadMode`` controls how Cosmos parses the dbt project. There are multiple :ref:`load mode options <parsing-methods>`, but fundamentally, Cosmos uses two approaches:
 
+1. Parses a user-supplied ``manifest.json`` file.
+2. Parses a dbt project directory using the ``dbt ls`` command.
+
+By default, Cosmos uses the ``automatic`` load mode, which first searches for a user-supplied ``manifest.json`` file, and then falls back to parsing the directory using the ``dbt ls`` command.
+Because it takes additional time to parse through the dbt project, using ``dbt_ls`` can be slower than providing a pre-computed ``manifest.json`` file.
 
 Use LoadMode.MANIFEST
-+++++++++++++++++++++
+++++++++++++++++++++++++
 
 You can use ``LoadMode.MANIFEST`` as a way to improve rendering the dbt project into Dags. This method pre-computes the dbt project ``manifest.json`` as part of the CI, so that Cosmos does not need to generate the manifest.
 
 See :ref:`dbt_manifest_load_mode` and :ref:`dbt_manifest_parsing_method` for more information about how to generate the ``manifest.json`` file and configure Cosmos to use it.
 
+Improving LoadMode.DBT_LS performance
++++++++++++++++++++++++++++++++++++++++
+
+If you can't use ``LoadMode.Manifest`` because you can't pre-comepute the ``manifest.json`` file as part of your CI pipeline, you can still take steps to ensure the best performance.
+
+- Ensure that :ref:`caching_dbt_ls` is enabled and that you use :ref:`InvocationMode.DBT_RUNNER <invocation-mode>` when possible.
+- Use :ref:`partial-parsing` or
+- Run ``dbt deps`` as part of your CI, and disable running it in Cosmos. See :ref:`pre-install-dbt-deps`.
 
 
-2. Run ``dbt deps`` as part of your CI, and disable running it in Cosmos. See :ref:`pre-install-dbt-deps`.
-3. Select a subset of nodes for large projects, instead of parsing the entire project. See :ref:`selecting-excluding`.
+
+select a subset of nodes for large projects, instead of parsing the entire project. See :ref:`selecting-excluding`.
+
+3. S
 4. Consider using the :ref:`build test behavior <testing-behavior>` to have a single node per model and its tests.
 5. Optimize dbt Core by using dbt as a library instead of a binary with :ref:`how-to-run-dbt-ls`. Install dbt and its adapters in the ``requirements.txt``. This can potentially cause :ref:`dependency conflicts <execution-modes-local-conflicts>` for some setups.
 6. Use Cosmos-native :ref:`operators <operators>` to group non-critical parts of the pipeline.

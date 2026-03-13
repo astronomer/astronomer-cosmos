@@ -3,149 +3,66 @@
 Optimize your Cosmos project setup
 ==================================
 
-How you set up your Cosmos project can impact your the overall performance of how Airflow runs your dbt project by addressing the following questions:
-
-- How do you install dbt alongside Airflow?
-- How do you install dbt dependencies?
-
-dbt core installation
-~~~~~~~~~~~~~~~~~~~~~~
-
-The following steps can help you decide how to install dbt core for your Cosmos implementation.
+How you set up your Cosmos project can impact the overall performance of how Airflow runs your dbt workflow.
+You can reduce the execution time by adjusting how you install dependencies, make authentication credentials available to cosmos, and choose an execution mode.
 
 
-Determine if you can install dbt and Airflow in the same Python environment
--------------------------------------------------------------------------------
+Install dbt and Airflow in the same Python environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you can, no cadditional onfiguration is needed.
+You can see overall performance improvements when you install dbt in the same Python environment as Airflow.
+With this strategy, Cosmos uses dbt as a library instead of subprocess, which reduces memory and CPU demands.
 
 By default, Cosmos uses:
 
-- ``ExecutionMode.LOCAL``
-- ``InvocationMode.DBT_RUNNER``
-
-.. code-block:: docker
-
-   FROM astrocrpublic.azurecr.io/runtime:3.1-5
-   RUN python -m venv dbt_venv && \
-      source dbt_venv/bin/activate && \
-      pip install --no-cache-dir<your-dbt-adapter> && \
-      deactivate
+- :ref:`ExecutionMode.LOCAL <local-execution>`
+- :ref:`InvocationMode.DBT_RUNNER <invocation-mode>`
 
 
-Decide if you can create and manage a dedicated Python environment alongside Airflow
----------------------------------------------------------------------------------------
+Pre-install dbt dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To use a dedicated Python virtual environment, you might need to configure two additional steps:
+The `dbt deps command <https://docs.getdbt.com/reference/commands/deps?version=1.12>` installs all package dependencies for your dbt Core implementation in a ``dbt_packages``
+folder in your dbt project. By default Cosmos (re-)runs this command whenever the dbt project is parsed and
+in every task execution, but that is often not necessary unless package requirements change.
 
-1. If using Astro, create the virtualenv as part of your Docker image build.
-2. Define where the dbt binary for Cosmos to use. This still uses the default ``ExecutionMode.LOCAL``:
+You can improve your overall project performance by setting up your CI/CD to run ``dbt deps``, and disabling running it in Cosmos by using the :ref:`ProjectConfig <project-config>`.
 
-.. code-block:: docker
+1. Configure your CI/CD process to run ``dbt deps``, or any similar command that installs dbt dependencies into the project, and make any output artefacts available to Cosmos.
 
-   FROM astrocrpublic.azurecr.io/runtime:3.1-5
-   RUN python -m venv dbt_venv && \
-      source dbt_venv/bin/activate && \
-      pip install --no-cache-dir<your-dbt-adapter> && \
-      deactivate
-
-   DbtDag(
-   ...,
-   execution_config=ExecutionConfig(
-         dbt_executable_path=Path("/usr/local/airflow/dbt_venv/bin/dbt")
-         operator_args={“py_requirements": ["dbt-postgres==1.6.0b1"]}
-         )
-      )
-
-
-Decide if you want to install dbt in Airflow nodes
------------------------------------------------------
-
-If you want to install dbt in Airflow nodes, Cosmos can create and manage the dbt Python virtualenv for you with ``ExecutionMode.VIRTUALENV``.
-
-.. code-block:: docker
-
-   FROM astrocrpublic.azurecr.io/runtime:3.1-5
-   RUN python -m venv dbt_venv && \
-      source dbt_venv/bin/activate && \
-      pip install --no-cache-dir<your-dbt-adapter> && \
-      deactivate
-   DbtDag(
-   ...,
-   execution_config=ExecutionConfig(
-         execution_mode=ExecutionMode.VIRTUALENV,
-      )
-   )
-
-
-Use Cosmos without dbt in the Airflow nodes
-----------------------------------------------
-
-You don’t have to use dbt in the Airflow nodes to benefit from Cosmos. Instead you can leverage ``LoadMode.DBT_MANIFEST`` or ``ExecutionMode.KUBERNETES``.
-
-.. code-block:: docker
-
-   FROM astrocrpublic.azurecr.io/runtime:3.1-5
-   RUN python -m venv dbt_venv && \
-      source dbt_venv/bin/activate && \
-      pip install --no-cache-dir<your-dbt-adapter> && \
-      deactivate
-   DbtDag(
-   ...,
-   execution_config=ExecutionConfig(
-         execution_mode=ExecutionMode.VIRTUALENV,
-      )
-   )
-
-.. _optimize-dbt-deps:
-
-Set up dbt deps
-~~~~~~~~~~~~~~~
-
-Determine if you can pre-install dbt dependencies in your Airflow deployment.
-
-If you can, this is the most efficient approach. You can tell Cosmos to ignore the dbt ``packages.yml`` file.
+2. Disable running ``dbt deps`` in Cosmos by setting ``install_dbt_deps=False`` in the ``ProjectConfig``:
 
 .. code-block:: python
 
-   DbtDag(
-       ...,
-       render_config=RenderConfig(dbt_deps=False),
-       execution_config=ExecutionConfig(operator_args={"install_deps": False}),
+   from cosmos import DbtDag, ProjectConfig
+
+   _project_config = ProjectConfig(
+      install_dbt_deps=False
+   )
+   my_dag = DbtDag(
+      # ...
+      project_config=_project_config,
    )
 
-If you can't pre-install dbt dependencies, Cosmos automatically runs dbt deps before running any dbt command, and does not require any additional configuration.
 
-.. _optimize-database-connections:
+Use the profiles.yml file instead of profile mapping
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Set up database connections
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In order for Cosmos to access your dbt warehouse, you must provide connection credentials to Cosmos with either a ``profiles.yml`` file or profile mapping.
 
-If you manage Airflow database credentials, Cosmos has an extensible set of ``ProfileMapping`` classes, that can automatically create the dbt ``profiles.yml`` from Airflow Connections.
+When you :ref:`use-profile-mapping`, Cosmos uses an Airflow Connection for your data warehouse credentials. However, when you :ref:`use-your-profiles-yml`, you provide credentials through your dbt project, and Cosmos does not have to parse it as an Airflow connection.
 
-.. code-block:: python
+See :ref:`connect_database` for more information about both options.
 
-   profile_config = ProfileConfig(
-       profile_name="my_profile_name",
-       target_name="my_target_name",
-       profile_mapping=SnowflakeUserPasswordProfileMapping(
-           conn_id="my_snowflake_conn_id",
-           profile_args={
-               "database": "my_snowflake_database",
-               "schema": "my_snowflake_schema",
-           },
-       ),
-   )
-   dag = DbtDag(
-       profile_config=profile_config,
-   )
 
-If you don't manage Airflow database credentials, Cosmos also allows you to define your own profiles.yml.
+Execution modes and Dag run performance
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: python
+The :ref:`execution mode <execution-modes>` you select can directly impact the speed that your Dag runs complete. Some execution modes invoke dbt multiple times while executing the Dag, which can add time.
 
-   profile_config = ProfileConfig(
-       profile_name="my_snowflake_profile",
-       target_name="dev",
-       profiles_yml_filepath="/path/to/profiles.yml",
-   )
+``ExecutionMode.WATCHER`` and ``ExecutionMode.AIRFLOW_ASYNC`` both address this kind of performance slowdown.
+
+See:
+
+- :ref:`watcher-execution-mode`
+- :ref:`async-execution-mode`

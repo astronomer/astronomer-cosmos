@@ -147,6 +147,12 @@ Cosmos docs use the ``image`` tag to call figures and diagrams.
     .. image:: ../_static/image.png
        :alt: Add the image description.
 
+Adding images and figures
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For resolution purposes, try to use image files that are ``.svg`` when possible.
+However, ``.png`` at sufficient resolution usually provides adequate quality.
+
 
 Links
 ++++++
@@ -238,3 +244,5 @@ Generating the nested table of contents has some limitations, some of which are 
 - All ``toctree`` with collapsible subfolder nesting must include a ``caption``.
 - If a subfolder only has one entry in its ``toctree``, it will not display as a collapsible option.
 - Your subfolder index page must have a title for it to render correctly as a collapsible option.
+
+

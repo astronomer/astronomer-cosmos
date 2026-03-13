@@ -88,19 +88,20 @@ def test_not_cosmos_dag():
     assert total_cosmos_tasks(dag) == 0
 
 
-def test_get_cosmos_telemetry_metadata_with_invalid_data():
-    """Test that get_cosmos_telemetry_metadata handles invalid compressed data gracefully."""
+@patch("cosmos.telemetry.Variable.get", return_value="invalid_base64_data!")
+def test_get_cosmos_telemetry_metadata_with_invalid_data(mock_variable_get):
+    """Test that get_cosmos_telemetry_metadata handles invalid Variable data gracefully."""
     with DAG("test-dag", start_date=datetime(2022, 1, 1)) as dag:
-        # Set invalid base64 data that will fail decompression
-        dag.params["__cosmos_telemetry_metadata__"] = "invalid_base64_data!"
+        pass
 
     # Should return empty dict instead of raising exception
     result = get_cosmos_telemetry_metadata(dag)
     assert result == {}
 
 
-def test_get_cosmos_telemetry_metadata_with_no_metadata():
-    """Test that get_cosmos_telemetry_metadata returns empty dict when no metadata present."""
+@patch("cosmos.telemetry.Variable.get", return_value=None)
+def test_get_cosmos_telemetry_metadata_with_no_metadata(mock_variable_get):
+    """Test that get_cosmos_telemetry_metadata returns empty dict when Variable is missing."""
     with DAG("test-dag", start_date=datetime(2022, 1, 1)) as dag:
         pass
 

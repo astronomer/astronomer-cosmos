@@ -46,6 +46,33 @@ def test_compress_decompress_telemetry_metadata_roundtrip():
     assert decompressed == original_metadata
 
 
+def test_get_cosmos_telemetry_variable_key():
+    """Test that the Variable key is derived from the DAG id."""
+    assert telemetry.get_cosmos_telemetry_variable_key("my_dag") == "cosmos_telemetry__my_dag"
+    assert telemetry.get_cosmos_telemetry_variable_key("basic_cosmos_dag") == "cosmos_telemetry__basic_cosmos_dag"
+
+
+@patch("cosmos.telemetry.Variable.get", return_value=None)
+def test_get_cosmos_telemetry_metadata_from_variable_missing(mock_variable_get):
+    """Test that missing Variable returns empty dict."""
+    assert telemetry.get_cosmos_telemetry_metadata_from_variable("some_dag") == {}
+    mock_variable_get.assert_called_once()
+
+
+@patch("cosmos.telemetry.Variable.get", return_value="invalid_base64!")
+def test_get_cosmos_telemetry_metadata_from_variable_invalid(mock_variable_get):
+    """Test that invalid compressed data returns empty dict."""
+    assert telemetry.get_cosmos_telemetry_metadata_from_variable("some_dag") == {}
+
+
+@patch("cosmos.telemetry.Variable.get")
+def test_get_cosmos_telemetry_metadata_from_variable_roundtrip(mock_variable_get):
+    """Test that valid Variable data is decompressed and returned."""
+    compressed = telemetry._compress_telemetry_metadata({"key": "value"})
+    mock_variable_get.return_value = compressed
+    assert telemetry.get_cosmos_telemetry_metadata_from_variable("my_dag") == {"key": "value"}
+
+
 def test_should_emit_is_true_by_default():
     assert telemetry.should_emit()
 

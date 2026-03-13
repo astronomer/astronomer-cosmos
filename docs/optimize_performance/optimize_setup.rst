@@ -24,7 +24,7 @@ By default, Cosmos uses:
 Pre-install dbt dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The `dbt deps command <https://docs.getdbt.com/reference/commands/deps?version=1.12>` installs all package dependencies for your dbt Core implementation in a ``dbt_packages``
+The `dbt deps command <https://docs.getdbt.com/reference/commands/deps?version=1.12>`_ installs all package dependencies for your dbt Core implementation in a ``dbt_packages``
 folder in your dbt project. By default Cosmos (re-)runs this command whenever the dbt project is parsed and
 in every task execution, but that is often not necessary unless package requirements change.
 

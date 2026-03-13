@@ -33,6 +33,37 @@ Check out the following:
 - :ref:`reference-template`
 - :ref:`procedure-docs-template`
 
+Cosmos style guide
+~~~~~~~~~~~~~~~~~~
+
+Apache Airflow®
+++++++++++++++++
+
+Cosmos docs follows the `Apache Airflow® <https://airflow.apache.org/>`_ registered trademark usage conventions.
+
+- Use the full name and link to the Airflow site on the first mention on the page::
+
+    `Apache Airflow® <https://airflow.apache.org/>`_
+
+- Use ``Apache Airflow®`` in headers and titles.
+
+The `Airflow docs <https://airflow.apache.org/docs/>`_ provides in-context usage examples, and you can read more about the `registered trademark use <https://lists.apache.org/thread/0fmp9olljfkm3vmg3ns5qd1o95sm7235>`_.
+
+Code formatting
+++++++++++++++++++
+
+When code elements of Cosmos are mentioned in-text, for example, the ``ExecutionConfig``, ``ProfileConfig``, ``ProjectConfig``, and ``RenderConfig``, format as code.
+
+Dags
+++++
+
+Cosmos follows the same capitalization conventions as the Airflow project: ``Dag``.
+
+Open-source focus
++++++++++++++++++
+
+When providing a list of options, aim to share open-source options, alphabetically, followed by commercial options, alphabetically.
+
 Sphinx style guide
 ~~~~~~~~~~~~~~~~~~~
 
@@ -207,3 +238,6 @@ Generating the nested table of contents has some limitations, some of which are 
 - All ``toctree`` with collapsible subfolder nesting must include a ``caption``.
 - If a subfolder only has one entry in its ``toctree``, it will not display as a collapsible option.
 - Your subfolder index page must have a title for it to render correctly as a collapsible option.
+
+
+

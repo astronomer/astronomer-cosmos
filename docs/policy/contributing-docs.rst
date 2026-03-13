@@ -244,5 +244,3 @@ Generating the nested table of contents has some limitations, some of which are 
 - All ``toctree`` with collapsible subfolder nesting must include a ``caption``.
 - If a subfolder only has one entry in its ``toctree``, it will not display as a collapsible option.
 - Your subfolder index page must have a title for it to render correctly as a collapsible option.
-
-

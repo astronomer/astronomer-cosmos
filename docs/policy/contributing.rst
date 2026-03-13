@@ -153,17 +153,6 @@ If testing for the same Airflow and Python version, next runs of the integration
 
     hatch run tests.py3.11-2.10-1.9:test-integration
 
-Writing Docs
-~~~~~~~~~~~~
-
-After following the steps described in :ref:`setting-up-hatch`, you are ready to build and serve the documentation locally.
-
-You can run the docs locally by running the following:
-
-.. code-block:: bash
-
-    hatch run docs:serve
-
 Building
 ~~~~~~~~
 
@@ -174,6 +163,7 @@ To build the project, run:
 .. code-block:: bash
 
     hatch build
+
 
 Releasing
 ~~~~~~~~~

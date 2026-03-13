@@ -40,5 +40,3 @@ List the required resources, versions, tools, or functionality that someone need
 ~~~~~~~~~~~~~~~~
 
 If there's only one step, skip numbering.
-
-

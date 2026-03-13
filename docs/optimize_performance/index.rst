@@ -15,8 +15,8 @@ Optimize Cosmos performance
    :caption: Optimize Performance
 
    optimize_setup
-   improve_task_execution
    optimize_rendering
+   improve_task_execution
    Memory optimization <memory_optimization>
    caching
    invocation_mode
@@ -36,6 +36,11 @@ Optimize rendering
 Cosmos must parse your dbt project to map it into corresponding Airflow tasks, and to create tasks in a Dag. Depending on how you set up your configurations, Cosmos might parse all of your dbt project every time, instead of parsing only changed files.
 
 See :ref:`optimize_rendering`.
+
+Improve task execution
+~~~~~~~~~~~~~~~~~~~~~~~
+
+When running your dbt project as an Airflow Dag, task performance issues related can arise depending on how you configured your overall Cosmos project. See :ref:`improve_task_execution`.
 
 Memory optimization
 ~~~~~~~~~~~~~~~~~~~

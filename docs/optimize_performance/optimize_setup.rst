@@ -36,12 +36,10 @@ You can improve your overall project performance by setting up your CI/CD to run
 
    from cosmos import DbtDag, ProjectConfig
 
-   _project_config = ProjectConfig(
-      install_dbt_deps=False
-   )
+   _project_config = ProjectConfig(install_dbt_deps=False)
    my_dag = DbtDag(
-      # ...
-      project_config=_project_config,
+       # ...
+       project_config=_project_config,
    )
 
 

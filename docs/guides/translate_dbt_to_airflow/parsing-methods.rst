@@ -96,6 +96,7 @@ Generate the manifest **after** installing and enabling packages: run ``dbt deps
 from your project directory. If the manifest was built before a package was added or enabled, package models will not
 appear in the DAG until you regenerate the manifest.
 
+.. _dbt_ls_parsing-method:
 
 ``dbt_ls``
 ----------

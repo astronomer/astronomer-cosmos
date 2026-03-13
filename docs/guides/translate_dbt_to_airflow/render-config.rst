@@ -31,6 +31,8 @@ The ``RenderConfig`` class takes the following arguments:
 - ``enable_owner_inheritance``: (introduced in 1.10.2) A boolean to control if dbt owners should be imported as part of the airflow DAG owners. Defaults to True.
 - ``node_conversion_by_task_group``: A boolean to control if node_converters are used at the task group level (ex. converting models with test_behavior=AFTER_EACH means the entire task group is converted including the run task and the test task), or the individual task level (gives more granularity for converting just the run tasks or just the test tasks).  Defaults to True.
 
+.. _how-to-run-dbt-ls:
+
 How to run dbt ls (invocation mode)
 -----------------------------------
 

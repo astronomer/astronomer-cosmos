@@ -15,6 +15,7 @@ Optimize Cosmos performance
    :caption: Optimize Performance
 
    optimize_setup
+   improve_task_execution
    optimize_rendering
    Memory optimization <memory_optimization>
    caching

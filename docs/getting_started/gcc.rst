@@ -15,12 +15,12 @@ Add the following to your base project ``requirements.txt``:
     astronomer-cosmos
 
 
-Move your dbt project into the DAGs directory
+Move your dbt project into the Dags directory
 ---------------------------------------------
 
-Make a new folder, ``dbt``, inside your local ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your DAGs directory.
+Make a new folder, ``dbt``, inside your local ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your Dags directory.
 
-Note: your dbt projects can go anywhere that Airflow can read. By default, Cosmos looks in the ``/usr/local/airflow/dags/dbt`` directory, but you can change this by setting the ``dbt_project_dir`` argument when you create your DAG instance.
+Note: your dbt projects can go anywhere that Airflow can read. By default, Cosmos looks in the ``/usr/local/airflow/dags/dbt`` directory, but you can change this by setting the ``dbt_project_dir`` argument when you create your Dag instance.
 
 For more accurate parsing of your dbt project, you should pre-compile your dbt project's ``manifest.json`` (include ``dbt deps && dbt compile`` as part of your deployment process).
 
@@ -42,10 +42,10 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
 .. note::
    You can also exclude the ``manifest_path=...`` from the ``ProjectConfig``. Excluding a ``manifest_path`` file will by default use Cosmos's ``custom`` parsing method, which may be less accurate at parsing a dbt project compared to providing a ``manifest.json``.
 
-Create your DAG
+Create your Dag
 ---------------
 
-In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and create a new DAG instance. You need to supply additional arguments in the ``operator_args`` dictionary to tell Cosmos which packages are required.
+In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and create a new Dag instance. You need to supply additional arguments in the ``operator_args`` dictionary to tell Cosmos which packages are required.
 
 Make sure to rename the ``<your-adapter>`` value below to your adapter's Python package (i.e. ``dbt-snowflake`` or ``dbt-bigquery``)
 

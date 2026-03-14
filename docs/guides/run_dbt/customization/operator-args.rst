@@ -93,7 +93,7 @@ dbt-related
 - ``models``: Specifies which nodes to include.
 - ``no_version_check``: If set, skip ensuring ``dbt``'s version matches the one specified in the ``dbt_project.yml``.
 - ``quiet``: run ``dbt`` in silent mode, only displaying its error logs.
-- ``vars``: Supply dbt variables to run the task using dbt project. This argument overrides variables defined in the ``dbt_project.yml`` and any values set in ``ProjectConfig.dbt_vars``. Arguments set as dbt ``vars`` in ``operators_args`` will not be used to render the DAG when using ``LoadMode.DBT_LS``. Use  ``ProjectConfig.dbt_vars`` instead for this use-case.
+- ``vars``: Supply dbt variables to run the task using dbt project. This argument overrides variables defined in the ``dbt_project.yml`` and any values set in ``ProjectConfig.dbt_vars``. Arguments set as dbt ``vars`` in ``operators_args`` will not be used to render the Dag when using ``LoadMode.DBT_LS``. Use  ``ProjectConfig.dbt_vars`` instead for this use-case.
 - ``warn_error``: convert ``dbt`` warnings into errors.
 - ``full_refresh``: If True, then full refresh the node. This only applies to model and seed nodes.
 - ``copy_dbt_packages``: (new in v1.10) When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
@@ -168,7 +168,7 @@ The following operator args support templating, and are accessible both through 
 - ``dbt_cmd_flags``
 
 .. note::
-    Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.
+    Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your Dag.
 
 Example usage of templated ``dbt_cmd_flags`` for microbatch models with event-time ranges:
 
@@ -200,7 +200,7 @@ The following template fields are only selectable when using the operators in a 
 - ``selector``
 - ``models``
 
-Since Airflow resolves template fields during Airflow DAG execution and not DAG parsing,  the args above cannot be templated via ``DbtDag`` and ``DbtTaskGroup`` because both need to select dbt nodes during DAG parsing.
+Since Airflow resolves template fields during Airflow Dag execution and not Dag parsing,  the args above cannot be templated via ``DbtDag`` and ``DbtTaskGroup`` because both need to select dbt nodes during Dag parsing.
 
 Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
 This is provided for telemetry on task execution, and is not an operator arg.

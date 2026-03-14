@@ -45,7 +45,7 @@ Then install ``airflow`` and ``astronomer-cosmos`` using python-venv:
     pip3 install "apache-airflow[cncf.kubernetes,openlineage]"
     pip3 install -e ".[dbt-postgres,dbt-databricks]"
 
-Set Airflow home to the ``dev/`` directory and disable loading example DAGs:
+Set Airflow home to the ``dev/`` directory and disable loading example Dags:
 
 .. code-block:: bash
 

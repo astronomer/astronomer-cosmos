@@ -8,7 +8,7 @@ It uses the `EKSPodOperator <https://airflow.apache.org/docs/apache-airflow-prov
 to run the dbt commands. You need to provide the ``cluster_name`` in your operator_args to connect to the AWS EKS cluster.
 
 
-Example DAG
+Example Dag
 
 .. code-block:: python
 

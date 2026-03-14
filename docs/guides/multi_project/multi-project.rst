@@ -34,7 +34,7 @@ When Cosmos parses a dbt project that uses dbt-loom, it encounters two types of 
 
 Cosmos automatically:
 
-- **Skips external nodes** during DAG generation (they don't have file paths)
+- **Skips external nodes** during Dag generation (they don't have file paths)
 - **Creates Airflow tasks only for local nodes** in each project
 - **Maintains proper dependency tracking** within each project
 
@@ -45,7 +45,7 @@ Requirements
 
 For dbt-loom to work with Cosmos:
 
-1. **For DAG parsing**: The upstream project's ``manifest.json`` must be accessible
+1. **For Dag parsing**: The upstream project's ``manifest.json`` must be accessible
 2. **For task execution**: The downstream project must be able to query upstream tables
 3. **dbt-loom installation**: `dbt-loom <https://pypi.org/project/dbt-loom/>`__ must be installed in the same Python virtual environment as the dbt
    executable used by Cosmos. This applies whether you're using a system-wide dbt installation or a
@@ -148,10 +148,10 @@ Note that dbt-loom is installed as a Python package (``pip install dbt-loom``), 
         on c.customer_id = o.customer_id
     group by 1, 2
 
-Cosmos DAG Configuration
+Cosmos Dag Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can use either separate DAGs or a combined DAG with task groups.
+You can use either separate Dags or a combined Dag with task groups.
 
 .. note::
 
@@ -167,16 +167,16 @@ You can use either separate DAGs or a combined DAG with task groups.
     **Important**: The downstream profile must have read access to the tables/views created by the
     upstream project. Ensure appropriate grants or cross-database access is configured.
 
-**Option 1: Combined DAG with Task Groups using dbt ls Load Mode (Recommended)**
+**Option 1: Combined Dag with Task Groups using dbt ls Load Mode (Recommended)**
 
 .. literalinclude:: ../../../dev/dags/cross_project_dbt_ls_dag.py
     :language: python
     :start-after: [START cross_project_dbt_ls_dag]
     :end-before: [END cross_project_dbt_ls_dag]
 
-**Option 2: Combined DAG with Task Groups using Manifest Load Mode**
+**Option 2: Combined Dag with Task Groups using Manifest Load Mode**
 
-This option uses pre-generated ``manifest.json`` files for faster DAG parsing (no ``dbt ls`` execution required).
+This option uses pre-generated ``manifest.json`` files for faster Dag parsing (no ``dbt ls`` execution required).
 
 .. literalinclude:: ../../../dev/dags/cross_project_manifest_dag.py
     :language: python
@@ -190,10 +190,10 @@ This option uses pre-generated ``manifest.json`` files for faster DAG parsing (n
     - Generate ``manifest.json`` for both projects before deploying (``dbt compile`` or ``dbt parse``)
     - For remote manifests (S3/GCS/Azure), configure the appropriate Airflow connection and use ``manifest_conn_id``
 
-**Option 3: Separate DAGs with Assets (Airflow 3) / Datasets (Airflow 2.4+)**
+**Option 3: Separate Dags with Assets (Airflow 3) / Datasets (Airflow 2.4+)**
 
 Cosmos automatically emits assets from each task when ``emit_datasets=True`` (the default).
-You can use these assets to trigger downstream DAGs.
+You can use these assets to trigger downstream Dags.
 
 .. figure:: /_static/cross_projects_assets_view.png
    :alt: Cross-project assets view in Airflow
@@ -201,9 +201,9 @@ You can use these assets to trigger downstream DAGs.
    Assets emitted by dbt models showing the OpenLineage-based URIs.
 
 .. figure:: /_static/cross_project_asset_triggered_dag.png
-   :alt: Asset-triggered DAG in Airflow
+   :alt: Asset-triggered Dag in Airflow
 
-   A downstream DAG triggered by upstream model assets.
+   A downstream Dag triggered by upstream model assets.
 
 .. note::
 
@@ -225,7 +225,7 @@ For example, a Postgres model ``stg_customers`` in schema ``platform`` generates
 
     postgres://postgres:5432/postgres/platform/stg_customers
 
-**Example: Trigger Downstream DAG on Specific Upstream Models (Airflow 3)**
+**Example: Trigger Downstream Dag on Specific Upstream Models (Airflow 3)**
 
 .. code-block:: python
 
@@ -239,7 +239,7 @@ For example, a Postgres model ``stg_customers`` in schema ``platform`` generates
         "postgres://postgres:5432/postgres/platform/int_customer_orders"
     )
 
-    # Upstream DAG - tasks automatically emit assets
+    # Upstream Dag - tasks automatically emit assets
     upstream_dag = DbtDag(
         dag_id="upstream_dag",
         project_config=ProjectConfig(dbt_project_path=UPSTREAM_PATH),
@@ -250,7 +250,7 @@ For example, a Postgres model ``stg_customers`` in schema ``platform`` generates
         schedule="@daily",
     )
 
-    # Downstream DAG triggers when specific upstream models complete
+    # Downstream Dag triggers when specific upstream models complete
     downstream_dag = DbtDag(
         dag_id="downstream_dag",
         project_config=ProjectConfig(dbt_project_path=DOWNSTREAM_PATH),
@@ -267,7 +267,7 @@ AssetAlias provides more flexible asset matching using URI patterns:
     from airflow.sdk import AssetAlias
     from cosmos import DbtDag, ProfileConfig, ProjectConfig
 
-    # Downstream DAG triggers on any asset matching the alias pattern
+    # Downstream Dag triggers on any asset matching the alias pattern
     downstream_dag = DbtDag(
         dag_id="downstream_dag",
         project_config=ProjectConfig(dbt_project_path=DOWNSTREAM_PATH),
@@ -279,9 +279,9 @@ AssetAlias provides more flexible asset matching using URI patterns:
         ],
     )
 
-**Example: Manual Asset for DAG-Level Dependency**
+**Example: Manual Asset for Dag-Level Dependency**
 
-If you want a single asset to represent the entire upstream DAG completion,
+If you want a single asset to represent the entire upstream Dag completion,
 add a final task that emits a custom asset:
 
 .. code-block:: python
@@ -313,7 +313,7 @@ add a final task that emits a custom asset:
 
         upstream_tasks >> mark_complete
 
-    # Downstream DAG triggers on the completion asset
+    # Downstream Dag triggers on the completion asset
     downstream_dag = DbtDag(
         dag_id="downstream_dag",
         project_config=ProjectConfig(dbt_project_path=DOWNSTREAM_PATH),
@@ -512,7 +512,7 @@ Best Practices
 --------------
 
 1. **Use environment variables** for manifest paths to support different environments
-2. **Chain task groups** (same DAG) or **use assets** (separate DAGs) to ensure proper execution order
+2. **Chain task groups** (same Dag) or **use assets** (separate Dags) to ensure proper execution order
 3. **Mark upstream models as public** using ``+access: public``
 4. **Generate manifests in CI** to ensure they're always available
 5. **Use persistent storage** (not in-memory databases) for cross-project data sharing
@@ -522,7 +522,7 @@ Best Practices
 Limitations
 -----------
 
-- dbt-loom external nodes are skipped during Cosmos DAG generation (by design)
+- dbt-loom external nodes are skipped during Cosmos Dag generation (by design)
 - Cross-project lineage is not yet visualized in Airflow's lineage view
-- DAGs cannot have ``outlets`` directly; use a completion marker task or rely on task-level assets
+- Dags cannot have ``outlets`` directly; use a completion marker task or rely on task-level assets
 - Asset URIs are auto-generated based on OpenLineage and may change if database connection details change

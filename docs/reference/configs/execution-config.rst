@@ -2,7 +2,7 @@ Execution Config
 ==================
 
 Cosmos aims to give you control over how your dbt project is executed when running in airflow.
-It does this by exposing a ``cosmos.config.ExecutionConfig`` class that you can use to configure how your DAGs are executed.
+It does this by exposing a ``cosmos.config.ExecutionConfig`` class that you can use to configure how your Dags are executed.
 
 The ``ExecutionConfig`` class takes the following arguments:
 

@@ -16,7 +16,7 @@ You can control this behavior using the ``source_rendering_behavior`` field in t
     - ``DbtSourceOperator``: For sources that have freshness checks.
     - ``DbtTestOperator``: For sources that have tests.
 
-  This approach aims to create a comprehensive DAG that aligns with dbt documentation, allowing for the rendering of both sources and models for a more detailed visual representation.
+  This approach aims to create a comprehensive Dag that aligns with dbt documentation, allowing for the rendering of both sources and models for a more detailed visual representation.
   It also ensures that model dependencies do not run if their sources are not fresh, thus preventing the execution of stale or incomplete data.
 
 - **none** (default): When set to ``none``, Cosmos does not automatically render any sources. Note that if node converters are being used for sources, they will still function as intended.
@@ -41,9 +41,9 @@ Source Pruning
 ~~~~~~~~~~~~~~
 
 The ``source_pruning`` is a boolean parameter available in the ``RenderConfig``.
-When set to ``True``, it automatically removes (or "prunes") any dbt source nodes from your Airflow DAG that do not have any downstream dependencies within the selected portion of the dbt graph.
+When set to ``True``, it automatically removes (or "prunes") any dbt source nodes from your Airflow Dag that do not have any downstream dependencies within the selected portion of the dbt graph.
 
-This is particularly useful for keeping your DAGs clean and focused, especially in large dbt projects where you might be selecting only a subset of models to run.
+This is particularly useful for keeping your Dags clean and focused, especially in large dbt projects where you might be selecting only a subset of models to run.
 
 By default, this option is set to ``False``.
 

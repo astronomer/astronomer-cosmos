@@ -39,7 +39,7 @@ We have `observed <https://github.com/astronomer/astronomer-cosmos/pull/1934>`_ 
 Getting Started with Airflow Async Mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This guide walks you through setting up an Astro CLI project and running a Cosmos-based DAG with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
+This guide walks you through setting up an Astro CLI project and running a Cosmos-based Dag with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
 
 Prerequisites
 -------------
@@ -92,10 +92,10 @@ In your ``requirements.txt``, add:
     astronomer-cosmos[dbt-bigquery, google]>=1.9
 
 
-4. Create Airflow DAG
+4. Create Airflow Dag
 ---------------------
 
-1. Create a new DAG file: ``dags/cosmos_async_dag.py``
+1. Create a new Dag file: ``dags/cosmos_async_dag.py``
 
 - Update the ``dataset`` and ``project``
 
@@ -198,15 +198,15 @@ Create an Airflow connection with following configurations
     }
 
 
-7. Execute the DAG
+7. Execute the Dag
 ------------------
 
 1. Visit the Airflow UI at ``http://localhost:8080``
-2. Enable the DAG: ``cosmos_async_dag``
-3. Trigger the DAG manually
+2. Enable the Dag: ``cosmos_async_dag``
+3. Trigger the Dag manually
 
 .. image:: /_static/jaffle_shop_async_execution_mode.png
-    :alt: Cosmos dbt Async DAG
+    :alt: Cosmos dbt Async Dag
     :align: center
 
 The ``run`` tasks will run asynchronously via the deferrable operator, freeing up worker slots while waiting on I/O or long-running tasks.
@@ -235,16 +235,16 @@ Limitations
 
 2. **BigQuery support only**: This mode only supports BigQuery as the target database. If a different target is specified, Cosmos will throw an error indicating the target database is unsupported in this mode. Adding support for other adapters is on the roadmap.
 
-3. **ProfileMapping parameter required**: You need to specify the ``ProfileMapping`` parameter in the ``ProfileConfig`` for your DAG. Refer to the example DAG below for details on setting this parameter.
+3. **ProfileMapping parameter required**: You need to specify the ``ProfileMapping`` parameter in the ``ProfileConfig`` for your Dag. Refer to the example Dag below for details on setting this parameter.
 
-4. **Location parameter required**: You must specify the location of the BigQuery dataset in the ``operator_args`` of the ``DbtDag`` or ``DbtTaskGroup``. The example DAG below provides guidance on this.
+4. **Location parameter required**: You must specify the location of the BigQuery dataset in the ``operator_args`` of the ``DbtDag`` or ``DbtTaskGroup``. The example Dag below provides guidance on this.
 
-5. **async_py_requirements parameter required**: If you're using the default approach of having a setup task, you must specify the necessary dbt adapter Python requirements based on your profile type for the async execution mode in the ``ExecutionConfig`` of your ``DbtDag`` or ``DbtTaskGroup``. The example DAG below provides guidance on this.
+5. **async_py_requirements parameter required**: If you're using the default approach of having a setup task, you must specify the necessary dbt adapter Python requirements based on your profile type for the async execution mode in the ``ExecutionConfig`` of your ``DbtDag`` or ``DbtTaskGroup``. The example Dag below provides guidance on this.
 
 6. **Creation of new isolated virtual environment for each task run**: By default, the ``SetupAsyncOperator`` creates and executes within a new isolated virtual environment for each task run, which can cause performance issues. To reuse an existing virtual environment, use the ``virtualenv_dir`` parameter within the ``operator_args`` of the ``DbtDag``. We have observed that for ``dbt-bigquery``, the ``SetupAsyncOperator`` executes approximately 30% faster when reusing an existing virtual environment, particularly for transformations that take around 10 minutes to complete.
 
 7. **Performance degradation when uploading to remote object location**: Even though it is possible to upload the SQL files to a remote object location by setting environment variables, it is slow. We observed that this introduces a significant overhead in the execution time (500s for 129 models).
 
-8. **TeardownAsyncOperator limitation**: When using a remote object location, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the DAG. This task will delete the SQL files from the remote location by the end of the DAG Run. This is can lead to a limitation from a retry perspective, as described in the issue `#2066 <https://github.com/astronomer/astronomer-cosmos/issues/2066>`_. This can be avoided by setting the ``enable_teardown_async_task`` configuration to ``False``, as described in the :ref:`enable_teardown_async_task` section.
+8. **TeardownAsyncOperator limitation**: When using a remote object location, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the Dag. This task will delete the SQL files from the remote location by the end of the Dag Run. This is can lead to a limitation from a retry perspective, as described in the issue `#2066 <https://github.com/astronomer/astronomer-cosmos/issues/2066>`_. This can be avoided by setting the ``enable_teardown_async_task`` configuration to ``False``, as described in the :ref:`enable_teardown_async_task` section.
 
 For a comparison between different Cosmos execution modes, please, check the :ref:`execution-modes-comparison` section.

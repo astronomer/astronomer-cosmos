@@ -97,7 +97,7 @@ Create a K8s secret which contains the credentials to access Postgres.
 
     kubectl create secret generic postgres-secrets --from-literal=host=postgres-postgresql.default.svc.cluster.local --from-literal=password=$POSTGRES_PASSWORD
 
-Clone the example repo that contains the Airflow DAG and dbt project files.
+Clone the example repo that contains the Airflow Dag and dbt project files.
 
 .. code-block:: bash
 
@@ -141,7 +141,7 @@ Create a Python virtual environment and install the latest version of Astronomer
     pip install --upgrade pip
     pip install "astronomer-cosmos[dbt-postgres]" apache-airflow-providers-cncf-kubernetes
 
-Make the `jaffle_shop_kubernetes.py <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/jaffle_shop_kubernetes.py>`__ file at your Airflow DAG home:
+Make the `jaffle_shop_kubernetes.py <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/jaffle_shop_kubernetes.py>`__ file at your Airflow Dag home:
 
 .. code-block:: bash
 
@@ -159,7 +159,7 @@ Run Airflow
 
 Log in to Airflow through a web browser ``http://localhost:8080/``, using the user ``airflow`` and the password described in the ``standalone_admin_password.txt`` file.
 
-Enable and trigger a run of the `jaffle_shop_k8s <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_kubernetes.py>`_ DAG. You will be able to see the following successful DAG run.
+Enable and trigger a run of the `jaffle_shop_k8s <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_kubernetes.py>`_ Dag. You will be able to see the following successful Dag run.
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_k8s_dag_run.png
     :width: 800

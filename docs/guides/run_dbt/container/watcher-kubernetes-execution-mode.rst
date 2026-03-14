@@ -42,7 +42,7 @@ The following example shows how to configure a ``DbtDag`` with ``ExecutionMode.W
 
     dag = DbtDag(
         dag_id="jaffle_shop_watcher_kubernetes",
-        # ... other DAG parameters ...
+        # ... other Dag parameters ...
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER_KUBERNETES,
             dbt_project_path=K8S_PROJECT_DIR,
@@ -67,7 +67,7 @@ For the complete setup including Kubernetes secrets, Docker image configuration,
 Performance Gains
 -----------------
 
-Early benchmarks using the ``jaffle_shop_watcher_kubernetes`` DAG show significant improvements:
+Early benchmarks using the ``jaffle_shop_watcher_kubernetes`` Dag show significant improvements:
 
 +-----------------------------------------------+------------------+
 | Execution Mode                                | Total Runtime    |
@@ -77,7 +77,7 @@ Early benchmarks using the ``jaffle_shop_watcher_kubernetes`` DAG show significa
 | ``ExecutionMode.WATCHER_KUBERNETES``          | 00:00:11.783     |
 +-----------------------------------------------+------------------+
 
-This represents approximately a **63% reduction** in total DAG runtime.
+This represents approximately a **63% reduction** in total Dag runtime.
 
 The performance improvement comes from:
 
@@ -122,7 +122,7 @@ The producer node created by the ``ExecutionMode.WATCHER_KUBERNETES`` producer t
 
     dag = DbtDag(
         dag_id="jaffle_shop_watcher_kubernetes",
-        # ... other DAG parameters ...
+        # ... other Dag parameters ...
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER_KUBERNETES,
             dbt_project_path=K8S_PROJECT_DIR,
@@ -148,7 +148,7 @@ The  ``operator_args`` must define ``get_logs`` and ``log_events_on_failure``:
 
     dag = DbtDag(
         dag_id="jaffle_shop_watcher_kubernetes",
-        # ... other DAG parameters ...
+        # ... other Dag parameters ...
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER_KUBERNETES,
             dbt_project_path=K8S_PROJECT_DIR,
@@ -179,10 +179,10 @@ Additionally, the limitations from ``ExecutionMode.KUBERNETES`` also apply to ``
 
 -------------------------------------------------------------------------------
 
-Example DAG
+Example Dag
 -----------
 
-Below is a complete example of a DAG using ``ExecutionMode.WATCHER_KUBERNETES``:
+Below is a complete example of a Dag using ``ExecutionMode.WATCHER_KUBERNETES``:
 
 .. literalinclude:: ../../../../dev/dags/jaffle_shop_watcher_kubernetes.py
     :language: python
@@ -207,7 +207,7 @@ Summary
 
 ``ExecutionMode.WATCHER_KUBERNETES`` provides:
 
-* ✅ **~63% faster** dbt DAG runs compared to ``ExecutionMode.KUBERNETES``
+* ✅ **~63% faster** dbt Dag runs compared to ``ExecutionMode.KUBERNETES``
 * ✅ **Isolation** between dbt and Airflow dependencies
 * ✅ **Model-level visibility** in Airflow
 * ✅ **Easy migration** from ``ExecutionMode.KUBERNETES``

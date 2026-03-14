@@ -10,7 +10,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 1. Enable Memory-Optimized Imports
 -------------------------------------
 
-**Impact**: High - Reduces memory footprint both at the DAG Processor and at Worker nodes.
+**Impact**: High - Reduces memory footprint both at the Dag Processor and at Worker nodes.
 
 **Configuration**:
 
@@ -140,10 +140,10 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 -------------------------------------------------------------------------------
 
-6. Control DAG-Level Concurrency with ``concurrency`` Parameter
+6. Control Dag-Level Concurrency with ``concurrency`` Parameter
 ----------------------------------------------------------------
 
-**Impact**: High - Limits concurrent task execution per DAG based on available resources.
+**Impact**: High - Limits concurrent task execution per Dag based on available resources.
 
 **Configuration**:
 
@@ -166,12 +166,12 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **What it does**:
 
-- ``concurrency``: The maximum number of task instances allowed to run concurrently across all active DAG runs for a given DAG
-- Allows different DAGs to have different concurrency limits (e.g., one DAG runs 32 tasks at once, another runs 16)
+- ``concurrency``: The maximum number of task instances allowed to run concurrently across all active Dag runs for a given Dag
+- Allows different Dags to have different concurrency limits (e.g., one Dag runs 32 tasks at once, another runs 16)
 - If not defined, defaults to the environment-level setting ``max_active_tasks_per_dag`` (default: 16)
-- Works in combination with ``max_active_runs`` to control both task and DAG run concurrency
+- Works in combination with ``max_active_runs`` to control both task and Dag run concurrency
 
-**Example: Different Concurrency for Different DAGs**:
+**Example: Different Concurrency for Different Dags**:
 
 .. code-block:: python
 
@@ -193,16 +193,16 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Benefits**:
 
-- **Per-DAG Control**: Set different concurrency limits for different DAGs based on their resource needs
-- **Resource Protection**: Prevent resource-intensive DAGs from overwhelming workers
+- **Per-Dag Control**: Set different concurrency limits for different Dags based on their resource needs
+- **Resource Protection**: Prevent resource-intensive Dags from overwhelming workers
 - **Flexible Configuration**: Adjust concurrency without changing environment-level settings
 - **Works with Pools**: Can be combined with task pools for even more granular control
 
 **Best Practices**:
 
-1. Set ``concurrency`` lower than your total worker capacity to leave room for other DAGs
-2. Use lower ``concurrency`` values for resource-intensive DAGs (e.g., large dbt models)
-3. Combine with ``max_active_runs`` to control both task and DAG run parallelism
+1. Set ``concurrency`` lower than your total worker capacity to leave room for other Dags
+2. Use lower ``concurrency`` values for resource-intensive Dags (e.g., large dbt models)
+3. Combine with ``max_active_runs`` to control both task and Dag run parallelism
 4. Monitor task queuing - if tasks are queued for long periods, consider increasing ``concurrency``
 
 **Reference**: `Airflow Scaling Workers Documentation <https://www.astronomer.io/docs/learn/airflow-scaling-workers>`_

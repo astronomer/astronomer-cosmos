@@ -41,10 +41,10 @@ Add the following to your base project ``requirements.txt``:
     astronomer-cosmos
 
 
-Move your dbt project into the DAGs directory
+Move your dbt project into the Dags directory
 ---------------------------------------------
 
-Make a new folder, ``dbt``, inside your local ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your DAGs directory. Your folder structure should look like this:
+Make a new folder, ``dbt``, inside your local ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your Dags directory. Your folder structure should look like this:
 
 .. code-block:: text
 
@@ -61,7 +61,7 @@ Make a new folder, ``dbt``, inside your local ``dags`` folder. Then, copy/paste 
     │   └── my_cosmos_dag.py
     └── ...
 
-Note: your dbt projects can go anywhere that Airflow can access. By default, Cosmos looks in the ``/usr/local/airflow/dags/dbt`` directory, but you can change this by setting the ``dbt_project_dir`` argument when you create your DAG instance.
+Note: your dbt projects can go anywhere that Airflow can access. By default, Cosmos looks in the ``/usr/local/airflow/dags/dbt`` directory, but you can change this by setting the ``dbt_project_dir`` argument when you create your Dag instance.
 
 For example, if you wanted to put your dbt project in the ``/usr/local/airflow/dags/my_dbt_project`` directory, you would do:
 
@@ -77,10 +77,10 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
     )
 
 
-Create your DAG
+Create your Dag
 ---------------
 
-In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and create a new DAG instance. Make sure to use the ``dbt_executable_path`` argument to point to the virtual environment you created in step 1.
+In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and create a new Dag instance. Make sure to use the ``dbt_executable_path`` argument to point to the virtual environment you created in step 1.
 
 .. code-block:: python
 

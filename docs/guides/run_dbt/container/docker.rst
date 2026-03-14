@@ -32,8 +32,8 @@ The following example setup steps include setting up the following:
 - Airflow
 - Astronomer-cosmos package containing the dbt Docker operators
 - Postgres Docker container
-- Docker image built with required dbt project and dbt DAG
-- dbt DAG with dbt Docker operators in the Airflow DAGs directory to run in Airflow
+- Docker image built with required dbt project and dbt Dag
+- dbt Dag with dbt Docker operators in the Airflow Dags directory to run in Airflow
 
 1. Install Airflow and Cosmos
 -----------------------------
@@ -60,7 +60,7 @@ You will need a PostgreSQL database running to use as the database for the dbt p
 3. Build the dbt Docker image
 -----------------------------
 
-For the Docker operators to work, you need to create a Docker image that will be supplied as image parameter to the dbt Docker operators used in the DAG.
+For the Docker operators to work, you need to create a Docker image that will be supplied as image parameter to the dbt Docker operators used in the Dag.
 
 1. Clone the `cosmos-example <https://github.com/astronomer/cosmos-example.git>`_ repo
 
@@ -123,7 +123,7 @@ This directory contains a Docker-specific example Dag.
 Specifying ProfileConfig
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Starting with Cosmos 1.8.0, you can use the ``profile_config`` argument in your Dbt DAG Docker operators to reference
+Starting with Cosmos 1.8.0, you can use the ``profile_config`` argument in your Dbt Dag Docker operators to reference
 profiles for your dbt project defined in a profiles.yml file. To do so, provide the file’s path via the
 ``profiles_yml_path`` parameter in ``profile_config``.
 

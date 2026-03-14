@@ -3,7 +3,7 @@
 Partial parsing
 ===============
 
-Starting in the 1.4 version, Cosmos tries to leverage dbt's partial parsing (``partial_parse.msgpack``) to speed up both the task execution and the DAG parsing (if using ``LoadMode.DBT_LS``).
+Starting in the 1.4 version, Cosmos tries to leverage dbt's partial parsing (``partial_parse.msgpack``) to speed up both the task execution and the Dag parsing (if using ``LoadMode.DBT_LS``).
 
 This feature is bound to `dbt partial parsing limitations <https://docs.getdbt.com/reference/parsing#known-limitations>`_.
 As an example, ``dbt`` requires the same ``--vars``, ``--target``, ``--profile``, and ``profile.yml`` environment variables (as called by the ``env_var()`` macro) while running dbt commands, otherwise it will reparse the project from scratch.

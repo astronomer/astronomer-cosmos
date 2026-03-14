@@ -8,7 +8,7 @@ Because Cosmos uses Airflow to power scheduling, you can leverage Airflow's sche
 Time-Based Scheduling
 ----------------------
 
-To schedule a dbt project on a time-based schedule, you can use Airflow's scheduling options. For example, to run a dbt project every day starting on January 1, 2023, you can use the following DAG:
+To schedule a dbt project on a time-based schedule, you can use Airflow's scheduling options. For example, to run a dbt project every day starting on January 1, 2023, you can use the following Dag:
 
 .. code-block:: python
 
@@ -49,7 +49,7 @@ For example, let's say you have:
 
 We are assuming that the Database used is Postgres, the host is ``host``, the database is ``database`` and the schema is ``schema``.
 
-Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_other_model`` to run after ``my_model``. For example, you can use the following DAGs:
+Then, you can use Airflow's data-aware scheduling capabilities to schedule ``my_other_model`` to run after ``my_model``. For example, you can use the following Dags:
 
 .. code-block:: python
 
@@ -72,7 +72,7 @@ In this scenario, ``project_one`` runs once a day and ``project_two`` runs immed
 Examples
 .................
 
-This example DAG:
+This example Dag:
 
 ..
    The following renders in Sphinx but not Github:
@@ -83,7 +83,7 @@ This example DAG:
     :end-before: [END local_example]
 
 
-Will trigger the following DAG to be run:
+Will trigger the following Dag to be run:
 
 .. code-block:: python
 
@@ -108,7 +108,7 @@ Will trigger the following DAG to be run:
         t1 >> t2
 
 
-From Cosmos 1.7 and Airflow 2.10, it is also possible to trigger DAGs be to be run by using ``DatasetAliases``:
+From Cosmos 1.7 and Airflow 2.10, it is also possible to trigger Dags be to be run by using ``DatasetAliases``:
 
 .. code-block:: python
 
@@ -154,7 +154,7 @@ If you want to use the Airflow 3 URI standard while still using Airflow 2, pleas
 
     export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1
 
-Remember to update any DAGs that are scheduled using this dataset.
+Remember to update any Dags that are scheduled using this dataset.
 
 Airflow 2.9 and below
 _____________________
@@ -185,7 +185,7 @@ _________________________
 
 If using Cosmos with Airflow 2.10.0 or 2.10.1, the two issues previously described are resolved, since Cosmos uses ``DatasetAlias``
 to support the dynamic creation of datasets during task execution. However, users may face ``sqlalchemy.orm.exc.FlushError``
-errors if they attempt to run Cosmos-powered DAGs using ``airflow dags test`` with these versions.
+errors if they attempt to run Cosmos-powered Dags using ``airflow dags test`` with these versions.
 
 We've reported this issue and it will be resolved in future versions of Airflow:
 

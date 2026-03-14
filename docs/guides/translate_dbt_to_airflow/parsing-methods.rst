@@ -39,7 +39,7 @@ To use this method, you don't need to supply any additional config. This is the 
 ``dbt_manifest``
 ----------------
 
-If you already have a ``manifest.json`` file created by dbt, Cosmos will parse the manifest to generate your DAG.
+If you already have a ``manifest.json`` file created by dbt, Cosmos will parse the manifest to generate your Dag.
 
 You can supply a ``manifest_path`` parameter on the DbtDag / DbtTaskGroup with a path to a ``manifest.json`` file.
 
@@ -91,10 +91,10 @@ dependencies using the following command: ``pip install "astronomer-cosmos[micro
     :start-after: [START azure_abfs_example]
     :end-before: [END azure_abfs_example]
 
-Package models (e.g. from the Elementary package) are included in the DAG when they are present in the manifest.
+Package models (e.g. from the Elementary package) are included in the Dag when they are present in the manifest.
 Generate the manifest **after** installing and enabling packages: run ``dbt deps`` then ``dbt compile`` (or ``dbt run``)
 from your project directory. If the manifest was built before a package was added or enabled, package models will not
-appear in the DAG until you regenerate the manifest.
+appear in the Dag until you regenerate the manifest.
 
 
 ``dbt_ls``

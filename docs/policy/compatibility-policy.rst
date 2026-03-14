@@ -192,7 +192,7 @@ All supported version combinations should:
 - Pass unit tests
 - Pass integration tests
 - Be tested in the CI/CD pipeline
-- Have example DAGs validated (where applicable)
+- Have example Dags validated (where applicable)
 
 How do I know when a version will be removed?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -59,7 +59,7 @@ The performance is suboptimal due to latency or resource utilization
 2. Leverage Cosmos :ref:`caching` mechanisms.
 3. For very large dbt pipelines, use recommended ``LoadMode.DBT_MANIFEST``. See :ref:`optimize_rendering` for more information about improving project rendering.
 4. Pre-install dbt deps in your Airflow environment. See :ref:`pre-install-dbt-deps`.
-5. If possible, use :ref:`execution-mode-watcher`. See :ref:`improve-execution-mode-dag-run` for more information about how execution modes can affect performance, or :ref:`execution-modes` to select an execution mode that best fits your project needs.
+5. If possible, use :ref:`watcher-execution-mode`. See :ref:`improve-execution-mode-dag-run` for more information about how execution modes can affect performance, or :ref:`execution-modes` to select an execution mode that best fits your project needs.
 6. Assess your Airflow tasks to see if you can :ref:`improve_task_execution`.
 
 

@@ -1,20 +1,6 @@
-"""JSON compatibility module for Cosmos.
+"""JSON wrapper that uses orjson when ``enable_orjson_parser`` is True, falling back to stdlib json.
 
-Uses orjson when ``enable_orjson_parser`` is ``True``, otherwise falls back to
-the standard-library :mod:`json` module.  The setting is evaluated at **call
-time** (not import time) so that runtime overrides and test patches take effect.
-
-Public API
-----------
-- ``loads``        -- deserialize, returns ``Any``
-- ``dumps``        -- serialize, returns ``bytes`` (orjson) or ``str`` (stdlib)
-- ``dumps_bytes``  -- serialize, **always** returns ``bytes``
-- ``dumps_str``    -- serialize, **always** returns ``str``
-- ``load``         -- deserialize from file handle, returns ``Any``
-- ``dump``         -- serialize to file handle (always writes ``str``)
-- ``JSONDecodeError`` -- re-exported from stdlib :mod:`json`
-- ``decoder``         -- re-exported stdlib ``json.decoder`` (for
-  code that references ``json.decoder.JSONDecodeError``)
+orjson only supports indent=2 (OPT_INDENT_2); any other indent value falls back to stdlib automatically.
 """
 
 from __future__ import annotations
@@ -27,18 +13,14 @@ try:
 except ImportError:  # pragma: no cover
     _orjson = None  # type: ignore[assignment]
 
-# ---------------------------------------------------------------------------
-# Re-export error types
-# ---------------------------------------------------------------------------
 JSONDecodeError = _json.JSONDecodeError
 decoder = _json.decoder
 
+# orjson only supports None (compact) and 2 (OPT_INDENT_2)
+_ORJSON_SUPPORTED_INDENTS = (None, 2)
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
+
 def _use_orjson() -> bool:
-    """Return *True* when orjson should be used based on Cosmos settings."""
     from cosmos import settings  # deferred to avoid circular imports
 
     if not settings.enable_orjson_parser:
@@ -51,11 +33,7 @@ def _use_orjson() -> bool:
     return True
 
 
-_ORJSON_SUPPORTED_INDENTS = (None, 2)
-
-
 def _orjson_option(sort_keys: bool = False, indent: int | None = None) -> int | None:
-    """Build the ``option`` bitmask for :func:`orjson.dumps`."""
     option = 0
     if sort_keys:
         option |= _orjson.OPT_SORT_KEYS  # type: ignore[union-attr]
@@ -64,26 +42,18 @@ def _orjson_option(sort_keys: bool = False, indent: int | None = None) -> int | 
     return option or None
 
 
-# ---------------------------------------------------------------------------
-# Deserialization
-# ---------------------------------------------------------------------------
 def loads(s: str | bytes | bytearray | memoryview, **kwargs: Any) -> Any:  # type: ignore[type-arg]
-    """Deserialize a JSON string/bytes to a Python object."""
     if _use_orjson():
         return _orjson.loads(s)  # type: ignore[union-attr]
     return _json.loads(s, **kwargs)  # type: ignore[arg-type]
 
 
 def load(fp: IO[str] | IO[bytes], **kwargs: Any) -> Any:
-    """Deserialize a JSON file-like object to a Python object."""
     if _use_orjson():
         return _orjson.loads(fp.read())  # type: ignore[union-attr]
     return _json.load(fp, **kwargs)
 
 
-# ---------------------------------------------------------------------------
-# Serialization helpers
-# ---------------------------------------------------------------------------
 def dumps(
     obj: Any,
     *,
@@ -92,12 +62,7 @@ def dumps(
     separators: tuple[str, str] | None = None,
     **kwargs: Any,
 ) -> bytes | str:
-    """Serialize *obj* to JSON.
-
-    Returns ``bytes`` when orjson is active, ``str`` otherwise.
-    Prefer :func:`dumps_bytes` or :func:`dumps_str` when you need a
-    guaranteed return type.
-    """
+    """Returns bytes when orjson is active, str otherwise."""
     if _use_orjson() and indent in _ORJSON_SUPPORTED_INDENTS:
         return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent))  # type: ignore[union-attr,no-any-return]
     return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs)
@@ -111,7 +76,6 @@ def dumps_bytes(
     separators: tuple[str, str] | None = None,
     **kwargs: Any,
 ) -> bytes:
-    """Serialize *obj* to JSON **bytes**.  Efficient for both backends."""
     if _use_orjson() and indent in _ORJSON_SUPPORTED_INDENTS:
         return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent))  # type: ignore[union-attr,no-any-return]
     return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs).encode()
@@ -125,7 +89,6 @@ def dumps_str(
     separators: tuple[str, str] | None = None,
     **kwargs: Any,
 ) -> str:
-    """Serialize *obj* to a JSON **string**.  Convenient for both backends."""
     if _use_orjson() and indent in _ORJSON_SUPPORTED_INDENTS:
         return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent)).decode()  # type: ignore[union-attr,no-any-return]
     return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs)
@@ -139,10 +102,6 @@ def dump(
     indent: int | None = None,
     **kwargs: Any,
 ) -> None:
-    """Serialize *obj* as JSON and write to the file-like *fp*.
-
-    Always writes ``str`` -- file handles are typically opened in text mode.
-    """
     if _use_orjson() and indent in _ORJSON_SUPPORTED_INDENTS:
         fp.write(_orjson.dumps(obj, option=_orjson_option(sort_keys, indent)).decode())  # type: ignore[union-attr]
     else:

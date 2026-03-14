@@ -78,9 +78,9 @@ class TestDumps:
         assert isinstance(result, str)
 
     @patch.object(settings, "enable_orjson_parser", True)
-    def test_dumps_orjson_returns_bytes(self):
+    def test_dumps_orjson_returns_str(self):
         result = json.dumps(SAMPLE_DATA)
-        assert isinstance(result, bytes)
+        assert isinstance(result, str)
 
     @patch.object(settings, "enable_orjson_parser", False)
     def test_dumps_sort_keys_stdlib(self):
@@ -90,10 +90,9 @@ class TestDumps:
     @patch.object(settings, "enable_orjson_parser", True)
     def test_dumps_sort_keys_orjson(self):
         result = json.dumps({"b": 2, "a": 1}, sort_keys=True)
-        assert isinstance(result, bytes)
-        assert b'"a"' in result
-        # orjson sorts keys
-        assert result.index(b'"a"') < result.index(b'"b"')
+        assert isinstance(result, str)
+        assert '"a"' in result
+        assert result.index('"a"') < result.index('"b"')
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +261,27 @@ class TestErrors:
     def test_json_decode_error_catches_bad_json(self):
         with pytest.raises(json.JSONDecodeError):
             json.loads("{bad json}")
+
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_json_decode_error_orjson_is_caught_as_stdlib_type(self):
+        # orjson.JSONDecodeError is a subclass of json.JSONDecodeError;
+        # callers catching json.JSONDecodeError must still work under orjson.
+        with pytest.raises(json.JSONDecodeError):
+            json.loads("{bad json}")
+
+
+class TestKwargsFallback:
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_loads_falls_back_to_stdlib_when_kwargs_passed(self):
+        # parse_int is a stdlib-only kwarg; passing it must not be silently ignored
+        result = json.loads('{"a": 1}', parse_int=float)
+        assert isinstance(result["a"], float)
+
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_load_falls_back_to_stdlib_when_kwargs_passed(self):
+        fp = io.StringIO('{"a": 1}')
+        result = json.load(fp, parse_int=float)
+        assert isinstance(result["a"], float)
 
 
 # ---------------------------------------------------------------------------

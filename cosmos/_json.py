@@ -43,13 +43,13 @@ def _orjson_option(sort_keys: bool = False, indent: int | None = None) -> int:
 
 
 def loads(s: str | bytes | bytearray | memoryview, **kwargs: Any) -> Any:  # type: ignore[type-arg]
-    if _use_orjson():
+    if _use_orjson() and not kwargs:
         return _orjson.loads(s)  # type: ignore[union-attr]
     return _json.loads(s, **kwargs)  # type: ignore[arg-type]
 
 
 def load(fp: IO[str] | IO[bytes], **kwargs: Any) -> Any:
-    if _use_orjson():
+    if _use_orjson() and not kwargs:
         return _orjson.loads(fp.read())  # type: ignore[union-attr]
     return _json.load(fp, **kwargs)
 
@@ -61,11 +61,9 @@ def dumps(
     indent: int | None = None,
     separators: tuple[str, str] | None = None,
     **kwargs: Any,
-) -> bytes | str:
-    """Returns bytes when orjson is active, str otherwise."""
-    if _use_orjson() and indent in _ORJSON_SUPPORTED_INDENTS:
-        return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent))  # type: ignore[union-attr,no-any-return]
-    return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs)
+) -> str:
+    """Compatibility wrapper; always returns str. Use dumps_bytes() for bytes."""
+    return dumps_str(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs)
 
 
 def dumps_bytes(

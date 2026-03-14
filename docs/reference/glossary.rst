@@ -4,7 +4,7 @@ Glossary
 =========
 
 Cosmos
-    An open-source Python package that allows you to write data transofrmations using dbt
+    An open-source Python package that allows you to write data transformations using dbt
     and then use  Apache Airflow®'s orchestration to integrate dbt projects into end-to-end workflows.
 
 Dag

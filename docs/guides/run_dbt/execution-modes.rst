@@ -7,13 +7,13 @@ The ```ExecutionConfig`` class defines your execution mode, which determines whe
 
 There are two categories of execution modes:
 
-1. **Execute dbt commands on the Airflow worker.** These execution modes offer faster execution times, since no extra container needs to be spun up. But, they also don't offer environment isolation, or only provide limited isolation. There are four options for this type of execution mode: ``watcher``, ``local``, ``virtualenv``, and ``airflow_async``. ``airflow_async`` is available for BigQuery as of Cosmos 1.9 and ``watcher`` is available as of Cosmos 1.11.
+1. **Execute dbt commands on the Apache Airflow® worker.** These execution modes offer faster execution times, since no extra container needs to be spun up. But, they also don't offer environment isolation, or only provide limited isolation. There are four options for this type of execution mode: ``watcher``, ``local``, ``virtualenv``, and ``airflow_async``. ``airflow_async`` is available for BigQuery as of Cosmos 1.9 and ``watcher`` is available as of Cosmos 1.11.
 
 2. **Execute dbt commands in a container** This type of execution mode offers high levels of environment isolation and also allows you to run dbt from either containers or external jobs, in both on-premises environments and various cloud services. There are multiple options for this type of execution mode: ``docker``, ``kubernetes``, ``watcher_kubernetes``, ``aws_ecs``, ``aws_eks``, ``azure_container_instance``, and ``gcp_cloud_run_job``.
 
 
-On the Airflow worker
-~~~~~~~~~~~~~~~~~~~~~~
+On the Apache Airflow® worker
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 These execution modes offer faster execution times, since you don't need to spin up any extra containers. You can also use Airflow connections via the ``ProfileConfig``. But, these execution modes do not have any, or offer limited, environment isolation.
 
@@ -24,7 +24,7 @@ There are four execution mode options that run on the Airflow worker:
   - **No isolation**: dbt is installed in the same Python virtual environment as Airflow. In this case, Cosmos can invoke dbt commands as a library rather than as a subprocess, leading to performance gains.
   - **Partial isolation**: Create a dedicated Python virtual environment in the Airflow deployment, install dbt there, and configure Cosmos to use it by setting ``ExecutionConfig.dbt_executable_path``. This provides a good solution for dependency conflicts.
 
-- :ref:`watcher <watcher-execution-mode>`: (Experimental since Cosmos 1.11.0) Optimized for execution speed. Run a single ``dbt build`` command from a producer task and have sensor tasks to watch the progress of the producer, with improved DAG run time while maintaining the tasks lineage in the Airflow UI, and ability to retry failed tasks.
+- :ref:`watcher <watcher-execution-mode>`: (Experimental since Cosmos 1.11.0) Optimized for execution speed. Run a single ``dbt build`` command from a producer task and have sensor tasks to watch the progress of the producer, with improved Dag run time while maintaining the tasks lineage in the Airflow UI, and ability to retry failed tasks.
 - :ref:`virtualenv <cosmos-managed-venv>`: Runs dbt commands from Python virtual environments created and managed by Cosmos. This mode removes the need to create a virtual environment at build time, unlike ``ExecutionMode.LOCAL``, while avoiding package conflicts. It is intended for cases where:
 
   - **Can't install dbt directly**: If you can't install dbt in the Airflow environment (either in the same environment or a dedicated one).

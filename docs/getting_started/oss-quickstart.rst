@@ -1,9 +1,9 @@
 .. _oss-quickstart:
 
-Run Cosmos in open-source Airflow
-=================================
+Run Cosmos in open-source Apache Airflow®
+===========================================
 
-Quickly get started working locally with Airflow, dbt, and Astronomer Cosmos using the `Open-source Airflow <https://airflow.apache.org/docs/apache-airflow/stable/index.html>`_.
+Quickly get started working locally with `Apache Airflow® <https://airflow.apache.org/>`_, dbt, and Astronomer Cosmos using the `Open-source Airflow <https://airflow.apache.org/docs/apache-airflow/stable/index.html>`_.
 
 This quickstart guide shows you how to set up a simple demo project, run a simple Dag locally with Cosmos, and then view the results with an open-source database viewer. If you want to get started working with your own project and configurations, see `Get started with Open-source Airflow <open-source.html>`_.
 
@@ -187,7 +187,7 @@ This Dag tells Airflow and Cosmos where to find the dbt project and profile conf
 
 
 5. Set environment variables
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To successfully launch, Airflow needs you to define the some environment variables. These identify the project home directory, ``AIRFLOW_HOME``, and disable additional Airflow and Cosmos features that are not required for local execution.
 
@@ -265,7 +265,7 @@ Troubleshooting the quickstart
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Can't log in to the Airflow UI
--------------------------------
++++++++++++++++++++++++++++++++
 
 1. Confirm that you are using a version of Python that is supported by Airflow. These versions are usually included in the `Airflow installation guide <https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html#prerequisites>`_.
 
@@ -285,7 +285,7 @@ To resolve, open your ``profiles.yml`` file and confirm that you correctly inclu
 .. _no-quickstart-dags:
 
 Dags do not load
------------------
++++++++++++++++++
 
 If you encounter issues, like error messages that say **Cosmos Dag not loading** or the **Dags** page on your Airflow UI does not show your Dags, try resetting the Airflow database and reserializing with the following commands.
 
@@ -299,7 +299,7 @@ Then, relaunch Airflow with ``airflow standalone``.
 .. _quickstart-dags-stall:
 
 Example Dags stall
--------------------
+++++++++++++++++++
 
 If your ``base_model_run`` Dag gets stuck in **Running** mode, even though the **Logs** show that it completed successfully, and the next Dag does not automatically start.
 

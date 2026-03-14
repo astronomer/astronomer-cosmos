@@ -32,7 +32,7 @@ Example: Using Callbacks with a Single Operator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To demonstrate how to specify a callback function for uploading files from the target directory, here’s an example
-using a single operator in an Airflow DAG:
+using a single operator in an Airflow Dag:
 
 .. literalinclude:: ../../../../dev/dags/example_operators.py
     :language: python
@@ -58,8 +58,8 @@ An example of how the data uploaded to GCS looks like when using ``upload_to_gcp
 The path naming convention is:
 
 * Bucket configured by the user
-* Name of the DAG
-* DAG Run identifier
+* Name of the Dag
+* Dag Run identifier
 * Task ID
 * Task retry identifier
 * Target folder with its contents
@@ -72,7 +72,7 @@ Custom Callbacks
 The helper functions introduced in Cosmos 1.8.0 are examples of how callback functions. Users are not limited to using these predefined functions — they can also create their custom
 callback functions to meet specific needs.
 
-Cosmos passes a few arguments to these functions, including the path to the dbt project directory and the Airflow task context, which includes DAG and task instance metadata.
+Cosmos passes a few arguments to these functions, including the path to the dbt project directory and the Airflow task context, which includes Dag and task instance metadata.
 
 Below, find an example of a callback method that raises an exception if the query takes more than 10 seconds to run:
 

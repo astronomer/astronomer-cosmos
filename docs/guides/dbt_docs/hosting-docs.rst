@@ -12,12 +12,8 @@ Airflow 2 and Airflow 3 use different UI plugin systems.
 - Airflow 3: Cosmos registers a FastAPI external view for each configured dbt project and a sub-application under ``/cosmos``.
 
 
-Overview
-~~~~~~~~
-
-
-Airflow 3
-~~~~~~~~~
+Apache Airflow® 3
+~~~~~~~~~~~~~~~~~
 
 The dbt docs are available in the Airflow menu under ``Browse``:
 
@@ -53,11 +49,11 @@ Endpoints per project (``<slug>``):
 - ``/cosmos/<slug>/manifest.json`` and ``/cosmos/<slug>/catalog.json``
 
 
-Local vs Remote docs (Airflow 3)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Local vs Remote docs (Apache Airflow® 3)
+++++++++++++++++++++++++++++++++++++++++
 
 Local docs (filesystem paths)
-''''''''''''''''''''''''''''''
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - When a project's ``dir`` is a local path (e.g. ``/usr/local/airflow/dbt/jaffle_shop/target``):
   - The plugin serves ``/cosmos/<slug>/dbt_docs_index.html`` by reading ``<dir>/<index>`` (default ``index.html``).
@@ -71,7 +67,7 @@ Local docs (filesystem paths)
        }
 
 Remote docs (S3, GCS, Azure, HTTP[S])
-''''''''''''''''''''''''''''''''''''''
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - When ``dir`` is a remote URI (e.g. ``s3://...``, ``gs://...``, ``abfs://...``, ``wasb://...``, ``http(s)://...``):
   - Files (index, manifest.json, catalog.json) are read via Airflow ObjectStorage (uPath/fsspec).
@@ -87,14 +83,14 @@ Remote docs (S3, GCS, Azure, HTTP[S])
        }
 
 Notes and behavior
-''''''''''''''''''
+^^^^^^^^^^^^^^^^^^^
 
 - Missing artifacts return HTTP 404 with the attempted path; other IO errors return HTTP 500 and are logged.
 - The docs iframe page (``/cosmos/<slug>/dbt_docs``) links to the index and shows within the Airflow UI; the index adds a small inline script to keep browser back/forward behavior intuitive.
 - If you deploy behind a path prefix (e.g. Astronomer hosted Airflow deployments), menu links include the prefix automatically using ``AIRFLOW__API__BASE_URL``.
 
-Airflow 2
-~~~~~~~~~
+Apache Airflow® 2
+~~~~~~~~~~~~~~~~~~
 
 .. important::
    The remainder of this page applies to Airflow 2 (Flask-AppBuilder) plugins only.
@@ -134,7 +130,7 @@ If your docs were generated using the ``--static`` flag, you can set the index f
 
 
 Host from Cloud Storage
-~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++
 
 For typical users, the recommended setup for hosting dbt docs would look like this:
 
@@ -143,7 +139,7 @@ For typical users, the recommended setup for hosting dbt docs would look like th
 3. If you want to use a conn ID other than the default connection, set your ``cosmos.dbt_docs_conn_id``. Otherwise, leave this blank.
 
 AWS S3 Example
-^^^^^^^^^^^^^^
++++++++++++++++
 
 .. code-block:: cfg
 
@@ -157,7 +153,7 @@ AWS S3 Example
     AIRFLOW__COSMOS__DBT_DOCS_CONN_ID="aws_default"
 
 Google Cloud Storage Example
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+++++++++++++++++++++++++++++
 
 .. code-block:: cfg
 
@@ -171,7 +167,7 @@ Google Cloud Storage Example
     AIRFLOW__COSMOS__DBT_DOCS_CONN_ID="google_cloud_default"
 
 Azure Blob Storage Example
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+++++++++++++++++++++++++++
 
 .. code-block:: cfg
 
@@ -185,7 +181,7 @@ Azure Blob Storage Example
     AIRFLOW__COSMOS__DBT_DOCS_CONN_ID="wasb_default"
 
 Host from Local Storage
-~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++
 
 By default, Cosmos will not generate docs on the fly. Local storage only works if you are pre-compiling your dbt project before deployment.
 
@@ -228,7 +224,7 @@ For example, Astronomer does not update the resources available to the webserver
         cp dags/dbt/target/index.html dbt_docs_dir/index.html
 
 Host from HTTP/HTTPS
-~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++
 
 .. code-block:: cfg
 

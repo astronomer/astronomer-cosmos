@@ -9,13 +9,13 @@ Guides
 
    self
 
-Cosmos offers a number of configuration options to customize how Airflow dags and dbt commands run.
+Cosmos offers a number of configuration options to customize how `Apache Airflow® <https://airflow.apache.org/>`_ dags and dbt commands run.
 
 To set up a project, you follow the same general set of steps.
 
 
-Set up dbt with Airflow
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Set up dbt with Apache Airflow
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Make your dbt projects available to Airflow and install dbt into the environment where your dbt code runs.
 
@@ -76,7 +76,7 @@ Specify more details about how Cosmos runs both dbt commands and Airflow Dags. T
    run_dbt/operators/operators
    run_dbt/customization/index
 
-Multi-project Setups
+Multi-project setups
 ~~~~~~~~~~~~~~~~~~~~
 
 If you have a multi-project architecture where you have multiple dbt projects that reference each others' models, you can set up ``dbt-loom`` with Cosmos to handle cross-project references.

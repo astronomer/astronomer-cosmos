@@ -3,8 +3,8 @@
 Testing Behavior
 ================
 
-Testing Configuration
----------------------
+Testing configuration
+~~~~~~~~~~~~~~~~~~~~~~
 
 By default, Cosmos will add a test after each model. This can be overridden using the ``test_behavior`` field in the ``RenderConfig`` object.
 Note that this behavior is different from dbt's default behavior, which runs all tests after all models have been run.
@@ -20,7 +20,7 @@ Cosmos supports the following test behaviors:
 - ``none``: don't include tests
 
 Example of the standard behavior of ``TestBehavior.AFTER_EACH``,
-when using the example DAG available in ``dev/dags/basic_cosmos_dag.py``:
+when using the example Dag available in ``dev/dags/basic_cosmos_dag.py``:
 
 .. image:: ../../_static/test_behavior_after_each.png
 
@@ -40,7 +40,7 @@ Example when changing the behavior to use ``TestBehavior.AFTER_ALL``:
 .. image:: ../../_static/test_behavior_after_all.png
 
 
-Finally, an example DAG and how it is rendered in the Airflow UI when using ``TestBehavior.BUILD`` (available since Cosmos 1.8):
+Finally, an example Dag and how it is rendered in the Airflow UI when using ``TestBehavior.BUILD`` (available since Cosmos 1.8):
 
 .. literalinclude::  ../../../dev/dags/example_cosmos_dbt_build.py
     :language: python
@@ -49,8 +49,8 @@ Finally, an example DAG and how it is rendered in the Airflow UI when using ``Te
 
 .. image:: ../../_static/test_behavior_build.png
 
-Warning Behavior
-----------------
+Warning behavior
+~~~~~~~~~~~~~~~~~
 
 .. note::
 
@@ -113,13 +113,13 @@ When at least one WARN message is present, the function passed to ``on_warning_c
     ``test_results`` context variables, which are specific to test-related warnings.
 
 
-Tests with Multiple Parents
----------------------------
+Tests with multiple parents
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 It is common for dbt projects to define tests that rely on multiple upstream models, snapshots or seeds.
 By default, Cosmos will attempt to run these tests using the behavior defined using ``test_behavior`` as previously explained.
 
-As an example, if there is a test that depends on multiple models (``model_a`` and ``combined_model``), and the DAG uses
+As an example, if there is a test that depends on multiple models (``model_a`` and ``combined_model``), and the Dag uses
 ``TestBehavior.AFTER_EACH``, Cosmos will attempt to run this test twice after each model run.
 
 While the standard behavior of Cosmos works for many cases, there are a few scenarios when the test fails unless both models
@@ -130,7 +130,7 @@ and will create a standalone test task for each of them.
 
 Cosmos will attempt to name this task after the test's original name. However, since some test names can exceed 250 characters and Airflow does not support IDs longer than this limit, Cosmos will assign names like “detached_0_test,” incrementing the number as needed.
 
-The DAG `example_tests_multiple_parents <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/example_tests_multiple_parents.py>`_ illustrates this behavior.
+The Dag `example_tests_multiple_parents <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/example_tests_multiple_parents.py>`_ illustrates this behavior.
 It renders a dbt project named `multiple_parents_test <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags/dbt/multiple_parents_test>`_ that has a test called `custom_test_combined_model <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/dbt/multiple_parents_test/macros/custom_test_combined_model.sql>`_ that depends on two models:
 
 - **combined_model**
@@ -166,7 +166,7 @@ By default, Cosmos will error:
 
 
 However, if users set ``should_detach_multiple_parents_tests=True``, the test will be detached, as illustrated below.
-The test will only run once after both models run, leading the DAG to succeed:
+The test will only run once after both models run, leading the Dag to succeed:
 
 .. code-block:: python
 

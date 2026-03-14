@@ -5,7 +5,7 @@
    :hidden:
    :caption: Cosmos Fundamentals
 
-   Similar dbt and Airflow concepts <dbt-airflow-concepts>
+   Similar dbt and Apache Airflow® concepts <dbt-airflow-concepts>
 
 .. toctree::
    :maxdepth: 1
@@ -20,9 +20,9 @@
    :hidden:
    :caption: Bring your own project
 
-   Open-source Airflow <open-source>
+   Open-source Apache Airflow® <open-source>
    Astro <astro>
-   Amazon Managed Workflows for Apache Airflow (MWAA) <mwaa>
+   Amazon Managed Workflows for Apache Airflow® (MWAA) <mwaa>
    Google Cloud Composer (GCC) <gcc>
 
 

@@ -8,14 +8,14 @@ AWS ECS execution mode
 Astronomer Cosmos provides a unified way to run containerized workloads across multiple cloud providers. Using ``AWS Elastic Container Service (ECS)`` as the execution mode provides an isolated and scalable way to run ``dbt`` tasks within an AWS ECS service. This execution mode ensures that each ``dbt`` run is performed inside a dedicated container running in an ECS task.
 
 Performance and maintenance considerations
-++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This execution mode requires you to have an AWS environment configured to run ECS tasks (see :ref:``aws-ecs`` for more details on the exact requirements). Similar to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
 
 Each task creates a new ECS task execution, providing full isolation. However, this separation introduces some overhead in execution time due to container startup and provisioning. If you require faster execution times, configuring appropriate ECS task definitions and cluster optimizations can help mitigate these delays.
 
 Setup
-+++++
+~~~~~~
 
 In this guide, you’ll learn how to deploy and run a Cosmos job on AWS Elastic Container Service (ECS) using Fargate.
 
@@ -25,7 +25,7 @@ Schematically, the guide will walk you through the steps required to build the f
     :width: 800
 
 Prerequisites
-+++++++++++++
+~~~~~~~~~~~~~~
 
 Before you begin, ensure you have the following:
 
@@ -39,9 +39,9 @@ Before you begin, ensure you have the following:
 
 
 Step-by-step guide
-++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~
 
-**Install Airflow and Cosmos**
+**Install Apache Airflow® and Cosmos**
 
 Create a python virtualenv, activate it, upgrade pip to the latest version and install ``apache airflow`` & ``astronomer cosmos``:
 
@@ -168,7 +168,7 @@ For example:
         --task-definition cosmos-job \
         --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678,subnet-87654321],securityGroups=[sg-abcdef12],assignPublicIp=ENABLED}"
 
-   Once the test is ok, we are able to run the dbt commands in our Cosmos DAG:
+   Once the test is ok, we are able to run the dbt commands in our Cosmos Dag:
 
    .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_aws_ecs_dag_run.png
     :width: 800
@@ -176,7 +176,7 @@ For example:
    .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_aws_ecs_dag_run_logs.png
     :width: 800
 
-   Remember to config your DAG for connecting to AWS ECS and the database connection where you are performing your SQL queries!
+   Remember to config your Dag for connecting to AWS ECS and the database connection where you are performing your SQL queries!
 
 
 **Monitor and Debug Your Job**
@@ -195,7 +195,6 @@ For example:
 
 **Conclusion**
 
-
 By following this guide, you can deploy Astronomer Cosmos jobs on AWS ECS using Fargate. This integration enables you to leverage the scalability and managed infrastructure of ECS while maintaining a consistent container orchestration experience with Cosmos.
 
 For more detailed information on AWS ECS, please refer to the `AWS ECS Developer Guide <https://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html>`_.
@@ -203,4 +202,4 @@ For more detailed information on AWS ECS, please refer to the `AWS ECS Developer
 Happy deploying! :rocket:
 
 
-Remember to config your DAG for connecting to AWS ECS and the database connection where you are performing your SQL queries!
+Remember to config your Dag for connecting to AWS ECS and the database connection where you are performing your SQL queries!

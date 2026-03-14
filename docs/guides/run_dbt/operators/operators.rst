@@ -7,12 +7,12 @@ Cosmos exposes individual operators that correspond to specific dbt commands, wh
 `Apache Airflow® <https://airflow.apache.org/>`_ operators. Cosmos names these operators using the format ``Dbt<dbt-command><execution-mode>Operator``. For example, ``DbtBuildLocalOperator``.
 
 Clone
------
+~~~~~~~~
 
 Requirement
 
-* Cosmos >= 1.8.0
-* dbt-core >= 1.6.0
+- Cosmos >= 1.8.0
+- dbt-core >= 1.6.0
 
 The ``DbtCloneLocalOperator`` implement `dbt clone <https://docs.getdbt.com/reference/commands/clone>`_ command.
 
@@ -25,7 +25,7 @@ Example of how to use
 
 
 Seed
-----
+~~~~~~
 
 The ``DbtSeedLocalOperator`` implements the `dbt seed <https://docs.getdbt.com/reference/commands/seed>`_ command.
 

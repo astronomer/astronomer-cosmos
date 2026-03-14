@@ -5,13 +5,13 @@ Selecting & Excluding
 
 Cosmos allows you to filter to a subset of your dbt project in each ``DbtDag`` / ``DbtTaskGroup`` using the ``select`` and ``exclude`` parameters in the ``RenderConfig`` class.
 
-    Since Cosmos 1.3, the ``selector`` parameter is available in ``RenderConfig`` when using the ``LoadMode.DBT_LS`` to parse the dbt project into Airflow.
+    Since Cosmos 1.3, the ``selector`` parameter is available in ``RenderConfig`` when using the ``LoadMode.DBT_LS`` to parse the dbt project into `Apache Airflow® <https://airflow.apache.org/>`_.
 
     Since Cosmos 1.13, the ``selector`` parameter is available in ``RenderConfig`` when using the ``LoadMode.DBT_MANIFEST`` to parse the dbt project into Airflow.
 
 
 Using ``select`` and ``exclude``
---------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``select`` and ``exclude`` parameters are lists, with values like the following:
 
@@ -43,7 +43,7 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 
     If you're using the ``dbt_ls`` parsing method, these arguments are passed directly to the dbt CLI command.
 
-    If you're using the ``dbt_manifest`` parsing method, Cosmos will filter the models in the manifest before creating the DAG. This does not directly use dbt's CLI command, but should include all metadata that dbt would include.
+    If you're using the ``dbt_manifest`` parsing method, Cosmos will filter the models in the manifest before creating the Dag. This does not directly use dbt's CLI command, but should include all metadata that dbt would include.
 
     If you're using the ``custom`` parsing method, Cosmos does not currently read the ``dbt_project.yml`` file. You can still select/exclude models if you're selecting on metadata defined in the model code or ``.yml`` files in the models directory.
 
@@ -146,7 +146,8 @@ Examples:
     )
 
 Using ``selector``
---------------------------------
+~~~~~~~~~~~~~~~~~~~
+
 .. note::
     Only currently supported using the ``LoadMode.DBT_LS`` (since Cosmos 1.3) or ``LoadMode.DBT_MANIFEST`` (since Cosmos 1.13).
     If  ``select`` and/or ``exclude`` are used with ``selector``, dbt will ignore the ``select`` and ``exclude`` parameters.
@@ -193,11 +194,11 @@ Examples:
     )
 
 Using ``selector`` with ``LoadMode.DBT_MANIFEST``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Since Cosmos 1.13, the ``selector`` parameter is also supported when using the ``LoadMode.DBT_MANIFEST`` parsing method.
 
-When using this combination, Cosmos will read the preprocessed YAML selectors from the manifest file and use them to filter the dbt nodes to include in the Airflow DAG or Task Group.
+When using this combination, Cosmos will read the preprocessed YAML selectors from the manifest file and use them to filter the dbt nodes to include in the Airflow Dag or Task Group.
 
 The YAML selection parser expects the selectors to be defined in the dbt project and will parse the preprocessed ``selectors`` found in the manifest file. Modifying the selector definitions in the manifest file in any way may lead to undefined behavior.
 The parser may or may not catch invalid selector definitions if the selectors in the manifest are altered.
@@ -208,7 +209,7 @@ Parsing of the ``default`` and ``indirect_selection`` keywords is not currently 
 
 In the event the dbt YAML selector specification changes, Cosmos will attempt to keep up to date with the changes, but there may be a lag between dbt releases and Cosmos releases.
 Once a new Cosmos version is released with the updated selector parsing logic, users should update their Cosmos version to ensure compatibility with the latest dbt selector specification.
-For subsequent updates to the YAML selector parser, existing YAML selector caches will be invalidated the next time the DAG is parsed.
+For subsequent updates to the YAML selector parser, existing YAML selector caches will be invalidated the next time the Dag is parsed.
 
 **Error Handling**
 

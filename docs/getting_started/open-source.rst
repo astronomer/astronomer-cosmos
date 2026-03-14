@@ -1,9 +1,9 @@
 .. _open-source:
 
-Getting Started with Cosmos on Open-source Airflow
-==================================================
+Getting Started with Cosmos on Open-source Apache Airflow®
+===========================================================
 
-When running open-source Airflow, your setup may vary. This guide assumes you have access to edit the underlying image.
+When running open-source `Apache Airflow® <https://airflow.apache.org/>`_, your setup may vary. This guide assumes you have access to edit the underlying image.
 
 Create a virtual environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -25,12 +25,12 @@ Install Cosmos
 Install ``astronomer-cosmos`` however you install Python packages in your environment.
 
 
-Move your dbt project into the DAGs directory
+Move your dbt project into the Dags directory
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Make a new folder, ``dbt``, inside your local project's ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your DAGs directory.
+Make a new folder, ``dbt``, inside your local project's ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your Dags directory.
 
-Note: your dbt projects can go anywhere on the Airflow image. By default, Cosmos looks in the ``/usr/local/airflow/dags/dbt`` directory, but you can change this by setting the ``dbt_project_dir`` argument when you create your DAG instance.
+Note: your dbt projects can go anywhere on the Airflow image. By default, Cosmos looks in the ``/usr/local/airflow/dags/dbt`` directory, but you can change this by setting the ``dbt_project_dir`` argument when you create your Dag instance.
 
 For example, if you wanted to put your dbt project in the ``/usr/local/airflow/dags/my_dbt_project`` directory, you would do:
 

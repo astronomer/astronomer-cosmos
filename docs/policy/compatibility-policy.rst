@@ -9,7 +9,7 @@ predictability for users and contributors regarding version support and removal
 criteria.
 
 Overview
---------
+~~~~~~~~~~
 
 Astronomer Cosmos is committed to maintaining compatibility with a range of
 Python, Apache Airflow, and dbt Core versions to support diverse user
@@ -23,19 +23,19 @@ This policy establishes:
 - User guidance for planning upgrades and checking compatibility
 - Contributor guidance for proposing version changes
 
-Currently Supported Versions
-----------------------------
+Currently supported versions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The following versions are currently tested and supported.
 
 Python
-~~~~~~
+++++++
 
 - **Minimum required**: Python 3.10
 - **Supported versions**: 3.10, 3.11, 3.12, 3.13
 
 Apache Airflow
-~~~~~~~~~~~~~~
++++++++++++++++
 
 New minor or major releases of Cosmos may drop support for Apache Airflow versions that have reached **End of Basic Support**, as defined in the `Astro Runtime Lifecycle schedule <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy#astro-runtime-lifecycle-schedule>`_.
 
@@ -45,7 +45,7 @@ In some cases, Cosmos may continue to support older Airflow versions, depending 
 - **Supported versions**: 2.9, 2.10, 2.11, 3.0, 3.1
 
 dbt Core
-~~~~~~~~
+++++++++
 
 - **Supported versions**: 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 2.0 (dbt Fusion)
 
@@ -55,15 +55,15 @@ dbt Core
    Refer to the `dbt documentation <https://docs.getdbt.com/docs/supported-data-platforms>`_
    for adapter-specific version compatibility.
 
-Version Removal Policy
-----------------------
+Version removal policy
+~~~~~~~~~~~~~~~~~~~~~~
 
 Cosmos removes support for versions based on clear and objective criteria.
 There is no deprecation period—versions are removed when they meet the removal
 criteria.
 
-Python Version Removal Criteria
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Python version removal criteria
++++++++++++++++++++++++++++++++
 
 Python versions are removed from support when **any** of the following
 conditions are met:
@@ -75,8 +75,8 @@ conditions are met:
 - **Astronomer Runtime incompatibility**: Astronomer Runtime no longer supports
   the Python version
 
-Apache Airflow Version Removal Criteria
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Apache Airflow version removal criteria
++++++++++++++++++++++++++++++++++++++++
 
 Apache Airflow versions are removed from support when **both** of the
 following conditions are met:
@@ -88,16 +88,16 @@ following conditions are met:
   Basic Support according to the
   `Astronomer Runtime lifecycle policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_
 
-dbt Core Version Removal Criteria
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+dbt Core version removal criteria
+++++++++++++++++++++++++++++++++++
 
 dbt Core versions are removed from support when:
 
 - **dbt Core EOL**: The dbt Core version has reached End of Life according to the
   `dbt Labs support policy <https://docs.getdbt.com/docs/dbt-versions/core>`_
 
-Version Removal Process
------------------------
+Version removal process
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 When a version meets the removal criteria:
 
@@ -109,11 +109,11 @@ When a version meets the removal criteria:
 4. **Removal**: Support is removed from the test matrix and CI/CD pipeline in
    the next release
 
-User Guidance
--------------
+User guidance
+~~~~~~~~~~~~~~
 
-Checking Compatibility
-~~~~~~~~~~~~~~~~~~~~~~
+Checking compatibility
++++++++++++++++++++++++
 
 Before upgrading Cosmos or its dependencies:
 
@@ -124,8 +124,8 @@ Before upgrading Cosmos or its dependencies:
 4. **Monitor GitHub issues and releases**: Check for known compatibility issues
    or migration guides
 
-Planning Upgrades
-~~~~~~~~~~~~~~~~~
+Planning upgrades
+++++++++++++++++++
 
 To minimize disruption:
 
@@ -137,8 +137,8 @@ To minimize disruption:
   EOL
 - **Use CI/CD**: Test compatibility in your CI/CD pipeline before deploying
 
-Reporting Compatibility Issues
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reporting compatibility issues
+++++++++++++++++++++++++++++++
 
 If you encounter compatibility issues:
 
@@ -151,10 +151,10 @@ If you encounter compatibility issues:
    in your report
 
 Contributor Guidance
---------------------
+~~~~~~~~~~~~~~~~~~~~~~
 
-Proposing Version Changes
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Proposing version changes
++++++++++++++++++++++++++++
 
 When proposing to add or remove version support:
 
@@ -172,8 +172,8 @@ When proposing to add or remove version support:
 4. **Verify criteria**: Ensure removal proposals meet the criteria outlined in
    this policy
 
-Updating Test Matrix
-~~~~~~~~~~~~~~~~~~~~
+Updating test matrix
++++++++++++++++++++++
 
 When adding or removing versions:
 
@@ -184,18 +184,18 @@ When adding or removing versions:
 3. **Update documentation**: Update this compatibility policy document
 4. **Update CHANGELOG.rst**: Document the change in the changelog
 
-Testing Requirements
-~~~~~~~~~~~~~~~~~~~~
+Testing requirements
++++++++++++++++++++++
 
 All supported version combinations should:
 
 - Pass unit tests
 - Pass integration tests
 - Be tested in the CI/CD pipeline
-- Have example DAGs validated (where applicable)
+- Have example Dags validated (where applicable)
 
 How do I know when a version will be removed?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++++++++++
 
 - **Monitor EOL dates**: Check the official EOL dates for Python, Apache Airflow,
   and dbt Core
@@ -205,8 +205,8 @@ How do I know when a version will be removed?
 - **Subscribe to releases**: Get notified of new releases that may include
   version removals
 
-Related Documentation
-~~~~~~~~~~~~~~~~~~~~~~
+Related documentation
+++++++++++++++++++++++
 
 - `CHANGELOG.rst <https://github.com/astronomer/astronomer-cosmos/blob/main/CHANGELOG.rst>`_
   – Release notes and version removal notices

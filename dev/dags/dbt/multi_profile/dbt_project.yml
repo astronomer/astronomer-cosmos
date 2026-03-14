@@ -1,0 +1,23 @@
+name: 'multi_profile'
+
+config-version: 2
+version: '0.1'
+
+profile: 'default'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+  - "logs"
+
+require-dbt-version: [">=1.5.0", "<2.0.0"]
+
+models:
+  multi_profile:
+    +materialized: view

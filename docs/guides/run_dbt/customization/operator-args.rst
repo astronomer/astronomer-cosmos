@@ -1,0 +1,207 @@
+.. _operator-args:
+
+Operator arguments
+==================
+
+It is possible to pass arguments to Cosmos operators in two ways. Either by passing them when directly instantiating Cosmos Operators
+or by defining the ``operator_args`` within a ``DbtDag`` or a ``DbtTaskGroup`` instance.
+The value of ``operator_args`` should be a dictionary that will become the underlining operators' ``kwargs``.
+
+Example of how to set Kubernetes-specific operator arguments:
+
+.. code-block:: python
+
+    DbtDag(
+        # ...
+        operator_args={
+            "queue": "kubernetes",
+            "image": "dbt-jaffle-shop:1.0.0",
+            "image_pull_policy": "Always",
+            "get_logs": True,
+            "is_delete_operator_pod": False,
+            "namespace": "default",
+        },
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.KUBERNETES,
+        ),
+    )
+
+Example of setting a Cosmos-specific operator argument:
+
+.. code-block:: python
+
+    DbtDag(
+        # ...
+        operator_args={"dbt_cmd_global_flags": ["--cache-selected-only"]}
+    )
+
+
+.. _operator-args-per-node:
+
+Overriding operator arguments per dbt node (or group of nodes)
+--------------------------------------------------------------
+
+.. versionadded:: 1.8.0
+
+Cosmos 1.8 introduced the capability for users to customise the operator arguments per dbt node, or per group of dbt nodes.
+This can be done by defining the arguments via a dbt meta property alongside other dbt project configurations.
+
+Let's say there is a DbtTaskGroup that sets a default pool to run all the dbt tasks, but a user would like the model expensive
+to run a separate pool.
+
+Users could either use ``operator_args`` or ``default args`` for defining the default behavior:
+
+.. code-block:: python
+
+    dbt_task_group = DbtTaskGroup(
+        # ...
+        profile_config=ProfileConfig,
+        default_args={"pool": "default_pool"},
+    )
+
+While configuring in the ``dbt_project.yml`` a different behaviour for the model "expensive", that should use the "expensive-pool":
+
+.. code-block::
+
+    version: 2
+        models:
+          - name: expensive
+            description: description
+            meta:
+              cosmos:
+                operator_kwargs:
+                  pool: expensive-pool
+
+
+More information about this feature can be found in :ref:`custom-airflow-properties`.
+
+To learn how to customise the profile per dbt model or Cosmos task, check :ref:`profile-customise-per-node`.
+
+Summary of Cosmos-specific arguments
+------------------------------------
+
+dbt-related
+...........
+
+- ``append_env``: Expose the operating system environment variables to the ``dbt`` command. For most execution modes, the default is ``False``, however, for execution modes ExecuteMode.LOCAL and ExecuteMode.VIRTUALENV, the default is True. This behavior is consistent with the LoadMode.DBT_LS command in forwarding the environment variables to the subprocess by default.
+- ``dbt_cmd_flags``: List of command flags to pass to ``dbt`` command, added after dbt subcommand
+- ``dbt_cmd_global_flags``: List of ``dbt`` `global flags <https://docs.getdbt.com/reference/global-configs/about-global-configs>`_ to be passed to the ``dbt`` command, before the subcommand
+- ``dbt_executable_path``: Path to dbt executable.
+- ``env``: (Deprecated since Cosmos 1.3 use ``ProjectConfig.env_vars`` instead) Declare, using a Python dictionary, values to be set as environment variables when running ``dbt`` commands.
+- ``fail_fast``: ``dbt`` exits immediately if ``dbt`` fails to process a resource.
+- ``interceptors``: (new in v1.14) Optional list of callables run before building the dbt command. Each callable receives ``(context, operator)`` and may modify ``operator.vars`` and ``operator.env``; the modified values are then used when building and running the dbt command. Supported for all execution modes. Useful for injecting runtime vars or env (e.g. from Airflow connections or XCom) per task run.
+- ``models``: Specifies which nodes to include.
+- ``no_version_check``: If set, skip ensuring ``dbt``'s version matches the one specified in the ``dbt_project.yml``.
+- ``quiet``: run ``dbt`` in silent mode, only displaying its error logs.
+- ``vars``: Supply dbt variables to run the task using dbt project. This argument overrides variables defined in the ``dbt_project.yml`` and any values set in ``ProjectConfig.dbt_vars``. Arguments set as dbt ``vars`` in ``operators_args`` will not be used to render the DAG when using ``LoadMode.DBT_LS``. Use  ``ProjectConfig.dbt_vars`` instead for this use-case.
+- ``warn_error``: convert ``dbt`` warnings into errors.
+- ``full_refresh``: If True, then full refresh the node. This only applies to model and seed nodes.
+- ``copy_dbt_packages``: (new in v1.10) When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
+- ``install_deps``: (deprecated in v1.9, use ``ProjectConfig.install_dbt_deps`` onwards) When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, run ``dbt deps`` every time a task is executed.
+- ``manifest_filepath`` (new in v1.10.1):  When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, use the user-defined ``manifest.json`` file.
+
+
+Airflow-related
+...............
+
+- ``cancel_query_on_kill``: If true, cancel any running queries when the task's ``on_kill()`` is executed.
+- ``output_encoding``: Declare the character encoding to parse the ``dbt`` command output.
+- ``skip_exit_code``: If the task exits with this exit code, leave the task in ``skipped`` state (default: 99).
+
+Sample usage
+............
+
+.. code-block:: python
+
+    DbtTaskGroup(
+        # ...
+        operator_args={
+            "append_env": True,
+            "dbt_cmd_flags": ["--models", "stg_customers"],
+            "dbt_cmd_global_flags": ["--cache-selected-only"],
+            "dbt_executable_path": Path("/home/user/dbt"),
+            "env": {"MY_ENVVAR": "some-value"},
+            "fail_fast": True,
+            "no_version_check": True,
+            "quiet": True,
+            "vars": {
+                "start_time": "{{ data_interval_start.strftime('%Y%m%d%H%M%S') }}",
+                "end_time": "{{ data_interval_end.strftime('%Y%m%d%H%M%S') }}",
+            },
+            "warn_error": True,
+            "cancel_query_on_kill": False,
+            "output_enconding": "utf-8",
+            "skip_exit_code": 1,
+        }
+    )
+
+Example: using ``interceptors`` to set vars and env at runtime (e.g. from Airflow context or connections):
+
+.. code-block:: python
+
+    def set_runtime_vars(context, task):
+        task.vars = {
+            "run_id": context["run_id"],
+            "execution_date": str(context["data_interval_start"]),
+        }
+        task.env = {"MY_ENV": "value"}
+
+
+    DbtTaskGroup(
+        # ...
+        operator_args={"interceptors": [set_runtime_vars]},
+    )
+
+
+Template fields
+---------------
+
+Some of the operator args are `template fields <https://airflow.apache.org/docs/apache-airflow/stable/howto/custom-operator.html#templating>`_ for your convenience.
+
+These template fields can be useful for hooking into Airflow `Params <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/params.html>`_, or for more advanced customization with `XComs <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html>`_.
+
+The following operator args support templating, and are accessible both through the  ``DbtDag`` and ``DbtTaskGroup`` constructors in addition to being accessible standalone:
+
+- ``env``
+- ``vars``
+- ``full_refresh`` (for the ``build``, ``seed``, and ``run`` operators since Cosmos 1.4.)
+- ``dbt_cmd_flags``
+
+.. note::
+    Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.
+
+Example usage of templated ``dbt_cmd_flags`` for microbatch models with event-time ranges:
+
+.. code-block:: python
+
+    DbtDag(
+        # ... other parameters
+        operator_args={
+            "dbt_cmd_flags": [
+                "{% if params.EVENT_TIME_START %}--event-time-start{% endif %}",
+                "{% if params.EVENT_TIME_START %}{{ params.EVENT_TIME_START }}{% endif %}",
+                "{% if params.EVENT_TIME_END %}--event-time-end{% endif %}",
+                "{% if params.EVENT_TIME_END %}{{ params.EVENT_TIME_END }}{% endif %}",
+                "--select",
+                "{{ params.MODEL_NAME }}",
+            ]
+        },
+        params={
+            "EVENT_TIME_START": Param(default=None, type=["null", "string"]),
+            "EVENT_TIME_END": Param(default=None, type=["null", "string"]),
+            "MODEL_NAME": Param(default=None, type=["null", "string"]),
+        },
+    )
+
+The following template fields are only selectable when using the operators in a standalone context (starting in Cosmos 1.4):
+
+- ``select``
+- ``exclude``
+- ``selector``
+- ``models``
+
+Since Airflow resolves template fields during Airflow DAG execution and not DAG parsing,  the args above cannot be templated via ``DbtDag`` and ``DbtTaskGroup`` because both need to select dbt nodes during DAG parsing.
+
+Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
+This is provided for telemetry on task execution, and is not an operator arg.
+For more information about this, see the `Compiled SQL <compiled-sql.html>`_ docs.

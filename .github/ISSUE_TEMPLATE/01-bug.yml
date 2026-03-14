@@ -20,10 +20,10 @@ body:
     validations:
       required: true
   - type: input
-    id: dbt-core-version
+    id: dbt-version
     attributes:
-      label: dbt-core version
-      description: What version of dbt-core are you running?
+      label: dbt Core or Fusion version
+      description: What version of dbt are you running?
       placeholder: e.g. 1.8.0
     validations:
       required: true
@@ -62,6 +62,7 @@ body:
         - "LOCAL"
         - "VIRTUALENV"
         - "WATCHER"
+        - "WATCHER_KUBERNETES"
       multiple: false
     validations:
       required: true

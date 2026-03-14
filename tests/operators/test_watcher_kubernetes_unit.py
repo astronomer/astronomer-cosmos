@@ -177,7 +177,8 @@ def make_context(ti_mock, *, run_id: str = "test-run", map_index: int = 0):
     }
 
 
-def test_first_execution_behaves_as_base_consumer_sensor():
+@patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+def test_first_execution_behaves_as_base_consumer_sensor(mock_startup_events):
     """
     On the first execution (try_number == 1), the sensor should poke for status
     from XCom, behaving as BaseConsumerSensor.

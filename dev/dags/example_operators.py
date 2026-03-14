@@ -91,5 +91,15 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
     )
     # [END clone_example]
 
-    seed_operator >> run_operator >> clone_operator
-    seed_operator >> check_file_uploaded_task
+    # [START seed_local_example]
+    seed_raw_orders = DbtSeedLocalOperator(
+        profile_config=profile_config,
+        project_dir=DBT_PROJ_DIR,
+        task_id="seed_raw_orders",
+        dbt_cmd_flags=["--select", "raw_orders"],
+        install_deps=True,
+    )
+    # [END seed_local_example]
+
+    [seed_operator, seed_raw_orders] >> run_operator >> clone_operator
+    [seed_operator, seed_raw_orders] >> check_file_uploaded_task

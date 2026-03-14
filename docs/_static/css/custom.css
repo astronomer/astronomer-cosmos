@@ -219,14 +219,19 @@ blockquote div[class^="highlight-"] {
   margin: 0;
 }
 
-/* Sidebar */
+/* Sidebar: allow left TOC to scroll so expanded items are not hidden by the footer.
+   Compatible with pydata-sphinx-theme >= 0.16. */
 
 .bd-sidebar-primary {
-  overflow: hidden;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   width: 20%;
+  max-height: calc(100vh - 6rem) !important;
+  min-height: 0; /* allow flex child to shrink and show scrollbar */
   font-weight: var(--bs-body-font-weight);
   padding: 1rem 1rem 1rem;
 }
+
 
 .sidebar-primary-item {
   padding: 0 .25rem !important;

@@ -4,7 +4,6 @@ import base64
 import zlib
 from collections.abc import Callable, Sequence
 from datetime import timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
@@ -20,13 +19,19 @@ except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from cosmos.constants import (
+    _DBT_STARTUP_EVENTS_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
     InvocationMode,
 )
 from cosmos.log import get_logger
-from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
+from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
+from cosmos.operators._watcher.base import (
+    BaseConsumerSensor,
+    store_compiled_sql_for_model,
+    store_dbt_resource_status_from_log,
+)
 from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,
@@ -91,6 +96,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
+        self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
+        self.test_results_per_model: dict[str, list[str]] = {}
+        # Do not publish compiled_sql to the producer's rendered_template: it would contain SQL for
+        # all models run by the producer, is often truncated in the UI due to size, and is of no use
+        # there; individual sensor tasks show the corresponding rendered_template per model.
+        kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
@@ -100,7 +111,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         default_args["retries"] = 0
         kwargs["default_args"] = default_args
         kwargs["retries"] = 0
-        kwargs["queue"] = watcher_dbt_execution_queue or DEFAULT_QUEUE
+        kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
         super().__init__(task_id=task_id, *args, **kwargs)
 
         if self.invocation_mode == InvocationMode.SUBPROCESS:
@@ -119,21 +130,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         ts_val = raw_ts.ToJsonString() if hasattr(raw_ts, "ToJsonString") else str(raw_ts)  # type: ignore[union-attr]
         startup_events.append({"name": info.name, "msg": info.msg, "ts": ts_val})
 
-    def _extract_compiled_sql_for_node_event(self, event_message: EventMsg) -> str | None:
-        if getattr(event_message.data.node_info, "resource_type", None) != "model":
-            return None
-        uid = event_message.data.node_info.unique_id
-        node_path = str(event_message.data.node_info.node_path)
-        package = uid.split(".")[1]
-        compiled_sql_path = Path.cwd() / "target" / "compiled" / package / "models" / node_path
-        if not compiled_sql_path.exists():
-            logger.warning(
-                "Compiled sql path %s does not exist and hence the rendered template field compiled_sql for the model will not be populated",
-                compiled_sql_path,
-            )
-            return None
-        return compiled_sql_path.read_text(encoding="utf-8").strip() or None
-
     def _handle_node_finished(
         self,
         event_message: EventMsg,
@@ -141,17 +137,24 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     ) -> None:
         logger.debug("DbtProducerWatcherOperator: handling node finished event: %s", event_message)
         uid = event_message.data.node_info.unique_id
+        node_path_val = getattr(event_message.data.node_info, "node_path", None)
+        node_path = str(node_path_val) if node_path_val is not None else None
+        resource_type = getattr(event_message.data.node_info, "resource_type", None)
         event_message_dict = self._serialize_event(event_message)
-        compiled_sql = self._extract_compiled_sql_for_node_event(event_message)
-        if compiled_sql:
-            event_message_dict["compiled_sql"] = compiled_sql
-        payload = base64.b64encode(zlib.compress(json.dumps_bytes(event_message_dict))).decode()
-        safe_xcom_push(task_instance=context["ti"], key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
+        store_compiled_sql_for_model(context["ti"], self.project_dir, uid, node_path, resource_type)
+
+        if resource_type == "test" and self.tests_per_model:
+            status: str = getattr(event_message.data.node_info, "node_status", None) or ""
+            logger.debug("Test '%s' finished with status '%s'", uid, status)
+            push_test_result_or_aggregate(uid, status, self.tests_per_model, self.test_results_per_model, context["ti"])
+        else:
+            payload = base64.b64encode(zlib.compress(json.dumps_bytes(event_message_dict))).decode()
+            safe_xcom_push(task_instance=context["ti"], key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:
         # Only push startup events; per-model statuses are available via individual nodefinished_<uid> entries.
         if startup_events:
-            safe_xcom_push(task_instance=context["ti"], key="dbt_startup_events", value=startup_events)
+            safe_xcom_push(task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events)
 
     def _set_invocation_mode_if_not_set(self) -> None:
         if not self.invocation_mode:
@@ -164,7 +167,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 "DbtProducerWatcherOperator: Setting log_format to json and process_log_line_callable to store_dbt_resource_status_from_log"
             )
             self.log_format = "json"
-            self._process_log_line_callable = store_dbt_resource_status_from_log
+            self._process_log_line_callable = functools.partial(
+                store_dbt_resource_status_from_log,
+                tests_per_model=self.tests_per_model,
+                test_results_per_model=self.test_results_per_model,
+            )
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         self._set_invocation_mode_if_not_set()
@@ -202,6 +209,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                         name = event_message.info.name
                         if name in {"MainReportVersion", "AdapterRegistered"}:
                             self._handle_startup_event(event_message, startup_events)
+                            safe_xcom_push(
+                                task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events
+                            )
                         elif name == "NodeFinished":
                             self._handle_node_finished(event_message, context)
                     except Exception:
@@ -252,13 +262,14 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
             profile_config=profile_config,
             project_dir=project_dir,
             profiles_dir=profiles_dir,
+            producer_task_id=producer_task_id,
+            deferrable=deferrable,
             **kwargs,
         )
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-        dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
-        if dbt_startup_events:  # pragma: no cover
-            logger.info("Dbt Startup Event: %s", dbt_startup_events)
+
+        self._log_startup_events(ti)
 
         node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
         logger.info("Pulling from producer task_id: %s, key: %s", self.producer_task_id, node_finished_key)
@@ -270,10 +281,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         event_json = _parse_compressed_xcom(compressed_b64_event_msg)
 
         logger.info("Node Info: %s", event_json)
-
-        self.compiled_sql = event_json.get("compiled_sql", "")
-        if self.compiled_sql:
-            self._override_rtif(context)
 
         return event_json.get("data", {}).get("run_result", {}).get("status")
 

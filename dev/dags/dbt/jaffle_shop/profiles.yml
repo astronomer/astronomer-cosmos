@@ -22,6 +22,8 @@ snowflake_profile:
       schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
       warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
       database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+  config:
+    send_anonymous_usage_stats: false
 
 postgres_profile:
   target: dev

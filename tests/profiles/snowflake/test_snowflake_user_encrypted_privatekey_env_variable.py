@@ -183,6 +183,7 @@ def test_profile_args(
         "account": f"{mock_account}.{mock_region}",
         "database": mock_snowflake_conn.extra_dejson.get("database"),
         "warehouse": mock_snowflake_conn.extra_dejson.get("warehouse"),
+        "threads": 4,
     }
 
 
@@ -212,6 +213,7 @@ def test_profile_args_overrides(
         "account": f"{mock_account}.{mock_region}",
         "database": "my_db_override",
         "warehouse": mock_snowflake_conn.extra_dejson.get("warehouse"),
+        "threads": 4,
     }
 
 
@@ -275,4 +277,5 @@ def test_old_snowflake_format() -> None:
             "account": conn.extra_dejson.get("account"),
             "database": conn.extra_dejson.get("database"),
             "warehouse": conn.extra_dejson.get("warehouse"),
+            "threads": 4,
         }

@@ -59,6 +59,8 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
         :param output_encoding: encoding to use for decoding stdout
         :param cwd: Working directory to run the command in.
             If None (default), the command is run in a temporary directory.
+        :param process_log_line: A callable to process log line
+
         :return: :class:`namedtuple` containing:
                                     ``exit_code``
                                     ``output``: the last line from stderr or stdout
@@ -99,6 +101,9 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
 
             last_line: str = ""
             assert self.sub_process.stdout is not None
+
+            # Make cwd available to the callback `process_log_line` function via kwargs
+            kwargs.setdefault("project_dir", cwd)
             for line in self.sub_process.stdout:
                 line = line.rstrip("\n")
                 last_line = line

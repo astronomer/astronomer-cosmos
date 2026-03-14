@@ -14,7 +14,7 @@ from packaging.version import Version
 from cosmos.config import ProfileConfig
 from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION, InvocationMode
 from cosmos.exceptions import CosmosValueError
-from cosmos.operators.virtualenv import DbtCloneVirtualenvOperator, DbtVirtualenvBaseOperator
+from cosmos.operators.virtualenv import DbtCloneVirtualenvOperator, DbtRunVirtualenvOperator, DbtVirtualenvBaseOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 from tests.utils import test_dag as run_test_dag
 
@@ -125,7 +125,7 @@ def test_run_command_without_virtualenv_dir(
         invocation_mode=InvocationMode.SUBPROCESS,
         vars={"variable": "value"},
     )
-    assert venv_operator.virtualenv_dir == None
+    assert venv_operator.virtualenv_dir is None
     venv_operator.run_command(
         cmd=["fake-dbt", "do-something"], env={}, context={"task_instance": MagicMock(), "run_id": "test_run_id"}
     )
@@ -447,3 +447,42 @@ def test_dbt_clone_virtualenv_operator_initialisation():
     )
 
     assert "clone" in operator.base_cmd
+
+
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.run_command")
+def test_build_and_run_cmd_invokes_interceptors(mock_run_command):
+    """
+    Test that build_and_run_cmd calls interceptors before build_cmd and that modified vars/env are used.
+    Virtualenv operators inherit build_and_run_cmd from local, so interceptors work the same way.
+    """
+    context = {"run_id": "test_run", "data_interval_start": MagicMock(), "data_interval_end": MagicMock()}
+    interceptor_mock = MagicMock()
+
+    def interceptor_modify_vars_and_env(context, task):
+        interceptor_mock(context, task)
+        task.vars = {"new_var": "new_var_value"}
+        task.env = {"NEW_ENV_VAR": "new_env_var_value"}
+
+    operator = DbtRunVirtualenvOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        vars=None,
+        env=None,
+        py_requirements=["dbt-postgres==1.5.0"],
+        interceptors=[interceptor_modify_vars_and_env],
+    )
+
+    operator.build_and_run_cmd(context=context)
+
+    interceptor_mock.assert_called_once_with(context, operator)
+    assert operator.vars == {"new_var": "new_var_value"}
+    assert operator.env == {"NEW_ENV_VAR": "new_env_var_value"}
+
+    call_kwargs = mock_run_command.call_args[1]
+    cmd = call_kwargs["cmd"]
+    env = call_kwargs["env"]
+
+    assert "--vars" in cmd
+    assert "new_var: new_var_value" in cmd[cmd.index("--vars") + 1]
+    assert env.get("NEW_ENV_VAR") == "new_env_var_value"

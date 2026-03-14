@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import Any
 from warnings import warn
 
+from airflow.exceptions import ParamValidationError
 from airflow.models.dag import DAG
 
 try:
@@ -96,11 +97,11 @@ def validate_arguments(
     Validate that mutually exclusive selectors filters have not been given.
     Validate deprecated arguments.
 
-    :param select: A list of dbt select arguments (e.g. 'config.materialized:incremental')
-    :param exclude: A list of dbt exclude arguments (e.g. 'tag:nightly')
-    :param profile_config: ProfileConfig Object
+    :param render_config: Render configuration
+    :param profile_config: Profile configuration
     :param task_args: Arguments to be used to instantiate an Airflow Task
-    :param execution_mode: the current execution mode
+    :param execution_config: Execution configuration
+    :param project_config: Project configuration
     """
     for field in ("tags", "paths"):
         select_items = retrieve_by_label(render_config.select, field)
@@ -364,6 +365,7 @@ class DbtToAirflowConverter:
             render_config=render_config,
             async_py_requirements=execution_config.async_py_requirements,
             execution_config=execution_config,
+            tests_per_model=self.dbt_graph.tests_per_model,
         )
 
         current_time = time.perf_counter()
@@ -453,7 +455,14 @@ class DbtToAirflowConverter:
         # Store metadata in dag.params which is preserved during serialization
         # Using a key that's unlikely to conflict with user params
         compressed_metadata = _compress_telemetry_metadata(metadata)
-        dag.params["__cosmos_telemetry_metadata__"] = Param(default=compressed_metadata, const=compressed_metadata)
-        logger.debug(
-            f"Stored compressed Cosmos telemetry metadata in DAG {dag.dag_id} params (original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
-        )
+        stored_metadata = False
+        try:
+            dag.params["__cosmos_telemetry_metadata__"] = Param(default=compressed_metadata, const=compressed_metadata)
+            stored_metadata = True
+        except ParamValidationError as e:
+            logger.warning(f"Failed to store compressed Cosmos telemetry metadata in DAG {dag.dag_id} params: {e}")
+
+        if stored_metadata:
+            logger.debug(
+                f"Stored compressed Cosmos telemetry metadata in DAG {dag.dag_id} params (original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
+            )

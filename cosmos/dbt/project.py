@@ -85,7 +85,8 @@ def get_dbt_packages_subpath(source_folder: Path) -> str:
             except yaml.YAMLError:
                 logger.info(f"Unable to read the {DBT_PROJECT_FILENAME} file")
             else:
-                subpath = dbt_project_file_content.get("packages-install-path", DBT_DEFAULT_PACKAGES_FOLDER)
+                if isinstance(dbt_project_file_content, dict):
+                    subpath = dbt_project_file_content.get("packages-install-path", DBT_DEFAULT_PACKAGES_FOLDER)
     return _resolve_env_var(subpath)
 
 

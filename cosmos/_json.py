@@ -144,8 +144,6 @@ def dump(
     Always writes ``str`` -- file handles are typically opened in text mode.
     """
     if _use_orjson() and indent in _ORJSON_SUPPORTED_INDENTS:
-        fp.write(
-            _orjson.dumps(obj, option=_orjson_option(sort_keys, indent)).decode()  # type: ignore[union-attr]
-        )
+        fp.write(_orjson.dumps(obj, option=_orjson_option(sort_keys, indent)).decode())  # type: ignore[union-attr]
     else:
         _json.dump(obj, fp, sort_keys=sort_keys, indent=indent, **kwargs)

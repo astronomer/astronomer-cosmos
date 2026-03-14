@@ -8,7 +8,7 @@ This page explains the caching strategies in ``astronomer-cosmos`` Astronomer Co
 All Cosmos caching mechanisms can be enabled or turned off in the ``airflow.cfg`` file or using environment variables.
 
 .. note::
-    For more information, see `configuring a Cosmos project <./project-config.html>`_.
+    For more information, see :ref:`configuring a Cosmos project <project-config>`.
 
 Depending on the Cosmos version, it creates a cache for three types of data:
 
@@ -19,13 +19,15 @@ Depending on the Cosmos version, it creates a cache for three types of data:
 It is possible to turn off any cache in Cosmos by exporting the environment variable ``AIRFLOW__COSMOS__ENABLE_CACHE=0``.
 Disabling individual types of cache in Cosmos is also possible, as explained below.
 
+.. _caching_dbt_ls:
+
 Caching the dbt ls output
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (Introduced in Cosmos 1.5)
 
-While parsing a dbt project using `LoadMode.DBT_LS <./parsing-methods.html#dbt-ls>`_, Cosmos uses subprocess to run ``dbt ls``.
-This operation can be very costly; it can increase the DAG parsing times and affect not only the scheduler DAG processing but
+While parsing a dbt project using `LoadMode.DBT_LS <../../guides/translate_dbt_to_airflow/parsing-methods.html#dbt-ls>`_, Cosmos uses subprocesses to run ``dbt ls``.
+This operation can be very costly; it can increase the Dag parsing times and affect not only the scheduler Dag processing but
 also the tasks queueing time.
 
 Cosmos 1.5 introduced a feature to mitigate the performance issue associated with ``LoadMode.DBT_LS`` by caching the output
@@ -115,7 +117,7 @@ Caching the YAML selectors
 
 (Introduced in Cosmos 1.13)
 
-While parsing a dbt project using `LoadMode.DBT_MANIFEST <./parsing-methods.html#dbt-manifest>`_, if a ``selector`` argument is provided to the `RenderConfig <./render-config.html>`_ instance passed to the ``DbtDag`` or ``DbtTaskGroup``,
+While parsing a dbt project using `LoadMode.DBT_MANIFEST <../../guides/translate_dbt_to_airflow/parsing-methods.html#dbt-manifest>`_, if a ``selector`` argument is provided to the `RenderConfig <../../guides/translate_dbt_to_airflow/render-config.html>`_ instance passed to the ``DbtDag`` or ``DbtTaskGroup``,
 Cosmos will parse the preprocessed YAML selectors found in the manifest. The YAML selectors will be parsed into selection criteria that Cosmos will use to filter the dbt nodes to include in the Airflow DAG. The parsed selectors will be cached to improve performance during DAG parsing.
 
 This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS=0``.
@@ -195,7 +197,7 @@ The cache values contain a few properties:
 **Shared Cache Behavior**
 
 When using Airflow variables as the backend to store cached cosmos artifacts, both the dbt ls output and the YAML selectors cache will use the same variable. It should not be possible
-to have both artifacts occupy the cache at the same time due to their distinct `RenderConfig.load_mode <./render-config.html>`_ and switching from using one cache to the other will invalidate the cache on the next version check.
+to have both artifacts occupy the cache at the same time due to their distinct `RenderConfig.load_mode <../../guides/translate_dbt_to_airflow/render-config.html>`_ and switching from using one cache to the other will invalidate the cache on the next version check.
 
 Caching the partial parse file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -213,7 +215,7 @@ Users can customize where to store the cache using the setting ``AIRFLOW__COSMOS
 
 It is possible to switch off this feature by exporting the environment variable ``AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE=0``.
 
-For more information, read the `Cosmos partial parsing documentation <./partial-parsing.html>`_
+For more information, read the :ref:`Cosmos partial parsing documentation <partial-parsing>`.
 
 
 Caching the profiles

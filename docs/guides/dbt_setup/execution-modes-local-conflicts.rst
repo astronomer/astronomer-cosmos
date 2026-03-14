@@ -90,11 +90,11 @@ Examples of errors
 
 .. code-block:: bash
 
-ERROR: Cannot install apache-airflow and dbt-core==1.10.0 because these package versions have conflicting dependencies.
+    ERROR: Cannot install apache-airflow and dbt-core==1.10.0 because these package versions have conflicting dependencies.
 
-The conflict is caused by:
-    dbt-core 1.10.0 depends on pydantic<2
-    apache-airflow-core 3.0.0 depends on pydantic>=2.11.0
+    The conflict is caused by:
+        dbt-core 1.10.0 depends on pydantic<2
+        apache-airflow-core 3.0.0 depends on pydantic>=2.11.0
 
 
 

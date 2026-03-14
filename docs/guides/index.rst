@@ -113,3 +113,4 @@ You can configure Cosmos to improve your development experience.
    cosmos_devex/compiled-sql
    cosmos_devex/logging
    cosmos_devex/task-display-name
+   cosmos_devex/troubleshooting

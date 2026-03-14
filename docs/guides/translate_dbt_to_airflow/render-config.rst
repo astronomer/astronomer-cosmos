@@ -1,3 +1,5 @@
+.. _render-config:
+
 Render Config
 ================
 

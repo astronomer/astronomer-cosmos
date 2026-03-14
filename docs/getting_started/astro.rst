@@ -9,7 +9,7 @@ If you'd like to see a fully functional project to run in Astro (CLI or Cloud), 
 
 Below you can find a step-by-step guide to run your own dbt project within Astro.
 
-Pre-requisites
+Prerequisites
 ~~~~~~~~~~~~~~
 
 To get started, you should have:

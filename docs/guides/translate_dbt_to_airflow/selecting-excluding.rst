@@ -11,7 +11,7 @@ Cosmos allows you to filter to a subset of your dbt project in each ``DbtDag`` /
 
 
 Using ``select`` and ``exclude``
---------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``select`` and ``exclude`` parameters are lists, with values like the following:
 
@@ -146,7 +146,8 @@ Examples:
     )
 
 Using ``selector``
---------------------------------
+~~~~~~~~~~~~~~~~~~~
+
 .. note::
     Only currently supported using the ``LoadMode.DBT_LS`` (since Cosmos 1.3) or ``LoadMode.DBT_MANIFEST`` (since Cosmos 1.13).
     If  ``select`` and/or ``exclude`` are used with ``selector``, dbt will ignore the ``select`` and ``exclude`` parameters.
@@ -193,7 +194,7 @@ Examples:
     )
 
 Using ``selector`` with ``LoadMode.DBT_MANIFEST``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Since Cosmos 1.13, the ``selector`` parameter is also supported when using the ``LoadMode.DBT_MANIFEST`` parsing method.
 

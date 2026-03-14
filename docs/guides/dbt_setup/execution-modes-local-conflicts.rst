@@ -42,7 +42,7 @@ In the following table, ``x`` represents combinations that lead to conflicts (va
 +---------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
 
 Examples of errors
------------------------------------
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
@@ -99,7 +99,7 @@ The conflict is caused by:
 
 
 How to reproduce
-----------------
+~~~~~~~~~~~~~~~~~
 
 The table was created by running  `nox <https://nox.thea.codes/en/stable/>`__ with the following ``noxfile.py``:
 

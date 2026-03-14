@@ -39,7 +39,7 @@ Example of setting a Cosmos-specific operator argument:
 .. _operator-args-per-node:
 
 Overriding operator arguments per dbt node (or group of nodes)
---------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. versionadded:: 1.8.0
 
@@ -61,7 +61,7 @@ Users could either use ``operator_args`` or ``default args`` for defining the de
 
 While configuring in the ``dbt_project.yml`` a different behaviour for the model "expensive", that should use the "expensive-pool":
 
-.. code-block::
+.. code-block:: yaml
 
     version: 2
         models:
@@ -78,10 +78,10 @@ More information about this feature can be found in :ref:`custom-airflow-propert
 To learn how to customise the profile per dbt model or Cosmos task, check :ref:`profile-customise-per-node`.
 
 Summary of Cosmos-specific arguments
-------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 dbt-related
-...........
++++++++++++
 
 - ``append_env``: Expose the operating system environment variables to the ``dbt`` command. For most execution modes, the default is ``False``, however, for execution modes ExecuteMode.LOCAL and ExecuteMode.VIRTUALENV, the default is True. This behavior is consistent with the LoadMode.DBT_LS command in forwarding the environment variables to the subprocess by default.
 - ``dbt_cmd_flags``: List of command flags to pass to ``dbt`` command, added after dbt subcommand
@@ -102,14 +102,14 @@ dbt-related
 
 
 Airflow-related
-...............
++++++++++++++++
 
 - ``cancel_query_on_kill``: If true, cancel any running queries when the task's ``on_kill()`` is executed.
 - ``output_encoding``: Declare the character encoding to parse the ``dbt`` command output.
 - ``skip_exit_code``: If the task exits with this exit code, leave the task in ``skipped`` state (default: 99).
 
 Sample usage
-............
+++++++++++++
 
 .. code-block:: python
 
@@ -154,7 +154,7 @@ Example: using ``interceptors`` to set vars and env at runtime (e.g. from Airflo
 
 
 Template fields
----------------
+++++++++++++++++
 
 Some of the operator args are `template fields <https://airflow.apache.org/docs/apache-airflow/stable/howto/custom-operator.html#templating>`_ for your convenience.
 
@@ -204,4 +204,4 @@ Since Airflow resolves template fields during Airflow Dag execution and not Dag 
 
 Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
 This is provided for telemetry on task execution, and is not an operator arg.
-For more information about this, see the `Compiled SQL <compiled-sql.html>`_ docs.
+For more information about this, see the :ref:`compiled-sql` docs.

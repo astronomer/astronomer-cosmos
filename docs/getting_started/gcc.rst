@@ -6,7 +6,7 @@ Getting Started on Google Cloud Composer (GCC)
 Because there's no straightforward way of creating a Python virtual environment in Google Cloud Composer (GCC) , we recommend using Cosmos' built-in virtual environment functionality to run dbt.
 
 Install Cosmos
---------------
+~~~~~~~~~~~~~~~
 
 Add the following to your base project ``requirements.txt``:
 
@@ -16,7 +16,7 @@ Add the following to your base project ``requirements.txt``:
 
 
 Move your dbt project into the Dags directory
----------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Make a new folder, ``dbt``, inside your local ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your Dags directory.
 
@@ -43,7 +43,7 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
    You can also exclude the ``manifest_path=...`` from the ``ProjectConfig``. Excluding a ``manifest_path`` file will by default use Cosmos's ``custom`` parsing method, which may be less accurate at parsing a dbt project compared to providing a ``manifest.json``.
 
 Create your Dag
----------------
+~~~~~~~~~~~~~~~~~
 
 In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and create a new Dag instance. You need to supply additional arguments in the ``operator_args`` dictionary to tell Cosmos which packages are required.
 

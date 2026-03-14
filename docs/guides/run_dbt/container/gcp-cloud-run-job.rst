@@ -7,7 +7,7 @@ GCP Cloud Run Job execution mode
 The ``gcp_cloud_run_job`` execution mode is particularly useful if you prefer to run their ``dbt`` commands on Google Cloud infrastructure, taking advantage of Cloud Run's scalability, isolation, and managed service capabilities.
 
 Performance and maintenance considerations
-++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For the ``gcp_cloud_run_job`` execution mode to work, a Cloud Run Job instance must first be created using a previously built Docker container. This container should include the latest ``dbt`` pipelines and profiles. You can find more details in the `Cloud Run Job creation guide <https://cloud.google.com/run/docs/create-jobs>`__ .
 
@@ -17,7 +17,7 @@ Each task will create a new Cloud Run Job execution, giving full isolation. The 
 
 
 Setup
-+++++
+~~~~~~
 
 This tutorial will guide you through the steps required to use Cloud Run Job instance as the Execution Mode for your dbt code with Astronomer Cosmos. This guide will walk you through the steps required to build the following architecture:
 
@@ -51,7 +51,7 @@ More information on how to achieve 2-6 is detailed below.
 
 
 Step-by-step guide
-++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~
 
 **Install Airflow and Cosmos**
 

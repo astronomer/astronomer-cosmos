@@ -25,7 +25,7 @@ If you're using the ``docker`` or ``kubernetes`` modes, you should use either ``
 
 
 ``automatic``
--------------
+~~~~~~~~~~~~~~~~~
 
 When you don't supply an argument to the ``load_mode`` parameter (or you supply the value ``"automatic"``), Cosmos will attempt the other methods in order:
 
@@ -37,7 +37,7 @@ To use this method, you don't need to supply any additional config. This is the 
 
 
 ``dbt_manifest``
-----------------
+~~~~~~~~~~~~~~~~~
 
 If you already have a ``manifest.json`` file created by dbt, Cosmos will parse the manifest to generate your Dag.
 
@@ -98,7 +98,7 @@ appear in the Dag until you regenerate the manifest.
 
 
 ``dbt_ls``
-----------
+~~~~~~~~~~~~
 
 .. note::
 
@@ -142,7 +142,7 @@ For more information, check the `RenderConfig docs <./render-config.html>`_.
 
 
 ``dbt_ls_file``
-----------------
+~~~~~~~~~~~~~~~~~
 
 .. note::
    New in Cosmos 1.3.
@@ -163,7 +163,7 @@ To use this:
     )
 
 ``custom``
-----------
+~~~~~~~~~~~~~
 
 If the above methods fail, Cosmos will default to using its own dbt parser. This parser is not as robust as dbt's, so it's recommended that you use one of the above methods if possible.
 

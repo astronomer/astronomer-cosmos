@@ -32,7 +32,7 @@ The ``RenderConfig`` class takes the following arguments:
 - ``node_conversion_by_task_group``: A boolean to control if node_converters are used at the task group level (ex. converting models with test_behavior=AFTER_EACH means the entire task group is converted including the run task and the test task), or the individual task level (gives more granularity for converting just the run tasks or just the test tasks).  Defaults to True.
 
 How to run dbt ls (invocation mode)
------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When using ``LoadMode.DBT_LS``, Cosmos runs ``dbt ls`` to parse the dbt project.
 

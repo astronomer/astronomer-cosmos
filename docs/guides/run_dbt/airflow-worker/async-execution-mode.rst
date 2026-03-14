@@ -36,19 +36,19 @@ We have `observed <https://github.com/astronomer/astronomer-cosmos/pull/1934>`_ 
 +----------------------------------------------+--------------------------+
 
 
-Getting Started with Airflow Async Mode
+Getting Started with Airflow Async mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This guide walks you through setting up an Astro CLI project and running a Cosmos-based Dag with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
 
 Prerequisites
--------------
++++++++++++++
 
 - `Astro CLI <https://www.astronomer.io/docs/astro/cli/install-cli>`_
 - Airflow>=2.9
 
-1. Create Astro-CLI Project
----------------------------
+1. Create Astro-CLI project
++++++++++++++++++++++++++++
 
 Run the following command in your terminal:
 
@@ -73,7 +73,7 @@ This will create an Astro project with the following structure:
 
 
 2. Update Dockerfile
---------------------
+++++++++++++++++++++
 
 Edit your Dockerfile to ensure all necessary requirements are included.
 
@@ -82,8 +82,8 @@ Edit your Dockerfile to ensure all necessary requirements are included.
     FROM astrocrpublic.azurecr.io/runtime:3.0-2
 
 
-3. Add astronomer-cosmos Dependency
------------------------------------
+3. Add astronomer-cosmos dependency
+++++++++++++++++++++++++++++++++++++
 
 In your ``requirements.txt``, add:
 
@@ -93,7 +93,7 @@ In your ``requirements.txt``, add:
 
 
 4. Create Airflow Dag
----------------------
+++++++++++++++++++++++
 
 1. Create a new Dag file: ``dags/cosmos_async_dag.py``
 
@@ -156,7 +156,7 @@ In your ``requirements.txt``, add:
 
 
 5. Start the project
---------------------
+++++++++++++++++++++
 
 Launch the Airflow project locally:
 
@@ -170,7 +170,7 @@ This will:
 - Expose Airflow UI at http://localhost:8080
 
 6. Create Airflow connection
-----------------------------
+++++++++++++++++++++++++++++
 
 Create an Airflow connection with following configurations
 
@@ -199,7 +199,7 @@ Create an Airflow connection with following configurations
 
 
 7. Execute the Dag
-------------------
++++++++++++++++++++
 
 1. Visit the Airflow UI at ``http://localhost:8080``
 2. Enable the Dag: ``cosmos_async_dag``

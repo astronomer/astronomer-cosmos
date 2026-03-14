@@ -1,12 +1,12 @@
 .. _scheduling:
 
 Scheduling
-================
+============
 
 Because Cosmos uses `Apache Airflow® <https://airflow.apache.org/>`_ to power scheduling, you can leverage Airflow's scheduling capabilities to schedule your dbt projects. This includes cron-based scheduling, timetables, and data-aware scheduling. For more info on Airflow's scheduling capabilities, check out the Airflow documentation or check out the `Astronomer documentation <https://docs.astronomer.io/learn/scheduling-in-airflow>`_.
 
-Time-Based Scheduling
-----------------------
+Time-based scheduling
+~~~~~~~~~~~~~~~~~~~~~~
 
 To schedule a dbt project on a time-based schedule, you can use Airflow's scheduling options. For example, to run a dbt project every day starting on January 1, 2023, you can use the following Dag:
 
@@ -22,8 +22,8 @@ To schedule a dbt project on a time-based schedule, you can use Airflow's schedu
 
 .. _data-aware-scheduling:
 
-Data-Aware Scheduling
----------------------
+Data-aware scheduling
+~~~~~~~~~~~~~~~~~~~~~~~
 
 Airflow 2.4 introduced the concept of `scheduling based on Datasets <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/datasets.html>`_.
 
@@ -70,7 +70,7 @@ In this scenario, ``project_one`` runs once a day and ``project_two`` runs immed
 
 
 Examples
-.................
+++++++++++
 
 This example Dag:
 
@@ -132,10 +132,10 @@ From Cosmos 1.7 and Airflow 2.10, it is also possible to trigger Dags be to be r
 
 
 Known Limitations
-.................
+~~~~~~~~~~~~~~~~~
 
 Airflow 3.0 and beyond
-______________________
+++++++++++++++++++++++++
 
 Airflow Asset (Dataset) URIs validation rules changed in Airflow 3.0.0 and OpenLineage URIs (standard used by Cosmos) are no longer valid in Airflow 3.
 
@@ -157,7 +157,7 @@ If you want to use the Airflow 3 URI standard while still using Airflow 2, pleas
 Remember to update any Dags that are scheduled using this dataset.
 
 Apache Airflow® 2.9 and below
-______________________________
+++++++++++++++++++++++++++++++
 
 If using cosmos with an Airflow 2.9 or below, users will experience the following issues:
 
@@ -180,8 +180,8 @@ References about the root cause of these issues:
 - https://github.com/apache/airflow/issues/34206
 
 
-Apache Airflow®2.10.0 and 2.10.1
-_________________________________
+Apache Airflow® 2.10.0 and 2.10.1
+++++++++++++++++++++++++++++++++++
 
 If using Cosmos with Airflow 2.10.0 or 2.10.1, the two issues previously described are resolved, since Cosmos uses ``DatasetAlias``
 to support the dynamic creation of datasets during task execution. However, users may face ``sqlalchemy.orm.exc.FlushError``
@@ -204,7 +204,7 @@ Starting in Airflow 3, Cosmos users are no longer allowed to set ``AIRFLOW__COSM
 
 
 Emitting Dataset URIs as XCom
-.............................
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 By default, Cosmos emits datasets as Airflow inlets/outlets but does not expose the raw dataset URIs as XCom values.
 If you need access to the dataset URIs (for example, to use them in downstream tasks or for debugging purposes),

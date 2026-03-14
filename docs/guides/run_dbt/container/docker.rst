@@ -23,7 +23,7 @@ Set up Docker execution mode
 The following procedure illustrates how to run the Cosmos dbt Docker Operators and the required setup for them.
 
 Requirements
-------------
+++++++++++++
 
 - Docker with Docker Desktop (Docker Desktop on MacOS) or equivalent (such as `Orbstack <https://orbstack.dev/>`__). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
 
@@ -36,7 +36,7 @@ The following example setup steps include setting up the following:
 - dbt Dag with dbt Docker operators in the Airflow Dags directory to run in Airflow
 
 1. Install Airflow and Cosmos
------------------------------
++++++++++++++++++++++++++++++
 
 Create a python virtualenv, activate it, upgrade pip to the latest version, and install `Apache Airflow® <https://airflow.apache.org/>`_ & ``astronomer-postgres``:
 
@@ -49,7 +49,7 @@ Create a python virtualenv, activate it, upgrade pip to the latest version, and 
     pip install "astronomer-cosmos[dbt-postgres]"
 
 2. Set up Postgres database
----------------------------
+++++++++++++++++++++++++++++
 
 You will need a PostgreSQL database running to use as the database for the dbt project. Run the following command to run and expose a postgres database:
 
@@ -58,7 +58,7 @@ You will need a PostgreSQL database running to use as the database for the dbt p
     docker run --name some-postgres -e POSTGRES_PASSWORD="<postgres_password>" -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -p5432:5432 -d postgres
 
 3. Build the dbt Docker image
------------------------------
+++++++++++++++++++++++++++++++
 
 For the Docker operators to work, you need to create a Docker image that will be supplied as image parameter to the dbt Docker operators used in the Dag.
 
@@ -93,7 +93,7 @@ Read the following example Dockerfiles to understand what it does so that you ca
 
 
 4. Set up and trigger the Dag with Airflow
-------------------------------------------
+++++++++++++++++++++++++++++++++++++++++++
 
 1. Copy the ``dags`` directory from the ``cosmos-example`` repo to your Airflow home
 

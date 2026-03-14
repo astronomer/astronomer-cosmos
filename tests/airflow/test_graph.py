@@ -21,6 +21,7 @@ except ImportError:
 from cosmos.airflow.graph import (
     _add_teardown_task,
     _convert_list_to_str,
+    _select_profile_from_dict,
     _snake_case_to_camelcase,
     build_airflow_graph,
     calculate_detached_node_name,
@@ -352,6 +353,84 @@ def test_build_airflow_graph_with_override_profile_config():
     generated_parent_profile_config = dag.task_dict["parent.run"].profile_config
     assert generated_parent_profile_config.profile_name == "default"
     assert generated_parent_profile_config.profile_mapping.profile_args["schema"] == "public"
+
+
+def test_select_profile_from_dict_uses_specified_key():
+    default_cfg = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="default_conn", profile_args={}),
+    )
+    secondary_cfg = ProfileConfig(
+        profile_name="secondary",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="secondary_conn", profile_args={}),
+    )
+    profile_config_dict = {"default": default_cfg, "secondary": secondary_cfg}
+
+    node = DbtNode(
+        unique_id="model.proj.stg_payments",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"profile_config_key": "secondary"}}},
+    )
+    task_args: dict = {}
+    _select_profile_from_dict(task_args, node, profile_config_dict)
+    assert task_args["profile_config"] is secondary_cfg
+
+
+def test_select_profile_from_dict_falls_back_to_default():
+    default_cfg = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="default_conn", profile_args={}),
+    )
+    profile_config_dict = {"default": default_cfg}
+
+    node = DbtNode(
+        unique_id="model.proj.stg_orders",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={},
+    )
+    task_args: dict = {}
+    _select_profile_from_dict(task_args, node, profile_config_dict)
+    assert task_args["profile_config"] is default_cfg
+
+
+def test_select_profile_from_dict_none_is_noop():
+    node = DbtNode(
+        unique_id="model.proj.stg_orders",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={},
+    )
+    task_args: dict = {"profile_config": "original"}
+    _select_profile_from_dict(task_args, node, None)
+    assert task_args["profile_config"] == "original"
+
+
+def test_select_profile_from_dict_raises_on_missing_key():
+    default_cfg = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="default_conn", profile_args={}),
+    )
+    profile_config_dict = {"default": default_cfg}
+
+    node = DbtNode(
+        unique_id="model.proj.stg_payments",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"profile_config_key": "nonexistent"}}},
+    )
+    task_args: dict = {}
+    with pytest.raises(CosmosValueError, match="nonexistent"):
+        _select_profile_from_dict(task_args, node, profile_config_dict)
 
 
 def test_calculate_operator_class():

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import binascii
 import hashlib
-import json
 import zlib
 from typing import TYPE_CHECKING, Any
 
 from airflow.listeners import hookimpl
+
+from cosmos import _json as json
 
 if TYPE_CHECKING:
     from airflow.models.dag import DAG

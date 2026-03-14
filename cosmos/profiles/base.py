@@ -6,13 +6,14 @@ inherit from to ensure consistency.
 from __future__ import annotations
 
 import hashlib
-import json
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields
 from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
+
+from cosmos import _json as json
 
 try:
     from airflow.sdk.bases.hook import BaseHook
@@ -109,7 +110,7 @@ class BaseProfileMapping(ABC):
             profile = self.profile
         profile["profile_name"] = profile_name
         profile["target_name"] = target_name
-        hash_object = hashlib.sha256(json.dumps(profile, sort_keys=True).encode())
+        hash_object = hashlib.sha256(json.dumps_bytes(profile, sort_keys=True))
         return hash_object.hexdigest()
 
     def _validate_profile_args(self) -> None:

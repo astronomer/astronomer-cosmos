@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -6,6 +5,7 @@ from typing import Any
 
 from airflow.exceptions import AirflowException
 
+from cosmos import _json as json
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     _DBT_STARTUP_EVENTS_XCOM_KEY,

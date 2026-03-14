@@ -164,6 +164,28 @@ def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_over
         task_kwargs["profile_config"] = modified_profile_config
 
 
+def _select_profile_from_dict(
+    task_args: dict[str, Any],
+    node: DbtNode,
+    profile_config_dict: dict[str, Any] | None,
+) -> None:
+    """
+    Replace task_args["profile_config"] with the ProfileConfig selected from profile_config_dict
+    based on the node's profile_config_key. Falls back to "default" if no key is specified.
+
+    Changes task_args in-place.
+    """
+    if not profile_config_dict:
+        return
+    key = node.profile_config_key or "default"
+    if key not in profile_config_dict:
+        raise CosmosValueError(
+            f"profile_config_key '{key}' for node <{node.unique_id}> not found in profile_config_dict. "
+            f"Available keys: {list(profile_config_dict.keys())}"
+        )
+    task_args["profile_config"] = profile_config_dict[key]
+
+
 def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,

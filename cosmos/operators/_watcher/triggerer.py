@@ -11,7 +11,8 @@ from asgiref.sync import sync_to_async
 from packaging.version import Version
 
 from cosmos import _json as json
-from cosmos.constants import AIRFLOW_VERSION
+from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
+from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
     build_producer_state_fetcher,

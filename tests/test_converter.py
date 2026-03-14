@@ -10,7 +10,12 @@ from airflow.models import DAG
 
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DbtResourceType, ExecutionMode, InvocationMode, LoadMode, TestBehavior
-from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config, validate_profile_config_dict
+from cosmos.converter import (
+    DbtToAirflowConverter,
+    validate_arguments,
+    validate_initial_user_config,
+    validate_profile_config_dict,
+)
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping

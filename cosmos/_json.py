@@ -33,13 +33,13 @@ def _use_orjson() -> bool:
     return True
 
 
-def _orjson_option(sort_keys: bool = False, indent: int | None = None) -> int | None:
+def _orjson_option(sort_keys: bool = False, indent: int | None = None) -> int:
     option = 0
     if sort_keys:
         option |= _orjson.OPT_SORT_KEYS  # type: ignore[union-attr]
     if indent is not None:
         option |= _orjson.OPT_INDENT_2  # type: ignore[union-attr]
-    return option or None
+    return option
 
 
 def loads(s: str | bytes | bytearray | memoryview, **kwargs: Any) -> Any:  # type: ignore[type-arg]

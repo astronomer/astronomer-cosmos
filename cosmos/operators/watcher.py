@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import functools
 import zlib
 from collections.abc import Callable, Sequence
 from datetime import timedelta

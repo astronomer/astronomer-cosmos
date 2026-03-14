@@ -881,6 +881,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     async_py_requirements: list[str] | None = None,
     execution_config: ExecutionConfig | None = None,
     tests_per_model: dict[str, list[str]] | None = None,
+    profile_config_dict: dict[str, Any] | None = None,
 ) -> dict[str, TaskGroup | BaseOperator]:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -937,12 +938,14 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         )
 
     for node_id, node in nodes.items():
+        node_task_args = {**task_args}
+        _select_profile_from_dict(node_task_args, node, profile_config_dict)
         task_or_group_args = {
             # Arguments to this method:
             "dag": dag,
             "task_group": task_group,
             "node": node,
-            "task_args": task_args,
+            "task_args": node_task_args,
             "dbt_project_name": dbt_project_name,
             "render_config": render_config,
             # Properties from ExecutionConfig:

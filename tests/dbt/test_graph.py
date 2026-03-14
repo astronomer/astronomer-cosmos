@@ -193,6 +193,28 @@ def test_dbt_profile_config_to_override():
     assert error_msg in str(exc_info.value)
 
 
+def test_dbt_node_profile_config_key_defined():
+    node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={"meta": {"cosmos": {"profile_config_key": "secondary"}}},
+    )
+    assert node.profile_config_key == "secondary"
+
+
+def test_dbt_node_profile_config_key_not_defined():
+    node = DbtNode(
+        unique_id="some-id",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        file_path="",
+        config={},
+    )
+    assert node.profile_config_key is None
+
+
 @pytest.mark.parametrize(
     "unique_id,expected_dict",
     [

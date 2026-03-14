@@ -186,6 +186,68 @@ class TestDump:
         json.dump({"a": 1}, fp)
         assert fp.getvalue() == '{"a":1}'
 
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_dump_orjson_with_sort_keys(self):
+        fp = io.StringIO()
+        json.dump({"b": 2, "a": 1}, fp, sort_keys=True)
+        assert fp.getvalue() == '{"a":1,"b":2}'
+
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_dump_orjson_with_indent_2(self):
+        fp = io.StringIO()
+        json.dump({"a": 1}, fp, indent=2)
+        assert '  "a"' in fp.getvalue()
+
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_dump_orjson_falls_back_for_indent_4(self):
+        """indent=4 is not supported by orjson, so dump() must fall back to stdlib."""
+        fp = io.StringIO()
+        json.dump({"a": 1}, fp, indent=4)
+        assert fp.getvalue() == '{\n    "a": 1\n}'
+
+
+# ---------------------------------------------------------------------------
+# Indent fallback: orjson only supports indent=None and indent=2.
+# Unsupported indent values must transparently fall back to stdlib.
+# ---------------------------------------------------------------------------
+class TestIndentFallback:
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_dumps_str_indent_4_falls_back_to_stdlib(self):
+        result = json.dumps_str({"a": 1}, indent=4)
+        assert '    "a": 1' in result
+
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_dumps_str_indent_2_uses_orjson(self):
+        result = json.dumps_str({"a": 1}, indent=2)
+        assert '  "a"' in result
+
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_dumps_str_indent_none_uses_orjson_compact(self):
+        result = json.dumps_str({"a": 1})
+        assert "\n" not in result
+
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_dumps_bytes_indent_4_falls_back_to_stdlib(self):
+        result = json.dumps_bytes({"a": 1}, indent=4)
+        assert isinstance(result, bytes)
+        assert b'    "a": 1' in result
+
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_dumps_indent_4_falls_back_to_stdlib(self):
+        result = json.dumps({"a": 1}, indent=4)
+        assert isinstance(result, str)
+        assert '    "a": 1' in result
+
+    @patch.object(settings, "enable_orjson_parser", True)
+    def test_dumps_str_indent_4_matches_stdlib_output(self):
+        """The freshness path (local.py) relies on indent=4 producing stdlib-compatible output."""
+        import json as stdlib_json
+
+        data = {"sources": [{"name": "src", "freshness": {"loaded_at": "2026-01-01"}}]}
+        result = json.dumps_str(data, indent=4)
+        expected = stdlib_json.dumps(data, indent=4)
+        assert result == expected
+
 
 # ---------------------------------------------------------------------------
 # Error re-exports

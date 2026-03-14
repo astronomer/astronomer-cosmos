@@ -1,11 +1,11 @@
 .. _async-execution-mode:
 
 Airflow async execution mode
-============================
+====================================
 
 This execution mode can reduce the runtime by 35% in comparison to Cosmos ``LOCAL`` execution mode, but is currently only available for BigQuery. While this mode was introduced in Cosmos 1.9, we strongly encourage users to use the latest version of Cosmos, which has significant performance improvements.
 
-The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using Apache Airflow's
+The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using the Apache Airflow®
 `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 This execution mode is well-suited for when you have long-running resources and you want to run them asynchronously by
 leveraging Airflow's deferrable operators. With deferrable operators, you can potentially observe higher throughput of tasks

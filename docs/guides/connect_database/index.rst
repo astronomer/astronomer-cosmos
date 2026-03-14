@@ -6,7 +6,7 @@ Connect to your database
 Cosmos supports two methods of authenticating with your database:
 
 - using your own `dbt profiles.yml <../../guides/connect_database/use-your-profiles-yml.html>`_ file
-- using Airflow connections via Cosmos' `profile mappings <../../guides/connect_database/use-profile-mapping.html>`_
+- using `Apache Airflow® <https://airflow.apache.org/>`_ connections via Cosmos' `profile mappings <../../guides/connect_database/use-profile-mapping.html>`_
 
 If you're already interacting with your database from Airflow and have a connection set up, it's recommended
 to use a profile mapping to translate that Airflow connection to a dbt profile. This is because it's easier to

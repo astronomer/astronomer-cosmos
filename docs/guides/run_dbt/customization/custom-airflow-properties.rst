@@ -1,9 +1,9 @@
 .. _custom-airflow-properties:
 
-Airflow Configuration Overrides with Astronomer Cosmos
-======================================================
+Apache Airflow® Configuration Overrides with Astronomer Cosmos
+===============================================================
 
-**Astronomer Cosmos** allows you to override Airflow configurations for each dbt task (dbt operator) via the dbt YAML file.
+**Astronomer Cosmos** allows you to override `Apache Airflow® <https://airflow.apache.org/>`_ configurations for each dbt task (dbt operator) via the dbt YAML file.
 
 Sample dbt Model YAML
 +++++++++++++++++++++

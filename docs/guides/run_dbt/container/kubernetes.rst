@@ -9,7 +9,7 @@ The ``kubernetes`` execution mode provides a very isolated method to run ``dbt``
 Performance and maintenance considerations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This execution mode assumes you have a Kubernetes cluster. It also expects you to ensure the Docker container has up-to-date ``dbt`` pipelines and profiles, potentially leading you to declare secrets in two places; Airflow and Docker container.
+This execution mode assumes you have a Kubernetes cluster. It also expects you to ensure the Docker container has up-to-date ``dbt`` pipelines and profiles, potentially leading you to declare secrets in two places; `Apache Airflow® <https://airflow.apache.org/>`_ and Docker container.
 
 The ``Kubernetes`` deployment might be slower than ``Docker`` and ``Virtualenv``, assuming that the container image is built (which is slower than creating a Python ``virtualenv`` and installing ``dbt-core``) and the Airflow task needs to spin up a new ``Pod`` in Kubernetes.
 

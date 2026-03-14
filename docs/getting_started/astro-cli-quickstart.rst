@@ -5,7 +5,7 @@
 Run Cosmos with the Astro CLI
 =============================
 
-Work locally with Airflow, dbt, and Astronomer Cosmos using the `Astro CLI <https://github.com/astronomer/astro-cli>`__. While Cosmos fully works with standard Airflow and independently of the Astro CLI, the Astro CLI can simplify creating and running Airflow projects. If you want to get started with Cosmos using only Airflow, see `Getting Started on Open Source Airflow <open-source.html>`_.
+Work locally with `Apache Airflow® <https://airflow.apache.org/>`_, dbt, and Astronomer Cosmos using the `Astro CLI <https://github.com/astronomer/astro-cli>`__. While Cosmos fully works with standard Airflow and independently of the Astro CLI, the Astro CLI can simplify creating and running Airflow projects. If you want to get started with Cosmos using only Airflow, see `Getting Started on Open Source Airflow <open-source.html>`_.
 
 This guide shows you how to run a simple Dag locally with Cosmos, using an example dbt project in Airflow.
 
@@ -36,8 +36,8 @@ Clone the demo repo
 
     git clone https://github.com/astronomer/cosmos-demo.git
 
-Start Airflow locally
-~~~~~~~~~~~~~~~~~~~~~
+Start Apache Airflow® locally
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Open a terminal at the root of the ``cosmos-demo`` repo.
 2. Run ``astro dev start --verbosity debug`` to start your Aiflow instance. Including the ``--verbosity debug`` flag allows the command to display the steps the Astro CLI takes to set up your Airflow project.

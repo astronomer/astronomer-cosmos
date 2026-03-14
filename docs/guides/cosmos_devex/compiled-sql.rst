@@ -3,7 +3,7 @@
 Compiled SQL
 ====================
 
-When using the local execution mode, Cosmos will store the compiled SQL for each model in the ``compiled_sql`` field of the task's ``template_fields``. This allows you to view the compiled SQL in the Airflow UI.
+When using the local execution mode, Cosmos will store the compiled SQL for each model in the ``compiled_sql`` field of the task's ``template_fields``. This allows you to view the compiled SQL in the `Apache Airflow® UI <https://airflow.apache.org/>`_.
 
 If you'd like to disable this feature, you can set ``should_store_compiled_sql=False`` on the local operator (or via the ``operator_args`` parameter on the Dag/Task Group). For example:
 

@@ -6,7 +6,7 @@ Post-rendering Dag customization
 .. note::
     The DbtToAirflowConverter.tasks_map property is only available for cosmos >= 1.8.0
 
-After Cosmos has rendered an Airflow Dag from a dbt project, you may want to add some extra Airflow tasks that interact
+After Cosmos has rendered an `Apache Airflow® <https://airflow.apache.org/>`_ Dag from a dbt project, you may want to add some extra Airflow tasks that interact
 with the tasks created by Cosmos. This document explains how to do this.
 
 An example use case you can think of is implementing sensor tasks that wait for an external Dag task to complete before

@@ -1,9 +1,9 @@
 .. _airflow3-compatibility:
 
-Airflow 3 Compatibility (First Iteration)
-=========================================
+Apache Airflow® 3 Compatibility (First Iteration)
+=================================================
 
-The Cosmos 1.10.0 release marks the **first iteration** of adding compatibility for `Apache Airflow® 3 <https://airflow.apache.org/>`_
+The Cosmos 1.10.0 release marks the **first iteration** of adding compatibility for `Apache Airflow® 3 <https://airflow.apache.org/>`_.
 This is an important milestone as we work towards ensuring that Cosmos seamlessly integrates with the latest advancements in the Airflow ecosystem.
 
 Breaking changes

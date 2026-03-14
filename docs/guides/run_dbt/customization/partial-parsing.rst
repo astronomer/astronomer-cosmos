@@ -13,8 +13,8 @@ Profile configuration
 
 To respect the dbt requirement of having the same profile to benefit from partial parsing, Cosmos users should either:
 
-* If using Cosmos profile mapping (``ProfileConfig(profile_mapping=...``), disable using mocked profile mappings by setting ``render_config=RenderConfig(enable_mock_profile=False)``
-* Declare their own ``profiles.yml`` file, via ``ProfileConfig(profiles_yml_filepath=...)``
+- If using Cosmos profile mapping (``ProfileConfig(profile_mapping=...``), disable using mocked profile mappings by setting ``render_config=RenderConfig(enable_mock_profile=False)``
+- Declare their own ``profiles.yml`` file, via ``ProfileConfig(profiles_yml_filepath=...)``
 
 If users don't follow these guidelines, Cosmos will use different profiles to parse the dbt project and to run tasks, and the user won't leverage dbt partial parsing.
 Their logs will contain multiple ``INFO`` messages similar to the following, meaning that Cosmos is not using partial parsing:

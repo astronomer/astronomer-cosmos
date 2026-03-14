@@ -3,7 +3,7 @@
 Scheduling
 ================
 
-Because Cosmos uses Airflow to power scheduling, you can leverage Airflow's scheduling capabilities to schedule your dbt projects. This includes cron-based scheduling, timetables, and data-aware scheduling. For more info on Airflow's scheduling capabilities, check out the Airflow documentation or check out the `Astronomer documentation <https://docs.astronomer.io/learn/scheduling-in-airflow>`_.
+Because Cosmos uses `Apache Airflow® <https://airflow.apache.org/>`_ to power scheduling, you can leverage Airflow's scheduling capabilities to schedule your dbt projects. This includes cron-based scheduling, timetables, and data-aware scheduling. For more info on Airflow's scheduling capabilities, check out the Airflow documentation or check out the `Astronomer documentation <https://docs.astronomer.io/learn/scheduling-in-airflow>`_.
 
 Time-Based Scheduling
 ----------------------
@@ -25,7 +25,7 @@ To schedule a dbt project on a time-based schedule, you can use Airflow's schedu
 Data-Aware Scheduling
 ---------------------
 
-`Apache Airflow® <https://airflow.apache.org/>`_ 2.4 introduced the concept of `scheduling based on Datasets <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/datasets.html>`_.
+Airflow 2.4 introduced the concept of `scheduling based on Datasets <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/datasets.html>`_.
 
 By default, if using a version between Airflow 2.4 or higher, Cosmos emits `Airflow Datasets <https://airflow.apache.org/docs/apache-airflow/stable/concepts/datasets.html>`_ when running dbt projects. This allows you to use Airflow's data-aware scheduling capabilities to schedule your dbt projects. Cosmos emits datasets using the OpenLineage URI format, as detailed in the `OpenLineage Naming Convention <https://github.com/OpenLineage/OpenLineage/blob/main/spec/Naming.md>`_.
 
@@ -156,8 +156,8 @@ If you want to use the Airflow 3 URI standard while still using Airflow 2, pleas
 
 Remember to update any Dags that are scheduled using this dataset.
 
-Airflow 2.9 and below
-_____________________
+Apache Airflow® 2.9 and below
+______________________________
 
 If using cosmos with an Airflow 2.9 or below, users will experience the following issues:
 
@@ -180,8 +180,8 @@ References about the root cause of these issues:
 - https://github.com/apache/airflow/issues/34206
 
 
-Airflow 2.10.0 and 2.10.1
-_________________________
+Apache Airflow®2.10.0 and 2.10.1
+_________________________________
 
 If using Cosmos with Airflow 2.10.0 or 2.10.1, the two issues previously described are resolved, since Cosmos uses ``DatasetAlias``
 to support the dynamic creation of datasets during task execution. However, users may face ``sqlalchemy.orm.exc.FlushError``

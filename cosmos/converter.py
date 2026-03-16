@@ -133,6 +133,22 @@ def validate_arguments(
             raise CosmosValueError(err_msg)
 
 
+def validate_profile_config_dict(profile_config_dict: dict[str, ProfileConfig] | None) -> None:
+    """
+    Validate that profile_config_dict has the required "default" key.
+
+    :param profile_config_dict: Dictionary of profile configurations keyed by name.
+    """
+    if profile_config_dict is not None:
+        if "default" not in profile_config_dict:
+            raise CosmosValueError('`profile_config_dict` must contain a "default" key.')
+        for key, value in profile_config_dict.items():
+            if not isinstance(value, ProfileConfig):
+                raise CosmosValueError(
+                    f'`profile_config_dict["{key}"]` must be an instance of ProfileConfig, got {type(value)}.'
+                )
+
+
 def validate_initial_user_config(
     execution_config: ExecutionConfig,
     profile_config: ProfileConfig | None,
@@ -267,6 +283,7 @@ class DbtToAirflowConverter:
         self,
         project_config: ProjectConfig,
         profile_config: ProfileConfig | None = None,
+        profile_config_dict: dict[str, ProfileConfig] | None = None,
         execution_config: ExecutionConfig | None = None,
         render_config: RenderConfig | None = None,
         dag: DAG | None = None,
@@ -283,6 +300,15 @@ class DbtToAirflowConverter:
         execution_config = copy.deepcopy(execution_config) if execution_config is not None else ExecutionConfig()
         render_config = copy.deepcopy(render_config) if render_config is not None else RenderConfig()
         operator_args = copy.copy(operator_args) if operator_args is not None else {}
+
+        validate_profile_config_dict(profile_config_dict)
+
+        # If profile_config_dict is provided, use the "default" entry as the effective profile_config.
+        # Individual key-to-node mapping will be resolved in a future implementation.
+        if profile_config_dict is not None and profile_config is None:
+            profile_config = profile_config_dict["default"]
+
+        self.profile_config_dict = profile_config_dict
 
         project_config.validate_project()
         validate_initial_user_config(execution_config, profile_config, project_config, render_config, operator_args)
@@ -366,6 +392,7 @@ class DbtToAirflowConverter:
             async_py_requirements=execution_config.async_py_requirements,
             execution_config=execution_config,
             tests_per_model=self.dbt_graph.tests_per_model,
+            profile_config_dict=profile_config_dict,
         )
 
         current_time = time.perf_counter()

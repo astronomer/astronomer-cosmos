@@ -10,7 +10,12 @@ from airflow.models import DAG
 
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import DbtResourceType, ExecutionMode, InvocationMode, LoadMode, TestBehavior
-from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
+from cosmos.converter import (
+    DbtToAirflowConverter,
+    validate_arguments,
+    validate_initial_user_config,
+    validate_profile_config_dict,
+)
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
@@ -27,6 +32,33 @@ sample_profile_config = ProfileConfig(
     target_name="my_target_name",
     profiles_yml_filepath=SAMPLE_PROFILE_YML,
 )
+
+
+def test_validate_profile_config_dict_valid():
+    default_cfg = sample_profile_config
+    secondary_cfg = ProfileConfig(
+        profile_name="secondary",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="secondary_conn", profile_args={}),
+    )
+    # Should not raise
+    validate_profile_config_dict({"default": default_cfg, "secondary": secondary_cfg})
+
+
+def test_validate_profile_config_dict_none():
+    # None is allowed (feature is opt-in)
+    validate_profile_config_dict(None)
+
+
+def test_validate_profile_config_dict_missing_default():
+    cfg = sample_profile_config
+    with pytest.raises(CosmosValueError, match='"default"'):
+        validate_profile_config_dict({"other": cfg})
+
+
+def test_validate_profile_config_dict_invalid_value_type():
+    with pytest.raises(CosmosValueError, match="must be an instance of ProfileConfig"):
+        validate_profile_config_dict({"default": "not_a_profile_config"})  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("argument_key", ["tags", "paths"])

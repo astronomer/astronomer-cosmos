@@ -146,6 +146,21 @@ class DbtNode:
         return operator_kwargs
 
     @property
+    def profile_config_key(self) -> str | None:
+        """
+        Extract the key used to select a ProfileConfig from a profile_config_dict passed to DbtDag or DbtTaskGroup.
+
+        Example dbt model YAML:
+            config:
+              meta:
+                cosmos:
+                  profile_config_key: "starrocks"
+
+        :returns: The key string if defined, otherwise None (falls back to "default").
+        """
+        return self.meta.get("profile_config_key")
+
+    @property
     def resource_name(self) -> str:
         """
         Use this property to retrieve the resource name for command generation, for instance: ["dbt", "run", "--models", f"{resource_name}"].

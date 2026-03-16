@@ -164,6 +164,28 @@ def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_over
         task_kwargs["profile_config"] = modified_profile_config
 
 
+def _select_profile_from_dict(
+    task_args: dict[str, Any],
+    node: DbtNode,
+    profile_config_dict: dict[str, Any] | None,
+) -> None:
+    """
+    Replace task_args["profile_config"] with the ProfileConfig selected from profile_config_dict
+    based on the node's profile_config_key. Falls back to "default" if no key is specified.
+
+    Changes task_args in-place.
+    """
+    if not profile_config_dict:
+        return
+    key = node.profile_config_key or "default"
+    if key not in profile_config_dict:
+        raise CosmosValueError(
+            f"profile_config_key '{key}' for node <{node.unique_id}> not found in profile_config_dict. "
+            f"Available keys: {list(profile_config_dict.keys())}"
+        )
+    task_args["profile_config"] = profile_config_dict[key]
+
+
 def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
@@ -859,6 +881,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     async_py_requirements: list[str] | None = None,
     execution_config: ExecutionConfig | None = None,
     tests_per_model: dict[str, list[str]] | None = None,
+    profile_config_dict: dict[str, Any] | None = None,
 ) -> dict[str, TaskGroup | BaseOperator]:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -915,12 +938,14 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         )
 
     for node_id, node in nodes.items():
+        node_task_args = {**task_args}
+        _select_profile_from_dict(node_task_args, node, profile_config_dict)
         task_or_group_args = {
             # Arguments to this method:
             "dag": dag,
             "task_group": task_group,
             "node": node,
-            "task_args": task_args,
+            "task_args": node_task_args,
             "dbt_project_name": dbt_project_name,
             "render_config": render_config,
             # Properties from ExecutionConfig:

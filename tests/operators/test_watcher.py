@@ -1339,6 +1339,32 @@ class TestDbtConsumerWatcherSensor:
         result = sensor._get_status_from_run_results(ti, _MockContext(ti=ti))
         assert result == "success"
 
+    def test_get_status_from_run_results_logs_error(self):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+
+        run_results_payload = {
+            "results": [
+                {
+                    "unique_id": sensor.model_unique_id,
+                    "status": "error",
+                    "message": "dbt model failed",
+                    "compiled_code": "select 1",
+                }
+            ]
+        }
+
+        encoded = base64.b64encode(zlib.compress(json.dumps(run_results_payload).encode())).decode("utf-8")
+
+        ti.xcom_pull.return_value = encoded
+        context = self.make_context(ti)
+
+        with patch("cosmos.operators._watcher.base.logger") as mock_logger:
+            result = sensor._get_status_from_run_results(ti, context)
+
+        assert result == "error"
+        mock_logger.error.assert_called_once()
+
     def test_get_status_from_run_results_none(self):
         sensor = self.make_sensor()
         ti = MagicMock()
@@ -1377,6 +1403,24 @@ class TestDbtConsumerWatcherSensor:
         result = sensor._get_status_from_events(ti, context)
         assert result == "success"
         assert sensor.compiled_sql == ""  # not set from event; poke() will get it from canonical key
+
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+    def test_get_status_logs_error(self, mock_log_startup_events):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+
+        event_payload = {"data": {"run_result": {"status": "error", "message": "dbt model failed"}}}
+
+        encoded_event = base64.b64encode(zlib.compress(json.dumps(event_payload).encode())).decode("utf-8")
+
+        ti.xcom_pull.return_value = encoded_event
+        context = self.make_context(ti)
+
+        with patch("cosmos.operators.watcher.logger.error") as mock_log_error:
+            result = sensor._get_status_from_events(ti, context)
+
+        assert result == "error"
+        mock_log_error.assert_called_once_with("%s", "dbt model failed")
 
     @patch("cosmos.operators._watcher.base.get_xcom_val")
     @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")

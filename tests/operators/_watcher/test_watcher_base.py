@@ -88,3 +88,42 @@ class TestBaseConsumerSensor:
                 mock_push.assert_called_once()
             else:
                 mock_push.assert_not_called()
+
+    def test_process_dbt_log_event_skips_duplicate_event(self):
+        task_instance = Mock()
+
+        dbt_log = {
+            "data": {
+                "node_info": {
+                    "unique_id": "model.test.my_model",
+                    "node_status": "success",
+                    "node_started_at": "2024-01-01T00:00:00",
+                    "node_finished_at": "2024-01-01T00:01:00",
+                },
+                "msg": "model finished",
+            },
+            "info": {},
+        }
+
+        duplicate_event = {
+            "status": "success",
+            "start_time": "2024-01-01T00:00:00",
+            "finish_time": "2024-01-01T00:01:00",
+            "msg": "model finished",
+        }
+
+        with (
+            patch(
+                "cosmos.operators._watcher.base.get_xcom_val",
+                return_value=duplicate_event,
+            ),
+            patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push,
+            patch(
+                "cosmos.operators._watcher.base._iso_to_string",
+                side_effect=lambda x: x,
+            ),
+        ):
+            result = _process_dbt_log_event(task_instance, dbt_log)
+
+            assert result is None
+            mock_push.assert_not_called()

@@ -7,6 +7,7 @@ Changelog
 Breaking changes
 
 * Drop support for Airflow versions earlier than **2.9** by @jedcunningham in #2288
+* Fix inclusion of package models and selection/exclusion behavior by @pankajkoti in #2357
 
 Features
 
@@ -30,7 +31,6 @@ Bug Fixes
 
 * Handle invalid YAML errors with ``LoadMode.DBT_MANIFEST`` and ``RenderConfig.selector`` by @YourRoyalLinus in #2316
 * Populate ``compiled_sql`` for ``InvocationMode.SUBPROCESS`` in ``ExecutionMode.WATCHER`` by @pankajkoti in #2319
-* Fix inclusion of package models and selection/exclusion behavior by @pankajkoti in #2357
 * Fix select/exclude type mismatch by @tatiana in #2364
 * Set ``emit_datasets=False`` for ``DbtTest*`` operators by @pankajastro in #2365
 * Set correct queue priority for watcher producer tasks by @pankajastro in #2372

@@ -18,6 +18,7 @@ from cosmos.operators._watcher.state import (
     _log_dbt_event,
     build_producer_state_fetcher,
     is_dbt_node_status_failed,
+    is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
 )
@@ -212,6 +213,10 @@ class WatcherTrigger(BaseTrigger):
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
+                return
+            elif is_dbt_node_status_skipped(dbt_node_status):
+                logger.info("dbt node '%s' skipped: upstream source is not fresh", self.model_unique_id)
+                yield TriggerEvent({"status": "skipped", "reason": "source_not_fresh"})  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == "failed":
                 logger.error(

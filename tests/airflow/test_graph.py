@@ -20,6 +20,7 @@ except ImportError:
 
 from cosmos.airflow.graph import (
     _add_teardown_task,
+    _compute_source_to_dependent_models,
     _convert_list_to_str,
     _snake_case_to_camelcase,
     build_airflow_graph,
@@ -1952,3 +1953,56 @@ class TestSelectExcludeAsStringsInOperators:
         assert metadata.arguments["select"] is None
         assert metadata.arguments["exclude"] is None
         assert metadata.arguments["selector"] is None
+
+
+class TestComputeSourceToDependentModels:
+    """Tests for _compute_source_to_dependent_models."""
+
+    def _make_node(self, unique_id: str, resource_type: DbtResourceType, depends_on: list) -> DbtNode:
+        return DbtNode(unique_id=unique_id, resource_type=resource_type, depends_on=depends_on, file_path="")
+
+    def test_empty_nodes_returns_empty(self):
+        assert _compute_source_to_dependent_models({}) == {}
+
+    def test_no_source_nodes_returns_empty(self):
+        model = self._make_node("model.proj.a", DbtResourceType.MODEL, [])
+        assert _compute_source_to_dependent_models({model.unique_id: model}) == {}
+
+    def test_source_with_no_dependents_not_included(self):
+        source = self._make_node("source.proj.raw.orders", DbtResourceType.SOURCE, [])
+        nodes = {source.unique_id: source}
+        assert _compute_source_to_dependent_models(nodes) == {}
+
+    def test_direct_dependent_included(self):
+        source = self._make_node("source.proj.raw.orders", DbtResourceType.SOURCE, [])
+        model = self._make_node("model.proj.stg_orders", DbtResourceType.MODEL, [source.unique_id])
+        nodes = {source.unique_id: source, model.unique_id: model}
+        result = _compute_source_to_dependent_models(nodes)
+        assert set(result["source.proj.raw.orders"]) == {"model.proj.stg_orders"}
+
+    def test_transitive_dependents_included(self):
+        source = self._make_node("source.proj.raw.orders", DbtResourceType.SOURCE, [])
+        stg = self._make_node("model.proj.stg_orders", DbtResourceType.MODEL, [source.unique_id])
+        final = self._make_node("model.proj.orders", DbtResourceType.MODEL, [stg.unique_id])
+        nodes = {source.unique_id: source, stg.unique_id: stg, final.unique_id: final}
+        result = _compute_source_to_dependent_models(nodes)
+        assert set(result["source.proj.raw.orders"]) == {"model.proj.stg_orders", "model.proj.orders"}
+
+    def test_multiple_sources_independent(self):
+        src_a = self._make_node("source.proj.raw.a", DbtResourceType.SOURCE, [])
+        src_b = self._make_node("source.proj.raw.b", DbtResourceType.SOURCE, [])
+        model_a = self._make_node("model.proj.from_a", DbtResourceType.MODEL, [src_a.unique_id])
+        model_b = self._make_node("model.proj.from_b", DbtResourceType.MODEL, [src_b.unique_id])
+        nodes = {n.unique_id: n for n in [src_a, src_b, model_a, model_b]}
+        result = _compute_source_to_dependent_models(nodes)
+        assert set(result["source.proj.raw.a"]) == {"model.proj.from_a"}
+        assert set(result["source.proj.raw.b"]) == {"model.proj.from_b"}
+
+    def test_shared_downstream_model_counted_once_per_source(self):
+        src_a = self._make_node("source.proj.raw.a", DbtResourceType.SOURCE, [])
+        src_b = self._make_node("source.proj.raw.b", DbtResourceType.SOURCE, [])
+        shared = self._make_node("model.proj.combined", DbtResourceType.MODEL, [src_a.unique_id, src_b.unique_id])
+        nodes = {n.unique_id: n for n in [src_a, src_b, shared]}
+        result = _compute_source_to_dependent_models(nodes)
+        assert result["source.proj.raw.a"] == ["model.proj.combined"]
+        assert result["source.proj.raw.b"] == ["model.proj.combined"]

@@ -2174,3 +2174,186 @@ def test_dbt_source_watcher_operator_template_fields():
 
     # DbtSourceWatcherOperator should inherit template_fields from DbtSourceLocalOperator
     assert DbtSourceWatcherOperator.template_fields == DbtSourceLocalOperator.template_fields
+
+
+# ---------------------------------------------------------------------------
+# Tests for source freshness feature (check_source_freshness=True)
+# ---------------------------------------------------------------------------
+
+
+class TestProducerSourceFreshness:
+    """Unit tests for DbtProducerWatcherOperator source-freshness logic."""
+
+    SOURCE_ID = "source.proj.raw.orders"
+    MODEL_ID = "model.proj.stg_orders"
+    MODEL_NAME = "stg_orders"
+
+    def _make_op(self, **kwargs: Any) -> DbtProducerWatcherOperator:
+        return DbtProducerWatcherOperator(
+            project_dir="/tmp/proj",
+            profile_config=None,
+            **kwargs,
+        )
+
+    # ------------------------------------------------------------------
+    # _get_stale_sources
+    # ------------------------------------------------------------------
+
+    def test_get_stale_sources_returns_empty_when_no_profile_config(self):
+        op = self._make_op(check_source_freshness=True)
+        assert op._get_stale_sources() == []
+
+    def test_get_stale_sources_returns_stale_ids(self, tmp_path):
+        sources_json = {
+            "results": [
+                {"unique_id": self.SOURCE_ID, "status": "error"},
+                {"unique_id": "source.proj.raw.other", "status": "pass"},
+            ]
+        }
+        target_dir = tmp_path / "target"
+        target_dir.mkdir()
+        (target_dir / "sources.json").write_text(json.dumps(sources_json))
+
+        mock_profile_config = MagicMock()
+        mock_profile_config.ensure_profile.return_value.__enter__ = MagicMock(
+            return_value=(tmp_path / "profiles" / "profiles.yml", {})
+        )
+        mock_profile_config.ensure_profile.return_value.__exit__ = MagicMock(return_value=False)
+        mock_profile_config.profile_name = "test_profile"
+        mock_profile_config.target_name = "dev"
+
+        op = DbtProducerWatcherOperator(
+            project_dir=str(tmp_path),
+            profile_config=mock_profile_config,
+            check_source_freshness=True,
+        )
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            stale = op._get_stale_sources()
+
+        assert stale == [self.SOURCE_ID]
+
+    def test_get_stale_sources_returns_empty_when_sources_json_missing(self, tmp_path):
+        mock_profile_config = MagicMock()
+        mock_profile_config.ensure_profile.return_value.__enter__ = MagicMock(
+            return_value=(tmp_path / "profiles.yml", {})
+        )
+        mock_profile_config.ensure_profile.return_value.__exit__ = MagicMock(return_value=False)
+        mock_profile_config.profile_name = None
+        mock_profile_config.target_name = None
+
+        op = DbtProducerWatcherOperator(
+            project_dir=str(tmp_path),
+            profile_config=mock_profile_config,
+            check_source_freshness=True,
+        )
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            stale = op._get_stale_sources()
+
+        assert stale == []
+
+    # ------------------------------------------------------------------
+    # _push_skipped_xcom_for_model
+    # ------------------------------------------------------------------
+
+    def test_push_skipped_xcom_subprocess_mode(self):
+        from cosmos.config import InvocationMode
+
+        op = self._make_op()
+        op.invocation_mode = InvocationMode.SUBPROCESS
+        mock_ti = MagicMock()
+
+        with patch("cosmos.operators.watcher.safe_xcom_push") as mock_push:
+            op._push_skipped_xcom_for_model(mock_ti, self.MODEL_ID)
+
+        mock_push.assert_called_once_with(
+            task_instance=mock_ti,
+            key=f"{self.MODEL_ID.replace('.', '__')}_status",
+            value="skipped",
+        )
+
+    def test_push_skipped_xcom_runner_mode(self):
+        from cosmos.config import InvocationMode
+
+        op = self._make_op()
+        op.invocation_mode = InvocationMode.DBT_RUNNER
+        mock_ti = MagicMock()
+
+        with patch("cosmos.operators.watcher.safe_xcom_push") as mock_push:
+            op._push_skipped_xcom_for_model(mock_ti, self.MODEL_ID)
+
+        call_kwargs = mock_push.call_args.kwargs
+        assert call_kwargs["key"] == f"nodefinished_{self.MODEL_ID.replace('.', '__')}"
+        # Value must be a compressed+base64 JSON containing status=skipped
+        import base64
+        import zlib
+
+        payload = json.loads(zlib.decompress(base64.b64decode(call_kwargs["value"])))
+        assert payload["data"]["run_result"]["status"] == "skipped"
+
+    # ------------------------------------------------------------------
+    # _apply_source_freshness_excludes
+    # ------------------------------------------------------------------
+
+    def test_apply_noop_when_flag_disabled(self):
+        op = self._make_op(check_source_freshness=False)
+        context: Any = {"ti": MagicMock()}
+        with patch.object(op, "_get_stale_sources") as mock_fresh:
+            op._apply_source_freshness_excludes(context)
+            mock_fresh.assert_not_called()
+        assert op.exclude is None or op.exclude == ""
+
+    def test_apply_noop_when_no_source_map(self):
+        op = self._make_op(check_source_freshness=True)
+        context: Any = {"ti": MagicMock()}
+        with patch.object(op, "_get_stale_sources") as mock_fresh:
+            op._apply_source_freshness_excludes(context)
+            mock_fresh.assert_not_called()
+
+    def test_apply_updates_exclude_and_pushes_xcom(self):
+        from cosmos.config import InvocationMode
+
+        op = self._make_op(
+            check_source_freshness=True,
+            source_to_dependent_models={self.SOURCE_ID: [self.MODEL_ID]},
+        )
+        op.invocation_mode = InvocationMode.SUBPROCESS
+        mock_ti = MagicMock()
+        context: Any = {"ti": mock_ti}
+
+        with (
+            patch.object(op, "_get_stale_sources", return_value=[self.SOURCE_ID]),
+            patch("cosmos.operators.watcher.safe_xcom_push") as mock_push,
+        ):
+            op._apply_source_freshness_excludes(context)
+
+        assert self.MODEL_NAME in (op.exclude or "")
+        mock_push.assert_called_once()
+
+    def test_apply_does_not_fail_on_freshness_error(self):
+        op = self._make_op(
+            check_source_freshness=True,
+            source_to_dependent_models={self.SOURCE_ID: [self.MODEL_ID]},
+        )
+        context: Any = {"ti": MagicMock()}
+
+        with patch.object(op, "_get_stale_sources", side_effect=RuntimeError("db down")):
+            # Must not raise; the build should proceed normally
+            op._apply_source_freshness_excludes(context)
+
+        assert not (op.exclude or "").strip()
+
+    def test_apply_no_excludes_when_no_stale_sources(self):
+        op = self._make_op(
+            check_source_freshness=True,
+            source_to_dependent_models={self.SOURCE_ID: [self.MODEL_ID]},
+        )
+        context: Any = {"ti": MagicMock()}
+
+        with patch.object(op, "_get_stale_sources", return_value=[]):
+            op._apply_source_freshness_excludes(context)
+
+        assert not (op.exclude or "").strip()

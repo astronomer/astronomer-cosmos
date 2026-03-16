@@ -141,6 +141,7 @@ class TestWatcherTrigger:
         [
             ("success", "running", {"status": "success"}),
             ("failed", "running", {"status": "failed", "reason": "model_failed"}),
+            ("skipped", "running", {"status": "skipped", "reason": "source_not_fresh"}),
             (None, "failed", {"status": "failed", "reason": "producer_failed"}),
             (None, "success", {"status": "success", "reason": "model_not_run"}),
         ],

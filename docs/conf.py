@@ -25,6 +25,7 @@ extensions = [
     # "autoapi.extension",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinxcontrib.mermaid",
     "sphinx_reredirects",
 ]
 
@@ -75,10 +76,10 @@ redirects = {
     "configuration/logging": "../guides/cosmos_devex/logging.html",
     "configuration/memory_optimization": "../optimize_performance/memory_optimization.html",
     "configuration/multi-project": "../run/multi_project/multi-project.html",
-    "configuration/operator-args": "../guides/run_dbt/customization/operator-args.html",
+    "configuration/operator-args": "../guides/run_dbt/operators/operator-args.html",
     "configuration/parsing-methods": "../guides/translate_dbt_to_airflow/parsing-methods.html",
     "configuration/partial-parsing": "../guides/run_dbt/customization/partial-parsing.html",
-    "configuration/profile-config": "../guides/connect_database/index.html",
+    "configuration/profile-config": "../reference/configs/profile-config.html",
     "configuration/project-config": "../reference/configs/project-config.html",
     "configuration/render-config": "../guides/translate_dbt_to_airflow/render-config.html",
     "configuration/scheduling": "../guides/run_dbt/customization/scheduling.html",

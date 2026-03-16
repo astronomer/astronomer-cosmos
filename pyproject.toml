@@ -221,6 +221,7 @@ dependencies = [
     "sphinx-autoapi",
     "sphinx-autobuild",
     "sphinx-reredirects",
+    "sphinxcontrib.mermaid",
 ]
 
 [tool.hatch.envs.docs.scripts]

@@ -1,3 +1,5 @@
+.. _cosmos-config:
+
 Cosmos Config
 =============
 

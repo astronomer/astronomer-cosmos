@@ -1,5 +1,8 @@
+
+from __future__ import annotations
+import json
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +20,9 @@ from cosmos.constants import (
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
+    DBT_FAILED_STATUSES,
+    _iso_to_string,
+    _log_dbt_event,
     build_producer_state_fetcher,
     get_xcom_val,
     is_dbt_node_status_success,
@@ -32,8 +38,59 @@ except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
     from airflow.utils.context import Context  # type: ignore[attr-defined]
 
+try:
+    from dbt_common.events.base_types import EventMsg
+except ImportError:  # pragma: no cover
+    EventMsg = None
 
 logger = get_logger(__name__)
+
+
+def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMsg) -> None:
+    logger.debug("dbt_log: %s", dbt_log)
+    sensitive_words = ["fail", "error"]
+    if isinstance(dbt_log, dict):  # Subprocess
+        data = dbt_log.get("data", {})
+        info = dbt_log.get("info", {})
+
+        node_info = data.get("node_info")
+        status = node_info.get("node_status") if node_info else None
+        unique_id = node_info.get("unique_id") if node_info else None
+        start_time = node_info.get("node_started_at") if node_info else None
+        finish_time = node_info.get("node_finished_at") if node_info else None
+        msg = data.get("msg") or info.get("msg") or None
+    else:  # Runner
+        node_info = getattr(dbt_log.data, "node_info", None)
+        unique_id = getattr(node_info, "unique_id") if node_info else None
+        status = getattr(node_info, "node_status", None) if node_info else None
+        start_time = getattr(node_info, "node_started_at", None) if node_info else None
+        finish_time = getattr(node_info, "node_finished_at", None) if node_info else None
+        msg = getattr(dbt_log.info, "msg", None)
+
+    # Special case when node status is the string "None"; only process messages that contain an error or fail word
+    if status in ["None"] and msg is not None:
+        # Check if there is error log message
+        for sensitive_word in sensitive_words:
+            if sensitive_word in msg.lower():
+                break
+        else:
+            return None
+
+    if unique_id:
+        dbt_event = {
+            "status": status,
+            "start_time": _iso_to_string(start_time),
+            "finish_time": _iso_to_string(finish_time),
+            "msg": msg,
+        }
+
+        xcom_key = f"{unique_id.replace('.', '__')}_dbt_event"
+        # Avoid redundant XCom writes (and global lock contention) by only pushing
+        # when the event payload has changed.
+        existing_event = get_xcom_val(task_instance=task_instance, key=xcom_key, task_ids=PRODUCER_WATCHER_TASK_ID)
+        if existing_event == dbt_event:
+            return None
+        safe_xcom_push(task_instance=task_instance, key=xcom_key, value=dbt_event)
 
 
 def _extract_compiled_sql(
@@ -135,6 +192,11 @@ def store_dbt_resource_status_from_log(
     """
     try:
         log_line = json.loads(line)
+        context = extra_kwargs.get("context") if extra_kwargs else None
+        ti = context.get("ti") if context else None
+
+        if ti:
+            _process_dbt_log_event(ti, log_line)
     except json.JSONDecodeError:
         logger.debug("Failed to parse log: %s", line)
         log_line = {}
@@ -179,14 +241,8 @@ def store_dbt_resource_status_from_log(
     level = log_info.get("level", "INFO").upper()
     ts = log_info.get("ts")
     if msg is not None:
-        if ts:
-            # Format timestamp to match dbt runner format (HH:MM:SS)
-            try:
-                # Parse ISO format timestamp (e.g., "2025-01-29T13:16:05.123456Z")
-                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                formatted_ts = dt.strftime("%H:%M:%S")
-            except (ValueError, AttributeError):
-                formatted_ts = ts
+        formatted_ts = _iso_to_string(ts)
+        if formatted_ts:
             logger.log(getattr(logging, level, logging.INFO), "%s  %s", formatted_ts, msg)
         else:
             logger.log(getattr(logging, level, logging.INFO), msg)
@@ -299,11 +355,17 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return None
 
         logger.info("Node Info: %s", run_results_json)
+
+        status = node_result.get("status")
+
+        if status in DBT_FAILED_STATUSES:
+            logger.error("%s", node_result.get("message"))
+
         self.compiled_sql = node_result.get("compiled_code")
         if self.compiled_sql and hasattr(self, "_override_rtif"):
             self._override_rtif(context)
 
-        return node_result.get("status")
+        return status
 
     def _get_producer_task_status(self, context: Context) -> str | None:
         """
@@ -365,6 +427,12 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if status != "failed":
             return
 
+        dbt_events = get_xcom_val(
+            task_instance=context["ti"],
+            key=f"{self.model_unique_id.replace('.', '__')}_dbt_event",
+            task_ids=self.producer_task_id,
+        )
+        _log_dbt_event(dbt_events)
         if reason == "model_failed":
             raise AirflowException(
                 f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
@@ -426,6 +494,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 self.compiled_sql = compiled_sql
                 if hasattr(self, "_override_rtif"):
                     self._override_rtif(context)
+
+        dbt_events = get_xcom_val(
+            task_instance=context["ti"],
+            key=f"{self.model_unique_id.replace('.', '__')}_dbt_event",
+            task_ids=self.producer_task_id,
+        )
+        _log_dbt_event(dbt_events)
 
         if status is None:
 

@@ -18,7 +18,9 @@ Learn the important concepts and key ideas for how Cosmos works with Airflow and
    :maxdepth: 1
    :caption: Cosmos Fundamentals
 
+   How Cosmos works <how-cosmos-works>
    Similar dbt and Airflow concepts <dbt-airflow-concepts>
+   Cosmos core concepts <core-concepts>
 
 Quickstart
 ~~~~~~~~~~~

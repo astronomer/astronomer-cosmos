@@ -7,8 +7,7 @@ While dbt is an open source tool for data transformations and analysis, using SQ
 for the development, scheduling and monitoring of batch-oriented workflows, using Python. Although both tools have many
 differences, they also share similar concepts.
 
-This page aims to list some of these concepts and help those
-who may be new to Airflow or dbt and are considering to use Cosmos.
+This page aims to list some of these concepts and help those who may be new to Airflow or dbt and are considering to use Cosmos.
 
 .. table::
    :align: left

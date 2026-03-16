@@ -11,6 +11,15 @@ There are two categories of execution modes:
 
 2. **Execute dbt commands in a container** This type of execution mode offers high levels of environment isolation and also allows you to run dbt from either containers or external jobs, in both on-premises environments and various cloud services. There are multiple options for this type of execution mode: ``docker``, ``kubernetes``, ``watcher_kubernetes``, ``aws_ecs``, ``aws_eks``, ``azure_container_instance``, and ``gcp_cloud_run_job``.
 
+Choose between local and container execution mode types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To decide which execution mode you want to use, first select whether you want to use one that runs on the Airflow worker node, or to use one that runs in a container.
+
+The following decision tree can help you pick which type works best for your Cosmos project by considering your setup:
+
+.. image:: ../../_static/local_vs_container_light.png
+   :alt: A diagram presenting different options for setting up an execution mode on the Airflow worker or in a container.
 
 On the Airflow worker
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -34,6 +43,15 @@ There are four execution mode options that run on the Airflow worker:
 
 - :ref:`airflow_async <async-execution-mode>`: (Stable since Cosmos 1.9.0) Optimized for worker efficiency if you have long-running dbt commands. Currently only works with BigQuery. Pre-compile the SQL transformations with dbt in a setup task and execute them asynchronously using Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 
+Choose your local execution mode type
+++++++++++++++++++++++++++++++++++++++
+
+If you want to use an execution mode that can run in the Airflow worker node, use the following workflow to choose how to customize its behavior or decide that you want to use the container type of execution mode.
+
+.. image:: ../../_static/local_decision_light.png
+   :alt: A diagram presenting different options for setting up an execution mode on the Airflow worker.
+
+
 In a container
 ~~~~~~~~~~~~~~
 
@@ -46,6 +64,17 @@ You can also execute dbt commands in a container. Choosing these kinds of execut
 - :ref:`aws_eks <aws-eks>`: Run ``dbt`` commands via Kubernetes Pods in AWS EKS.
 - :ref:`azure_container_instance <azure-container-instance>`: Run ``dbt`` commands in Azure Container Instances.
 - :ref:`gcp_cloud_run_job <gcp-cloud-run-job>`: Run ``dbt`` commands via a container managed by GCP Cloud Run Job.
+
+
+Choose your container execution mode type
+++++++++++++++++++++++++++++++++++++++++++
+
+If you want to use a container execution mode, use the following decision tree to decide which kind of container execution mode works best for your project needs.
+
+
+.. image:: ../../_static/container_decision_light.png
+   :alt: A diagram presenting different options for setting up an execution mode in a container.
+
 
 .. _execution-modes-comparison:
 

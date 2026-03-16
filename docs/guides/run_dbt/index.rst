@@ -5,12 +5,11 @@ How Cosmos runs dbt
 
 Cosmos can run dbt commands directly using operators, or, after the dbt project has been parsed and turned into an Airflow Dag or task group, you can execute it.
 
-For most execution modes, Cosmos’ ``DbtDag`` and ``DbtTaskGroup`` follow the Airflow best practice of creating tasks that are as atomic as
-possible, meaning that there is a separate task for each dbt node. This leads to improved visibility and the
+In many execution modes, Cosmos’ ``DbtDag`` and ``DbtTaskGroup '' create a separate task for each dbt node (model, seed, snapshot).
+This leads to improved visibility and the
 possibility of fine-grained control over your dbt commands. For example, you can set task parameters like pool
-or retries, on individual Cosmos tasks. Or, you can make downstream tasks run as soon as a specific Cosmos task has
-finished successfully. The exceptions to using the Airflow best practice of creating atomic tasks are :ref:`watcher-execution-mode`,
-which uses dbt threading and deferrable sensors, and :ref:`async-execution-mode`, which uses the Airflow defferable operator.
+or retries on individual Cosmos tasks. Or, you can make downstream tasks run as soon as a specific Cosmos task has finished successfully.
+Running one dbt command per task can bring performance challenges, since each invocation of a dbt command incurs overhead. To improve performance, newer versions of Cosmos have introduced alternatives that offer the same level of granularity while centralising the execution of the dbt command in a single task. Check :ref:`watcher-execution-mode` and :ref:`async-execution-mode`, for more information.
 
 Cosmos uses different kinds of configurations to control how the dbt nodes are executed within the Airflow Dag or task group, which you can customize based on your project and needs.
 

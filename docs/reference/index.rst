@@ -15,7 +15,7 @@ Reference
    configs/project-config
    configs/execution-config
    configs/cosmos-conf
-   configs/profiles-config
+   configs/profile-config
 
 .. toctree::
    :maxdepth: 1

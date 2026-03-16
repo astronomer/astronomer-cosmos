@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from cosmos import settings
 
-__version__ = "1.14.0a2"
+__version__ = "1.14.0a3"
 
 
 if not settings.enable_memory_optimised_imports:

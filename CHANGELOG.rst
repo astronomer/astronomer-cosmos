@@ -11,14 +11,14 @@ Breaking changes
 
 Features
 
-* Add watcher mode support for dbt test node states by @michal-mrazek in #2318
 * Add cluster policy support for ``ExecutionMode.WATCHER`` sensor retries by @astro-anand in #2293
-* Add debug mode to track memory utilization by @tatiana in #2327
 * Add FQN selection support for ``LoadMode.DBT_MANIFEST`` by @pankajastro in #2375
 * Introduce interceptors for Cosmos tasks by @tatiana in #2419
 
 Enhancements
 
+* Add watcher mode support for dbt test node states by @michal-mrazek in #2318
+* Add debug mode to track memory utilization by @tatiana in #2327
 * Rename watcher-mode sensor retry queue and reuse it for producer tasks by @pankajastro in #2331
 * Fix leaked semaphore warnings in Airflow 3 by resetting dbt adapters by @pankajkoti in #2335
 * Improve dbt Fusion support and related tests by @tatiana in #2356

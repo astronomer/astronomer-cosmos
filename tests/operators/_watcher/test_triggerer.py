@@ -146,8 +146,10 @@ class TestWatcherTrigger:
         ],
     )
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
-    async def test_run_various_outcomes(self, mock_startup_events, dbt_node_status, producer_state, expected):
-
+    @patch("cosmos.operators._watcher.triggerer._log_dbt_event")
+    async def test_run_various_outcomes(
+        self, mock_dbt_event, mock_startup_events, dbt_node_status, producer_state, expected
+    ):
         async def fake_get_xcom_val(key):
             if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
                 return _STARTUP_EVENTS
@@ -259,17 +261,11 @@ class TestWatcherTrigger:
         assert "The producer task 'task_1' succeeded" in caplog.text
         assert "There is no information about the node 'model.test' execution" in caplog.text
 
-    @pytest.mark.asyncio
+    @patch("cosmos.operators._watcher.triggerer._log_dbt_event")
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
-    async def test_run_poke_interval_and_debug_log(self, mock_startup_events, caplog):
-        async def get_xcom_val_side_effect(key):
-            if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
-                return _STARTUP_EVENTS
-            if key.endswith("_compiled_sql"):
-                return "SELECT 1"
-            return "compressed_data"
-
-        get_xcom_val_mock = AsyncMock(side_effect=get_xcom_val_side_effect)
+    async def test_run_poke_interval_and_debug_log(self, mock_startup_events, mock_dbt_event, caplog):
+        get_xcom_val_mock = AsyncMock(return_value=None)
+        mock_dbt_event.return_value = None
         get_producer_status_mock = AsyncMock(side_effect=["running", "running", "running"])
         parse_dbt_node_status_and_compiled_sql_mock = AsyncMock(
             side_effect=[(None, None), (None, None), ("success", "SELECT 1")]

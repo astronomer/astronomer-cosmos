@@ -152,7 +152,7 @@ Example usage of templated ``dbt_cmd_flags`` for microbatch models with event-ti
         },
     )
 
-The following template fields are only selectable when using the operators in a standalone context via the `operator_args` parameter (starting in Cosmos 1.4):
+The following template fields are only selectable when using the operators in a standalone context via the ``operator_args`` parameter (starting in Cosmos 1.4):
 
 - ``select``
 - ``exclude``

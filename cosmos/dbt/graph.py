@@ -507,7 +507,7 @@ class DbtGraph:
         cache_args = list(self.dbt_ls_args)
         env_vars = self.env_vars
         if env_vars:
-            envvars_str = json.dumps_str(env_vars, sort_keys=True)
+            envvars_str = json.dumps_str(env_vars, sort_keys=True, separators=(",", ":"))
             cache_args.append(envvars_str)
         if self.render_config.airflow_vars_to_purge_dbt_ls_cache:
             for var_name in self.render_config.airflow_vars_to_purge_dbt_ls_cache:

@@ -9,6 +9,7 @@ load, dump) work correctly with both the stdlib json fallback
 from __future__ import annotations
 
 import io
+import importlib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -27,7 +28,10 @@ SAMPLE_DATA = {"key": "value", "number": 42, "nested": {"a": 1}}
 # Setting defaults
 # ---------------------------------------------------------------------------
 class TestSettings:
-    def test_disabled_by_default(self):
+    def test_disabled_by_default(self, monkeypatch):
+        # Ensure environment does not force-enable the parser, then reload settings
+        monkeypatch.delenv("AIRFLOW__COSMOS__ENABLE_ORJSON_PARSER", raising=False)
+        importlib.reload(settings)
         assert settings.enable_orjson_parser is False
 
     @patch.object(settings, "enable_orjson_parser", True)

@@ -110,7 +110,8 @@ class BaseProfileMapping(ABC):
             profile = self.profile
         profile["profile_name"] = profile_name
         profile["target_name"] = target_name
-        hash_object = hashlib.sha256(json.dumps_bytes(profile, sort_keys=True))
+        serialized_profile = json.dumps(profile, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        hash_object = hashlib.sha256(serialized_profile.encode("utf-8"))
         return hash_object.hexdigest()
 
     def _validate_profile_args(self) -> None:

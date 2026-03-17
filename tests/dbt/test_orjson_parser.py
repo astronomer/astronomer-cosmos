@@ -8,8 +8,8 @@ load, dump) work correctly with both the stdlib json fallback
 
 from __future__ import annotations
 
-import io
 import importlib
+import io
 from pathlib import Path
 from unittest.mock import patch
 

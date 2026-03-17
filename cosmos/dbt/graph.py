@@ -64,6 +64,31 @@ from cosmos.log import get_logger
 logger = get_logger(__name__)
 
 
+def _get_variable_as_dict(key: str, default: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Get an Airflow Variable as a dict, handling both JSON string and already-deserialized dict.
+
+    In Astronomer/Airflow >= 3.1, Variable.get(..., deserialize_json=True) can fail with
+    TypeError because the backend may return an already-deserialized dict, and the SDK
+    then calls json.loads() on it. This helper avoids that by getting the raw value and
+    normalizing to a dict ourselves.
+    """
+    if default is None:
+        default = {}
+    try:
+        raw = Variable.get(key)
+    except Exception:
+        return default
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw:
+        try:
+            return json.loads(raw)  # type: ignore[no-any-return]
+        except json.JSONDecodeError:
+            return default
+    return default
+
+
 def _normalize_path(path: str) -> str:
     """
     Converts a potentially Windows path string into a Posix-friendly path.
@@ -605,7 +630,7 @@ class DbtGraph:
             cache_dict = (
                 self._get_dbt_ls_remote_cache(remote_cache_dir)
                 if remote_cache_dir
-                else Variable.get(self.cache_key, deserialize_json=True)
+                else _get_variable_as_dict(self.cache_key)
             )
         except tuple(airflow_variable_exceptions):
             return cache_dict
@@ -1031,7 +1056,7 @@ class DbtGraph:
             cache_dict = (
                 self._get_yaml_selectors_remote_cache(remote_cache_dir)
                 if remote_cache_dir
-                else Variable.get(self.cache_key, deserialize_json=True)
+                else _get_variable_as_dict(self.cache_key)
             )
         except tuple(airflow_variable_exceptions):
             return cache_dict

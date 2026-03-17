@@ -411,7 +411,9 @@ def delete_unused_dbt_cache(
     # Identify Cosmos-related cache in Airflow variables
     for var in all_variables:
         if var.key.startswith(VAR_KEY_CACHE_PREFIX):
-            var_value = json.loads(var.val)
+            # In Astronomer/Airflow >= 3.1, var.val may already be a dict
+            raw_val = var.val
+            var_value = raw_val if isinstance(raw_val, dict) else json.loads(raw_val)
             cosmos_dags_ids[var_value["dag_id"]].append(var.key)
             total_cosmos_variables += 1
 

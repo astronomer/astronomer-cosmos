@@ -344,7 +344,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     path_base=base_path,
-                    original_file_path=Path(node_file_path),
+                    original_file_path=Path(_normalize_path(node_file_path)),
                     tags=node_dict.get("tags") or [],
                     config=node_dict.get("config") or {},
                     has_freshness=(

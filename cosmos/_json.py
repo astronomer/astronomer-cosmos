@@ -44,13 +44,27 @@ def _orjson_option(sort_keys: bool = False, indent: int | None = None) -> int:
 
 def loads(s: str | bytes | bytearray | memoryview, **kwargs: Any) -> Any:  # type: ignore[type-arg]
     if _use_orjson() and not kwargs:
-        return _orjson.loads(s)  # type: ignore[union-attr]
+        # orjson.loads expects a bytes-like object; normalize stdlib-compatible inputs.
+        if isinstance(s, str):
+            data = s.encode()
+        elif isinstance(s, (bytearray, memoryview)):
+            data = bytes(s)
+        else:
+            data = s
+        return _orjson.loads(data)  # type: ignore[union-attr]
     return _json.loads(s, **kwargs)  # type: ignore[arg-type]
 
 
 def load(fp: IO[str] | IO[bytes], **kwargs: Any) -> Any:
     if _use_orjson() and not kwargs:
-        return _orjson.loads(fp.read())  # type: ignore[union-attr]
+        raw = fp.read()
+        if isinstance(raw, str):
+            data = raw.encode()
+        elif isinstance(raw, (bytearray, memoryview)):
+            data = bytes(raw)
+        else:
+            data = raw
+        return _orjson.loads(data)  # type: ignore[union-attr]
     return _json.load(fp, **kwargs)
 
 
@@ -74,7 +88,12 @@ def dumps_bytes(
     separators: tuple[str, str] | None = None,
     **kwargs: Any,
 ) -> bytes:
-    if _use_orjson() and indent in _ORJSON_SUPPORTED_INDENTS:
+    if (
+        _use_orjson()
+        and indent in _ORJSON_SUPPORTED_INDENTS
+        and separators is None
+        and not kwargs
+    ):
         return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent))  # type: ignore[union-attr,no-any-return]
     return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs).encode()
 
@@ -87,7 +106,12 @@ def dumps_str(
     separators: tuple[str, str] | None = None,
     **kwargs: Any,
 ) -> str:
-    if _use_orjson() and indent in _ORJSON_SUPPORTED_INDENTS:
+    if (
+        _use_orjson()
+        and indent in _ORJSON_SUPPORTED_INDENTS
+        and separators is None
+        and not kwargs
+    ):
         return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent)).decode()  # type: ignore[union-attr,no-any-return]
     return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs)
 

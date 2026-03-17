@@ -88,12 +88,7 @@ def dumps_bytes(
     separators: tuple[str, str] | None = None,
     **kwargs: Any,
 ) -> bytes:
-    if (
-        _use_orjson()
-        and indent in _ORJSON_SUPPORTED_INDENTS
-        and separators is None
-        and not kwargs
-    ):
+    if _use_orjson() and indent in _ORJSON_SUPPORTED_INDENTS and separators is None and not kwargs:
         return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent))  # type: ignore[union-attr,no-any-return]
     return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs).encode()
 
@@ -106,12 +101,7 @@ def dumps_str(
     separators: tuple[str, str] | None = None,
     **kwargs: Any,
 ) -> str:
-    if (
-        _use_orjson()
-        and indent in _ORJSON_SUPPORTED_INDENTS
-        and separators is None
-        and not kwargs
-    ):
+    if _use_orjson() and indent in _ORJSON_SUPPORTED_INDENTS and separators is None and not kwargs:
         return _orjson.dumps(obj, option=_orjson_option(sort_keys, indent)).decode()  # type: ignore[union-attr,no-any-return]
     return _json.dumps(obj, sort_keys=sort_keys, indent=indent, separators=separators, **kwargs)
 

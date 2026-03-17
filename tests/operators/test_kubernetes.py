@@ -5,7 +5,12 @@ import kubernetes.client as k8s
 import pytest
 from airflow import __version__ as airflow_version
 from airflow.models import DAG, TaskInstance
-from airflow.utils.context import Context
+
+try:
+    from airflow.sdk.definitions.context import Context
+except ImportError:
+    from airflow.utils.context import Context
+
 from packaging import version
 from pendulum import datetime
 

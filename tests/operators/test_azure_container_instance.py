@@ -1,7 +1,11 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from airflow.utils.context import Context
+try:
+    from airflow.sdk.definitions.context import Context
+except ImportError:
+    from airflow.utils.context import Context
+
 from pendulum import datetime
 
 from cosmos.operators.azure_container_instance import (

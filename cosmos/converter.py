@@ -386,6 +386,8 @@ class DbtToAirflowConverter:
         """
         if dag is None:
             return
+        if not settings.enable_dag_versioning:
+            return
 
         try:
             dbt_project_hash = _create_folder_version_hash(self.dbt_graph.project_path)

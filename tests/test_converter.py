@@ -1206,6 +1206,33 @@ def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, 
     )
 
 
+@patch("cosmos.converter.settings.enable_dag_versioning", False)
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_skipped_when_setting_disabled(mock_load_dbt_graph, mock_hash_func):
+    """Test that dbt project hash is not computed or appended when enable_dag_versioning is False."""
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
+    assert dag.doc_md is None
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    assert dag.doc_md is None
+    mock_hash_func.assert_not_called()
+
+
 @patch("cosmos.converter.logger")
 @patch("cosmos.converter.DbtGraph.load")
 def test_converter_logs_parsing_group_order(mock_load_dbt_graph, mock_logger):

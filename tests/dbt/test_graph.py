@@ -214,8 +214,8 @@ def test_dbt_profile_config_to_override():
                 "unique_id": "model.my_project.customers",
                 "resource_type": "model",
                 "depends_on": [],
-                "file_path": ".",
-                "original_file_path": ".",
+                "file_path": "base_path/original_file_path",
+                "original_file_path": "original_file_path",
                 "tags": [],
                 "config": {},
                 "has_test": False,
@@ -230,8 +230,8 @@ def test_dbt_profile_config_to_override():
                 "unique_id": "model.my_project.customers.v1",
                 "resource_type": "model",
                 "depends_on": [],
-                "file_path": ".",
-                "original_file_path": ".",
+                "file_path": "base_path/original_file_path",
+                "original_file_path": "original_file_path",
                 "tags": [],
                 "config": {},
                 "has_test": False,
@@ -250,8 +250,8 @@ def test_dbt_node_context_dict(
         unique_id=unique_id,
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        path_base=Path(""),
-        original_file_path=Path(""),
+        path_base=Path("base_path"),
+        original_file_path=Path("original_file_path"),
     )
     assert node.context_dict == expected_dict
 

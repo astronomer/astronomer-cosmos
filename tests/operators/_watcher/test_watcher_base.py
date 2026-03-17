@@ -57,39 +57,16 @@ class TestBaseConsumerSensor:
         assert sensor.extra_context == {}
 
     @pytest.mark.parametrize(
-        "msg,should_push",
+        "event_name,should_push",
         [
-            ("1 of 30 START sql table model bq_dev.a ......................... [RUN]", False),
-            ("6 of 30 FAIL creating sql view model bq_dev.stg_customers ............... [ERROR in 1.18s]", True),
-            ("6 of 30 ERROR creating sql view model bq_dev.stg_customers ..................... [ERROR in 1.18s]", True),
+            (None, False),
+            ("LogStartLine", False),
+            ("NodeFinished", True),
+            ("NodeStart", True),
         ],
     )
-    def test_process_dbt_log_event_sensitive_words(self, msg, should_push):
-        task_instance = Mock()
-
-        dbt_log = {
-            "data": {
-                "node_info": {
-                    "unique_id": "model.test.my_model",
-                    "node_status": "None",
-                    "node_started_at": "2024-01-01T00:00:00",
-                    "node_finished_at": "2024-01-01T00:01:00",
-                },
-                "msg": msg,
-            },
-            "info": {},
-        }
-
-        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
-
-            _process_dbt_log_event(task_instance, dbt_log)
-
-            if should_push:
-                mock_push.assert_called_once()
-            else:
-                mock_push.assert_not_called()
-
-    def test_process_dbt_log_event_skips_duplicate_event(self):
+    def test_process_dbt_log_event_only_pushes_when_event_in_allowlist(self, event_name, should_push):
+        """Only events in _DBT_EVENTS_TYPE are pushed to XCom."""
         task_instance = Mock()
 
         dbt_log = {
@@ -102,28 +79,30 @@ class TestBaseConsumerSensor:
                 },
                 "msg": "model finished",
             },
-            "info": {},
+            "info": {"name": event_name} if event_name is not None else {},
         }
 
-        duplicate_event = {
-            "status": "success",
-            "start_time": "2024-01-01T00:00:00",
-            "finish_time": "2024-01-01T00:01:00",
-            "msg": "model finished",
+        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+            _process_dbt_log_event(task_instance, dbt_log)
+
+            if should_push:
+                mock_push.assert_called_once()
+                call_kwargs = mock_push.call_args.kwargs
+                assert call_kwargs["key"] == "model__test__my_model_dbt_event"
+                assert call_kwargs["value"]["status"] == "success"
+                assert call_kwargs["value"]["msg"] == "model finished"
+            else:
+                mock_push.assert_not_called()
+
+    def test_process_dbt_log_event_skips_when_no_unique_id(self):
+        """Events with no node_info.unique_id are not pushed."""
+        task_instance = Mock()
+
+        dbt_log = {
+            "data": {"node_info": {}, "msg": "some log"},
+            "info": {"name": "NodeFinished"},
         }
 
-        with (
-            patch(
-                "cosmos.operators._watcher.base.get_xcom_val",
-                return_value=duplicate_event,
-            ),
-            patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push,
-            patch(
-                "cosmos.operators._watcher.base._iso_to_string",
-                side_effect=lambda x: x,
-            ),
-        ):
-            result = _process_dbt_log_event(task_instance, dbt_log)
-
-            assert result is None
+        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+            _process_dbt_log_event(task_instance, dbt_log)
             mock_push.assert_not_called()

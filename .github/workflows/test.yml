@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, airflow_3.2]
   # Also run on pull requests originating from forks. Although this is insecure by default, we need it to run
   # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
   # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.
@@ -109,7 +109,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1"]
+        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
         dbt-version: ["1.10"]
         exclude:
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
@@ -166,7 +166,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1"]
+        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
         dbt-version: [ "1.11" ]
         exclude:
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.

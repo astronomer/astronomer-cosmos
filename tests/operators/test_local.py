@@ -19,7 +19,11 @@ try:  # For Airflow 3
 except ImportError:  # For Airflow 2
     from airflow.hooks.subprocess import SubprocessResult
 from airflow.models.taskinstance import TaskInstance
-from airflow.utils.context import Context
+
+try:
+    from airflow.sdk.definitions.context import Context
+except ImportError:
+    from airflow.utils.context import Context
 from packaging import version
 from pendulum import datetime
 

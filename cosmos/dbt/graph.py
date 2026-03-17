@@ -185,7 +185,6 @@ class DbtNode:
             "resource_type": self.resource_type.value,  # convert enum to value
             "depends_on": self.depends_on,
             "file_path": str(self.file_path),  # convert path to string
-            "original_file_path": str(self.original_file_path),  # convert original path to string
             "tags": self.tags,
             "config": self.config,
             "has_test": self.has_test,

@@ -68,7 +68,10 @@ def _normalize_path(path: str) -> str:
     """
     Converts a potentially Windows path string into a Posix-friendly path.
     """
-    return Path(path.replace("\\", "/")).as_posix()
+    if path is None:
+        return ""
+    else:
+        return Path(path.replace("\\", "/")).as_posix()
 
 
 class CosmosLoadDbtException(Exception):

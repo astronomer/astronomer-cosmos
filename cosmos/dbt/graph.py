@@ -101,7 +101,7 @@ class DbtNode:
 
     @property
     def file_path(self) -> Path:
-        """Resolved absolute path to the node's file (path_base / original_file_path)."""
+        """Combined path to the node's file (path_base / original_file_path)."""
         return self.path_base / self.original_file_path
 
     @property

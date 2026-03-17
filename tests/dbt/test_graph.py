@@ -250,8 +250,8 @@ def test_dbt_node_context_dict(
         unique_id=unique_id,
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        path_base=Path("."),
-        original_file_path=Path("."),
+        path_base=Path(""),
+        original_file_path=Path(""),
     )
     assert node.context_dict == expected_dict
 
@@ -1777,7 +1777,7 @@ Values returned by mac_get_values:
             unique_id="model.some_package.some_model",
             resource_type=DbtResourceType.MODEL,
             depends_on=["source.some_source"],
-            path_base=Path("fake/some_package"),
+            path_base=Path("some_package"),
             original_file_path=Path("models/some_model.sql"),
             tags=[],
             config={
@@ -1828,7 +1828,7 @@ def test_parse_dbt_ls_output():
             unique_id="fake-unique-id",
             resource_type=DbtResourceType.MODEL,
             depends_on=[],
-            path_base=Path("fake/fake-project"),
+            path_base=Path("fake-project"),
             original_file_path=Path("fake-file-path.sql"),
             tags=[],
             config={},
@@ -1848,7 +1848,7 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
             unique_id="some-unique-id",
             resource_type=DbtResourceType.MODEL,
             depends_on=[],
-            path_base=Path("some/some-project"),
+            path_base=Path("some-project"),
             original_file_path=Path("some-file-path.sql"),
             tags=[],
             config={},

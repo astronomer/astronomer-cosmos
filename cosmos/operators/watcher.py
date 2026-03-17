@@ -12,6 +12,7 @@ from airflow.exceptions import AirflowException
 
 from cosmos.config import ProfileConfig
 from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
+from cosmos.operators._watcher.state import DBT_FAILED_STATUSES
 from cosmos.settings import watcher_dbt_execution_queue
 
 try:
@@ -20,6 +21,7 @@ except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from cosmos.constants import (
+    _DBT_STARTUP_EVENTS_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
@@ -29,6 +31,7 @@ from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
+    _process_dbt_log_event,
     store_compiled_sql_for_model,
     store_dbt_resource_status_from_log,
 )
@@ -98,6 +101,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self.test_results_per_model: dict[str, list[str]] = {}
+        # Do not publish compiled_sql to the producer's rendered_template: it would contain SQL for
+        # all models run by the producer, is often truncated in the UI due to size, and is of no use
+        # there; individual sensor tasks show the corresponding rendered_template per model.
+        kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
@@ -150,7 +157,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:
         # Only push startup events; per-model statuses are available via individual nodefinished_<uid> entries.
         if startup_events:
-            safe_xcom_push(task_instance=context["ti"], key="dbt_startup_events", value=startup_events)
+            safe_xcom_push(task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events)
 
     def _set_invocation_mode_if_not_set(self) -> None:
         if not self.invocation_mode:
@@ -202,9 +209,13 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
                 def _callback(event_message: EventMsg) -> None:
                     try:
+                        _process_dbt_log_event(context["ti"], event_message)
                         name = event_message.info.name
                         if name in {"MainReportVersion", "AdapterRegistered"}:
                             self._handle_startup_event(event_message, startup_events)
+                            safe_xcom_push(
+                                task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events
+                            )
                         elif name == "NodeFinished":
                             self._handle_node_finished(event_message, context)
                     except Exception:
@@ -261,9 +272,8 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         )
 
     def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-        dbt_startup_events = ti.xcom_pull(task_ids=self.producer_task_id, key="dbt_startup_events")
-        if dbt_startup_events:  # pragma: no cover
-            logger.info("Dbt Startup Event: %s", dbt_startup_events)
+
+        self._log_startup_events(ti)
 
         node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
         logger.info("Pulling from producer task_id: %s, key: %s", self.producer_task_id, node_finished_key)
@@ -275,8 +285,12 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         event_json = _parse_compressed_xcom(compressed_b64_event_msg)
 
         logger.info("Node Info: %s", event_json)
+        node_result = event_json.get("data", {}).get("run_result", {})
+        status = node_result.get("status")
+        if status in DBT_FAILED_STATUSES:
+            logger.error("%s", node_result.get("message"))
 
-        return event_json.get("data", {}).get("run_result", {}).get("status")
+        return status
 
     def use_event(self) -> bool:
         if not self.invocation_mode:

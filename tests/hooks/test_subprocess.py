@@ -107,11 +107,12 @@ def test_store_dbt_resource_status_from_log_param(status, context, should_push, 
                 line, {"context": context}, tests_per_model={}, test_results_per_model={}
             )
             if should_push:
-                mock_push.assert_called_once_with(
+                mock_push.assert_called_with(
                     task_instance=context["ti"], key="model__jaffle_shop__stg_orders_status", value=status
                 )
+                assert mock_push.call_count == 2
             else:
-                mock_push.assert_not_called()
+                mock_push.assert_called_once()
 
 
 def test_store_dbt_resource_status_from_log_invalid_json():

@@ -333,8 +333,6 @@ class ProfileConfig:
             target_type = profile["outputs"][self.target_name]["type"]
             return str(target_type)
 
-        return "undefined"
-
     def _get_profile_path(self, use_mock_values: bool = False) -> Path:
         """
         Handle the profile caching mechanism.

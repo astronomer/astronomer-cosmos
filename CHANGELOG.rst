@@ -255,7 +255,7 @@ Others
 
 Features
 
-* Introduce ``ExecutionMode.WATCHER`` to reduce DAG run time by 1/5 in several PRs. Learn more about it `here <https://astronomer.github.io/astronomer-cosmos/getting_started/watcher-execution-mode.html#watcher-execution-mode>`_. This feature was implemented via multiple PRs, including:
+* Introduce ``ExecutionMode.WATCHER`` to reduce DAG run time by 1/5 in several PRs. Learn more about it `here <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html>`_. This feature was implemented via multiple PRs, including:
   * Expose new execution mode by @tatiana @pankajastro @pankajkoti in #1999
   * Add ``DbtProducerWatcherOperator`` for the proposed ``ExecutionMode.WATCHER`` by @pankajkoti in #1982
   * Add ``DbtConsumerWatcherSensor`` for the proposed ``ExecutionMode.WATCHER`` by @pankajastro in #1998
@@ -274,8 +274,8 @@ Features
   * Fix ``ExecutionMode.WATCHER`` behaviour with ``DbtTaskGroup`` by @tatiana in #2044
   * Fix Cosmos behaviour when using watcher with ``InvocationMode.DBT_RUNNER`` by @tatiana in #2048
 
-* Add Airflow 3 plugin for dbt docs with multiple dbt projects support by @pankajkoti in #2009, check the `documentation <https://astronomer.github.io/astronomer-cosmos/configuration/hosting-docs.html>`_.
-* Initial support to ``dbt Fusion`` by @tatiana in #1803. `More details here. <https://astronomer.github.io/astronomer-cosmos/configuration/dbt-fusion>`_.
+* Add Airflow 3 plugin for dbt docs with multiple dbt projects support by @pankajkoti in #2009, check the `documentation <https://astronomer.github.io/astronomer-cosmos/guides/dbt_docs/hosting-docs.html>`_.
+* Initial support to ``dbt Fusion`` by @tatiana in #1803. `More details here. <https://astronomer.github.io/astronomer-cosmos/guides/dbt_setup/dbt-fusion.html>`_.
 * Support to prune sources without downstream references in dbt projects by @corsettigyg in #1988
 * Allow to set task display name as a user-defined function by @corsettigyg in #1761
 * Add dbt project's hash to dag docs to support dag versioning in Airflow 3 by @pankajkoti in #1907
@@ -562,12 +562,12 @@ Breaking changes
   While this represents significant performance improvements (half the vCPU usage and some memory consumption improvement), this may not work in
   scenarios where users had multiple Python virtual environments to manage different versions of dbt and its adaptors. In those cases,
   please, set ``RenderConfig(invocation_mode=InvocationMode.SUBPROCESS)`` to have the same behaviour Cosmos had in previous versions.
-  Additional information `here <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-ls>`_ and `here <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
+  Additional information `here <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/parsing-methods.html#dbt-ls>`_ and `here <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
 
 Features
 
-* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if ``dbt-core`` is available by @tatiana in #1484. Additional information `here <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-ls>`_.
-* Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495. Check out the `documentation <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
+* Use ``dbtRunner`` in the DAG Processor when using ``LoadMode.DBT_LS`` if ``dbt-core`` is available by @tatiana in #1484. Additional information `here <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/render-config.html#dbt-ls>`_.
+* Allow users to opt-out of ``dbtRunner`` during DAG parsing with ``InvocationMode.SUBPROCESS`` by @tatiana in #1495. Check out the `documentation <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
 * Add structure to support multiple db for async operator execution by @pankajastro in #1483
 * Support overriding the ``profile_config`` per dbt node or folder using config by @tatiana in #1492. More information `here <https://astronomer.github.io/astronomer-cosmos/profiles/#profile-customise-per-node>`_.
 * Create and run accurate SQL statements when using ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajkoti, @tatiana and @pankajastro in #1474
@@ -621,7 +621,7 @@ Bug Fixes
 
 Enhancement
 
-* Allow users to opt-in or out (default) of detached test nodes by @tatiana in #1470. Learn more about this `here <https://astronomer.github.io/astronomer-cosmos/configuration/testing-behavior.html>`_.
+* Allow users to opt-in or out (default) of detached test nodes by @tatiana in #1470. Learn more about this `here <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/testing-behavior.html>`_.
 
 Docs
 
@@ -662,13 +662,13 @@ Others
 
 New Features
 
-* Support customizing Airflow operator arguments per dbt node by @wornjs in #1339. `More information <https://astronomer.github.io/astronomer-cosmos/getting_started/custom-airflow-properties.html>`_.
-* Support uploading dbt artifacts to remote cloud storages via callback by @pankajkoti in #1389. `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/callbacks.html>`_.
-* Add support to ``TestBehavior.BUILD`` by @tatiana in #1377. `Documentation <https://astronomer.github.io/astronomer-cosmos/configuration/testing-behavior.html>`_.
+* Support customizing Airflow operator arguments per dbt node by @wornjs in #1339. `More information <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/customization/custom-airflow-properties.html>`_.
+* Support uploading dbt artifacts to remote cloud storages via callback by @pankajkoti in #1389. `Read more <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/callbacks/callbacks.html>`_.
+* Add support to ``TestBehavior.BUILD`` by @tatiana in #1377. `Documentation <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/testing-behavior.html>`_.
 * Add support for the "at" operator when using ``LoadMode.DBT_MANIFEST`` or ``CUSTOM`` by @benjy44 in #1372
-* Add dbt clone operator by @pankajastro in #1326, as documented in `here <https://astronomer.github.io/astronomer-cosmos/getting_started/operators.html>`_.
-* Support rendering tasks with non-ASCII characters by @t0momi219 in #1278 `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/task-display-name.html>`_.
-* Add warning callback on source freshness by @pankajastro in #1400 `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/source-nodes-rendering.html#on-warning-callback-callback>`_.
+* Add dbt clone operator by @pankajastro in #1326, as documented in `here <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/operators/operators.html>`_.
+* Support rendering tasks with non-ASCII characters by @t0momi219 in #1278 `Read more <https://astronomer.github.io/astronomer-cosmos/guides/cosmos_devex/task-display-name.html>`_.
+* Add warning callback on source freshness by @pankajastro in #1400 `Read more <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/managing-sources.html#on-warning-callback-callback>`_.
 * Add Oracle Profile mapping by @slords and @pankajkoti in #1190 and #1404
 * Emit telemetry to Scarf during DAG run by @tatiana in #1397
 * Save tasks map as ``DbtToAirflowConverter`` property by @internetcoffeephone and @hheemskerk in #1362
@@ -766,18 +766,18 @@ New Features
 * Introduction of experimental support to run dbt BQ models using Airflow deferrable operators by @pankajkoti @pankajastro @tatiana in #1224 #1230.
   This is a first step in this journey and we would really appreciate feedback from the community.
 
-  For more information, check the documentation: https://astronomer.github.io/astronomer-cosmos/getting_started/execution-modes.html#airflow-async-experimental
+  For more information, check the documentation: https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/execution-modes.html#airflow-async-experimental
 
   This work has been inspired by the talk "Airflow at Monzo: Evolving our data platform as the bank scales" by
   @jonathanrainer @ed-sparkes given at Airflow Summit 2023: https://airflowsummit.org/sessions/2023/airflow-at-monzo-evolving-our-data-platform-as-the-bank-scales/.
 
 * Support using ``DatasetAlias`` and fix orphaning unreferenced dataset by @tatiana in #1217 #1240
 
-  Documentation: https://astronomer.github.io/astronomer-cosmos/configuration/scheduling.html#data-aware-scheduling
+  Documentation: https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/customization/scheduling.html#data-aware-scheduling
 
 * Add GCP_CLOUD_RUN_JOB execution mode by @ags-de #1153
 
-  Learn more about it: https://astronomer.github.io/astronomer-cosmos/getting_started/gcp-cloud-run-job.html
+  Learn more about it: https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/container/gcp-cloud-run-job.html
 
 Enhancements
 
@@ -1073,17 +1073,17 @@ Others
 
 Features
 
-* Add new parsing method ``LoadMode.DBT_LS_FILE`` by @woogakoki in #733 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/parsing-methods.html#dbt-ls-file>`_).
-* Add support to select using (some) graph operators when using ``LoadMode.CUSTOM`` and ``LoadMode.DBT_MANIFEST`` by @tatiana in #728 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/selecting-excluding.html#using-select-and-exclude>`_)
-* Add support for dbt ``selector`` arg for DAG parsing by @jbandoro in #755 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/render-config.html#render-config>`_).
+* Add new parsing method ``LoadMode.DBT_LS_FILE`` by @woogakoki in #733 (`documentation <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/parsing-methods.html#dbt-ls-file>`_).
+* Add support to select using (some) graph operators when using ``LoadMode.CUSTOM`` and ``LoadMode.DBT_MANIFEST`` by @tatiana in #728 (`documentation <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/selecting-excluding.html#using-select-and-exclude>`_)
+* Add support for dbt ``selector`` arg for DAG parsing by @jbandoro in #755 (`documentation <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/render-config.html#render-config>`_).
 * Add ``ProfileMapping`` for Vertica by @perttus in #540, #688 and #741 (`documentation <https://astronomer.github.io/astronomer-cosmos/profiles/VerticaUserPassword.html>`_).
 * Add ``ProfileMapping`` for Snowflake encrypted private key path by @ivanstillfront in #608 (`documentation <https://astronomer.github.io/astronomer-cosmos/profiles/SnowflakeEncryptedPrivateKeyFilePem.html>`_).
 * Add support for Snowflake encrypted private key environment variable by @DanMawdsleyBA in #649
-* Add ``DbtDocsGCSOperator`` for uploading dbt docs to GCS by @jbandoro in #616, (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/generating-docs.html#upload-to-gcs>`_).
-* Add cosmos/propagate_logs Airflow config support for disabling log propagation by @agreenburg in #648 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/logging.html>`_).
+* Add ``DbtDocsGCSOperator`` for uploading dbt docs to GCS by @jbandoro in #616, (`documentation <https://astronomer.github.io/astronomer-cosmos/guides/dbt_docs/generating-docs.html#upload-to-gcs>`_).
+* Add cosmos/propagate_logs Airflow config support for disabling log propagation by @agreenburg in #648 (`documentation <https://astronomer.github.io/astronomer-cosmos/guides/cosmos_devex/logging.html>`_).
 * Add operator_args ``full_refresh`` as a templated field by @joppevos in #623
-* Expose environment variables and dbt variables in ``ProjectConfig`` by @jbandoro in #735 (`documentation <https://astronomer.github.io/astronomer-cosmos/configuration/project-config.html#project-config-example>`_).
-* Support disabling event tracking when using Cosmos profile mapping by @jbandoro in #768 (`documentation <https://astronomer.github.io/astronomer-cosmos/profiles/index.html#disabling-dbt-event-tracking>`_).
+* Expose environment variables and dbt variables in ``ProjectConfig`` by @jbandoro in #735 (`documentation <https://astronomer.github.io/astronomer-cosmos/reference/configs/project-config.html#project-config-example>`_).
+* Support disabling event tracking when using Cosmos profile mapping by @jbandoro in #768 (`documentation <https://astronomer.github.io/astronomer-cosmos/guides/connect_database/profile-customise-per-node.html#disabling-dbt-event-tracking>`_).
 
 Enhancements
 
@@ -1275,7 +1275,7 @@ Features
 Enhancements
 
 * Hide sensitive field when using BigQuery keyfile_dict profile mapping by @jbandoro in #471
-* Consistent Airflow Dataset URIs, inlets and outlets with `Openlineage package <https://pypi.org/project/openlineage-integration-common/>`_ by @tatiana in #485. `Read more <https://astronomer.github.io/astronomer-cosmos/configuration/lineage.html>`_.
+* Consistent Airflow Dataset URIs, inlets and outlets with `Openlineage package <https://pypi.org/project/openlineage-integration-common/>`_ by @tatiana in #485. `Read more <https://astronomer.github.io/astronomer-cosmos/guides/cosmos_devex/lineage.html>`_.
 * Refactor ``LoadMethod.DBT_LS`` to run from a temporary directory with symbolic links by @tatiana in #488
 * Run ``dbt deps`` when using ``LoadMethod.DBT_LS`` by @DanMawdsleyBA in #481
 * Update Cosmos log color to purple by @harels in #494

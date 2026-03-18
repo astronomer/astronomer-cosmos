@@ -64,7 +64,7 @@ from cosmos.log import get_logger
 logger = get_logger(__name__)
 
 
-def _normalize_path(path: str) -> str:
+def _normalize_path(path: str | None) -> str:
     """
     Converts a potentially Windows path string into a Posix-friendly path.
     """

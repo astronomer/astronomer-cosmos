@@ -66,7 +66,7 @@ class TestBaseConsumerSensor:
         ],
     )
     def test_process_dbt_log_event_only_pushes_when_event_in_allowlist(self, event_name, should_push):
-        """Only events in _DBT_EVENTS_TYPE are pushed to XCom."""
+        """Only allowed dbt event types are pushed to XCom."""
         task_instance = Mock()
 
         dbt_log = {

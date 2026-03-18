@@ -58,6 +58,8 @@ def get_dag_bag() -> DagBag:
 
         if AIRFLOW_VERSION > Version("3.1.0"):
             file.writelines("cosmos_manifest_example.py\n")
+            file.writelines("cosmos_manifest_selectors_example.py\n")
+            file.writelines("cross_project_manifest_dag.py\n")
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())

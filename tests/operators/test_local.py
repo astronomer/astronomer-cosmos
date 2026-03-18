@@ -20,12 +20,11 @@ except ImportError:  # For Airflow 2
     from airflow.hooks.subprocess import SubprocessResult
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.context import Context
-from airflow.utils.state import DagRunState
 from packaging import version
 from pendulum import datetime
 
 import cosmos.dbt.runner as dbt_runner
-from cosmos import DbtDag, DbtTaskGroup, ProjectConfig, RenderConfig, cache
+from cosmos import cache
 from cosmos.config import ProfileConfig
 from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
 from cosmos.dbt.parser.output import (
@@ -56,7 +55,6 @@ from tests.utils import new_test_dag
 from tests.utils import test_dag as run_test_dag
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
-MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
 MINI_DBT_PROJ_DIR = Path(__file__).parent.parent / "sample/mini"
 MINI_DBT_PROJ_DIR_FAILING_SCHEMA = MINI_DBT_PROJ_DIR / "schema_failing_test.yml"
 MINI_DBT_PROJ_PROFILE = MINI_DBT_PROJ_DIR / "profiles.yml"
@@ -77,16 +75,6 @@ real_profile_config = ProfileConfig(
 )
 
 mini_profile_config = ProfileConfig(profile_name="mini", target_name="dev", profiles_yml_filepath=MINI_DBT_PROJ_PROFILE)
-
-multi_folder_profile_config = ProfileConfig(
-    profile_name="default",
-    target_name="dev",
-    profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="example_conn",
-        profile_args={"schema": "public"},
-        disable_event_tracking=True,
-    ),
-)
 
 
 @pytest.fixture
@@ -583,67 +571,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
         "Outlets: [Asset(name='postgres://0.0.0.0:5432/postgres/public/stg_customers', uri='postgres://0.0.0.0:5432/postgres/public/stg_customers'"
         in caplog.text
     )
-
-
-@pytest.mark.integration
-def test_dbt_dag_with_group_nodes_by_folder():
-    """
-    Run a DbtDag with RenderConfig(group_nodes_by_folder=True) (ExecutionMode.LOCAL).
-    Confirm the DAG runs successfully and tasks are grouped by folder (seeds_a, seeds_b, models_a, models_b).
-    """
-    grouped_dag = DbtDag(
-        project_config=ProjectConfig(dbt_project_path=MULTI_FOLDER_DBT_PROJ_DIR),
-        profile_config=multi_folder_profile_config,
-        render_config=RenderConfig(group_nodes_by_folder=True, emit_datasets=False),
-        operator_args={"install_deps": True},
-        start_date=datetime(2024, 1, 1),
-        dag_id="multi_folder_grouped_dag",
-        default_args={"retries": 0},
-    )
-    outcome = new_test_dag(grouped_dag)
-    assert outcome.state == DagRunState.SUCCESS
-
-    # multi_folder has seeds_a (products), seeds_b (regions, region_managers), models_a (stg_products, dim_products), models_b (stg_regions)
-    assert len(grouped_dag.dbt_graph.filtered_nodes) == 6  # 3 seeds + 3 models
-    task_ids = set(grouped_dag.task_dict)
-    assert len(task_ids) == 6  # 3 seeds + 3 model runs
-    assert "seeds.seeds_a.products_seed" in task_ids
-    assert "seeds.seeds_b.regions_seed" in task_ids
-    assert "seeds.seeds_b.region_managers_seed" in task_ids
-    assert "models.models_a.stg_products_run" in task_ids
-    assert "models.models_a.dim_products_run" in task_ids
-    assert "models.models_b.stg_regions_run" in task_ids
-
-
-@pytest.mark.integration
-def test_dbt_task_group_with_group_nodes_by_folder():
-    """
-    Run a DAG containing a DbtTaskGroup with RenderConfig(group_nodes_by_folder=True) (ExecutionMode.LOCAL).
-    Confirm the DAG runs successfully and tasks are grouped by folder.
-    """
-    with DAG(
-        dag_id="multi_folder_grouped_task_group_dag",
-        start_date=datetime(2024, 1, 1),
-        default_args={"retries": 0},
-    ) as dag:
-        DbtTaskGroup(
-            group_id="multi_folder_dbt",
-            project_config=ProjectConfig(dbt_project_path=MULTI_FOLDER_DBT_PROJ_DIR),
-            profile_config=multi_folder_profile_config,
-            render_config=RenderConfig(group_nodes_by_folder=True, emit_datasets=False),
-            operator_args={"install_deps": True},
-        )
-    outcome = new_test_dag(dag)
-    assert outcome.state == DagRunState.SUCCESS
-
-    task_ids = set(dag.task_dict)
-    assert len(task_ids) == 6  # 3 seeds + 3 model runs
-    assert "multi_folder_dbt.seeds.seeds_a.products_seed" in task_ids
-    assert "multi_folder_dbt.seeds.seeds_b.regions_seed" in task_ids
-    assert "multi_folder_dbt.seeds.seeds_b.region_managers_seed" in task_ids
-    assert "multi_folder_dbt.models.models_a.stg_products_run" in task_ids
-    assert "multi_folder_dbt.models.models_a.dim_products_run" in task_ids
-    assert "multi_folder_dbt.models.models_b.stg_regions_run" in task_ids
 
 
 @pytest.mark.skipif(

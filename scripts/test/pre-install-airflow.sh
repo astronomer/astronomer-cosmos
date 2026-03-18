@@ -44,6 +44,7 @@ elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
   uv pip install -U dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install dbt-loom
+  uv pip install "universal-pathlib==0.2.6"
 else
   # Download Airflow constraints according to the version being used
   if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
@@ -69,7 +70,6 @@ else
   uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0" apache-airflow==$AIRFLOW_VERSION
   uv pip install dbt-loom
-  uv pip install "universal-pathlib==0.2.6"
 
   # Delete the no longer needed constraint file
   rm /tmp/constraint.txt

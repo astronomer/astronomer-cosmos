@@ -44,9 +44,9 @@ except ImportError:  # pragma: no cover
 
 logger = get_logger(__name__)
 
-# List of dbt event we are interested in to display logs in consumer tasks
-# https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/events/types.py
-_DBT_EVENTS_TYPE = frozenset(
+# List of dbt error/failure events we are interested in, used to display logs in consumer tasks.
+# Source: https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/events/types.py
+_DBT_ERROR_EVENTS_TYPES = frozenset(
     {
         "InvalidOptionYAML",
         "LogDbtProjectError",
@@ -72,13 +72,10 @@ _DBT_EVENTS_TYPE = frozenset(
         "FlushEventsFailure",
         "TrackingInitializeFailure",
         "ArtifactUploadError",
-        # Non-error state
-        "NodeStart",
-        "NodeCompiling",
-        "NodeExecuting",
-        "NodeFinished",
     }
 )
+
+_DBT_NODE_STATUS_EVENT_TYPES = frozenset({"NodeStart", "NodeCompiling", "NodeExecuting", "NodeFinished"})
 
 
 def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMsg) -> None:
@@ -103,7 +100,7 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         finish_time = getattr(node_info, "node_finished_at", None) if node_info else None
         msg = getattr(dbt_log.info, "msg", None)
 
-    if event_name not in _DBT_EVENTS_TYPE:
+    if event_name not in (_DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES):
         return None
 
     if unique_id:

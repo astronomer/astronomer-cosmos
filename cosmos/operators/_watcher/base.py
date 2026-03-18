@@ -44,7 +44,10 @@ except ImportError:  # pragma: no cover
 
 logger = get_logger(__name__)
 
-# List of dbt error/failure events we are interested in, used to display logs in consumer tasks.
+# Subset of dbt event types that represent errors/failures.
+# Used (together with node status lifecycle events like NodeStart/NodeCompiling/
+# NodeExecuting/NodeFinished) to build _DBT_EVENT_ALLOWLIST, which controls which
+# events are surfaced in consumer tasks.
 # Source: https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/events/types.py
 _DBT_ERROR_EVENTS_TYPES = frozenset(
     {

@@ -30,7 +30,14 @@ except ImportError:
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import DbtResourceType, ExecutionMode, InvocationMode, LoadMode
+from cosmos.constants import (
+    _AIRFLOW3_MAJOR_VERSION,
+    AIRFLOW_VERSION,
+    DbtResourceType,
+    ExecutionMode,
+    InvocationMode,
+    LoadMode,
+)
 from cosmos.dbt.executable import get_system_dbt, is_dbt_installed_in_same_environment
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import has_non_empty_dependencies_file
@@ -380,11 +387,15 @@ class DbtToAirflowConverter:
         Add dbt project content hash to DAG documentation for Airflow 3 dag versioning support.
 
         This enables Airflow 3's automatic DAG versioning to detect when dbt project
-        files change, ensuring proper DAG version updates.
+        files change, ensuring proper DAG version updates. On Airflow 2.x this is a no-op.
 
         :param dag: The Airflow DAG to add versioning information to. If None, no action is taken.
         """
         if dag is None:
+            return
+        if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
+            return
+        if not settings.enable_dag_versioning:
             return
 
         try:

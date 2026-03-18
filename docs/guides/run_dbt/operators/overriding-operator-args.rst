@@ -1,7 +1,7 @@
 .. _operator-args-per-node:
 
 Overriding operator arguments per dbt node (or group of nodes)
-==============================================================
+--------------------------------------------------------------
 
 .. versionadded:: 1.8.0
 

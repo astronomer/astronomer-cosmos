@@ -1,7 +1,7 @@
 .. _profile-config:
 
 Profile Config
-================
+--------------
 
 Cosmos supports two methods of authenticating with your database:
 

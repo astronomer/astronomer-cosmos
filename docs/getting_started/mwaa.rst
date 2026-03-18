@@ -1,7 +1,7 @@
 .. _mwaa:
 
 Getting Started with Cosmos on Amazon Managed Workflows
-=======================================================
+-------------------------------------------------------
 
 Users can face Python dependency issues when trying to use the Cosmos `Local Execution Mode <execution-modes.html#local>`_ in Amazon Managed Workflows for `Apache Airflow® <https://airflow.apache.org/>`_ (MWAA).
 
@@ -10,7 +10,7 @@ This step-by-step illustrates how to use the Local Execution Mode, together with
 the ``dbt_executable_path`` argument.
 
 Create a Startup Script
------------------------
++++++++++++++++++++++++
 
 MWAA allows users to run a startup script before the scheduler and webserver are started. This is a great place to install dbt into a virtual environment.
 
@@ -32,7 +32,7 @@ To do so:
 
 
 Install Cosmos
---------------
+++++++++++++++
 
 Add the following to your base project ``requirements.txt``:
 
@@ -42,7 +42,7 @@ Add the following to your base project ``requirements.txt``:
 
 
 Move your dbt project into the DAGs directory
----------------------------------------------
++++++++++++++++++++++++++++++++++++++++++++++
 
 Make a new folder, ``dbt``, inside your local ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your DAGs directory. Your folder structure should look like this:
 
@@ -78,7 +78,7 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
 
 
 Create your DAG
----------------
++++++++++++++++
 
 In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and create a new DAG instance. Make sure to use the ``dbt_executable_path`` argument to point to the virtual environment you created in step 1.
 

@@ -1,7 +1,7 @@
 .. _astro:
 
 Getting Started with Cosmos on Astro
-====================================
+------------------------------------
 
 While it is possible to use Cosmos on Astro with all :ref:`Execution Modes <execution-modes>`, we recommend using the ``local`` execution mode. It's the simplest to set up and use.
 
@@ -10,7 +10,7 @@ If you'd like to see a fully functional project to run in Astro (CLI or Cloud), 
 Below you can find a step-by-step guide to run your own dbt project within Astro.
 
 Pre-requisites
-~~~~~~~~~~~~~~
+++++++++++++++
 
 To get started, you should have:
 
@@ -19,7 +19,7 @@ To get started, you should have:
 - A dbt project. The `jaffle shop example <https://github.com/dbt-labs/jaffle-shop-classic>`_ is a good example.
 
 Create a virtual environment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++
 
 Create a virtual environment in your ``Dockerfile`` using the sample below. Be sure to replace ``<your-dbt-adapter>`` with the actual adapter you need (i.e. ``dbt-redshift``, ``dbt-snowflake``). It's recommended to use a virtual environment because dbt and Airflow can have conflicting dependencies.
 
@@ -34,7 +34,7 @@ Create a virtual environment in your ``Dockerfile`` using the sample below. Be s
 An example of dbt adapter is ``dbt-postgres``.
 
 Install Cosmos
-~~~~~~~~~~~~~~
+++++++++++++++
 
 Add Cosmos to your project's ``requirements.txt``.
 
@@ -44,7 +44,7 @@ Add Cosmos to your project's ``requirements.txt``.
 
 
 Move your dbt project into the DAGs directory
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++++++++++
 
 Make a new folder, ``dbt``, inside your local project's ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your DAGs directory. Your project structure should look like this:
 
@@ -81,7 +81,7 @@ For example, if you wanted to put your dbt project in the ``/usr/local/airflow/d
     )
 
 Create a dagfile
-~~~~~~~~~~~~~~~~
+++++++++++++++++
 
 In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and create a new DAG instance. Make sure to use the ``dbt_executable_path`` argument to point to the virtual environment you created in step 1.
 
@@ -125,7 +125,7 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
    This error can be resolved by increasing the value of the Airflow configuration `core.dagbag_import_timeout <https://airflow.apache.org/docs/apache-airflow/stable/configurations-ref.html#dagbag-import-timeout>`_.
 
 Start your project
-~~~~~~~~~~~~~~~~~~
+++++++++++++++++++
 
 Start your project with ``astro dev start``. You should see your Airflow DAG in the Airflow UI (``localhost:8080`` by default), where you can trigger it.
 

@@ -1,7 +1,7 @@
 .. _logging:
 
 Logging
-====================
+-------
 
 Cosmos allows for a custom logger implementation that adds ``(astronomer-cosmos)`` to each log message.
 

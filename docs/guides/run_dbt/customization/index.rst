@@ -1,5 +1,5 @@
 Additional Customization
-========================
+------------------------
 
 .. toctree::
    :maxdepth: 1

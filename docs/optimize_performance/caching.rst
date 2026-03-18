@@ -1,7 +1,7 @@
 .. _caching:
 
 Caching
-=======
+-------
 
 This page explains the caching strategies in ``astronomer-cosmos`` Astronomer Cosmos behavior.
 
@@ -20,7 +20,7 @@ It is possible to turn off any cache in Cosmos by exporting the environment vari
 Disabling individual types of cache in Cosmos is also possible, as explained below.
 
 Caching the dbt ls output
-~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++
 
 (Introduced in Cosmos 1.5)
 
@@ -111,7 +111,7 @@ The cache values contain a few properties:
 * ``cosmos_type`` is either ``DbtDag`` or ``DbtTaskGroup``
 
 Caching the YAML selectors
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++
 
 (Introduced in Cosmos 1.13)
 
@@ -198,7 +198,7 @@ When using Airflow variables as the backend to store cached cosmos artifacts, bo
 to have both artifacts occupy the cache at the same time due to their distinct `RenderConfig.load_mode <./render-config.html>`_ and switching from using one cache to the other will invalidate the cache on the next version check.
 
 Caching the partial parse file
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++++
 
 (Introduced in Cosmos 1.4)
 
@@ -217,7 +217,7 @@ For more information, read the `Cosmos partial parsing documentation <./partial-
 
 
 Caching the profiles
-~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++
 
 (Introduced in Cosmos 1.5)
 

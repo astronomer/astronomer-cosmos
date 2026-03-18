@@ -1,5 +1,5 @@
 Reference
-=========
+---------
 
 .. toctree::
    :maxdepth: 0
@@ -25,7 +25,7 @@ Reference
    profiles/index
 
 Configurations
-~~~~~~~~~~~~~~~
+++++++++++++++
 
 There are different configurations and profiles that you can use to configure how Cosmos works.
 
@@ -35,7 +35,7 @@ There are different configurations and profiles that you can use to configure ho
 - `ProfileConfig <configs/profiles-config.html>`_: The ``ProfileConfig`` class determines which data warehouse Cosmos connects to when it executes the dbt SQL. These docs include reference documentation for connecting to popular data warehouses you might use in your dbt code.
 
 Profiles
-~~~~~~~~~
+++++++++
 
 The **Profiles** reference provides information about the different kinds of profile mappings available in Cosmos. These profile mappings are Airflow operators that map Airflow connections to dbt profiles, allowing you to work with resources in your data warehouses.
 

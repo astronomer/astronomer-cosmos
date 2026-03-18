@@ -1,7 +1,7 @@
 .. _cosmos-managed-venv:
 
 Cosmos-managed virtual environment execution mode
-========================================================
+-------------------------------------------------
 
 The ``virtualenv`` mode runs dbt commands from Python virtual environments created and managed by Cosmos. This mode removes the need to create a virtual environment at build time, unlike ``ExecutionMode.LOCAL``, while avoiding package conflicts. It is intended for cases where:
 

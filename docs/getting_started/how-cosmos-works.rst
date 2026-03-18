@@ -1,7 +1,7 @@
 .. _how-cosmos-works:
 
 How Cosmos works
-=================
+----------------
 
 Cosmos is an open-source Python package developed by Astronomer under the Apache License 2.0. The
 package includes classes that automatically turn dbt Core and dbt Fusion projects into `Apache Airflow® <https://airflow.apache.org/>`_
@@ -12,7 +12,7 @@ advanced orchestration capabilities to integrate your dbt projects into your end
 run automatically.
 
 Overview
-~~~~~~~~~
+++++++++
 
 Cosmos creates an interface between a dbt project and Airflow, allowing you to translate your dbt project into a Dag. Then, your Cosmos configuration provides the necessary configurations to Airflow so that it can schedule and initiate running your dbt code when you want.
 
@@ -26,12 +26,12 @@ You have a number of configuration options, but fundamentally, Cosmos provides t
    :alt: Diagram showing that Cosmos parses dbt projects, with options defined by the ProfileConfig and RenderConfig. Then, Cosmos executes the resulting Dag, with options defined by ExecutionConfig and ProjectConfig.
 
 Quickstart
-~~~~~~~~~~~
+++++++++++
 
 Even though Cosmos is highly extensible, and you have many advanced customization options, you can run a demo with the `Astro CLI <astro-cli-quickstart.html>`_ in just a few minutes. This demo introduces you to the key elements required for Cosmos to parse dbt projects and run Dags.
 
 Bring your own project
-~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++
 
 If you have existing resources for Airflow or dbt, and want to start exploring how to get started with a project more similar to your use case, check out the **Get started with Cosmos** guides. These resources provide more general recommendations for how to create a new project.
 

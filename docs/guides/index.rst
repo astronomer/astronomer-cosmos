@@ -1,7 +1,7 @@
 .. _guides:
 
 Guides
-======
+------
 
 .. toctree::
    :maxdepth: 0
@@ -15,7 +15,7 @@ To set up a project, you follow the same general set of steps.
 
 
 Set up dbt with Airflow
-~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++
 
 Make your dbt projects available to Airflow and install dbt into the environment where your dbt code runs.
 
@@ -27,7 +27,7 @@ Make your dbt projects available to Airflow and install dbt into the environment
    dbt_setup/execution-modes-local-conflicts
 
 Connect to your dbt database
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++
 
 Configure your Cosmos project to allow Airflow Dags to initiate dbt commands, and make data transformations and updates in your data warehouses. You can create these connections with your ``profiles.yml`` file in the dbt project, using profile mappings, or customizing ``ProfileConfig`` per dbt configuration.
 
@@ -43,7 +43,7 @@ Configure your Cosmos project to allow Airflow Dags to initiate dbt commands, an
 
 
 Translate your dbt code into Airflow Dags
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++++++
 
 You can customize how Cosmos parses your dbt workflows into Airflow Dags. Choosing how you want your dbt nodes to map to Airflow tasks within Dags can affect the time required for Cosmos to parse the dbt workflows and for Airflow to execute the resulting Dags.
 
@@ -61,7 +61,7 @@ You can customize how Cosmos parses your dbt workflows into Airflow Dags. Choosi
 
 
 Run dbt
-~~~~~~~~~~~~~
++++++++
 
 Specify more details about how Cosmos runs both dbt commands and Airflow Dags. This includes :ref:`execution-modes` , either one that runs dbt on an Airflow worker node or one that runs in a container. You can customize additional aspects of how your dbt code runs, like using particular operators that correspond to dbt commands. And, you can leverage Airflow's scheduling capabilities in your Cosmos Dags.
 
@@ -78,7 +78,7 @@ Specify more details about how Cosmos runs both dbt commands and Airflow Dags. T
    run_dbt/customization/index
 
 Multi-project Setups
-~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++
 
 If you have a multi-project architecture where you have multiple dbt projects that reference each others' models, you can set up ``dbt-loom`` with Cosmos to handle cross-project references.
 
@@ -89,7 +89,7 @@ If you have a multi-project architecture where you have multiple dbt projects th
    Handle cross-project references <multi_project/multi-project>
 
 Add your dbt documentation
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++
 
 Cosmos supports dbt's documentation capabilities.
 
@@ -102,7 +102,7 @@ Cosmos supports dbt's documentation capabilities.
 
 
 Cosmos DevEx
-~~~~~~~~~~~~
+++++++++++++
 
 You can configure Cosmos to improve your development experience.
 

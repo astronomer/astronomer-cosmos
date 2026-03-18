@@ -1,7 +1,7 @@
 .. _getting_started:
 
 Getting started with Cosmos
-===========================
+---------------------------
 
 .. toctree::
    :maxdepth: 0
@@ -10,7 +10,7 @@ Getting started with Cosmos
    self
 
 Cosmos fundamentals
-~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++
 
 Learn the important concepts and key ideas for how Cosmos works with Airflow and dbt.
 
@@ -23,7 +23,7 @@ Learn the important concepts and key ideas for how Cosmos works with Airflow and
    Cosmos core concepts <core-concepts>
 
 Quickstart
-~~~~~~~~~~~
+++++++++++
 
 Run Cosmos in just a few minutes using a pre-configured demo, such as the `cosmos-demo <https://github.com/astronomer/cosmos-demo>`_.
 These guides are an ideal place to start if you don't have a particular project that you want to try out, and just want walk through the process of setting up Cosmos, Airflow, and a dbt project to work together.
@@ -36,7 +36,7 @@ These guides are an ideal place to start if you don't have a particular project 
    Astro CLI quickstart <astro-cli-quickstart>
 
 Bring your own project
-~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++
 
 An example workflow for setting up Cosmos, depending on how you run Airflow. For guides that describe specific scenarios or platforms that you want to use, see the following:
 

@@ -1,7 +1,7 @@
 .. _execution-modes:
 
 Choose an execution mode
-========================
+------------------------
 
 The ```ExecutionConfig`` class defines your execution mode, which determines where and how Cosmos runs dbt commands.
 
@@ -12,7 +12,7 @@ There are two categories of execution modes:
 2. **Execute dbt commands in a container** This type of execution mode offers high levels of environment isolation and also allows you to run dbt from either containers or external jobs, in both on-premises environments and various cloud services. There are multiple options for this type of execution mode: ``docker``, ``kubernetes``, ``watcher_kubernetes``, ``aws_ecs``, ``aws_eks``, ``azure_container_instance``, and ``gcp_cloud_run_job``.
 
 Choose between local and container execution mode type
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 To decide which execution mode you want to use, first select whether you want to use one that runs on the Airflow worker node, or to use one that runs in a container.
 
@@ -60,7 +60,7 @@ The following decision tree can help you pick which type works best for your Cos
       class J,L,K,M result
 
 On the Airflow worker
-~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++
 
 These execution modes offer faster execution times, since you don't need to spin up any extra containers. You can also use Airflow connections via the ``ProfileConfig``. But, these execution modes do not have any, or offer limited, environment isolation.
 
@@ -82,7 +82,7 @@ There are four execution mode options that run on the Airflow worker:
 - :ref:`airflow_async <async-execution-mode>`: (Stable since Cosmos 1.9.0) Optimized for worker efficiency if you have long-running dbt commands. Currently only works with BigQuery. Pre-compile the SQL transformations with dbt in a setup task and execute them asynchronously using Apache Airflow's `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 
 Choose your local execution mode type
-++++++++++++++++++++++++++++++++++++++
+'''''''''''''''''''''''''''''''''''''
 
 If you want to use an execution mode that can run in the Airflow worker node, use the following workflow to choose how to customize its behavior or decide that you want to use the container type of execution mode.
 
@@ -136,7 +136,7 @@ If you want to use an execution mode that can run in the Airflow worker node, us
 
 
 In a container
-~~~~~~~~~~~~~~
+++++++++++++++
 
 You can also execute dbt commands in a container. Choosing these kinds of execution modes provides a high degree of isolation. However, they come with limitations where you can only create Airflow connections with the dbt ``profiles.yml`` file and it has slower run times because of container provisioning. They all also require a pre-existing Docker image.
 
@@ -149,7 +149,7 @@ You can also execute dbt commands in a container. Choosing these kinds of execut
 - :ref:`gcp_cloud_run_job <gcp-cloud-run-job>`: Run ``dbt`` commands via a container managed by GCP Cloud Run Job.
 
 Choose your container execution mode type
-++++++++++++++++++++++++++++++++++++++++++
+'''''''''''''''''''''''''''''''''''''''''
 
 If you want to use a container execution mode, use the following decision tree to decide which kind of container execution mode works best for your project needs.
 
@@ -216,7 +216,7 @@ If you want to use a container execution mode, use the following decision tree t
 .. _execution-modes-comparison:
 
 Execution modes comparison
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++
 
 The type of execution mode that you choose directly affects how fast your Cosmos Dag runs.
 

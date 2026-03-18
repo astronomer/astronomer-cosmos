@@ -1,7 +1,7 @@
 .. _invocation-mode:
 
 Invocation Modes
-================
+----------------
 .. versionadded:: 1.4
 
 For ``ExecutionMode.LOCAL`` execution mode, Cosmos supports two invocation modes for running dbt:

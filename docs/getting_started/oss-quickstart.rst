@@ -1,7 +1,7 @@
 .. _oss-quickstart:
 
 Run Cosmos in open-source Airflow
-=================================
+---------------------------------
 
 Quickly get started working locally with Airflow, dbt, and Astronomer Cosmos using the `Open-source Airflow <https://airflow.apache.org/docs/apache-airflow/stable/index.html>`_.
 
@@ -15,13 +15,13 @@ By the end of this quickstart, you will:
 - (Optional) View your Dag run output
 
 Prerequisites
-~~~~~~~~~~~~~
++++++++++++++
 
 - A Python version supported by `Airflow <https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html#prerequisites>`_.
 - (Optional) Install a database viewer. This guide uses `dBeaver <https://dbeaver.io/download/>`_.
 
 1. Set up your project environment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++++++++
 
 1. Create your demo project directory.
 
@@ -55,7 +55,7 @@ The Cosmos project includes Airflow as a dependency, so when you install Cosmos 
 
 
 2. Create your Cosmos project structure
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++++
 
 1. Set up separate subdirectories in your demo directory for Dags and dbt project:
 
@@ -72,7 +72,7 @@ Your project structure should look like this: ::
     └── dbt_project/micro_project/
 
 3. Create a minimal dbt project
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++
 
 For the demo dbt project, you need to make some essential components for your project. The dbt commands for this demo take two SQL files, a ``base_model`` that creates a table with greetings in your database, and an ``enriched_model`` table that has transformed values for greetings in the base model.
 
@@ -148,7 +148,7 @@ Add the following content to your new project definition.
 
 
 4. Create an Airflow Dag
-~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++
 
 1. Now, in your ``dags`` directory, create an Airflow Dag with the following commands:
 
@@ -187,7 +187,7 @@ This Dag tells Airflow and Cosmos where to find the dbt project and profile conf
 
 
 5. Set environment variables
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++
 
 To successfully launch, Airflow needs you to define the some environment variables. These identify the project home directory, ``AIRFLOW_HOME``, and disable additional Airflow and Cosmos features that are not required for local execution.
 
@@ -199,7 +199,7 @@ To successfully launch, Airflow needs you to define the some environment variabl
 
 
 6. Run Airflow
-~~~~~~~~~~~~~~
+++++++++++++++
 
 At this point, you have completed the following project setup steps:
 
@@ -219,7 +219,7 @@ At this point, you have completed the following project setup steps:
 2. Airflow autogenerates credentials when it launches that you must use to access the local Airflow UI. Open the ``simple_auth_manager_passwords.json.generated`` file in your ``oss-quickstart`` directory. This file contains the ``{"username": "password"}`` key-value pair for you to use to login to ``localhost:8080``. Use this username and password to log in.
 
 7. Trigger your Dag
-~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++
 
 1. Open the **Dags** view in Airflow.
 
@@ -228,7 +228,7 @@ At this point, you have completed the following project setup steps:
 3. After the Dag successfully finishes, you can explore the `Airflow UI Dag views <https://www.astronomer.io/docs/learn/airflow-ui#dag-views>`_ to view the logs or check the Dag code.
 
 8. (Optional) View results with a database viewer
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++++++++++++++
 
 To view the transformations completed by the Dag, you must use a database viewer to access the views and materializations completed by your dbt project.
 
@@ -262,10 +262,10 @@ To view the transformations completed by the Dag, you must use a database viewer
 .. _troubleshoot-quickstart:
 
 Troubleshooting the quickstart
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++++
 
 Can't log in to the Airflow UI
--------------------------------
+''''''''''''''''''''''''''''''
 
 1. Confirm that you are using a version of Python that is supported by Airflow. These versions are usually included in the `Airflow installation guide <https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html#prerequisites>`_.
 
@@ -285,7 +285,7 @@ To resolve, open your ``profiles.yml`` file and confirm that you correctly inclu
 .. _no-quickstart-dags:
 
 Dags do not load
------------------
+''''''''''''''''
 
 If you encounter issues, like error messages that say **Cosmos Dag not loading** or the **Dags** page on your Airflow UI does not show your Dags, try resetting the Airflow database and reserializing with the following commands.
 
@@ -299,7 +299,7 @@ Then, relaunch Airflow with ``airflow standalone``.
 .. _quickstart-dags-stall:
 
 Example Dags stall
--------------------
+''''''''''''''''''
 
 If your ``base_model_run`` Dag gets stuck in **Running** mode, even though the **Logs** show that it completed successfully, and the next Dag does not automatically start.
 

@@ -1,7 +1,7 @@
 .. _policy:
 
 Cosmos project policies and compatibility
-=========================================
+-----------------------------------------
 
 
 .. toctree::

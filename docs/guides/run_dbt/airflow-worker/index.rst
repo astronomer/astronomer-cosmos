@@ -1,5 +1,5 @@
 Run dbt in an Airflow worker
-============================
+----------------------------
 
 .. toctree::
    :maxdepth: 1

@@ -1,12 +1,12 @@
 .. _open-source:
 
 Getting Started with Cosmos on Open-source Airflow
-==================================================
+--------------------------------------------------
 
 When running open-source Airflow, your setup may vary. This guide assumes you have access to edit the underlying image.
 
 Create a virtual environment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++
 
 Create a virtual environment in your ``Dockerfile`` using the sample below. Be sure to replace ``<your-dbt-adapter>`` with the actual adapter you need (i.e. ``dbt-redshift``, ``dbt-snowflake``). It's recommended to use a virtual environment because dbt and Airflow can have conflicting dependencies.
 
@@ -20,13 +20,13 @@ Create a virtual environment in your ``Dockerfile`` using the sample below. Be s
 
 
 Install Cosmos
-~~~~~~~~~~~~~~
+++++++++++++++
 
 Install ``astronomer-cosmos`` however you install Python packages in your environment.
 
 
 Move your dbt project into the DAGs directory
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++++++++++
 
 Make a new folder, ``dbt``, inside your local project's ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your DAGs directory.
 

@@ -3,7 +3,7 @@
 .. title:: Run Cosmos with the Astro CLI
 
 Run Cosmos with the Astro CLI
-=============================
+-----------------------------
 
 Work locally with Airflow, dbt, and Astronomer Cosmos using the `Astro CLI <https://github.com/astronomer/astro-cli>`__. While Cosmos fully works with standard Airflow and independently of the Astro CLI, the Astro CLI can simplify creating and running Airflow projects. If you want to get started with Cosmos using only Airflow, see `Getting Started on Open Source Airflow <open-source.html>`_.
 
@@ -16,7 +16,7 @@ By the end of this quickstart you will:
 - Run a simple Dag that uses dbt to load, run, and test sample e-commerce data
 
 Prerequisites
-~~~~~~~~~~~~~~
++++++++++++++
 
 - `Python <https://www.python.org/downloads/>`_
 - Install `git <https://git-scm.com/install/>`_
@@ -27,7 +27,7 @@ Prerequisites
 Depending on your operating system, you might also need to install a separate installation manager like `Homebrew <https://brew.sh>`_ or `WinGet <https://learn.microsoft.com/en-us/windows/package-manager/winget/>`_.
 
 Clone the demo repo
-~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++
 
 1. Open a terminal in the directory where you want to clone your sample repo.
 2. Clone the ``cosmos-demo`` repo.
@@ -37,7 +37,7 @@ Clone the demo repo
     git clone https://github.com/astronomer/cosmos-demo.git
 
 Start Airflow locally
-~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++
 
 1. Open a terminal at the root of the ``cosmos-demo`` repo.
 2. Run ``astro dev start --verbosity debug`` to start your Aiflow instance. Including the ``--verbosity debug`` flag allows the command to display the steps the Astro CLI takes to set up your Airflow project.
@@ -47,7 +47,7 @@ Start Airflow locally
 The `Airflow UI <https://www.astronomer.io/docs/learn/airflow-ui>`_ enables you to start, stop, troubleshoot, or manage your Dags.
 
 Run a simple Cosmos Dag
-~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++
 
 1. From the Airflow Dashboard, click **Dags**. This opens a view where you can see all available Dags. Or, you can see if there were problems loading Dags to your Airflow project.
 2. Select **Simple Dag** from the list to access the `Dag view <https://www.astronomer.io/docs/learn/airflow-ui#individual-dag>`_ in the Airflow UI. Click **Code** to see the Dag code.
@@ -81,7 +81,7 @@ For example in the ``stg_customers``, task group, in the ``run`` task, the logs 
 This log indicates that the Dag triggers Cosmos to initiate the ``dbt run`` command following the sql actions defined in the ``stg_customers.sql``.
 
 View results with a database viewer
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++
 
 To view the transformations completed by the Dag, you must use a database viewer to access the views and materializations completed by your dbt project.
 
@@ -116,7 +116,7 @@ You have several options to locate this kind of information in dbt projects. For
    :alt: dBeaver user interface displaying the Customers table view produced by the dbt code. This table includes data that has been joined together from three separate raw database sources.
 
 Key Concepts
-~~~~~~~~~~~~
+++++++++++++
 
 Congratulations! You ran a dbt project successfully on Airflow! This quickstart includes the minimal steps required to get started working with Cosmos. Specifically it includes:
 
@@ -133,7 +133,7 @@ This demo repo also includes a dbt project with configurations that allow you to
 Cosmos does not require you to use the specific project architecture shown in the ``cosmos-demo`` to run successfully. However, it can serve as a template or example for you to adapt your dbt or Airflow projects to work cohesively.
 
 Next steps
-~~~~~~~~~~
+++++++++++
 
 - Follow one of the Getting Started Guides where you can bring your own dbt projects and/or Dag code:
     - `Getting Started on Open-Source <open-source.html>`__

@@ -1,7 +1,7 @@
 .. _callbacks:
 
 Callbacks
-=========
+---------
 
 .. note::
     Feature available when using ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``.
@@ -29,7 +29,7 @@ There are two ways users can leverage using Cosmos auxiliary callback functions:
 
 
 Example: Using Callbacks with a Single Operator
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++++++++++++
 
 To demonstrate how to specify a callback function for uploading files from the target directory, here’s an example
 using a single operator in an Airflow DAG:
@@ -40,7 +40,7 @@ using a single operator in an Airflow DAG:
     :end-before: [END single_operator_callback]
 
 Example: Using DbtDag or DbtTaskGroup
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++
 
 You can leverage the :ref:`remote_target_path` configuration to upload files
 from the target directory to a remote storage. Below is an example of how to define a callback helper function in your
@@ -67,7 +67,7 @@ The path naming convention is:
 If users are unhappy with this structure or format, they can implement similar methods, which can be based (or not) on the Cosmos standard ones.
 
 Custom Callbacks
-~~~~~~~~~~~~~~~~
+++++++++++++++++
 
 The helper functions introduced in Cosmos 1.8.0 are examples of how callback functions. Users are not limited to using these predefined functions — they can also create their custom
 callback functions to meet specific needs.
@@ -176,7 +176,7 @@ Users can use the same approach to call the data observability platform `monteca
 
 
 Limitations and Contributions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++
 
 Callback support is available only when using ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``.
 Contributions to extend this functionality to other execution modes are welcome and encouraged. You can reference the

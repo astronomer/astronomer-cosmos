@@ -1,7 +1,7 @@
 .. _aws-container-run-job:
 
 AWS ECS execution mode
-======================
+----------------------
 
 .. versionadded:: 1.9.0
 

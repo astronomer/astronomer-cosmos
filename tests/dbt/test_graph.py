@@ -2387,12 +2387,7 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
         # Some macOS versions compute a different directory hash than Linux, while others match the Linux behavior.
         # The first value is the macOS-specific hash; the second value is the Linux hash, which certain macOS versions also produce.
         # We allow both here to keep the test stable across macOS releases, while non-macOS platforms assert only the Linux hash.
-        # 05b2f136b8c97298e60a15134aec1d2d observed after DbtNode path_base refactor.
-        assert hash_dir in (
-            "9d95cbf6529e2ab51fadd6a3f0a3971f",
-            "633a523f295ef0cd496525428815537b",
-            "05b2f136b8c97298e60a15134aec1d2d",
-        )
+        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "633a523f295ef0cd496525428815537b")
     else:
         assert hash_dir == "633a523f295ef0cd496525428815537b"
 

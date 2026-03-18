@@ -77,6 +77,8 @@ _DBT_ERROR_EVENTS_TYPES = frozenset(
 
 _DBT_NODE_STATUS_EVENT_TYPES = frozenset({"NodeStart", "NodeCompiling", "NodeExecuting", "NodeFinished"})
 
+_DBT_EVENT_ALLOWLIST = _DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES
+
 
 def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMsg) -> None:
     logger.debug("dbt_log: %s", dbt_log)
@@ -85,7 +87,7 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         info = dbt_log.get("info", {})
 
         event_name = info.get("name")
-        if event_name not in (_DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES):
+        if event_name not in _DBT_EVENT_ALLOWLIST:
             return None
         node_info = data.get("node_info")
         status = node_info.get("node_status") if node_info else None
@@ -95,7 +97,7 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         msg = data.get("msg") or info.get("msg") or None
     else:  # Runner
         event_name = getattr(getattr(dbt_log, "info", None), "name", None)
-        if event_name not in (_DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES):
+        if event_name not in _DBT_EVENT_ALLOWLIST:
             return None
         node_info = getattr(dbt_log.data, "node_info", None)
         unique_id = getattr(node_info, "unique_id") if node_info else None

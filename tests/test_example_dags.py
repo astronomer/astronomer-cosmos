@@ -74,7 +74,7 @@ def get_dag_bag() -> DagBag:  # noqa: C901
             file.writelines("example_source_rendering.py\n")
             file.writelines("basic_cosmos_task_group_different_owners.py\n")
 
-        if AIRFLOW_VERSION >= Version("3.2.0"):
+        if AIRFLOW_VERSION > Version("3.1.0"):
             file.writelines("cosmos_manifest_example.py\n")
 
     print(".airflowignore contents: ")

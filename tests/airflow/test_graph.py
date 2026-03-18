@@ -163,6 +163,7 @@ def test_build_airflow_graph_with_after_each():
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
             render_config=RenderConfig(
+                group_nodes_by_folder=True,
                 test_behavior=TestBehavior.AFTER_EACH,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
             ),
@@ -171,22 +172,25 @@ def test_build_airflow_graph_with_after_each():
     topological_sort = [task.task_id for task in dag.topological_sort()]
     expected_sort = [
         "seed_parent_seed",
-        "parent.run",
-        "parent.test",
-        "child_run",
-        "child2_v2_run",
+        "gen2.models.parent.run",
+        "gen2.models.parent.test",
+        "gen2.models.child_run",
+        "gen2.models.child2_v2_run",
     ]
 
     assert topological_sort == expected_sort
     task_groups = dag.task_group_dict
-    assert len(task_groups) == 1
+    assert len(task_groups) == 4
 
-    assert task_groups["parent"].upstream_task_ids == {"seed_parent_seed"}
-    assert list(task_groups["parent"].children.keys()) == ["parent.run", "parent.test"]
+    assert task_groups["gen2.models.parent"].upstream_task_ids == {"seed_parent_seed"}
+    assert list(task_groups["gen2.models.parent"].children.keys()) == [
+        "gen2.models.parent.run",
+        "gen2.models.parent.test",
+    ]
 
     assert len(dag.leaves) == 2
-    assert dag.leaves[0].task_id == "child_run"
-    assert dag.leaves[1].task_id == "child2_v2_run"
+    assert dag.leaves[0].task_id == "gen2.models.child_run"
+    assert dag.leaves[1].task_id == "gen2.models.child2_v2_run"
 
     task_seed_parent_seed = dag.tasks[0]
     task_parent_run = dag.tasks[1]
@@ -264,6 +268,7 @@ def test_build_airflow_graph_with_after_all():
         }
         render_config = RenderConfig(
             select=["tag:some"],
+            group_nodes_by_folder=True,
             test_behavior=TestBehavior.AFTER_ALL,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         )
@@ -277,11 +282,17 @@ def test_build_airflow_graph_with_after_all():
             render_config=render_config,
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
-    expected_sort = ["seed_parent_seed", "parent_run", "child_run", "child2_v2_run", "astro_shop_test"]
+    expected_sort = [
+        "seed_parent_seed",
+        "gen2.models.parent_run",
+        "gen2.models.child_run",
+        "gen2.models.child2_v2_run",
+        "astro_shop_test",
+    ]
     assert topological_sort == expected_sort
 
     task_groups = dag.task_group_dict
-    assert len(task_groups) == 0
+    assert len(task_groups) == 3
 
     assert len(dag.leaves) == 1
     assert dag.leaves[0].task_id == "astro_shop_test"
@@ -304,6 +315,7 @@ def test_build_airflow_graph_with_build():
             ),
         }
         render_config = RenderConfig(
+            group_nodes_by_folder=True,
             test_behavior=TestBehavior.BUILD,
         )
         build_airflow_graph(
@@ -316,15 +328,20 @@ def test_build_airflow_graph_with_build():
             render_config=render_config,
         )
     topological_sort = [task.task_id for task in dag.topological_sort()]
-    expected_sort = ["seed_parent_seed_build", "parent_model_build", "child_model_build", "child2_v2_model_build"]
+    expected_sort = [
+        "seed_parent_seed_build",
+        "gen2.models.parent_model_build",
+        "gen2.models.child_model_build",
+        "gen2.models.child2_v2_model_build",
+    ]
     assert topological_sort == expected_sort
 
     task_groups = dag.task_group_dict
-    assert len(task_groups) == 0
+    assert len(task_groups) == 3
 
     assert len(dag.leaves) == 2
-    assert dag.leaves[0].task_id in ("child_model_build", "child2_v2_model_build")
-    assert dag.leaves[1].task_id in ("child_model_build", "child2_v2_model_build")
+    assert dag.leaves[0].task_id in ("gen2.models.child_model_build", "gen2.models.child2_v2_model_build")
+    assert dag.leaves[1].task_id in ("gen2.models.child_model_build", "gen2.models.child2_v2_model_build")
 
 
 @pytest.mark.integration
@@ -351,14 +368,14 @@ def test_build_airflow_graph_with_override_profile_config():
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
             dbt_project_name="astro_shop",
-            render_config=RenderConfig(),
+            render_config=RenderConfig(group_nodes_by_folder=True),
         )
 
     generated_seed_profile_config = dag.task_dict["seed_parent_seed"].profile_config
     assert generated_seed_profile_config.profile_name == "new_profile"  # overridden via config
     assert generated_seed_profile_config.profile_mapping.profile_args["schema"] == "different"  # overridden via config
 
-    generated_parent_profile_config = dag.task_dict["parent.run"].profile_config
+    generated_parent_profile_config = dag.task_dict["gen2.models.parent.run"].profile_config
     assert generated_parent_profile_config.profile_name == "default"
     assert generated_parent_profile_config.profile_mapping.profile_args["schema"] == "public"
 
@@ -1060,7 +1077,9 @@ def test_airflow_kwargs_generation():
         "group_id": "fake_group_id",
         "project_dir": SAMPLE_PROJ_PATH,
         "conn_id": "fake_conn",
-        "render_config": RenderConfig(select=["fake-render"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR),
+        "render_config": RenderConfig(
+            select=["fake-render"], group_nodes_by_folder=True, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
+        ),
         "default_args": {"retries": 2},
         "profile_config": ProfileConfig(
             profile_name="default",
@@ -1189,6 +1208,7 @@ def test_custom_meta():
             test_indirect_selection=TestIndirectSelection.EAGER,
             task_args=task_args,
             render_config=RenderConfig(
+                group_nodes_by_folder=True,
                 test_behavior=TestBehavior.AFTER_EACH,
                 source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
             ),
@@ -1196,12 +1216,12 @@ def test_custom_meta():
         )
         # test custom meta (queue, pool)
         for task in dag.tasks:
-            if task.task_id == "child2_v2_run":
+            if task.task_id == "gen2.models.child2_v2_run":
                 assert task.pool == "custom_pool"
             else:
                 assert task.pool == "default_pool"
 
-            if task.task_id == "child_run":
+            if task.task_id == "gen2.models.child_run":
                 assert task.queue == "custom_queue"
             else:
                 assert task.queue == "default"

@@ -68,6 +68,7 @@ class RenderConfig:
     :param dbt_project_path: Configures the DBT project location accessible on the airflow controller for DAG rendering. Mutually Exclusive with ProjectConfig.dbt_project_path. Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``.
     :param dbt_ls_path: Configures the location of an output of ``dbt ls``. Required when using ``load_method=LoadMode.DBT_LS_FILE``.
     :param enable_mock_profile: Allows to enable/disable mocking profile. Enabled by default. Mock profiles are useful for parsing Cosmos DAGs in the CI, but should be disabled to benefit from partial parsing (since Cosmos 1.4).
+    :param group_nodes_by_folder: When enabled, groups nodes by folder structure, creating a ``TaskGroup`` per resource type and folder. Disabled by default.
     :param source_rendering_behavior: Determines how source nodes are rendered when using cosmos default source node rendering (ALL, NONE, WITH_TESTS_OR_FRESHNESS). Defaults to "NONE" (since Cosmos 1.6).
     :param source_pruning: Determines if source nodes without a corresponding downstream task should be removed or not. Default is False
     :param airflow_vars_to_purge_dbt_ls_cache: Specify Airflow variables that will affect the LoadMode.DBT_LS cache.
@@ -94,6 +95,7 @@ class RenderConfig:
     dbt_ls_path: Path | None = None
     project_path: Path | None = field(init=False)
     enable_mock_profile: bool = True
+    group_nodes_by_folder: bool = False
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE
     source_pruning: bool = False
     airflow_vars_to_purge_dbt_ls_cache: list[str] = field(default_factory=list)

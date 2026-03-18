@@ -1895,11 +1895,14 @@ def test_parse_dbt_ls_output_does_not_skip_non_model_without_path(caplog):
     assert "Skipping model" not in caplog.text
 
 
-def test_parse_dbt_ls_output_raises_when_project_path_is_none():
-    """Test that parse_dbt_ls_output raises CosmosLoadDbtException when project_path is None."""
-    ls_stdout = '{"resource_type": "model", "name": "x", "package_name": "p", "original_file_path": "x.sql", "unique_id": "model.p.x", "tags": [], "config": {}}'
-    with pytest.raises(CosmosLoadDbtException, match="project_path is required to parse dbt ls output"):
-        parse_dbt_ls_output(None, ls_stdout)
+def test_parse_dbt_ls_output_returns_empty_when_project_path_is_none():
+    """Test that parse_dbt_ls_output returns an empty dict when project_path is None (skips all lines)."""
+    valid_node_line = '{"resource_type": "model", "name": "some-model", "package_name": "my_project", "original_file_path": "models/some_model.sql", "unique_id": "model.my_project.some_model", "tags": [], "config": {}}'
+    ls_stdout = f"{valid_node_line}\n"
+
+    nodes = parse_dbt_ls_output(project_path=None, ls_stdout=ls_stdout)
+
+    assert nodes == {}
 
 
 @patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)

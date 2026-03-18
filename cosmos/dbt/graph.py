@@ -316,8 +316,6 @@ def run_command(
 
 def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, DbtNode]:
     """Parses the output of `dbt ls` into a dictionary of `DbtNode` instances."""
-    if project_path is None:
-        raise CosmosLoadDbtException("project_path is required to parse dbt ls output")
     nodes = {}
     for line in ls_stdout.split("\n"):
         try:
@@ -325,6 +323,8 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
         except json.decoder.JSONDecodeError:
             logger.debug("Skipped dbt ls line: %s", line)
         else:
+            if project_path is None:
+                continue
             base_path: Path = (
                 project_path.parent / node_dict["package_name"] if node_dict.get("package_name") else project_path
             )

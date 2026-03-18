@@ -41,6 +41,7 @@ from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
+MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
 
 DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
@@ -1786,6 +1787,55 @@ def test_dbt_dag_with_watcher(capsys):
     # Verify that log messages are not duplicated (each dbt message should appear only once)
     message_count = stdout.count(log_message)
     assert message_count == 1, f"Expected '{log_message}' to be logged exactly once, but found {message_count} times"
+
+
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_and_group_nodes_by_folder(capsys):
+    """
+    Run a DbtDag using ExecutionMode.WATCHER with RenderConfig(group_nodes_by_folder=True)
+    and TestBehavior.AFTER_ALL (mirrors multi_folder_grouped_watcher_dag from dev/dags).
+    """
+    watcher_dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=MULTI_FOLDER_DBT_PROJ_DIR),
+        profile_config=profile_config,
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+        render_config=RenderConfig(
+            group_nodes_by_folder=True,
+            test_behavior=TestBehavior.AFTER_ALL,
+            emit_datasets=False,
+        ),
+        operator_args={
+            "install_deps": True,
+            "trigger_rule": "all_success",
+            "execution_timeout": timedelta(seconds=120),
+        },
+        start_date=datetime(2024, 1, 1),
+        dag_id="multi_folder_grouped_watcher_dag",
+        default_args={"retries": 0},
+    )
+    outcome = new_test_dag(watcher_dag)
+    assert outcome.state == DagRunState.SUCCESS
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 6  # 3 seeds + 3 models
+    task_ids = set(watcher_dag.task_dict)
+    # 1 producer + 3 seeds + 3 model runs + 1 after_all test = 8
+    assert len(task_ids) == 8
+    assert "dbt_producer_watcher" in task_ids
+    assert "seeds.seeds_a.products_seed" in task_ids
+    assert "seeds.seeds_b.regions_seed" in task_ids
+    assert "seeds.seeds_b.region_managers_seed" in task_ids
+    assert "models.models_a.stg_products_run" in task_ids
+    assert "models.models_a.dim_products_run" in task_ids
+    assert "models.models_b.stg_regions_run" in task_ids
+    assert "multi_folder_test" in task_ids
+
+    assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["seeds.seeds_a.products_seed"], DbtSeedWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["models.models_a.stg_products_run"], DbtRunWatcherOperator)
+    # AFTER_ALL test task is rendered as DbtTestLocalOperator, not DbtTestWatcherOperator
+    from cosmos.operators.local import DbtTestLocalOperator
+
+    assert isinstance(watcher_dag.task_dict["multi_folder_test"], DbtTestLocalOperator)
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")

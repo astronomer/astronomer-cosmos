@@ -457,7 +457,9 @@ class DbtToAirflowConverter:
         compressed_metadata = _compress_telemetry_metadata(metadata)
         stored_metadata = False
         try:
-            dag.params["__cosmos_telemetry_metadata__"] = Param(default=compressed_metadata, const=compressed_metadata)
+            dag.params["__cosmos_telemetry_metadata__"] = Param(
+                default=compressed_metadata, description="Cosmos telemetry metadata. Do not edit."
+            )
             stored_metadata = True
         except ParamValidationError as e:
             logger.warning(f"Failed to store compressed Cosmos telemetry metadata in DAG {dag.dag_id} params: {e}")

@@ -722,11 +722,6 @@ def test_node_without_depends_on_with_tag_selector_should_not_raise_exception():
         original_file_path=Path("tests/generic/builtin.sql"),
         tags=[],
         config={},
-<<<<<<< feat/create-task-groups-by-dbt-models
-=======
-        path_base=SAMPLE_PROJ_PATH,
-        original_file_path=Path("tests/generic/builtin.sql"),
->>>>>>> main
     )
     nodes = {standalone_test_node.unique_id: standalone_test_node}
     assert not select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["tag:some-tag"])
@@ -741,11 +736,6 @@ def test_should_include_node_without_depends_on(selector_config):
         original_file_path=Path("tests/generic/builtin.sql"),
         tags=[],
         config={},
-<<<<<<< feat/create-task-groups-by-dbt-models
-=======
-        path_base=SAMPLE_PROJ_PATH,
-        original_file_path=Path("tests/generic/builtin.sql"),
->>>>>>> main
     )
     selector = NodeSelector({}, selector_config)
     selector.visited_nodes = set()

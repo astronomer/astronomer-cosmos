@@ -214,13 +214,8 @@ def test_dbt_profile_config_to_override():
                 "unique_id": "model.my_project.customers",
                 "resource_type": "model",
                 "depends_on": [],
-<<<<<<< feat/create-task-groups-by-dbt-models
-                "file_path": ".",
-                "original_file_path": ".",
-=======
                 "file_path": "base_path/original_file_path",
                 "original_file_path": "original_file_path",
->>>>>>> main
                 "tags": [],
                 "config": {},
                 "has_test": False,
@@ -235,13 +230,8 @@ def test_dbt_profile_config_to_override():
                 "unique_id": "model.my_project.customers.v1",
                 "resource_type": "model",
                 "depends_on": [],
-<<<<<<< feat/create-task-groups-by-dbt-models
-                "file_path": ".",
-                "original_file_path": ".",
-=======
                 "file_path": "base_path/original_file_path",
                 "original_file_path": "original_file_path",
->>>>>>> main
                 "tags": [],
                 "config": {},
                 "has_test": False,
@@ -260,13 +250,8 @@ def test_dbt_node_context_dict(
         unique_id=unique_id,
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-<<<<<<< feat/create-task-groups-by-dbt-models
-        path_base=Path("."),
-        original_file_path=Path("."),
-=======
         path_base=Path("base_path"),
         original_file_path=Path("original_file_path"),
->>>>>>> main
     )
     assert node.context_dict == expected_dict
 
@@ -1910,7 +1895,6 @@ def test_parse_dbt_ls_output_does_not_skip_non_model_without_path(caplog):
     assert "Skipping model" not in caplog.text
 
 
-<<<<<<< feat/create-task-groups-by-dbt-models
 def test_parse_dbt_ls_output_returns_empty_when_project_path_is_none():
     """Test that parse_dbt_ls_output returns an empty dict when project_path is None (skips all lines)."""
     valid_node_line = '{"resource_type": "model", "name": "some-model", "package_name": "my_project", "original_file_path": "models/some_model.sql", "unique_id": "model.my_project.some_model", "tags": [], "config": {}}'
@@ -1919,13 +1903,6 @@ def test_parse_dbt_ls_output_returns_empty_when_project_path_is_none():
     nodes = parse_dbt_ls_output(project_path=None, ls_stdout=ls_stdout)
 
     assert nodes == {}
-=======
-def test_parse_dbt_ls_output_raises_when_project_path_is_none():
-    """Test that parse_dbt_ls_output raises CosmosLoadDbtException when project_path is None."""
-    ls_stdout = '{"resource_type": "model", "name": "x", "package_name": "p", "original_file_path": "x.sql", "unique_id": "model.p.x", "tags": [], "config": {}}'
-    with pytest.raises(CosmosLoadDbtException, match="project_path is required to parse dbt ls output"):
-        parse_dbt_ls_output(None, ls_stdout)
->>>>>>> main
 
 
 @patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)

@@ -1224,6 +1224,7 @@ def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, 
     )
 
 
+@skipif_airflow_lt_3_dag_doc_hash
 @patch("cosmos.converter.settings.enable_dag_versioning", False)
 @patch("cosmos.converter._create_folder_version_hash")
 @patch("cosmos.converter.DbtGraph.load")

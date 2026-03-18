@@ -1895,6 +1895,13 @@ def test_parse_dbt_ls_output_does_not_skip_non_model_without_path(caplog):
     assert "Skipping model" not in caplog.text
 
 
+def test_parse_dbt_ls_output_raises_when_project_path_is_none():
+    """Test that parse_dbt_ls_output raises CosmosLoadDbtException when project_path is None."""
+    ls_stdout = '{"resource_type": "model", "name": "x", "package_name": "p", "original_file_path": "x.sql", "unique_id": "model.p.x", "tags": [], "config": {}}'
+    with pytest.raises(CosmosLoadDbtException, match="project_path is required to parse dbt ls output"):
+        parse_dbt_ls_output(None, ls_stdout)
+
+
 @patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)
 @patch("cosmos.dbt.graph.Popen")
 @patch("cosmos.dbt.graph.DbtGraph.update_node_dependency")

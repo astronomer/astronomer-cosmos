@@ -316,6 +316,8 @@ def run_command(
 
 def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, DbtNode]:
     """Parses the output of `dbt ls` into a dictionary of `DbtNode` instances."""
+    if project_path is None:
+        raise CosmosLoadDbtException("project_path is required to parse dbt ls output")
     nodes = {}
     for line in ls_stdout.split("\n"):
         try:

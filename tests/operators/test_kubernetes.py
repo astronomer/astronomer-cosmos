@@ -3,15 +3,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import kubernetes.client as k8s
 import pytest
-from airflow import __version__ as airflow_version
-from airflow.models import DAG, TaskInstance
+from airflow.models import DAG
 
 try:
     from airflow.sdk.definitions.context import Context
 except ImportError:
     from airflow.utils.context import Context
 
-from packaging import version
 from pendulum import datetime
 
 from cosmos import ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig
@@ -29,6 +27,7 @@ from cosmos.operators.kubernetes import (
     DbtTestWarningHandler,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.conftest import make_task_instance
 
 
 @pytest.fixture()
@@ -502,10 +501,7 @@ def test_dbt_kubernetes_operator_handle_warnings(
     mock_warning_callback = Mock()
     test_operator = DbtTestKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
 
-    if version.parse(airflow_version) >= version.Version("3.1"):
-        task_instance = TaskInstance(test_operator, dag_version_id=None)
-    else:
-        task_instance = TaskInstance(test_operator)
+    task_instance = make_task_instance(test_operator)
 
     task_instance.task.pod_manager = FakePodManager(log_string)
     task_instance.task.pod = task_instance.task.remote_pod = "pod"
@@ -527,10 +523,7 @@ def test_dbt_kubernetes_operator_handle_warnings_noop(
 ):
     mock_warning_callback = Mock()
     run_operator = DbtRunKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
-    if version.parse(airflow_version) >= version.Version("3.1"):
-        task_instance = TaskInstance(run_operator, dag_version_id=None)
-    else:
-        task_instance = TaskInstance(run_operator)
+    task_instance = make_task_instance(run_operator)
     context = Context(task_instance=task_instance)
 
     warning_handler_no_context = DbtTestWarningHandler(mock_warning_callback, run_operator, None)

@@ -98,7 +98,7 @@ dbt-databricks==1.11.6
 dbt-duckdb==1.10.1
 dbt-extractor==0.6.0
 dbt-loom==0.9.4
-dbt-***==1.10.0
+dbt-postgres==1.10.0
 dbt-protos==1.0.443
 dbt-semantic-interfaces==0.9.0
 dbt-spark==1.10.1

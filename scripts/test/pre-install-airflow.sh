@@ -42,7 +42,7 @@ elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
   uv pip install apache-airflow-providers-google
   uv pip install apache-airflow-providers-microsoft-azure
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
-  uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
+  uv pip install -U dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install dbt-loom
 else
   # Download Airflow constraints according to the version being used

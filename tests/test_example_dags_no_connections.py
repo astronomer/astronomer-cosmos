@@ -56,6 +56,9 @@ def get_dag_bag() -> DagBag:
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.write("example_cosmos_cleanup_dag.py\n")
 
+        if AIRFLOW_VERSION >= Version("3.2.0"):
+            file.writelines("cosmos_manifest_example.py\n")
+
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)

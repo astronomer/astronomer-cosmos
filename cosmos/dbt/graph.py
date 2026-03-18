@@ -64,11 +64,14 @@ from cosmos.log import get_logger
 logger = get_logger(__name__)
 
 
-def _normalize_path(path: str) -> str:
+def _normalize_path(path: str | None) -> str:
     """
     Converts a potentially Windows path string into a Posix-friendly path.
     """
-    return Path(path.replace("\\", "/")).as_posix()
+    if path is None:
+        return ""
+    else:
+        return Path(path.replace("\\", "/")).as_posix()
 
 
 class CosmosLoadDbtException(Exception):
@@ -101,7 +104,11 @@ class DbtNode:
 
     @property
     def file_path(self) -> Path:
+<<<<<<< feat/create-task-groups-by-dbt-models
         """Resolved absolute path to the node's file (path_base / original_file_path)."""
+=======
+        """Combined path to the node's file (path_base / original_file_path)."""
+>>>>>>> main
         return self.path_base / self.original_file_path
 
     @property
@@ -177,8 +184,8 @@ class DbtNode:
     @property
     def context_dict(self) -> dict[str, Any]:
         """
-        Returns a dictionary containing all the attributes of the DbtNode object,
-        ensuring that the output is JSON serializable so it can be stored in Airflow's db
+        Returns a JSON-serializable dictionary containing a curated subset of
+        DbtNode attributes, suitable for storing in Airflow's database.
         """
         return {
             "unique_id": self.unique_id,
@@ -313,6 +320,8 @@ def run_command(
 
 def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, DbtNode]:
     """Parses the output of `dbt ls` into a dictionary of `DbtNode` instances."""
+    if project_path is None:
+        raise CosmosLoadDbtException("project_path is required to parse dbt ls output")
     nodes = {}
     for line in ls_stdout.split("\n"):
         try:
@@ -320,10 +329,15 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
         except json.decoder.JSONDecodeError:
             logger.debug("Skipped dbt ls line: %s", line)
         else:
+<<<<<<< feat/create-task-groups-by-dbt-models
             if project_path is None:
                 continue
             base_path: Path = (
                 project_path.parent / node_dict["package_name"] if node_dict.get("package_name") else project_path  # type: ignore[arg-type]
+=======
+            base_path: Path = (
+                project_path.parent / node_dict["package_name"] if node_dict.get("package_name") else project_path
+>>>>>>> main
             )
 
             # dbt-core defined the node path via "original_file_path", dbt fusion identifies it via "path"
@@ -346,9 +360,15 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     resource_type=DbtResourceType(node_dict["resource_type"]),
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     path_base=base_path,
+<<<<<<< feat/create-task-groups-by-dbt-models
                     original_file_path=Path(node_file_path),
                     tags=node_dict.get("tags", []),
                     config=node_dict.get("config", {}),
+=======
+                    original_file_path=Path(_normalize_path(node_file_path)),
+                    tags=node_dict.get("tags") or [],
+                    config=node_dict.get("config") or {},
+>>>>>>> main
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
                         if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE

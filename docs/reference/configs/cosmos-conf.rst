@@ -32,6 +32,18 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE``
 
+.. _enable_dag_versioning:
+
+`enable_dag_versioning`_:
+    **Airflow 3+ only:** when enabled (default), Cosmos computes a hash of the dbt project directory and appends
+    it to the DAG's ``doc_md`` so that Airflow 3's DAG versioning can detect when dbt project files change.
+    On Airflow 2.x, ``doc_md`` is not modified for this purpose (the setting has no effect there).
+    When disabled on Airflow 3+, the hash is not computed (faster DAG parsing) and DAG versioning will not
+    reflect dbt project content changes from this mechanism.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_DAG_VERSIONING``
+
 .. _enable_cache_dbt_ls:
 
 `enable_cache_dbt_ls`_:

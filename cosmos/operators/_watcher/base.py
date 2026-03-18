@@ -85,6 +85,8 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         info = dbt_log.get("info", {})
 
         event_name = info.get("name")
+        if event_name not in (_DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES):
+            return None
         node_info = data.get("node_info")
         status = node_info.get("node_status") if node_info else None
         unique_id = node_info.get("unique_id") if node_info else None
@@ -93,15 +95,14 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         msg = data.get("msg") or info.get("msg") or None
     else:  # Runner
         event_name = getattr(getattr(dbt_log, "info", None), "name", None)
+        if event_name not in (_DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES):
+            return None
         node_info = getattr(dbt_log.data, "node_info", None)
         unique_id = getattr(node_info, "unique_id") if node_info else None
         status = getattr(node_info, "node_status", None) if node_info else None
         start_time = getattr(node_info, "node_started_at", None) if node_info else None
         finish_time = getattr(node_info, "node_finished_at", None) if node_info else None
         msg = getattr(dbt_log.info, "msg", None)
-
-    if event_name not in (_DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES):
-        return None
 
     if unique_id:
         dbt_event = {

@@ -180,8 +180,8 @@ class DbtNode:
     @property
     def context_dict(self) -> dict[str, Any]:
         """
-        Returns a dictionary containing all the attributes of the DbtNode object,
-        ensuring that the output is JSON serializable so it can be stored in Airflow's db
+        Returns a JSON-serializable dictionary containing a curated subset of
+        DbtNode attributes, suitable for storing in Airflow's database.
         """
         return {
             "unique_id": self.unique_id,

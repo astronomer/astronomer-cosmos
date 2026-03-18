@@ -35,16 +35,15 @@ elif [ "$AIRFLOW_VERSION" = "3.0" ] ; then
 elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
   uv pip install -r requirements/requirements-airflow-3.1-dbt-1.11.txt
 elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
-  uv pip install --pre apache-airflow==3.2.0b1 dbt-core==1.11.7
-  uv pip install apache-airflow-providers-amazon
+  uv pip install --pre apache-airflow==3.2.0b1
+  uv pip install "apache-airflow-providers-amazon[s3fs]"
   uv pip install apache-airflow-providers-cncf-kubernetes
   uv pip install apache-airflow-providers-docker
   uv pip install apache-airflow-providers-google
-  uv pip install apache-airflow-providers-http
   uv pip install apache-airflow-providers-microsoft-azure
-  uv pip install apache-airflow-providers-postgres
-  uv pip install apache-airflow-providers-smtp
-  uv pip install apache-airflow-providers-standard
+  uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
+  uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
+  uv pip install dbt-loom
 else
   # Download Airflow constraints according to the version being used
   if [ "$AIRFLOW_VERSION" = "3.0" ] ; then

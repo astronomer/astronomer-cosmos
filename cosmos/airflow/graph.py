@@ -671,41 +671,6 @@ def _add_dbt_setup_async_task(
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
 
 
-def _compute_source_to_dependent_models(nodes: dict[str, DbtNode]) -> dict[str, list[str]]:
-    """Return a mapping of source unique_id → list of all model unique_ids that transitively depend on it.
-
-    Used at DAG parse time to pre-compute the dependency graph so the watcher producer can, at
-    runtime, determine which models to exclude from ``dbt build`` when a source is stale.
-
-    :param nodes: The full set of dbt nodes for the current render scope (from ``DbtGraph.filtered_nodes``).
-    :returns: Dict keyed by source unique_id; values are lists of unique_ids of every node that
-        transitively depends on that source (non-source nodes only).
-    """
-    # Reverse adjacency: node_id → set of node_ids that directly depend on it
-    dependents: dict[str, set[str]] = defaultdict(set)
-    for node_id, node in nodes.items():
-        for dep_id in node.depends_on:
-            dependents[dep_id].add(node_id)
-
-    source_to_models: dict[str, list[str]] = {}
-    for node_id, node in nodes.items():
-        if node.resource_type != DbtResourceType.SOURCE:
-            continue
-        # BFS to collect all transitive non-source dependents
-        visited: set[str] = set()
-        queue = list(dependents.get(node_id, set()))
-        while queue:
-            current = queue.pop()
-            if current in visited:
-                continue
-            visited.add(current)
-            queue.extend(dependents.get(current, set()))
-        if visited:
-            source_to_models[node_id] = list(visited)
-
-    return source_to_models
-
-
 def _add_watcher_producer_task(
     dag: DAG,
     task_args: dict[str, Any],
@@ -714,7 +679,6 @@ def _add_watcher_producer_task(
     render_config: RenderConfig | None = None,
     execution_mode: ExecutionMode = ExecutionMode.WATCHER,
     tests_per_model: dict[str, list[str]] | None = None,
-    source_to_dependent_models: dict[str, list[str]] | None = None,
 ) -> BaseOperator:
     """
     Create the producer task for the watcher execution mode and add it to the tasks_map.
@@ -723,8 +687,8 @@ def _add_watcher_producer_task(
     producer_task_args = task_args.copy()
     if tests_per_model is not None:
         producer_task_args["tests_per_model"] = tests_per_model
-    if source_to_dependent_models is not None:
-        producer_task_args["source_to_dependent_models"] = source_to_dependent_models
+    if render_config is not None and render_config.source_rendering_behavior is not SourceRenderingBehavior.NONE:
+        producer_task_args["_check_source_freshness"] = True
 
     if render_config is not None:
         producer_task_args["select"] = _convert_list_to_str(render_config.select)
@@ -939,6 +903,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
     elif execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
         setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
+
         # We are intentionally creating the producer task ahead of the consumer tasks
         # Airflow priority weight is not being respected in multiple versions of the library, including 3.1
         # To instantiate the producer before helps having it before on the DAG topological order and scheduling this task before the consumer tasks
@@ -950,7 +915,6 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             render_config=render_config,
             execution_mode=execution_mode,
             tests_per_model=tests_per_model,
-            source_to_dependent_models=_compute_source_to_dependent_models(nodes),
         )
 
     for node_id, node in nodes.items():

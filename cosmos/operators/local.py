@@ -120,6 +120,19 @@ from cosmos.operators.base import (
 logger = get_logger(__name__)
 
 
+def _read_target_sources_json(project_root: Path) -> dict[str, Any] | None:
+    """Parse ``target/sources.json`` under ``project_root`` if the file exists."""
+    path = project_root / "target" / "sources.json"
+    if not path.is_file():
+        return None
+    try:
+        result: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+        return result
+    except json.JSONDecodeError:
+        logger.warning("Could not parse JSON from %s", path)
+        return None
+
+
 # The following is related to the ability of Cosmos parsing dbt artifacts and generating OpenLineage URIs
 # It is used for emitting Airflow assets and not necessarily OpenLineage events
 try:
@@ -204,6 +217,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.callback_args = callback_args or {}
         self.compiled_sql = ""
         self.freshness = ""
+        self._sources_json: dict[str, Any] | None = None
         self.should_store_compiled_sql = should_store_compiled_sql
         self.should_upload_compiled_sql = should_upload_compiled_sql
         self.openlineage_events_completes: list[RunEvent] = []
@@ -674,6 +688,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     cwd=tmp_project_dir,
                     context=context,
                 )
+                # TODO: Early return if running from watcher mode
+                self._sources_json = _read_target_sources_json(tmp_dir_path)
+                if self._sources_json:
+                    return result
                 if is_openlineage_common_available:
                     self.calculate_openlineage_events_completes(env, tmp_dir_path)
                     if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:

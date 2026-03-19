@@ -3,12 +3,9 @@ from __future__ import annotations
 import base64
 import functools
 import json
-import os
-import subprocess
 import zlib
 from collections.abc import Callable, Sequence
 from datetime import timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
@@ -70,6 +67,12 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 
+def _default_freshness_callback(context: Context, sources_json: dict[str, Any] | None) -> tuple[list[str], str]:
+    # TODO: Remove hardcoded Value
+    # Eventually this should be supplied by user
+    return ["model.jaffle_shop.customers"], "skip"
+
+
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     """Run dbt build and update XCom with the progress of each model, as part of the *WATCHER* execution mode.
 
@@ -100,10 +103,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     - pushes a synthetic ``"skipped"`` XCom entry for every model that transitively depends on that
       source so consumer sensors raise ``AirflowSkipException`` instead of waiting;
     - adds those models to the ``--exclude`` list of the subsequent ``dbt build`` call.
-
-    The mapping of source unique-ids to dependent model unique-ids is computed at DAG parse time and
-    injected automatically by ``cosmos.airflow.graph.create_airflow_graph``; users do not need to
-    set ``source_to_dependent_models`` manually.
     """
 
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
@@ -115,8 +114,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self.test_results_per_model: dict[str, list[str]] = {}
-        self.check_source_freshness: bool = kwargs.pop("check_source_freshness", False)
-        self.source_to_dependent_models: dict[str, list[str]] = kwargs.pop("source_to_dependent_models", {})
+        self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
+        self._freshness_callback: Callable[[Context, dict[str, Any] | None], tuple[list[str], str]] = (
+            _default_freshness_callback
+        )
         # Do not publish compiled_sql to the producer's rendered_template: it would contain SQL for
         # all models run by the producer, is often truncated in the UI due to size, and is of no use
         # there; individual sensor tasks show the corresponding rendered_template per model.
@@ -175,56 +176,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         if startup_events:
             safe_xcom_push(task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events)
 
-    def _get_stale_sources(self) -> list[str]:
-        """Run ``dbt source freshness`` and return the unique_ids of stale sources.
-
-        Runs the command as a subprocess against ``self.project_dir`` using the same profile
-        configuration as the build step. Returns an empty list (and logs a warning) if the
-        freshness check cannot be performed or the artifact is missing.
-        """
-        if not self.profile_config:
-            logger.warning("check_source_freshness=True but no profile_config is set; skipping freshness check.")
-            return []
-
-        with self.profile_config.ensure_profile() as profile_values:
-            profile_path, env_vars = profile_values
-            env = {**os.environ, **{k: str(v) for k, v in env_vars.items()}}
-
-            dbt_executable = str(getattr(self, "dbt_executable_path", None) or "dbt")
-            cmd: list[str] = [
-                dbt_executable,
-                "source",
-                "freshness",
-                "--project-dir",
-                str(self.project_dir),
-                "--profiles-dir",
-                str(profile_path.parent),
-            ]
-            if self.profile_config.profile_name:
-                cmd += ["--profile", self.profile_config.profile_name]
-            if self.profile_config.target_name:
-                cmd += ["--target", self.profile_config.target_name]
-
-            logger.info("Running dbt source freshness: %s", cmd)
-            proc = subprocess.run(cmd, env=env, capture_output=True, text=True, cwd=str(self.project_dir))
-            logger.info("dbt source freshness stdout:\n%s", proc.stdout)
-            if proc.returncode != 0:
-                logger.warning("dbt source freshness exited with code %d; stderr:\n%s", proc.returncode, proc.stderr)
-
-        sources_json_path = Path(self.project_dir) / "target" / "sources.json"
-        if not sources_json_path.exists():
-            logger.warning(
-                "sources.json not found at %s after freshness check; skipping exclusions.", sources_json_path
-            )
-            return []
-
-        sources_data: dict[str, Any] = json.loads(sources_json_path.read_text(encoding="utf-8"))
-        stale: list[str] = [
-            r["unique_id"] for r in sources_data.get("results", []) if r.get("status") in ("error", "warn")
-        ]
-        logger.info("Stale sources detected: %s", stale)
-        return stale
-
     def _push_skipped_xcom_for_model(self, ti: Any, unique_id: str) -> None:
         """Push a synthetic ``"skipped"`` status XCom for a model excluded due to a stale upstream source.
 
@@ -244,46 +195,60 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         else:
             safe_xcom_push(task_instance=ti, key=f"{uid_key}_status", value="skipped")
 
-    def _apply_source_freshness_excludes(self, context: Context) -> None:
-        """Run freshness check, push skipped XComs for stale-dependent models, and update ``self.exclude``.
-
-        No-op when ``check_source_freshness=False`` or no source dependency map is available.
-        On any error during the freshness check the method logs a warning and returns without
-        modifying the exclude list so that the ``dbt build`` proceeds normally (fail-open).
-        """
-        if not self.check_source_freshness or not self.source_to_dependent_models:
-            return
-
+    def _run_source_freshness(self, context: Context) -> None:
+        """Run ``dbt source freshness`` via ``build_cmd`` and ``run_command`` (temp dir, profile, deps like ``dbt build``)."""
+        original_base_cmd = self.base_cmd
+        original_indirect_selection = getattr(self, "indirect_selection", None)
         try:
-            stale_source_ids = self._get_stale_sources()
-        except Exception:
-            logger.exception("Unexpected error during source freshness check; proceeding with full dbt build.")
-            return
+            self.base_cmd = ["source", "freshness"]
+            self.indirect_selection = None  # ``dbt source freshness`` does not support --indirect-selection
+            full_cmd, env = self.build_cmd(context=context, cmd_flags=[])
+            self.run_command(cmd=full_cmd, env=env, context=context)
+        finally:
+            self.base_cmd = original_base_cmd
+            self.indirect_selection = original_indirect_selection
 
-        if not stale_source_ids:
+    def _skipped_node_token(self, context: Context, node_unique_ids: list[str]) -> None:
+        if not node_unique_ids:
             return
 
         ti = context["ti"]
-        excluded_unique_ids: set[str] = set()
-        for source_id in stale_source_ids:
-            for model_uid in self.source_to_dependent_models.get(source_id, []):
-                excluded_unique_ids.add(model_uid)
 
-        if not excluded_unique_ids:
-            logger.info("Stale sources found but no dependent models in the current render scope: %s", stale_source_ids)
-            return
-
-        for unique_id in excluded_unique_ids:
-            logger.info("Marking model '%s' as skipped (stale upstream source)", unique_id)
+        for unique_id in node_unique_ids:
+            logger.info(
+                "Marking resource '%s' as skipped (stale upstream source)",
+                unique_id,
+            )
             self._push_skipped_xcom_for_model(ti, unique_id)
 
-        # Append model names to the exclude selector for dbt build.
-        # Use only the last segment of the unique_id (the model name) as the dbt selector.
-        model_names = [uid.split(".")[-1] for uid in excluded_unique_ids]
-        additional_exclude = " ".join(model_names)
-        current_exclude: str = getattr(self, "exclude", None) or ""
-        self.exclude = f"{current_exclude} {additional_exclude}".strip() if current_exclude else additional_exclude
-        logger.info("dbt build --exclude updated to: %s", self.exclude)
+        model_names = {uid.rsplit(".", 1)[-1] for uid in node_unique_ids}
+
+        current_exclude = getattr(self, "exclude", None)
+
+        if isinstance(current_exclude, str):
+            current_set = set(current_exclude.split())
+        elif isinstance(current_exclude, (list, set, tuple)):
+            current_set = set(current_exclude)
+        else:
+            current_set = set()
+
+        updated_exclude = current_set | model_names
+        self.exclude = " ".join(sorted(updated_exclude))
+
+        logger.info("dbt build --exclude updated: %s", self.exclude)
+
+    def _apply_source_freshness(self, context: Context) -> None:
+        """Run freshness, filter stale sources via callback, then skip XCom + ``--exclude`` for downstream resources."""
+        try:
+            self._run_source_freshness(context)
+            node_unique_ids, status = self._freshness_callback(context, self._sources_json)
+            if node_unique_ids is None or node_unique_ids == []:
+                return
+            if status == "skip":
+                self._skipped_node_token(context, node_unique_ids)
+        except Exception:
+            logger.exception("Unexpected error during source freshness check; proceeding with full dbt build.")
+            return
 
     def _set_invocation_mode_if_not_set(self) -> None:
         if not self.invocation_mode:
@@ -325,7 +290,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             "downstream sensors own model-level retries."
         )
 
-        self._apply_source_freshness_excludes(context)
+        if self._check_source_freshness:
+            self._apply_source_freshness(context)
 
         try:
             use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None

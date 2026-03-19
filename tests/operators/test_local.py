@@ -614,6 +614,17 @@ def test_dbt_dag_with_group_nodes_by_folder():
     assert "models.models_a.dim_products_run" in task_ids
     assert "models.models_b.stg_regions_run" in task_ids
 
+    # Check dependencies
+    assert grouped_dag.task_dict["seeds.seeds_a.products_seed"].downstream_task_ids == {
+        "models.models_a.stg_products_run"
+    }
+    assert grouped_dag.task_dict["seeds.seeds_b.regions_seed"].downstream_task_ids == {
+        "models.models_b.stg_regions_run"
+    }
+    assert grouped_dag.task_dict["seeds.seeds_b.region_managers_seed"].downstream_task_ids == {
+        "models.models_b.stg_regions_run"
+    }
+
 
 @pytest.mark.integration
 def test_dbt_task_group_with_group_nodes_by_folder():

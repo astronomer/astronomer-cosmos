@@ -7,9 +7,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 from airflow.exceptions import ParamValidationError
 from airflow.models import DAG
+from packaging.version import Version
 
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import DbtResourceType, ExecutionMode, InvocationMode, LoadMode, TestBehavior
+from cosmos.constants import (
+    AIRFLOW_VERSION,
+    DbtResourceType,
+    ExecutionMode,
+    InvocationMode,
+    LoadMode,
+    TestBehavior,
+)
 from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
@@ -21,6 +29,11 @@ SAMPLE_DBT_PROJECT = Path(__file__).parent / "sample/"
 SAMPLE_DBT_MANIFEST = Path(__file__).parent / "sample/manifest.json"
 MULTIPLE_PARENTS_TEST_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt/multiple_parents_test/"
 DBT_PROJECTS_PROJ_WITH_DEPS_DIR = Path(__file__).parent.parent / "dev/dags/dbt" / "jaffle_shop"
+
+skipif_airflow_lt_3_dag_doc_hash = pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("3.0.0"),
+    reason="dbt project hash in doc_md is only applied on Airflow 3+",
+)
 
 sample_profile_config = ProfileConfig(
     profile_name="my_profile_name",
@@ -238,7 +251,8 @@ parent_seed = DbtNode(
     unique_id=f"{DbtResourceType.SEED}.{SAMPLE_DBT_PROJECT.stem}.seed_parent",
     resource_type=DbtResourceType.SEED,
     depends_on=[],
-    file_path="",
+    path_base=Path("."),
+    original_file_path=Path("."),
 )
 nodes = {"seed_parent": parent_seed}
 
@@ -1025,7 +1039,8 @@ sample_model = DbtNode(
     unique_id=f"{DbtResourceType.MODEL}.{SAMPLE_DBT_PROJECT.stem}.sample_model",
     resource_type=DbtResourceType.MODEL,
     depends_on=[],
-    file_path="",
+    path_base=Path("."),
+    original_file_path=Path("."),
 )
 nodes_with_model = {"sample_model": sample_model}
 
@@ -1060,6 +1075,7 @@ def test_converter_creates_model_with_pre_dbt_fusion(mock_load_dbt_graph):
     assert converter.tasks_map["sample_model"].select is None
 
 
+@skipif_airflow_lt_3_dag_doc_hash
 @patch("cosmos.converter._create_folder_version_hash")
 @patch("cosmos.converter.DbtGraph.load")
 def test_dag_versioning_hash_appended_to_empty_doc_md(mock_load_dbt_graph, mock_hash_func):
@@ -1087,6 +1103,7 @@ def test_dag_versioning_hash_appended_to_empty_doc_md(mock_load_dbt_graph, mock_
     mock_hash_func.assert_called_once()
 
 
+@skipif_airflow_lt_3_dag_doc_hash
 @patch("cosmos.converter._create_folder_version_hash")
 @patch("cosmos.converter.DbtGraph.load")
 def test_dag_versioning_hash_appended_to_existing_doc_md(mock_load_dbt_graph, mock_hash_func):
@@ -1115,6 +1132,7 @@ def test_dag_versioning_hash_appended_to_existing_doc_md(mock_load_dbt_graph, mo
     mock_hash_func.assert_called_once()
 
 
+@skipif_airflow_lt_3_dag_doc_hash
 @patch("cosmos.converter.logger")
 @patch("cosmos.converter._create_folder_version_hash")
 @patch("cosmos.converter.DbtGraph.load")
@@ -1149,6 +1167,7 @@ def test_dag_versioning_hash_error_handling(mock_load_dbt_graph, mock_hash_func,
     assert "File system error" in warning_call
 
 
+@skipif_airflow_lt_3_dag_doc_hash
 @patch("cosmos.converter._create_folder_version_hash")
 @patch("cosmos.converter.DbtGraph.load")
 def test_dag_versioning_hash_with_special_characters(mock_load_dbt_graph, mock_hash_func):
@@ -1176,6 +1195,7 @@ def test_dag_versioning_hash_with_special_characters(mock_load_dbt_graph, mock_h
     assert dag.doc_md == expected_doc
 
 
+@skipif_airflow_lt_3_dag_doc_hash
 @patch("cosmos.converter.logger")
 @patch("cosmos.converter._create_folder_version_hash")
 @patch("cosmos.converter.DbtGraph.load")
@@ -1204,6 +1224,62 @@ def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, 
     assert any(
         "Appended dbt project hash test_hash_123 to DAG test_dag_logging documentation" in call for call in debug_calls
     )
+
+
+@skipif_airflow_lt_3_dag_doc_hash
+@patch("cosmos.converter.settings.enable_dag_versioning", False)
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_skipped_when_setting_disabled(mock_load_dbt_graph, mock_hash_func):
+    """Test that dbt project hash is not computed or appended when enable_dag_versioning is False."""
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
+    assert dag.doc_md is None
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    assert dag.doc_md is None
+    mock_hash_func.assert_not_called()
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION >= Version("3.0.0"),
+    reason="Airflow 2.x skips dbt project hash; behavior asserted only on Airflow 2",
+)
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_skipped_on_airflow_2(mock_load_dbt_graph, mock_hash_func):
+    """Hash is only for Airflow 3+ DAG versioning; Airflow 2.x skips hash computation."""
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1), doc_md="Existing docs")
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="my_profile_name",
+        target_name="my_target_name",
+        profiles_yml_filepath=SAMPLE_PROFILE_YML,
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    assert dag.doc_md == "Existing docs"
+    mock_hash_func.assert_not_called()
 
 
 @patch("cosmos.converter.logger")

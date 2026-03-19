@@ -1,3 +1,5 @@
+.. _project-config:
+
 Project Config
 ================
 

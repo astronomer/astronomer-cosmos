@@ -227,11 +227,12 @@ def create_test_task_metadata(
     watcher_to_test_execution_mode = {
         ExecutionMode.WATCHER: ExecutionMode.LOCAL,
         ExecutionMode.WATCHER_KUBERNETES: ExecutionMode.KUBERNETES,
+        ExecutionMode.WATCHER_GCP_GKE: ExecutionMode.GCP_GKE,
     }
     if (
         render_config is not None
         and render_config.test_behavior == TestBehavior.AFTER_ALL
-        and execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES)
+        and execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES, ExecutionMode.WATCHER_GCP_GKE)
     ):
         test_execution_mode = watcher_to_test_execution_mode[execution_mode]
         operator_class = calculate_operator_class(execution_mode=test_execution_mode, dbt_class=dbt_class)
@@ -921,7 +922,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
         # This property is only relevant for the setup task, not the other tasks:
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
-    elif execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES):
+    elif execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES, ExecutionMode.WATCHER_GCP_GKE):
         setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
         # We are intentionally creating the producer task ahead of the consumer tasks
         # Airflow priority weight is not being respected in multiple versions of the library, including 3.1

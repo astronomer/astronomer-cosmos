@@ -793,6 +793,7 @@ jobs:
       - Run-Integration-Tests
       - Run-Integration-Tests-Expensive
       - Run-Kubernetes-Tests
+      - Run-Telemetry-Tests
     runs-on: ubuntu-latest
     permissions:
       contents: read

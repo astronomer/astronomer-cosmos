@@ -1,11 +1,17 @@
 apache-airflow==3.2.0b1
 apache-airflow-providers-amazon==9.21.0
+apache-airflow-providers-cncf-kubernetes
+apache-airflow-providers-docker
+apache-airflow-providers-google
+apache-airflow-providers-microsoft-azure
+airflow-provider-duckdb>=0.2.0
 
 dbt-postgres
 dbt-bigquery
 dbt-vertica
 dbt-databricks
 pyspark
+dbt-duckdb
 
 s3fs==2025.9.0
 fsspec==2025.9.0

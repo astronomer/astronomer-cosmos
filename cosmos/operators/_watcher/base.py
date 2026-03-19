@@ -44,14 +44,54 @@ except ImportError:  # pragma: no cover
 
 logger = get_logger(__name__)
 
+# Subset of dbt event types that represent errors/failures.
+# Used (together with node status lifecycle events like NodeStart/NodeCompiling/
+# NodeExecuting/NodeFinished) to build _DBT_EVENT_ALLOWLIST, which controls which
+# events are surfaced in consumer tasks.
+# Source: https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/events/types.py
+_DBT_ERROR_EVENTS_TYPES = frozenset(
+    {
+        "InvalidOptionYAML",
+        "LogDbtProjectError",
+        "LogDbtProfileError",
+        "InputFileDiffError",
+        "PartialParsingErrorProcessingFile",
+        "PartialParsingError",
+        "ParsedFileLoadFailed",
+        "ParseInlineNodeError",
+        "RunningOperationCaughtError",
+        "SQLRunnerException",
+        "RunningOperationUncaughtError",
+        "CatchableExceptionOnRun",
+        "InternalErrorOnRun",
+        "GenericExceptionOnRun",
+        "NodeConnectionReleaseError",
+        "MainEncounteredError",
+        "RunResultFailure",
+        "RunResultError",
+        "CheckNodeTestFailure",
+        "LogSkipBecauseError",
+        "SendEventFailure",
+        "FlushEventsFailure",
+        "TrackingInitializeFailure",
+        "ArtifactUploadError",
+    }
+)
+
+_DBT_NODE_STATUS_EVENT_TYPES = frozenset({"NodeStart", "NodeCompiling", "NodeExecuting", "NodeFinished"})
+
+_DBT_EVENT_ALLOWLIST = _DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES
+
 
 def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMsg) -> None:
     logger.debug("dbt_log: %s", dbt_log)
-    sensitive_words = ["fail", "error"]
     if isinstance(dbt_log, dict):  # Subprocess
         data = dbt_log.get("data", {})
         info = dbt_log.get("info", {})
 
+        event_name = info.get("name")
+        if event_name not in _DBT_EVENT_ALLOWLIST:
+            return None
         node_info = data.get("node_info")
         status = node_info.get("node_status") if node_info else None
         unique_id = node_info.get("unique_id") if node_info else None
@@ -59,21 +99,15 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         finish_time = node_info.get("node_finished_at") if node_info else None
         msg = data.get("msg") or info.get("msg") or None
     else:  # Runner
+        event_name = getattr(getattr(dbt_log, "info", None), "name", None)
+        if event_name not in _DBT_EVENT_ALLOWLIST:
+            return None
         node_info = getattr(dbt_log.data, "node_info", None)
         unique_id = getattr(node_info, "unique_id") if node_info else None
         status = getattr(node_info, "node_status", None) if node_info else None
         start_time = getattr(node_info, "node_started_at", None) if node_info else None
         finish_time = getattr(node_info, "node_finished_at", None) if node_info else None
         msg = getattr(dbt_log.info, "msg", None)
-
-    # Special case when node status is the string "None"; only process messages that contain an error or fail word
-    if status in ["None"] and msg is not None:
-        # Check if there is error log message
-        for sensitive_word in sensitive_words:
-            if sensitive_word in msg.lower():
-                break
-        else:
-            return None
 
     if unique_id:
         dbt_event = {
@@ -84,11 +118,6 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         }
 
         xcom_key = f"{unique_id.replace('.', '__')}_dbt_event"
-        # Avoid redundant XCom writes (and global lock contention) by only pushing
-        # when the event payload has changed.
-        existing_event = get_xcom_val(task_instance=task_instance, key=xcom_key, task_ids=PRODUCER_WATCHER_TASK_ID)
-        if existing_event == dbt_event:
-            return None
         safe_xcom_push(task_instance=task_instance, key=xcom_key, value=dbt_event)
 
 

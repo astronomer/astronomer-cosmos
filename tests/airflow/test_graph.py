@@ -1207,7 +1207,8 @@ def test_watcher_dependency_wiring(test_behavior, depends_on_past):
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child2.v2_b",
         resource_type=DbtResourceType.MODEL,
         depends_on=[parent_node.unique_id],
-        file_path=SAMPLE_PROJ_PATH / "gen3/models/child2_v2.sql",
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen3/models/child2_v2.sql"),
         tags=["nightly"],
         config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"pool": "custom_pool"}}}},
         has_test=True,
@@ -1217,7 +1218,8 @@ def test_watcher_dependency_wiring(test_behavior, depends_on_past):
         unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.child2.test_v2_b",
         resource_type=DbtResourceType.TEST,
         depends_on=[child_2b.unique_id],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
     )
 
     build_airflow_graph(

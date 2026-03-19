@@ -37,7 +37,7 @@ from cosmos.operators.watcher import (
     store_dbt_resource_status_from_log,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
-from tests.utils import AIRFLOW_VERSION, test_dag
+from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
@@ -1726,7 +1726,7 @@ def test_dbt_dag_with_watcher(capsys):
         render_config=RenderConfig(emit_datasets=False),
         operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
     )
-    outcome = test_dag(watcher_dag)
+    outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 23
@@ -1813,7 +1813,7 @@ def test_dbt_dag_with_watcher_and_group_nodes_by_folder(capsys):
         dag_id="multi_folder_grouped_watcher_dag",
         default_args={"retries": 0},
     )
-    outcome = test_dag(watcher_dag)
+    outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 6  # 3 seeds + 3 models
@@ -1876,7 +1876,7 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
         render_config=RenderConfig(emit_datasets=False, select=["raw_orders"], test_behavior=TestBehavior.AFTER_ALL),
         operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
     )
-    dag_run = test_dag(watcher_dag)
+    dag_run = new_test_dag(watcher_dag)
     assert dag_run.state == DagRunState.SUCCESS
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 1
@@ -1957,7 +1957,7 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
         },
         dagrun_timeout=timedelta(seconds=30),
     )
-    outcome = test_dag(watcher_dag)
+    outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 2

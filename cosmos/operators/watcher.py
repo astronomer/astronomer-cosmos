@@ -10,7 +10,14 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
+
 from cosmos.config import ProfileConfig
+from cosmos.dbt.graph import DbtNode
 from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
 from cosmos.operators._watcher.state import DBT_FAILED_STATUSES
 from cosmos.settings import watcher_dbt_execution_queue
@@ -67,7 +74,13 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 
-def _default_freshness_callback(context: Context, sources_json: dict[str, Any] | None) -> tuple[list[str], str]:
+def _default_freshness_callback(
+    context: Context,
+    dag: Any,
+    task_group: TaskGroup | None,
+    nodes: dict[str, DbtNode] | None,
+    sources_json: dict[str, Any] | None,
+) -> tuple[list[str], str]:
     # TODO: Remove hardcoded Value
     # Eventually this should be supplied by user
     return ["model.jaffle_shop.customers"], "skip"
@@ -115,9 +128,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self.test_results_per_model: dict[str, list[str]] = {}
         self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
-        self._freshness_callback: Callable[[Context, dict[str, Any] | None], tuple[list[str], str]] = (
-            _default_freshness_callback
-        )
+        self._freshness_callback: Callable[
+            [Context, Any, TaskGroup | None, dict[str, DbtNode] | None, dict[str, Any] | None],
+            tuple[list[str], str],
+        ] = _default_freshness_callback
         # Do not publish compiled_sql to the producer's rendered_template: it would contain SQL for
         # all models run by the producer, is often truncated in the UI due to size, and is of no use
         # there; individual sensor tasks show the corresponding rendered_template per model.
@@ -241,7 +255,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         """Run freshness, filter stale sources via callback, then skip XCom + ``--exclude`` for downstream resources."""
         try:
             self._run_source_freshness(context)
-            node_unique_ids, status = self._freshness_callback(context, self._sources_json)
+            logger.info("self.dag.__dict__: %s", self.dag.__dict__)
+            dbt_nodes = getattr(getattr(getattr(self, "dag", None), "dbt_graph", None), "nodes", None)
+            node_unique_ids, status = self._freshness_callback(
+                context, self.dag, self.task_group, dbt_nodes, self._sources_json
+            )
             if node_unique_ids is None or node_unique_ids == []:
                 return
             if status == "skip":

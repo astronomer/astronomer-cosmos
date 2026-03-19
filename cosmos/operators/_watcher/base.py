@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -288,8 +287,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         profiles_dir: str | None = None,
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
         poke_interval: int = 10,
-        timeout: int = 60 * 60,  # 1 h safety valve
-        execution_timeout: timedelta = timedelta(hours=1),
         deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
@@ -303,8 +300,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
         super().__init__(
             poke_interval=poke_interval,
-            timeout=timeout,
-            execution_timeout=execution_timeout,
             profile_config=profile_config,
             project_dir=project_dir,
             profiles_dir=profiles_dir,

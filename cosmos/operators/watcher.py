@@ -32,6 +32,7 @@ from cosmos.constants import (
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
+    DbtResourceType,
     InvocationMode,
 )
 from cosmos.log import get_logger
@@ -81,9 +82,40 @@ def _default_freshness_callback(
     nodes: dict[str, DbtNode] | None,
     sources_json: dict[str, Any] | None,
 ) -> tuple[list[str], str]:
-    # TODO: Remove hardcoded Value
-    # Eventually this should be supplied by user
-    return ["model.jaffle_shop.customers"], "skip"
+    """Return unique_ids of all nodes that transitively depend on a stale source, plus the status ``"skip"``.
+
+    Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``.
+    Traversal is BFS over the reverse-dependency graph built from ``nodes``.
+    """
+    if not nodes or not sources_json:
+        return [], "skip"
+
+    stale_source_ids = {r["unique_id"] for r in sources_json.get("results", []) if r.get("status") in ("error", "warn")}
+    if not stale_source_ids:
+        return [], "skip"
+
+    # Build reverse map: dep_id -> set of node_ids that directly depend on it
+    dependents: dict[str, set[str]] = {}
+    for node_id, node in nodes.items():
+        for dep_id in node.depends_on:
+            dependents.setdefault(dep_id, set()).add(node_id)
+
+    # BFS from each stale source to collect all transitive dependents
+    _excludable_resource_types = {DbtResourceType.MODEL, DbtResourceType.SEED, DbtResourceType.SNAPSHOT}
+    visited: set[str] = set()
+    queue = list(stale_source_ids)
+    while queue:
+        current = queue.pop()
+        for dependent_id in dependents.get(current, set()):
+            if dependent_id not in visited:
+                visited.add(dependent_id)
+                queue.append(dependent_id)
+
+    # Only return model/seed/snapshot nodes — tests are skipped automatically when their parent is excluded,
+    # and test hash-suffixed unique_ids are not valid dbt --exclude selectors.
+    excludable = [uid for uid in visited if nodes.get(uid) and nodes[uid].resource_type in _excludable_resource_types]
+    logger.info("Nodes to skip due to stale sources: %s", excludable)
+    return excludable, "skip"
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):

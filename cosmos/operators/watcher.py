@@ -5,7 +5,6 @@ import functools
 import json
 import zlib
 from collections.abc import Callable, Sequence
-from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
@@ -398,15 +397,11 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         profiles_dir: str | None = None,
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
         poke_interval: int = 10,
-        timeout: int = 60 * 60,  # 1 h safety valve
-        execution_timeout: timedelta = timedelta(hours=1),
         deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
         super().__init__(
             poke_interval=poke_interval,
-            timeout=timeout,
-            execution_timeout=execution_timeout,
             profile_config=profile_config,
             project_dir=project_dir,
             profiles_dir=profiles_dir,

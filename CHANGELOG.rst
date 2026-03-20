@@ -157,6 +157,7 @@ Bug Fixes
 * Allow watcher producer retries without erroring by @tatiana in #2283
 * Fix ``TestBehavior.AFTER_ALL`` is missing project_name information when loading project using manifest file by @tuantran0910 in #2242
 * Fix duplicate log lines in watcher subprocess execution and format timestamps by @pankajkoti in #2301
+* Remove forced ``retries=0`` from watcher producer operators by @tatiana in #2479
 
 Docs
 

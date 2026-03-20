@@ -404,7 +404,7 @@ When using ``ExecutionMode.WATCHER``, you may want to configure specific propert
 - Reduced manual intervention - failed producer runs can recover without requiring operator restarts.
 - Better reliability - retry behavior can be tuned independently from sensor tasks.
 
-Because the producer gracefully skips re-execution on retries (returning success without re-running the dbt build), it is safe to set ``retries`` to any value you wish.
+Because the producer gracefully skips re-execution on retries (returning success without re-running the dbt build), it is safe to set ``retries`` to any value you wish. Currently, retries work for sensor tasks, which, after a first failed attempt, will effectively run the corresponding dbt command.
 
 Example: Configure the producer task with custom retry settings.
 

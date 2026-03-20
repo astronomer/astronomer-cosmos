@@ -16,7 +16,7 @@ Features
 * Add FQN selection support for ``LoadMode.DBT_MANIFEST`` by @pankajastro in #2375
 * Introduce interceptors for Cosmos tasks by @tatiana in #2419
 * Add config to allow disabling dag versioning by @pankajkoti in #2470
-* feature: implement TaskGroups by models folder by @maximilianoarcieri and @tatiana in #1566, #2469, and #2420
+* Implement TaskGroups by models folder by @maximilianoarcieri and @tatiana in #1566, #2469, and #2420
 
 Enhancements
 
@@ -41,8 +41,9 @@ Bug Fixes
 * Respect ``deferrable=False`` from ``operator_args`` on watcher consumer sensors by @pankajkoti in #2384
 * Fix watcher queue precedence and add documentation by @pankajastro in #2391
 * Do not set ``compiled_sql`` on ``ExecutionMode.WATCHER`` producers by @pankajkoti in #2440
-* Remove const attribute for __cosmos_telemetry_metadata__ dag param by @pankajkoti in #2466
+* Remove const attribute for ``__cosmos_telemetry_metadata__`` dag param by @pankajkoti in #2466
 * Remove timeout override from Cosmos watcher sensors by @tatiana and @claude in #2478
+* Remove forced ``retries=0`` from watcher producer operators by @tatiana in #2479
 
 Docs
 
@@ -157,7 +158,6 @@ Bug Fixes
 * Allow watcher producer retries without erroring by @tatiana in #2283
 * Fix ``TestBehavior.AFTER_ALL`` is missing project_name information when loading project using manifest file by @tuantran0910 in #2242
 * Fix duplicate log lines in watcher subprocess execution and format timestamps by @pankajkoti in #2301
-* Remove forced ``retries=0`` from watcher producer operators by @tatiana in #2479
 
 Docs
 

@@ -248,10 +248,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             self.base_cmd = ["source", "freshness"]
             self.indirect_selection = None  # ``dbt source freshness`` does not support --indirect-selection
             full_cmd, env = self.build_cmd(context=context, cmd_flags=[])
+            context["_check_source_freshness"] = True  # type: ignore[typeddict-unknown-key]  # signal run_command to read sources.json and return early
             self.run_command(cmd=full_cmd, env=env, context=context)
         finally:
             self.base_cmd = original_base_cmd
             self.indirect_selection = original_indirect_selection
+            context.pop("_check_source_freshness", None)  # type: ignore[typeddict-item]
 
     def _skipped_node_token(self, context: Context, node_unique_ids: list[str]) -> None:
         if not node_unique_ids:
@@ -286,7 +288,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         """Run freshness, filter stale sources via callback, then skip XCom + ``--exclude`` for downstream resources."""
         try:
             self._run_source_freshness(context)
-            logger.info("self.dag.__dict__: %s", self.dag.__dict__)
             dbt_nodes = getattr(getattr(getattr(self, "dag", None), "dbt_graph", None), "nodes", None)
             node_unique_ids, status = self._freshness_callback(
                 context, self.dag, self.task_group, dbt_nodes, self._sources_json

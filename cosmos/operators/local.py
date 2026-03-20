@@ -688,9 +688,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     cwd=tmp_project_dir,
                     context=context,
                 )
-                # TODO: Early return if running from watcher mode
-                self._sources_json = _read_target_sources_json(tmp_dir_path)
-                if self._sources_json:
+                if context.get("_check_source_freshness"):
+                    self._sources_json = _read_target_sources_json(tmp_dir_path)
                     return result
                 if is_openlineage_common_available:
                     self.calculate_openlineage_events_completes(env, tmp_dir_path)

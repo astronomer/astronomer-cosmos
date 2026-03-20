@@ -57,7 +57,7 @@ Docs
 * Fix miscellaneous Sphinx warnings by @pankajastro in #2395
 * Improve contributing documentation by @lzdanski in #2397
 * Add **Get Started in 5 Minutes** guide by @lzdanski in #2398
-* Add Sphinx reredirects package for documentation redirects by @lzdanski in #2407
+* Add Sphinx redirects package for documentation redirects by @lzdanski in #2407
 * Restructure **Getting Started** and **Guides** sections by @lzdanski in #2418
 * Add open-source quickstart by @lzdanski in #2439
 * Fix documentation redirects by @lzdanski in #2442

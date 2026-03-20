@@ -42,7 +42,7 @@ Bug Fixes
 * Fix watcher queue precedence and add documentation by @pankajastro in #2391
 * Do not set ``compiled_sql`` on ``ExecutionMode.WATCHER`` producers by @pankajkoti in #2440
 * Remove const attribute for __cosmos_telemetry_metadata__ dag param by @pankajkoti in #2466
-* Remove timeout override from Cosmos watcher sensors by @tatiana in #2478
+* Remove timeout override from Cosmos watcher sensors by @tatiana and @claude in #2478
 
 Docs
 
@@ -68,7 +68,7 @@ Docs
 * Update **Getting Started** overview and index pages by @lzdanski in #2452
 * Add guide: *How Cosmos Runs dbt* by @lzdanski in #2453
 * Fix miscellaneous documentation links by @lzdanski in #2454
-* Add Mermaid diagrams and execution mode diagrams by @lzdanski in #2459
+* Add Mermaid diagrams and execution mode diagrams by @lzdanski and @tatiana in #2459
 * Add documentation for memory optimization options by @pankajastro in #2340
 
 Others
@@ -98,7 +98,7 @@ Others
 * Pre-commit autoupdate by @pre-commit-ci in #2367, #2396, #2422, #2451, and #2468
 * Add file to support Claude understanding the Cosmos repository by @tatiana in #2458
 * Dependency updates by @dependabot in #2368, #2425, #2435, #2465, and #2475
-* Isolate Scarf telemetry integration test into its own CI job by @pankajkoti in #2477
+* Isolate Scarf telemetry integration test into its own CI job by @pankajkoti and @claude in #2477
 
 1.13.1 (2026-02-25)
 -------------------

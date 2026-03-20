@@ -1842,7 +1842,7 @@ def test_dbt_dag_with_watcher_and_group_nodes_by_folder(capsys):
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 6  # 3 seeds + 3 models
     task_ids = set(watcher_dag.task_dict)
     # 1 producer + 3 seeds + 3 model runs + 1 after_all test = 8
-    assert len(task_ids) == 8
+    assert len(task_ids) == 9
     assert "dbt_producer_watcher" in task_ids
     assert "seeds.seeds_a.products_seed" in task_ids
     assert "seeds.seeds_b.regions_seed" in task_ids
@@ -1866,6 +1866,7 @@ def test_dbt_dag_with_watcher_and_group_nodes_by_folder(capsys):
         "seeds.seeds_b.regions_seed",
         "seeds.seeds_a.products_seed",
         "seeds.seeds_b.region_managers_seed",
+        "dbt_producer_watcher_gate",
     }
     assert watcher_dag.task_dict["seeds.seeds_a.products_seed"].downstream_task_ids == {
         "models.models_a.stg_products_run"

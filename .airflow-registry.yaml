@@ -212,6 +212,8 @@ operators:
   - module: cosmos.operators.watcher_kubernetes.DbtTestWatcherKubernetesOperator
     description: Runs `dbt test` using the Kubernetes execution pattern, or acts as an `EmptyOperator` for `TestBehavior.AFTER_EACH`.
 
+  # TODO: update for AWS ECS Watcher?
+
 other:
   - module: cosmos.airflow.dag.DbtDag
     description: Render a complete dbt project as an Airflow DAG

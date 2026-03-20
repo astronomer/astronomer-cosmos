@@ -71,10 +71,29 @@ class DbtAwsEksBaseOperator(DbtKubernetesBaseOperator):
             aws_conn_id=self.aws_conn_id,
             region_name=self.region,
         )
-        with eks_hook.generate_config_file(
-            eks_cluster_name=self.cluster_name, pod_namespace=self.namespace
-        ) as self.config_file:
-            return super().execute(context)
+
+        # apache-airflow-providers-amazon >=9.13.0 changed generate_config_file() to require
+        # a credentials_file positional argument (PR apache/airflow#55195). Detect the new API
+        # by checking for _secure_credential_context and pass credentials accordingly.
+        if hasattr(eks_hook, "_secure_credential_context"):
+            credentials = eks_hook.get_credentials()
+            with eks_hook._secure_credential_context(
+                credentials.access_key,
+                credentials.secret_key,
+                credentials.token,
+            ) as credentials_file:
+                with eks_hook.generate_config_file(
+                    eks_cluster_name=self.cluster_name,
+                    pod_namespace=self.namespace,
+                    credentials_file=credentials_file,
+                ) as self.config_file:
+                    return super().execute(context)
+        else:
+            with eks_hook.generate_config_file(
+                eks_cluster_name=self.cluster_name,
+                pod_namespace=self.namespace,
+            ) as self.config_file:
+                return super().execute(context)
 
 
 class DbtBuildAwsEksOperator(DbtAwsEksBaseOperator, DbtBuildKubernetesOperator):

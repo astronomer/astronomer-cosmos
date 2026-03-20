@@ -62,9 +62,15 @@ def test_dbt_kubernetes_build_command():
 
 
 @patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_kube_args")
-@patch("cosmos.operators.aws_eks.EksHook.generate_config_file")
-def test_dbt_kubernetes_operator_execute(mock_generate_config_file, mock_build_kube_args, mock_kubernetes_execute):
-    """Tests that the execute method call results in both the build_kube_args method and the kubernetes execute method being called."""
+@patch("cosmos.operators.aws_eks.EksHook")
+def test_dbt_kubernetes_operator_execute_legacy_provider(
+    mock_eks_hook_class, mock_build_kube_args, mock_kubernetes_execute
+):
+    """Tests execute with apache-airflow-providers-amazon <9.13.0 (legacy signature without credentials_file)."""
+    mock_hook = mock_eks_hook_class.return_value
+    # Simulate old provider: no _secure_credential_context attribute
+    del mock_hook._secure_credential_context
+
     operator = DbtLSAwsEksOperator(
         conn_id="my_airflow_connection",
         cluster_name="my-cluster",
@@ -73,13 +79,45 @@ def test_dbt_kubernetes_operator_execute(mock_generate_config_file, mock_build_k
         project_dir="my/dir",
     )
     operator.execute(context={})
-    # Assert that the build_kube_args method was called in the execution
+
     mock_build_kube_args.assert_called_once()
+    mock_hook.generate_config_file.assert_called_once_with(eks_cluster_name="my-cluster", pod_namespace="default")
+    mock_kubernetes_execute.assert_called_once()
+    assert mock_kubernetes_execute.call_args.args[-1] == {}
 
-    # Assert that the generate_config_file method was called in the execution to create the kubeconfig for eks
-    mock_generate_config_file.assert_called_once_with(eks_cluster_name="my-cluster", pod_namespace="default")
 
-    # Assert that the kubernetes execute method was called in the execution
+@patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_kube_args")
+@patch("cosmos.operators.aws_eks.EksHook")
+def test_dbt_kubernetes_operator_execute_new_provider(
+    mock_eks_hook_class, mock_build_kube_args, mock_kubernetes_execute
+):
+    """Tests execute with apache-airflow-providers-amazon >=9.13.0 (credentials_file required)."""
+    mock_hook = mock_eks_hook_class.return_value
+    mock_credentials = MagicMock()
+    mock_credentials.access_key = "test-access-key"
+    mock_credentials.secret_key = "test-secret-key"
+    mock_credentials.token = "test-session-token"
+    mock_hook.get_credentials.return_value = mock_credentials
+    mock_hook._secure_credential_context.return_value.__enter__ = MagicMock(return_value="/tmp/creds")
+    mock_hook._secure_credential_context.return_value.__exit__ = MagicMock(return_value=False)
+
+    operator = DbtLSAwsEksOperator(
+        conn_id="my_airflow_connection",
+        cluster_name="my-cluster",
+        task_id="my-task",
+        image="my_image",
+        project_dir="my/dir",
+    )
+    operator.execute(context={})
+
+    mock_build_kube_args.assert_called_once()
+    mock_hook.get_credentials.assert_called_once()
+    mock_hook._secure_credential_context.assert_called_once_with(
+        "test-access-key", "test-secret-key", "test-session-token"
+    )
+    mock_hook.generate_config_file.assert_called_once_with(
+        eks_cluster_name="my-cluster", pod_namespace="default", credentials_file="/tmp/creds"
+    )
     mock_kubernetes_execute.assert_called_once()
     assert mock_kubernetes_execute.call_args.args[-1] == {}
 

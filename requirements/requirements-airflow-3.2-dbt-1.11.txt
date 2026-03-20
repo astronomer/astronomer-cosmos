@@ -3,6 +3,7 @@ apache-airflow-providers-amazon==9.21.0
 apache-airflow-providers-cncf-kubernetes
 apache-airflow-providers-docker
 apache-airflow-providers-google
+msrestazure
 apache-airflow-providers-microsoft-azure
 airflow-provider-duckdb>=0.2.0
 

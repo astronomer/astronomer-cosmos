@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.14.0a4 (2026-03-16)
+1.14.0a5 (2026-03-20)
 ---------------------
 
 Breaking changes
@@ -14,6 +14,8 @@ Features
 * Add cluster policy support for ``ExecutionMode.WATCHER`` sensor retries by @astro-anand in #2293
 * Add FQN selection support for ``LoadMode.DBT_MANIFEST`` by @pankajastro in #2375
 * Introduce interceptors for Cosmos tasks by @tatiana in #2419
+* Add config to allow disabling dag versioning by @pankajkoti in #2470
+* feature: implement TaskGroups by models folder by @maximilianoarcieri and @tatiana in #1566, #2469, and #2420
 
 Enhancements
 
@@ -26,6 +28,7 @@ Enhancements
 * Attempt to remove Pydantic as a dependency by @tatiana in #2377
 * Log dbt-core and adapter versions in watcher consumer tasks by @pankajastro in #2412
 * Log model errors in watcher consumer on dbt node failure by @pankajastro in #2431
+* Reduce XCom read/write for tracking node state and errors in ConsumerWatcher task by @pankajastro in #2471
 
 Bug Fixes
 
@@ -38,6 +41,8 @@ Bug Fixes
 * Respect ``deferrable=False`` from ``operator_args`` on watcher consumer sensors by @pankajkoti in #2384
 * Fix watcher queue precedence and add documentation by @pankajastro in #2391
 * Do not set ``compiled_sql`` on ``ExecutionMode.WATCHER`` producers by @pankajkoti in #2440
+* Remove const attribute for __cosmos_telemetry_metadata__ dag param by @pankajkoti in #2466
+* Remove timeout override from Cosmos watcher sensors by @tatiana in #2478
 
 Docs
 
@@ -90,9 +95,10 @@ Others
 * Add version comments for commit SHA pinned GitHub Actions by @pankajkoti in #2436
 * Fix ``hatch run docs:build`` issues by @tatiana in #2437
 * Minor code improvements by @dnskr in #2446
-* Pre-commit autoupdate by @pre-commit-ci in #2367, #2396, #2422, and #2451
+* Pre-commit autoupdate by @pre-commit-ci in #2367, #2396, #2422, #2451, and #2468
 * Add file to support Claude understanding the Cosmos repository by @tatiana in #2458
-* Dependency updates by @dependabot in #2368, #2425, #2435, and #2465
+* Dependency updates by @dependabot in #2368, #2425, #2435, #2465, and #2475
+* Isolate Scarf telemetry integration test into its own CI job by @pankajkoti in #2477
 
 1.13.1 (2026-02-25)
 -------------------

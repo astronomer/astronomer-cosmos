@@ -2413,3 +2413,67 @@ def test_handle_datasets_does_not_push_xcom_when_no_outlets():
     # Verify xcom_push was NOT called (no outlets to push)
     uri_xcom_calls = [call for call in mock_ti.xcom_push.call_args_list if call[1].get("key") == "uri"]
     assert len(uri_xcom_calls) == 0, "URI XCom should not be pushed when there are no outlets"
+
+
+# ---------------------------------------------------------------------------
+# Tests for _read_target_sources_json and _check_source_freshness context flag
+# ---------------------------------------------------------------------------
+
+from cosmos.operators.local import _read_target_sources_json  # noqa: E402
+
+
+def test_read_target_sources_json_returns_dict_when_file_exists(tmp_path):
+    """Returns parsed dict when sources.json exists and is valid JSON."""
+    sources_data = {"results": [{"unique_id": "source.proj.raw.orders", "status": "pass"}]}
+    (tmp_path / "target").mkdir()
+    (tmp_path / "target" / "sources.json").write_text(json.dumps(sources_data))
+
+    result = _read_target_sources_json(tmp_path)
+
+    assert result == sources_data
+
+
+def test_read_target_sources_json_returns_none_when_file_missing(tmp_path):
+    """Returns None when sources.json does not exist."""
+    result = _read_target_sources_json(tmp_path)
+
+    assert result is None
+
+
+def test_read_target_sources_json_returns_none_on_invalid_json(tmp_path):
+    """Returns None when sources.json contains invalid JSON."""
+    (tmp_path / "target").mkdir()
+    (tmp_path / "target" / "sources.json").write_text("not valid json{{{")
+
+    result = _read_target_sources_json(tmp_path)
+
+    assert result is None
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator.invoke_dbt")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._clone_project")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._generate_dbt_flags", return_value=[])
+def test_run_command_reads_sources_json_and_returns_early_when_flag_set(
+    _mock_flags, _mock_clone, mock_invoke, mock_context, mock_session, tmp_path
+):
+    """When _check_source_freshness is in context, run_command reads sources.json and returns before post-execution."""
+    sources_data = {"results": [{"unique_id": "source.proj.raw.orders", "status": "error"}]}
+    profile_config = MagicMock()
+    profile_config.ensure_profile.return_value.__enter__ = MagicMock(return_value=(tmp_path / "profiles.yml", {}))
+    profile_config.ensure_profile.return_value.__exit__ = MagicMock(return_value=False)
+
+    op = DbtRunLocalOperator(
+        task_id="test",
+        profile_config=profile_config,
+        project_dir=str(tmp_path),
+    )
+    mock_invoke.return_value = MagicMock()
+    mock_context["_check_source_freshness"] = True  # type: ignore[index]
+
+    with patch("cosmos.operators.local._read_target_sources_json", return_value=sources_data) as mock_read:
+        with patch("cosmos.operators.local.DbtLocalBaseOperator._handle_post_execution") as mock_post:
+            op.run_command(cmd=["dbt", "source", "freshness"], env={}, context=mock_context)
+
+    mock_read.assert_called_once()
+    mock_post.assert_not_called()
+    assert op._sources_json == sources_data

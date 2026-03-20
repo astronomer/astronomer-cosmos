@@ -20,6 +20,7 @@ except ImportError:
 
 from cosmos.airflow.graph import (
     _add_teardown_task,
+    _add_watcher_producer_task,
     _convert_list_to_str,
     _snake_case_to_camelcase,
     build_airflow_graph,
@@ -2016,3 +2017,48 @@ class TestSelectExcludeAsStringsInOperators:
         assert metadata.arguments["select"] is None
         assert metadata.arguments["exclude"] is None
         assert metadata.arguments["selector"] is None
+
+
+@pytest.mark.parametrize(
+    "source_rendering_behavior, expect_flag",
+    [
+        (SourceRenderingBehavior.ALL, True),
+        (SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS, True),
+        (SourceRenderingBehavior.NONE, False),
+    ],
+)
+def test_add_watcher_producer_task_sets_check_source_freshness_flag(source_rendering_behavior, expect_flag):
+    """_add_watcher_producer_task must set _check_source_freshness=True on the producer when
+    source_rendering_behavior is not NONE, and must NOT set it when it is NONE."""
+    from cosmos.operators.watcher import DbtProducerWatcherOperator
+
+    with DAG("test-watcher-flag", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        render_config = RenderConfig(source_rendering_behavior=source_rendering_behavior)
+        tasks_map: dict = {}
+
+        producer_task = _add_watcher_producer_task(
+            dag=dag,
+            task_args=task_args,
+            tasks_map=tasks_map,
+            task_group=None,
+            render_config=render_config,
+            execution_mode=ExecutionMode.WATCHER,
+        )
+
+    assert isinstance(producer_task, DbtProducerWatcherOperator)
+    if expect_flag:
+        assert producer_task._check_source_freshness is True
+    else:
+        assert not getattr(producer_task, "_check_source_freshness", False)

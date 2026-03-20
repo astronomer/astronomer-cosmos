@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
+from airflow.exceptions import AirflowSkipException
 
 from cosmos.operators._watcher.base import BaseConsumerSensor, _process_dbt_log_event
 from cosmos.operators.local import DbtRunLocalOperator
@@ -106,3 +107,65 @@ class TestBaseConsumerSensor:
         with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
             _process_dbt_log_event(task_instance, dbt_log)
             mock_push.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # execute_complete — skipped status
+    # ------------------------------------------------------------------
+
+    def test_execute_complete_raises_airflow_skip_exception_when_status_is_skipped(self):
+        """execute_complete must raise AirflowSkipException when the event status is 'skipped'."""
+
+        class ConcreteConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            def use_event(self) -> bool:
+                return False
+
+            def _get_status_from_events(self, ti, context):  # type: ignore[override]
+                return None
+
+        sensor = ConcreteConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_build",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}},
+        )
+
+        with pytest.raises(AirflowSkipException, match="skipped"):
+            sensor.execute_complete(context=Mock(), event={"status": "skipped"})
+
+    # ------------------------------------------------------------------
+    # poke — skipped status
+    # ------------------------------------------------------------------
+
+    def test_poke_raises_airflow_skip_exception_when_status_is_skipped(self):
+        """poke must raise AirflowSkipException when the XCom status is 'skipped'."""
+
+        class ConcreteConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            def use_event(self) -> bool:
+                return False
+
+            def _get_status_from_events(self, ti, context):  # type: ignore[override]
+                return None
+
+        sensor = ConcreteConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_build",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}},
+        )
+
+        mock_ti = Mock()
+        mock_ti.try_number = 1
+        mock_ti.xcom_pull.return_value = None  # prevent _log_startup_events from iterating a Mock
+        context: dict = {"ti": mock_ti}
+
+        with (
+            patch(
+                "cosmos.operators._watcher.base.BaseConsumerSensor._get_producer_task_status", return_value="running"
+            ),
+            patch("cosmos.operators._watcher.base.get_xcom_val", return_value="skipped"),
+            patch("cosmos.operators._watcher.base._log_dbt_event"),
+        ):
+            with pytest.raises(AirflowSkipException, match="skipped"):
+                sensor.poke(context)  # type: ignore[arg-type]

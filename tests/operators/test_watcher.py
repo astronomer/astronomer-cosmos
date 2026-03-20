@@ -2453,6 +2453,28 @@ class TestProducerSourceFreshness:
         assert "already_excluded" in op.exclude
         assert self.MODEL_NAME in op.exclude
 
+    @pytest.mark.parametrize(
+        "existing_exclude",
+        [
+            ["already_excluded"],
+            {"already_excluded"},
+            ("already_excluded",),
+        ],
+        ids=["list", "set", "tuple"],
+    )
+    def test_skipped_node_token_merges_with_list_set_tuple_exclude(self, existing_exclude: Any):
+        """When existing exclude is a list, set, or tuple it should be merged with the new model name."""
+        op = self._make_op()
+        op.exclude = existing_exclude
+        op.invocation_mode = InvocationMode.SUBPROCESS
+        context: Any = {"ti": MagicMock()}
+
+        with patch.object(op, "_push_skipped_xcom_for_model"):
+            op._skipped_node_token(context, [self.MODEL_ID])
+
+        assert "already_excluded" in op.exclude
+        assert self.MODEL_NAME in op.exclude
+
     # ------------------------------------------------------------------
     # _apply_source_freshness
     # ------------------------------------------------------------------

@@ -192,11 +192,6 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
     assert op.priority_weight == 100
 
 
-def test_dbt_producer_watcher_operator_retries_forced_to_zero():
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    assert op.retries == 0
-
-
 @pytest.mark.parametrize(
     "invocation_mode, expected_log_format",
     (
@@ -207,19 +202,6 @@ def test_dbt_producer_watcher_operator_retries_forced_to_zero():
 def test_dbt_producer_log_format_adjusts_with_invocation(invocation_mode, expected_log_format):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=invocation_mode)
     assert getattr(op, "log_format", None) == expected_log_format
-
-
-def test_dbt_producer_watcher_operator_retries_ignores_user_input():
-    user_default_args = {"retries": 5}
-    op = DbtProducerWatcherOperator(
-        project_dir=".",
-        profile_config=None,
-        default_args=user_default_args,
-        retries=3,
-    )
-
-    assert op.retries == 0
-    assert user_default_args["retries"] == 5
 
 
 def test_dbt_producer_watcher_operator_pushes_completion_status():
@@ -299,20 +281,6 @@ def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message
         "Model 'model.pkg.skipped_model' was skipped by the dbt command" in message for message in caplog.messages
     )
     assert any("ephemeral model or if the model sql file is empty" in message for message in caplog.messages)
-
-
-def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    ti = _MockTI()
-    ti.try_number = 1
-    context = {"ti": ti}
-
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute", return_value="ok") as mock_execute:
-        with caplog.at_level(logging.INFO):
-            op.execute(context=context)
-
-    mock_execute.assert_called_once()
-    assert any("forces Airflow retries to 0" in message for message in caplog.messages)
 
 
 def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):

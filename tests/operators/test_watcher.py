@@ -2257,7 +2257,8 @@ def _make_dbt_node(unique_id: str, resource_type: DbtResourceType, depends_on: l
         unique_id=unique_id,
         resource_type=resource_type,
         depends_on=depends_on,
-        file_path=Path("/tmp/fake.sql"),
+        path_base=Path("/tmp"),
+        original_file_path=Path("/tmp/fake.sql"),
     )
 
 

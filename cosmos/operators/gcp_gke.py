@@ -153,7 +153,11 @@ class DbtGcpGkeBaseOperator(AbstractDbtBase, GKEStartPodOperator):  # type: igno
 
         # set env vars
         self.build_env_args(env_vars)
-        self.arguments = dbt_cmd
+        # Split the executable from arguments to avoid double invocation when the
+        # container image has ENTRYPOINT ["dbt"]. Setting self.cmds overrides the
+        # image's ENTRYPOINT, so this works regardless of image configuration.
+        self.cmds = [dbt_cmd[0]]
+        self.arguments = dbt_cmd[1:]
 
 
 class DbtTestWarningHandlerGcpGke(KubernetesPodOperatorCallback):  # type: ignore[misc]

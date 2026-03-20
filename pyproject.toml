@@ -194,6 +194,7 @@ test-integration-dbtf = 'sh scripts/test/integration-dbtf.sh'
 test-integration-dbt-1-5-4 = 'sh scripts/test/integration-dbt-1-5-4.sh'
 test-integration-dbt-async = 'sh scripts/test/integration-dbt-async.sh {matrix:dbt}'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
+test-telemetry = 'sh scripts/test/telemetry.sh'
 
 test-performance = 'sh scripts/test/performance.sh'
 test-performance-setup = 'sh scripts/test/performance-setup.sh {matrix:dbt}'

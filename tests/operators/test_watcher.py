@@ -40,6 +40,7 @@ from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
+MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
 
 DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
@@ -179,11 +180,6 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
     assert op.priority_weight == 100
 
 
-def test_dbt_producer_watcher_operator_retries_forced_to_zero():
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    assert op.retries == 0
-
-
 @pytest.mark.parametrize(
     "invocation_mode, expected_log_format",
     (
@@ -194,19 +190,6 @@ def test_dbt_producer_watcher_operator_retries_forced_to_zero():
 def test_dbt_producer_log_format_adjusts_with_invocation(invocation_mode, expected_log_format):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=invocation_mode)
     assert getattr(op, "log_format", None) == expected_log_format
-
-
-def test_dbt_producer_watcher_operator_retries_ignores_user_input():
-    user_default_args = {"retries": 5}
-    op = DbtProducerWatcherOperator(
-        project_dir=".",
-        profile_config=None,
-        default_args=user_default_args,
-        retries=3,
-    )
-
-    assert op.retries == 0
-    assert user_default_args["retries"] == 5
 
 
 def test_dbt_producer_watcher_operator_pushes_completion_status():
@@ -286,20 +269,6 @@ def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message
         "Model 'model.pkg.skipped_model' was skipped by the dbt command" in message for message in caplog.messages
     )
     assert any("ephemeral model or if the model sql file is empty" in message for message in caplog.messages)
-
-
-def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    ti = _MockTI()
-    ti.try_number = 1
-    context = {"ti": ti}
-
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute", return_value="ok") as mock_execute:
-        with caplog.at_level(logging.INFO):
-            op.execute(context=context)
-
-    mock_execute.assert_called_once()
-    assert any("forces Airflow retries to 0" in message for message in caplog.messages)
 
 
 def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
@@ -1610,6 +1579,72 @@ def test_dbt_dag_with_watcher(capsys):
     # Verify that log messages are not duplicated (each dbt message should appear only once)
     message_count = stdout.count(log_message)
     assert message_count == 1, f"Expected '{log_message}' to be logged exactly once, but found {message_count} times"
+
+
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_and_group_nodes_by_folder(capsys):
+    """
+    Run a DbtDag using ExecutionMode.WATCHER with RenderConfig(group_nodes_by_folder=True)
+    and TestBehavior.AFTER_ALL (mirrors multi_folder_grouped_watcher_dag from dev/dags).
+    """
+    watcher_dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=MULTI_FOLDER_DBT_PROJ_DIR),
+        profile_config=profile_config,
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+        render_config=RenderConfig(
+            group_nodes_by_folder=True,
+            test_behavior=TestBehavior.AFTER_ALL,
+            emit_datasets=False,
+        ),
+        operator_args={
+            "install_deps": True,
+            "trigger_rule": "all_success",
+            "execution_timeout": timedelta(seconds=120),
+        },
+        start_date=datetime(2024, 1, 1),
+        dag_id="multi_folder_grouped_watcher_dag",
+        default_args={"retries": 0},
+    )
+    outcome = new_test_dag(watcher_dag)
+    assert outcome.state == DagRunState.SUCCESS
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 6  # 3 seeds + 3 models
+    task_ids = set(watcher_dag.task_dict)
+    # 1 producer + 3 seeds + 3 model runs + 1 after_all test = 8
+    assert len(task_ids) == 8
+    assert "dbt_producer_watcher" in task_ids
+    assert "seeds.seeds_a.products_seed" in task_ids
+    assert "seeds.seeds_b.regions_seed" in task_ids
+    assert "seeds.seeds_b.region_managers_seed" in task_ids
+    assert "models.models_a.stg_products_run" in task_ids
+    assert "models.models_a.dim_products_run" in task_ids
+    assert "models.models_b.stg_regions_run" in task_ids
+    assert "multi_folder_test" in task_ids
+
+    assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["seeds.seeds_a.products_seed"], DbtSeedWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["models.models_a.stg_products_run"], DbtRunWatcherOperator)
+
+    # AFTER_ALL test task is rendered as DbtTestLocalOperator, not DbtTestWatcherOperator
+    from cosmos.operators.local import DbtTestLocalOperator
+
+    assert isinstance(watcher_dag.task_dict["multi_folder_test"], DbtTestLocalOperator)
+
+    # Check dependencies
+    assert watcher_dag.task_dict["dbt_producer_watcher"].downstream_task_ids == {
+        "seeds.seeds_b.regions_seed",
+        "seeds.seeds_a.products_seed",
+        "seeds.seeds_b.region_managers_seed",
+    }
+    assert watcher_dag.task_dict["seeds.seeds_a.products_seed"].downstream_task_ids == {
+        "models.models_a.stg_products_run"
+    }
+    assert watcher_dag.task_dict["seeds.seeds_b.regions_seed"].downstream_task_ids == {
+        "models.models_b.stg_regions_run"
+    }
+    assert watcher_dag.task_dict["seeds.seeds_b.region_managers_seed"].downstream_task_ids == {
+        "models.models_b.stg_regions_run"
+    }
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION < Version("2.7"), reason="Airflow did not have dag.test() until the 2.6 release")

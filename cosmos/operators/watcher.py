@@ -5,7 +5,6 @@ import functools
 import json
 import zlib
 from collections.abc import Callable, Sequence
-from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
@@ -101,13 +100,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
-        # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
-        # would repeat the full dbt build and duplicate watcher callbacks which may not be processed by the consumers if
-        # they have already processed output XCOMs from the first run of the producer, so we disable retries.
-        default_args = dict(kwargs.get("default_args", {}) or {})
-        default_args["retries"] = 0
-        kwargs["default_args"] = default_args
-        kwargs["retries"] = 0
         kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
         super().__init__(task_id=task_id, *args, **kwargs)
 
@@ -188,11 +180,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             )
             return None
 
-        self.log.info(
-            "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "
-            "downstream sensors own model-level retries."
-        )
-
         try:
             use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
             logger.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
@@ -248,15 +235,11 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         profiles_dir: str | None = None,
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
         poke_interval: int = 10,
-        timeout: int = 60 * 60,  # 1 h safety valve
-        execution_timeout: timedelta = timedelta(hours=1),
         deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
         super().__init__(
             poke_interval=poke_interval,
-            timeout=timeout,
-            execution_timeout=execution_timeout,
             profile_config=profile_config,
             project_dir=project_dir,
             profiles_dir=profiles_dir,

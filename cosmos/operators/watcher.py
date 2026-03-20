@@ -106,13 +106,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
-        # Consumer watcher retry logic handles model-level reruns using the LOCAL execution mode; rerunning the producer
-        # would repeat the full dbt build and duplicate watcher callbacks which may not be processed by the consumers if
-        # they have already processed output XCOMs from the first run of the producer, so we disable retries.
-        default_args = dict(kwargs.get("default_args", {}) or {})
-        default_args["retries"] = 0
-        kwargs["default_args"] = default_args
-        kwargs["retries"] = 0
         kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
         super().__init__(task_id=task_id, *args, **kwargs)
 
@@ -192,11 +185,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 try_number,
             )
             return None
-
-        self.log.info(
-            "Dbt WATCHER producer task forces Airflow retries to 0 so the dbt build only runs once; "
-            "downstream sensors own model-level retries."
-        )
 
         try:
             use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None

@@ -324,11 +324,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         For test sensors, re-execution is not supported in watcher mode; retries are skipped.
         """
         if self.is_test_sensor:
-            logger.info(
-                "Test sensor retry detected (try #%s). Skipping — test re-execution is not supported in watcher mode.",
-                try_number,
+            raise AirflowException(
+                f"Test re-execution is not yet supported in watcher mode. "
+                f"{self._resource_label} '{self.model_unique_id}' cannot be retried. "
+                f"A future release will add fallback to local test execution."
             )
-            return True
 
         logger.info(
             f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",

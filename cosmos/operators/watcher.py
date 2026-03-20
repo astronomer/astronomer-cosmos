@@ -295,7 +295,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 return
             if status == "skip":
                 self._skipped_node_token(context, node_unique_ids)
-        except Exception:
+        except Exception:  # intentional: freshness check must never block dbt build
             logger.exception("Unexpected error during source freshness check; proceeding with full dbt build.")
             return
 
@@ -423,7 +423,7 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
 
         event_json = _parse_compressed_xcom(compressed_b64_event_msg)
 
-        logger.info("Node Info: %s", event_json)
+        logger.info("Node Info: %s", str(event_json))
         node_result = event_json.get("data", {}).get("run_result", {})
         status = node_result.get("status")
         if status in DBT_FAILED_STATUSES:

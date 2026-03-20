@@ -378,7 +378,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             )
             return None
 
-        logger.info("Node Info: %s", run_results_json)
+        logger.info("Node Info: %s", str(run_results_json))
 
         status = node_result.get("status")
 

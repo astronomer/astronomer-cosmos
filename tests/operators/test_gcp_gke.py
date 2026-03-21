@@ -16,7 +16,6 @@ from cosmos.operators.gcp_gke import (
     DbtTestGcpGkeOperator,
 )
 
-
 base_kwargs = {
     "project_id": "my-gcp-project",
     "location": "us-central1",

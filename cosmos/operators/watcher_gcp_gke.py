@@ -107,9 +107,7 @@ class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
     def execute(self, context: Context, **kwargs: Any) -> Any:
         task_instance = context.get("ti")
         if task_instance is None:
-            raise AirflowException(
-                "DbtProducerWatcherGcpGkeOperator expects a task instance in the execution context"
-            )
+            raise AirflowException("DbtProducerWatcherGcpGkeOperator expects a task instance in the execution context")
 
         try_number = getattr(task_instance, "try_number", 1)
 

@@ -25,7 +25,6 @@ from cosmos.operators.watcher_gcp_gke import (
     DbtProducerWatcherGcpGkeOperator,
 )
 
-
 GKE_KWARGS = {
     "project_id": "my-gcp-project",
     "location": "us-central1",

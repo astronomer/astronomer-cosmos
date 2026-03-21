@@ -59,7 +59,6 @@ operator_args = {
         "POSTGRES_SCHEMA": "public",
         "POSTGRES_USER": "postgres",
     },
-    "retry": 0,
     "project_id": "my-gcp-project",
     "location": "us-central1",
     "cluster_name": "my-gke-cluster",

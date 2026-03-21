@@ -222,7 +222,7 @@ class DbtTestWarningHandlerGcpGke(KubernetesPodOperatorCallback):  # type: ignor
 
         if not warning_detected:
             self.operator.log.warning(
-                "Failed to scrape warning count from the pod logs.Potential warning callbacks could not be triggered."
+                "Failed to scrape warning count from the pod logs. Potential warning callbacks could not be triggered."
             )
             return
 

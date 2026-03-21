@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 from airflow.providers.amazon.aws.hooks.eks import EksHook
+from packaging.version import Version
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -27,6 +29,9 @@ from cosmos.operators.kubernetes import (
 
 DEFAULT_CONN_ID = "aws_default"
 DEFAULT_NAMESPACE = "default"
+
+_AMAZON_PROVIDER_VERSION = Version(version("apache-airflow-providers-amazon"))
+_GENERATE_CONFIG_CREDENTIALS_FILE_MIN = Version("9.13.0")
 
 
 class DbtAwsEksBaseOperator(DbtKubernetesBaseOperator):
@@ -72,10 +77,7 @@ class DbtAwsEksBaseOperator(DbtKubernetesBaseOperator):
             region_name=self.region,
         )
 
-        # apache-airflow-providers-amazon >=9.13.0 changed generate_config_file() to require
-        # a credentials_file positional argument (PR apache/airflow#55195). Detect the new API
-        # by checking for _secure_credential_context and pass credentials accordingly.
-        if hasattr(eks_hook, "_secure_credential_context"):
+        if _AMAZON_PROVIDER_VERSION >= _GENERATE_CONFIG_CREDENTIALS_FILE_MIN:
             credentials = eks_hook.get_credentials()
             with eks_hook._secure_credential_context(
                 credentials.access_key,

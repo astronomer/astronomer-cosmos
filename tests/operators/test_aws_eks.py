@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow.exceptions import AirflowException
+from packaging.version import Version
 
 from cosmos.operators.aws_eks import (
     DbtBuildAwsEksOperator,
@@ -61,6 +62,7 @@ def test_dbt_kubernetes_build_command():
         ]
 
 
+@patch("cosmos.operators.aws_eks._AMAZON_PROVIDER_VERSION", new=Version("9.0.0"))
 @patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_kube_args")
 @patch("cosmos.operators.aws_eks.EksHook")
 def test_dbt_kubernetes_operator_execute_legacy_provider(
@@ -68,8 +70,6 @@ def test_dbt_kubernetes_operator_execute_legacy_provider(
 ):
     """Tests execute with apache-airflow-providers-amazon <9.13.0 (legacy signature without credentials_file)."""
     mock_hook = mock_eks_hook_class.return_value
-    # Simulate old provider: no _secure_credential_context attribute
-    del mock_hook._secure_credential_context
 
     operator = DbtLSAwsEksOperator(
         conn_id="my_airflow_connection",
@@ -86,6 +86,7 @@ def test_dbt_kubernetes_operator_execute_legacy_provider(
     assert mock_kubernetes_execute.call_args.args[-1] == {}
 
 
+@patch("cosmos.operators.aws_eks._AMAZON_PROVIDER_VERSION", new=Version("9.13.0"))
 @patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_kube_args")
 @patch("cosmos.operators.aws_eks.EksHook")
 def test_dbt_kubernetes_operator_execute_new_provider(

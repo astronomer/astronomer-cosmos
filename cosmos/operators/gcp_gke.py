@@ -54,7 +54,7 @@ try:
 except ImportError:
     raise ImportError(
         "Could not import GKEStartPodOperator. Ensure you've installed the Google Cloud provider "
-        "separately or with `pip install astronomer-cosmos[...,gcp-gke]`."
+        "separately or with `pip install astronomer-cosmos[...,google]`."
     )
 
 logger = get_logger(__name__)
@@ -222,8 +222,7 @@ class DbtTestWarningHandlerGcpGke(KubernetesPodOperatorCallback):  # type: ignor
 
         if not warning_detected:
             self.operator.log.warning(
-                "Failed to scrape warning count from the pod logs."
-                "Potential warning callbacks could not be triggered."
+                "Failed to scrape warning count from the pod logs.Potential warning callbacks could not be triggered."
             )
             return
 

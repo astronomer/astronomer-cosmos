@@ -140,7 +140,7 @@ class DbtConsumerWatcherGcpGkeSensor(BaseConsumerSensor, DbtRunGcpGkeOperator):
 class DbtBuildWatcherGcpGkeOperator:
     def __init__(self, *args: Any, **kwargs: Any):
         raise NotImplementedError(
-            "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, "
+            "`ExecutionMode.WATCHER_GCP_GKE` does not expose a DbtBuild operator, "
             "since the build command is executed by the producer task."
         )
 

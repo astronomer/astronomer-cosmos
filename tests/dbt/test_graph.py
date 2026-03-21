@@ -544,14 +544,18 @@ def test_load_manifest_cached_invalidates_on_file_change(tmp_path):
     _load_manifest_cached.cache_clear()
 
     manifest_file = tmp_path / "manifest.json"
-    manifest_file.write_text(json.dumps({"metadata": {"project_name": "p"}, "nodes": {}, "sources": {}, "exposures": {}}))
+    manifest_file.write_text(
+        json.dumps({"metadata": {"project_name": "p"}, "nodes": {}, "sources": {}, "exposures": {}})
+    )
 
     path_str = str(manifest_file)
     mtime1 = manifest_file.stat().st_mtime
     result1 = _load_manifest_cached(path_str, mtime1)
     assert result1["metadata"]["project_name"] == "p"
 
-    manifest_file.write_text(json.dumps({"metadata": {"project_name": "q"}, "nodes": {}, "sources": {}, "exposures": {}}))
+    manifest_file.write_text(
+        json.dumps({"metadata": {"project_name": "q"}, "nodes": {}, "sources": {}, "exposures": {}})
+    )
     # Force a different mtime deterministically (works even on filesystems with 1s granularity)
     future_time = mtime1 + 10
     os.utime(manifest_file, (future_time, future_time))

@@ -77,31 +77,6 @@ project_config = ProjectConfig(
 render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=TestBehavior.NONE)
 
 
-def test_retries_set_to_zero_on_init():
-    """
-    Test that the operator sets retries to 0 during initialization.
-    """
-    op = DbtProducerWatcherKubernetesOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-    )
-    assert op.retries == 0
-
-
-def test_retries_overridden_even_if_user_sets_them():
-    """
-    Test that even if a user explicitly sets retries, they are overridden to 0.
-    """
-    op = DbtProducerWatcherKubernetesOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-        retries=5,
-    )
-    assert op.retries == 0
-
-
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
 def test_skips_retry_attempt(mock_execute, caplog):
     """

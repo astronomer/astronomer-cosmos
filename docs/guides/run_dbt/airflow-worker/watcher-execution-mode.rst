@@ -240,9 +240,7 @@ This behavior is designed to support TaskGroup-level retries, as reported in `#2
 
 **Important considerations:**
 
-- The producer task should still be configured with ``retries=0`` (which Cosmos enforces by default) to avoid unintended duplicate ``dbt build`` runs.
-
-- By default, Cosmos sets ``retries`` to ``0`` in``DbtProducerWatcherOperator``. Users can retry manually by clearing the status of the producer task and all its downstream tasks, keeping in mind that the producer task will not re-run the ``dbt build`` command and will succeed.
+- Retries are no longer forced to ``0`` by Cosmos, since 1.14.0. Users may configure ``retries`` freely on the producer task. On any retry attempt (``try_number > 1``), the producer gracefully skips execution and returns success — it will not re-run the ``dbt build`` command. This means retrying the producer (or clearing an entire TaskGroup) is safe and will not cause duplicate dbt builds. During the retry of the sensor tasks, they will effectively run the correspondent dbt commands.
 
 The overall retry behavior will be further improved once `#1978 <https://github.com/astronomer/astronomer-cosmos/issues/1978>`_ is implemented.
 
@@ -406,6 +404,8 @@ When using ``ExecutionMode.WATCHER``, you may want to configure specific propert
 - Reduced manual intervention - failed producer runs can recover without requiring operator restarts.
 - Better reliability - retry behavior can be tuned independently from sensor tasks.
 
+Because the producer gracefully skips re-execution on retries (returning success without re-running the dbt build), it is safe to set ``retries`` to any value you wish. Currently, retries work for sensor tasks, which, after a first failed attempt, will effectively run the corresponding dbt command.
+
 Example: Configure the producer task with custom retry settings.
 
 .. code-block:: python
@@ -417,7 +417,7 @@ Example: Configure the producer task with custom retry settings.
     execution_config = ExecutionConfig(
         execution_mode=ExecutionMode.WATCHER,
         setup_operator_args={
-            "retries": 0,
+            "retries": 3,
             "retry_delay": timedelta(minutes=5),
         },
     )

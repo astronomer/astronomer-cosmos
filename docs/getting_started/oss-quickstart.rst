@@ -137,7 +137,7 @@ Add the following content to your new project definition.
 
 6. Open the ``enriched_model.sql`` file and add the following commands:
 
-.. code-block:: SQL
+.. code-block:: sql+jinja
 
     select
         id,

@@ -105,7 +105,7 @@ def test_raises_exception_when_task_instance_missing():
 
 def test_dbt_build_watcher_gcp_gke_operator_raises_not_implemented_error():
     expected_message = (
-        "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, "
+        "`ExecutionMode.WATCHER_GCP_GKE` does not expose a DbtBuild operator, "
         "since the build command is executed by the producer task."
     )
 

@@ -9,9 +9,7 @@ Contains dags, task groups, and operators.
 from __future__ import annotations
 
 from cosmos import settings
-
-__version__ = "1.13.0"
-
+from cosmos.version import __version__
 
 if not settings.enable_memory_optimised_imports:
     from cosmos.airflow.dag import DbtDag
@@ -246,6 +244,7 @@ if not settings.enable_memory_optimised_imports:
         )
 
     __all__ = [
+        "__version__",
         "ProjectConfig",
         "ProfileConfig",
         "ExecutionConfig",

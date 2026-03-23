@@ -474,7 +474,7 @@ Answer: When ``ExecutionMode.WATCHER`` runs dbt as a subprocess (i.e. when dbt a
        "dbt_cmd_global_flags": ["--debug"],
    }
 
-This causes dbt debug messages to be forwarded to Python's ``logging`` module at the ``DEBUG`` level. Because Airflow's default logging level is ``WARNING``, these messages are suppressed unless you explicitly lower it. To make dbt debug logs visible, also set:
+This causes dbt debug messages to be forwarded to Python's ``logging`` module at the ``DEBUG`` level. These messages will only be visible if Airflow's logging level is configured to ``DEBUG`` (or more verbose). To make dbt debug logs visible, set:
 
 .. code-block:: bash
 

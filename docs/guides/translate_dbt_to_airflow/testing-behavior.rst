@@ -1,10 +1,10 @@
 .. _testing-behavior:
 
 Testing Behavior
-================
+----------------
 
 Testing Configuration
----------------------
++++++++++++++++++++++
 
 By default, Cosmos will add a test after each model. This can be overridden using the ``test_behavior`` field in the ``RenderConfig`` object.
 Note that this behavior is different from dbt's default behavior, which runs all tests after all models have been run.
@@ -50,7 +50,7 @@ Finally, an example DAG and how it is rendered in the Airflow UI when using ``Te
 .. image:: ../../_static/test_behavior_build.png
 
 Warning Behavior
-----------------
+++++++++++++++++
 
 .. note::
 
@@ -114,7 +114,7 @@ When at least one WARN message is present, the function passed to ``on_warning_c
 
 
 Tests with Multiple Parents
----------------------------
++++++++++++++++++++++++++++
 
 It is common for dbt projects to define tests that rely on multiple upstream models, snapshots or seeds.
 By default, Cosmos will attempt to run these tests using the behavior defined using ``test_behavior`` as previously explained.

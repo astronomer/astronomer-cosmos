@@ -764,13 +764,72 @@ class TestStoreCompiledSqlForModelPathHandling:
         assert ti.store.get("model__pkg__foo_compiled_sql") == "SELECT 1"
 
 
-def test_producer_always_uses_subprocess_invocation_mode():
-    """DbtProducerWatcherOperator always forces InvocationMode.SUBPROCESS regardless of what was passed."""
-    from cosmos.config import InvocationMode
-
+def test_producer_does_not_force_invocation_mode():
+    """DbtProducerWatcherOperator does not force an invocation_mode; auto-discovery runs at runtime."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    assert op.invocation_mode is None  # resolved lazily by _discover_invocation_mode()
+
+
+def test_producer_respects_explicit_invocation_mode():
+    """An explicit invocation_mode passed by the caller is preserved unchanged."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=InvocationMode.SUBPROCESS)
     assert op.invocation_mode == InvocationMode.SUBPROCESS
-    assert op.log_format == "json"
+
+    op2 = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=InvocationMode.DBT_RUNNER)
+    assert op2.invocation_mode == InvocationMode.DBT_RUNNER
+
+
+def test_run_subprocess_sets_process_log_line_callable():
+    """run_subprocess wires up _process_log_line_callable before executing the subprocess."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    assert op._process_log_line_callable is None
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.run_subprocess", return_value=MagicMock()):
+        op.run_subprocess(command=["dbt", "build"], env={}, cwd="/tmp/proj")
+
+    assert op._process_log_line_callable is not None
+
+
+def test_run_dbt_runner_registers_event_callback():
+    """run_dbt_runner appends an EventMsg→JSON→parse callback to _dbt_runner_callbacks."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    assert not op._dbt_runner_callbacks
+
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "run-1"}
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.run_dbt_runner", return_value=MagicMock()):
+        op.run_dbt_runner(command=["dbt", "build"], env={}, cwd="/tmp/proj", context=context)
+
+    assert len(op._dbt_runner_callbacks) == 1
+
+
+def test_run_dbt_runner_event_callback_calls_store_from_log():
+    """The registered callback converts an EventMsg to JSON and passes it to store_dbt_resource_status_from_log."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "run-1"}
+
+    fake_json = '{"info": {"name": "NodeFinished"}, "data": {}}'
+    fake_event = MagicMock()
+
+    # Patch store_dbt_resource_status_from_log *before* run_dbt_runner so that _make_parse_callable
+    # captures the mock through functools.partial, not the real function.
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.run_dbt_runner", return_value=MagicMock()),
+        patch("cosmos.operators.watcher.store_dbt_resource_status_from_log") as mock_parse,
+        patch("google.protobuf.json_format.MessageToJson", return_value=fake_json) as mock_to_json,
+    ):
+        op.run_dbt_runner(command=["dbt", "build"], env={}, cwd="/tmp/proj", context=context)
+        callback = op._dbt_runner_callbacks[0]
+        callback(fake_event)
+
+    mock_to_json.assert_called_once_with(fake_event, preserving_proto_field_name=True)
+    mock_parse.assert_called_once()
+    call_args = mock_parse.call_args
+    assert call_args[0][0] == fake_json  # first positional arg is the JSON string
+    assert call_args[0][1]["project_dir"] == "/tmp/proj"
+    assert call_args[0][1]["context"] is context
 
 
 MODEL_UNIQUE_ID = "model.jaffle_shop.stg_orders"

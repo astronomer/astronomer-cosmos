@@ -19,7 +19,6 @@ from cosmos.constants import (
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
-    InvocationMode,
 )
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import (
@@ -57,14 +56,20 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     Executes **one** ``dbt build`` covering the whole selection.
 
-    dbt is always invoked via ``InvocationMode.SUBPROCESS`` with ``--log-format json`` so that each
-    log line can be parsed in real-time by ``store_dbt_resource_status_from_log``.  As each
-    ``NodeFinished`` event arrives the operator pushes the per-model status to XCom under key
-    ``<unique_id>_status`` so downstream sensors can react without waiting for the full build to
-    complete.
+    dbt is invoked with ``--log-format json`` and the invocation mode is auto-discovered at runtime:
+    ``InvocationMode.DBT_RUNNER`` is preferred when dbt-core is available in the same environment
+    (faster, no subprocess overhead), falling back to ``InvocationMode.SUBPROCESS`` otherwise.
+    The user may override this by passing ``invocation_mode`` explicitly — that value takes precedence.
 
-    This keeps the heavy dbt work centralised while providing near real-time
-    feedback and granular task-level observability downstream.
+    Both modes feed the same parser (``store_dbt_resource_status_from_log``):
+    - SUBPROCESS: each JSON log line from stdout is parsed directly.
+    - DBT_RUNNER: each ``EventMsg`` from the dbt callback is serialised to JSON via
+      ``google.protobuf.json_format.MessageToJson`` — a transitive dbt-core dependency — and then
+      passed through the same parser.
+
+    As each ``NodeFinished`` event arrives the operator pushes the per-model status to XCom under
+    key ``<unique_id>_status`` so downstream sensors can react without waiting for the full build
+    to complete.
     """
 
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
@@ -83,25 +88,55 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
-        # WATCHER always uses SUBPROCESS so that dbt JSON logs can be parsed line-by-line.
-        # This is the single, unified approach for real-time per-model status tracking.
-        kwargs["invocation_mode"] = InvocationMode.SUBPROCESS
+        # invocation_mode is intentionally NOT forced here; the parent's _discover_invocation_mode()
+        # picks DBT_RUNNER when available and falls back to SUBPROCESS otherwise.
+        # An explicit invocation_mode passed by the caller is preserved as-is.
         super().__init__(task_id=task_id, *args, **kwargs)
         self.log_format = "json"
 
-    def _set_process_log_line_callable(self) -> None:
-        logger.info(
-            "DbtProducerWatcherOperator: Setting process_log_line_callable to store_dbt_resource_status_from_log"
-        )
-        self._process_log_line_callable = functools.partial(
+    def _make_parse_callable(self) -> Callable[[str, Any], None]:
+        """Returns store_dbt_resource_status_from_log with the operator's test maps pre-bound."""
+        return functools.partial(
             store_dbt_resource_status_from_log,
             tests_per_model=self.tests_per_model,
             test_results_per_model=self.test_results_per_model,
         )
 
-    def execute(self, context: Context, **kwargs: Any) -> Any:
-        self._set_process_log_line_callable()
+    def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> Any:
+        """Wire up per-line JSON log parsing before delegating to the subprocess runner.
 
+        The subprocess hook passes ``{"context": ..., "project_dir": cwd}`` as ``extra_kwargs`` to
+        the callable, so no additional closure is needed here.
+        """
+        self._process_log_line_callable = self._make_parse_callable()
+        return super().run_subprocess(command, env, cwd, **kwargs)
+
+    def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> Any:
+        """Register an EventMsg → JSON → parse callback before delegating to the dbt runner.
+
+        dbt callbacks receive only the ``EventMsg`` protobuf object; context and project_dir are
+        captured via closure so the unified ``store_dbt_resource_status_from_log`` parser can be
+        reused identically to the SUBPROCESS path.
+
+        ``google.protobuf.json_format`` is a transitive dependency of dbt-core and is always
+        available when ``InvocationMode.DBT_RUNNER`` is in use.
+        """
+        context = kwargs.get("context")
+        extra_kwargs: dict[str, Any] = {"project_dir": cwd}
+        if context is not None:
+            extra_kwargs["context"] = context
+        parse = self._make_parse_callable()
+
+        def _event_callback(event: Any) -> None:
+            from google.protobuf.json_format import MessageToJson
+
+            json_str = MessageToJson(event, preserving_proto_field_name=True)
+            parse(json_str, extra_kwargs)
+
+        self._dbt_runner_callbacks = [*(self._dbt_runner_callbacks or []), _event_callback]
+        return super().run_dbt_runner(command, env, cwd, **kwargs)
+
+    def execute(self, context: Context, **kwargs: Any) -> Any:
         task_instance = context.get("ti")
         if task_instance is None:
             raise AirflowException("DbtProducerWatcherOperator expects a task instance in the execution context")

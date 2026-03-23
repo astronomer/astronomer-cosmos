@@ -228,7 +228,6 @@ def store_dbt_resource_status_from_log(
         logger.debug("Failed to parse log: %s", line)
         log_line = {}
     else:
-        logger.debug("Log line: %s", log_line)
         context = extra_kwargs.get("context")
         if context is not None:
             _store_startup_event_from_log(context["ti"], log_line)

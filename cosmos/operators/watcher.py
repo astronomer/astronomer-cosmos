@@ -65,11 +65,18 @@ except ImportError:  # pragma: no cover
 
 logger = get_logger(__name__)
 
+# When ``--selector`` is set, dbt ignores ``--exclude`` (dbt-core#5009). For ``TestBehavior.NONE`` /
+# ``AFTER_ALL``, the producer must not run tests inside the same invocation as models; ``dbt build``
+# cannot drop tests in that case, so we run ``seed``, ``run``, and ``snapshot`` sequentially (#2415).
+# Order matches typical dbt DAGs: seeds feed models; snapshots often ``ref()`` models and must run after ``run``.
+_WATCHER_SELECTOR_SPLIT_BASE_CMDS: tuple[list[str], ...] = (["seed"], ["run"], ["snapshot"])
+
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     """Run dbt build and update XCom with the progress of each model, as part of the *WATCHER* execution mode.
 
-    Executes **one** ``dbt build`` covering the whole selection.
+    Executes **one** ``dbt build`` covering the whole selection (or ``seed`` → ``run`` → ``snapshot``
+    when a YAML selector is used with ``TestBehavior.NONE`` / ``AFTER_ALL`` — see #2415).
 
     - **When ``InvocationMode.DBT_RUNNER`` is set** we patch
       ``dbtRunner`` so we receive structured events *while* dbt is running.  In
@@ -98,6 +105,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
+        self.watcher_split_build_for_selector_no_tests: bool = kwargs.pop(
+            "watcher_split_build_for_selector_no_tests", False
+        )
+        self._producer_subcommand: list[str] | None = None
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self.test_results_per_model: dict[str, list[str]] = {}
         # Do not publish compiled_sql to the producer's rendered_template: it would contain SQL for
@@ -111,6 +122,13 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         if self.invocation_mode == InvocationMode.SUBPROCESS:
             self.log_format = "json"
+
+    @property
+    def base_cmd(self) -> list[str]:
+        """Use ``seed`` / ``run`` / ``snapshot`` when splitting the producer for selector + no tests (#2415)."""
+        if self._producer_subcommand is not None:
+            return self._producer_subcommand
+        return DbtBuildMixin.base_cmd  # type: ignore[no-any-return]
 
     @staticmethod
     def _serialize_event(event_message: EventMsg) -> dict[str, Any]:
@@ -192,31 +210,58 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
             startup_events: list[dict[str, Any]] = []
 
-            if use_events:
+            split_build = self.watcher_split_build_for_selector_no_tests and bool(self.selector)
 
-                def _callback(event_message: EventMsg) -> None:
-                    try:
-                        _process_dbt_log_event(context["ti"], event_message)
-                        name = event_message.info.name
-                        if name in {"MainReportVersion", "AdapterRegistered"}:
-                            self._handle_startup_event(event_message, startup_events)
-                            safe_xcom_push(
-                                task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events
-                            )
-                        elif name == "NodeFinished":
-                            self._handle_node_finished(event_message, context)
-                    except Exception:
-                        event_name = getattr(getattr(event_message, "info", None), "name", "unknown")
-                        logger.exception(
-                            "DbtProducerWatcherOperator: error while handling dbt event '%s'",
-                            event_name,
+            def _callback(event_message: EventMsg) -> None:
+                try:
+                    _process_dbt_log_event(context["ti"], event_message)
+                    name = event_message.info.name
+                    if name in {"MainReportVersion", "AdapterRegistered"}:
+                        self._handle_startup_event(event_message, startup_events)
+                        safe_xcom_push(
+                            task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events
                         )
+                    elif name == "NodeFinished":
+                        self._handle_node_finished(event_message, context)
+                except Exception:
+                    event_name = getattr(getattr(event_message, "info", None), "name", "unknown")
+                    logger.exception(
+                        "DbtProducerWatcherOperator: error while handling dbt event '%s'",
+                        event_name,
+                    )
 
+            if split_build:
+                self.log.info(
+                    "Running dbt seed, run, and snapshot sequentially instead of dbt build because "
+                    "a YAML selector is set and tests cannot be excluded alongside --selector (#2415)."
+                )
+
+            if split_build:
+                return_value: Any = None
+                n_sub = len(_WATCHER_SELECTOR_SPLIT_BASE_CMDS)
+                for idx, sub_cmd in enumerate(_WATCHER_SELECTOR_SPLIT_BASE_CMDS):
+                    self._producer_subcommand = sub_cmd
+                    try:
+                        if use_events:
+                            self._dbt_runner_callbacks = [_callback]
+                            return_value = self.build_and_run_cmd(
+                                context=context, cmd_flags=self.add_cmd_flags(), **kwargs
+                            )
+                        else:
+                            return_value = self.build_and_run_cmd(
+                                context=context,
+                                cmd_flags=self.add_cmd_flags(),
+                                push_run_results_to_xcom=(idx == n_sub - 1),
+                                **kwargs,
+                            )
+                    finally:
+                        self._producer_subcommand = None
+                if use_events:
+                    self._finalize(context, startup_events)
+            elif use_events:
                 self._dbt_runner_callbacks = [_callback]
-                result = super().execute(context=context, **kwargs)
-
+                return_value = super().execute(context=context, **kwargs)
                 self._finalize(context, startup_events)
-                return_value = result
             else:
                 # Fallback – push run_results.json via base class helper
                 kwargs["push_run_results_to_xcom"] = True

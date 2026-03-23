@@ -33,6 +33,7 @@ from cosmos.airflow.graph import (
 )
 from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
+    PRODUCER_WATCHER_TASK_ID,
     DbtResourceType,
     ExecutionMode,
     SourceRenderingBehavior,
@@ -48,6 +49,7 @@ from cosmos.operators.local import (
     DbtSeedLocalOperator,
     DbtTestLocalOperator,
 )
+from cosmos.operators.watcher import _WATCHER_SELECTOR_SPLIT_BASE_CMDS, DbtProducerWatcherOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 SAMPLE_PROJ_PATH = Path("/home/user/path/dbt-proj/")
@@ -1783,6 +1785,77 @@ class TestConvertListToStr:
 
     def test_empty_string_passthrough(self):
         assert _convert_list_to_str("") == ""
+
+
+def test_watcher_selector_split_subcommands_order():
+    assert _WATCHER_SELECTOR_SPLIT_BASE_CMDS == (["seed"], ["run"], ["snapshot"])
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])
+def test_watcher_producer_with_selector_sets_split_build_flag(test_behavior):
+    """YAML selector + NONE/AFTER_ALL: producer keeps --selector; split seed/snapshot/run at runtime (#2415)."""
+    with DAG("test-watcher-selector", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.WATCHER,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(
+                test_behavior=test_behavior,
+                selector="cx",
+                exclude=["some_model"],
+            ),
+            dbt_project_name="astro_shop",
+        )
+
+    producer = dag.task_dict[PRODUCER_WATCHER_TASK_ID]
+    assert isinstance(producer, DbtProducerWatcherOperator)
+    assert producer.selector == "cx"
+    assert producer.watcher_split_build_for_selector_no_tests is True
+    assert producer.exclude == "some_model"
+    assert "resource_type:test" not in (producer.exclude or "")
+
+
+def test_watcher_producer_without_selector_merges_test_excludes_for_none_and_after_all():
+    with DAG("test-watcher-no-selector", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.WATCHER,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+            dbt_project_name="astro_shop",
+        )
+
+    producer = dag.task_dict[PRODUCER_WATCHER_TASK_ID]
+    assert producer.watcher_split_build_for_selector_no_tests is False
+    assert producer.exclude == "resource_type:test resource_type:unit_test"
 
 
 class TestExcludeDetachedTestsIfNeeded:

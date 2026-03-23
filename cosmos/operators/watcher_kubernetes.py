@@ -25,6 +25,7 @@ from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators.base import (
+    DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
     DbtSnapshotMixin,
@@ -34,6 +35,7 @@ from cosmos.operators.kubernetes import (
     DbtRunKubernetesOperator,
     DbtSourceKubernetesOperator,
 )
+from cosmos.operators.watcher import _WATCHER_SELECTOR_SPLIT_BASE_CMDS
 
 logger = get_logger(__name__)
 
@@ -80,6 +82,10 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
+        self.watcher_split_build_for_selector_no_tests: bool = kwargs.pop(
+            "watcher_split_build_for_selector_no_tests", False
+        )
+        self._producer_subcommand: list[str] | None = None
 
         existing_callbacks = kwargs.get("callbacks")
         if existing_callbacks is None:
@@ -92,6 +98,12 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         kwargs["callbacks"] = normalized_callbacks
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
+
+    @property
+    def base_cmd(self) -> list[str]:
+        if self._producer_subcommand is not None:
+            return self._producer_subcommand
+        return DbtBuildMixin.base_cmd  # type: ignore[no-any-return]
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
@@ -118,6 +130,22 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         # While the callback is set during the operator initialization, the context is only created during the operator's execution.
         global producer_task_context
         producer_task_context = context
+
+        split_build = self.watcher_split_build_for_selector_no_tests and bool(self.selector)
+        if split_build:
+            self.log.info(
+                "Running dbt seed, run, and snapshot sequentially instead of dbt build because "
+                "a YAML selector is set and tests cannot be excluded alongside --selector (#2415)."
+            )
+            last_result: Any = None
+            for sub_cmd in _WATCHER_SELECTOR_SPLIT_BASE_CMDS:
+                self._producer_subcommand = sub_cmd
+                try:
+                    last_result = super().execute(context, **kwargs)
+                finally:
+                    self._producer_subcommand = None
+            return last_result
+
         return super().execute(context, **kwargs)
 
 

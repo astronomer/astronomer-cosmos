@@ -19,7 +19,6 @@ except ImportError:  # pragma: no cover
 
 try:
     from airflow.providers.amazon.aws.hooks.logs import AwsLogsHook
-    from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
     from airflow.providers.amazon.aws.utils.task_log_fetcher import AwsTaskLogFetcher
 except ImportError:  # pragma: no cover
     raise ImportError(
@@ -43,7 +42,7 @@ from cosmos.operators.base import (
 logger = get_logger(__name__)
 
 
-class DbtAwsTaskLogFetcher(AwsTaskLogFetcher):
+class DbtAwsTaskLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
     """
     Extends ``AwsTaskLogFetcher`` to intercept each CloudWatch log line as it
     arrives and forward it to a caller-supplied ``on_log_line`` callback.
@@ -127,6 +126,8 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
         self,
         context: Context,
         cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Any:
         # DbtAwsEcsBaseOperator.build_and_run_cmd calls EcsRunTaskOperator.execute(self, context)
@@ -142,7 +143,7 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
     # ------------------------------------------------------------------
 
     def _get_task_log_fetcher(self) -> DbtAwsTaskLogFetcher:
-        # TODO: consistenly use self.log vs logger in this class (and the fetcher) — currently a mix of both.
+        # TODO: consistently use self.log vs logger in this class (and the fetcher) — currently a mix of both.
         self.log.debug(
             "_get_task_log_fetcher called — context available: %s, ecs_task_id: %s",
             self._current_context is not None,
@@ -222,8 +223,8 @@ class DbtConsumerWatcherAwsEcsSensor(BaseConsumerSensor, DbtRunAwsEcsOperator):
     falls back to running the model directly via a new ECS task.
     """
 
-    template_fields: tuple[str, ...] = (  # type: ignore[assignment]
-        BaseConsumerSensor.template_fields + DbtRunAwsEcsOperator.template_fields
+    template_fields: tuple[str, ...] = tuple(
+        BaseConsumerSensor.template_fields + DbtRunAwsEcsOperator.template_fields  # type: ignore[operator]
     )
 
     def use_event(self) -> bool:
@@ -258,8 +259,8 @@ class DbtSeedWatcherAwsEcsOperator(DbtSeedMixin, DbtConsumerWatcherAwsEcsSensor)
     Falls back to running the seed directly on ECS when a retry is detected.
     """
 
-    template_fields: tuple[str, ...] = (  # type: ignore[assignment]
-        DbtConsumerWatcherAwsEcsSensor.template_fields + DbtSeedMixin.template_fields
+    template_fields: tuple[str, ...] = tuple(  # type: ignore[assignment]
+        DbtConsumerWatcherAwsEcsSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -296,8 +297,8 @@ class DbtRunWatcherAwsEcsOperator(DbtConsumerWatcherAwsEcsSensor):
     Falls back to running the model directly on ECS when a retry is detected.
     """
 
-    template_fields: tuple[str, ...] = (  # type: ignore[assignment]
-        DbtConsumerWatcherAwsEcsSensor.template_fields + DbtRunMixin.template_fields
+    template_fields: tuple[str, ...] = tuple(  # type: ignore[assignment]
+        DbtConsumerWatcherAwsEcsSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

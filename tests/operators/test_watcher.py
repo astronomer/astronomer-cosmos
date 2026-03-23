@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-import base64
 import json
 import logging
-import zlib
-from contextlib import nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 from unittest.mock import ANY, MagicMock, Mock, patch
 
@@ -77,43 +73,6 @@ class _MockTI:
 
 class _MockContext(dict):
     pass
-
-
-def _fake_event(
-    name: str = "NodeFinished", uid: str = "model.pkg.m", resource_type: str | None = None, node_path: str | None = None
-):
-    """Create a minimal fake EventMsg-like object suitable for helper tests."""
-
-    class _Info(SimpleNamespace):
-        pass
-
-    class _NodeInfo(SimpleNamespace):
-        pass
-
-    class _RunResult(SimpleNamespace):
-        pass
-
-    node_info = _NodeInfo(unique_id=uid)
-    if resource_type is not None:
-        setattr(node_info, "resource_type", resource_type)
-    if node_path is not None:
-        setattr(node_info, "node_path", node_path)
-    run_result = _RunResult(status="success", message="ok")
-
-    data = SimpleNamespace(node_info=node_info, run_result=run_result)
-    info = _Info(name=name, code="X", msg="msg")
-    return SimpleNamespace(info=info, data=data)
-
-
-@patch("google.protobuf.json_format.MessageToDict")
-def test_serialize_event(mock_mtd):
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-
-    mock_mtd.side_effect = lambda ev, **kwargs: {"dummy": True}
-
-    out = op._serialize_event(_fake_event())
-    assert out == {"dummy": True}
-    mock_mtd.assert_called()
 
 
 def test_dbt_producer_watcher_operator_priority_weight_default():
@@ -192,16 +151,10 @@ def test_dbt_producer_watcher_operator_priority_weight_override():
     assert op.priority_weight == 100
 
 
-@pytest.mark.parametrize(
-    "invocation_mode, expected_log_format",
-    (
-        (InvocationMode.SUBPROCESS, "json"),
-        (InvocationMode.DBT_RUNNER, None),
-    ),
-)
-def test_dbt_producer_log_format_adjusts_with_invocation(invocation_mode, expected_log_format):
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=invocation_mode)
-    assert getattr(op, "log_format", None) == expected_log_format
+def test_dbt_producer_log_format_always_json():
+    """WATCHER always uses --log-format json regardless of any invocation_mode hint passed."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    assert op.log_format == "json"
 
 
 def test_dbt_producer_watcher_operator_pushes_completion_status():
@@ -248,14 +201,6 @@ def test_dbt_producer_watcher_operator_requires_task_instance():
 
     mock_execute.assert_not_called()
     assert "expects a task instance" in str(excinfo.value)
-
-
-def test_handle_startup_event():
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    lst: list[dict] = []
-    ev = _fake_event("MainReportVersion")
-    op._handle_startup_event(ev, lst)
-    assert lst and lst[0]["name"] == "MainReportVersion"
 
 
 def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message(caplog):
@@ -337,181 +282,6 @@ def test_dbt_consumer_watcher_sensor_execute_complete(mock_dbt_event, event, exp
         sensor.execute_complete(context, event)
 
     assert str(excinfo.value) == expected_message
-
-
-def test_handle_node_finished_pushes_xcom():
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    ti = _MockTI()
-    ctx = _MockContext(ti=ti)
-
-    with patch.object(op, "_serialize_event", return_value={"foo": "bar"}):
-        ev = _fake_event()
-        op._handle_node_finished(ev, ctx)
-
-    stored = list(ti.store.values())[0]
-    raw = zlib.decompress(base64.b64decode(stored)).decode()
-    assert json.loads(raw) == {"foo": "bar"}
-
-
-def test_handle_node_finished_injects_compiled_sql(tmp_path, monkeypatch):
-    op = DbtProducerWatcherOperator(project_dir=str(tmp_path), profile_config=None)
-    ti = _MockTI()
-    ctx = _MockContext(ti=ti)
-
-    # Create compiled SQL file at expected path: target/compiled/pkg/models/my_model.sql
-    compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
-    compiled_dir.mkdir(parents=True)
-    compiled_file = compiled_dir / "my_model.sql"
-    sql_text = "select 1"
-    compiled_file.write_text(sql_text, encoding="utf-8")
-
-    # Ensure watcher looks up under this tmp project dir
-    monkeypatch.chdir(tmp_path)
-
-    with patch.object(op, "_serialize_event", return_value={}):
-        ev = _fake_event(name="NodeFinished", uid="model.pkg.my_model", resource_type="model", node_path="my_model.sql")
-        op._handle_node_finished(ev, ctx)
-
-    # Compiled SQL is pushed to the canonical XCom key (single strategy for both event and subprocess)
-    assert ti.store.get("model__pkg__my_model_compiled_sql") == sql_text
-
-
-def test_handle_node_finished_without_compiled_sql_does_not_inject(tmp_path, monkeypatch):
-    op = DbtProducerWatcherOperator(project_dir=str(tmp_path), profile_config=None)
-    ti = _MockTI()
-    ctx = _MockContext(ti=ti)
-
-    # Ensure watcher looks up under this tmp project dir, but do NOT create compiled file
-    monkeypatch.chdir(tmp_path)
-
-    with patch.object(op, "_serialize_event", return_value={}):
-        ev = _fake_event(name="NodeFinished", uid="model.pkg.my_model", resource_type="model", node_path="my_model.sql")
-        op._handle_node_finished(ev, ctx)
-
-    # Event payload does not contain compiled_sql; canonical key is only set when extraction succeeds
-    stored = list(ti.store.values())[0]
-    data = json.loads(zlib.decompress(base64.b64decode(stored)).decode())
-    assert "compiled_sql" not in data
-    assert "model__pkg__my_model_compiled_sql" not in ti.store
-
-
-def test_execute_streaming_mode():
-    """Streaming path should push startup + per-model XComs."""
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    op.invocation_mode = InvocationMode.DBT_RUNNER
-
-    import cosmos.operators.watcher as _watch_mod
-
-    # Ensure EventMsg symbol exists without permanently altering the module
-    if _watch_mod.EventMsg is None:
-
-        class _DummyEv:
-            pass
-
-        eventmsg_patch = patch("cosmos.operators.watcher.EventMsg", _DummyEv, create=True)
-    else:
-        eventmsg_patch = nullcontext()  # type: ignore
-
-    ti = _MockTI()
-    ctx = {"ti": ti, "run_id": "dummy"}
-
-    main_rep = _fake_event("MainReportVersion")
-    node_evt = _fake_event("NodeFinished", uid="model.pkg.x")
-
-    def fake_base_execute(self, context=None, **_):  # type: ignore[override]
-        for cb in getattr(self, "_dbt_runner_callbacks", []):
-            cb(main_rep)
-            cb(node_evt)
-        return None
-
-    with (
-        eventmsg_patch,
-        patch.object(
-            DbtProducerWatcherOperator,
-            "_serialize_event",
-            lambda self, ev: {"dummy": True},
-        ),
-        patch(
-            "cosmos.operators.watcher.DbtLocalBaseOperator.execute",
-            fake_base_execute,
-        ),
-    ):
-        op.execute(context=ctx)
-
-    assert _DBT_STARTUP_EVENTS_XCOM_KEY in ti.store
-    startup_events = ti.store[_DBT_STARTUP_EVENTS_XCOM_KEY]
-    assert isinstance(startup_events, list) and len(startup_events) == 1
-    assert startup_events[0]["name"] == "MainReportVersion"
-
-    node_key = "nodefinished_model__pkg__x"
-    assert node_key in ti.store
-
-
-def test_execute_callback_exception_is_logged(caplog):
-    """Errors inside dbt callback should be logged instead of bubbling up."""
-
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    op.invocation_mode = InvocationMode.DBT_RUNNER
-
-    import cosmos.operators.watcher as _watch_mod
-
-    if _watch_mod.EventMsg is None:
-
-        class _DummyEv:
-            pass
-
-        eventmsg_patch = patch("cosmos.operators.watcher.EventMsg", _DummyEv, create=True)
-    else:
-        eventmsg_patch = nullcontext()  # type: ignore
-
-    ti = _MockTI()
-    ctx = {"ti": ti, "run_id": "dummy"}
-
-    def fake_base_execute(self, context=None, **_):  # type: ignore[override]
-        for cb in getattr(self, "_dbt_runner_callbacks", []):
-            cb(_fake_event("MainReportVersion"))
-        return "ok"
-
-    with (
-        eventmsg_patch,
-        patch.object(DbtProducerWatcherOperator, "_handle_startup_event", side_effect=RuntimeError("boom")),
-        patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", fake_base_execute),
-        caplog.at_level("ERROR"),
-    ):
-        result = op.execute(context=ctx)
-
-    assert result == "ok"
-    assert "error while handling dbt event" in caplog.text
-    assert ti.store.get("task_status") == "completed"
-
-
-def test_execute_fallback_mode(tmp_path):
-    """Fallback path pushes compressed run_results once."""
-
-    tgt = tmp_path / "target"
-    tgt.mkdir()
-    with (tgt / "run_results.json").open("w") as fp:
-        json.dump({"results": [{"unique_id": "a", "status": "success"}]}, fp)
-
-    op = DbtProducerWatcherOperator(project_dir=str(tmp_path), profile_config=None)
-    op.invocation_mode = InvocationMode.SUBPROCESS  # force fallback
-
-    ti = _MockTI()
-    ctx = {"ti": ti, "run_id": "x"}
-
-    def fake_build_run(self, context, **kw):
-        from cosmos.operators.local import AbstractDbtLocalBase
-
-        AbstractDbtLocalBase._handle_post_execution(self, self.project_dir, context, True)
-        return None
-
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd", fake_build_run):
-        op.execute(context=ctx)
-
-    compressed = ti.store.get("run_results")
-    assert compressed
-    data = json.loads(zlib.decompress(base64.b64decode(compressed)).decode())
-    assert data["results"][0]["status"] == "success"
 
 
 class TestStoreDbtStatusFromLog:
@@ -994,35 +764,16 @@ class TestStoreCompiledSqlForModelPathHandling:
         assert ti.store.get("model__pkg__foo_compiled_sql") == "SELECT 1"
 
 
-@patch("cosmos.dbt.runner.is_available", return_value=False)
-@patch("cosmos.operators.watcher.DbtLocalBaseOperator.execute", return_value="done")
-def test_execute_discovers_invocation_mode(_mock_execute, _mock_is_available):
-    """If invocation_mode is unset, execute() should discover and set it."""
-
+def test_producer_always_uses_subprocess_invocation_mode():
+    """DbtProducerWatcherOperator always forces InvocationMode.SUBPROCESS regardless of what was passed."""
     from cosmos.config import InvocationMode
 
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    assert op.invocation_mode is None  # precondition
-
-    ti = _MockTI()
-    ctx = {"ti": ti, "run_id": "xyz"}
-
-    result = op.execute(context=ctx)
-
-    assert result == "done"
     assert op.invocation_mode == InvocationMode.SUBPROCESS
+    assert op.log_format == "json"
 
 
 MODEL_UNIQUE_ID = "model.jaffle_shop.stg_orders"
-ENCODED_RUN_RESULTS = base64.b64encode(
-    zlib.compress(b'{"results":[{"unique_id":"model.jaffle_shop.stg_orders","status":"success"}]}')
-).decode("utf-8")
-
-ENCODED_RUN_RESULTS_FAILED = base64.b64encode(
-    zlib.compress(b'{"results":[{"unique_id":"model.jaffle_shop.stg_orders","status":"fail"}]}')
-).decode("utf-8")
-
-ENCODED_EVENT = base64.b64encode(zlib.compress(b'{"data": {"run_result": {"status": "success"}}}')).decode("utf-8")
 
 
 class TestDbtConsumerWatcherSensor:
@@ -1037,7 +788,6 @@ class TestDbtConsumerWatcherSensor:
             **kwargs,
         )
 
-        sensor.invocation_mode = "DBT_RUNNER"
         sensor._get_producer_task_status = MagicMock(return_value=None)
         return sensor
 
@@ -1158,26 +908,22 @@ class TestDbtConsumerWatcherSensor:
         )
         assert status is None
 
-    @patch("cosmos.operators.watcher.EventMsg")
-    def test_poke_status_none_from_events(self, MockEventMsg):
-        mock_event_instance = MagicMock()
-        mock_event_instance.status = "done"
-        MockEventMsg.return_value = mock_event_instance
-
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+    def test_poke_status_none(self, mock_startup_events):
+        """poke returns False when no status has been written to XCom yet."""
         sensor = self.make_sensor()
-        sensor.invocation_mode = InvocationMode.DBT_RUNNER
+
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.side_effect = [None, None, None]  # no event msg found
+        ti.xcom_pull.return_value = None
         context = self.make_context(ti)
 
         result = sensor.poke(context)
         assert result is False
 
     @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
-    def test_poke_success_from_run_results(self, mock_startup_events):
+    def test_poke_success(self, mock_startup_events):
         sensor = self.make_sensor()
-        sensor.invocation_mode = "SUBPROCESS"
 
         ti = MagicMock()
         ti.try_number = 1
@@ -1207,64 +953,18 @@ class TestDbtConsumerWatcherSensor:
         assert sensor.compiled_sql == "SELECT * FROM orders"
         mock_override_rtif.assert_called_once_with(context)
 
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor.use_event", return_value=True)
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_status", return_value="running")
-    @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
-    def test_poke_event_mode_extracts_compiled_sql_from_canonical_key(
-        self, mock_override_rtif, mock_get_producer, mock_use_event
-    ):
-        """Test that in event (DBT_RUNNER) mode, poke gets compiled_sql from canonical *_compiled_sql key after status."""
-        sensor = self.make_sensor()
-        sensor.model_unique_id = MODEL_UNIQUE_ID
-
-        ti = MagicMock()
-        ti.try_number = 1
-        # _get_status_from_events: dbt_startup_events=None, nodefinished_*=ENCODED_EVENT; then get_xcom_val(compiled_sql_key), get_xcom_val(_dbt_event)
-        ti.xcom_pull.side_effect = [None, ENCODED_EVENT, "SELECT * FROM orders", None]
-        context = self.make_context(ti)
-
-        assert sensor.compiled_sql == ""  # Initially empty
-        result = sensor.poke(context)
-        assert result is True
-        assert sensor.compiled_sql == "SELECT * FROM orders"
-        mock_override_rtif.assert_called_once_with(context)
-
-    @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._get_producer_task_status", return_value=None)
-    def _fallback_to_non_watcher_run(self, mock_get_producer_task_status):
-        sensor = self.make_sensor()
-        sensor.invocation_mode = None
-
-        ti = MagicMock()
-        ti.try_number = 1
-        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
-        context = self.make_context(ti)
-        result = sensor.poke(context)
-        assert result is True
-
     @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
-    def test_poke_failure_from_run_results(self, mock_startup_events):
+    def test_poke_failure(self, mock_startup_events):
+        """poke raises AirflowException when model status is a failure value."""
         sensor = self.make_sensor()
-        sensor.invocation_mode = "OTHER_MODE"
 
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS_FAILED
+        ti.xcom_pull.return_value = "failed"
         context = self.make_context(ti)
 
         with pytest.raises(AirflowException):
             sensor.poke(context)
-
-    def test_poke_status_none_from_run_results(self):
-        sensor = self.make_sensor()
-        sensor.invocation_mode = "OTHER_MODE"
-
-        ti = MagicMock()
-        ti.try_number = 1
-        ti.xcom_pull.return_value = None
-        context = self.make_context(ti)
-
-        result = sensor.poke(context)
-        assert result is False
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase.build_and_run_cmd")
     def test_task_retry(self, mock_build_and_run_cmd):
@@ -1299,97 +999,6 @@ class TestDbtConsumerWatcherSensor:
         result = DbtConsumerWatcherSensor._filter_flags(flags)
 
         assert result == expected
-
-    def test_get_status_from_run_results_success(self):
-        sensor = self.make_sensor()
-        ti = MagicMock()
-        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS
-
-        result = sensor._get_status_from_run_results(ti, _MockContext(ti=ti))
-        assert result == "success"
-
-    def test_get_status_from_run_results_logs_error(self):
-        sensor = self.make_sensor()
-        ti = MagicMock()
-
-        run_results_payload = {
-            "results": [
-                {
-                    "unique_id": sensor.model_unique_id,
-                    "status": "error",
-                    "message": "dbt model failed",
-                    "compiled_code": "select 1",
-                }
-            ]
-        }
-
-        encoded = base64.b64encode(zlib.compress(json.dumps(run_results_payload).encode())).decode("utf-8")
-
-        ti.xcom_pull.return_value = encoded
-        context = self.make_context(ti)
-
-        with patch("cosmos.operators._watcher.base.logger") as mock_logger:
-            result = sensor._get_status_from_run_results(ti, context)
-
-        assert result == "error"
-        mock_logger.error.assert_called_once()
-
-    def test_get_status_from_run_results_none(self):
-        sensor = self.make_sensor()
-        ti = MagicMock()
-        ti.xcom_pull.return_value = None
-
-        result = sensor._get_status_from_run_results(ti, _MockContext(ti=ti))
-        assert result is None
-
-    def test_get_status_from_events_success(self):
-        sensor = self.make_sensor()
-        ti = MagicMock()
-        ti.xcom_pull.side_effect = [None, ENCODED_EVENT]
-        context = self.make_context(ti)
-
-        result = sensor._get_status_from_events(ti, context)
-        assert result == "success"
-
-    def test_get_status_from_events_none(self):
-        sensor = self.make_sensor()
-        ti = MagicMock()
-        ti.xcom_pull.side_effect = [None, None]
-        context = self.make_context(ti)
-
-        result = sensor._get_status_from_events(ti, context)
-        assert result is None
-
-    def test_get_status_from_events_does_not_set_compiled_sql_from_event(self):
-        """compiled_sql is no longer in the event payload; it is read from the canonical XCom key in poke()."""
-        sensor = self.make_sensor()
-        ti = MagicMock()
-        event_payload = {"data": {"run_result": {"status": "success"}}}
-        encoded_event = base64.b64encode(zlib.compress(json.dumps(event_payload).encode())).decode("utf-8")
-        ti.xcom_pull.side_effect = [None, encoded_event]
-        context = self.make_context(ti)
-
-        result = sensor._get_status_from_events(ti, context)
-        assert result == "success"
-        assert sensor.compiled_sql == ""  # not set from event; poke() will get it from canonical key
-
-    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
-    def test_get_status_logs_error(self, mock_log_startup_events):
-        sensor = self.make_sensor()
-        ti = MagicMock()
-
-        event_payload = {"data": {"run_result": {"status": "error", "message": "dbt model failed"}}}
-
-        encoded_event = base64.b64encode(zlib.compress(json.dumps(event_payload).encode())).decode("utf-8")
-
-        ti.xcom_pull.return_value = encoded_event
-        context = self.make_context(ti)
-
-        with patch("cosmos.operators.watcher.logger.error") as mock_log_error:
-            result = sensor._get_status_from_events(ti, context)
-
-        assert result == "error"
-        mock_log_error.assert_called_once_with("%s", "dbt model failed")
 
     @patch("cosmos.operators._watcher.base.get_xcom_val")
     @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
@@ -1432,32 +1041,6 @@ class TestDbtConsumerWatcherSensor:
 
         sensor.poke(context)
         mock_fallback_to_non_watcher_run.assert_called_once()
-
-    @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
-    def test_get_status_from_run_results_with_compiled_sql(self, mock_override_rtif, monkeypatch):
-        sensor = self.make_sensor()
-        sensor.model_unique_id = "model.test_table"
-
-        # Create a fake run_results payload containing compiled_code and status
-        run_results = {
-            "results": [
-                {
-                    "unique_id": "model.test_table",
-                    "compiled_code": "SELECT * FROM dummy_table;",
-                    "status": "success",
-                }
-            ]
-        }
-
-        compressed = zlib.compress(json.dumps(run_results).encode())
-        encoded = base64.b64encode(compressed).decode()
-
-        # Mock TaskInstance.xcom_pull to return encoded results
-        ti = MagicMock()
-        ti.xcom_pull.return_value = encoded
-        context = {"ti": ti}
-        sensor._get_status_from_run_results(ti, context)
-        mock_override_rtif.assert_called_with(context)
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor.poke")
     def test_sensor_deferred(self, mock_poke):
@@ -1551,21 +1134,20 @@ class TestDbtBuildWatcherOperator:
 class TestWatcherTrigger:
     """Tests for WatcherTrigger compiled_sql extraction."""
 
-    def make_trigger(self, use_event: bool = False):
+    def make_trigger(self):
         return WatcherTrigger(
             model_unique_id="model.pkg.my_model",
             producer_task_id="dbt_producer_watcher",
             dag_id="test_dag",
             run_id="test_run",
             map_index=None,
-            use_event=use_event,
             poke_interval=1.0,
         )
 
     @pytest.mark.asyncio
     async def test_parse_dbt_node_status_and_compiled_sql_subprocess_mode(self):
         """Test that compiled_sql is extracted from XCom in subprocess mode."""
-        trigger = self.make_trigger(use_event=False)
+        trigger = self.make_trigger()
 
         # Mock get_xcom_val to return status and compiled_sql
         async def mock_get_xcom_val(key):
@@ -1585,7 +1167,7 @@ class TestWatcherTrigger:
     @pytest.mark.asyncio
     async def test_parse_dbt_node_status_and_compiled_sql_subprocess_no_compiled_sql(self):
         """Test that missing compiled_sql is handled gracefully in subprocess mode."""
-        trigger = self.make_trigger(use_event=False)
+        trigger = self.make_trigger()
 
         # Mock get_xcom_val to return only status
         async def mock_get_xcom_val(key):
@@ -1599,29 +1181,6 @@ class TestWatcherTrigger:
 
         assert status == "success"
         assert compiled_sql is None
-
-    @pytest.mark.asyncio
-    async def test_parse_dbt_node_status_and_compiled_sql_dbt_runner_mode(self):
-        """Test that in dbt_runner mode status comes from event payload and compiled_sql from canonical key."""
-        trigger = self.make_trigger(use_event=True)
-
-        # Event payload (no longer contains compiled_sql; it is stored under canonical key)
-        event_data = {"data": {"run_result": {"status": "success"}}}
-        compressed = base64.b64encode(zlib.compress(json.dumps(event_data).encode())).decode()
-
-        async def mock_get_xcom_val(key):
-            if key == "nodefinished_model__pkg__my_model":
-                return compressed
-            if key == "model__pkg__my_model_compiled_sql":
-                return "SELECT id FROM users"
-            return None
-
-        trigger.get_xcom_val = mock_get_xcom_val
-
-        status, compiled_sql = await trigger._parse_dbt_node_status_and_compiled_sql()
-
-        assert status == "success"
-        assert compiled_sql == "SELECT id FROM users"
 
     @pytest.mark.asyncio
     async def test_log_startup_events_returns_when_events_available(self, caplog):
@@ -1689,7 +1248,6 @@ def test_dbt_dag_with_watcher(capsys):
         dag_id="watcher_dag",
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER,
-            invocation_mode=InvocationMode.DBT_RUNNER,
         ),
         render_config=RenderConfig(emit_datasets=False),
         operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
@@ -1916,7 +1474,6 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
         dag_id="watcher_dag_empty_model",
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.WATCHER,
-            invocation_mode=InvocationMode.DBT_RUNNER,
         ),
         render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
         operator_args={

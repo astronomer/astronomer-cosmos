@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-import base64
 import functools
-import json
-import zlib
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 
 from cosmos.config import ProfileConfig
-from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
-from cosmos.operators._watcher.state import DBT_FAILED_STATUSES
+from cosmos.operators._watcher import safe_xcom_push
 from cosmos.settings import watcher_dbt_execution_queue
 
 try:
@@ -20,18 +16,14 @@ except ImportError:  # pragma: no cover
     from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from cosmos.constants import (
-    _DBT_STARTUP_EVENTS_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
     InvocationMode,
 )
 from cosmos.log import get_logger
-from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
-    _process_dbt_log_event,
-    store_compiled_sql_for_model,
     store_dbt_resource_status_from_log,
 )
 from cosmos.operators.base import (
@@ -45,12 +37,6 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
-
-try:
-    from dbt_common.events.base_types import EventMsg
-except ImportError:  # pragma: no cover
-    EventMsg = None
-
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -71,21 +57,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     Executes **one** ``dbt build`` covering the whole selection.
 
-    - **When ``InvocationMode.DBT_RUNNER`` is set** we patch
-      ``dbtRunner`` so we receive structured events *while* dbt is running.  In
-      this real-time mode the operator:
-        – pushes startup metadata events (``MainReportVersion``,
-          ``AdapterRegistered``) together under XCom key
-          ``dbt_startup_events``;
-        – pushes each ``NodeFinished`` event immediately to XCom under
-          ``nodefinished_<unique_id>`` (zlib zipped+base64 JSON) so downstream
-          sensors can react with near-zero latency.
-
-    - **When ``dbtRunner`` is *not* available** (older dbt or
-      ``InvocationMode=SUBPROCESS``) we fallback to delayed strategy: after
-      dbt exits we read ``target/run_results.json`` and push the whole mapping
-      once under key ``run_results`` to XCom.  Sensors can poll this key but will not
-      get per-model updates until the build completes - by the end of the execution of all dbt nodes.
+    dbt is always invoked via ``InvocationMode.SUBPROCESS`` with ``--log-format json`` so that each
+    log line can be parsed in real-time by ``store_dbt_resource_status_from_log``.  As each
+    ``NodeFinished`` event arrives the operator pushes the per-model status to XCom under key
+    ``<unique_id>_status`` so downstream sensors can react without waiting for the full build to
+    complete.
 
     This keeps the heavy dbt work centralised while providing near real-time
     feedback and granular task-level observability downstream.
@@ -107,70 +83,24 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
+        # WATCHER always uses SUBPROCESS so that dbt JSON logs can be parsed line-by-line.
+        # This is the single, unified approach for real-time per-model status tracking.
+        kwargs["invocation_mode"] = InvocationMode.SUBPROCESS
         super().__init__(task_id=task_id, *args, **kwargs)
+        self.log_format = "json"
 
-        if self.invocation_mode == InvocationMode.SUBPROCESS:
-            self.log_format = "json"
-
-    @staticmethod
-    def _serialize_event(event_message: EventMsg) -> dict[str, Any]:
-        """Convert structured dbt EventMsg to plain dict."""
-        from google.protobuf.json_format import MessageToDict
-
-        return MessageToDict(event_message, preserving_proto_field_name=True)  # type: ignore[no-any-return]
-
-    def _handle_startup_event(self, event_message: EventMsg, startup_events: list[dict[str, Any]]) -> None:
-        info = event_message.info  # type: ignore[attr-defined]
-        raw_ts = getattr(info, "ts", None)
-        ts_val = raw_ts.ToJsonString() if hasattr(raw_ts, "ToJsonString") else str(raw_ts)  # type: ignore[union-attr]
-        startup_events.append({"name": info.name, "msg": info.msg, "ts": ts_val})
-
-    def _handle_node_finished(
-        self,
-        event_message: EventMsg,
-        context: Context,
-    ) -> None:
-        logger.debug("DbtProducerWatcherOperator: handling node finished event: %s", event_message)
-        uid = event_message.data.node_info.unique_id
-        node_path_val = getattr(event_message.data.node_info, "node_path", None)
-        node_path = str(node_path_val) if node_path_val is not None else None
-        resource_type = getattr(event_message.data.node_info, "resource_type", None)
-        event_message_dict = self._serialize_event(event_message)
-        store_compiled_sql_for_model(context["ti"], self.project_dir, uid, node_path, resource_type)
-
-        if resource_type == "test" and self.tests_per_model:
-            status: str = getattr(event_message.data.node_info, "node_status", None) or ""
-            logger.debug("Test '%s' finished with status '%s'", uid, status)
-            push_test_result_or_aggregate(uid, status, self.tests_per_model, self.test_results_per_model, context["ti"])
-        else:
-            payload = base64.b64encode(zlib.compress(json.dumps(event_message_dict).encode())).decode()
-            safe_xcom_push(task_instance=context["ti"], key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
-
-    def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:
-        # Only push startup events; per-model statuses are available via individual nodefinished_<uid> entries.
-        if startup_events:
-            safe_xcom_push(task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events)
-
-    def _set_invocation_mode_if_not_set(self) -> None:
-        if not self.invocation_mode:
-            logger.info("No invocation mode provided, discovering it")
-            self._discover_invocation_mode()
-
-    def _set_process_log_line_callable_if_subprocess(self) -> None:
-        if self.invocation_mode == InvocationMode.SUBPROCESS:
-            logger.info(
-                "DbtProducerWatcherOperator: Setting log_format to json and process_log_line_callable to store_dbt_resource_status_from_log"
-            )
-            self.log_format = "json"
-            self._process_log_line_callable = functools.partial(
-                store_dbt_resource_status_from_log,
-                tests_per_model=self.tests_per_model,
-                test_results_per_model=self.test_results_per_model,
-            )
+    def _set_process_log_line_callable(self) -> None:
+        logger.info(
+            "DbtProducerWatcherOperator: Setting process_log_line_callable to store_dbt_resource_status_from_log"
+        )
+        self._process_log_line_callable = functools.partial(
+            store_dbt_resource_status_from_log,
+            tests_per_model=self.tests_per_model,
+            test_results_per_model=self.test_results_per_model,
+        )
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
-        self._set_invocation_mode_if_not_set()
-        self._set_process_log_line_callable_if_subprocess()
+        self._set_process_log_line_callable()
 
         task_instance = context.get("ti")
         if task_instance is None:
@@ -187,41 +117,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             return None
 
         try:
-            use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
-            logger.debug("DbtProducerWatcherOperator: use_events=%s", use_events)
-
-            startup_events: list[dict[str, Any]] = []
-
-            if use_events:
-
-                def _callback(event_message: EventMsg) -> None:
-                    try:
-                        _process_dbt_log_event(context["ti"], event_message)
-                        name = event_message.info.name
-                        if name in {"MainReportVersion", "AdapterRegistered"}:
-                            self._handle_startup_event(event_message, startup_events)
-                            safe_xcom_push(
-                                task_instance=context["ti"], key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=startup_events
-                            )
-                        elif name == "NodeFinished":
-                            self._handle_node_finished(event_message, context)
-                    except Exception:
-                        event_name = getattr(getattr(event_message, "info", None), "name", "unknown")
-                        logger.exception(
-                            "DbtProducerWatcherOperator: error while handling dbt event '%s'",
-                            event_name,
-                        )
-
-                self._dbt_runner_callbacks = [_callback]
-                result = super().execute(context=context, **kwargs)
-
-                self._finalize(context, startup_events)
-                return_value = result
-            else:
-                # Fallback – push run_results.json via base class helper
-                kwargs["push_run_results_to_xcom"] = True
-                return_value = super().execute(context=context, **kwargs)
-
+            return_value = super().execute(context=context, **kwargs)
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             return return_value
 
@@ -253,32 +149,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
             deferrable=deferrable,
             **kwargs,
         )
-
-    def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-
-        self._log_startup_events(ti)
-
-        node_finished_key = f"nodefinished_{self.model_unique_id.replace('.', '__')}"
-        logger.info("Pulling from producer task_id: %s, key: %s", self.producer_task_id, node_finished_key)
-        compressed_b64_event_msg = ti.xcom_pull(task_ids=self.producer_task_id, key=node_finished_key)
-
-        if not compressed_b64_event_msg:
-            return None
-
-        event_json = _parse_compressed_xcom(compressed_b64_event_msg)
-
-        logger.info("Node Info: %s", event_json)
-        node_result = event_json.get("data", {}).get("run_result", {})
-        status = node_result.get("status")
-        if status in DBT_FAILED_STATUSES:
-            logger.error("%s", node_result.get("message"))
-
-        return status
-
-    def use_event(self) -> bool:
-        if not self.invocation_mode:
-            self._discover_invocation_mode()
-        return self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
 
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.

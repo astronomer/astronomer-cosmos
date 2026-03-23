@@ -18,7 +18,6 @@ from cosmos.constants import (
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
-    DBT_FAILED_STATUSES,
     _iso_to_string,
     _log_dbt_event,
     build_producer_state_fetcher,
@@ -27,7 +26,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_terminal,
     safe_xcom_push,
 )
-from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
+from cosmos.operators._watcher.triggerer import WatcherTrigger
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
@@ -35,11 +34,6 @@ try:
 except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
     from airflow.utils.context import Context  # type: ignore[attr-defined]
-
-try:
-    from dbt_common.events.base_types import EventMsg
-except ImportError:  # pragma: no cover
-    EventMsg = None
 
 logger = get_logger(__name__)
 
@@ -82,31 +76,20 @@ _DBT_NODE_STATUS_EVENT_TYPES = frozenset({"NodeStart", "NodeCompiling", "NodeExe
 _DBT_EVENT_ALLOWLIST = _DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES
 
 
-def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMsg) -> None:
+def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
     logger.debug("dbt_log: %s", dbt_log)
-    if isinstance(dbt_log, dict):  # Subprocess
-        data = dbt_log.get("data", {})
-        info = dbt_log.get("info", {})
+    data = dbt_log.get("data", {})
+    info = dbt_log.get("info", {})
 
-        event_name = info.get("name")
-        if event_name not in _DBT_EVENT_ALLOWLIST:
-            return None
-        node_info = data.get("node_info")
-        status = node_info.get("node_status") if node_info else None
-        unique_id = node_info.get("unique_id") if node_info else None
-        start_time = node_info.get("node_started_at") if node_info else None
-        finish_time = node_info.get("node_finished_at") if node_info else None
-        msg = data.get("msg") or info.get("msg") or None
-    else:  # Runner
-        event_name = getattr(getattr(dbt_log, "info", None), "name", None)
-        if event_name not in _DBT_EVENT_ALLOWLIST:
-            return None
-        node_info = getattr(dbt_log.data, "node_info", None)
-        unique_id = getattr(node_info, "unique_id") if node_info else None
-        status = getattr(node_info, "node_status", None) if node_info else None
-        start_time = getattr(node_info, "node_started_at", None) if node_info else None
-        finish_time = getattr(node_info, "node_finished_at", None) if node_info else None
-        msg = getattr(dbt_log.info, "msg", None)
+    event_name = info.get("name")
+    if event_name not in _DBT_EVENT_ALLOWLIST:
+        return None
+    node_info = data.get("node_info")
+    status = node_info.get("node_status") if node_info else None
+    unique_id = node_info.get("unique_id") if node_info else None
+    start_time = node_info.get("node_started_at") if node_info else None
+    finish_time = node_info.get("node_finished_at") if node_info else None
+    msg = data.get("msg") or info.get("msg") or None
 
     if unique_id:
         dbt_event = {
@@ -126,9 +109,7 @@ def _extract_compiled_sql(
     """
     Extract compiled SQL from the target directory for a given dbt node.
 
-    Used by both the subprocess strategy (via store_dbt_resource_status_from_log)
-    and the node-event strategy (via DbtProducerWatcherOperator._handle_node_finished);
-    both consume from the same target/compiled layout under project_dir.
+    Used by store_dbt_resource_status_from_log; reads from the target/compiled layout under project_dir.
 
     Assumes inputs come from dbt (relative node_path, unique_id like model.package.name).
     """
@@ -357,39 +338,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         logger.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
         return True
 
-    def _get_status_from_run_results(self, ti: Any, context: Context) -> Any:
-        compressed_b64_run_results = ti.xcom_pull(task_ids=self.producer_task_id, key="run_results")
-
-        if not compressed_b64_run_results:
-            return None
-
-        run_results_json = _parse_compressed_xcom(compressed_b64_run_results)
-
-        logger.debug("Run results: %s", run_results_json)
-
-        results = run_results_json.get("results", [])
-        node_result = next((r for r in results if r.get("unique_id") == self.model_unique_id), None)
-
-        if not node_result:  # pragma: no cover
-            logger.warning(
-                "The dbt node with unique_id '%s' was not executed by the dbt command run in the producer task. This may happen if it is an ephemeral model or if the model sql file is empty.",
-                self.model_unique_id,
-            )
-            return None
-
-        logger.info("Node Info: %s", run_results_json)
-
-        status = node_result.get("status")
-
-        if status in DBT_FAILED_STATUSES:
-            logger.error("%s", node_result.get("message"))
-
-        self.compiled_sql = node_result.get("compiled_code")
-        if self.compiled_sql and hasattr(self, "_override_rtif"):
-            self._override_rtif(context)
-
-        return status
-
     def _get_producer_task_status(self, context: Context) -> str | None:
         """
         Get the task status of the producer task for both Airflow 2 and Airflow 3.
@@ -423,7 +371,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     dag_id=self.dag_id,
                     run_id=context["run_id"],
                     map_index=context["task_instance"].map_index,
-                    use_event=self.use_event(),
                     poke_interval=self.poke_interval,
                 ),
                 timeout=self.execution_timeout,
@@ -466,12 +413,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 f"Watcher producer task '{self.producer_task_id}' failed before reporting model results. Check its logs for the underlying error."
             )
 
-    def use_event(self) -> bool:
-        raise NotImplementedError("Subclasses must implement this method")
-
-    def _get_status_from_events(self, ti: Any, context: Context) -> Any:
-        raise NotImplementedError("Subclasses should implement this method if `use_event` may return True")
-
     def _log_startup_events(self, ti: Any) -> None:
         dbt_startup_events: list[dict[str, Any]] = ti.xcom_pull(
             task_ids=self.producer_task_id, key=_DBT_STARTUP_EVENTS_XCOM_KEY
@@ -500,13 +441,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if try_number > 1:
             return self._fallback_to_non_watcher_run(try_number, context)
 
-        # We have assumption here that both the build producer and the sensor task will have same invocation mode
         producer_task_state = self._get_producer_task_status(context)
-        if self.use_event():
-            status = self._get_status_from_events(ti, context)
-        else:
-            self._log_startup_events(ti)
-            status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+        self._log_startup_events(ti)
+        status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
 
         # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
         if status is not None:

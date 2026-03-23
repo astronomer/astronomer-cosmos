@@ -21,7 +21,6 @@ class TestWatcherTrigger:
             dag_id="dag_1",
             run_id="run_123",
             map_index=None,
-            use_event=True,
             poke_interval=0.001,  # fast polling
         )
 
@@ -30,6 +29,7 @@ class TestWatcherTrigger:
         assert classpath.endswith("WatcherTrigger")
         assert args["model_unique_id"] == "model.test"
         assert args["poke_interval"] == 0.001
+        assert "use_event" not in args
 
     @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Require Airflow < 3.0.0")
     @pytest.mark.asyncio
@@ -83,37 +83,22 @@ class TestWatcherTrigger:
                 assert none_result is None
 
     @pytest.mark.parametrize(
-        "use_event, xcom_val, expected_status, expected_compiled_sql",
+        "xcom_val, expected_status, expected_compiled_sql",
         [
-            # Event mode: status from event payload; compiled_sql from canonical *_compiled_sql key only
-            (True, {"data": {"run_result": {"status": "success"}}}, "success", "SELECT 1"),
-            (True, {"data": {"run_result": {"status": "success"}}}, "success", None),
-            (True, None, None, None),
-            # Subprocess mode: status from *_status key; compiled_sql from canonical key
-            (False, "failed", "failed", None),
-            (False, "success", "success", "SELECT * FROM table"),
+            ("failed", "failed", None),
+            ("success", "success", "SELECT * FROM table"),
+            (None, None, None),
         ],
     )
-    async def test_parse_dbt_node_status_and_compiled_sql(
-        self, use_event, xcom_val, expected_status, expected_compiled_sql
-    ):
-        self.trigger.use_event = use_event
-
+    async def test_parse_dbt_node_status_and_compiled_sql(self, xcom_val, expected_status, expected_compiled_sql):
         async def mock_get_xcom_val(key):
-            # compiled_sql is always read from the canonical key (same for both modes)
             if key.endswith("_compiled_sql"):
                 return expected_compiled_sql
-            if use_event:
-                return xcom_val if xcom_val else None
-            # Subprocess mode: status from per-model key
             if key.endswith("_status"):
                 return xcom_val
             return None
 
-        with (
-            patch("cosmos.operators._watcher.triggerer._parse_compressed_xcom", return_value=xcom_val),
-            patch.object(self.trigger, "get_xcom_val", AsyncMock(side_effect=mock_get_xcom_val)),
-        ):
+        with patch.object(self.trigger, "get_xcom_val", AsyncMock(side_effect=mock_get_xcom_val)):
             status, compiled_sql = await self.trigger._parse_dbt_node_status_and_compiled_sql()
             assert status == expected_status
             assert compiled_sql == expected_compiled_sql
@@ -155,15 +140,13 @@ class TestWatcherTrigger:
                 return _STARTUP_EVENTS
             if key.endswith("_compiled_sql"):
                 return None
-            return "compressed_data"
+            if key.endswith("_status"):
+                return dbt_node_status
+            return None
 
         with (
             patch.object(self.trigger, "get_xcom_val", side_effect=fake_get_xcom_val),
             patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value=producer_state)),
-            patch(
-                "cosmos.operators._watcher.triggerer._parse_compressed_xcom",
-                return_value={"data": {"run_result": {"status": dbt_node_status}}} if dbt_node_status else {},
-            ),
         ):
             events = [event async for event in self.trigger.run()]
             assert events[0].payload == expected

@@ -464,6 +464,32 @@ Troubleshooting
 Problem: "I changed from ``ExecutionMode.LOCAL`` to ``ExecutionMode.WATCHER``, but my DAG is running slower."
 Answer: Please, check the number of threads that are being used by searching the producer task logs for a message similar to ``Concurrency: 1 threads (target='DEV')``. To leverage the Watcher mode, you should have a high number of threads, at least dbt's default of 4. Check the `dbt threading docs <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ for more information on how to set the number of threads.
 
+Problem: "I cannot see dbt debug logs in the producer task."
+Answer: When ``ExecutionMode.WATCHER`` runs dbt as a subprocess (i.e. when dbt and Airflow are **not** installed in the same Python virtual environment), pass ``--debug`` via ``dbt_cmd_global_flags`` in ``operator_args``:
+
+.. code-block:: python
+
+   operator_args = {
+       "install_deps": True,
+       "dbt_cmd_global_flags": ["--debug"],
+   }
+
+This causes dbt debug messages to be forwarded to Python's ``logging`` module at the ``DEBUG`` level. These messages will only be visible if Airflow's logging level is configured to ``DEBUG`` (or more verbose). To make dbt debug logs visible, set:
+
+.. code-block:: bash
+
+   export AIRFLOW__LOGGING__LOGGING_LEVEL=DEBUG
+
+Or add the equivalent to your ``airflow.cfg``:
+
+.. code-block:: ini
+
+   [logging]
+   logging_level = DEBUG
+
+.. note::
+   Enabling ``DEBUG``-level logging is verbose and may significantly increase log volume. Consider scoping it to development or troubleshooting environments rather than production deployments.
+
 
 Summary
 -------

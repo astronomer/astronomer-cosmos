@@ -1,5 +1,5 @@
 Render Config
-================
+-------------
 
 
 Cosmos aims to give you control over how your dbt project is rendered as an Airflow DAG or Task Group.
@@ -33,7 +33,7 @@ The ``RenderConfig`` class takes the following arguments:
 - ``group_nodes_by_folder``: When enabled, groups nodes by folder structure, creating a ``TaskGroup`` per resource type and folder. Disabled by default.
 
 How to run dbt ls (invocation mode)
------------------------------------
++++++++++++++++++++++++++++++++++++
 
 When using ``LoadMode.DBT_LS``, Cosmos runs ``dbt ls`` to parse the dbt project.
 
@@ -54,7 +54,7 @@ and do not want Cosmos to use the dbt version installed in the same Python Virtu
 
 
 Customizing how nodes are rendered
-----------------------------------
+++++++++++++++++++++++++++++++++++
 
 .. versionadded:: 1.2.0
 

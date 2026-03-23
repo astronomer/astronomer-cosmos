@@ -227,11 +227,12 @@ def create_test_task_metadata(
     watcher_to_test_execution_mode = {
         ExecutionMode.WATCHER: ExecutionMode.LOCAL,
         ExecutionMode.WATCHER_KUBERNETES: ExecutionMode.KUBERNETES,
+        ExecutionMode.WATCHER_GKE: ExecutionMode.GKE,
     }
     if (
         render_config is not None
         and render_config.test_behavior == TestBehavior.AFTER_ALL
-        and execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES)
+        and execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES, ExecutionMode.WATCHER_GKE)
     ):
         test_execution_mode = watcher_to_test_execution_mode[execution_mode]
         operator_class = calculate_operator_class(execution_mode=test_execution_mode, dbt_class=dbt_class)

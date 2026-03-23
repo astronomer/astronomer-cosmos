@@ -10,12 +10,12 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "eu-central-1")
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
 
+from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY
 from cosmos.operators.watcher_aws_ecs import (
     DbtBuildWatcherAwsEcsOperator,
     DbtConsumerWatcherAwsEcsSensor,
     DbtProducerWatcherAwsEcsOperator,
 )
-from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY
 
 # ---------------------------------------------------------------------------
 # Shared fixtures

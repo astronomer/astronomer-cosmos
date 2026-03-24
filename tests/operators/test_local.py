@@ -2417,19 +2417,21 @@ def test_handle_datasets_does_not_push_xcom_when_no_outlets():
 
 @patch("cosmos.dbt.seed.update_seed_hash_after_run")
 @patch("cosmos.dbt.seed.has_seed_changed")
-def test_dbt_seed_local_operator_execute_skips_when_seed_unchanged(mock_has_seed_changed, mock_update_hash, caplog):
+def test_dbt_seed_local_operator_execute_skips_when_seed_unchanged(
+    mock_has_seed_changed, mock_update_hash, caplog, tmp_path
+):
     """Test that DbtSeedLocalOperator.execute() skips the seed command when seed has not changed."""
     from cosmos.constants import SeedRenderingBehavior
 
     caplog.set_level(logging.INFO)
 
-    test_file = Path("/tmp/test_seed.csv")
+    test_file = tmp_path / "test_seed.csv"
     test_file.write_text("id,name\n1,Alice\n")
 
     with DAG("test-seed-unchanged", start_date=datetime(2022, 1, 1)) as dag:
         operator = DbtSeedLocalOperator(
             profile_config=profile_config,
-            project_dir="/tmp/test_project",
+            project_dir=str(tmp_path / "test_project"),
             task_id="test_seed",
             dag=dag,
         )

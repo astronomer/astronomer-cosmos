@@ -55,8 +55,8 @@ class _NullWriter:
     size and verbosity. _NullWriter discards each write immediately with no allocation.
     """
 
-    def write(self, *args: Any) -> int:
-        return 0
+    def write(self, s: str) -> int:
+        return len(s)
 
     def flush(self) -> None:
         pass

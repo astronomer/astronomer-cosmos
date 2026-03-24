@@ -4,7 +4,7 @@ import pytest
 from packaging.version import Version
 
 from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
-from cosmos.operators._watcher.triggerer import WatcherTrigger
+from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 
 _STARTUP_EVENTS = [{"name": "MainReportVersion", "msg": "Running with dbt=1.0.0", "ts": ""}]
 
@@ -118,6 +118,19 @@ class TestWatcherTrigger:
             assert status == expected_status
             assert compiled_sql == expected_compiled_sql
 
+    async def test_parse_dbt_node_status_for_test_sensor(self):
+        """When is_test_sensor=True, _parse_dbt_node_status_and_compiled_sql reads the aggregated tests_status key."""
+        self.trigger.is_test_sensor = True
+        self.trigger.model_unique_id = "model.jaffle_shop.stg_orders"
+
+        mock_get_xcom_val = AsyncMock(return_value="pass")
+        with patch.object(self.trigger, "get_xcom_val", mock_get_xcom_val):
+            status, compiled_sql = await self.trigger._parse_dbt_node_status_and_compiled_sql()
+
+        assert status == "pass"
+        assert compiled_sql is None
+        mock_get_xcom_val.assert_called_once_with("model__jaffle_shop__stg_orders_tests_status")
+
     @pytest.mark.parametrize(
         "airflow_version, expected_val",
         [
@@ -140,9 +153,9 @@ class TestWatcherTrigger:
         "dbt_node_status, producer_state, expected",
         [
             ("success", "running", {"status": "success"}),
-            ("failed", "running", {"status": "failed", "reason": "model_failed"}),
-            (None, "failed", {"status": "failed", "reason": "producer_failed"}),
-            (None, "success", {"status": "success", "reason": "model_not_run"}),
+            ("failed", "running", {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}),
+            (None, "failed", {"status": "failed", "reason": WatcherEventReason.PRODUCER_FAILED}),
+            (None, "success", {"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}),
         ],
     )
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
@@ -236,7 +249,7 @@ class TestWatcherTrigger:
 
     @pytest.mark.asyncio
     async def test_run_producer_success_model_not_run(self, caplog):
-        """Test that when producer succeeds but model has no status, trigger yields success with model_not_run reason."""
+        """Test that when producer succeeds but model has no status, trigger yields success with node_not_run reason."""
         get_xcom_val_mock = AsyncMock(
             side_effect=lambda key: _STARTUP_EVENTS if key == _DBT_STARTUP_EVENTS_XCOM_KEY else None
         )
@@ -257,7 +270,7 @@ class TestWatcherTrigger:
                 events.append(event)
 
         assert len(events) == 1
-        assert events[0].payload == {"status": "success", "reason": "model_not_run"}
+        assert events[0].payload == {"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}
         assert "The producer task 'task_1' succeeded" in caplog.text
         assert "There is no information about the node 'model.test' execution" in caplog.text
 
@@ -309,7 +322,7 @@ class TestWatcherTrigger:
             events = [event async for event in self.trigger.run()]
         assert len(events) == 1
         assert events[0].payload["status"] == "failed"
-        assert events[0].payload["reason"] == "model_failed"
+        assert events[0].payload["reason"] == WatcherEventReason.NODE_FAILED
         assert events[0].payload["compiled_sql"] == "SELECT * FROM broken_model"
 
     @patch("cosmos.operators._watcher.triggerer.logger")

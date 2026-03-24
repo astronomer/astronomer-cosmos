@@ -1,7 +1,7 @@
 .. _gcp-cloud-run-job:
 
 GCP Cloud Run Job execution mode
-=================================
+--------------------------------
 .. versionadded:: 1.7
 
 The ``gcp_cloud_run_job`` execution mode is particularly useful if you prefer to run their ``dbt`` commands on Google Cloud infrastructure, taking advantage of Cloud Run's scalability, isolation, and managed service capabilities.

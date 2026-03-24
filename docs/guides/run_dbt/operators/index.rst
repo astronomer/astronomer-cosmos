@@ -2,7 +2,7 @@
 .. _operator-index:
 
 Operators
-=========
+---------
 
 Learn how to use operators with Cosmos.
 

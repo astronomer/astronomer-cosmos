@@ -314,7 +314,9 @@ def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
     )
     sensor.model_unique_id = "model.pkg.m"
 
-    context = {"dag_run": MagicMock()}
+    ti = MagicMock()
+    ti.xcom_pull.return_value = None
+    context = {"dag_run": MagicMock(), "ti": ti}
 
     if expected_message is None:
         sensor.execute_complete(context, event)
@@ -1110,7 +1112,8 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.return_value = "success"
+        # xcom_pull calls: _log_startup_events=None, _get_node_status="success", compiled_sql=None, _dbt_event=None
+        ti.xcom_pull.side_effect = [None, "success", None, None]
         context = self.make_context(ti)
 
         result = sensor.poke(context)
@@ -1125,8 +1128,8 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        # First call returns status from per-model XCom key, second call returns compiled_sql from per-model XCom key
-        ti.xcom_pull.side_effect = ["success", "SELECT * FROM orders"]
+        # xcom_pull calls: _log_startup_events=None, _get_node_status="success", compiled_sql="SELECT * FROM orders", _dbt_event=None
+        ti.xcom_pull.side_effect = [None, "success", "SELECT * FROM orders", None]
         context = self.make_context(ti)
 
         assert sensor.compiled_sql == ""  # Initially empty
@@ -1147,8 +1150,8 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        # _get_status_from_events: dbt_startup_events=None, nodefinished_*=ENCODED_EVENT; then get_xcom_val(compiled_sql_key)
-        ti.xcom_pull.side_effect = [None, ENCODED_EVENT, "SELECT * FROM orders"]
+        # _get_status_from_events: dbt_startup_events=None, nodefinished_*=ENCODED_EVENT; then compiled_sql, then _dbt_event=None
+        ti.xcom_pull.side_effect = [None, ENCODED_EVENT, "SELECT * FROM orders", None]
         context = self.make_context(ti)
 
         assert sensor.compiled_sql == ""  # Initially empty
@@ -1175,7 +1178,8 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.return_value = ENCODED_RUN_RESULTS_FAILED
+        # xcom_pull calls: _log_startup_events=None, _get_node_status=ENCODED_RUN_RESULTS_FAILED, compiled_sql=None, _dbt_event=None
+        ti.xcom_pull.side_effect = [None, ENCODED_RUN_RESULTS_FAILED, None, None]
         context = self.make_context(ti)
 
         with pytest.raises(AirflowException):
@@ -1282,7 +1286,8 @@ class TestDbtConsumerWatcherSensor:
         ti.try_number = 1
         sensor.poke_retry_number = 1
         mock_get_xcom_val.return_value = None
-        ti.xcom_pull.return_value = "failed"
+        # _log_startup_events still calls ti.xcom_pull directly
+        ti.xcom_pull.return_value = None
 
         context = self.make_context(ti)
 
@@ -1307,7 +1312,8 @@ class TestDbtConsumerWatcherSensor:
         ti.try_number = 1
         sensor.poke_retry_number = 0
         mock_get_xcom_val.return_value = None
-        ti.xcom_pull.return_value = "failed"
+        # _log_startup_events still calls ti.xcom_pull directly
+        ti.xcom_pull.return_value = None
 
         context = self.make_context(ti)
 
@@ -1379,11 +1385,14 @@ class TestDbtConsumerWatcherSensor:
     )
     def test_execute_complete(self, mock_event):
         sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.xcom_pull.return_value = None
+        context = self.make_context(ti)
         if mock_event.get("status") == "failed":
             with pytest.raises(AirflowException):
-                sensor.execute_complete(context=Mock(), event=mock_event)
+                sensor.execute_complete(context=context, event=mock_event)
         else:
-            assert sensor.execute_complete(context=Mock(), event=mock_event) is None
+            assert sensor.execute_complete(context=context, event=mock_event) is None
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
     def test_execute_complete_extracts_compiled_sql(self, mock_override_rtif):

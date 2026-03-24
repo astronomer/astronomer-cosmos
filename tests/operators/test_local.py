@@ -19,7 +19,12 @@ try:  # For Airflow 3
 except ImportError:  # For Airflow 2
     from airflow.hooks.subprocess import SubprocessResult
 from airflow.models.taskinstance import TaskInstance
-from airflow.utils.context import Context
+
+try:
+    from airflow.sdk.definitions.context import Context
+except ImportError:
+    from airflow.utils.context import Context
+
 from airflow.utils.state import DagRunState
 from packaging import version
 from pendulum import datetime
@@ -52,6 +57,7 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.conftest import make_task_instance
 from tests.utils import new_test_dag
 from tests.utils import test_dag as run_test_dag
 
@@ -979,10 +985,7 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     )
     delattr(dbt_base_operator, "openlineage_events_completes")
 
-    if version.parse(airflow_version) >= version.Version("3.1"):
-        task_instance = TaskInstance(dbt_base_operator, dag_version_id=None)
-    else:
-        task_instance = TaskInstance(dbt_base_operator)
+    task_instance = make_task_instance(dbt_base_operator)
 
     facets = dbt_base_operator.get_openlineage_facets_on_complete(task_instance)
 

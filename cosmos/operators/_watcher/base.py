@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +16,7 @@ from cosmos.constants import (
     WATCHER_TASK_WEIGHT_RULE,
 )
 from cosmos.log import get_logger
-from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate
+from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
     DBT_FAILED_STATUSES,
     _iso_to_string,
@@ -28,7 +27,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_terminal,
     safe_xcom_push,
 )
-from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
+from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger, _parse_compressed_xcom
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
@@ -44,14 +43,54 @@ except ImportError:  # pragma: no cover
 
 logger = get_logger(__name__)
 
+# Subset of dbt event types that represent errors/failures.
+# Used (together with node status lifecycle events like NodeStart/NodeCompiling/
+# NodeExecuting/NodeFinished) to build _DBT_EVENT_ALLOWLIST, which controls which
+# events are surfaced in consumer tasks.
+# Source: https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/events/types.py
+_DBT_ERROR_EVENTS_TYPES = frozenset(
+    {
+        "InvalidOptionYAML",
+        "LogDbtProjectError",
+        "LogDbtProfileError",
+        "InputFileDiffError",
+        "PartialParsingErrorProcessingFile",
+        "PartialParsingError",
+        "ParsedFileLoadFailed",
+        "ParseInlineNodeError",
+        "RunningOperationCaughtError",
+        "SQLRunnerException",
+        "RunningOperationUncaughtError",
+        "CatchableExceptionOnRun",
+        "InternalErrorOnRun",
+        "GenericExceptionOnRun",
+        "NodeConnectionReleaseError",
+        "MainEncounteredError",
+        "RunResultFailure",
+        "RunResultError",
+        "CheckNodeTestFailure",
+        "LogSkipBecauseError",
+        "SendEventFailure",
+        "FlushEventsFailure",
+        "TrackingInitializeFailure",
+        "ArtifactUploadError",
+    }
+)
+
+_DBT_NODE_STATUS_EVENT_TYPES = frozenset({"NodeStart", "NodeCompiling", "NodeExecuting", "NodeFinished"})
+
+_DBT_EVENT_ALLOWLIST = _DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES
+
 
 def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMsg) -> None:
     logger.debug("dbt_log: %s", dbt_log)
-    sensitive_words = ["fail", "error"]
     if isinstance(dbt_log, dict):  # Subprocess
         data = dbt_log.get("data", {})
         info = dbt_log.get("info", {})
 
+        event_name = info.get("name")
+        if event_name not in _DBT_EVENT_ALLOWLIST:
+            return None
         node_info = data.get("node_info")
         status = node_info.get("node_status") if node_info else None
         unique_id = node_info.get("unique_id") if node_info else None
@@ -59,21 +98,15 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         finish_time = node_info.get("node_finished_at") if node_info else None
         msg = data.get("msg") or info.get("msg") or None
     else:  # Runner
+        event_name = getattr(getattr(dbt_log, "info", None), "name", None)
+        if event_name not in _DBT_EVENT_ALLOWLIST:
+            return None
         node_info = getattr(dbt_log.data, "node_info", None)
         unique_id = getattr(node_info, "unique_id") if node_info else None
         status = getattr(node_info, "node_status", None) if node_info else None
         start_time = getattr(node_info, "node_started_at", None) if node_info else None
         finish_time = getattr(node_info, "node_finished_at", None) if node_info else None
         msg = getattr(dbt_log.info, "msg", None)
-
-    # Special case when node status is the string "None"; only process messages that contain an error or fail word
-    if status in ["None"] and msg is not None:
-        # Check if there is error log message
-        for sensitive_word in sensitive_words:
-            if sensitive_word in msg.lower():
-                break
-        else:
-            return None
 
     if unique_id:
         dbt_event = {
@@ -84,11 +117,6 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any] | EventMs
         }
 
         xcom_key = f"{unique_id.replace('.', '__')}_dbt_event"
-        # Avoid redundant XCom writes (and global lock contention) by only pushing
-        # when the event payload has changed.
-        existing_event = get_xcom_val(task_instance=task_instance, key=xcom_key, task_ids=PRODUCER_WATCHER_TASK_ID)
-        if existing_event == dbt_event:
-            return None
         safe_xcom_push(task_instance=task_instance, key=xcom_key, value=dbt_event)
 
 
@@ -200,7 +228,6 @@ def store_dbt_resource_status_from_log(
         logger.debug("Failed to parse log: %s", line)
         log_line = {}
     else:
-        logger.debug("Log line: %s", log_line)
         context = extra_kwargs.get("context")
         if context is not None:
             _store_startup_event_from_log(context["ti"], log_line)
@@ -259,8 +286,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         profiles_dir: str | None = None,
         producer_task_id: str = PRODUCER_WATCHER_TASK_ID,
         poke_interval: int = 10,
-        timeout: int = 60 * 60,  # 1 h safety valve
-        execution_timeout: timedelta = timedelta(hours=1),
         deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
@@ -274,8 +299,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         extra_context = kwargs.pop("extra_context") if "extra_context" in kwargs else {}
         super().__init__(
             poke_interval=poke_interval,
-            timeout=timeout,
-            execution_timeout=execution_timeout,
             profile_config=profile_config,
             project_dir=project_dir,
             profiles_dir=profiles_dir,
@@ -287,6 +310,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         self.producer_task_id = producer_task_id
         self.deferrable = deferrable
         self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
+
+    @property
+    def is_test_sensor(self) -> bool:
+        """Whether this sensor watches aggregated test results instead of individual node results."""
+        return False
+
+    @property
+    def _resource_label(self) -> str:
+        """Human-readable label for log and error messages."""
+        return "Tests for model" if self.is_test_sensor else "Model"
 
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
@@ -310,7 +343,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         Handles logic for retrying a failed dbt model execution.
         Reconstructs the dbt command by cloning the project and re-running the model
         with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
+
+        For test sensors, re-execution is not supported in watcher mode; retries are skipped.
         """
+        if self.is_test_sensor:
+            raise AirflowException(
+                f"Test re-execution is not yet supported in watcher mode. "
+                f"{self._resource_label} '{self.model_unique_id}' cannot be retried. "
+                f"A future release will add fallback to local test execution."
+            )
+
         logger.info(
             f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
             try_number - 1,
@@ -401,6 +443,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     map_index=context["task_instance"].map_index,
                     use_event=self.use_event(),
                     poke_interval=self.poke_interval,
+                    is_test_sensor=self.is_test_sensor,
                 ),
                 timeout=self.execution_timeout,
                 method_name=self.execute_complete.__name__,
@@ -410,9 +453,10 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         status = event.get("status")
         reason = event.get("reason")
 
-        if status == "success" and reason == "model_not_run":
+        if status == "success" and reason == WatcherEventReason.NODE_NOT_RUN:
             logger.info(
-                "Model '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
+                "%s '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
+                self._resource_label,
                 self.model_unique_id,
             )
 
@@ -432,14 +476,14 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             task_ids=self.producer_task_id,
         )
         _log_dbt_event(dbt_events)
-        if reason == "model_failed":
+        if reason == WatcherEventReason.NODE_FAILED:
             raise AirflowException(
-                f"dbt model '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
+                f"dbt {self._resource_label.lower()} '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
             )
 
-        if reason == "producer_failed":
+        if reason == WatcherEventReason.PRODUCER_FAILED:
             raise AirflowException(
-                f"Watcher producer task '{self.producer_task_id}' failed before reporting model results. Check its logs for the underlying error."
+                f"Watcher producer task '{self.producer_task_id}' failed before reporting results for {self._resource_label.lower()} '{self.model_unique_id}'. Check its logs for the underlying error."
             )
 
     def use_event(self) -> bool:
@@ -457,19 +501,33 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 # Adding debug level to avoid redundant logs for non-deferrable mode
                 logger.debug("%s", event.get("msg"))
 
+    def _get_node_status(self, ti: Any, context: Context) -> Any:
+        """Return the current status of the watched dbt node from XCom.
+
+        For test sensors, reads the aggregated ``_tests_status`` key.
+        For model sensors, reads from event-based or subprocess-based keys.
+        """
+        if self.is_test_sensor:
+            xcom_key = get_tests_status_xcom_key(self.model_unique_id)
+            return get_xcom_val(ti, self.producer_task_id, xcom_key)
+        if self.use_event():
+            return self._get_status_from_events(ti, context)
+        return get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+
     def poke(self, context: Context) -> bool:
         """
-        Checks the status of a dbt model run by pulling relevant XComs from the master task.
-        Handles retries and checks for successful completion of the model execution.
+        Checks the status of a dbt node (model or aggregated tests) by pulling relevant XComs from the producer task.
+        Handles retries and checks for successful completion.
         """
         ti = context["ti"]
         try_number = ti.try_number
 
         logger.info(
-            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for model '%s'",
+            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for %s '%s'",
             try_number,
             self.poke_retry_number,
             self.producer_task_id,
+            self._resource_label.lower(),
             self.model_unique_id,
         )
 
@@ -478,11 +536,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         # We have assumption here that both the build producer and the sensor task will have same invocation mode
         producer_task_state = self._get_producer_task_status(context)
-        if self.use_event():
-            status = self._get_status_from_events(ti, context)
-        else:
+        if not self.use_event() and not self.is_test_sensor:
             self._log_startup_events(ti)
-            status = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+        status = self._get_node_status(ti, context)
 
         # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
         if status is not None:
@@ -518,4 +574,4 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         elif is_dbt_node_status_success(status):
             return True
         else:
-            raise AirflowException(f"Model '{self.model_unique_id}' finished with status '{status}'")
+            raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")

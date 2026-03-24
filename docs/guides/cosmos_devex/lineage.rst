@@ -1,7 +1,7 @@
 .. _lineage:
 
 Configuring Lineage
-===================
+-------------------
 
 Since Cosmos 1.1, it uses internally the `openlineage-integration-common <https://github.com/OpenLineage/OpenLineage/tree/main/integration/common>`_
 to parse artefacts generated with dbt commands and create lineage events.
@@ -15,7 +15,7 @@ No change to the user DAG files is required to use OpenLineage.
 
 
 Known limitations
------------------
++++++++++++++++++
 
 This feature is only available for the local
 and virtualenv execution methods (read `execution modes <../run_dbt/execution-modes.html>`_ for more information).
@@ -36,19 +36,19 @@ Additionally, since Cosmos uses the open-source `openlineage-integration-common 
 Contributions are also welcome in the `OpenLineage project <https://github.com/OpenLineage/OpenLineage/blob/main/integration/common/openlineage/common/provider/dbt/processor.py#L36C1-L47C22>`_ to support more adaptors.
 
 Installation
-------------
+++++++++++++
 
 Install ``apache-airflow-providers-openlineage``.
 
 
 Configuration
--------------
++++++++++++++
 
 Follow `the instructions <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_ on how to configure OpenLineage.
 
 
 Namespace
-.........
+'''''''''
 
 Cosmos will use the Airflow ``[openlineage]`` ``namespace`` property as a namespace, `if available <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_.
 

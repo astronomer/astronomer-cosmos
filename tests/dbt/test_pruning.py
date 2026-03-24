@@ -40,7 +40,8 @@ class TestSourcePruningLogic:
             unique_id="source.test_project.source_used",
             resource_type=DbtResourceType.SOURCE,
             depends_on=[],
-            file_path=Path("/test/source_used.yml"),
+            path_base=Path("/test"),
+            original_file_path=Path("source_used.yml"),
             package_name="test_project",
         )
 
@@ -48,7 +49,8 @@ class TestSourcePruningLogic:
             unique_id="source.test_project.source_orphaned",
             resource_type=DbtResourceType.SOURCE,
             depends_on=[],
-            file_path=Path("/test/source_orphaned.yml"),
+            path_base=Path("/test"),
+            original_file_path=Path("source_orphaned.yml"),
             package_name="test_project",
         )
 
@@ -56,7 +58,8 @@ class TestSourcePruningLogic:
             unique_id="source.test_project.source_multiple",
             resource_type=DbtResourceType.SOURCE,
             depends_on=[],
-            file_path=Path("/test/source_multiple.yml"),
+            path_base=Path("/test"),
+            original_file_path=Path("source_multiple.yml"),
             package_name="test_project",
         )
 
@@ -64,7 +67,8 @@ class TestSourcePruningLogic:
             unique_id="model.test_project.model1",
             resource_type=DbtResourceType.MODEL,
             depends_on=["source.test_project.source_used"],
-            file_path=Path("/test/model1.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("model1.sql"),
             package_name="test_project",
         )
 
@@ -72,7 +76,8 @@ class TestSourcePruningLogic:
             unique_id="model.test_project.model2",
             resource_type=DbtResourceType.MODEL,
             depends_on=["model.test_project.model1"],
-            file_path=Path("/test/model2.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("model2.sql"),
             package_name="test_project",
         )
 
@@ -80,7 +85,8 @@ class TestSourcePruningLogic:
             unique_id="model.test_project.model3",
             resource_type=DbtResourceType.MODEL,
             depends_on=["source.test_project.source_multiple"],
-            file_path=Path("/test/model3.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("model3.sql"),
             package_name="test_project",
         )
 
@@ -88,7 +94,8 @@ class TestSourcePruningLogic:
             unique_id="model.test_project.model4",
             resource_type=DbtResourceType.MODEL,
             depends_on=["source.test_project.source_multiple"],
-            file_path=Path("/test/model4.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("model4.sql"),
             package_name="test_project",
         )
 
@@ -126,7 +133,8 @@ class TestSourcePruningLogic:
             unique_id="model.test_project.independent",
             resource_type=DbtResourceType.MODEL,
             depends_on=[],  # No dependencies
-            file_path=Path("/test/independent.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("independent.sql"),
             package_name="test_project",
         )
 
@@ -148,7 +156,8 @@ class TestSourcePruningLogic:
                 "model.test_project.model1",  # Model dependency
                 "source.test_project.source_used",  # Source dependency
             ],
-            file_path=Path("/test/complex.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("complex.sql"),
             package_name="test_project",
         )
 
@@ -188,7 +197,8 @@ class TestSourcePruningIntegration:
             unique_id="source.test_project.source_with_downstream",
             resource_type=DbtResourceType.SOURCE,
             depends_on=[],
-            file_path=Path("/test/source_with_downstream.yml"),
+            path_base=Path("/test"),
+            original_file_path=Path("source_with_downstream.yml"),
             package_name="test_project",
             has_freshness=True,  # Make it renderable
         )
@@ -197,7 +207,8 @@ class TestSourcePruningIntegration:
             unique_id="source.test_project.source_orphaned",
             resource_type=DbtResourceType.SOURCE,
             depends_on=[],
-            file_path=Path("/test/source_orphaned.yml"),
+            path_base=Path("/test"),
+            original_file_path=Path("source_orphaned.yml"),
             package_name="test_project",
             has_freshness=True,  # Make it renderable
         )
@@ -206,7 +217,8 @@ class TestSourcePruningIntegration:
             unique_id="model.test_project.model_using_source",
             resource_type=DbtResourceType.MODEL,
             depends_on=["source.test_project.source_with_downstream"],
-            file_path=Path("/test/model_using_source.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("model_using_source.sql"),
             package_name="test_project",
         )
 
@@ -315,7 +327,8 @@ class TestSourcePruningIntegration:
             unique_id="model.test_project.unrelated",
             resource_type=DbtResourceType.MODEL,
             depends_on=["some.other.source"],  # Doesn't depend on source_orphaned
-            file_path=Path("/test/unrelated.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("unrelated.sql"),
             package_name="test_project",
         )
         metadata_unused = create_task_metadata(
@@ -384,7 +397,8 @@ class TestSourcePruningIntegration:
             unique_id="source.test_project.source_no_freshness",
             resource_type=DbtResourceType.SOURCE,
             depends_on=[],
-            file_path=Path("/test/source_no_freshness.yml"),
+            path_base=Path("/test"),
+            original_file_path=Path("source_no_freshness.yml"),
             package_name="test_project",
             has_freshness=False,  # No freshness
         )
@@ -430,7 +444,8 @@ class TestSourcePruningEdgeCases:
             unique_id="model.test_project.some_model",
             resource_type=DbtResourceType.MODEL,
             depends_on=["source.test_project.some_source"],
-            file_path=Path("/test/some_model.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("some_model.sql"),
             package_name="test_project",
         )
 
@@ -439,7 +454,8 @@ class TestSourcePruningEdgeCases:
             unique_id="model.test_project.dependent_model",
             resource_type=DbtResourceType.MODEL,
             depends_on=["model.test_project.some_model"],
-            file_path=Path("/test/dependent_model.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("dependent_model.sql"),
             package_name="test_project",
         )
 
@@ -457,7 +473,8 @@ class TestSourcePruningEdgeCases:
             unique_id="source.test_project.raw_data",
             resource_type=DbtResourceType.SOURCE,
             depends_on=[],
-            file_path=Path("/test/raw_data.yml"),
+            path_base=Path("/test"),
+            original_file_path=Path("raw_data.yml"),
             package_name="test_project",
             has_freshness=True,
         )
@@ -466,7 +483,8 @@ class TestSourcePruningEdgeCases:
             unique_id="model.test_project.stg_data",
             resource_type=DbtResourceType.MODEL,
             depends_on=["source.test_project.raw_data"],
-            file_path=Path("/test/stg_data.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("stg_data.sql"),
             package_name="test_project",
         )
 
@@ -474,7 +492,8 @@ class TestSourcePruningEdgeCases:
             unique_id="model.test_project.mart_data",
             resource_type=DbtResourceType.MODEL,
             depends_on=["model.test_project.stg_data"],
-            file_path=Path("/test/mart_data.sql"),
+            path_base=Path("/test"),
+            original_file_path=Path("mart_data.sql"),
             package_name="test_project",
         )
 
@@ -502,7 +521,8 @@ class TestSourcePruningEdgeCases:
             unique_id="source.test_project.test_source",
             resource_type=DbtResourceType.SOURCE,
             depends_on=[],
-            file_path=Path("/test/test_source.yml"),
+            path_base=Path("/test"),
+            original_file_path=Path("test_source.yml"),
             package_name="test_project",
             has_freshness=True,
         )

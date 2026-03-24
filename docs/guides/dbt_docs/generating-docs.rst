@@ -1,7 +1,7 @@
 .. _generating-docs:
 
 Generating Docs
-===============
+---------------
 
 dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official dbt documentation <https://docs.getdbt.com/docs/building-a-dbt-project/documentation>`_. For an example of what the docs look like with the ``jaffle_shop`` project, check out `this site <http://cosmos-demo-dbt-docs.s3-website.eu-north-1.amazonaws.com/>`_.
 
@@ -20,10 +20,10 @@ The first three operators require you to have a connection to the target storage
 
 
 Examples
-----------------------
+++++++++
 
 Upload to S3
-~~~~~~~~~~~~~~~~~~~~~~~
+''''''''''''
 
 S3 supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official S3 documentation <https://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteHosting.html>`_.
 
@@ -44,7 +44,7 @@ You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upl
     )
 
 Upload to Azure Blob Storage
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+''''''''''''''''''''''''''''
 
 Azure Blob Storage supports serving static files directly from a container. To learn more (and to set it up), check out the `official documentation <https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website>`_.
 
@@ -65,7 +65,7 @@ You can use the :class:`~cosmos.operators.DbtDocsAzureStorageOperator` to genera
     )
 
 Upload to GCS
-~~~~~~~~~~~~~~~~~~~~~~~
+'''''''''''''
 
 GCS supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official GCS documentation <https://cloud.google.com/appengine/docs/standard/serving-static-files?tab=python>`_.
 
@@ -86,13 +86,13 @@ You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and up
     )
 
 Choosing a folder
-~~~~~~~~~~~~~~~~~~~~~~~
+'''''''''''''''''
 
 All the DbtDocsOperators support specification of a custom folder (prefix) to place documentation in on the target cloud storage. This can be done by
 adding a ``folder_dir`` parameter to the operator definition.
 
 Static Flag
-~~~~~~~~~~~~~~~~~~~~~~~
+'''''''''''
 
 All of the DbtDocsOperator accept the ``--static`` flag. To learn more about the static flag, check out the `original PR on dbt-core <https://github.com/dbt-labs/dbt-docs/pull/465>`_.
 The static flag is used to generate a single doc file that can be hosted directly from cloud storage.
@@ -120,7 +120,7 @@ The following code snippet shows how to provide this flag with the default jaffl
     )
 
 Custom Callback
-~~~~~~~~~~~~~~~~~~~~~~~
+'''''''''''''''
 
 If you want to run custom code after the docs are generated, you can use the :class:`~cosmos.operators.DbtDocsOperator`. The following code snippet shows how to do this with the default jaffle_shop project:
 

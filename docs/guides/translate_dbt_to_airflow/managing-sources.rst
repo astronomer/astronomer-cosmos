@@ -1,7 +1,7 @@
 .. _managing-sources:
 
 Managing Sources
-================
+----------------
 
 .. note::
     This feature is only available for dbt-core >= 1.5 and cosmos >= 1.6.0.
@@ -38,7 +38,7 @@ Example:
 
 
 Source Pruning
-~~~~~~~~~~~~~~
+++++++++++++++
 
 The ``source_pruning`` is a boolean parameter available in the ``RenderConfig``.
 When set to ``True``, it automatically removes (or "prunes") any dbt source nodes from your Airflow DAG that do not have any downstream dependencies within the selected portion of the dbt graph.
@@ -64,7 +64,7 @@ In this example, if the ``jaffle_shop`` project has multiple sources, but only s
 
 
 on_warning_callback Callback
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++
 
 The ``on_warning_callback`` is a callback parameter available on the ``DbtSourceLocalOperator``. This callback is triggered when a warning occurs during the execution of the ``dbt source freshness`` command. The callback accepts the task context, which includes additional parameters: test_names and test_results
 

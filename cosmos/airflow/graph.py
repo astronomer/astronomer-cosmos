@@ -790,6 +790,25 @@ def identify_detached_nodes(
                     detached_from_parent[parent_id].append(node)
 
 
+def create_task_groups_based_on_folder(
+    dag: DAG, node: DbtNode, parent_task_group: TaskGroup | None, task_groups: dict[str, TaskGroup]
+) -> TaskGroup | None:
+    """
+    Generate the parent task group for the given node based on the node's file path. If a TaskGroup is given, it will
+    be used as the parent group.
+    """
+    task_group = None
+    resource_file_path_parts = str(node.original_file_path).split("/")[:-1]
+    for resource_file_path_part in resource_file_path_parts:
+        if resource_file_path_part in task_groups:
+            task_group = task_groups[resource_file_path_part]
+        else:
+            task_group = TaskGroup(dag=dag, group_id=resource_file_path_part, parent_group=parent_task_group)
+            task_groups[resource_file_path_part] = task_group
+        parent_task_group = task_group
+    return task_group
+
+
 _counter = 0
 
 
@@ -884,8 +903,11 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
     and “test_results” of type List.
     :return: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
     """
+    group_nodes_by_folder = render_config.group_nodes_by_folder
     tasks_map: dict[str, TaskGroup | BaseOperator] = {}
+    task_groups: dict[str, TaskGroup] = {}
     task_or_group: TaskGroup | BaseOperator | None
+    parent_task_group = task_group
     producer_task: BaseOperator | None = None
 
     # Identify test nodes that should be run detached from the associated dbt resource nodes because they
@@ -915,6 +937,11 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         )
 
     for node_id, node in nodes.items():
+        task_group = (
+            create_task_groups_based_on_folder(dag, node, parent_task_group, task_groups)
+            if group_nodes_by_folder
+            else task_group
+        )
         task_or_group_args = {
             # Arguments to this method:
             "dag": dag,
@@ -936,6 +963,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         task_or_group = generate_task_or_group(**task_or_group_args, filtered_nodes=nodes)  # type: ignore[arg-type]
         if task_or_group is not None:
             tasks_map[node_id] = task_or_group
+        task_group = parent_task_group
 
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
@@ -954,6 +982,8 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             "task_meta": test_meta,
             "resource_type": DbtResourceType.TEST,  # type: ignore
         }
+        # AFTER_ALL test is a single DAG-level task: place it at root so task_id stays e.g. "astro_shop_test"
+        test_task_args["task_group"] = parent_task_group
         test_task = generate_or_convert_task(**test_task_args)  # type: ignore[arg-type]
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:

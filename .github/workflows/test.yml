@@ -588,6 +588,55 @@ jobs:
           RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
 
+  Run-Telemetry-Tests:
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11"]
+        airflow-version: ["2.10"]
+        dbt-version: ["1.9"]
+    env:
+      SCARF_NO_ANALYTICS: "false"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
+      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: telemetry-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install uv
+          uv pip install --system "hatch>=1.14.2"
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
+
+      - name: Run telemetry tests
+        run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-telemetry
+
+      - name: Upload coverage to Github
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: coverage-telemetry-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
+          path: .coverage
+          include-hidden-files: true
+
   Run-Performance-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
@@ -744,6 +793,7 @@ jobs:
       - Run-Integration-Tests
       - Run-Integration-Tests-Expensive
       - Run-Kubernetes-Tests
+      - Run-Telemetry-Tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -761,7 +811,7 @@ jobs:
         run: |
           pip3 install coverage
       - name: Download all coverage artifacts
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: ./coverage
       - name: Combine coverage

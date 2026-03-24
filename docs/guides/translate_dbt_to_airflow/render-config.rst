@@ -1,5 +1,5 @@
 Render Config
-================
+-------------
 
 
 Cosmos aims to give you control over how your dbt project is rendered as an Airflow DAG or Task Group.
@@ -30,9 +30,10 @@ The ``RenderConfig`` class takes the following arguments:
 - ``should_detach_multiple_parents_tests``: A boolean to control if tests that depend on multiple parents should be run as standalone tasks. See `Testing Behavior <testing-behavior.html>`_ for more information.
 - ``enable_owner_inheritance``: (introduced in 1.10.2) A boolean to control if dbt owners should be imported as part of the airflow DAG owners. Defaults to True.
 - ``node_conversion_by_task_group``: A boolean to control if node_converters are used at the task group level (ex. converting models with test_behavior=AFTER_EACH means the entire task group is converted including the run task and the test task), or the individual task level (gives more granularity for converting just the run tasks or just the test tasks).  Defaults to True.
+- ``group_nodes_by_folder``: When enabled, groups nodes by folder structure, creating a ``TaskGroup`` per resource type and folder. Disabled by default.
 
 How to run dbt ls (invocation mode)
------------------------------------
++++++++++++++++++++++++++++++++++++
 
 When using ``LoadMode.DBT_LS``, Cosmos runs ``dbt ls`` to parse the dbt project.
 
@@ -53,7 +54,7 @@ and do not want Cosmos to use the dbt version installed in the same Python Virtu
 
 
 Customizing how nodes are rendered
-----------------------------------
+++++++++++++++++++++++++++++++++++
 
 .. versionadded:: 1.2.0
 

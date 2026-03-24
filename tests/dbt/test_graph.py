@@ -116,7 +116,13 @@ def postgres_profile_config() -> ProfileConfig:
     ],
 )
 def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
-    node = DbtNode(unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="")
+    node = DbtNode(
+        unique_id=unique_id,
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+    )
     assert node.name == expected_name
     assert node.resource_name == expected_select
 
@@ -126,7 +132,8 @@ def test_dbt_node_meta():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": {}}},
     )
     assert valid_node.meta == {}
@@ -135,7 +142,8 @@ def test_dbt_node_meta():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": ""}},
     )
     with pytest.raises(CosmosLoadDbtException) as exc_info:
@@ -150,7 +158,8 @@ def test_dbt_node_operator_kwargs_to_override():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": {"operator_kwargs": {}}}},
     )
     assert valid_node.operator_kwargs_to_override == {}
@@ -159,7 +168,8 @@ def test_dbt_node_operator_kwargs_to_override():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": {"operator_kwargs": ""}}},
     )
     with pytest.raises(CosmosLoadDbtException) as exc_info:
@@ -174,7 +184,8 @@ def test_dbt_profile_config_to_override():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": {"profile_config": {}}}},
     )
     assert valid_node.profile_config_to_override == {}
@@ -183,7 +194,8 @@ def test_dbt_profile_config_to_override():
         unique_id="some-id",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
-        file_path="",
+        path_base=Path("."),
+        original_file_path=Path("."),
         config={"meta": {"cosmos": {"profile_config": ""}}},
     )
     with pytest.raises(CosmosLoadDbtException) as exc_info:
@@ -202,7 +214,8 @@ def test_dbt_profile_config_to_override():
                 "unique_id": "model.my_project.customers",
                 "resource_type": "model",
                 "depends_on": [],
-                "file_path": "",
+                "file_path": "base_path/original_file_path",
+                "original_file_path": "original_file_path",
                 "tags": [],
                 "config": {},
                 "has_test": False,
@@ -217,7 +230,8 @@ def test_dbt_profile_config_to_override():
                 "unique_id": "model.my_project.customers.v1",
                 "resource_type": "model",
                 "depends_on": [],
-                "file_path": "",
+                "file_path": "base_path/original_file_path",
+                "original_file_path": "original_file_path",
                 "tags": [],
                 "config": {},
                 "has_test": False,
@@ -232,7 +246,13 @@ def test_dbt_node_context_dict(
     unique_id,
     expected_dict,
 ):
-    node = DbtNode(unique_id=unique_id, resource_type=DbtResourceType.MODEL, depends_on=[], file_path="")
+    node = DbtNode(
+        unique_id=unique_id,
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("base_path"),
+        original_file_path=Path("original_file_path"),
+    )
     assert node.context_dict == expected_dict
 
 
@@ -1756,7 +1776,9 @@ Values returned by mac_get_values:
         "model.some_package.some_model": DbtNode(
             unique_id="model.some_package.some_model",
             resource_type=DbtResourceType.MODEL,
-            file_path=Path("some_package/models/some_model.sql"),
+            depends_on=["source.some_source"],
+            path_base=Path("some_package"),
+            original_file_path=Path("models/some_model.sql"),
             tags=[],
             config={
                 "access": "protected",
@@ -1789,7 +1811,6 @@ Values returned by mac_get_values:
                 "tags": [],
                 "unique_key": None,
             },
-            depends_on=["source.some_source"],
             package_name="some_package",
         ),
     }
@@ -1806,10 +1827,11 @@ def test_parse_dbt_ls_output():
         "fake-unique-id": DbtNode(
             unique_id="fake-unique-id",
             resource_type=DbtResourceType.MODEL,
-            file_path=Path("fake-project/fake-file-path.sql"),
+            depends_on=[],
+            path_base=Path("fake-project"),
+            original_file_path=Path("fake-file-path.sql"),
             tags=[],
             config={},
-            depends_on=[],
             package_name="fake-project",
         ),
     }
@@ -1825,10 +1847,11 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
         "some-unique-id": DbtNode(
             unique_id="some-unique-id",
             resource_type=DbtResourceType.MODEL,
-            file_path=Path("some-project/some-file-path.sql"),
+            depends_on=[],
+            path_base=Path("some-project"),
+            original_file_path=Path("some-file-path.sql"),
             tags=[],
             config={},
-            depends_on=[],
             package_name="some-project",
         ),
     }
@@ -1870,6 +1893,16 @@ def test_parse_dbt_ls_output_does_not_skip_non_model_without_path(caplog):
 
     # Source without path should NOT be skipped by the dbt-loom node check
     assert "Skipping model" not in caplog.text
+
+
+def test_parse_dbt_ls_output_returns_empty_when_project_path_is_none():
+    """Test that parse_dbt_ls_output returns an empty dict when project_path is None (skips all lines)."""
+    valid_node_line = '{"resource_type": "model", "name": "some-model", "package_name": "my_project", "original_file_path": "models/some_model.sql", "unique_id": "model.my_project.some_model", "tags": [], "config": {}}'
+    ls_stdout = f"{valid_node_line}\n"
+
+    nodes = parse_dbt_ls_output(project_path=None, ls_stdout=ls_stdout)
+
+    assert nodes == {}
 
 
 @patch("cosmos.dbt.graph.DbtGraph.should_use_dbt_ls_cache", return_value=False)

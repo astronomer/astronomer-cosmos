@@ -9,6 +9,7 @@ Contains dags, task groups, and operators.
 from __future__ import annotations
 
 from cosmos import settings
+
 from cosmos.version import __version__
 
 if not settings.enable_memory_optimised_imports:

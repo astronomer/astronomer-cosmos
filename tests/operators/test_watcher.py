@@ -767,6 +767,29 @@ def test_run_dbt_runner_event_callback_calls_store_from_log():
     assert call_args[0][1]["context"] is context
 
 
+def test_run_dbt_runner_callback_error_fails_producer_after_run(caplog):
+    """A callback error must not surface as GenericExceptionOnRun inside dbt; instead it must be
+    re-raised after the dbt run so it propagates through execute() and triggers the task_status
+    XCom push that signals consumer sensors to check the producer task state."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    context = {"ti": _MockTI(), "run_id": "run-1"}
+
+    def fake_run_dbt_runner(self_inner, command, env, cwd, **kw):
+        # Simulate dbt calling the registered callback for one event, as the real runner would.
+        for cb in op._dbt_runner_callbacks or []:
+            cb(MagicMock())
+
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.run_dbt_runner", fake_run_dbt_runner),
+        patch("google.protobuf.json_format.MessageToJson", side_effect=RuntimeError("serialisation error")),
+        caplog.at_level(logging.ERROR),
+        pytest.raises(RuntimeError, match="serialisation error"),
+    ):
+        op.run_dbt_runner(command=["dbt", "build"], env={}, cwd="/tmp/proj", context=context)
+
+    assert "Error in dbt event callback" in caplog.text
+
+
 MODEL_UNIQUE_ID = "model.jaffle_shop.stg_orders"
 
 

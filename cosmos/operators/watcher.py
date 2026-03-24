@@ -145,16 +145,31 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         if context is not None:
             extra_kwargs: dict[str, Any] = {"project_dir": cwd, "context": context}
             parse = self._make_parse_callable()
+            # Collect callback errors rather than raising inside the callback: dbt catches
+            # exceptions raised by callbacks and wraps them as GenericExceptionOnRun, which
+            # would cause the build to emit spurious failures but potentially still succeed.
+            # Instead we capture the first error here and re-raise it after the dbt run so it
+            # propagates through execute(), triggering the existing task_status XCom mechanism
+            # that signals consumer sensors to check the producer task state.
+            callback_error: list[BaseException] = []
 
             def _event_callback(event: Any) -> None:
-                from google.protobuf.json_format import MessageToJson
+                try:
+                    from google.protobuf.json_format import MessageToJson
 
-                json_str = MessageToJson(event, preserving_proto_field_name=True)
-                parse(json_str, extra_kwargs)
+                    json_str = MessageToJson(event, preserving_proto_field_name=True)
+                    parse(json_str, extra_kwargs)
+                except Exception as e:
+                    logger.exception("Error in dbt event callback: %s", e)
+                    if not callback_error:
+                        callback_error.append(e)
 
             self._dbt_runner_callbacks = [*(self._dbt_runner_callbacks or []), _event_callback]
             with contextlib.redirect_stdout(_NullWriter()):
-                return super().run_dbt_runner(command, env, cwd, **kwargs)
+                result = super().run_dbt_runner(command, env, cwd, **kwargs)
+            if callback_error:
+                raise callback_error[0]
+            return result
         return super().run_dbt_runner(command, env, cwd, **kwargs)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:

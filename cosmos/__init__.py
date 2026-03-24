@@ -8,10 +8,16 @@ Contains dags, task groups, and operators.
 
 from __future__ import annotations
 
-from cosmos import settings
-from cosmos.version import __version__
+__version__ = "1.14.0a3"
 
-if not settings.enable_memory_optimised_imports:
+
+def _is_memory_optimised() -> bool:
+    from cosmos import settings
+
+    return settings.enable_memory_optimised_imports
+
+
+if not _is_memory_optimised():
     from cosmos.airflow.dag import DbtDag
     from cosmos.airflow.task_group import DbtTaskGroup
     from cosmos.config import (

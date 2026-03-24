@@ -24,7 +24,7 @@ try:
     from airflow.sdk.definitions.context import Context
 except ImportError:
     from airflow.utils.context import Context
-    
+
 from airflow.utils.state import DagRunState
 from packaging import version
 from pendulum import datetime

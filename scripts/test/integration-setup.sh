@@ -15,6 +15,8 @@ rm -f $AIRFLOW_HOME/airflow.db
 airflow db reset -y
 
 # ATTENTION: Airflow and its dependencies are installed using pre-install-airflow.sh script, so we don't install them here.
+AIRFLOW_VERSION=$(airflow version)
+AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | cut -d. -f1)
 #Explicit override for 3.2.0b2
 if [ "$AIRFLOW_VERSION" = "3.2.0b2" ]; then
     echo "Detected Airflow $AIRFLOW_VERSION (beta). Running 'airflow db migrate'..."

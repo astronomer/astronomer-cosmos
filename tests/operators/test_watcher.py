@@ -2344,7 +2344,8 @@ class TestProducerSourceFreshness:
             op.execute(context)
 
         mock_apply.assert_called_once_with(context)
-      
+
+
 class TestDbtTestWatcherOperator:
     """Tests for DbtTestWatcherOperator — the sensor that watches aggregated test results."""
 

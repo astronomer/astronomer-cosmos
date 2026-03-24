@@ -18,11 +18,9 @@ except ImportError:
 try:
     from airflow.providers.standard.operators.empty import EmptyOperator
 except ImportError:  # pragma: no cover
-    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+    pass  # type: ignore[no-redef]
 
 from cosmos.config import ProfileConfig
-from cosmos.dbt.graph import DbtNode
-
 from cosmos.constants import (
     _DBT_STARTUP_EVENTS_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
@@ -31,6 +29,7 @@ from cosmos.constants import (
     DbtResourceType,
     InvocationMode,
 )
+from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
 from cosmos.operators._watcher import _parse_compressed_xcom, safe_xcom_push
 from cosmos.operators._watcher.aggregation import push_test_result_or_aggregate

@@ -25,6 +25,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
     safe_xcom_push,
+    xcom_set_lock,
 )
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 
@@ -162,6 +163,12 @@ def _store_startup_event_from_log(task_instance: Any, log_line: dict[str, Any]) 
     """
     When dbt JSON log contains MainReportVersion or AdapterRegistered, append to
     dbt_startup_events XCom (same shape as runner path) for trigger to log versions.
+
+    The pull+append+push is performed under ``xcom_set_lock`` to prevent a race
+    condition: dbt runner callbacks are invoked from multiple threads, so two
+    startup events arriving concurrently could both read the same stale list and
+    one append would be silently lost.  Holding the same lock used by
+    ``safe_xcom_push`` makes the entire read-modify-write atomic.
     """
     event_name = log_line.get("info", {}).get("name")
     if event_name not in ("MainReportVersion", "AdapterRegistered"):
@@ -169,9 +176,13 @@ def _store_startup_event_from_log(task_instance: Any, log_line: dict[str, Any]) 
     info = log_line.get("info", {})
     msg = info.get("msg", "")
     ts = info.get("ts", "")
-    current = list(task_instance.xcom_pull(key=_DBT_STARTUP_EVENTS_XCOM_KEY) or [])
-    current.append({"name": event_name, "msg": msg, "ts": ts})
-    safe_xcom_push(task_instance=task_instance, key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=current)
+    # Hold the lock for the full read-modify-write cycle.  We call xcom_push
+    # directly (bypassing safe_xcom_push) to avoid a deadlock: Lock is not
+    # re-entrant, so acquiring it again inside safe_xcom_push would block forever.
+    with xcom_set_lock:
+        current = list(task_instance.xcom_pull(key=_DBT_STARTUP_EVENTS_XCOM_KEY) or [])
+        current.append({"name": event_name, "msg": msg, "ts": ts})
+        task_instance.xcom_push(key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=current)
 
 
 def _log_dbt_msg(log_line: dict[str, Any]) -> None:

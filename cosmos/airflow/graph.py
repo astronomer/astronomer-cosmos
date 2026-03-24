@@ -419,16 +419,6 @@ def create_task_metadata(  # noqa: C901
                 if render_config.seed_rendering_behavior == SeedRenderingBehavior.NONE:
                     return None
 
-                if (
-                    render_config.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES
-                    and render_config.test_behavior == TestBehavior.BUILD
-                ):
-                    logger.warning(
-                        "SeedRenderingBehavior.WHEN_SEED_CHANGES is not compatible with TestBehavior.BUILD. "
-                        "The seed change detection will be ignored because dbt build runs seeds, models, "
-                        "and tests together. Consider using TestBehavior.AFTER_EACH or TestBehavior.AFTER_ALL instead."
-                    )
-
                 extra_context["seed_rendering_behavior"] = render_config.seed_rendering_behavior.value
 
             if node.fqn and len(node.fqn) > 0:

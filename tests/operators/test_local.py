@@ -2413,3 +2413,47 @@ def test_handle_datasets_does_not_push_xcom_when_no_outlets():
     # Verify xcom_push was NOT called (no outlets to push)
     uri_xcom_calls = [call for call in mock_ti.xcom_push.call_args_list if call[1].get("key") == "uri"]
     assert len(uri_xcom_calls) == 0, "URI XCom should not be pushed when there are no outlets"
+
+
+@patch("cosmos.dbt.seed.update_seed_hash_after_run")
+@patch("cosmos.dbt.seed.has_seed_changed")
+def test_dbt_seed_local_operator_execute_skips_when_seed_unchanged(
+    mock_has_seed_changed, mock_update_hash, caplog
+):
+    """Test that DbtSeedLocalOperator.execute() skips the seed command when seed has not changed."""
+    from cosmos.constants import SeedRenderingBehavior
+
+    caplog.set_level(logging.INFO)
+
+    test_file = Path("/tmp/test_seed.csv")
+    test_file.write_text("id,name\n1,Alice\n")
+
+    with DAG("test-seed-unchanged", start_date=datetime(2022, 1, 1)) as dag:
+        operator = DbtSeedLocalOperator(
+            profile_config=profile_config,
+            project_dir="/tmp/test_project",
+            task_id="test_seed",
+            dag=dag,
+        )
+        operator.extra_context = {
+            "seed_rendering_behavior": SeedRenderingBehavior.WHEN_SEED_CHANGES.value,
+            "dbt_node_config": {
+                "file_path": str(test_file),
+                "unique_id": "seed.my_project.my_seed",
+            },
+            "dbt_dag_task_group_identifier": "my_dag__my_task_group",
+        }
+
+        mock_has_seed_changed.return_value = False
+        with patch.object(operator, "build_and_run_cmd") as mock_build_and_run:
+            context = {
+                "run_id": "test_run_id",
+                "ti": MagicMock(),
+            }
+
+            operator.execute(context)
+
+            mock_build_and_run.assert_not_called()
+
+            assert "has not changed since last execution. Skipping seed command" in caplog.text
+            assert "seed.my_project.my_seed" in caplog.text

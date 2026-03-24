@@ -213,3 +213,17 @@ def test_update_seed_hash_after_run_raises_on_store_failure(mock_store, tmp_path
 
     with pytest.raises(Exception, match="DB error"):
         update_seed_hash_after_run("my_dag", "seed.project.my_seed", test_file)
+
+
+@patch("cosmos.dbt.seed.get_stored_seed_hash")
+@patch("cosmos.dbt.seed._compute_file_hash")
+def test_has_seed_changed_returns_true_when_hash_computation_fails(mock_compute_hash, mock_get_stored, tmp_path):
+    """Test that True is returned when hash computation fails."""
+    test_file = tmp_path / "seed.csv"
+    test_file.write_text("id,name\n1,Alice\n")
+    mock_compute_hash.side_effect = PermissionError("Permission denied")
+    mock_get_stored.return_value = None
+
+    result = has_seed_changed("my_dag", "seed.project.my_seed", test_file)
+
+    assert result is True

@@ -714,7 +714,8 @@ def test_create_task_metadata_seed_with_rendering_options(
         unique_id=f"{DbtResourceType.SEED.value}.my_folder.my_seed",
         resource_type=DbtResourceType.SEED,
         depends_on=[],
-        file_path=Path(""),
+        path_base=Path(""),
+        original_file_path=Path(""),
         tags=[],
         config={},
     )
@@ -743,13 +744,14 @@ def test_create_task_metadata_seed_with_rendering_options(
         SeedRenderingBehavior.WHEN_SEED_CHANGES,
     ],
 )
-def test_create_task_metadata_seed_with_build_test_behavior(seed_rendering_behavior, caplog):
+def test_create_task_metadata_seed_with_build_test_behavior(seed_rendering_behavior):
     """Test that seed rendering behavior works correctly with TestBehavior.BUILD."""
     sample_node = DbtNode(
         unique_id=f"{DbtResourceType.SEED.value}.my_folder.my_seed",
         resource_type=DbtResourceType.SEED,
         depends_on=[],
-        file_path=Path(""),
+        path_base=Path("."),
+        original_file_path=Path("."),
         tags=[],
         config={},
     )
@@ -788,7 +790,8 @@ def test_generate_task_or_group_seed_with_rendering_behavior(seed_rendering_beha
         node = DbtNode(
             unique_id=f"{DbtResourceType.SEED.value}.my_folder.my_seed",
             resource_type=DbtResourceType.SEED,
-            file_path=SAMPLE_PROJ_PATH / "seeds/my_seed.csv",
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("seeds/my_seed.csv"),
             tags=[],
             config={},
             depends_on=[],

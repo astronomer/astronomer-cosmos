@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import functools
-import io
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -45,6 +44,22 @@ except ImportError:  # pragma: no cover
     from airflow.models.abstractoperator import DEFAULT_QUEUE  # type: ignore[no-redef]
 
 logger = get_logger(__name__)
+
+
+class _NullWriter:
+    """Write-only sink that discards all data; used to suppress dbt stdout in DBT_RUNNER mode.
+
+    Preferred over ``io.StringIO()`` because StringIO buffers every byte written to it for the
+    lifetime of the context manager. On large projects dbt emits megabytes of JSON log lines,
+    so StringIO would grow unbounded and increase worker memory usage proportionally to project
+    size and verbosity. _NullWriter discards each write immediately with no allocation.
+    """
+
+    def write(self, *args: Any) -> int:
+        return 0
+
+    def flush(self) -> None:
+        pass
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
@@ -138,7 +153,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 parse(json_str, extra_kwargs)
 
             self._dbt_runner_callbacks = [*(self._dbt_runner_callbacks or []), _event_callback]
-            with contextlib.redirect_stdout(io.StringIO()):
+            with contextlib.redirect_stdout(_NullWriter()):
                 return super().run_dbt_runner(command, env, cwd, **kwargs)
         return super().run_dbt_runner(command, env, cwd, **kwargs)
 

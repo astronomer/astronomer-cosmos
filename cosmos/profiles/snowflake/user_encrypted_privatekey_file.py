@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any
 
+from cosmos import _json as json
 from cosmos.profiles.snowflake.base import SnowflakeBaseProfileMapping
 
 if TYPE_CHECKING:
@@ -67,7 +67,7 @@ class SnowflakeEncryptedPrivateKeyFilePemProfileMapping(SnowflakeBaseProfileMapp
         if conn_dejson.get("extra__snowflake__account"):
             conn_dejson = {key.replace("extra__snowflake__", ""): value for key, value in conn_dejson.items()}
 
-        conn.extra = json.dumps(conn_dejson)
+        conn.extra = json.dumps_str(conn_dejson)
 
         return conn
 

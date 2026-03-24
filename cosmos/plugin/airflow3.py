@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-import json
 import logging
 import os
 import os.path as op
@@ -19,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from packaging.version import Version
 
+from cosmos import _json as json
 from cosmos import telemetry
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
 from cosmos.listeners import dag_run_listener, task_instance_listener

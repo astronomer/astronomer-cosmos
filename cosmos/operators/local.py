@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import inspect
-import json
 import os
 import tempfile
 import time
@@ -21,6 +20,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
 from packaging.version import Version
 
+from cosmos import _json as json
 from cosmos.io import _construct_dest_file_path
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -396,7 +396,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if sources_json_path.exists():
             sources_json_content = sources_json_path.read_text(encoding="utf-8").strip()
             sources_data = json.loads(sources_json_content)
-            formatted_sources_json = json.dumps(sources_data, indent=4)
+            formatted_sources_json = json.dumps_str(sources_data, indent=4)
             self.freshness = formatted_sources_json
         else:
             self.freshness = ""
@@ -584,7 +584,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             raise AirflowException("Invalid JSON in run_results.json") from exc
         logger.debug("Loaded run results from %s", run_results_path)
 
-        compressed = base64.b64encode(zlib.compress(json.dumps(raw).encode())).decode()
+        compressed = base64.b64encode(zlib.compress(json.dumps_bytes(raw))).decode()
         context["ti"].xcom_push(key="run_results", value=compressed)
 
         logger.info("Pushed run results to XCom")

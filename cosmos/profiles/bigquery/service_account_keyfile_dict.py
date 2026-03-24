@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
+from cosmos import _json as json
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.base import BaseProfileMapping
 

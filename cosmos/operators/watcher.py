@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import base64
 import functools
-import json
 import zlib
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 
+from cosmos import _json as json
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     _DBT_STARTUP_EVENTS_XCOM_KEY,
@@ -137,7 +137,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             logger.debug("Test '%s' finished with status '%s'", uid, status)
             push_test_result_or_aggregate(uid, status, self.tests_per_model, self.test_results_per_model, context["ti"])
         else:
-            payload = base64.b64encode(zlib.compress(json.dumps(event_message_dict).encode())).decode()
+            payload = base64.b64encode(zlib.compress(json.dumps_bytes(event_message_dict))).decode()
             safe_xcom_push(task_instance=context["ti"], key=f"nodefinished_{uid.replace('.', '__')}", value=payload)
 
     def _finalize(self, context: Context, startup_events: list[dict[str, Any]]) -> None:

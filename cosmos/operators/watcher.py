@@ -78,7 +78,7 @@ def _default_freshness_callback(
     """Return unique_ids of all nodes that transitively depend on a stale source, plus the status ``"skip"``.
 
     Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``.
-    Traversal is BFS over the reverse-dependency graph built from ``nodes``.
+    Traversal is DFS over the reverse-dependency graph built from ``nodes``.
     """
     if not nodes or not sources_json:
         return [], "skip"
@@ -135,7 +135,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     This keeps the heavy dbt work centralised while providing near real-time
     feedback and granular task-level observability downstream.
 
-    When ``check_source_freshness=True`` is passed (via ``operator_args``), the producer first runs
+    When SourceRenderingBehavior is not NONE the producer first runs
     ``dbt source freshness``, reads ``target/sources.json``, and for every stale source:
 
     - pushes a synthetic ``"skipped"`` XCom entry for every model that transitively depends on that

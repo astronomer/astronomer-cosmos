@@ -85,12 +85,12 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
     event_name = info.get("name")
     if event_name not in _DBT_EVENT_ALLOWLIST:
         return None
-    node_info = data.get("node_info")
-    status = node_info.get("node_status") if node_info else None
-    unique_id = node_info.get("unique_id") if node_info else None
-    start_time = node_info.get("node_started_at") if node_info else None
-    finish_time = node_info.get("node_finished_at") if node_info else None
-    msg = data.get("msg") or info.get("msg") or None
+    node_info = data.get("node_info") or {}
+    status = node_info.get("node_status")
+    unique_id = node_info.get("unique_id")
+    start_time = node_info.get("node_started_at")
+    finish_time = node_info.get("node_finished_at")
+    msg = data.get("msg") or info.get("msg")
 
     if unique_id:
         dbt_event = {

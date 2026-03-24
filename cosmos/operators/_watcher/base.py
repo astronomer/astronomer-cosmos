@@ -174,6 +174,21 @@ def _store_startup_event_from_log(task_instance: Any, log_line: dict[str, Any]) 
     safe_xcom_push(task_instance=task_instance, key=_DBT_STARTUP_EVENTS_XCOM_KEY, value=current)
 
 
+def _log_dbt_msg(log_line: dict[str, Any]) -> None:
+    """Log the human-readable message from a parsed dbt JSON log line."""
+    log_info = log_line.get("info", {})
+    msg = log_info.get("msg")
+    if msg is None:
+        return
+    level = log_info.get("level", "INFO").upper()
+    ts = log_info.get("ts")
+    formatted_ts = _iso_to_string(ts)
+    if formatted_ts:
+        logger.log(getattr(logging, level, logging.INFO), "%s  %s", formatted_ts, msg)
+    else:
+        logger.log(getattr(logging, level, logging.INFO), msg)
+
+
 def store_dbt_resource_status_from_log(
     line: str,
     extra_kwargs: Any,
@@ -224,7 +239,8 @@ def store_dbt_resource_status_from_log(
         # TODO: handle all possible statuses including skipped, warn, etc.
         if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
-            assert context is not None  # Make MyPy happy
+            if context is None:
+                return
             if dbt_node_resource_type == "test" and tests_per_model and test_results_per_model is not None:
                 logger.debug("Test '%s' finished with status '%s'", unique_id, dbt_node_status)
                 push_test_result_or_aggregate(
@@ -244,16 +260,7 @@ def store_dbt_resource_status_from_log(
                 )
 
     # Additionally, log the message from dbt logs
-    log_info = log_line.get("info", {})
-    msg = log_info.get("msg")
-    level = log_info.get("level", "INFO").upper()
-    ts = log_info.get("ts")
-    if msg is not None:
-        formatted_ts = _iso_to_string(ts)
-        if formatted_ts:
-            logger.log(getattr(logging, level, logging.INFO), "%s  %s", formatted_ts, msg)
-        else:
-            logger.log(getattr(logging, level, logging.INFO), msg)
+    _log_dbt_msg(log_line)
 
 
 class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]

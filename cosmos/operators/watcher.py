@@ -120,20 +120,24 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         ``google.protobuf.json_format`` is a transitive dependency of dbt-core and is always
         available when ``InvocationMode.DBT_RUNNER`` is in use.
+
+        The callback is only registered when ``context`` is present (i.e. during task execution,
+        not during auxiliary calls such as ``dbt deps``). Without a context there is no XCom
+        backend to push to, so registering a callback would cause it to raise and dbt would emit
+        ``GenericExceptionOnRun`` for every node.
         """
         context = kwargs.get("context")
-        extra_kwargs: dict[str, Any] = {"project_dir": cwd}
         if context is not None:
-            extra_kwargs["context"] = context
-        parse = self._make_parse_callable()
+            extra_kwargs: dict[str, Any] = {"project_dir": cwd, "context": context}
+            parse = self._make_parse_callable()
 
-        def _event_callback(event: Any) -> None:
-            from google.protobuf.json_format import MessageToJson
+            def _event_callback(event: Any) -> None:
+                from google.protobuf.json_format import MessageToJson
 
-            json_str = MessageToJson(event, preserving_proto_field_name=True)
-            parse(json_str, extra_kwargs)
+                json_str = MessageToJson(event, preserving_proto_field_name=True)
+                parse(json_str, extra_kwargs)
 
-        self._dbt_runner_callbacks = [*(self._dbt_runner_callbacks or []), _event_callback]
+            self._dbt_runner_callbacks = [*(self._dbt_runner_callbacks or []), _event_callback]
         return super().run_dbt_runner(command, env, cwd, **kwargs)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:

@@ -1294,12 +1294,14 @@ class TestWatcherTrigger:
 
 
 @pytest.mark.integration
-def test_dbt_dag_with_watcher(capsys):
+def test_dbt_dag_with_watcher(caplog):
     """
     Run a DbtDag using `ExecutionMode.WATCHER`.
     Confirm the right amount of tasks is created and that tasks are in the expected topological order.
     Confirm that the producer watcher task is created and that it is the parent of the root dbt nodes.
     """
+    caplog.set_level(logging.INFO, logger="cosmos.operators._watcher.base")
+
     watcher_dag = DbtDag(
         project_config=project_config,
         profile_config=profile_config,
@@ -1357,20 +1359,16 @@ def test_dbt_dag_with_watcher(capsys):
         "raw_customers_seed",
     }
 
-    # dbt runner logs are not captured by caplog, so we need to capture them using capsys
-    capsys_output = capsys.readouterr()
-    stdout = capsys_output.out
-
     assert (
         '''"node_status": "success", "resource_type": "seed", "unique_id": "seed.jaffle_shop.raw_orders"'''
-        not in stdout
+        not in caplog.text
     )
 
     log_message = "OK loaded seed file public.raw_orders"
-    assert log_message in stdout
+    assert log_message in caplog.text
 
     # Verify that log messages are not duplicated (each dbt message should appear only once)
-    message_count = stdout.count(log_message)
+    message_count = caplog.text.count(log_message)
     assert message_count == 1, f"Expected '{log_message}' to be logged exactly once, but found {message_count} times"
 
 
@@ -1525,6 +1523,8 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
     # 10:29:03  Completed successfully
     # 10:29:03
     # 10:29:03  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=1
+
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
 
     watcher_dag = DbtDag(
         project_config=project_config,

@@ -24,7 +24,8 @@ from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
-from cosmos.constants import PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
+from cosmos.constants import PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, DbtResourceType, ExecutionMode
+from cosmos.dbt.graph import DbtNode
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
@@ -34,6 +35,7 @@ from cosmos.operators.watcher import (
     DbtRunWatcherOperator,
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
+    _default_freshness_callback,
     store_dbt_resource_status_from_log,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
@@ -2048,10 +2050,6 @@ def test_dbt_source_watcher_operator_template_fields():
 # ---------------------------------------------------------------------------
 # Tests for source freshness feature (_check_source_freshness=True)
 # ---------------------------------------------------------------------------
-
-from cosmos.constants import DbtResourceType
-from cosmos.dbt.graph import DbtNode
-from cosmos.operators.watcher import _default_freshness_callback
 
 
 def _make_dbt_node(unique_id: str, resource_type: DbtResourceType, depends_on: list[str]) -> DbtNode:

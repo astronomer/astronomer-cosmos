@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import functools
+import io
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -125,6 +127,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         not during auxiliary calls such as ``dbt deps``). Without a context there is no XCom
         backend to push to, so registering a callback would cause it to raise and dbt would emit
         ``GenericExceptionOnRun`` for every node.
+
+        When a callback is registered, dbt's stdout is redirected to a null buffer so that the
+        raw ``--log-format json`` lines do not appear in Airflow task logs alongside the
+        human-readable messages already emitted by ``_log_dbt_msg`` inside the callback.
         """
         context = kwargs.get("context")
         if context is not None:
@@ -138,6 +144,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 parse(json_str, extra_kwargs)
 
             self._dbt_runner_callbacks = [*(self._dbt_runner_callbacks or []), _event_callback]
+            with contextlib.redirect_stdout(io.StringIO()):
+                return super().run_dbt_runner(command, env, cwd, **kwargs)
         return super().run_dbt_runner(command, env, cwd, **kwargs)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:

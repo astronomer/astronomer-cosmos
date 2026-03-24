@@ -44,6 +44,14 @@ elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
   uv pip install apache-airflow-providers-microsoft-azure
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
   uv pip install -U dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
+
+  uv pip install "apache-airflow-providers-amazon[s3fs]==9.21.0"
+  uv pip install s3fs==2025.9.0
+  uv pip install fsspec==2025.9.0
+  uv pip install aiobotocore==2.24.2
+  uv pip install boto3==1.40.18
+  uv pip install botocore==1.40.18
+  uv pip install universal-pathlib==0.2.6
 #  uv pip install dbt-loom
 #  uv pip install "universal-pathlib==0.2.6"
 else

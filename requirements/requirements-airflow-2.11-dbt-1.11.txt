@@ -236,7 +236,6 @@ leather==0.4.1
 librt==0.7.8
 limits==5.2.0
 linkify-it-py==2.0.3
-litellm==1.81.9
 lockfile==0.12.2
 looker-sdk==25.8.0
 lxml==5.3.2

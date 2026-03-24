@@ -15,11 +15,6 @@ try:
 except ImportError:
     from airflow.utils.task_group import TaskGroup
 
-try:
-    from airflow.providers.standard.operators.empty import EmptyOperator
-except ImportError:  # pragma: no cover
-    pass  # type: ignore[no-redef]
-
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     _DBT_STARTUP_EVENTS_XCOM_KEY,

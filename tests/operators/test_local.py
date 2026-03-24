@@ -2454,6 +2454,7 @@ def test_dbt_seed_local_operator_execute_skips_when_seed_unchanged(
             operator.execute(context)
 
             mock_build_and_run.assert_not_called()
+            mock_update_hash.assert_not_called()
 
             assert "has not changed since last execution. Skipping seed command" in caplog.text
             assert "seed.my_project.my_seed" in caplog.text

@@ -240,7 +240,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try:
             self.base_cmd = ["source", "freshness"]
             self.indirect_selection = None  # ``dbt source freshness`` does not support --indirect-selection
-            full_cmd, env = self.build_cmd(context=context, cmd_flags=[])
+            full_cmd, env = self.build_cmd(context=context, cmd_flags=self.add_cmd_flags())
             context["_check_source_freshness"] = True  # type: ignore[typeddict-unknown-key]  # signal run_command to read sources.json and return early
             self.run_command(cmd=full_cmd, env=env, context=context)
         finally:
@@ -279,19 +279,15 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     def _apply_source_freshness(self, context: Context) -> None:
         """Run freshness, filter stale sources via callback, then skip XCom + ``--exclude`` for downstream resources."""
-        try:
-            self._run_source_freshness(context)
-            dbt_nodes = getattr(getattr(getattr(self, "dag", None), "dbt_graph", None), "nodes", None)
-            node_unique_ids, status = self._freshness_callback(
-                context, self.dag, self.task_group, dbt_nodes, self._sources_json
-            )
-            if node_unique_ids is None or node_unique_ids == []:
-                return
-            if status == "skip":
-                self._skipped_node_token(context, node_unique_ids)
-        except Exception:  # intentional: freshness check must never block dbt build
-            logger.exception("Unexpected error during source freshness check; proceeding with full dbt build.")
+        self._run_source_freshness(context)
+        dbt_nodes = getattr(getattr(getattr(self, "dag", None), "dbt_graph", None), "nodes", None)
+        node_unique_ids, status = self._freshness_callback(
+            context, self.dag, self.task_group, dbt_nodes, self._sources_json
+        )
+        if node_unique_ids is None or node_unique_ids == []:
             return
+        if status == "skip":
+            self._skipped_node_token(context, node_unique_ids)
 
     def _set_invocation_mode_if_not_set(self) -> None:
         if not self.invocation_mode:

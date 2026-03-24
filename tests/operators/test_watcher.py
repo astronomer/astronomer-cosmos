@@ -2480,16 +2480,6 @@ class TestProducerSourceFreshness:
 
         mock_skip.assert_not_called()
 
-    def test_apply_source_freshness_does_not_propagate_error(self):
-        op = self._make_op()
-        context: Any = {"ti": MagicMock()}
-
-        with patch.object(op, "_run_source_freshness", side_effect=RuntimeError("db down")):
-            # Must not raise — build should proceed normally
-            op._apply_source_freshness(context)
-
-        assert not (op.exclude or "").strip()
-
     def test_execute_skips_apply_when_flag_disabled(self):
         """_apply_source_freshness must not be called when _check_source_freshness is False."""
         op = self._make_op(_check_source_freshness=False)

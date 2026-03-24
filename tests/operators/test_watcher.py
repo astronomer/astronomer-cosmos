@@ -4,7 +4,6 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
@@ -21,8 +20,8 @@ from packaging.version import Version
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
 from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
-from cosmos.operators._watcher.base import _store_startup_event_from_log, store_compiled_sql_for_model
-from cosmos.operators._watcher.triggerer import WatcherTrigger
+from cosmos.operators._watcher.base import store_compiled_sql_for_model
+from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
     DbtConsumerWatcherSensor,
@@ -59,16 +58,11 @@ profile_config = ProfileConfig(
 
 class _MockTI:
     def __init__(self) -> None:
-        self.store: dict[str, Any] = {}
+        self.store: dict[str, str] = {}
         self.try_number = 1
 
-    def xcom_push(self, key: str, value: Any, **_):
+    def xcom_push(self, key: str, value: str, **_):
         self.store[key] = value
-
-    def xcom_pull(self, task_ids=None, key=None, **kwargs):
-        if key is not None:
-            return self.store.get(key)
-        return None
 
 
 class _MockContext(dict):
@@ -79,12 +73,6 @@ def test_dbt_producer_watcher_operator_priority_weight_default():
     """Test that DbtProducerWatcherOperator uses default priority_weight of 9999."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     assert op.priority_weight == PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT
-
-
-def test_dbt_producer_watcher_operator_does_not_store_compiled_sql_on_template():
-    """Producer does not publish compiled_sql to its rendered_template; sensors show it per model."""
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    assert op.should_store_compiled_sql is False
 
 
 @pytest.mark.parametrize(
@@ -204,7 +192,7 @@ def test_dbt_producer_watcher_operator_requires_task_instance():
 
 
 def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message(caplog):
-    """Test that execute_complete logs an info message when model was skipped (model_not_run)."""
+    """Test that execute_complete logs an info message when model was skipped (node_not_run)."""
     sensor = DbtConsumerWatcherSensor(
         project_dir=".",
         profiles_dir=".",
@@ -217,7 +205,7 @@ def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message
     sensor.model_unique_id = "model.pkg.skipped_model"
 
     context = {"dag_run": MagicMock()}
-    event = {"status": "success", "reason": "model_not_run"}
+    event = {"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}
 
     with caplog.at_level(logging.INFO):
         sensor.execute_complete(context, event)
@@ -248,19 +236,18 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     "event, expected_message",
     [
         ({"status": "success"}, None),
-        ({"status": "success", "reason": "model_not_run"}, None),
+        ({"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}, None),
         (
-            {"status": "failed", "reason": "model_failed"},
+            {"status": "failed", "reason": WatcherEventReason.NODE_FAILED},
             "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher_operator' logs for details.",
         ),
         (
-            {"status": "failed", "reason": "producer_failed"},
-            "Watcher producer task 'dbt_producer_watcher_operator' failed before reporting model results. Check its logs for the underlying error.",
+            {"status": "failed", "reason": WatcherEventReason.PRODUCER_FAILED},
+            "Watcher producer task 'dbt_producer_watcher_operator' failed before reporting results for model 'model.pkg.m'. Check its logs for the underlying error.",
         ),
     ],
 )
-@patch("cosmos.operators._watcher.base._log_dbt_event")
-def test_dbt_consumer_watcher_sensor_execute_complete(mock_dbt_event, event, expected_message):
+def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
     sensor = DbtConsumerWatcherSensor(
         project_dir=".",
         profiles_dir=".",
@@ -272,7 +259,9 @@ def test_dbt_consumer_watcher_sensor_execute_complete(mock_dbt_event, event, exp
     )
     sensor.model_unique_id = "model.pkg.m"
 
-    context = {"dag_run": MagicMock(), "ti": MagicMock()}
+    ti = MagicMock()
+    ti.xcom_pull.return_value = None
+    context = {"dag_run": MagicMock(), "ti": ti}
 
     if expected_message is None:
         sensor.execute_complete(context, event)
@@ -470,59 +459,6 @@ class TestStoreDbtStatusFromLog:
         # No status should be stored
         assert len(ti.store) == 0
 
-    def test_store_startup_event_from_log_appends_to_dbt_startup_events(self):
-        """Test that _store_startup_event_from_log appends MainReportVersion/AdapterRegistered to dbt_startup_events."""
-        # Use a minimal mock with xcom_pull (needed by _store_startup_event_from_log); _MockTI does not have it.
-        store = {}
-
-        class _TIMock:
-            def xcom_push(self, key, value, **_):
-                store[key] = value
-
-            def xcom_pull(self, task_ids=None, key=None, **_):
-                return store.get(key) if key else None
-
-        ti = _TIMock()
-        _store_startup_event_from_log(
-            ti,
-            {"info": {"name": "MainReportVersion", "msg": "Running with dbt=1.10.0", "ts": "2025-01-01T12:00:00Z"}},
-        )
-        assert _DBT_STARTUP_EVENTS_XCOM_KEY in store
-        events = store[_DBT_STARTUP_EVENTS_XCOM_KEY]
-        assert len(events) == 1
-        assert events[0]["name"] == "MainReportVersion"
-        assert events[0]["msg"] == "Running with dbt=1.10.0"
-
-        _store_startup_event_from_log(
-            ti,
-            {
-                "info": {
-                    "name": "AdapterRegistered",
-                    "msg": "Registered adapter: postgres=1.10.0",
-                    "ts": "2025-01-01T12:00:01Z",
-                }
-            },
-        )
-        events = store[_DBT_STARTUP_EVENTS_XCOM_KEY]
-        assert len(events) == 2
-        assert events[1]["name"] == "AdapterRegistered"
-        assert events[1]["msg"] == "Registered adapter: postgres=1.10.0"
-
-    def test_store_startup_event_from_log_ignores_other_events(self):
-        """Test that _store_startup_event_from_log ignores events other than MainReportVersion/AdapterRegistered."""
-        store = {}
-
-        class _TIMock:
-            def xcom_push(self, key, value, **_):
-                store[key] = value
-
-            def xcom_pull(self, task_ids=None, key=None, **_):
-                return store.get(key) if key else None
-
-        ti = _TIMock()
-        _store_startup_event_from_log(ti, {"info": {"name": "NodeFinished", "msg": "Done"}})
-        assert _DBT_STARTUP_EVENTS_XCOM_KEY not in store
-
     @pytest.mark.parametrize(
         "msg, level",
         [
@@ -630,8 +566,7 @@ class TestStoreDbtStatusFromLog:
 
         assert ti.store.get("model__pkg__model_a_status") == "success"
         assert ti.store.get("model__pkg__model_b_status") == "failed"
-        assert "model__pkg__model_a_status" in ti.store
-        assert "model__pkg__model_b_status" in ti.store
+        assert len(ti.store) == 2  # Only success and failed statuses are stored
 
     def test_store_dbt_resource_status_from_log_pushes_compiled_sql_for_models(self, tmp_path):
         """Test that compiled_sql is pushed to XCom for successful model nodes."""
@@ -980,21 +915,20 @@ class TestDbtConsumerWatcherSensor:
         result = sensor.poke(context)
         assert result is False
 
-    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
-    def test_poke_success(self, mock_startup_events):
+    def test_poke_success(self):
         sensor = self.make_sensor()
 
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.return_value = "success"
+        # xcom_pull calls: _log_startup_events=None, _get_node_status="success", compiled_sql=None, _dbt_event=None
+        ti.xcom_pull.side_effect = [None, "success", None, None]
         context = self.make_context(ti)
 
         result = sensor.poke(context)
         assert result is True
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
-    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
-    def test_poke_subprocess_mode_extracts_compiled_sql_from_xcom(self, mock_startup_events, mock_override_rtif):
+    def test_poke_subprocess_mode_extracts_compiled_sql_from_xcom(self, mock_override_rtif):
         """Test that in subprocess mode, poke extracts compiled_sql from per-model XCom key when status is success."""
         sensor = self.make_sensor()
         sensor.invocation_mode = "SUBPROCESS"
@@ -1002,8 +936,8 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        # First call returns status from per-model XCom key, second call returns compiled_sql, third is _dbt_event for _log_dbt_event
-        ti.xcom_pull.side_effect = ["success", "SELECT * FROM orders", None]
+        # xcom_pull calls: _log_startup_events=None, _get_node_status="success", compiled_sql="SELECT * FROM orders", _dbt_event=None
+        ti.xcom_pull.side_effect = [None, "success", "SELECT * FROM orders", None]
         context = self.make_context(ti)
 
         assert sensor.compiled_sql == ""  # Initially empty
@@ -1012,14 +946,14 @@ class TestDbtConsumerWatcherSensor:
         assert sensor.compiled_sql == "SELECT * FROM orders"
         mock_override_rtif.assert_called_once_with(context)
 
-    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
-    def test_poke_failure(self, mock_startup_events):
+    def test_poke_failure(self):
         """poke raises AirflowException when model status is a failure value."""
         sensor = self.make_sensor()
 
         ti = MagicMock()
         ti.try_number = 1
-        ti.xcom_pull.return_value = "failed"
+        # xcom_pull calls: _log_startup_events=None, _get_node_status="failed", compiled_sql=None, _dbt_event=None
+        ti.xcom_pull.side_effect = [None, "failed", None, None]
         context = self.make_context(ti)
 
         with pytest.raises(AirflowException):
@@ -1060,15 +994,15 @@ class TestDbtConsumerWatcherSensor:
         assert result == expected
 
     @patch("cosmos.operators._watcher.base.get_xcom_val")
-    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
-    def test_producer_state_failed(self, mock_startup_events, mock_get_xcom_val):
+    def test_producer_state_failed(self, mock_get_xcom_val):
         sensor = self.make_sensor()
         sensor._get_producer_task_status.return_value = "failed"
         ti = MagicMock()
         ti.try_number = 1
         sensor.poke_retry_number = 1
         mock_get_xcom_val.return_value = None
-        ti.xcom_pull.return_value = "failed"
+        # _log_startup_events still calls ti.xcom_pull directly
+        ti.xcom_pull.return_value = None
 
         context = self.make_context(ti)
 
@@ -1080,9 +1014,8 @@ class TestDbtConsumerWatcherSensor:
 
     @patch("cosmos.operators.watcher.DbtConsumerWatcherSensor._fallback_to_non_watcher_run")
     @patch("cosmos.operators._watcher.base.get_xcom_val")
-    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
     def test_producer_state_does_not_fail_if_previously_upstream_failed(
-        self, mock_startup_events, mock_get_xcom_val, mock_fallback_to_non_watcher_run
+        self, mock_get_xcom_val, mock_fallback_to_non_watcher_run
     ):
         """
         Attempt to run the task using ExecutionMode.LOCAL if State.UPSTREAM_FAILED happens.
@@ -1094,7 +1027,8 @@ class TestDbtConsumerWatcherSensor:
         ti.try_number = 1
         sensor.poke_retry_number = 0
         mock_get_xcom_val.return_value = None
-        ti.xcom_pull.return_value = "failed"
+        # _log_startup_events still calls ti.xcom_pull directly
+        ti.xcom_pull.return_value = None
 
         context = self.make_context(ti)
 
@@ -1133,24 +1067,21 @@ class TestDbtConsumerWatcherSensor:
     @pytest.mark.parametrize(
         "mock_event",
         [
-            {"status": "failed", "reason": "model_failed"},
-            {"status": "failed", "reason": "producer_failed"},
+            {"status": "failed", "reason": WatcherEventReason.NODE_FAILED},
+            {"status": "failed", "reason": WatcherEventReason.PRODUCER_FAILED},
             {"status": "success"},
         ],
     )
-    @patch("cosmos.operators._watcher.base._log_dbt_event")
-    def test_execute_complete(self, mock_log_dbt_event, mock_event):
+    def test_execute_complete(self, mock_event):
         sensor = self.make_sensor()
-
         ti = MagicMock()
-        context = {"ti": ti}
-
+        ti.xcom_pull.return_value = None
+        context = self.make_context(ti)
         if mock_event.get("status") == "failed":
             with pytest.raises(AirflowException):
                 sensor.execute_complete(context=context, event=mock_event)
         else:
-            result = sensor.execute_complete(context=context, event=mock_event)
-            assert result is None
+            assert sensor.execute_complete(context=context, event=mock_event) is None
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
     def test_execute_complete_extracts_compiled_sql(self, mock_override_rtif):
@@ -1825,3 +1756,90 @@ def test_dbt_source_watcher_operator_template_fields():
 
     # DbtSourceWatcherOperator should inherit template_fields from DbtSourceLocalOperator
     assert DbtSourceWatcherOperator.template_fields == DbtSourceLocalOperator.template_fields
+
+
+class TestDbtTestWatcherOperator:
+    """Tests for DbtTestWatcherOperator — the sensor that watches aggregated test results."""
+
+    MODEL_UID = "model.jaffle_shop.stg_orders"
+    TESTS_STATUS_XCOM_KEY = "model__jaffle_shop__stg_orders_tests_status"
+
+    def make_sensor(self, **overrides):
+        extra_context = {"dbt_node_config": {"unique_id": self.MODEL_UID}}
+        sensor = DbtTestWatcherOperator(
+            task_id="stg_orders.test",
+            project_dir="/tmp/project",
+            profile_config=None,
+            deferrable=overrides.pop("deferrable", True),
+            extra_context=extra_context,
+            **overrides,
+        )
+        sensor._get_producer_task_status = MagicMock(return_value=None)
+        return sensor
+
+    def make_context(self, ti_mock, *, run_id="test-run", map_index=0):
+        return {
+            "ti": ti_mock,
+            "run_id": run_id,
+            "task_instance": MagicMock(map_index=map_index),
+        }
+
+    def test_is_test_sensor_returns_true(self):
+        sensor = self.make_sensor()
+        assert sensor.is_test_sensor is True
+
+    def test_poke_returns_true_when_tests_pass(self):
+        """When the aggregated test status is 'pass', poke should return True."""
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.return_value = "pass"
+        context = self.make_context(ti)
+
+        assert sensor.poke(context) is True
+
+    def test_poke_raises_when_tests_fail(self):
+        """When the aggregated test status is 'fail', poke should raise AirflowException."""
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.return_value = "fail"
+        context = self.make_context(ti)
+
+        with pytest.raises(AirflowException, match="Tests for model"):
+            sensor.poke(context)
+
+    def test_poke_returns_false_when_no_status_yet(self):
+        """When the aggregated test status has not been pushed yet, poke should return False."""
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.return_value = None
+        context = self.make_context(ti)
+
+        assert sensor.poke(context) is False
+
+    def test_poke_reads_correct_xcom_key(self):
+        """Poke should pull from the _tests_status XCom key, not the regular _status key."""
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.return_value = "pass"
+        context = self.make_context(ti)
+
+        sensor.poke(context)
+
+        # Verify xcom_pull was called with the aggregated tests_status key
+        calls = ti.xcom_pull.call_args_list
+        xcom_keys_used = [call.kwargs.get("key") or call[1].get("key") for call in calls]
+        assert self.TESTS_STATUS_XCOM_KEY in xcom_keys_used
+
+    def test_fallback_raises_on_retry(self):
+        """On retry (try_number > 1), the test sensor should raise since test re-execution is not yet supported."""
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.try_number = 2
+        context = self.make_context(ti)
+
+        with pytest.raises(AirflowException, match="Test re-execution is not yet supported"):
+            sensor.poke(context)

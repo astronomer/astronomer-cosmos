@@ -1,7 +1,7 @@
 .. _profile-customise-per-node:
 
 Customising the profile config per dbt node
-===========================================
+-------------------------------------------
 
 .. versionadded:: 1.9.0
 
@@ -52,7 +52,7 @@ to subsets of nodes selected based on path or other criteria that dbt supports.
 
 
 Dbt profile config variables
-----------------------------
+++++++++++++++++++++++++++++
 .. versionadded:: 1.4.0
 
 The parts of ``profiles.yml``, which aren't specific to a particular data platform `dbt docs <https://docs.getdbt.com/docs/core/connect-data-platform/profiles.yml>`_
@@ -90,7 +90,7 @@ The parts of ``profiles.yml``, which aren't specific to a particular data platfo
 
 
 Disabling dbt event tracking
-----------------------------
+++++++++++++++++++++++++++++
 
 .. note:
    Deprecated in v.1.4 and will be removed in v2.0.0. Use dbt_config_vars=DbtProfileConfigVars(send_anonymous_usage_stats=False) instead.

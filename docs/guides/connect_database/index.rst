@@ -1,7 +1,7 @@
 .. _connect_database:
 
 Connect to your database
-===============================
+------------------------
 
 Cosmos supports two methods of authenticating with your database:
 

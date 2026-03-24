@@ -1,7 +1,7 @@
 .. _how-cosmos-runs-dbt:
 
 How Cosmos runs dbt
-===================
+-------------------
 
 Cosmos can run dbt commands directly using operators, or, after the dbt project has been parsed and turned into an Airflow Dag or task group, you can execute it.
 
@@ -14,7 +14,7 @@ Running one dbt command per task can bring performance challenges, since each in
 Cosmos uses different kinds of configurations to control how the dbt nodes are executed within the Airflow Dag or task group, which you can customize based on your project and needs.
 
 Execution modes
-~~~~~~~~~~~~~~~~
++++++++++++++++
 
 Execution modes are defined by the ``ExecutionConfig`` class in your Cosmos Dag.
 Depending on your specific dbt project architecture and whether you want to run your dbt commands in the cloud or in a container separate from your Airflow environment.
@@ -23,7 +23,7 @@ Check out the available :ref:`execution-modes` and the detailed :ref:`execution-
 
 
 Running dbt commands
-~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++
 
 In addition to specifying where you want Cosmos to run dbt commands, you can also configure the following:
 

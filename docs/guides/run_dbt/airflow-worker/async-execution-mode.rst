@@ -1,7 +1,7 @@
 .. _async-execution-mode:
 
 Airflow async execution mode
-============================
+----------------------------
 
 This execution mode can reduce the runtime by 35% in comparison to Cosmos ``LOCAL`` execution mode, but is currently only available for BigQuery. While this mode was introduced in Cosmos 1.9, we strongly encourage users to use the latest version of Cosmos, which has significant performance improvements.
 
@@ -17,7 +17,7 @@ All the pipeline dbt model transformations run using ``DbtRunAirflowAsyncOperato
 You can also use other existing ``BigQueryInsertJobOperator`` features, such as the UI controls to link to the job in the BigQuery UI.
 
 Advantages of Airflow Async Mode
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++++++
 
 - **Improved Task Throughput:** Async tasks free up Airflow workers by leveraging the Airflow Trigger framework. While long-running SQL transformations are executing in the data warehouse, the worker is released and can handle other tasks, increasing overall task throughput.
 - **Better Resource Utilization:** By minimizing idle time on Airflow workers, async tasks allow more efficient use of compute resources. Workers aren't blocked waiting for external systems and can be reused for other work while waiting on async operations.
@@ -37,18 +37,18 @@ We have `observed <https://github.com/astronomer/astronomer-cosmos/pull/1934>`_ 
 
 
 Getting Started with Airflow Async Mode
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++++
 
 This guide walks you through setting up an Astro CLI project and running a Cosmos-based DAG with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
 
 Prerequisites
--------------
+'''''''''''''
 
 - `Astro CLI <https://www.astronomer.io/docs/astro/cli/install-cli>`_
 - Airflow>=2.9
 
 1. Create Astro-CLI Project
----------------------------
+'''''''''''''''''''''''''''
 
 Run the following command in your terminal:
 
@@ -73,7 +73,7 @@ This will create an Astro project with the following structure:
 
 
 2. Update Dockerfile
---------------------
+''''''''''''''''''''
 
 Edit your Dockerfile to ensure all necessary requirements are included.
 
@@ -83,7 +83,7 @@ Edit your Dockerfile to ensure all necessary requirements are included.
 
 
 3. Add astronomer-cosmos Dependency
------------------------------------
+'''''''''''''''''''''''''''''''''''
 
 In your ``requirements.txt``, add:
 
@@ -93,7 +93,7 @@ In your ``requirements.txt``, add:
 
 
 4. Create Airflow DAG
----------------------
+'''''''''''''''''''''
 
 1. Create a new DAG file: ``dags/cosmos_async_dag.py``
 
@@ -156,7 +156,7 @@ In your ``requirements.txt``, add:
 
 
 5. Start the project
---------------------
+''''''''''''''''''''
 
 Launch the Airflow project locally:
 
@@ -170,7 +170,7 @@ This will:
 - Expose Airflow UI at http://localhost:8080
 
 6. Create Airflow connection
-----------------------------
+''''''''''''''''''''''''''''
 
 Create an Airflow connection with following configurations
 
@@ -199,7 +199,7 @@ Create an Airflow connection with following configurations
 
 
 7. Execute the DAG
-------------------
+''''''''''''''''''
 
 1. Visit the Airflow UI at ``http://localhost:8080``
 2. Enable the DAG: ``cosmos_async_dag``
@@ -213,7 +213,7 @@ The ``run`` tasks will run asynchronously via the deferrable operator, freeing u
 
 
 Control where to upload the SQL files
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++++++++++++++++++++++++++++++++++++++
 
 For optimal performance we encourage to keep Cosmos standard behaviour (introduced in 1.11), which is to upload the SQL files to XCom, instead of a remote object location.
 
@@ -228,7 +228,7 @@ However, if you want to upload the SQL files to a remote object location instead
 
 
 Limitations
-~~~~~~~~~~~
++++++++++++
 
 
 1. **Limited to dbt models**: Only dbt resource type models are run asynchronously using Airflow deferrable operators. Other resource types are executed synchronously, similar to the local execution mode.

@@ -1,5 +1,5 @@
 Run dbt in a container
-======================
+----------------------
 
 .. toctree::
    :maxdepth: 1

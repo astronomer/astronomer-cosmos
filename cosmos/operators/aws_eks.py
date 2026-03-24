@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 from airflow.providers.amazon.aws.hooks.eks import EksHook
+from packaging.version import Version
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -27,6 +29,9 @@ from cosmos.operators.kubernetes import (
 
 DEFAULT_CONN_ID = "aws_default"
 DEFAULT_NAMESPACE = "default"
+
+_AMAZON_PROVIDER_VERSION = Version(version("apache-airflow-providers-amazon"))
+_GENERATE_CONFIG_CREDENTIALS_FILE_MIN = Version("9.13.0")
 
 
 class DbtAwsEksBaseOperator(DbtKubernetesBaseOperator):
@@ -71,10 +76,26 @@ class DbtAwsEksBaseOperator(DbtKubernetesBaseOperator):
             aws_conn_id=self.aws_conn_id,
             region_name=self.region,
         )
-        with eks_hook.generate_config_file(
-            eks_cluster_name=self.cluster_name, pod_namespace=self.namespace
-        ) as self.config_file:
-            return super().execute(context)
+
+        if _AMAZON_PROVIDER_VERSION >= _GENERATE_CONFIG_CREDENTIALS_FILE_MIN:
+            credentials = eks_hook.get_credentials()
+            with eks_hook._secure_credential_context(
+                credentials.access_key,
+                credentials.secret_key,
+                credentials.token,
+            ) as credentials_file:
+                with eks_hook.generate_config_file(
+                    eks_cluster_name=self.cluster_name,
+                    pod_namespace=self.namespace,
+                    credentials_file=credentials_file,
+                ) as self.config_file:
+                    return super().execute(context)
+        else:
+            with eks_hook.generate_config_file(
+                eks_cluster_name=self.cluster_name,
+                pod_namespace=self.namespace,
+            ) as self.config_file:
+                return super().execute(context)
 
 
 class DbtBuildAwsEksOperator(DbtAwsEksBaseOperator, DbtBuildKubernetesOperator):

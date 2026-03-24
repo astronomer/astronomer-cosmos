@@ -2417,9 +2417,7 @@ def test_handle_datasets_does_not_push_xcom_when_no_outlets():
 
 @patch("cosmos.dbt.seed.update_seed_hash_after_run")
 @patch("cosmos.dbt.seed.has_seed_changed")
-def test_dbt_seed_local_operator_execute_skips_when_seed_unchanged(
-    mock_has_seed_changed, mock_update_hash, caplog
-):
+def test_dbt_seed_local_operator_execute_skips_when_seed_unchanged(mock_has_seed_changed, mock_update_hash, caplog):
     """Test that DbtSeedLocalOperator.execute() skips the seed command when seed has not changed."""
     from cosmos.constants import SeedRenderingBehavior
 

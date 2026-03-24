@@ -116,7 +116,7 @@ Seeds Without Tests
 Full Example DAG
 ~~~~~~~~~~~~~~~~
 
-.. literalinclude:: ../../dev/dags/example_seed_rendering.py
+.. literalinclude:: ../../../dev/dags/example_seed_rendering.py
     :language: python
     :start-after: [START cosmos_seed_always_example]
     :end-before: [END cosmos_seed_always_example]

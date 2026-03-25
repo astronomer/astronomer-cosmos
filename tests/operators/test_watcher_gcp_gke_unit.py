@@ -1,4 +1,7 @@
 import logging
+import os
+from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -23,6 +26,8 @@ from cosmos.operators.watcher_gcp_gke import (
     DbtBuildWatcherGcpGkeOperator,
     DbtConsumerWatcherGcpGkeSensor,
     DbtProducerWatcherGcpGkeOperator,
+    DbtRunWatcherGcpGkeOperator,
+    DbtSeedWatcherGcpGkeOperator,
 )
 
 GKE_KWARGS = {
@@ -32,22 +37,10 @@ GKE_KWARGS = {
 }
 
 
-def test_retries_set_to_zero_on_init():
+def test_retries_not_forced_to_zero():
     """
-    Test that the operator sets retries to 0 during initialization.
-    """
-    op = DbtProducerWatcherGcpGkeOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-        **GKE_KWARGS,
-    )
-    assert op.retries == 0
-
-
-def test_retries_overridden_even_if_user_sets_them():
-    """
-    Test that even if a user explicitly sets retries, they are overridden to 0.
+    Test that the operator does not force retries to 0, allowing user-configured retries.
+    The producer gracefully skips on retry (try_number > 1) instead.
     """
     op = DbtProducerWatcherGcpGkeOperator(
         project_dir=".",
@@ -56,7 +49,7 @@ def test_retries_overridden_even_if_user_sets_them():
         retries=5,
         **GKE_KWARGS,
     )
-    assert op.retries == 0
+    assert op.retries == 5
 
 
 @patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.execute")
@@ -333,3 +326,86 @@ def test_callbacks_included_in_producer_operator():
     )
     callback_classes = [callback.__name__ for callback in op.callbacks]
     assert "WatcherGcpGkeCallback" in callback_classes
+
+
+DEFAULT_DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
+DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
+AIRFLOW_DBT_PROJECT_DIR = DBT_ROOT_PATH / "jaffle_shop"
+
+
+def test_dag_structure_with_watcher_gcp_gke():
+    """
+    Create a Cosmos DbtDag with ExecutionMode.WATCHER_GCP_GKE and verify the DAG structure
+    (task count, task names, task types, dependencies) without executing the DAG.
+    """
+    from airflow.providers.cncf.kubernetes.secret import Secret
+
+    from cosmos import DbtDag
+    from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+    from cosmos.constants import ExecutionMode, LoadMode, TestBehavior
+
+    K8S_PROJECT_DIR = "dags/dbt/jaffle_shop"
+
+    operator_args = {
+        "deferrable": False,
+        "image": "dbt-jaffle-shop:1.0.0",
+        "get_logs": True,
+        "is_delete_operator_pod": False,
+        "secrets": [
+            Secret(deploy_type="env", deploy_target="POSTGRES_PASSWORD", secret="postgres-secrets", key="password"),
+            Secret(deploy_type="env", deploy_target="POSTGRES_HOST", secret="postgres-secrets", key="host"),
+        ],
+        "project_id": "my-gcp-project",
+        "location": "us-central1",
+        "cluster_name": "my-gke-cluster",
+    }
+
+    dag = DbtDag(
+        dag_id="watcher_gcp_gke_structure_test",
+        start_date=datetime(2022, 11, 27),
+        catchup=False,
+        project_config=ProjectConfig(
+            project_name="jaffle_shop",
+            manifest_path=AIRFLOW_DBT_PROJECT_DIR / "target/manifest.json",
+        ),
+        profile_config=ProfileConfig(
+            profile_name="postgres_profile",
+            target_name="dev",
+            profiles_yml_filepath=Path(K8S_PROJECT_DIR) / "profiles.yml",
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=TestBehavior.NONE),
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER_GCP_GKE,
+            dbt_project_path=K8S_PROJECT_DIR,
+        ),
+        operator_args=operator_args,
+    )
+
+    assert len(dag.task_dict) == 9
+
+    tasks_names = [task.task_id for task in dag.topological_sort()]
+    expected_task_names = [
+        "dbt_producer_watcher",
+        "raw_customers_seed",
+        "raw_orders_seed",
+        "raw_payments_seed",
+        "stg_customers_run",
+        "stg_orders_run",
+        "stg_payments_run",
+        "customers_run",
+        "orders_run",
+    ]
+    assert tasks_names == expected_task_names
+
+    assert isinstance(dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherGcpGkeOperator)
+    assert isinstance(dag.task_dict["raw_customers_seed"], DbtSeedWatcherGcpGkeOperator)
+    assert isinstance(dag.task_dict["raw_orders_seed"], DbtSeedWatcherGcpGkeOperator)
+    assert isinstance(dag.task_dict["raw_payments_seed"], DbtSeedWatcherGcpGkeOperator)
+    assert isinstance(dag.task_dict["stg_customers_run"], DbtRunWatcherGcpGkeOperator)
+    assert isinstance(dag.task_dict["stg_orders_run"], DbtRunWatcherGcpGkeOperator)
+    assert isinstance(dag.task_dict["stg_payments_run"], DbtRunWatcherGcpGkeOperator)
+    assert isinstance(dag.task_dict["customers_run"], DbtRunWatcherGcpGkeOperator)
+    assert isinstance(dag.task_dict["orders_run"], DbtRunWatcherGcpGkeOperator)
+
+    expected_downstream_task_ids = {"raw_payments_seed", "raw_orders_seed", "raw_customers_seed"}
+    assert dag.task_dict["dbt_producer_watcher"].downstream_task_ids == expected_downstream_task_ids

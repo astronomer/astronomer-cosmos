@@ -2,20 +2,20 @@
 
 
 Azure Container Instance execution mode
-=======================================
+---------------------------------------
 .. versionadded:: 1.4
 
 Using ``Azure Container Instances`` as the execution mode provides an isolated way of running ``dbt``, since the ``dbt`` run itself occurs within a container running in an Azure Container Instance.
 
 Performance and maintenance considerations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++++++++++++++++++++++++++
 
 This execution mode requires you to have an Azure environment that can be used to run Azure Container Groups. Similar to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available that contains up-to-date ``dbt`` pipelines and profiles.
 
 Each task creates a new container on Azure, giving full isolation. This, however, comes at the cost of speed, as this separation of tasks introduces some overhead.
 
 Setup
-~~~~~
++++++
 
 This tutorial guides you through the steps required to use Azure Container Instance as the execution mode for your dbt code with Astronomer Cosmos. Schematically, the guide demonstrates how to build the following architecture:
 
@@ -23,7 +23,7 @@ This tutorial guides you through the steps required to use Azure Container Insta
     :width: 800
 
 Prerequisites
-~~~~~~~~~~~~~
++++++++++++++
 
 1. Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
 2. Airflow
@@ -42,7 +42,7 @@ More information on how to achieve 2-6 is detailed below.
 Note that the steps below will walk you through an example, for which the code can be found HERE
 
 Step-by-step guide
-~~~~~~~~~~~~~~~~~~
+++++++++++++++++++
 
 **Install Airflow and Cosmos**
 

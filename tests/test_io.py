@@ -68,9 +68,10 @@ def test_upload_artifacts_to_gcp_gs_no_tarball(dummy_kwargs):
 
 def test_upload_artifacts_to_gcp_gs_tarball(dummy_kwargs):
     """Test upload_artifacts_to_gcp_gs with use_tarball=True."""
-    with patch("airflow.providers.google.cloud.hooks.gcs.GCSHook") as mock_hook, patch(
-        "tarfile.open"
-    ) as mock_tarfile_open:
+    with (
+        patch("airflow.providers.google.cloud.hooks.gcs.GCSHook") as mock_hook,
+        patch("tarfile.open") as mock_tarfile_open,
+    ):
         mock_tar = MagicMock()
         mock_tarfile_open.return_value.__enter__.return_value = mock_tar
 

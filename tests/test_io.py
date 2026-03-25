@@ -54,6 +54,36 @@ def test_upload_artifacts_to_gcp_gs(dummy_kwargs):
         assert hook_instance.upload.call_count == 2
 
 
+def test_upload_artifacts_to_gcp_gs_no_tarball(dummy_kwargs):
+    """Test upload_artifacts_to_gcp_gs with use_tarball=False."""
+    with patch("airflow.providers.google.cloud.hooks.gcs.GCSHook") as mock_hook, patch("os.walk") as mock_walk:
+        mock_walk.return_value = [("/target", [], ["file1.txt", "file2.txt"])]
+
+        upload_to_gcp_gs("/project_dir", use_tarball=False, **dummy_kwargs)
+
+        mock_walk.assert_called_once_with("/project_dir/target")
+        hook_instance = mock_hook.return_value
+        assert hook_instance.upload.call_count == 2
+
+
+def test_upload_artifacts_to_gcp_gs_tarball(dummy_kwargs):
+    """Test upload_artifacts_to_gcp_gs with use_tarball=True."""
+    with patch("airflow.providers.google.cloud.hooks.gcs.GCSHook") as mock_hook, patch(
+        "tarfile.open"
+    ) as mock_tarfile_open:
+        mock_tar = MagicMock()
+        mock_tarfile_open.return_value.__enter__.return_value = mock_tar
+
+        upload_to_gcp_gs("/project_dir", use_tarball=True, **dummy_kwargs)
+
+        mock_tar.add.assert_called_once_with("/project_dir/target", arcname="target")
+        hook_instance = mock_hook.return_value
+        hook_instance.upload.assert_called_once()
+        call_kwargs = hook_instance.upload.call_args.kwargs
+        assert call_kwargs["object_name"].endswith("target.tar.gz")
+        assert call_kwargs["mime_type"] == "application/gzip"
+
+
 def test_upload_artifacts_to_azure_wasb(dummy_kwargs):
     """Test upload_artifacts_to_azure_wasb."""
     with patch("airflow.providers.microsoft.azure.hooks.wasb.WasbHook") as mock_hook, patch("os.walk") as mock_walk:

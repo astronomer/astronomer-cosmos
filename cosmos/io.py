@@ -87,12 +87,11 @@ def upload_to_gcp_gs(
     hook = GCSHook(gcp_conn_id=gcp_conn_id)
     context = kwargs["context"]
 
-    object_prefix = (
+    run_prefix = (
         f"{context['dag'].dag_id}"
         f"/{context['run_id']}"
         f"/{context['task_instance'].task_id}"
         f"/{context['task_instance']._try_number}"
-        f"/{source_subpath}"
     )
 
     if use_tarball:
@@ -102,7 +101,7 @@ def upload_to_gcp_gs(
         buf.seek(0)
         hook.upload(
             bucket_name=bucket_name,
-            object_name=f"{object_prefix}.tar.gz",
+            object_name=f"{run_prefix}/{source_subpath}.tar.gz",
             data=buf.read(),
             mime_type="application/gzip",
         )
@@ -110,10 +109,7 @@ def upload_to_gcp_gs(
         # Iterate over the files in the target dir and upload them to GCP GS
         for dirpath, _, filenames in os.walk(target_dir):
             for filename in filenames:
-                object_name = (
-                    f"{object_prefix}"
-                    f"{dirpath.split(project_dir)[-1]}/{filename}"
-                )
+                object_name = f"{run_prefix}{dirpath.split(project_dir)[-1]}/{filename}"
                 hook.upload(
                     filename=f"{dirpath}/{filename}",
                     bucket_name=bucket_name,

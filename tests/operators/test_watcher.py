@@ -1468,7 +1468,7 @@ class TestDbtConsumerWatcherSensor:
         with (
             patch("cosmos.debug.start_memory_tracking") as mock_start,
             patch("cosmos.debug.stop_memory_tracking") as mock_stop,
-            patch("airflow.sensors.base.BaseSensorOperator.execute") as mock_super_execute,
+            patch("cosmos.operators._watcher.base.BaseSensorOperator.execute") as mock_super_execute,
         ):
             sensor.execute(context=context)
 

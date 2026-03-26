@@ -274,6 +274,8 @@ def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
     assert str(excinfo.value) == expected_message
 
 
+
+
 class TestStoreDbtStatusFromLog:
     """Tests for store_dbt_resource_status_from_log and _process_log_line_callable."""
 
@@ -286,7 +288,7 @@ class TestStoreDbtStatusFromLog:
 
         store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
-        assert ti.store.get("model__pkg__my_model_status") == "success"
+        assert ti.store.get("model__pkg__my_model_status") == {"status": "success", "outlet_uris": []}
 
     def test_store_dbt_resource_status_from_log_failed(self):
         """Test that failed status is correctly parsed and stored in XCom."""
@@ -297,7 +299,7 @@ class TestStoreDbtStatusFromLog:
 
         store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
-        assert ti.store.get("model__pkg__failed_model_status") == "failed"
+        assert ti.store.get("model__pkg__failed_model_status") == {"status": "failed", "outlet_uris": []}
 
     def test_store_dbt_resource_status_from_log_ignores_other_statuses(self):
         """Test that statuses other than success/failed are ignored."""
@@ -330,7 +332,7 @@ class TestStoreDbtStatusFromLog:
 
         store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
-        assert ti.store.get("test__pkg__my_test_status") == "pass"
+        assert ti.store.get("test__pkg__my_test_status") == {"status": "pass", "outlet_uris": []}
 
     def test_store_dbt_resource_status_from_log_detects_failed_test_status(self):
         """Test that a failed test status is correctly parsed and stored in XCom."""
@@ -350,7 +352,7 @@ class TestStoreDbtStatusFromLog:
 
         store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
-        assert ti.store.get("test__pkg__my_test_status") == "fail"
+        assert ti.store.get("test__pkg__my_test_status") == {"status": "fail", "outlet_uris": []}
 
     def test_store_dbt_resource_status_from_log_aggregates_test_results_when_tests_per_model_provided(self):
         """When tests_per_model is non-empty and a test node finishes, the function should
@@ -565,8 +567,8 @@ class TestStoreDbtStatusFromLog:
         for line in log_lines:
             op._process_log_line_callable(line, kwargs)
 
-        assert ti.store.get("model__pkg__model_a_status") == "success"
-        assert ti.store.get("model__pkg__model_b_status") == "failed"
+        assert ti.store.get("model__pkg__model_a_status") == {"status": "success", "outlet_uris": []}
+        assert ti.store.get("model__pkg__model_b_status") == {"status": "failed", "outlet_uris": []}
         assert len(ti.store) == 2  # Only success and failed statuses are stored
 
     def test_store_dbt_resource_status_from_log_pushes_compiled_sql_for_models(self, tmp_path):
@@ -596,7 +598,7 @@ class TestStoreDbtStatusFromLog:
 
         store_dbt_resource_status_from_log(log_line, {"context": ctx, "project_dir": str(tmp_path)})
 
-        assert ti.store.get("model__pkg__my_model_status") == "success"
+        assert ti.store.get("model__pkg__my_model_status") == {"status": "success", "outlet_uris": []}
         assert ti.store.get("model__pkg__my_model_compiled_sql") == "SELECT * FROM orders WHERE status = 'completed'"
 
     def test_store_dbt_resource_status_from_log_no_compiled_sql_for_non_models(self, tmp_path):
@@ -620,7 +622,7 @@ class TestStoreDbtStatusFromLog:
 
         store_dbt_resource_status_from_log(log_line, {"context": ctx, "project_dir": str(tmp_path)})
 
-        assert ti.store.get("seed__pkg__my_seed_status") == "success"
+        assert ti.store.get("seed__pkg__my_seed_status") == {"status": "success", "outlet_uris": []}
         assert "seed__pkg__my_seed_compiled_sql" not in ti.store
 
     def test_store_dbt_resource_status_from_log_pushes_compiled_sql_on_failure(self, tmp_path):
@@ -649,7 +651,7 @@ class TestStoreDbtStatusFromLog:
 
         store_dbt_resource_status_from_log(log_line, {"context": ctx, "project_dir": str(tmp_path)})
 
-        assert ti.store.get("model__pkg__failed_model_status") == "failed"
+        assert ti.store.get("model__pkg__failed_model_status") == {"status": "failed", "outlet_uris": []}
         assert ti.store.get("model__pkg__failed_model_compiled_sql") == "SELECT * FROM orders WHERE invalid_column = 1"
 
 

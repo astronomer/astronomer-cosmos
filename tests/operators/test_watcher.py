@@ -1457,6 +1457,25 @@ class TestDbtConsumerWatcherSensor:
         mock_start.assert_called_once_with(context)
         mock_stop.assert_called_once_with(context)
 
+    @patch("cosmos.operators._watcher.base.settings")
+    def test_execute_debug_mode_tracks_memory_non_deferrable(self, mock_settings):
+        """Memory tracking is started and stopped on the non-deferrable path (super().execute() loop)."""
+        mock_settings.enable_debug_mode = True
+        sensor = self.make_sensor(deferrable=False)
+        ti = MagicMock()
+        context = self.make_context(ti)
+
+        with (
+            patch("cosmos.debug.start_memory_tracking") as mock_start,
+            patch("cosmos.debug.stop_memory_tracking") as mock_stop,
+            patch("airflow.sensors.base.BaseSensorOperator.execute") as mock_super_execute,
+        ):
+            sensor.execute(context=context)
+
+        mock_super_execute.assert_called_once_with(context)
+        mock_start.assert_called_once_with(context)
+        mock_stop.assert_called_once_with(context)
+
 
 class TestDbtBuildWatcherOperator:
     def test_dbt_build_watcher_operator_raises_not_implemented_error(self):

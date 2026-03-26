@@ -7,6 +7,7 @@ from typing import Any
 
 from airflow.exceptions import AirflowException
 
+from cosmos import settings
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     _DBT_STARTUP_EVENTS_XCOM_KEY,
@@ -430,7 +431,8 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         return fetch_state()
 
-    def execute(self, context: Context, **kwargs: Any) -> None:
+    def _execute_core(self, context: Context) -> None:
+        """Run or defer the sensor. Extracted so execute() can wrap it with debug tracking."""
         if not self.deferrable:
             super().execute(context)
         elif not self.poke(context):
@@ -448,6 +450,21 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 timeout=self.execution_timeout,
                 method_name=self.execute_complete.__name__,
             )
+
+    def execute(self, context: Context, **kwargs: Any) -> None:
+        if settings.enable_debug_mode:
+            from cosmos.debug import start_memory_tracking, stop_memory_tracking
+
+            start_memory_tracking(context)
+            try:
+                self._execute_core(context)
+            finally:
+                # Use finally (not except Exception) because self.defer() raises TaskDeferred,
+                # a BaseException subclass, which would bypass an except-Exception block and
+                # leave the tracker running. Deferring is normal execution, not an error.
+                stop_memory_tracking(context)
+        else:
+            self._execute_core(context)
 
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
         status = event.get("status")

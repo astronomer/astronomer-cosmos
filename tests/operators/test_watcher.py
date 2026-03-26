@@ -1420,6 +1420,62 @@ class TestDbtConsumerWatcherSensor:
 
         assert sensor.compiled_sql == ""  # Should remain empty
 
+    @patch("cosmos.operators._watcher.base.settings")
+    def test_execute_debug_mode_tracks_memory_on_success(self, mock_settings):
+        """Memory tracking is started and stopped when poke() returns True (task completes without deferral)."""
+        mock_settings.enable_debug_mode = True
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        context = self.make_context(ti)
+
+        with (
+            patch("cosmos.debug.start_memory_tracking") as mock_start,
+            patch("cosmos.debug.stop_memory_tracking") as mock_stop,
+            patch.object(sensor, "poke", return_value=True),
+        ):
+            sensor.execute(context=context)
+
+        mock_start.assert_called_once_with(context)
+        mock_stop.assert_called_once_with(context)
+
+    @patch("cosmos.operators._watcher.base.settings")
+    def test_execute_debug_mode_tracks_memory_on_defer(self, mock_settings):
+        """Memory tracking is started and stopped even when the task defers (TaskDeferred is BaseException)."""
+        mock_settings.enable_debug_mode = True
+        sensor = self.make_sensor(deferrable=True)
+        ti = MagicMock()
+        context = self.make_context(ti)
+
+        with (
+            patch("cosmos.debug.start_memory_tracking") as mock_start,
+            patch("cosmos.debug.stop_memory_tracking") as mock_stop,
+            patch.object(sensor, "poke", return_value=False),
+            pytest.raises(TaskDeferred),
+        ):
+            sensor.execute(context=context)
+
+        mock_start.assert_called_once_with(context)
+        mock_stop.assert_called_once_with(context)
+
+    @patch("cosmos.operators._watcher.base.settings")
+    def test_execute_debug_mode_tracks_memory_non_deferrable(self, mock_settings):
+        """Memory tracking is started and stopped on the non-deferrable path (super().execute() loop)."""
+        mock_settings.enable_debug_mode = True
+        sensor = self.make_sensor(deferrable=False)
+        ti = MagicMock()
+        context = self.make_context(ti)
+
+        with (
+            patch("cosmos.debug.start_memory_tracking") as mock_start,
+            patch("cosmos.debug.stop_memory_tracking") as mock_stop,
+            patch("cosmos.operators._watcher.base.BaseSensorOperator.execute") as mock_super_execute,
+        ):
+            sensor.execute(context=context)
+
+        mock_super_execute.assert_called_once_with(context)
+        mock_start.assert_called_once_with(context)
+        mock_stop.assert_called_once_with(context)
+
 
 class TestDbtBuildWatcherOperator:
     def test_dbt_build_watcher_operator_raises_not_implemented_error(self):

@@ -31,7 +31,7 @@ class TestWatcherTrigger:
         assert args["poke_interval"] == 0.001
         assert "use_event" not in args
 
-    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Require Airflow < 3.0.0")
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Require Airflow >= 3.0.0")
     @pytest.mark.asyncio
     async def test_get_xcom_val_af3(self):
         expected_value = {"foo": "bar"}

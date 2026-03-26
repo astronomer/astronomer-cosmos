@@ -69,7 +69,7 @@ docker compose -f dev/docker-compose.yaml up -d --build
 Follow the [seven rules of a great Git commit message](https://cbea.ms/git-commit/):
 
 1. Separate subject from body with a blank line
-2. Limit the subject line to 50 characters (72 hard max)
+2. Aim for a subject line of 50 characters; do not exceed 72 characters
 3. Capitalize the subject line
 4. Do not end the subject line with a period
 5. Use the imperative mood in the subject line ("Add feature" not "Added feature")

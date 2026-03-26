@@ -103,7 +103,7 @@ def test_dbt_dag_with_watcher_kubernetes():
 
     run_dag(dag_dbt_watcher_kubernetes)
 
-    assert len(dag_dbt_watcher_kubernetes.task_dict) == 9
+    assert len(dag_dbt_watcher_kubernetes.task_dict) == 10
     tasks_names = [task.task_id for task in dag_dbt_watcher_kubernetes.topological_sort()]
 
     expected_task_names = [
@@ -116,6 +116,7 @@ def test_dbt_dag_with_watcher_kubernetes():
         "stg_payments_run",
         "customers_run",
         "orders_run",
+        "dbt_producer_watcher_gate",
     ]
     assert tasks_names == expected_task_names
 
@@ -136,6 +137,7 @@ def test_dbt_dag_with_watcher_kubernetes():
         "raw_payments_seed",
         "raw_orders_seed",
         "raw_customers_seed",
+        "dbt_producer_watcher_gate",
     }
     assert (
         dag_dbt_watcher_kubernetes.task_dict["dbt_producer_watcher"].downstream_task_ids == expected_downstream_task_ids

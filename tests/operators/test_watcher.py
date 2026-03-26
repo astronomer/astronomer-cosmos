@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
-from airflow.exceptions import AirflowException, TaskDeferred
+from airflow.exceptions import AirflowException, AirflowSkipException, TaskDeferred
 from airflow.utils.state import DagRunState
 
 try:
@@ -217,8 +217,9 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
         mock_execute.side_effect = TestException("test error")
 
-        with pytest.raises(TestException):
+        with pytest.raises(AirflowSkipException) as exc:
             op.execute(context=context)
+        assert isinstance(exc.value.__cause__, TestException)
 
         # Verify completed status was pushed even in failure case
         assert mock_ti.store.get("task_status") == "completed"
@@ -271,20 +272,36 @@ def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message
     assert any("ephemeral model or if the model sql file is empty" in message for message in caplog.messages)
 
 
-def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
+def test_dbt_producer_watcher_operator_logs_retry_message(caplog):
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    ti = _MockTI()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute", return_value="ok") as mock_execute:
+        with caplog.at_level(logging.INFO):
+            op.execute(context=context)
+
+    mock_execute.assert_called_once()
+    assert any("forces Airflow retries to 0" in message for message in caplog.messages)
+
+
+def test_dbt_producer_watcher_operator_skips_retry_attempt():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
     ti.try_number = 2
     context = {"ti": ti}
 
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
-        with caplog.at_level(logging.INFO):
-            result = op.execute(context=context)
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        pytest.raises(
+            AirflowSkipException,
+            match="DbtProducerWatcherOperator does not support Airflow retries. Detected attempt #2; skipping execution to avoid running a second dbt build.",
+        ),
+    ):
+        op.execute(context=context)
 
     mock_execute.assert_not_called()
-    assert result is None
-    assert any("does not support Airflow retries" in message for message in caplog.messages)
-    assert any("skipping execution" in message for message in caplog.messages)
 
 
 @pytest.mark.parametrize(
@@ -1293,7 +1310,7 @@ class TestDbtConsumerWatcherSensor:
 
         with pytest.raises(
             AirflowException,
-            match="The dbt build command failed in producer task. Please check the log of task dbt_producer_watcher for details.",
+            match="The dbt build command failed in the producer task. Please check the log of task dbt_producer_watcher for details.",
         ):
             sensor.poke(context)
 
@@ -1525,14 +1542,19 @@ def test_dbt_dag_with_watcher(capsys):
             invocation_mode=InvocationMode.DBT_RUNNER,
         ),
         render_config=RenderConfig(emit_datasets=False),
-        operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
+        operator_args={
+            "trigger_rule": "all_success",
+            "execution_timeout": timedelta(seconds=120),
+            "depends_on_past": True,
+        },
     )
+
     outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 23
 
-    assert len(watcher_dag.task_dict) == 14
+    assert len(watcher_dag.task_dict) == 15
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
     expected_task_names = [
         "dbt_producer_watcher",
@@ -1549,6 +1571,7 @@ def test_dbt_dag_with_watcher(capsys):
         "customers.test",
         "orders.run",
         "orders.test",
+        "dbt_producer_watcher_gate",
     ]
     assert tasks_names == expected_task_names
 
@@ -1571,7 +1594,21 @@ def test_dbt_dag_with_watcher(capsys):
         "raw_payments_seed",
         "raw_orders_seed",
         "raw_customers_seed",
+        "dbt_producer_watcher_gate",
     }
+
+    assert (
+        watcher_dag.task_dict["dbt_producer_watcher"].depends_on_past
+        and watcher_dag.task_dict["dbt_producer_watcher"].wait_for_downstream
+    )
+    assert (
+        watcher_dag.task_dict["customers.run"].depends_on_past
+        and watcher_dag.task_dict["customers.run"].wait_for_downstream
+    )
+    assert (
+        watcher_dag.task_dict["dbt_producer_watcher_gate"].depends_on_past
+        and not watcher_dag.task_dict["dbt_producer_watcher_gate"].wait_for_downstream
+    )
 
     # dbt runner logs are not captured by caplog, so we need to capture them using capsys
     capsys_output = capsys.readouterr()
@@ -1620,7 +1657,7 @@ def test_dbt_dag_with_watcher_and_group_nodes_by_folder(capsys):
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 6  # 3 seeds + 3 models
     task_ids = set(watcher_dag.task_dict)
     # 1 producer + 3 seeds + 3 model runs + 1 after_all test = 8
-    assert len(task_ids) == 8
+    assert len(task_ids) == 9
     assert "dbt_producer_watcher" in task_ids
     assert "seeds.seeds_a.products_seed" in task_ids
     assert "seeds.seeds_b.regions_seed" in task_ids
@@ -1644,6 +1681,7 @@ def test_dbt_dag_with_watcher_and_group_nodes_by_folder(capsys):
         "seeds.seeds_b.regions_seed",
         "seeds.seeds_a.products_seed",
         "seeds.seeds_b.region_managers_seed",
+        "dbt_producer_watcher_gate",
     }
     assert watcher_dag.task_dict["seeds.seeds_a.products_seed"].downstream_task_ids == {
         "models.models_a.stg_products_run"
@@ -1682,9 +1720,9 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 1
 
-    assert len(watcher_dag.task_dict) == 3
+    assert len(watcher_dag.task_dict) == 4
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
-    expected_task_names = ["dbt_producer_watcher", "raw_orders_seed", "jaffle_shop_test"]
+    expected_task_names = ["dbt_producer_watcher", "dbt_producer_watcher_gate", "raw_orders_seed", "jaffle_shop_test"]
     assert tasks_names == expected_task_names
     # Confirm that the dbt command was successfully run using the given dbt executable path:
     assert "venv-subprocess/bin/dbt'), 'build'" in caplog.text
@@ -1763,10 +1801,11 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 2
 
-    assert len(watcher_dag.task_dict) == 3
+    assert len(watcher_dag.task_dict) == 4
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
     expected_task_names = [
         "dbt_producer_watcher",
+        "dbt_producer_watcher_gate",
         "add_row_run",
         "empty_model_run",
     ]
@@ -1779,6 +1818,7 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
     assert watcher_dag.task_dict["dbt_producer_watcher"].downstream_task_ids == {
         "add_row_run",
         "empty_model_run",
+        "dbt_producer_watcher_gate",
     }
 
     assert "Total filtered nodes: 2" in caplog.text
@@ -1841,12 +1881,13 @@ def test_dbt_task_group_with_watcher():
     # assert outcome.state == DagRunState.SUCCESS
     # Fortunately, when we trigger the DAG run manually, the weight is being respected and the producer task is being picked up in advance.
 
-    assert len(dag_dbt_task_group_watcher.task_dict) == 10
+    assert len(dag_dbt_task_group_watcher.task_dict) == 11
     tasks_names = [task.task_id for task in dag_dbt_task_group_watcher.topological_sort()]
 
     expected_task_names = [
         "pre_dbt",
         "dbt_task_group.dbt_producer_watcher",
+        "dbt_task_group.dbt_producer_watcher_gate",
         "dbt_task_group.raw_customers_seed",
         "dbt_task_group.raw_orders_seed",
         "dbt_task_group.raw_payments_seed",
@@ -1861,6 +1902,7 @@ def test_dbt_task_group_with_watcher():
     assert isinstance(
         dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"], DbtProducerWatcherOperator
     )
+    assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher_gate"], EmptyOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_customers_seed"], DbtSeedWatcherOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_orders_seed"], DbtSeedWatcherOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.raw_payments_seed"], DbtSeedWatcherOperator)
@@ -1870,7 +1912,9 @@ def test_dbt_task_group_with_watcher():
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.customers_run"], DbtRunWatcherOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.orders_run"], DbtRunWatcherOperator)
 
-    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()
+    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == {
+        "dbt_task_group.dbt_producer_watcher_gate"
+    }
 
 
 @pytest.mark.integration

@@ -7,7 +7,7 @@ import zlib
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
@@ -106,6 +106,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         if self.invocation_mode == InvocationMode.SUBPROCESS:
             self.log_format = "json"
 
+        if self.depends_on_past:
+            self.wait_for_downstream = True
+
     @staticmethod
     def _serialize_event(event_message: EventMsg) -> dict[str, Any]:
         """Convert structured dbt EventMsg to plain dict."""
@@ -173,12 +176,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
-            self.log.info(
-                "Dbt WATCHER producer task does not support Airflow retries. "
-                "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
-                try_number,
+            raise AirflowSkipException(
+                "DbtProducerWatcherOperator does not support Airflow retries. "
+                f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
-            return None
 
         try:
             use_events = self.invocation_mode == InvocationMode.DBT_RUNNER and EventMsg is not None
@@ -219,9 +220,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             return return_value
 
-        except Exception:
+        except Exception as e:
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
-            raise
+            self.log.exception("DbtProducerWatcherOperator execution failed")
+            raise AirflowSkipException("Skipping execution due to task failure") from e
 
 
 class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type: ignore[misc]

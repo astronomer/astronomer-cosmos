@@ -250,6 +250,11 @@ def store_dbt_resource_status_from_log(
         if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
             if context is None:
+                logger.warning(
+                    "context is None for terminal node '%s' — XCom status will not be pushed. "
+                    "This is unexpected and should never happen; check the caller is passing context correctly.",
+                    unique_id,
+                )
                 return
             if dbt_node_resource_type == "test" and tests_per_model and test_results_per_model is not None:
                 logger.debug("Test '%s' finished with status '%s'", unique_id, dbt_node_status)

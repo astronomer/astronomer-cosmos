@@ -27,7 +27,7 @@ jobs:
     steps:
       - run: true
 
-  # Skip unit/integration tests when only non-code files changed (pre-commit/Type-Check still run).
+  # Skip unit/integration tests when only non-code files changed (Type-Check still runs).
   Check-changed-files:
     needs: Authorize
     runs-on: ubuntu-latest
@@ -96,9 +96,7 @@ jobs:
               Tiltfile) ;;
               .codespell-ignore-words) ;;
               .pre-commit-config.yaml) ;;
-              codecov.yml) ;;
               .airflow-registry.yaml) ;;
-              .coveragerc) ;;
               *) CODE_CHANGED=true; break ;;
             esac
           done <<< "$FILES"

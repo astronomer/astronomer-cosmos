@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 from airflow.models import DAG
 
-from cosmos.operators.watcher import DbtTestWatcherOperator
+from cosmos.operators.watcher import DbtProducerWatcherOperator, DbtTestWatcherOperator
 
 try:
     # Airflow 3.1 onwards
@@ -33,6 +33,7 @@ from cosmos.airflow.graph import (
 )
 from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
+    WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST,
     DbtResourceType,
     ExecutionMode,
     SourceRenderingBehavior,
@@ -1185,6 +1186,75 @@ def test_test_behavior_for_watcher_mode(test_behavior):
     if test_behavior == TestBehavior.AFTER_ALL:
         assert any(isinstance(task, DbtTestLocalOperator) for task in tasks)
         assert len(tasks) == 6
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])
+def test_watcher_producer_uses_resource_type_flag_when_selector_is_set(test_behavior):
+    """When a dbt selector is used, --exclude is ignored by dbt. The producer should use --resource-type instead."""
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    build_airflow_graph(
+        nodes=sample_nodes,
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=RenderConfig(
+            test_behavior=test_behavior,
+            selector="my_selector",
+        ),
+        dbt_project_name="astro_shop",
+    )
+    producer_task = next(task for task in dag.tasks if isinstance(task, DbtProducerWatcherOperator))
+    assert "--resource-type" in producer_task.dbt_cmd_flags
+    resource_type_idx = producer_task.dbt_cmd_flags.index("--resource-type")
+    assert producer_task.dbt_cmd_flags[resource_type_idx + 1] == WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST
+    assert producer_task.exclude is None or "resource_type:test" not in (producer_task.exclude or "")
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])
+def test_watcher_producer_uses_exclude_when_no_selector(test_behavior):
+    """Without a selector, the producer should use --exclude to filter tests (existing behavior)."""
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    build_airflow_graph(
+        nodes=sample_nodes,
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=RenderConfig(
+            test_behavior=test_behavior,
+        ),
+        dbt_project_name="astro_shop",
+    )
+    producer_task = next(task for task in dag.tasks if isinstance(task, DbtProducerWatcherOperator))
+    assert "resource_type:test" in (producer_task.exclude or "")
+    assert not producer_task.dbt_cmd_flags
 
 
 def test_custom_meta():

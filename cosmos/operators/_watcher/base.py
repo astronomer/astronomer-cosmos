@@ -313,7 +313,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         if self.depends_on_past:
             self.wait_for_downstream = True
- 
+
     @property
     def is_test_sensor(self) -> bool:
         """Whether this sensor watches aggregated test results instead of individual node results."""

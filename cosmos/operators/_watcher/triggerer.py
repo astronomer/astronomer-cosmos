@@ -43,7 +43,7 @@ class WatcherTrigger(BaseTrigger):
         poke_interval: float = 5.0,
         is_test_sensor: bool = False,
         # Accepted for upgrade-compatibility only: triggers serialized before the
-        # invocation-mode unification may still carry this kwarg. It is no longer
+        # invocation-mode unification may still carry this kwarg (Cosmos < 1.14.0). It is no longer
         # used because both SUBPROCESS and DBT_RUNNER now push the same *_status
         # XCom keys, so the trigger does not need to know the invocation mode.
         use_event: bool = True,  # noqa: ARG002

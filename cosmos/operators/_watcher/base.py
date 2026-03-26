@@ -431,52 +431,40 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         return fetch_state()
 
+    def _execute_core(self, context: Context) -> None:
+        """Run or defer the sensor. Extracted so execute() can wrap it with debug tracking."""
+        if not self.deferrable:
+            super().execute(context)
+        elif not self.poke(context):
+            self.defer(
+                trigger=WatcherTrigger(
+                    model_unique_id=self.model_unique_id,
+                    producer_task_id=self.producer_task_id,
+                    dag_id=self.dag_id,
+                    run_id=context["run_id"],
+                    map_index=context["task_instance"].map_index,
+                    use_event=self.use_event(),
+                    poke_interval=self.poke_interval,
+                    is_test_sensor=self.is_test_sensor,
+                ),
+                timeout=self.execution_timeout,
+                method_name=self.execute_complete.__name__,
+            )
+
     def execute(self, context: Context, **kwargs: Any) -> None:
         if settings.enable_debug_mode:
             from cosmos.debug import start_memory_tracking, stop_memory_tracking
 
             start_memory_tracking(context)
             try:
-                if not self.deferrable:
-                    super().execute(context)
-                elif not self.poke(context):
-                    self.defer(
-                        trigger=WatcherTrigger(
-                            model_unique_id=self.model_unique_id,
-                            producer_task_id=self.producer_task_id,
-                            dag_id=self.dag_id,
-                            run_id=context["run_id"],
-                            map_index=context["task_instance"].map_index,
-                            use_event=self.use_event(),
-                            poke_interval=self.poke_interval,
-                            is_test_sensor=self.is_test_sensor,
-                        ),
-                        timeout=self.execution_timeout,
-                        method_name=self.execute_complete.__name__,
-                    )
+                self._execute_core(context)
             finally:
                 # Use finally (not except Exception) because self.defer() raises TaskDeferred,
                 # a BaseException subclass, which would bypass an except-Exception block and
                 # leave the tracker running. Deferring is normal execution, not an error.
                 stop_memory_tracking(context)
         else:
-            if not self.deferrable:
-                super().execute(context)
-            elif not self.poke(context):
-                self.defer(
-                    trigger=WatcherTrigger(
-                        model_unique_id=self.model_unique_id,
-                        producer_task_id=self.producer_task_id,
-                        dag_id=self.dag_id,
-                        run_id=context["run_id"],
-                        map_index=context["task_instance"].map_index,
-                        use_event=self.use_event(),
-                        poke_interval=self.poke_interval,
-                        is_test_sensor=self.is_test_sensor,
-                    ),
-                    timeout=self.execution_timeout,
-                    method_name=self.execute_complete.__name__,
-                )
+            self._execute_core(context)
 
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
         status = event.get("status")

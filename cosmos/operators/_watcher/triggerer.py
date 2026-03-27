@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import json
-import zlib
 from collections.abc import AsyncIterator
 from enum import Enum
 from typing import Any
@@ -43,16 +40,19 @@ class WatcherTrigger(BaseTrigger):
         dag_id: str,
         run_id: str,
         map_index: int | None,
-        use_event: bool,
         poke_interval: float = 5.0,
         is_test_sensor: bool = False,
+        # Accepted for upgrade-compatibility only: triggers serialized before the
+        # invocation-mode unification may still carry this kwarg (Cosmos < 1.14.0). It is no longer
+        # used because both SUBPROCESS and DBT_RUNNER now push the same *_status
+        # XCom keys, so the trigger does not need to know the invocation mode.
+        use_event: bool = True,  # noqa: ARG002
     ):
         self.model_unique_id = model_unique_id
         self.producer_task_id = producer_task_id
         self.dag_id = dag_id
         self.run_id = run_id
         self.map_index = map_index
-        self.use_event = use_event
         self.poke_interval = poke_interval
         self.is_test_sensor = is_test_sensor
 
@@ -65,7 +65,6 @@ class WatcherTrigger(BaseTrigger):
                 "dag_id": self.dag_id,
                 "run_id": self.run_id,
                 "map_index": self.map_index,
-                "use_event": self.use_event,
                 "poke_interval": self.poke_interval,
                 "is_test_sensor": self.is_test_sensor,
             },
@@ -118,21 +117,8 @@ class WatcherTrigger(BaseTrigger):
             return await self.get_xcom_val_af3(key)
 
     async def _get_node_status(self) -> Any | None:
-        status_key = (
-            f"nodefinished_{self.model_unique_id.replace('.', '__')}"
-            if self.use_event
-            else f"{self.model_unique_id.replace('.', '__')}_status"
-        )
-
-        if self.use_event:
-            compressed_xcom_val = await self.get_xcom_val(status_key)
-            if not compressed_xcom_val:
-                return None
-            data_json = _parse_compressed_xcom(compressed_xcom_val)
-            status = data_json.get("data", {}).get("run_result", {}).get("status")
-        else:
-            status = await self.get_xcom_val(status_key)
-        return status
+        status_key = f"{self.model_unique_id.replace('.', '__')}_status"
+        return await self.get_xcom_val(status_key)
 
     async def _parse_dbt_node_status_and_compiled_sql(self) -> tuple[str | None, str | None]:
         """
@@ -143,9 +129,10 @@ class WatcherTrigger(BaseTrigger):
         For test sensors (``is_test_sensor=True``), the aggregated test status is
         read from the ``<model_uid>_tests_status`` key. No compiled_sql is relevant.
 
-        For regular sensors, status comes from mode-specific keys
-        (nodefinished_* for event, *_status for subprocess).
-        compiled_sql is always read from the canonical per-model key (same for both modes).
+        For regular sensors, status is read from the per-model ``*_status`` XCom key
+        pushed by store_dbt_resource_status_from_log (same key for both SUBPROCESS
+        and DBT_RUNNER invocation modes).
+        compiled_sql is always read from the canonical per-model ``*_compiled_sql`` key.
         """
         if self.is_test_sensor:
             from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key
@@ -257,10 +244,3 @@ class WatcherTrigger(BaseTrigger):
             # Sleep briefly before re-polling
             await asyncio.sleep(self.poke_interval)
             logger.debug("Polling again for node '%s' status...", self.model_unique_id)
-
-
-def _parse_compressed_xcom(compressed_b64_event_msg: str) -> Any:
-    """Decode and decompress a base64-encoded, zlib-compressed XCom payload."""
-    compressed_bytes = base64.b64decode(compressed_b64_event_msg)
-    event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")
-    return json.loads(event_json_str)

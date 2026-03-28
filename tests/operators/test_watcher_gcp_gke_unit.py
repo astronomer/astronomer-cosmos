@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 from datetime import datetime
@@ -23,13 +22,13 @@ try:
 except ImportError:
     pytest.skip("Google Cloud provider not installed", allow_module_level=True)
 
+from cosmos.operators._k8s_common import WatcherK8sCallback
 from cosmos.operators.watcher_gcp_gke import (
     DbtBuildWatcherGcpGkeOperator,
     DbtConsumerWatcherGcpGkeSensor,
     DbtProducerWatcherGcpGkeOperator,
     DbtRunWatcherGcpGkeOperator,
     DbtSeedWatcherGcpGkeOperator,
-    WatcherGcpGkeCallback,
 )
 
 GKE_KWARGS = {
@@ -52,6 +51,27 @@ def test_retries_not_forced_to_zero():
         **GKE_KWARGS,
     )
     assert op.retries == 5
+
+
+@patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.execute")
+def test_first_attempt_calls_parent_execute(mock_execute):
+    """On the first attempt (try_number=1), the producer delegates to the parent's execute."""
+    op = DbtProducerWatcherGcpGkeOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        **GKE_KWARGS,
+    )
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    mock_execute.return_value = "result"
+    result = op.execute(context=context)
+
+    mock_execute.assert_called_once()
+    assert result == "result"
 
 
 @patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.execute")
@@ -171,154 +191,15 @@ def test_retry_executes_as_dbt_run_gcp_gke_operator(mock_build_and_run_cmd):
     mock_build_and_run_cmd.assert_called_once()
 
 
-class TestCallbacksNormalization:
-    """Tests for the callbacks normalization logic in DbtProducerWatcherGcpGkeOperator."""
-
-    def test_callbacks_none_adds_watcher_callback(self):
-        """
-        Test that when callbacks is None, WatcherGcpGkeCallback is added.
-        """
-        from cosmos.operators.watcher_gcp_gke import WatcherGcpGkeCallback
-
-        op = DbtProducerWatcherGcpGkeOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=None,
-            **GKE_KWARGS,
-        )
-        assert op.callbacks == [WatcherGcpGkeCallback]
-
-    def test_callbacks_not_provided_adds_watcher_callback(self):
-        """
-        Test that when callbacks is not provided, WatcherGcpGkeCallback is added.
-        """
-        from cosmos.operators.watcher_gcp_gke import WatcherGcpGkeCallback
-
-        op = DbtProducerWatcherGcpGkeOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            **GKE_KWARGS,
-        )
-        assert op.callbacks == [WatcherGcpGkeCallback]
-
-    def test_callbacks_list_appends_watcher_callback(self):
-        """
-        Test that when callbacks is a list, WatcherGcpGkeCallback is appended.
-        """
-        from cosmos.operators.watcher_gcp_gke import WatcherGcpGkeCallback
-
-        class CustomCallback:
-            pass
-
-        op = DbtProducerWatcherGcpGkeOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=[CustomCallback],
-            **GKE_KWARGS,
-        )
-        assert op.callbacks == [CustomCallback, WatcherGcpGkeCallback]
-
-    def test_callbacks_tuple_appends_watcher_callback(self):
-        """
-        Test that when callbacks is a tuple, WatcherGcpGkeCallback is appended.
-        """
-        from cosmos.operators.watcher_gcp_gke import WatcherGcpGkeCallback
-
-        class CustomCallback:
-            pass
-
-        op = DbtProducerWatcherGcpGkeOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=(CustomCallback,),
-            **GKE_KWARGS,
-        )
-        assert op.callbacks == [CustomCallback, WatcherGcpGkeCallback]
-
-    def test_callbacks_single_value_wraps_and_appends_watcher_callback(self):
-        """
-        Test that when callbacks is a single value (not list/tuple), it is wrapped in a list
-        and WatcherGcpGkeCallback is appended.
-        """
-        from cosmos.operators.watcher_gcp_gke import WatcherGcpGkeCallback
-
-        class CustomCallback:
-            pass
-
-        op = DbtProducerWatcherGcpGkeOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=CustomCallback,
-            **GKE_KWARGS,
-        )
-        assert op.callbacks == [CustomCallback, WatcherGcpGkeCallback]
-
-    def test_callbacks_empty_list_adds_watcher_callback(self):
-        """
-        Test that when callbacks is an empty list, WatcherGcpGkeCallback is added.
-        """
-        from cosmos.operators.watcher_gcp_gke import WatcherGcpGkeCallback
-
-        op = DbtProducerWatcherGcpGkeOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=[],
-            **GKE_KWARGS,
-        )
-        assert op.callbacks == [WatcherGcpGkeCallback]
-
-    def test_callbacks_multiple_values_appends_watcher_callback(self):
-        """
-        Test that when callbacks contains multiple values, WatcherGcpGkeCallback is appended.
-        """
-        from cosmos.operators.watcher_gcp_gke import WatcherGcpGkeCallback
-
-        class CustomCallback1:
-            pass
-
-        class CustomCallback2:
-            pass
-
-        op = DbtProducerWatcherGcpGkeOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=[CustomCallback1, CustomCallback2],
-            **GKE_KWARGS,
-        )
-        assert op.callbacks == [CustomCallback1, CustomCallback2, WatcherGcpGkeCallback]
-
-
-def test_callbacks_included_in_producer_operator():
-    """
-    Test that the WatcherGcpGkeCallback is included in the callbacks of the DbtProducerWatcherGcpGkeOperator.
-    """
+def test_producer_uses_watcher_k8s_callback():
+    """Test that the WatcherK8sCallback is included in the producer's callbacks."""
     op = DbtProducerWatcherGcpGkeOperator(
         project_dir=".",
         profile_config=None,
         image="dbt-image:latest",
-        callbacks=MagicMock,
         **GKE_KWARGS,
     )
-    callback_classes = [callback.__name__ for callback in op.callbacks]
-    assert "WatcherGcpGkeCallback" in callback_classes
-    assert "MagicMock" in callback_classes
-
-    op = DbtProducerWatcherGcpGkeOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-        callbacks=[MagicMock],
-        **GKE_KWARGS,
-    )
-    callback_classes = [callback.__name__ for callback in op.callbacks]
-    assert "WatcherGcpGkeCallback" in callback_classes
+    assert WatcherK8sCallback in op.callbacks
 
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -402,56 +283,3 @@ def test_dag_structure_with_watcher_gcp_gke():
 
     expected_downstream_task_ids = {"raw_payments_seed", "raw_orders_seed", "raw_customers_seed"}
     assert dag.task_dict["dbt_producer_watcher"].downstream_task_ids == expected_downstream_task_ids
-
-
-def _make_dbt_log_line(
-    unique_id: str = "model.pkg.my_model",
-    status: str = "success",
-    event_name: str = "NodeFinished",
-    resource_type: str = "model",
-) -> str:
-    """Build a minimal dbt --log-format json line for testing the callback."""
-    return json.dumps(
-        {
-            "info": {"name": event_name, "level": "INFO", "msg": f"Node {unique_id} finished", "ts": ""},
-            "data": {
-                "node_info": {
-                    "unique_id": unique_id,
-                    "node_status": status,
-                    "resource_type": resource_type,
-                    "node_started_at": "",
-                    "node_finished_at": "",
-                }
-            },
-        }
-    )
-
-
-_CALLBACK_KWARGS = dict(client=MagicMock(), mode="sync", container_name="base", timestamp=None, pod=MagicMock())
-
-
-def test_progress_callback_calls_store_dbt_resource_status():
-    """progress_callback forwards the log line to store_dbt_resource_status_from_log."""
-    context = {"ti": MagicMock()}
-    line = _make_dbt_log_line()
-
-    with patch("cosmos.operators.watcher_gcp_gke.store_dbt_resource_status_from_log") as mock_store:
-        WatcherGcpGkeCallback.progress_callback(line=line, **_CALLBACK_KWARGS, context=context)
-        mock_store.assert_called_once_with(line, {"context": context})
-
-
-def test_progress_callback_uses_global_context_when_not_in_kwargs():
-    """Falls back to the module-level producer_task_context global."""
-    import cosmos.operators.watcher_gcp_gke as watcher_module
-
-    fake_context = {"ti": MagicMock()}
-    original = watcher_module.producer_task_context
-    try:
-        watcher_module.producer_task_context = fake_context
-
-        with patch("cosmos.operators.watcher_gcp_gke.store_dbt_resource_status_from_log") as mock_store:
-            WatcherGcpGkeCallback.progress_callback(line=_make_dbt_log_line(), **_CALLBACK_KWARGS)
-            call_kwargs = mock_store.call_args[0][1]
-            assert call_kwargs["context"] is fake_context
-    finally:
-        watcher_module.producer_task_context = original

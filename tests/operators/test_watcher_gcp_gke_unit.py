@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from datetime import datetime
@@ -28,6 +29,7 @@ from cosmos.operators.watcher_gcp_gke import (
     DbtProducerWatcherGcpGkeOperator,
     DbtRunWatcherGcpGkeOperator,
     DbtSeedWatcherGcpGkeOperator,
+    WatcherGcpGkeCallback,
 )
 
 GKE_KWARGS = {
@@ -400,3 +402,56 @@ def test_dag_structure_with_watcher_gcp_gke():
 
     expected_downstream_task_ids = {"raw_payments_seed", "raw_orders_seed", "raw_customers_seed"}
     assert dag.task_dict["dbt_producer_watcher"].downstream_task_ids == expected_downstream_task_ids
+
+
+def _make_dbt_log_line(
+    unique_id: str = "model.pkg.my_model",
+    status: str = "success",
+    event_name: str = "NodeFinished",
+    resource_type: str = "model",
+) -> str:
+    """Build a minimal dbt --log-format json line for testing the callback."""
+    return json.dumps(
+        {
+            "info": {"name": event_name, "level": "INFO", "msg": f"Node {unique_id} finished", "ts": ""},
+            "data": {
+                "node_info": {
+                    "unique_id": unique_id,
+                    "node_status": status,
+                    "resource_type": resource_type,
+                    "node_started_at": "",
+                    "node_finished_at": "",
+                }
+            },
+        }
+    )
+
+
+_CALLBACK_KWARGS = dict(client=MagicMock(), mode="sync", container_name="base", timestamp=None, pod=MagicMock())
+
+
+def test_progress_callback_calls_store_dbt_resource_status():
+    """progress_callback forwards the log line to store_dbt_resource_status_from_log."""
+    context = {"ti": MagicMock()}
+    line = _make_dbt_log_line()
+
+    with patch("cosmos.operators.watcher_gcp_gke.store_dbt_resource_status_from_log") as mock_store:
+        WatcherGcpGkeCallback.progress_callback(line=line, **_CALLBACK_KWARGS, context=context)
+        mock_store.assert_called_once_with(line, {"context": context})
+
+
+def test_progress_callback_uses_global_context_when_not_in_kwargs():
+    """Falls back to the module-level producer_task_context global."""
+    import cosmos.operators.watcher_gcp_gke as watcher_module
+
+    fake_context = {"ti": MagicMock()}
+    original = watcher_module.producer_task_context
+    try:
+        watcher_module.producer_task_context = fake_context
+
+        with patch("cosmos.operators.watcher_gcp_gke.store_dbt_resource_status_from_log") as mock_store:
+            WatcherGcpGkeCallback.progress_callback(line=_make_dbt_log_line(), **_CALLBACK_KWARGS)
+            call_kwargs = mock_store.call_args[0][1]
+            assert call_kwargs["context"] is fake_context
+    finally:
+        watcher_module.producer_task_context = original

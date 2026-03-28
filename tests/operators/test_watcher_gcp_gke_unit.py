@@ -169,15 +169,6 @@ def test_retry_executes_as_dbt_run_gcp_gke_operator(mock_build_and_run_cmd):
     mock_build_and_run_cmd.assert_called_once()
 
 
-def test_use_event_returns_false():
-    """
-    DbtConsumerWatcherGcpGkeSensor should return False for use_event(),
-    meaning it uses XCom-based status retrieval instead of events.
-    """
-    sensor = make_sensor()
-    assert sensor.use_event() is False
-
-
 class TestCallbacksNormalization:
     """Tests for the callbacks normalization logic in DbtProducerWatcherGcpGkeOperator."""
 

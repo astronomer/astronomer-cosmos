@@ -67,15 +67,18 @@ Make a new folder, ``dbt``, inside your local project's ``dags`` folder. Then, c
 
 Note: your dbt projects can go anywhere on the Airflow image. By default, Cosmos looks in the ``/usr/local/airflow/dags/dbt`` directory, but you can change this by setting the ``dbt_project_dir`` argument when you create your DAG instance.
 
-For example, if you wanted to put your dbt project in the ``/usr/local/airflow/dags/my_dbt_project`` directory, you would do:
+For example, if you wanted to put your dbt project in a directory relative to your DAG file (for example, ``my_dbt_project``), you would do:
 
 .. code-block:: python
 
+    from pathlib import Path
     from cosmos import DbtDag, ProjectConfig
 
     my_cosmos_dag = DbtDag(
         project_config=ProjectConfig(
-            dbt_project_path="/usr/local/airflow/dags/my_dbt_project",
+            dbt_project_path=(Path(__file__).parent / "my_dbt_project")
+            .absolute()
+            .to_posix(),
         ),
         # ...,
     )

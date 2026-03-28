@@ -44,7 +44,6 @@ producer_task_context = None
 
 
 class WatcherGcpGkeCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
-
     @staticmethod
     def progress_callback(
         *,
@@ -75,7 +74,6 @@ class WatcherGcpGkeCallback(KubernetesPodOperatorCallback):  # type: ignore[misc
 
 
 class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
-
     template_fields: tuple[str, ...] = tuple(DbtBuildGcpGkeOperator.template_fields) + ("deferrable",)
     _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = store_dbt_resource_status_from_log
 
@@ -177,7 +175,6 @@ class DbtRunWatcherGcpGkeOperator(DbtConsumerWatcherGcpGkeSensor):
 class DbtTestWatcherGcpGkeOperator(EmptyOperator):
     """
     As a starting point, this operator does nothing.
-    We'll be implementing this operator as part of: https://github.com/astronomer/astronomer-cosmos/issues/1974
     """
 
     def __init__(self, *args: Any, **kwargs: Any):

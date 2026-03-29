@@ -12,6 +12,7 @@ from cosmos.operators._k8s_common import (
     DbtTestWarningHandler,
     WatcherK8sCallback,
     _build_env_vars,
+    execute_watcher_producer,
     inject_watcher_callback,
 )
 from cosmos.operators.kubernetes import (
@@ -28,8 +29,20 @@ base_kwargs = {
 }
 
 
+def _make_handler(**overrides: Any) -> DbtTestWarningHandler:
+    """Create a DbtTestWarningHandler with sensible defaults."""
+    defaults: dict[str, Any] = {
+        "on_warning_callback": MagicMock(),
+        "operator": MagicMock(),
+        "test_operator_class": DbtTestKubernetesOperator,
+        "source_operator_class": DbtSourceKubernetesOperator,
+    }
+    defaults.update(overrides)
+    return DbtTestWarningHandler(**defaults)
+
+
 # ---------------------------------------------------------------------------
-# build_env_vars
+# _build_env_vars
 # ---------------------------------------------------------------------------
 
 
@@ -45,7 +58,7 @@ def test_build_env_vars_merges_env_and_existing():
 
 
 # ---------------------------------------------------------------------------
-# build_kube_args (tested via GCP GKE operator as a concrete subclass)
+# build_kube_args
 # ---------------------------------------------------------------------------
 
 
@@ -85,49 +98,31 @@ def test_container_resources_dict_converted():
 
 
 # ---------------------------------------------------------------------------
-# DbtTestWarningHandler
+# DbtTestWarningHandler._detect_standard_warnings
 # ---------------------------------------------------------------------------
 
 
-def test_detect_standard_warnings_found():
-    handler = DbtTestWarningHandler(
-        on_warning_callback=MagicMock(),
-        operator=MagicMock(),
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-    )
-    log_text = "10:29:03  Done. PASS=5 WARN=3 ERROR=0 SKIP=0 NO-OP=0 TOTAL=8"
-    assert handler._detect_standard_warnings(log_text) == 3
+@pytest.mark.parametrize(
+    ("log_text", "expected"),
+    (
+        pytest.param("10:29:03  Done. PASS=5 WARN=3 ERROR=0 SKIP=0 NO-OP=0 TOTAL=8", 3, id="found"),
+        pytest.param("10:29:03  Done. PASS=5 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=5", 0, id="zero"),
+        pytest.param("some unrelated log output", None, id="not_found"),
+    ),
+)
+def test_detect_standard_warnings(log_text: str, expected: int | None):
+    handler = _make_handler()
+    assert handler._detect_standard_warnings(log_text) == expected
 
 
-def test_detect_standard_warnings_zero():
-    handler = DbtTestWarningHandler(
-        on_warning_callback=MagicMock(),
-        operator=MagicMock(),
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-    )
-    log_text = "10:29:03  Done. PASS=5 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=5"
-    assert handler._detect_standard_warnings(log_text) == 0
-
-
-def test_detect_standard_warnings_not_found():
-    handler = DbtTestWarningHandler(
-        on_warning_callback=MagicMock(),
-        operator=MagicMock(),
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-    )
-    assert handler._detect_standard_warnings("some unrelated log output") is None
+# ---------------------------------------------------------------------------
+# DbtTestWarningHandler._detect_source_freshness_warnings
+# ---------------------------------------------------------------------------
 
 
 def test_detect_source_freshness_warnings_detailed():
-    handler = DbtTestWarningHandler(
-        on_warning_callback=MagicMock(),
-        operator=MagicMock(),
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-    )
+    """Detailed pattern extracts timestamp, source, and execution time."""
+    handler = _make_handler()
     log_text = "10:30:00  1 of 2  WARN freshness of source.my_db.my_table  [WARN in 3.5s]"
     result = handler._detect_source_freshness_warnings(log_text)
     assert len(result) == 1
@@ -138,51 +133,32 @@ def test_detect_source_freshness_warnings_detailed():
     assert result[0]["type"] == "source_freshness"
 
 
-def test_detect_source_freshness_warnings_simple_fallback():
-    handler = DbtTestWarningHandler(
-        on_warning_callback=MagicMock(),
-        operator=MagicMock(),
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-    )
-    log_text = "WARN freshness of source.db.simple_table"
+@pytest.mark.parametrize(
+    ("log_text", "expected_count", "expected_source"),
+    (
+        pytest.param("WARN freshness of source.db.simple_table", 1, "source.db.simple_table", id="simple_fallback"),
+        pytest.param(
+            "10:30:00  1 of 1  WARN freshness of source.db.tbl  [WARN in 2.0s]", 1, "source.db.tbl", id="no_dupes"
+        ),
+        pytest.param("no warnings here", 0, None, id="empty"),
+    ),
+)
+def test_detect_source_freshness_warnings(log_text: str, expected_count: int, expected_source: str | None):
+    handler = _make_handler()
     result = handler._detect_source_freshness_warnings(log_text)
-    assert len(result) == 1
-    assert result[0]["source"] == "source.db.simple_table"
-    assert "timestamp" not in result[0]
+    assert len(result) == expected_count
+    if expected_source:
+        assert result[0]["source"] == expected_source
 
 
-def test_detect_source_freshness_warnings_no_duplicates():
-    handler = DbtTestWarningHandler(
-        on_warning_callback=MagicMock(),
-        operator=MagicMock(),
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-    )
-    log_text = "10:30:00  1 of 1  WARN freshness of source.db.tbl  [WARN in 2.0s]"
-    result = handler._detect_source_freshness_warnings(log_text)
-    assert len(result) == 1
-
-
-def test_detect_source_freshness_warnings_empty():
-    handler = DbtTestWarningHandler(
-        on_warning_callback=MagicMock(),
-        operator=MagicMock(),
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-    )
-    assert handler._detect_source_freshness_warnings("no warnings here") == []
+# ---------------------------------------------------------------------------
+# DbtTestWarningHandler.on_pod_completion
+# ---------------------------------------------------------------------------
 
 
 def test_on_pod_completion_no_context_logs_warning():
     operator = MagicMock()
-    handler = DbtTestWarningHandler(
-        on_warning_callback=MagicMock(),
-        operator=operator,
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-        context=None,
-    )
+    handler = _make_handler(operator=operator, context=None)
     handler.on_pod_completion(pod=MagicMock())
     operator.log.warning.assert_called_once_with("No context provided to the DbtTestWarningHandler.")
 
@@ -191,13 +167,7 @@ def test_on_pod_completion_wrong_task_type_logs_warning():
     operator = MagicMock()
     task = MagicMock()  # not a test or source operator
     context = {"task_instance": MagicMock(task=task)}
-    handler = DbtTestWarningHandler(
-        on_warning_callback=MagicMock(),
-        operator=operator,
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-        context=context,
-    )
+    handler = _make_handler(operator=operator, context=context)
     handler.on_pod_completion(pod=MagicMock())
     operator.log.warning.assert_called_once()
     assert "Cannot handle dbt warnings" in str(operator.log.warning.call_args)
@@ -205,21 +175,13 @@ def test_on_pod_completion_wrong_task_type_logs_warning():
 
 def test_on_pod_completion_test_operator_with_warnings():
     callback = MagicMock()
-    operator = MagicMock()
     task = MagicMock(spec=DbtTestKubernetesOperator)
     task.pod_manager.read_pod_logs.return_value = [
         b"10:29:03  Running 3 tests",
         b"10:29:03  Done. PASS=2 WARN=1 ERROR=0 SKIP=0 TOTAL=3",
     ]
     context = {"task_instance": MagicMock(task=task)}
-
-    handler = DbtTestWarningHandler(
-        on_warning_callback=callback,
-        operator=operator,
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-        context=context,
-    )
+    handler = _make_handler(on_warning_callback=callback, context=context)
 
     with patch("cosmos.operators._k8s_common.extract_log_issues", return_value=(["test1"], ["warn"])):
         handler.on_pod_completion(pod=MagicMock())
@@ -229,20 +191,12 @@ def test_on_pod_completion_test_operator_with_warnings():
 
 def test_on_pod_completion_source_operator_with_freshness_warnings():
     callback = MagicMock()
-    operator = MagicMock()
     task = MagicMock(spec=DbtSourceKubernetesOperator)
     task.pod_manager.read_pod_logs.return_value = [
         b"WARN freshness of source.db.stale_table",
     ]
     context = {"task_instance": MagicMock(task=task)}
-
-    handler = DbtTestWarningHandler(
-        on_warning_callback=callback,
-        operator=operator,
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-        context=context,
-    )
+    handler = _make_handler(on_warning_callback=callback, context=context)
 
     with patch("cosmos.operators._k8s_common.extract_log_issues", return_value=(["src1"], ["warn"])):
         handler.on_pod_completion(pod=MagicMock())
@@ -258,14 +212,7 @@ def test_on_pod_completion_no_warnings_logs_failure():
         b"10:29:03  Done. PASS=5 WARN=0 ERROR=0 SKIP=0 TOTAL=5",
     ]
     context = {"task_instance": MagicMock(task=task)}
-
-    handler = DbtTestWarningHandler(
-        on_warning_callback=callback,
-        operator=operator,
-        test_operator_class=DbtTestKubernetesOperator,
-        source_operator_class=DbtSourceKubernetesOperator,
-        context=context,
-    )
+    handler = _make_handler(on_warning_callback=callback, operator=operator, context=context)
     handler.on_pod_completion(pod=MagicMock())
 
     callback.assert_not_called()
@@ -274,7 +221,7 @@ def test_on_pod_completion_no_warnings_logs_failure():
 
 
 # ---------------------------------------------------------------------------
-# setup_warning_handler
+# setup_warning_handler (via DbtTestKubernetesOperator)
 # ---------------------------------------------------------------------------
 
 
@@ -303,8 +250,10 @@ def test_warning_operator_build_and_run_cmd_sets_context(mock_super_build):
 
 
 # ---------------------------------------------------------------------------
-# inject_watcher_callback (callback normalization)
+# inject_watcher_callback
 # ---------------------------------------------------------------------------
+
+
 class CustomCallback1:
     pass
 
@@ -316,14 +265,14 @@ class CustomCallback2:
 @pytest.mark.parametrize(
     ("callbacks", "expected"),
     (
-        pytest.param(None, [WatcherK8sCallback], id="none_callbacks"),
-        pytest.param([CustomCallback1], [CustomCallback1, WatcherK8sCallback], id="list_callbacks"),
-        pytest.param((CustomCallback1,), [CustomCallback1, WatcherK8sCallback], id="tuple_callbacks"),
-        pytest.param(CustomCallback1, [CustomCallback1, WatcherK8sCallback], id="single_callback"),
+        pytest.param(None, [WatcherK8sCallback], id="none"),
+        pytest.param([CustomCallback1], [CustomCallback1, WatcherK8sCallback], id="list"),
+        pytest.param((CustomCallback1,), [CustomCallback1, WatcherK8sCallback], id="tuple"),
+        pytest.param(CustomCallback1, [CustomCallback1, WatcherK8sCallback], id="single"),
         pytest.param(
             [CustomCallback1, CustomCallback2],
             [CustomCallback1, CustomCallback2, WatcherK8sCallback],
-            id="multiple_callbacks",
+            id="multiple",
         ),
         pytest.param((), [WatcherK8sCallback], id="empty_list"),
         pytest.param((), [WatcherK8sCallback], id="empty_tuple"),
@@ -401,73 +350,43 @@ def test_progress_callback_uses_global_context_when_not_in_kwargs():
 # ---------------------------------------------------------------------------
 
 
-def test_execute_watcher_producer_calls_parent_on_first_attempt():
-    """On try_number=1, execute_watcher_producer delegates to parent_execute."""
-    from cosmos.operators._k8s_common import execute_watcher_producer
-
+@pytest.mark.parametrize(
+    ("try_number", "extra_kwargs", "expect_call", "expected_result"),
+    (
+        pytest.param(1, {}, True, "result", id="first_attempt"),
+        pytest.param(1, {"extra_arg": "value"}, True, "result", id="forwards_kwargs"),
+        pytest.param(2, {}, False, None, id="skips_retry"),
+    ),
+)
+def test_execute_watcher_producer(try_number: int, extra_kwargs: dict, expect_call: bool, expected_result: Any):
     ti = MagicMock()
-    ti.try_number = 1
+    ti.try_number = try_number
     context = {"ti": ti}
     parent_execute = MagicMock(return_value="result")
 
-    result = execute_watcher_producer(MagicMock(), context, parent_execute)
+    result = execute_watcher_producer(MagicMock(), context, parent_execute, **extra_kwargs)
 
-    parent_execute.assert_called_once_with(context)
-    assert result == "result"
-
-
-def test_execute_watcher_producer_forwards_kwargs():
-    """execute_watcher_producer must forward **kwargs to parent_execute."""
-    from cosmos.operators._k8s_common import execute_watcher_producer
-
-    ti = MagicMock()
-    ti.try_number = 1
-    context = {"ti": ti}
-    parent_execute = MagicMock(return_value="result")
-
-    result = execute_watcher_producer(MagicMock(), context, parent_execute, extra_arg="value")
-
-    parent_execute.assert_called_once_with(context, extra_arg="value")
-    assert result == "result"
-
-
-def test_execute_watcher_producer_skips_on_retry():
-    """On try_number > 1, execute_watcher_producer returns None without calling parent_execute."""
-    from cosmos.operators._k8s_common import execute_watcher_producer
-
-    ti = MagicMock()
-    ti.try_number = 2
-    context = {"ti": ti}
-    parent_execute = MagicMock()
-
-    result = execute_watcher_producer(MagicMock(), context, parent_execute)
-
-    parent_execute.assert_not_called()
-    assert result is None
+    assert result == expected_result
+    if expect_call:
+        parent_execute.assert_called_once_with(context, **extra_kwargs)
+    else:
+        parent_execute.assert_not_called()
 
 
 def test_execute_watcher_producer_raises_when_ti_missing():
-    """execute_watcher_producer raises AirflowException when context has no task instance."""
     from airflow.exceptions import AirflowException
 
-    from cosmos.operators._k8s_common import execute_watcher_producer
-
-    context = {"ti": None}
-
     with pytest.raises(AirflowException, match="expects a task instance"):
-        execute_watcher_producer(MagicMock(), context, MagicMock())
+        execute_watcher_producer(MagicMock(), {"ti": None}, MagicMock())
 
 
 def test_execute_watcher_producer_sets_global_context():
-    """execute_watcher_producer sets _producer_task_context before calling parent_execute."""
     import cosmos.operators._k8s_common as mod
-    from cosmos.operators._k8s_common import execute_watcher_producer
 
     ti = MagicMock()
     ti.try_number = 1
     context = {"ti": ti}
-
-    captured = {}
+    captured: dict[str, Any] = {}
 
     def capture_context(ctx, **kwargs):
         captured["context"] = mod._producer_task_context

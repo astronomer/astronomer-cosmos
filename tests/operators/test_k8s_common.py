@@ -12,7 +12,7 @@ from cosmos.operators._k8s_common import (
     DbtTestWarningHandler,
     WatcherK8sCallback,
     _build_env_vars,
-    init_watcher_producer,
+    inject_watcher_callback,
 )
 from cosmos.operators.kubernetes import (
     DbtRunKubernetesOperator,
@@ -90,24 +90,44 @@ def test_container_resources_dict_converted():
 
 
 def test_detect_standard_warnings_found():
-    handler = DbtTestWarningHandler(on_warning_callback=MagicMock(), operator=MagicMock())
+    handler = DbtTestWarningHandler(
+        on_warning_callback=MagicMock(),
+        operator=MagicMock(),
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+    )
     log_text = "10:29:03  Done. PASS=5 WARN=3 ERROR=0 SKIP=0 NO-OP=0 TOTAL=8"
     assert handler._detect_standard_warnings(log_text) == 3
 
 
 def test_detect_standard_warnings_zero():
-    handler = DbtTestWarningHandler(on_warning_callback=MagicMock(), operator=MagicMock())
+    handler = DbtTestWarningHandler(
+        on_warning_callback=MagicMock(),
+        operator=MagicMock(),
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+    )
     log_text = "10:29:03  Done. PASS=5 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=5"
     assert handler._detect_standard_warnings(log_text) == 0
 
 
 def test_detect_standard_warnings_not_found():
-    handler = DbtTestWarningHandler(on_warning_callback=MagicMock(), operator=MagicMock())
+    handler = DbtTestWarningHandler(
+        on_warning_callback=MagicMock(),
+        operator=MagicMock(),
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+    )
     assert handler._detect_standard_warnings("some unrelated log output") is None
 
 
 def test_detect_source_freshness_warnings_detailed():
-    handler = DbtTestWarningHandler(on_warning_callback=MagicMock(), operator=MagicMock())
+    handler = DbtTestWarningHandler(
+        on_warning_callback=MagicMock(),
+        operator=MagicMock(),
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+    )
     log_text = "10:30:00  1 of 2  WARN freshness of source.my_db.my_table  [WARN in 3.5s]"
     result = handler._detect_source_freshness_warnings(log_text)
     assert len(result) == 1
@@ -119,7 +139,12 @@ def test_detect_source_freshness_warnings_detailed():
 
 
 def test_detect_source_freshness_warnings_simple_fallback():
-    handler = DbtTestWarningHandler(on_warning_callback=MagicMock(), operator=MagicMock())
+    handler = DbtTestWarningHandler(
+        on_warning_callback=MagicMock(),
+        operator=MagicMock(),
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+    )
     log_text = "WARN freshness of source.db.simple_table"
     result = handler._detect_source_freshness_warnings(log_text)
     assert len(result) == 1
@@ -128,20 +153,36 @@ def test_detect_source_freshness_warnings_simple_fallback():
 
 
 def test_detect_source_freshness_warnings_no_duplicates():
-    handler = DbtTestWarningHandler(on_warning_callback=MagicMock(), operator=MagicMock())
+    handler = DbtTestWarningHandler(
+        on_warning_callback=MagicMock(),
+        operator=MagicMock(),
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+    )
     log_text = "10:30:00  1 of 1  WARN freshness of source.db.tbl  [WARN in 2.0s]"
     result = handler._detect_source_freshness_warnings(log_text)
     assert len(result) == 1
 
 
 def test_detect_source_freshness_warnings_empty():
-    handler = DbtTestWarningHandler(on_warning_callback=MagicMock(), operator=MagicMock())
+    handler = DbtTestWarningHandler(
+        on_warning_callback=MagicMock(),
+        operator=MagicMock(),
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+    )
     assert handler._detect_source_freshness_warnings("no warnings here") == []
 
 
 def test_on_pod_completion_no_context_logs_warning():
     operator = MagicMock()
-    handler = DbtTestWarningHandler(on_warning_callback=MagicMock(), operator=operator, context=None)
+    handler = DbtTestWarningHandler(
+        on_warning_callback=MagicMock(),
+        operator=operator,
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+        context=None,
+    )
     handler.on_pod_completion(pod=MagicMock())
     operator.log.warning.assert_called_once_with("No context provided to the DbtTestWarningHandler.")
 
@@ -153,9 +194,9 @@ def test_on_pod_completion_wrong_task_type_logs_warning():
     handler = DbtTestWarningHandler(
         on_warning_callback=MagicMock(),
         operator=operator,
-        context=context,
         test_operator_class=DbtTestKubernetesOperator,
         source_operator_class=DbtSourceKubernetesOperator,
+        context=context,
     )
     handler.on_pod_completion(pod=MagicMock())
     operator.log.warning.assert_called_once()
@@ -175,9 +216,9 @@ def test_on_pod_completion_test_operator_with_warnings():
     handler = DbtTestWarningHandler(
         on_warning_callback=callback,
         operator=operator,
-        context=context,
         test_operator_class=DbtTestKubernetesOperator,
         source_operator_class=DbtSourceKubernetesOperator,
+        context=context,
     )
 
     with patch("cosmos.operators._k8s_common.extract_log_issues", return_value=(["test1"], ["warn"])):
@@ -198,9 +239,9 @@ def test_on_pod_completion_source_operator_with_freshness_warnings():
     handler = DbtTestWarningHandler(
         on_warning_callback=callback,
         operator=operator,
-        context=context,
         test_operator_class=DbtTestKubernetesOperator,
         source_operator_class=DbtSourceKubernetesOperator,
+        context=context,
     )
 
     with patch("cosmos.operators._k8s_common.extract_log_issues", return_value=(["src1"], ["warn"])):
@@ -221,9 +262,9 @@ def test_on_pod_completion_no_warnings_logs_failure():
     handler = DbtTestWarningHandler(
         on_warning_callback=callback,
         operator=operator,
-        context=context,
         test_operator_class=DbtTestKubernetesOperator,
         source_operator_class=DbtSourceKubernetesOperator,
+        context=context,
     )
     handler.on_pod_completion(pod=MagicMock())
 
@@ -262,65 +303,42 @@ def test_warning_operator_build_and_run_cmd_sets_context(mock_super_build):
 
 
 # ---------------------------------------------------------------------------
-# init_watcher_producer (callback normalization)
+# inject_watcher_callback (callback normalization)
 # ---------------------------------------------------------------------------
+class CustomCallback1:
+    pass
 
 
-def test_init_watcher_producer_none_callbacks():
-    kwargs: dict[str, Any] = {"callbacks": None}
-    init_watcher_producer(WatcherK8sCallback, kwargs)
-    assert kwargs["callbacks"] == [WatcherK8sCallback]
+class CustomCallback2:
+    pass
 
 
-def test_init_watcher_producer_no_callbacks_key():
+@pytest.mark.parametrize(
+    ("callbacks", "expected"),
+    (
+        pytest.param(None, [WatcherK8sCallback], id="none_callbacks"),
+        pytest.param([CustomCallback1], [CustomCallback1, WatcherK8sCallback], id="list_callbacks"),
+        pytest.param((CustomCallback1,), [CustomCallback1, WatcherK8sCallback], id="tuple_callbacks"),
+        pytest.param(CustomCallback1, [CustomCallback1, WatcherK8sCallback], id="single_callback"),
+        pytest.param(
+            [CustomCallback1, CustomCallback2],
+            [CustomCallback1, CustomCallback2, WatcherK8sCallback],
+            id="multiple_callbacks",
+        ),
+        pytest.param((), [WatcherK8sCallback], id="empty_list"),
+        pytest.param((), [WatcherK8sCallback], id="empty_tuple"),
+    ),
+)
+def test_inject_watcher_callback(callbacks: list[Any] | tuple[Any] | None, expected: list[Any]) -> None:
+    kwargs: dict[str, Any] = {"callbacks": callbacks}
+    inject_watcher_callback(kwargs)
+    assert kwargs["callbacks"] == expected
+
+
+def test_inject_watcher_callback_no_callbacks_key():
     kwargs: dict[str, Any] = {}
-    init_watcher_producer(WatcherK8sCallback, kwargs)
+    inject_watcher_callback(kwargs)
     assert kwargs["callbacks"] == [WatcherK8sCallback]
-
-
-def test_init_watcher_producer_list_callbacks():
-    class CustomCallback:
-        pass
-
-    kwargs: dict[str, Any] = {"callbacks": [CustomCallback]}
-    init_watcher_producer(WatcherK8sCallback, kwargs)
-    assert kwargs["callbacks"] == [CustomCallback, WatcherK8sCallback]
-
-
-def test_init_watcher_producer_tuple_callbacks():
-    class CustomCallback:
-        pass
-
-    kwargs: dict[str, Any] = {"callbacks": (CustomCallback,)}
-    init_watcher_producer(WatcherK8sCallback, kwargs)
-    assert kwargs["callbacks"] == [CustomCallback, WatcherK8sCallback]
-
-
-def test_init_watcher_producer_single_callback():
-    class CustomCallback:
-        pass
-
-    kwargs: dict[str, Any] = {"callbacks": CustomCallback}
-    init_watcher_producer(WatcherK8sCallback, kwargs)
-    assert kwargs["callbacks"] == [CustomCallback, WatcherK8sCallback]
-
-
-def test_init_watcher_producer_empty_list():
-    kwargs: dict[str, Any] = {"callbacks": []}
-    init_watcher_producer(WatcherK8sCallback, kwargs)
-    assert kwargs["callbacks"] == [WatcherK8sCallback]
-
-
-def test_init_watcher_producer_multiple_callbacks():
-    class CustomCallback1:
-        pass
-
-    class CustomCallback2:
-        pass
-
-    kwargs: dict[str, Any] = {"callbacks": [CustomCallback1, CustomCallback2]}
-    init_watcher_producer(WatcherK8sCallback, kwargs)
-    assert kwargs["callbacks"] == [CustomCallback1, CustomCallback2, WatcherK8sCallback]
 
 
 # ---------------------------------------------------------------------------

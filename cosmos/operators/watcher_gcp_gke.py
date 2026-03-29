@@ -36,7 +36,7 @@ class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
-        _k8s_common.init_watcher_producer(_k8s_common.WatcherK8sCallback, kwargs)
+        _k8s_common.inject_watcher_callback(kwargs)
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 

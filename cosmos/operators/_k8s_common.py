@@ -12,19 +12,26 @@ import inspect
 import re
 from collections.abc import Callable
 from os import PathLike
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import kubernetes.client as k8s
 from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import convert_env_vars
 from airflow.providers.cncf.kubernetes.callbacks import client_type
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from airflow.utils.context import context_merge
 
+from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover
     from pendulum import DateTime
 
+if TYPE_CHECKING:  # pragma: no cover
+    try:
+        from airflow.sdk.definitions.context import Context
+    except ImportError:
+        from airflow.utils.context import Context  # type: ignore[attr-defined]
 try:
     # apache-airflow-providers-cncf-kubernetes >= 7.14.0
     from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback
@@ -48,9 +55,25 @@ except ImportError:
 logger = get_logger(__name__)
 
 
+# The 2 classes below are an attempt at type hinting the operators. Not perfect but workable.
+class K8sOperatorProtocol(Protocol):
+    profile_config: ProfileConfig
+    env_vars: list[k8s.V1EnvVar]
+    cmds: list[str]
+    arguments: list[str]
+    project_dir: str
+    log: Any
+    callbacks: Any
+
+    def build_kube_args(self, context: Context, cmd_flags: list[str] | None = None) -> None: ...
+
+
+class DbtK8sOperator(AbstractDbtBase, K8sOperatorProtocol): ...
+
+
 def init_k8s_operator(
-    operator: Any,
-    pod_operator_class: type,
+    operator: DbtK8sOperator,
+    pod_operator_class: type[KubernetesPodOperator],
     profile_config: Any,
     kwargs: dict[str, Any],
 ) -> None:
@@ -71,7 +94,7 @@ def init_k8s_operator(
     operator_kwargs: dict[str, Any] = {}
     operator_args: set[str] = set()
     for clazz in pod_operator_class.__mro__:
-        operator_args.update(inspect.signature(clazz.__init__).parameters.keys())
+        operator_args.update(inspect.signature(clazz.__init__).parameters.keys())  # type: ignore[misc]
         if clazz == BaseOperator:
             break
     for arg in operator_args:
@@ -98,18 +121,15 @@ def init_k8s_operator(
     pod_operator_class.__init__(operator, **operator_kwargs)
 
 
-def _build_env_vars(
-    env: dict[str, str | bytes | PathLike[Any]],
-    existing_env_vars: list[Any],
-) -> list[Any]:
+def _build_env_vars(env: dict[str, str | bytes | PathLike[Any]], existing_env_vars: list[Any]) -> list[k8s.V1EnvVar]:
     """Merge an env dict with existing K8s env vars and return the combined list."""
     env_vars_dict = {k: str(v) for k, v in env.items()}
     for ev in existing_env_vars:
         env_vars_dict[ev.name] = ev.value
-    return convert_env_vars(env_vars_dict)
+    return convert_env_vars(env_vars_dict)  # type: ignore[no-any-return]
 
 
-def build_kube_args(operator: Any, context: Any, cmd_flags: list[str] | None = None) -> None:
+def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[str] | None = None) -> None:
     """Build the dbt command, set env vars, and assign ``cmds``/``arguments`` on the operator.
 
     Always splits the executable from arguments (``self.cmds = ["dbt"]``, ``self.arguments = [...]``)
@@ -141,9 +161,9 @@ def build_kube_args(operator: Any, context: Any, cmd_flags: list[str] | None = N
 
 
 def build_and_run_cmd(
-    operator: Any,
-    pod_operator_class: type,
-    context: Any,
+    operator: DbtK8sOperator,
+    pod_operator_class: type[KubernetesPodOperator],
+    context: Context,
     cmd_flags: list[str] | None = None,
 ) -> Any:
     """Build kube args, log the command, and invoke the pod operator's ``execute``."""
@@ -174,7 +194,7 @@ _FRESHNESS_PATTERN = re.compile(
 _SIMPLE_FRESHNESS_PATTERN = re.compile(r"WARN\s+freshness\s+of\s+([^\s]+)")
 
 
-class DbtTestWarningHandler(KubernetesPodOperatorCallback):
+class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc]
     """
     Detect dbt test and source freshness warnings from pod logs.
 
@@ -189,10 +209,10 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
     def __init__(
         self,
         on_warning_callback: Callable[..., Any],
-        operator: Any,
-        context: Any | None = None,
-        test_operator_class: type | None = None,
-        source_operator_class: type | None = None,
+        operator: DbtK8sOperator,
+        test_operator_class: type,
+        source_operator_class: type,
+        context: Context | None = None,
     ) -> None:
         self.on_warning_callback = on_warning_callback
         self.operator = operator
@@ -200,7 +220,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
         self.test_operator_class = test_operator_class
         self.source_operator_class = source_operator_class
 
-    def on_pod_completion(
+    def on_pod_completion(  # type: ignore[override]
         self,
         *,
         pod: k8s.V1Pod,
@@ -227,7 +247,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
 
         # Get the logs from the pod
         logs = []
-        for log in task.pod_manager.read_pod_logs(pod, "base"):
+        for log in task.pod_manager.read_pod_logs(pod, "base"):  # type: ignore[attr-defined]
             decoded_log = log.decode("utf-8")
             if decoded_log != "":
                 logs.append(decoded_log)
@@ -318,7 +338,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):
 
 
 def setup_warning_handler(
-    operator: Any,
+    operator: DbtK8sOperator,
     on_warning_callback: Callable[..., Any] | None,
     test_operator_class: type,
     source_operator_class: type,
@@ -379,8 +399,8 @@ class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
         store_dbt_resource_status_from_log(line, kwargs)
 
 
-def init_watcher_producer(callback_class: type, kwargs: dict[str, Any]) -> None:
-    """Normalise the ``callbacks`` kwarg and append the watcher callback class."""
+def inject_watcher_callback(kwargs: dict[str, Any]) -> None:
+    """Normalize the ``callbacks`` kwarg and append ``WatcherK8sCallback``."""
     existing_callbacks = kwargs.get("callbacks")
     if existing_callbacks is None:
         normalized_callbacks: list[Any] = []
@@ -388,11 +408,13 @@ def init_watcher_producer(callback_class: type, kwargs: dict[str, Any]) -> None:
         normalized_callbacks = list(existing_callbacks)
     else:
         normalized_callbacks = [existing_callbacks]
-    normalized_callbacks.append(callback_class)
+    normalized_callbacks.append(WatcherK8sCallback)
     kwargs["callbacks"] = normalized_callbacks
 
 
-def execute_watcher_producer(operator: Any, context: Any, parent_execute: Callable[..., Any], **kwargs: Any) -> Any:
+def execute_watcher_producer(
+    operator: DbtK8sOperator, context: Context, parent_execute: Callable[..., Any], **kwargs: Any
+) -> Any:
     """Shared ``execute`` logic for K8s watcher producer operators.
 
     Handles retry skipping and sets the module-level context global so that

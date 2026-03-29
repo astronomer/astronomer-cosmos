@@ -241,7 +241,13 @@ def create_test_handler():
     mock_callback = Mock()
     mock_operator = Mock()
     mock_context = {"task_instance": Mock()}
-    handler = DbtTestWarningHandler(on_warning_callback=mock_callback, operator=mock_operator, context=mock_context)
+    handler = DbtTestWarningHandler(
+        on_warning_callback=mock_callback,
+        operator=mock_operator,
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+        context=mock_context,
+    )
     return handler, mock_callback, mock_operator, mock_context
 
 
@@ -531,9 +537,9 @@ def test_dbt_kubernetes_operator_handle_warnings_noop(
     warning_handler_no_context = DbtTestWarningHandler(
         mock_warning_callback,
         run_operator,
-        None,
         test_operator_class=DbtTestKubernetesOperator,
         source_operator_class=DbtSourceKubernetesOperator,
+        context=None,
     )
     warning_handler_no_context.on_pod_completion(pod="pod")
 
@@ -542,9 +548,9 @@ def test_dbt_kubernetes_operator_handle_warnings_noop(
     warning_handler = DbtTestWarningHandler(
         mock_warning_callback,
         run_operator,
-        context,
         test_operator_class=DbtTestKubernetesOperator,
         source_operator_class=DbtSourceKubernetesOperator,
+        context=context,
     )
     warning_handler.on_pod_completion(pod="pod")
 

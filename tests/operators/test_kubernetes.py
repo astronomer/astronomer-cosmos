@@ -11,6 +11,7 @@ from pendulum import datetime
 
 from cosmos import ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig
 from cosmos.airflow.task_group import DbtTaskGroup
+from cosmos.operators._k8s_common import DbtTestWarningHandler
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
     DbtCloneKubernetesOperator,
@@ -21,7 +22,6 @@ from cosmos.operators.kubernetes import (
     DbtSeedKubernetesOperator,
     DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
-    DbtTestWarningHandler,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -198,8 +198,8 @@ def test_dbt_kubernetes_build_command():
     """
     for command_name, command_operator in result_map.items():
         command_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
+        assert command_operator.cmds == ["dbt"]
         assert command_operator.arguments == [
-            "dbt",
             *command_name,
             "--vars",
             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
@@ -528,12 +528,24 @@ def test_dbt_kubernetes_operator_handle_warnings_noop(
         task_instance = TaskInstance(run_operator)
     context = Context(task_instance=task_instance)
 
-    warning_handler_no_context = DbtTestWarningHandler(mock_warning_callback, run_operator, None)
+    warning_handler_no_context = DbtTestWarningHandler(
+        mock_warning_callback,
+        run_operator,
+        None,
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+    )
     warning_handler_no_context.on_pod_completion(pod="pod")
 
     assert "No context provided" in caplog.text
 
-    warning_handler = DbtTestWarningHandler(mock_warning_callback, run_operator, context)
+    warning_handler = DbtTestWarningHandler(
+        mock_warning_callback,
+        run_operator,
+        context,
+        test_operator_class=DbtTestKubernetesOperator,
+        source_operator_class=DbtSourceKubernetesOperator,
+    )
     warning_handler.on_pod_completion(pod="pod")
 
     assert "Cannot handle dbt warnings for task of type" in caplog.text
@@ -559,7 +571,6 @@ def test_created_pod():
     assert container.image == "my_image"
 
     expected_container_args = [
-        "dbt",
         "ls",
         "--vars",
         "end_time: '{{ "
@@ -573,50 +584,50 @@ def test_created_pod():
         "my/dir",
     ]
     assert container.args == expected_container_args
-    assert container.command == []
+    assert container.command == ["dbt"]
 
 
 @pytest.mark.parametrize(
-    "operator_class,kwargs,expected_cmd",
+    "operator_class,kwargs,expected_args",
     [
         (
             DbtSeedKubernetesOperator,
             {"full_refresh": True},
-            ["dbt", "seed", "--full-refresh", "--project-dir", "my/dir"],
+            ["seed", "--full-refresh", "--project-dir", "my/dir"],
         ),
         (
             DbtBuildKubernetesOperator,
             {"full_refresh": True},
-            ["dbt", "build", "--full-refresh", "--project-dir", "my/dir"],
+            ["build", "--full-refresh", "--project-dir", "my/dir"],
         ),
         (
             DbtRunKubernetesOperator,
             {"full_refresh": True},
-            ["dbt", "run", "--full-refresh", "--project-dir", "my/dir"],
+            ["run", "--full-refresh", "--project-dir", "my/dir"],
         ),
         (
             DbtTestKubernetesOperator,
             {},
-            ["dbt", "test", "--project-dir", "my/dir"],
+            ["test", "--project-dir", "my/dir"],
         ),
         (
             DbtTestKubernetesOperator,
             {"select": []},
-            ["dbt", "test", "--project-dir", "my/dir"],
+            ["test", "--project-dir", "my/dir"],
         ),
         (
             DbtTestKubernetesOperator,
             {"full_refresh": True, "select": ["tag:daily"], "exclude": ["tag:disabled"]},
-            ["dbt", "test", "--select", "tag:daily", "--exclude", "tag:disabled", "--project-dir", "my/dir"],
+            ["test", "--select", "tag:daily", "--exclude", "tag:disabled", "--project-dir", "my/dir"],
         ),
         (
             DbtTestKubernetesOperator,
             {"full_refresh": True, "selector": "nightly_snowplow"},
-            ["dbt", "test", "--selector", "nightly_snowplow", "--project-dir", "my/dir"],
+            ["test", "--selector", "nightly_snowplow", "--project-dir", "my/dir"],
         ),
     ],
 )
-def test_operator_execute_with_flags(operator_class, kwargs, expected_cmd):
+def test_operator_execute_with_flags(operator_class, kwargs, expected_args):
     task = operator_class(
         task_id="my-task",
         project_dir="my/dir",
@@ -640,9 +651,11 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_cmd):
             if e != get_or_create_pod.side_effect:
                 raise
 
-    pod_args = get_or_create_pod.call_args.kwargs["pod_request_obj"].to_dict()["spec"]["containers"][0]["args"]
+    container = get_or_create_pod.call_args.kwargs["pod_request_obj"].to_dict()["spec"]["containers"][0]
 
-    assert expected_cmd == pod_args
+    # build_kube_args now splits the executable into cmds and arguments
+    assert container["command"] == ["dbt"]
+    assert container["args"] == expected_args
 
 
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"

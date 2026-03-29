@@ -53,6 +53,9 @@ class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
 class DbtConsumerWatcherGcpGkeSensor(BaseConsumerSensor, DbtRunGcpGkeOperator):
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunGcpGkeOperator.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the
 # producer task. That said, it is important to raise an exception if users attempt to use TestBehavior.BUILD,
@@ -72,6 +75,9 @@ class DbtSeedWatcherGcpGkeOperator(DbtSeedMixin, DbtConsumerWatcherGcpGkeSensor)
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtSnapshotWatcherGcpGkeOperator(DbtSnapshotMixin, DbtConsumerWatcherGcpGkeSensor):  # type: ignore[misc]
     """
@@ -79,6 +85,9 @@ class DbtSnapshotWatcherGcpGkeOperator(DbtSnapshotMixin, DbtConsumerWatcherGcpGk
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtSourceWatcherGcpGkeOperator(DbtSourceGcpGkeOperator):
@@ -88,6 +97,9 @@ class DbtSourceWatcherGcpGkeOperator(DbtSourceGcpGkeOperator):
 
     template_fields: tuple[str, ...] = tuple(DbtSourceGcpGkeOperator.template_fields)  # type: ignore[arg-type]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtRunWatcherGcpGkeOperator(DbtConsumerWatcherGcpGkeSensor):
     """
@@ -95,6 +107,9 @@ class DbtRunWatcherGcpGkeOperator(DbtConsumerWatcherGcpGkeSensor):
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtTestWatcherGcpGkeOperator(EmptyOperator):

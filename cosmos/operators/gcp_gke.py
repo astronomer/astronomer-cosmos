@@ -95,11 +95,17 @@ class DbtBuildGcpGkeOperator(DbtBuildMixin, DbtGcpGkeBaseOperator):
 
     template_fields: Sequence[str] = DbtGcpGkeBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtLSGcpGkeOperator(DbtLSMixin, DbtGcpGkeBaseOperator):
     """
     Executes a dbt core ls command.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtSeedGcpGkeOperator(DbtSeedMixin, DbtGcpGkeBaseOperator):
@@ -109,11 +115,17 @@ class DbtSeedGcpGkeOperator(DbtSeedMixin, DbtGcpGkeBaseOperator):
 
     template_fields: Sequence[str] = DbtGcpGkeBaseOperator.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtSnapshotGcpGkeOperator(DbtSnapshotMixin, DbtGcpGkeBaseOperator):
     """
     Executes a dbt core snapshot command.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtTestGcpGkeOperator(DbtTestMixin, DbtWarningGcpGkeOperator):
@@ -121,11 +133,17 @@ class DbtTestGcpGkeOperator(DbtTestMixin, DbtWarningGcpGkeOperator):
     Executes a dbt core test command.
     """
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtSourceGcpGkeOperator(DbtSourceMixin, DbtWarningGcpGkeOperator):
     """
     Executes a dbt source freshness command.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtRunGcpGkeOperator(DbtRunMixin, DbtGcpGkeBaseOperator):
@@ -135,6 +153,9 @@ class DbtRunGcpGkeOperator(DbtRunMixin, DbtGcpGkeBaseOperator):
 
     template_fields: Sequence[str] = DbtGcpGkeBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtRunOperationGcpGkeOperator(DbtRunOperationMixin, DbtGcpGkeBaseOperator):
     """
@@ -143,8 +164,14 @@ class DbtRunOperationGcpGkeOperator(DbtRunOperationMixin, DbtGcpGkeBaseOperator)
 
     template_fields: Sequence[str] = DbtGcpGkeBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtCloneGcpGkeOperator(DbtCloneMixin, DbtGcpGkeBaseOperator):
     """
     Executes a dbt core clone command.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)

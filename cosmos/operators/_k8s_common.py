@@ -149,7 +149,8 @@ def build_and_run_cmd(
     """Build kube args, log the command, and invoke the pod operator's ``execute``."""
     operator.invoke_interceptors(context)
     operator.build_kube_args(context, cmd_flags)
-    operator.log.info(f"Running command: {operator.arguments}")
+    # Log the full command (executable + arguments) for accurate, debuggable output.
+    operator.log.info(f"Running command: {operator.cmds + operator.arguments}")
     result = pod_operator_class.execute(operator, context)
     operator.log.info(result)
 
@@ -391,7 +392,7 @@ def init_watcher_producer(callback_class: type, kwargs: dict[str, Any]) -> None:
     kwargs["callbacks"] = normalized_callbacks
 
 
-def execute_watcher_producer(operator: Any, context: Any, parent_execute: Callable[..., Any]) -> Any:
+def execute_watcher_producer(operator: Any, context: Any, parent_execute: Callable[..., Any], **kwargs: Any) -> Any:
     """Shared ``execute`` logic for K8s watcher producer operators.
 
     Handles retry skipping and sets the module-level context global so that
@@ -417,4 +418,4 @@ def execute_watcher_producer(operator: Any, context: Any, parent_execute: Callab
     # during the operator's execution.
     global _producer_task_context
     _producer_task_context = context
-    return parent_execute(context)
+    return parent_execute(context, **kwargs)

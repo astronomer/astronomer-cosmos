@@ -47,7 +47,7 @@ class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
     def execute(self, context: Context, **kwargs: Any) -> Any:
         # Bind before passing, because bare super() doesn't work inside lambdas or when called outside this method.
         parent_execute = super().execute
-        return _k8s_common.execute_watcher_producer(self, context, parent_execute)
+        return _k8s_common.execute_watcher_producer(self, context, parent_execute, **kwargs)
 
 
 class DbtConsumerWatcherGcpGkeSensor(BaseConsumerSensor, DbtRunGcpGkeOperator):

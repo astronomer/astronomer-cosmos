@@ -15,7 +15,7 @@ try:
 except ImportError:
     raise ImportError(
         "Could not import GKEStartPodOperator. Ensure you've installed the Google Cloud provider "
-        "separately or with `pip install astronomer-cosmos[...,google]`."
+        "separately or with `pip install astronomer-cosmos[google]`."
     )
 
 import cosmos.operators._k8s_common as _k8s_common

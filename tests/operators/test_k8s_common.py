@@ -6,6 +6,8 @@ import json
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from cosmos.operators._k8s_common import (
     DbtTestWarningHandler,
     WatcherK8sCallback,
@@ -372,5 +374,89 @@ def test_progress_callback_uses_global_context_when_not_in_kwargs():
             WatcherK8sCallback.progress_callback(line=_make_dbt_log_line(), **_CALLBACK_KWARGS)
             call_kwargs = mock_store.call_args[0][1]
             assert call_kwargs["context"] is fake_context
+    finally:
+        mod._producer_task_context = original
+
+
+# ---------------------------------------------------------------------------
+# execute_watcher_producer
+# ---------------------------------------------------------------------------
+
+
+def test_execute_watcher_producer_calls_parent_on_first_attempt():
+    """On try_number=1, execute_watcher_producer delegates to parent_execute."""
+    from cosmos.operators._k8s_common import execute_watcher_producer
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+    parent_execute = MagicMock(return_value="result")
+
+    result = execute_watcher_producer(MagicMock(), context, parent_execute)
+
+    parent_execute.assert_called_once_with(context)
+    assert result == "result"
+
+
+def test_execute_watcher_producer_forwards_kwargs():
+    """execute_watcher_producer must forward **kwargs to parent_execute."""
+    from cosmos.operators._k8s_common import execute_watcher_producer
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+    parent_execute = MagicMock(return_value="result")
+
+    result = execute_watcher_producer(MagicMock(), context, parent_execute, extra_arg="value")
+
+    parent_execute.assert_called_once_with(context, extra_arg="value")
+    assert result == "result"
+
+
+def test_execute_watcher_producer_skips_on_retry():
+    """On try_number > 1, execute_watcher_producer returns None without calling parent_execute."""
+    from cosmos.operators._k8s_common import execute_watcher_producer
+
+    ti = MagicMock()
+    ti.try_number = 2
+    context = {"ti": ti}
+    parent_execute = MagicMock()
+
+    result = execute_watcher_producer(MagicMock(), context, parent_execute)
+
+    parent_execute.assert_not_called()
+    assert result is None
+
+
+def test_execute_watcher_producer_raises_when_ti_missing():
+    """execute_watcher_producer raises AirflowException when context has no task instance."""
+    from airflow.exceptions import AirflowException
+
+    from cosmos.operators._k8s_common import execute_watcher_producer
+
+    context = {"ti": None}
+
+    with pytest.raises(AirflowException, match="expects a task instance"):
+        execute_watcher_producer(MagicMock(), context, MagicMock())
+
+
+def test_execute_watcher_producer_sets_global_context():
+    """execute_watcher_producer sets _producer_task_context before calling parent_execute."""
+    import cosmos.operators._k8s_common as mod
+    from cosmos.operators._k8s_common import execute_watcher_producer
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    captured = {}
+
+    def capture_context(ctx, **kwargs):
+        captured["context"] = mod._producer_task_context
+
+    original = mod._producer_task_context
+    try:
+        execute_watcher_producer(MagicMock(), context, capture_context)
+        assert captured["context"] is context
     finally:
         mod._producer_task_context = original

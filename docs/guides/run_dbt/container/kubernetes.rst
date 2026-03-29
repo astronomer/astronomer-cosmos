@@ -172,7 +172,7 @@ GCP GKE execution mode
 ``ExecutionMode.GCP_GKE`` works the same way as ``ExecutionMode.KUBERNETES`` but uses the
 `GKEStartPodOperator <https://airflow.apache.org/docs/apache-airflow-providers-google/stable/_api/airflow/providers/google/cloud/operators/kubernetes_engine/index.html>`_
 instead of ``KubernetesPodOperator``. This is the recommended mode for users running
-dbt on Google Kubernetes Engine, as it handles GKE authentication automatically and let's you select the cluster to use.
+dbt on Google Kubernetes Engine, as it handles GKE authentication automatically and lets you select the cluster to use.
 
 The ``GKEStartPodOperator`` requires three additional parameters in ``operator_args``:
 
@@ -208,7 +208,7 @@ To use this mode, install the Google Cloud provider:
 
 .. code-block:: bash
 
-    pip install "astronomer-cosmos[dbt-bigquery]" apache-airflow-providers-google
+    pip install "astronomer-cosmos[google]"
 
 .. _kubernetes-known-limitations:
 

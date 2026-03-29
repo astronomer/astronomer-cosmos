@@ -238,7 +238,7 @@ To use this mode, install the Google Cloud provider:
 
 .. code-block:: bash
 
-    pip install "astronomer-cosmos[dbt-bigquery]" apache-airflow-providers-google
+    pip install "astronomer-cosmos[google]"
 
 -------------------------------------------------------------------------------
 

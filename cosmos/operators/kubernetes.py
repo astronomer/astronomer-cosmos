@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from abc import ABC
 from collections.abc import Callable, Sequence
-from os import PathLike
 from typing import TYPE_CHECKING, Any
 
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator

@@ -14,7 +14,7 @@ By default this is not enabled; you can enable it with:
 
 or
 
-.. code-block:: python
+.. code-block:: bash
 
     AIRFLOW__COSMOS__RICH_LOGGING = "True"
 

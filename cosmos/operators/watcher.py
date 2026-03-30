@@ -7,12 +7,20 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
+
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
+    DbtResourceType,
 )
+from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
 from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.base import (
@@ -44,6 +52,49 @@ except ImportError:  # pragma: no cover
     from airflow.models.abstractoperator import DEFAULT_QUEUE  # type: ignore[no-redef]
 
 logger = get_logger(__name__)
+
+
+def _default_freshness_callback(
+    context: Any,
+    dag: Any,
+    task_group: TaskGroup | None,
+    nodes: dict[str, DbtNode] | None,
+    sources_json: dict[str, Any] | None,
+) -> tuple[list[str], str]:
+    """Return unique_ids of all nodes that transitively depend on a stale source, plus the status ``"skip"``.
+
+    Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``.
+    Traversal is BFS over the reverse-dependency graph built from ``nodes``.
+    """
+    if not nodes or not sources_json:
+        return [], "skip"
+
+    stale_source_ids = {r["unique_id"] for r in sources_json.get("results", []) if r.get("status") in ("error", "warn")}
+    if not stale_source_ids:
+        return [], "skip"
+
+    # Build reverse map: dep_id -> set of node_ids that directly depend on it
+    dependents: dict[str, set[str]] = {}
+    for node_id, node in nodes.items():
+        for dep_id in node.depends_on:
+            dependents.setdefault(dep_id, set()).add(node_id)
+
+    # BFS from each stale source to collect all transitive dependents
+    _excludable_resource_types = {DbtResourceType.MODEL, DbtResourceType.SEED, DbtResourceType.SNAPSHOT}
+    visited: set[str] = set()
+    queue = list(stale_source_ids)
+    while queue:
+        current = queue.pop()
+        for dependent_id in dependents.get(current, set()):
+            if dependent_id not in visited:
+                visited.add(dependent_id)
+                queue.append(dependent_id)
+
+    # Only return model/seed/snapshot nodes — tests are skipped automatically when their parent is excluded,
+    # and test hash-suffixed unique_ids are not valid dbt --exclude selectors.
+    excludable = [uid for uid in visited if nodes.get(uid) and nodes[uid].resource_type in _excludable_resource_types]
+    logger.info("Nodes to skip due to stale sources: %s", excludable)
+    return excludable, "skip"
 
 
 class _NullWriter:
@@ -81,6 +132,13 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     As each ``NodeFinished`` event arrives the operator pushes the per-model status to XCom under
     key ``<unique_id>_status`` so downstream sensors can react without waiting for the full build
     to complete.
+
+    When SourceRenderingBehavior is not NONE the producer first runs
+    ``dbt source freshness``, reads ``target/sources.json``, and for every stale source:
+
+    - pushes a synthetic ``"skipped"`` XCom entry for every model that transitively depends on that
+      source so consumer sensors raise ``AirflowSkipException`` instead of waiting;
+    - adds those models to the ``--exclude`` list of the subsequent ``dbt build`` call.
     """
 
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
@@ -92,6 +150,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self.test_results_per_model: dict[str, list[str]] = {}
+        self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
+        self._freshness_callback: Callable[
+            [Any, Any, TaskGroup | None, dict[str, DbtNode] | None, dict[str, Any] | None],
+            tuple[list[str], str],
+        ] = _default_freshness_callback
         # Do not publish compiled_sql to the producer's rendered_template: it would contain SQL for
         # all models run by the producer, is often truncated in the UI due to size, and is of no use
         # there; individual sensor tasks show the corresponding rendered_template per model.
@@ -172,6 +235,71 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             return result
         return super().run_dbt_runner(command, env, cwd, **kwargs)
 
+    def _push_skipped_xcom_for_model(self, ti: Any, unique_id: str) -> None:
+        """Push a synthetic ``"skipped"`` status XCom for a model excluded due to a stale upstream source.
+
+        Both invocation modes (SUBPROCESS and DBT_RUNNER) now use the canonical ``{uid}_status`` key,
+        so no branching on invocation mode is needed.
+        """
+        uid_key = unique_id.replace(".", "__")
+        safe_xcom_push(task_instance=ti, key=f"{uid_key}_status", value="skipped")
+
+    def _run_source_freshness(self, context: Any) -> None:
+        """Run ``dbt source freshness`` via ``build_cmd`` and ``run_command`` (temp dir, profile, deps like ``dbt build``)."""
+        original_base_cmd = self.base_cmd
+        original_indirect_selection = getattr(self, "indirect_selection", None)
+        try:
+            self.base_cmd = ["source", "freshness"]
+            self.indirect_selection = None  # ``dbt source freshness`` does not support --indirect-selection
+            full_cmd, env = self.build_cmd(context=context, cmd_flags=self.add_cmd_flags())
+            context["_check_source_freshness"] = True  # type: ignore[typeddict-unknown-key]  # signal run_command to read sources.json and return early
+            self.run_command(cmd=full_cmd, env=env, context=context)
+        finally:
+            self.base_cmd = original_base_cmd
+            self.indirect_selection = original_indirect_selection
+            context.pop("_check_source_freshness", None)  # type: ignore[typeddict-item]
+
+    def _skipped_node_token(self, context: Any, node_unique_ids: list[str]) -> None:
+        if not node_unique_ids:
+            return
+
+        ti = context["ti"]
+
+        for unique_id in node_unique_ids:
+            logger.info(
+                "Marking resource '%s' as skipped (stale upstream source)",
+                unique_id,
+            )
+            self._push_skipped_xcom_for_model(ti, unique_id)
+
+        model_names = {uid.rsplit(".", 1)[-1] for uid in node_unique_ids}
+
+        current_exclude = getattr(self, "exclude", None)
+
+        if isinstance(current_exclude, str):
+            current_set = set(current_exclude.split())
+        elif isinstance(current_exclude, (list, set, tuple)):
+            current_set = set(current_exclude)
+        else:
+            current_set = set()
+
+        updated_exclude = current_set | model_names
+        self.exclude = " ".join(sorted(updated_exclude))
+
+        logger.info("dbt build --exclude updated: %s", self.exclude)
+
+    def _apply_source_freshness(self, context: Any) -> None:
+        """Run freshness, filter stale sources via callback, then skip XCom + ``--exclude`` for downstream resources."""
+        self._run_source_freshness(context)
+        dbt_nodes = getattr(getattr(getattr(self, "dag", None), "dbt_graph", None), "nodes", None)
+        node_unique_ids, status = self._freshness_callback(
+            context, self.dag, self.task_group, dbt_nodes, self._sources_json
+        )
+        if not node_unique_ids:
+            return
+        if status == "skip":
+            self._skipped_node_token(context, node_unique_ids)
+
     def execute(self, context: Context, **kwargs: Any) -> Any:
         task_instance = context.get("ti")
         if task_instance is None:
@@ -186,6 +314,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 try_number,
             )
             return None
+
+        if self._check_source_freshness:
+            self._apply_source_freshness(context)
 
         try:
             return_value = super().execute(context=context, **kwargs)

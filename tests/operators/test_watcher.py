@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
@@ -19,7 +20,13 @@ from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
-from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
+from cosmos.constants import (
+    _DBT_STARTUP_EVENTS_XCOM_KEY,
+    PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
+    DbtResourceType,
+    ExecutionMode,
+)
+from cosmos.dbt.graph import DbtNode
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
@@ -29,6 +36,7 @@ from cosmos.operators.watcher import (
     DbtRunWatcherOperator,
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
+    _default_freshness_callback,
     store_dbt_resource_status_from_log,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
@@ -1922,3 +1930,240 @@ class TestDbtTestWatcherOperator:
 
         with pytest.raises(AirflowException, match="Test re-execution is not yet supported"):
             sensor.poke(context)
+
+
+# ---------------------------------------------------------------------------
+# Tests for source freshness feature (_check_source_freshness=True)
+# ---------------------------------------------------------------------------
+
+
+def _make_dbt_node(unique_id: str, resource_type: DbtResourceType, depends_on: list[str]) -> DbtNode:
+    return DbtNode(
+        unique_id=unique_id,
+        resource_type=resource_type,
+        depends_on=depends_on,
+        path_base=Path("/tmp"),
+        original_file_path=Path("/tmp/fake.sql"),
+    )
+
+
+class TestDefaultFreshnessCallback:
+    """Unit tests for the _default_freshness_callback helper."""
+
+    SOURCE_ID = "source.proj.raw.orders"
+    MODEL_ID = "model.proj.stg_orders"
+    MODEL_ID_2 = "model.proj.orders"
+    TEST_ID = "test.proj.not_null_stg_orders_id.abc123"
+
+    def test_returns_empty_when_nodes_is_none(self):
+        result_ids, status = _default_freshness_callback(None, None, None, None, {"results": []})
+        assert result_ids == []
+        assert status == "skip"
+
+    def test_returns_empty_when_sources_json_is_none(self):
+        nodes = {self.MODEL_ID: _make_dbt_node(self.MODEL_ID, DbtResourceType.MODEL, [self.SOURCE_ID])}
+        result_ids, status = _default_freshness_callback(None, None, None, nodes, None)
+        assert result_ids == []
+        assert status == "skip"
+
+    def test_returns_empty_when_no_stale_sources(self):
+        nodes = {self.MODEL_ID: _make_dbt_node(self.MODEL_ID, DbtResourceType.MODEL, [self.SOURCE_ID])}
+        sources_json = {"results": [{"unique_id": self.SOURCE_ID, "status": "pass"}]}
+        result_ids, status = _default_freshness_callback(None, None, None, nodes, sources_json)
+        assert result_ids == []
+        assert status == "skip"
+
+    def test_returns_direct_dependent_model(self):
+        nodes = {
+            self.SOURCE_ID: _make_dbt_node(self.SOURCE_ID, DbtResourceType.SOURCE, []),
+            self.MODEL_ID: _make_dbt_node(self.MODEL_ID, DbtResourceType.MODEL, [self.SOURCE_ID]),
+        }
+        sources_json = {"results": [{"unique_id": self.SOURCE_ID, "status": "error"}]}
+        result_ids, status = _default_freshness_callback(None, None, None, nodes, sources_json)
+        assert result_ids == [self.MODEL_ID]
+        assert status == "skip"
+
+    def test_returns_transitive_dependents(self):
+        # source → model_1 → model_2
+        model_1 = "model.proj.stg_orders"
+        model_2 = "model.proj.orders"
+        nodes = {
+            self.SOURCE_ID: _make_dbt_node(self.SOURCE_ID, DbtResourceType.SOURCE, []),
+            model_1: _make_dbt_node(model_1, DbtResourceType.MODEL, [self.SOURCE_ID]),
+            model_2: _make_dbt_node(model_2, DbtResourceType.MODEL, [model_1]),
+        }
+        sources_json = {"results": [{"unique_id": self.SOURCE_ID, "status": "warn"}]}
+        result_ids, status = _default_freshness_callback(None, None, None, nodes, sources_json)
+        assert sorted(result_ids) == sorted([model_1, model_2])
+        assert status == "skip"
+
+    def test_test_nodes_are_filtered_out(self):
+        """Test nodes that depend on a stale source must not be returned — dbt skips them automatically."""
+        nodes = {
+            self.SOURCE_ID: _make_dbt_node(self.SOURCE_ID, DbtResourceType.SOURCE, []),
+            self.MODEL_ID: _make_dbt_node(self.MODEL_ID, DbtResourceType.MODEL, [self.SOURCE_ID]),
+            self.TEST_ID: _make_dbt_node(self.TEST_ID, DbtResourceType.TEST, [self.MODEL_ID]),
+        }
+        sources_json = {"results": [{"unique_id": self.SOURCE_ID, "status": "error"}]}
+        result_ids, status = _default_freshness_callback(None, None, None, nodes, sources_json)
+        assert self.TEST_ID not in result_ids
+        assert self.MODEL_ID in result_ids
+
+    def test_unrelated_models_not_included(self):
+        unrelated = "model.proj.unrelated"
+        nodes = {
+            self.SOURCE_ID: _make_dbt_node(self.SOURCE_ID, DbtResourceType.SOURCE, []),
+            self.MODEL_ID: _make_dbt_node(self.MODEL_ID, DbtResourceType.MODEL, [self.SOURCE_ID]),
+            unrelated: _make_dbt_node(unrelated, DbtResourceType.MODEL, []),
+        }
+        sources_json = {"results": [{"unique_id": self.SOURCE_ID, "status": "error"}]}
+        result_ids, _ = _default_freshness_callback(None, None, None, nodes, sources_json)
+        assert unrelated not in result_ids
+        assert self.MODEL_ID in result_ids
+
+
+class TestProducerSourceFreshness:
+    """Unit tests for DbtProducerWatcherOperator source-freshness logic."""
+
+    SOURCE_ID = "source.proj.raw.orders"
+    MODEL_ID = "model.proj.stg_orders"
+    MODEL_NAME = "stg_orders"
+
+    def _make_op(self, **kwargs: Any) -> DbtProducerWatcherOperator:
+        return DbtProducerWatcherOperator(
+            project_dir="/tmp/proj",
+            profile_config=None,
+            **kwargs,
+        )
+
+    def test_run_source_freshness_sets_base_cmd_and_restores_it(self):
+        op = self._make_op()
+        original_base_cmd = list(op.base_cmd)
+        context: Any = {"ti": MagicMock(), "run_id": "test_run"}
+        with (
+            patch.object(op, "build_cmd", return_value=(["dbt", "source", "freshness"], {})) as mock_build,
+            patch.object(op, "run_command") as mock_run,
+        ):
+            op._run_source_freshness(context)
+        mock_build.assert_called_once_with(context=context, cmd_flags=["--log-format", "json"])
+        mock_run.assert_called_once_with(cmd=["dbt", "source", "freshness"], env={}, context=context)
+        assert op.base_cmd == original_base_cmd
+
+    def test_run_source_freshness_restores_base_cmd_on_error(self):
+        op = self._make_op()
+        original_base_cmd = list(op.base_cmd)
+        context: Any = {"ti": MagicMock(), "run_id": "test_run"}
+        with (
+            patch.object(op, "build_cmd", return_value=([], {})),
+            patch.object(op, "run_command", side_effect=RuntimeError("dbt error")),
+            pytest.raises(RuntimeError),
+        ):
+            op._run_source_freshness(context)
+        assert op.base_cmd == original_base_cmd
+
+    def test_push_skipped_xcom_pushes_status_key(self):
+        """Both invocation modes now use the unified {uid}_status XCom key."""
+        op = self._make_op()
+        mock_ti = MagicMock()
+        with patch("cosmos.operators.watcher.safe_xcom_push") as mock_push:
+            op._push_skipped_xcom_for_model(mock_ti, self.MODEL_ID)
+        mock_push.assert_called_once_with(
+            task_instance=mock_ti,
+            key=f"{self.MODEL_ID.replace('.', '__')}_status",
+            value="skipped",
+        )
+
+    def test_skipped_node_token_pushes_xcom_and_updates_exclude(self):
+        op = self._make_op()
+        context: Any = {"ti": MagicMock()}
+        with patch.object(op, "_push_skipped_xcom_for_model") as mock_push:
+            op._skipped_node_token(context, [self.MODEL_ID])
+        mock_push.assert_called_once_with(context["ti"], self.MODEL_ID)
+        assert self.MODEL_NAME in op.exclude
+
+    def test_skipped_node_token_noop_on_empty_list(self):
+        op = self._make_op()
+        context: Any = {"ti": MagicMock()}
+        with patch.object(op, "_push_skipped_xcom_for_model") as mock_push:
+            op._skipped_node_token(context, [])
+        mock_push.assert_not_called()
+        assert not (op.exclude or "").strip()
+
+    def test_skipped_node_token_merges_with_existing_exclude(self):
+        op = self._make_op()
+        op.exclude = "already_excluded"
+        context: Any = {"ti": MagicMock()}
+        with patch.object(op, "_push_skipped_xcom_for_model"):
+            op._skipped_node_token(context, [self.MODEL_ID])
+        assert "already_excluded" in op.exclude
+        assert self.MODEL_NAME in op.exclude
+
+    @pytest.mark.parametrize(
+        "existing_exclude",
+        [
+            ["already_excluded"],
+            {"already_excluded"},
+            ("already_excluded",),
+        ],
+        ids=["list", "set", "tuple"],
+    )
+    def test_skipped_node_token_merges_with_list_set_tuple_exclude(self, existing_exclude: Any):
+        """When existing exclude is a list, set, or tuple it should be merged with the new model name."""
+        op = self._make_op()
+        op.exclude = existing_exclude
+        context: Any = {"ti": MagicMock()}
+        with patch.object(op, "_push_skipped_xcom_for_model"):
+            op._skipped_node_token(context, [self.MODEL_ID])
+        assert "already_excluded" in op.exclude
+        assert self.MODEL_NAME in op.exclude
+
+    def test_apply_source_freshness_calls_callback_and_skips_nodes(self):
+        from unittest.mock import PropertyMock
+
+        op = self._make_op()
+        context: Any = {"ti": MagicMock()}
+        mock_dag = MagicMock()
+        with (
+            patch.object(type(op), "dag", new_callable=PropertyMock, return_value=mock_dag),
+            patch.object(op, "_run_source_freshness"),
+            patch.object(op, "_freshness_callback", return_value=([self.MODEL_ID], "skip")),
+            patch.object(op, "_skipped_node_token") as mock_skip,
+        ):
+            op._apply_source_freshness(context)
+        mock_skip.assert_called_once_with(context, [self.MODEL_ID])
+
+    def test_apply_source_freshness_noop_when_callback_returns_empty(self):
+        from unittest.mock import PropertyMock
+
+        op = self._make_op()
+        context: Any = {"ti": MagicMock()}
+        with (
+            patch.object(type(op), "dag", new_callable=PropertyMock, return_value=MagicMock()),
+            patch.object(op, "_run_source_freshness"),
+            patch.object(op, "_freshness_callback", return_value=([], "skip")),
+            patch.object(op, "_skipped_node_token") as mock_skip,
+        ):
+            op._apply_source_freshness(context)
+        mock_skip.assert_not_called()
+
+    def test_execute_skips_apply_when_flag_disabled(self):
+        """_apply_source_freshness must not be called when _check_source_freshness is False."""
+        op = self._make_op(_check_source_freshness=False)
+        context: Any = {"ti": MagicMock(try_number=1), "run_id": "r1"}
+        with (
+            patch.object(op, "_apply_source_freshness") as mock_apply,
+            patch("cosmos.operators.local.DbtLocalBaseOperator.execute", return_value=None),
+        ):
+            op.execute(context)
+        mock_apply.assert_not_called()
+
+    def test_execute_calls_apply_when_flag_enabled(self):
+        """_apply_source_freshness must be called when _check_source_freshness is True."""
+        op = self._make_op(_check_source_freshness=True)
+        context: Any = {"ti": MagicMock(try_number=1), "run_id": "r1"}
+        with (
+            patch.object(op, "_apply_source_freshness") as mock_apply,
+            patch("cosmos.operators.local.DbtLocalBaseOperator.execute", return_value=None),
+        ):
+            op.execute(context)
+        mock_apply.assert_called_once_with(context)

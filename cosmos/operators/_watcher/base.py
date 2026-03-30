@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 
 from cosmos import settings
 from cosmos.config import ProfileConfig
@@ -23,6 +23,7 @@ from cosmos.operators._watcher.state import (
     _log_dbt_event,
     build_producer_state_fetcher,
     get_xcom_val,
+    is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
     safe_xcom_push,
@@ -447,6 +448,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 self.model_unique_id,
             )
 
+        if status == "skipped":
+            raise AirflowSkipException(f"Model '{self.model_unique_id}' skipped: upstream source is not fresh.")
+
         # Extract and store compiled_sql from the event if available
         compiled_sql = event.get("compiled_sql")
         if compiled_sql:
@@ -494,7 +498,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return get_xcom_val(ti, self.producer_task_id, xcom_key)
         return get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
 
-    def poke(self, context: Context) -> bool:
+    def poke(self, context: Context) -> bool:  # noqa: C901
         """
         Checks the status of a dbt node (model or aggregated tests) by pulling relevant XComs from the producer task.
         Handles retries and checks for successful completion.
@@ -552,5 +556,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return False
         elif is_dbt_node_status_success(status):
             return True
+        elif is_dbt_node_status_skipped(status):
+            raise AirflowSkipException(f"Model '{self.model_unique_id}' skipped: upstream source is not fresh.")
         else:
             raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")

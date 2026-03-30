@@ -137,6 +137,7 @@ class TestWatcherTrigger:
     @pytest.mark.parametrize(
         "dbt_node_status, producer_state, expected",
         [
+            ("skipped", "running", {"status": "skipped", "reason": "source_not_fresh"}),
             ("success", "running", {"status": "success"}),
             ("failed", "running", {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}),
             (None, "failed", {"status": "failed", "reason": WatcherEventReason.PRODUCER_FAILED}),

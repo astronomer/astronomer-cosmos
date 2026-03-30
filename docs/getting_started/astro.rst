@@ -67,7 +67,7 @@ Make a new folder, ``dbt``, inside your local project's ``dags`` folder. Then, c
 
 Note: dbt projects can be placed anywhere in the Airflow image or mounted independently via the `astro dbt deploy <https://www.astronomer.io/docs/astro/cli/astro-dbt-deploy>`__ command. You can customise where the dbt project is by setting the ``dbt_project_path`` parameter on ``ProjectConfig`` when you create your DAG instance.
 
-For example, if you wanted to put your dbt project in a directory relative to your DAG file (for example, ``my_dbt_project``), you would do:
+For example, if you wanted to put your dbt project in a directory relative to your DAG file (for example, ``dbt/my_dbt_project``), you would do:
 
 .. code-block:: python
 

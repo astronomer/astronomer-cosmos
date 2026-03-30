@@ -16,7 +16,7 @@ or
 
 .. code-block:: bash
 
-    export AIRFLOW__COSMOS__RICH_LOGGING=True  
+    export AIRFLOW__COSMOS__RICH_LOGGING=True
 
 Previous versions of Cosmos had a feature called ``propagate_logs`` to handle issues with Cosmos's previous logging implementation on some systems.
 This config option is deprecated.

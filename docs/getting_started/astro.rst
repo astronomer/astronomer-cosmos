@@ -76,7 +76,7 @@ For example, if you wanted to put your dbt project in a directory relative to yo
 
     my_cosmos_dag = DbtDag(
         project_config=ProjectConfig(
-            dbt_project_path=(Path(__file__).parent / "my_dbt_project")
+            dbt_project_path=(Path(__file__).parent / "dbt/my_dbt_project")
             .absolute()
             .as_posix(),
         ),

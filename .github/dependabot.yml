@@ -10,3 +10,14 @@ updates:
       - "dependencies"
     reviewers:
       - "@astronomer/oss-integrations"
+
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 7
+    labels:
+      - "dependencies"
+    reviewers:
+      - "@astronomer/oss-integrations"

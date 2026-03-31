@@ -288,14 +288,16 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         task_group = getattr(context.get("task_instance"), "task", None)
         task_group = getattr(task_group, "task_group", None)
 
-        # Resolve graph nodes from the DbtDag or DbtTaskGroup converter, falling back gracefully.
+        # Use the full graph (nodes) for dependency traversal so intermediate unselected
+        # nodes don't break transitive relationships.  The callback intersects the result
+        # with rendered resource types so only actionable nodes are returned.
         nodes = None
         if dag is not None:
             dbt_graph = getattr(dag, "dbt_graph", None)
-            nodes = getattr(dbt_graph, "filtered_nodes", None)
+            nodes = getattr(dbt_graph, "nodes", None)
         if nodes is None and task_group is not None:
             tg_dbt_graph = getattr(task_group, "dbt_graph", None)
-            nodes = getattr(tg_dbt_graph, "filtered_nodes", None)
+            nodes = getattr(tg_dbt_graph, "nodes", None)
 
         node_ids_to_skip, _ = self._freshness_callback(context, dag, task_group, nodes, self._sources_json)
         self._skipped_node_token(context, node_ids_to_skip)

@@ -105,7 +105,7 @@ class TestBaseConsumerSensor:
             extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
         )
         context = Mock()
-        with pytest.raises(AirflowSkipException, match="upstream source is not fresh"):
+        with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
             sensor.execute_complete(context, {"status": "skipped", "reason": "source_not_fresh"})
 
     def test_poke_raises_airflow_skip_exception_when_status_is_skipped(self):
@@ -130,5 +130,5 @@ class TestBaseConsumerSensor:
             patch.object(sensor, "_get_node_status", return_value="skipped"),
             patch.object(sensor, "_log_startup_events"),
         ):
-            with pytest.raises(AirflowSkipException, match="upstream source is not fresh"):
+            with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
                 sensor.poke(context)

@@ -23,6 +23,7 @@ ProducerStateFetcher = Callable[[], str | None]
 # dbt uses different status values for different node types (models/tests):"
 DBT_SUCCESS_STATUSES = frozenset({"success", "pass"})
 DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error", "runtime error"})
+DBT_SKIPPED_STATUSES = frozenset({"skipped"})
 
 
 class DbtTestStatus(str, Enum):
@@ -44,9 +45,14 @@ def is_dbt_node_status_failed(status: str | None) -> bool:
     return status in DBT_FAILED_STATUSES
 
 
+def is_dbt_node_status_skipped(status: str | None) -> bool:
+    """Check if the dbt node status indicates it was skipped due to a stale upstream source."""
+    return status in DBT_SKIPPED_STATUSES
+
+
 def is_dbt_node_status_terminal(status: str | None) -> bool:
-    """Check if the dbt node status is terminal (success or failed)."""
-    return is_dbt_node_status_success(status) or is_dbt_node_status_failed(status)
+    """Check if the dbt node status is terminal (success, failed, or skipped)."""
+    return is_dbt_node_status_success(status) or is_dbt_node_status_failed(status) or is_dbt_node_status_skipped(status)
 
 
 xcom_set_lock = Lock()

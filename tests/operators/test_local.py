@@ -50,6 +50,7 @@ from cosmos.operators.local import (
     DbtSnapshotLocalOperator,
     DbtSourceLocalOperator,
     DbtTestLocalOperator,
+    _read_target_sources_json,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 from tests.utils import new_test_dag
@@ -2413,3 +2414,28 @@ def test_handle_datasets_does_not_push_xcom_when_no_outlets():
     # Verify xcom_push was NOT called (no outlets to push)
     uri_xcom_calls = [call for call in mock_ti.xcom_push.call_args_list if call[1].get("key") == "uri"]
     assert len(uri_xcom_calls) == 0, "URI XCom should not be pushed when there are no outlets"
+
+
+class TestReadTargetSourcesJson:
+    def test_returns_dict_when_file_exists(self, tmp_path):
+        target = tmp_path / "target"
+        target.mkdir()
+        sources_file = target / "sources.json"
+        sources_file.write_text(json.dumps({"results": [{"unique_id": "source.pkg.src", "status": "pass"}]}))
+
+        result = _read_target_sources_json(tmp_path)
+        assert result is not None
+        assert result["results"][0]["unique_id"] == "source.pkg.src"
+
+    def test_returns_none_when_file_missing(self, tmp_path):
+        result = _read_target_sources_json(tmp_path)
+        assert result is None
+
+    def test_returns_none_on_invalid_json(self, tmp_path):
+        target = tmp_path / "target"
+        target.mkdir()
+        sources_file = target / "sources.json"
+        sources_file.write_text("not valid json {{{")
+
+        result = _read_target_sources_json(tmp_path)
+        assert result is None

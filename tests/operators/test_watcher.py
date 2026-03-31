@@ -29,6 +29,7 @@ from cosmos.operators.watcher import (
     DbtRunWatcherOperator,
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
+    _default_freshness_callback,
     store_dbt_resource_status_from_log,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
@@ -1922,3 +1923,163 @@ class TestDbtTestWatcherOperator:
 
         with pytest.raises(AirflowException, match="Test re-execution is not yet supported"):
             sensor.poke(context)
+
+
+class TestDefaultFreshnessCallback:
+    """Tests for the _default_freshness_callback function."""
+
+    def test_returns_empty_when_no_nodes(self):
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=None, sources_json=None
+        )
+        assert node_ids == []
+        assert status == "skip"
+
+    def test_returns_empty_when_no_stale_sources(self):
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "model.pkg.m1": DbtNode(
+                unique_id="model.pkg.m1",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.src1"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+            ),
+        }
+        sources_json = {"results": [{"unique_id": "source.pkg.src1", "status": "pass"}]}
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        assert node_ids == []
+        assert status == "skip"
+
+    def test_returns_transitive_dependents_of_stale_source(self):
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "source.pkg.src1": DbtNode(
+                unique_id="source.pkg.src1",
+                resource_type=DbtResourceType.SOURCE,
+                depends_on=[],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+            ),
+            "model.pkg.m1": DbtNode(
+                unique_id="model.pkg.m1",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.src1"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+            ),
+            "model.pkg.m2": DbtNode(
+                unique_id="model.pkg.m2",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["model.pkg.m1"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+            ),
+        }
+        sources_json = {"results": [{"unique_id": "source.pkg.src1", "status": "error"}]}
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        assert set(node_ids) == {"model.pkg.m1", "model.pkg.m2"}
+        assert status == "skip"
+
+    def test_excludes_test_nodes(self):
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "source.pkg.src1": DbtNode(
+                unique_id="source.pkg.src1",
+                resource_type=DbtResourceType.SOURCE,
+                depends_on=[],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+            ),
+            "model.pkg.m1": DbtNode(
+                unique_id="model.pkg.m1",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.src1"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+            ),
+            "test.pkg.t1": DbtNode(
+                unique_id="test.pkg.t1",
+                resource_type=DbtResourceType.TEST,
+                depends_on=["model.pkg.m1"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+            ),
+        }
+        sources_json = {"results": [{"unique_id": "source.pkg.src1", "status": "warn"}]}
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        # Only model nodes, not test nodes
+        assert node_ids == ["model.pkg.m1"]
+        assert status == "skip"
+
+
+class TestProducerSourceFreshness:
+    """Tests for source freshness methods on DbtProducerWatcherOperator."""
+
+    def _make_producer(self, check_source_freshness=True, **kwargs):
+        from airflow import DAG
+
+        with DAG(dag_id="test_freshness_dag", start_date=datetime(2023, 1, 1)):
+            producer = DbtProducerWatcherOperator(
+                project_dir=str(DBT_PROJECT_PATH),
+                profile_config=profile_config,
+                _check_source_freshness=check_source_freshness,
+                **kwargs,
+            )
+        return producer
+
+    def test_init_stores_check_source_freshness_flag(self):
+        producer = self._make_producer(check_source_freshness=True)
+        assert producer._check_source_freshness is True
+
+    def test_init_default_check_source_freshness_is_false(self):
+        producer = self._make_producer(check_source_freshness=False)
+        assert producer._check_source_freshness is False
+
+    def test_push_skipped_xcom_for_model(self):
+        producer = self._make_producer()
+        ti = MagicMock()
+        producer._push_skipped_xcom_for_model(ti, "model.pkg.my_model")
+        ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_status", value="skipped")
+
+    def test_skipped_node_token_updates_exclude(self):
+        producer = self._make_producer()
+        producer.exclude = None
+        ti = MagicMock()
+        context = {"ti": ti}
+        producer._skipped_node_token(context, ["model.pkg.m1", "model.pkg.m2"])
+        # Both models should be pushed as skipped
+        assert ti.xcom_push.call_count == 2
+        # Exclude should contain the model short names
+        assert "m1" in producer.exclude
+        assert "m2" in producer.exclude
+
+    def test_skipped_node_token_appends_to_existing_exclude(self):
+        producer = self._make_producer()
+        producer.exclude = "existing_model"
+        ti = MagicMock()
+        context = {"ti": ti}
+        producer._skipped_node_token(context, ["model.pkg.m1"])
+        assert "existing_model" in producer.exclude
+        assert "m1" in producer.exclude
+
+    def test_skipped_node_token_noop_when_empty(self):
+        producer = self._make_producer()
+        producer.exclude = None
+        ti = MagicMock()
+        context = {"ti": ti}
+        producer._skipped_node_token(context, [])
+        ti.xcom_push.assert_not_called()
+        assert producer.exclude is None

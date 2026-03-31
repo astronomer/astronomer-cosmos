@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 
 from cosmos import settings
 from cosmos.config import ProfileConfig
@@ -23,6 +23,7 @@ from cosmos.operators._watcher.state import (
     _log_dbt_event,
     build_producer_state_fetcher,
     get_xcom_val,
+    is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
     safe_xcom_push,
@@ -440,6 +441,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         status = event.get("status")
         reason = event.get("reason")
 
+        if status == "skipped":
+            raise AirflowSkipException(
+                f"{self._resource_label} '{self.model_unique_id}' was skipped because an upstream source is not fresh."
+            )
+
         if status == "success" and reason == WatcherEventReason.NODE_NOT_RUN:
             logger.info(
                 "%s '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
@@ -494,6 +500,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return get_xcom_val(ti, self.producer_task_id, xcom_key)
         return get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
 
+    def _cache_compiled_sql(self, ti: Any, context: Context) -> None:
+        """Pull compiled_sql from XCom and cache it on the sensor instance."""
+        compiled_sql = get_xcom_val(
+            ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
+        )
+        if compiled_sql:
+            self.compiled_sql = compiled_sql
+            if hasattr(self, "_override_rtif"):
+                self._override_rtif(context)
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt node (model or aggregated tests) by pulling relevant XComs from the producer task.
@@ -521,13 +537,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
         if status is not None:
-            compiled_sql = get_xcom_val(
-                ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
-            )
-            if compiled_sql:
-                self.compiled_sql = compiled_sql
-                if hasattr(self, "_override_rtif"):
-                    self._override_rtif(context)
+            self._cache_compiled_sql(ti, context)
 
         dbt_events = get_xcom_val(
             task_instance=context["ti"],
@@ -550,6 +560,10 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             self.poke_retry_number += 1
 
             return False
+        elif is_dbt_node_status_skipped(status):
+            raise AirflowSkipException(
+                f"{self._resource_label} '{self.model_unique_id}' was skipped because an upstream source is not fresh."
+            )
         elif is_dbt_node_status_success(status):
             return True
         else:

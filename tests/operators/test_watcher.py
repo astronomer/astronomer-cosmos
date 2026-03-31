@@ -274,8 +274,6 @@ def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
     assert str(excinfo.value) == expected_message
 
 
-
-
 class TestStoreDbtStatusFromLog:
     """Tests for store_dbt_resource_status_from_log and _process_log_line_callable."""
 

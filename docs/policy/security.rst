@@ -21,4 +21,4 @@ This policy currently applies to:
 - Pre-commit hook updates
 
 These updates are managed via `Dependabot <https://docs.github.com/en/code-security/dependabot/dependabot-version-updates>`_, which is
-configured to respect the 7-day cooldown through its scheduling settings.
+configured with a 7-day cooldown setting for these updates.

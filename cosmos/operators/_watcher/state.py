@@ -46,7 +46,7 @@ def is_dbt_node_status_failed(status: str | None) -> bool:
 
 
 def is_dbt_node_status_skipped(status: str | None) -> bool:
-    """Check if the dbt node status indicates it was skipped due to a stale upstream source."""
+    """Check if the dbt node status indicates it was skipped (e.g. stale upstream source, upstream failure)."""
     return status in DBT_SKIPPED_STATUSES
 
 

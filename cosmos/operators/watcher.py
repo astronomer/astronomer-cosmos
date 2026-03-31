@@ -79,7 +79,7 @@ def _default_freshness_callback(
         for dep_id in node.depends_on:
             dependents.setdefault(dep_id, set()).add(node_id)
 
-    # BFS from each stale source to collect all transitive dependents
+    # DFS from each stale source to collect all transitive dependents
     _excludable_resource_types = {DbtResourceType.MODEL, DbtResourceType.SEED, DbtResourceType.SNAPSHOT}
     visited: set[str] = set()
     queue = list(stale_source_ids)

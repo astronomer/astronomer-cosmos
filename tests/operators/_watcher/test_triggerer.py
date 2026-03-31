@@ -138,7 +138,7 @@ class TestWatcherTrigger:
         "dbt_node_status, producer_state, expected",
         [
             ("success", "running", {"status": "success"}),
-            ("skipped", "running", {"status": "skipped", "reason": "source_not_fresh"}),
+            ("skipped", "running", {"status": "skipped"}),
             ("failed", "running", {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}),
             (None, "failed", {"status": "failed", "reason": WatcherEventReason.PRODUCER_FAILED}),
             (None, "success", {"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}),

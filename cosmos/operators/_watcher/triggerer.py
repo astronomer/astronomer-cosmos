@@ -219,8 +219,8 @@ class WatcherTrigger(BaseTrigger):
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif is_dbt_node_status_skipped(dbt_node_status):
-                logger.info("dbt node '%s' skipped: upstream source is not fresh", self.model_unique_id)
-                yield TriggerEvent({"status": "skipped", "reason": "source_not_fresh"})  # type: ignore[no-untyped-call]
+                logger.info("dbt node '%s' was skipped", self.model_unique_id)
+                yield TriggerEvent({"status": "skipped"})  # type: ignore[no-untyped-call]
                 return
             elif is_dbt_node_status_failed(dbt_node_status):
                 logger.warning("dbt node '%s' failed", self.model_unique_id)

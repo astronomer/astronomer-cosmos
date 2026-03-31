@@ -443,7 +443,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         if status == "skipped":
             raise AirflowSkipException(
-                f"{self._resource_label} '{self.model_unique_id}' was skipped because an upstream source is not fresh."
+                f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
 
         if status == "success" and reason == WatcherEventReason.NODE_NOT_RUN:
@@ -562,7 +562,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return False
         elif is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
-                f"{self._resource_label} '{self.model_unique_id}' was skipped because an upstream source is not fresh."
+                f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
         elif is_dbt_node_status_success(status):
             return True

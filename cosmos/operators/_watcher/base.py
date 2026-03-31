@@ -288,10 +288,13 @@ def store_dbt_resource_status_from_log(
                     unique_id, dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
                 )
             else:
-                # Lazily populate per-model outlet URIs from the manifest
-                project_dir = extra_kwargs.get("project_dir")
-                _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
-                outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
+                # Lazily populate per-model outlet URIs from the manifest, but only for
+                # resource types that can emit datasets (models/seeds/snapshots).
+                outlet_uris: list[str] = []
+                if dbt_node_resource_type in {"model", "seed", "snapshot"}:
+                    project_dir = extra_kwargs.get("project_dir")
+                    _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
+                    outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
 
                 status_value: dict[str, Any] | str = {
                     "status": dbt_node_status,
@@ -483,7 +486,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         else:
             self._execute_core(context)
 
-    def execute_complete(self, context: Context, event: dict[str, str]) -> None:
+    def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
         status = event.get("status")
         reason = event.get("reason")
 

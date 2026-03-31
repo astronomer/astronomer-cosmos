@@ -85,7 +85,8 @@ class TestGetDatasetNamespace:
         profile_config.profile_mapping = MagicMock()
         profile_config.profile_mapping.dbt_profile_type = "snowflake"
         profile_config.profile_mapping.profile = {"account": "xy12345.us-east-1"}
-        assert get_dataset_namespace(profile_config) == "snowflake://xy12345.us-east-1"
+        # fix_account_name normalizes account locator format (appends cloud suffix)
+        assert get_dataset_namespace(profile_config) == "snowflake://xy12345.us-east-1.aws"
 
     def test_unknown_adapter_fallback(self):
         profile_config = MagicMock()
@@ -130,12 +131,12 @@ class TestConstructDatasetUri:
     @patch("cosmos.dataset.settings")
     def test_airflow2_default_uri(self, mock_settings):
         mock_settings.use_dataset_airflow3_uri_standard = False
-        uri = construct_dataset_uri("postgres://host:5432", "mydb", "public", "customers")
+        uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
         assert uri == "postgres://host:5432/mydb.public.customers"
 
     @patch("cosmos.dataset.AIRFLOW_VERSION", new=MagicMock(__lt__=lambda self, other: False, major=3))
     def test_airflow3_uri(self):
-        uri = construct_dataset_uri("postgres://host:5432", "mydb", "public", "customers")
+        uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
         assert uri == "postgres://host:5432/mydb/public/customers"
 
 

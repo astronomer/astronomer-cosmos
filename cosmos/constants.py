@@ -178,16 +178,6 @@ SUPPORTED_BUILD_RESOURCES = [
 # https://docs.getdbt.com/reference/commands/test
 TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED}
 
-# Resource types that the watcher producer task should build (everything except tests).
-# Used with --resource-type flag to exclude tests from the producer dbt build command.
-# Update this tuple if Cosmos adds watcher operators for new dbt resource types (e.g., saved_query, semantic_model).
-WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST = (
-    DbtResourceType.MODEL,
-    DbtResourceType.SEED,
-    DbtResourceType.SNAPSHOT,
-    DbtResourceType.SOURCE,
-)
-
 DBT_SETUP_ASYNC_TASK_ID = "dbt_setup_async"
 DBT_TEARDOWN_ASYNC_TASK_ID = "dbt_teardown_async"
 

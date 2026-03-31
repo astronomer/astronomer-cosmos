@@ -33,7 +33,7 @@ from cosmos.airflow.graph import (
 )
 from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
-    WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST,
+    SUPPORTED_BUILD_RESOURCES,
     DbtResourceType,
     ExecutionMode,
     SourceRenderingBehavior,
@@ -1222,7 +1222,7 @@ def test_watcher_producer_uses_resource_type_flag_to_exclude_tests(test_behavior
     producer_task = next(task for task in dag.tasks if isinstance(task, DbtProducerWatcherOperator))
 
     # Should use --resource-type flags, not --exclude
-    expected_resource_types = [rt.value for rt in WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST]
+    expected_resource_types = [rt.value for rt in SUPPORTED_BUILD_RESOURCES]
     flags = producer_task.dbt_cmd_flags
     actual_resource_types = [flags[i + 1] for i in range(len(flags)) if flags[i] == "--resource-type"]
     assert actual_resource_types == expected_resource_types

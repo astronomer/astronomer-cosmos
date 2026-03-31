@@ -28,7 +28,6 @@ from cosmos.constants import (
     PRODUCER_WATCHER_TASK_ID,
     SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
-    WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST,
     DbtResourceType,
     ExecutionMode,
     SourceRenderingBehavior,
@@ -699,7 +698,7 @@ def _add_watcher_producer_task(
             # This works both with and without selectors (--exclude is ignored by dbt when a selector is used).
             existing_flags = producer_task_args.get("dbt_cmd_flags") or []
             dbt_cmd_flags = list(existing_flags)
-            for resource_type in WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST:
+            for resource_type in SUPPORTED_BUILD_RESOURCES:
                 dbt_cmd_flags.extend(["--resource-type", resource_type.value])  # type: ignore[attr-defined]
             producer_task_args["dbt_cmd_flags"] = dbt_cmd_flags
 

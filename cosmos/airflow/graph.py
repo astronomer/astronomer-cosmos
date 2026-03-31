@@ -746,9 +746,11 @@ def _add_watcher_dependencies(
         # The way it is implemented is by setting the trigger_rule to "always" for the consumer tasks, and by having the producer task with a high priority_weight.
         if "DbtDag" in dag.__class__.__name__:
             # Is this dbt node a root of the (subset of the) dbt project?
-            # Note: this may happen in one scenarios:
+            # Note: this may happen in two scenarios:
             # - the dbt node not having any `depends_on` within the user-selected `nodes`
-            if nodes and node_id in nodes and not set(nodes[node_id].depends_on).intersection(nodes):
+            # - the dbt node only depending on source nodes, which are in `nodes` but not in `tasks_map`
+            #   (e.g. when source_rendering_behavior=NONE, sources have no consumer tasks)
+            if nodes and node_id in nodes and not set(nodes[node_id].depends_on).intersection(tasks_map):
                 producer_airflow_task >> task_or_taskgroup
                 if isinstance(task_or_taskgroup, TaskGroup):
                     taskgroup = task_or_taskgroup

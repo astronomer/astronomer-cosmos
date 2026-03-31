@@ -6,8 +6,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import SourceRenderingBehavior
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.constants import ExecutionMode, SourceRenderingBehavior
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -30,6 +30,7 @@ source_rendering_dag = DbtDag(
     project_config=ProjectConfig(
         DBT_ROOT_PATH / "altered_jaffle_shop",
     ),
+    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
     profile_config=profile_config,
     operator_args={
         "install_deps": True,  # install any necessary dependencies before running any dbt command

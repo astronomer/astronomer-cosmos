@@ -7,8 +7,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import SourceRenderingBehavior
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.constants import ExecutionMode, SourceRenderingBehavior
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -36,6 +36,7 @@ source_rendering_dag = DbtDag(
         "install_deps": True,  # install any necessary dependencies before running any dbt command
         "full_refresh": True,  # used only in dbt commands that support this flag
     },
+    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
     render_config=RenderConfig(
         source_rendering_behavior=SourceRenderingBehavior.ALL,
         source_pruning=True,

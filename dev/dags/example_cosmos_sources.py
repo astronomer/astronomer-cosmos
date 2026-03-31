@@ -24,8 +24,8 @@ except ImportError:
     from airflow.operators.dummy import DummyOperator as EmptyOperator
 from airflow.utils.task_group import TaskGroup
 
-from cosmos import DbtDag, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import DbtResourceType
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.constants import DbtResourceType, ExecutionMode
 from cosmos.dbt.graph import DbtNode
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -73,9 +73,11 @@ project_config = ProjectConfig(
     dbt_vars={"animation_alias": "top_5_animated_movies"},
 )
 
+execution_config = ExecutionConfig(execution_mode=ExecutionMode.WATCHER)
 
 example_cosmos_sources = DbtDag(
     # dbt/cosmos-specific parameters
+    execution_config=execution_config,
     project_config=project_config,
     profile_config=profile_config,
     render_config=render_config,

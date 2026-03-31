@@ -20,6 +20,7 @@ except ImportError:
 
 from cosmos.airflow.graph import (
     _add_teardown_task,
+    _add_watcher_dependencies,
     _add_watcher_producer_task,
     _convert_list_to_str,
     _snake_case_to_camelcase,
@@ -2060,3 +2061,70 @@ def test_add_watcher_producer_task_sets_check_source_freshness_flag(source_rende
         assert producer_task._check_source_freshness is True
     else:
         assert not getattr(producer_task, "_check_source_freshness", False)
+
+
+def test_add_watcher_dependencies_source_only_deps_treated_as_root():
+    """Models depending only on source nodes (no consumer tasks) must be treated as root consumers.
+
+    When source_rendering_behavior=NONE, source nodes appear in `nodes` but NOT in `tasks_map`.
+    A model whose `depends_on` contains only sources must still get `producer >> model` and
+    `trigger_rule="always"`, so it runs after (not before) the producer task in `airflow dags test`.
+    """
+    source_node = DbtNode(
+        unique_id="source.proj.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("sources.yml"),
+    )
+    model_node = DbtNode(
+        unique_id="model.proj.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[source_node.unique_id],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/my_model.sql"),
+    )
+    nodes = {
+        source_node.unique_id: source_node,
+        model_node.unique_id: model_node,
+    }
+    task_args = {
+        "project_dir": SAMPLE_PROJ_PATH,
+        "conn_id": "fake_conn",
+        "profile_config": ProfileConfig(
+            profile_name="default",
+            target_name="default",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="fake_conn",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    }
+    # Use a DAG subclass named "DbtDag" to satisfy the `"DbtDag" in dag.__class__.__name__` check
+    # in _add_watcher_dependencies (which only sets producer >> consumer for DbtDag instances).
+    FakeDbtDag = type("DbtDag", (DAG,), {})
+    with FakeDbtDag("test-watcher-source-deps", start_date=datetime(2022, 1, 1)) as dag:
+        tasks_map: dict = {}
+        producer_task = _add_watcher_producer_task(
+            dag=dag,
+            task_args=task_args,
+            tasks_map=tasks_map,
+            task_group=None,
+            render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.NONE),
+            execution_mode=ExecutionMode.WATCHER,
+        )
+        model_task = EmptyOperator(task_id="my_model_run", dag=dag)
+        tasks_map[model_node.unique_id] = model_task
+
+        _add_watcher_dependencies(
+            dag=dag,
+            producer_airflow_task=producer_task,
+            task_args=task_args,
+            tasks_map=tasks_map,
+            nodes=nodes,
+        )
+
+    # The model depends only on a source (no task in tasks_map), so it must be a root consumer:
+    # producer >> model_task must be set, and trigger_rule must be "always".
+    assert model_task.task_id in [t.task_id for t in producer_task.downstream_list]
+    assert model_task.trigger_rule == "always"

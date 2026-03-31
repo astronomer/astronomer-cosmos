@@ -264,7 +264,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             )
             self._push_skipped_xcom_for_model(ti, unique_id)
 
-        model_names = {uid.rsplit(".", 1)[-1] for uid in node_unique_ids}
+        model_names = sorted({uid.rsplit(".", 1)[-1] for uid in node_unique_ids})
 
         current_exclude = getattr(self, "exclude", None)
         exclude_str = " ".join(model_names)

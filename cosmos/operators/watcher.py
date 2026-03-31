@@ -132,6 +132,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     As each ``NodeFinished`` event arrives the operator pushes the per-model status to XCom under
     key ``<unique_id>_status`` so downstream sensors can react without waiting for the full build
     to complete.
+
+    When the private kwarg ``_check_source_freshness`` is ``True`` (set automatically by
+    ``_add_watcher_producer_task`` when ``SourceRenderingBehavior`` is not ``NONE``), the
+    producer first runs ``dbt source freshness``, identifies stale sources, marks all
+    transitive dependents as ``"skipped"`` via XCom, and adds them to ``--exclude`` before
+    running the main ``dbt build``.
     """
 
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]

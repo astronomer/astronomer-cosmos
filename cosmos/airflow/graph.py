@@ -695,20 +695,13 @@ def _add_watcher_producer_task(
         producer_task_args["exclude"] = _convert_list_to_str(render_config.exclude)
 
         if render_config.test_behavior in [TestBehavior.NONE, TestBehavior.AFTER_ALL]:
-            if render_config.selector:
-                # When a dbt selector is used, --exclude is ignored by dbt.
-                # Use --resource-type as a final filter to exclude tests instead.
-                resource_types = WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST
-                dbt_cmd_flags = producer_task_args.get("dbt_cmd_flags") or []
-                dbt_cmd_flags.extend(["--resource-type", resource_types])
-                producer_task_args["dbt_cmd_flags"] = dbt_cmd_flags
-            else:
-                additional_excludes = "resource_type:test resource_type:unit_test"
-                current_exclude = producer_task_args.get("exclude")
-                if current_exclude:
-                    producer_task_args["exclude"] = f"{current_exclude} {additional_excludes}"
-                else:
-                    producer_task_args["exclude"] = additional_excludes
+            # Use --resource-type to exclude tests from the producer dbt build command.
+            # This works both with and without selectors (--exclude is ignored by dbt when a selector is used).
+            existing_flags = producer_task_args.get("dbt_cmd_flags") or []
+            dbt_cmd_flags = list(existing_flags)
+            for resource_type in WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST:
+                dbt_cmd_flags.extend(["--resource-type", resource_type.value])  # type: ignore[attr-defined]
+            producer_task_args["dbt_cmd_flags"] = dbt_cmd_flags
 
     class_name = calculate_operator_class(execution_mode, "DbtProducer")
 

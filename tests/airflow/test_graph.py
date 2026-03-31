@@ -1189,8 +1189,9 @@ def test_test_behavior_for_watcher_mode(test_behavior):
 
 
 @pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])
-def test_watcher_producer_uses_resource_type_flag_when_selector_is_set(test_behavior):
-    """When a dbt selector is used, --exclude is ignored by dbt. The producer should use --resource-type instead."""
+@pytest.mark.parametrize("selector", [None, "my_selector"])
+def test_watcher_producer_uses_resource_type_flag_to_exclude_tests(test_behavior, selector):
+    """The producer should use --resource-type to exclude tests, regardless of whether a selector is used."""
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,
@@ -1205,32 +1206,38 @@ def test_watcher_producer_uses_resource_type_flag_when_selector_is_set(test_beha
             ),
         }
 
+    render_config = RenderConfig(test_behavior=test_behavior)
+    if selector:
+        render_config = RenderConfig(test_behavior=test_behavior, selector=selector)
+
     build_airflow_graph(
         nodes=sample_nodes,
         dag=dag,
         execution_mode=ExecutionMode.WATCHER,
         test_indirect_selection=TestIndirectSelection.EAGER,
         task_args=task_args,
-        render_config=RenderConfig(
-            test_behavior=test_behavior,
-            selector="my_selector",
-        ),
+        render_config=render_config,
         dbt_project_name="astro_shop",
     )
     producer_task = next(task for task in dag.tasks if isinstance(task, DbtProducerWatcherOperator))
-    assert "--resource-type" in producer_task.dbt_cmd_flags
-    resource_type_idx = producer_task.dbt_cmd_flags.index("--resource-type")
-    assert producer_task.dbt_cmd_flags[resource_type_idx + 1] == WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST
-    assert producer_task.exclude is None or "resource_type:test" not in (producer_task.exclude or "")
+
+    # Should use --resource-type flags, not --exclude
+    expected_resource_types = [rt.value for rt in WATCHER_BUILD_RESOURCE_TYPES_EXCEPT_TEST]
+    flags = producer_task.dbt_cmd_flags
+    actual_resource_types = [flags[i + 1] for i in range(len(flags)) if flags[i] == "--resource-type"]
+    assert actual_resource_types == expected_resource_types
+    assert "resource_type:test" not in (producer_task.exclude or "")
 
 
 @pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])
-def test_watcher_producer_uses_exclude_when_no_selector(test_behavior):
-    """Without a selector, the producer should use --exclude to filter tests (existing behavior)."""
+def test_watcher_producer_preserves_existing_dbt_cmd_flags(test_behavior):
+    """The producer should not mutate the original dbt_cmd_flags list and should preserve existing flags."""
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        original_flags = ["--full-refresh"]
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,
             "conn_id": "fake_conn",
+            "dbt_cmd_flags": original_flags,
             "profile_config": ProfileConfig(
                 profile_name="default",
                 target_name="default",
@@ -1247,14 +1254,16 @@ def test_watcher_producer_uses_exclude_when_no_selector(test_behavior):
         execution_mode=ExecutionMode.WATCHER,
         test_indirect_selection=TestIndirectSelection.EAGER,
         task_args=task_args,
-        render_config=RenderConfig(
-            test_behavior=test_behavior,
-        ),
+        render_config=RenderConfig(test_behavior=test_behavior),
         dbt_project_name="astro_shop",
     )
     producer_task = next(task for task in dag.tasks if isinstance(task, DbtProducerWatcherOperator))
-    assert "resource_type:test" in (producer_task.exclude or "")
-    assert not producer_task.dbt_cmd_flags
+
+    # Original flags should not be mutated
+    assert original_flags == ["--full-refresh"]
+    # Producer should have the original flag plus the resource-type flags
+    assert "--full-refresh" in producer_task.dbt_cmd_flags
+    assert "--resource-type" in producer_task.dbt_cmd_flags
 
 
 def test_custom_meta():

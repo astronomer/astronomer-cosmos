@@ -270,7 +270,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             )
             self._push_skipped_xcom_for_model(ti, unique_id)
 
-        model_names = sorted({uid.rsplit(".", 1)[-1] for uid in node_unique_ids})
+        # Use the same parsing as DbtNode.resource_name: unique_id.split(".", 2)[2]
+        # This preserves version suffixes (e.g. model.pkg.my_model.v1 -> my_model.v1)
+        model_names = sorted({uid.split(".", 2)[2] for uid in node_unique_ids if len(uid.split(".", 2)) == 3})
 
         current_exclude = getattr(self, "exclude", None)
         exclude_str = " ".join(model_names)

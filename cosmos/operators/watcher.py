@@ -64,7 +64,7 @@ def _default_freshness_callback(
     """Return unique_ids of all nodes that transitively depend on a stale source, plus the status ``"skip"``.
 
     Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``.
-    Traversal is BFS over the reverse-dependency graph built from ``nodes``.
+    Traversal is DFS over the reverse-dependency graph built from ``nodes``.
     """
     if not nodes or not sources_json:
         return [], "skip"

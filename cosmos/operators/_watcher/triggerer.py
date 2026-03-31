@@ -220,7 +220,7 @@ class WatcherTrigger(BaseTrigger):
                 return
             elif is_dbt_node_status_skipped(dbt_node_status):
                 logger.info("dbt node '%s' was skipped", self.model_unique_id)
-                yield TriggerEvent({"status": "skipped"})  # type: ignore[no-untyped-call]
+                yield TriggerEvent({"status": EventStatus.SKIPPED})  # type: ignore[no-untyped-call]
                 return
             elif is_dbt_node_status_failed(dbt_node_status):
                 logger.warning("dbt node '%s' failed", self.model_unique_id)

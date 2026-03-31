@@ -26,26 +26,64 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+
+def _resolve_snowflake_account(account: str) -> str:
+    """Normalize a Snowflake account name, delegating to the OL helper when available."""
+    try:
+        from openlineage.common.provider.snowflake import fix_account_name
+
+        return str(fix_account_name(account))
+    except ImportError:
+        return account
+
+
+def _resolve_spark_namespace(profile: dict[str, Any]) -> str:
+    """Derive the Spark namespace, matching OL's port-by-method logic."""
+    host = profile.get("host", "localhost")
+    if "port" in profile:
+        port = profile["port"]
+    elif profile.get("method") in ("http", "odbc"):
+        port = 443
+    elif profile.get("method") == "thrift":
+        port = 10001
+    else:
+        port = 10000
+    return f"spark://{host}:{port}"
+
+
+def _resolve_glue_namespace(profile: dict[str, Any]) -> str:
+    """Derive the AWS Glue namespace, matching OL's ARN logic."""
+    region = profile.get("region", "us-east-1")
+    if "account_id" in profile:
+        return f"arn:aws:glue:{region}:{profile['account_id']}"
+    role_arn = profile.get("role_arn", "")
+    parts = role_arn.split(":")
+    account_id = parts[4] if len(parts) > 4 else ""
+    return f"arn:aws:glue:{region}:{account_id}"
+
+
 # Mapping of dbt adapter type to a callable that derives the OL-compatible dataset namespace
 # from the profile dict. Each callable receives the profile dict and returns the namespace string.
+#
+# Only adapters supported by the OpenLineage dbt integration are included so that URIs produced
+# by WATCHER mode match those from LOCAL mode (which delegates to the OL library).
+#
+# Source: https://openlineage.io/docs/spec/naming/
+# Reference impl: openlineage.common.provider.dbt.processor.DbtArtifactProcessor.extract_namespace
 _ADAPTER_NAMESPACE_RESOLVERS: dict[str, Any] = {
     "postgres": lambda p: f"postgres://{p.get('host', 'localhost')}:{p.get('port', 5432)}",
     "redshift": lambda p: f"redshift://{p.get('host', 'localhost')}:{p.get('port', 5439)}",
     "bigquery": lambda _: "bigquery",
-    "snowflake": lambda p: f"snowflake://{p.get('account', '')}",
+    "snowflake": lambda p: f"snowflake://{_resolve_snowflake_account(p.get('account', ''))}",
     "databricks": lambda p: f"databricks://{p.get('host', '')}",
-    "spark": lambda p: f"spark://{p.get('host', 'localhost')}:{p.get('port', 10000)}",
+    "spark": _resolve_spark_namespace,
     "trino": lambda p: f"trino://{p.get('host', 'localhost')}:{p.get('port', 8080)}",
-    "mysql": lambda p: f"mysql://{p.get('host', 'localhost')}:{p.get('port', 3306)}",
-    "oracle": lambda p: f"oracle://{p.get('host', 'localhost')}:{p.get('port', 1521)}",
     "clickhouse": lambda p: f"clickhouse://{p.get('host', 'localhost')}:{p.get('port', 8123)}",
-    "vertica": lambda p: f"vertica://{p.get('host', 'localhost')}:{p.get('port', 5433)}",
-    "exasol": lambda p: f"exasol://{p.get('host', 'localhost')}:{p.get('port', 8563)}",
-    "athena": lambda p: f"athena://athena.{p.get('region_name', 'us-east-1')}.amazonaws.com",
+    "sqlserver": lambda p: f"mssql://{p.get('server', 'localhost')}:{p.get('port', 1433)}",
+    "dremio": lambda p: f"dremio://{p.get('software_host', 'localhost')}:{p.get('port', 443)}",
+    "athena": lambda p: f"awsathena://athena.{p.get('region_name', 'us-east-1')}.amazonaws.com",
+    "glue": _resolve_glue_namespace,
     "duckdb": lambda p: f"duckdb://{p.get('path', '')}",
-    "sqlserver": lambda p: f"sqlserver://{p.get('host', 'localhost')}:{p.get('port', 1433)}",
-    "teradata": lambda p: f"teradata://{p.get('host', 'localhost')}",
-    "starburst": lambda p: f"trino://{p.get('host', 'localhost')}:{p.get('port', 8080)}",
 }
 
 
@@ -108,11 +146,17 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     The namespace is adapter-specific: e.g. ``postgres://host:5432``, ``bigquery``,
     ``snowflake://account``.
 
-    Returns ``None`` if the namespace cannot be determined.
+    If the adapter type is recognised in ``_ADAPTER_NAMESPACE_RESOLVERS``, the
+    corresponding resolver builds the namespace from connection details in the
+    profile dict. For unknown adapters, a generic ``<adapter_type>://`` namespace
+    is returned as a best-effort fallback.
+
+    Returns ``None`` if the namespace cannot be determined (e.g. missing or
+    invalid profile configuration).
     """
     try:
         adapter_type, profile_dict = _get_profile_dict(profile_config)
-    except Exception:
+    except (AttributeError, KeyError, TypeError, FileNotFoundError, yaml.YAMLError):
         logger.debug("Unable to extract profile info for dataset namespace derivation", exc_info=True)
         return None
 
@@ -123,25 +167,50 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     if resolver:
         return str(resolver(profile_dict))
 
-    # Fallback for unknown adapters
+    # Fallback: for adapters not in _ADAPTER_NAMESPACE_RESOLVERS, use a generic scheme
     return f"{adapter_type}://"
 
 
-def construct_dataset_uri(namespace: str, database: str, schema: str, alias: str) -> str:
+def construct_dataset_uri(namespace: str, name: str) -> str:
     """
-    Construct an OL-compatible Airflow Asset/Dataset URI from its components.
+    Construct an Airflow Asset/Dataset URI from an OL-compatible namespace and
+    dataset name.
 
-    Uses the same Airflow 2 vs 3 URI logic as ``DbtLocalBaseOperator._create_asset_uri``.
+    On Airflow 2, dots in the name are preserved (``namespace/db.schema.table``).
+    On Airflow 3 (or when ``use_dataset_airflow3_uri_standard`` is enabled),
+    dots are replaced with slashes (``namespace/db/schema/table``).
+
+    :param namespace: The OL-compatible dataset namespace (e.g. ``postgres://host:5432``).
+    :param name: The dot-delimited dataset name (e.g. ``database.schema.table``).
     """
-    name = f"{database}.{schema}.{alias}"
     airflow_2_uri = namespace + "/" + urllib.parse.quote(name)
     airflow_3_uri = namespace + "/" + urllib.parse.quote(name).replace(".", "/")
 
     if AIRFLOW_VERSION < Version("3.0.0"):
         if settings.use_dataset_airflow3_uri_standard:
             return airflow_3_uri
+        logger.warning(
+            "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs "
+            "(standard used by Cosmos) will no longer be valid. "
+            "Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to <%s>. "
+            "Previously, with Airflow 2.x, the URI was <%s>. "
+            "If you want to use the Airflow 3 URI standard while still using Airflow 2, please set: "
+            "export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1 "
+            "Remember to update any DAGs that are scheduled using this dataset.",
+            airflow_3_uri,
+            airflow_2_uri,
+        )
         return airflow_2_uri
 
+    logger.warning(
+        "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs "
+        "(standard used by Cosmos) are no longer accepted. "
+        "Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <%s>. "
+        "Before, with Airflow 2.x, the URI used to be <%s>. "
+        "Please, change any DAGs that were scheduled using the old standard to the new one.",
+        airflow_3_uri,
+        airflow_2_uri,
+    )
     return airflow_3_uri
 
 
@@ -155,11 +224,19 @@ def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict
     """
     _RESOURCE_TYPES_WITH_DATASETS = {"model", "seed", "snapshot"}
 
+    # The manifest may not exist if dbt failed before completing compilation,
+    # or if the temp project directory was cleaned up before this function ran.
+    # In those cases we gracefully return an empty dict — consumers simply
+    # won't emit datasets for the affected run.
     try:
         with open(manifest_path) as f:
             manifest = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        logger.debug("Unable to read manifest at %s for dataset URI computation", manifest_path, exc_info=True)
+        logger.warning(
+            "Unable to read manifest at %s for dataset URI computation. Dataset emission will be skipped.",
+            manifest_path,
+            exc_info=True,
+        )
         return {}
 
     result: dict[str, list[str]] = {}
@@ -175,7 +252,7 @@ def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict
         if not all([database, schema, alias]):
             continue
 
-        uri = construct_dataset_uri(namespace, database, schema, alias)
+        uri = construct_dataset_uri(namespace, f"{database}.{schema}.{alias}")
         result[unique_id] = [uri]
 
     return result

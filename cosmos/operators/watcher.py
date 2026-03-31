@@ -428,7 +428,7 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         # If we reach here without deferring, the model succeeded — emit datasets
         self._emit_datasets(context)
 
-    def execute_complete(self, context: Context, event: dict[str, str]) -> None:
+    def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
         # Extract outlet URIs from trigger event before parent handles status
         self._outlet_uris = event.get("outlet_uris", [])
         super().execute_complete(context, event)

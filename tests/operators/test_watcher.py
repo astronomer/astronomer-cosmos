@@ -2031,25 +2031,24 @@ class TestDefaultFreshnessCallback:
 class TestProducerSourceFreshness:
     """Tests for source freshness methods on DbtProducerWatcherOperator."""
 
-    def _make_producer(self, check_source_freshness=True, **kwargs):
+    def _make_producer(self, **kwargs):
         from airflow import DAG
 
         with DAG(dag_id="test_freshness_dag", start_date=datetime(2023, 1, 1)):
             producer = DbtProducerWatcherOperator(
                 project_dir=str(DBT_PROJECT_PATH),
                 profile_config=profile_config,
-                _check_source_freshness=check_source_freshness,
                 **kwargs,
             )
         return producer
 
-    def test_init_stores_check_source_freshness_flag(self):
-        producer = self._make_producer(check_source_freshness=True)
-        assert producer._check_source_freshness is True
-
-    def test_init_default_check_source_freshness_is_false(self):
-        producer = self._make_producer(check_source_freshness=False)
+    def test_init_check_source_freshness_defaults_to_false(self):
+        producer = self._make_producer()
         assert producer._check_source_freshness is False
+
+    def test_init_stores_check_source_freshness_flag(self):
+        producer = self._make_producer(_check_source_freshness=True)
+        assert producer._check_source_freshness is True
 
     def test_push_skipped_xcom_for_model(self):
         producer = self._make_producer()

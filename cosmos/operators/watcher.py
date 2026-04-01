@@ -424,6 +424,20 @@ class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):  # t
         """Human-readable label for this sensor's dbt resource type."""
         return "Source"
 
+    def _fallback_to_non_watcher_run(self, try_number: int, context: Context) -> bool:
+        """Run ``dbt source freshness`` locally for this specific source on retry."""
+        logger.info(
+            "Retry attempt #%s – Running source freshness for '%s' from project '%s'",
+            try_number - 1,
+            self.model_unique_id,
+            self.project_dir,
+        )
+        resource_name = self.model_unique_id.split(".", 2)[2]
+        cmd_flags = ["--select", f"source:{resource_name}"]
+        self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]
+        logger.info("dbt source freshness completed successfully on retry for source '%s'", self.model_unique_id)
+        return True
+
 
 class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
     """

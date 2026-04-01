@@ -246,16 +246,19 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         """Run ``dbt source freshness`` via ``build_cmd`` and ``run_command``.
 
         Temporarily overrides operator attributes that carry flags unsupported by
-        ``dbt source freshness`` (``--full-refresh``, ``--indirect-selection``).
-        User-supplied ``--select``/``--exclude`` are preserved.
+        ``dbt source freshness`` (``--full-refresh``, ``--indirect-selection``,
+        and build-specific ``dbt_cmd_flags`` such as ``--resource-type``).
+        ``--select``/``--exclude`` are unaffected (they come from ``add_global_flags``).
         """
         original_base_cmd = self.base_cmd
         original_indirect_selection = getattr(self, "indirect_selection", None)
         original_full_refresh = getattr(self, "full_refresh", None)
+        original_dbt_cmd_flags = self.dbt_cmd_flags
         try:
             self.base_cmd = ["source", "freshness"]
             self.indirect_selection = None  # ``dbt source freshness`` does not support --indirect-selection
             self.full_refresh = False  # type: ignore[assignment]  # ``dbt source freshness`` does not support --full-refresh
+            self.dbt_cmd_flags = []  # clear build-specific flags (e.g. --resource-type)
             full_cmd, env = self.build_cmd(context=context, cmd_flags=self.add_cmd_flags())
             context["_check_source_freshness"] = True  # type: ignore[typeddict-unknown-key]
             self.run_command(cmd=full_cmd, env=env, context=context)
@@ -263,6 +266,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             self.base_cmd = original_base_cmd
             self.indirect_selection = original_indirect_selection
             self.full_refresh = original_full_refresh  # type: ignore[assignment]
+            self.dbt_cmd_flags = original_dbt_cmd_flags
             context.pop("_check_source_freshness", None)  # type: ignore[typeddict-item]
 
     def _skipped_node_token(self, context: Context, node_unique_ids: list[str]) -> None:

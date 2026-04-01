@@ -1826,16 +1826,19 @@ def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
 
 
 def test_dbt_source_watcher_operator_template_fields():
-    """Test that DbtSourceWatcherOperator doesn't include model_unique_id in template_fields."""
+    """Test that DbtSourceWatcherOperator includes model_unique_id as a consumer sensor."""
+    from cosmos.operators._watcher.base import BaseConsumerSensor
     from cosmos.operators.local import DbtSourceLocalOperator
     from cosmos.operators.watcher import DbtSourceWatcherOperator
 
-    # DbtSourceWatcherOperator should NOT have model_unique_id in template_fields
-    # because it runs locally and doesn't watch models, it executes source freshness
-    assert "model_unique_id" not in DbtSourceWatcherOperator.template_fields
+    # DbtSourceWatcherOperator is now a consumer sensor, so it should have model_unique_id
+    assert "model_unique_id" in DbtSourceWatcherOperator.template_fields
 
-    # DbtSourceWatcherOperator should inherit template_fields from DbtSourceLocalOperator
-    assert DbtSourceWatcherOperator.template_fields == DbtSourceLocalOperator.template_fields
+    # It should combine template_fields from both BaseConsumerSensor and DbtSourceLocalOperator
+    for field in BaseConsumerSensor.template_fields:
+        assert field in DbtSourceWatcherOperator.template_fields
+    for field in DbtSourceLocalOperator.template_fields:
+        assert field in DbtSourceWatcherOperator.template_fields
 
 
 class TestDbtTestWatcherOperator:

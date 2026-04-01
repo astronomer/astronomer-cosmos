@@ -18,11 +18,11 @@ from cosmos.operators._watcher.state import (
 class TestNodeStatusHelpers:
     """Tests for node status helper functions."""
 
-    @pytest.mark.parametrize("status", ["success", "pass"])
+    @pytest.mark.parametrize("status", ["success", "pass", "warn"])
     def test_is_dbt_node_status_success_true(self, status: str):
         assert is_dbt_node_status_success(status) is True
 
-    @pytest.mark.parametrize("status", ["failed", "fail", "error", "skipped", "warn", None, ""])
+    @pytest.mark.parametrize("status", ["failed", "fail", "error", "skipped", None, ""])
     def test_is_dbt_node_status_success_false(self, status: str | None):
         assert is_dbt_node_status_success(status) is False
 
@@ -42,11 +42,11 @@ class TestNodeStatusHelpers:
     def test_is_dbt_node_status_skipped_false(self, status: str | None):
         assert is_dbt_node_status_skipped(status) is False
 
-    @pytest.mark.parametrize("status", ["success", "pass", "failed", "fail", "error", "skipped"])
+    @pytest.mark.parametrize("status", ["success", "pass", "warn", "failed", "fail", "error", "skipped"])
     def test_is_dbt_node_status_terminal_true(self, status: str):
         assert is_dbt_node_status_terminal(status) is True
 
-    @pytest.mark.parametrize("status", ["warn", "running", None, ""])
+    @pytest.mark.parametrize("status", ["running", None, ""])
     def test_is_dbt_node_status_terminal_false(self, status: str | None):
         assert is_dbt_node_status_terminal(status) is False
 

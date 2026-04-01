@@ -303,7 +303,7 @@ class TestConsumerEmitDatasets:
     @patch.object(DbtConsumerWatcherSensor, "register_dataset")
     def test_emit_datasets_calls_register(self, mock_register):
         sensor = self._make_sensor()
-        sensor._outlet_uris = ["postgres://host:5432/db.schema.table"]
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
         ti = _MockTI()
         ctx = {"ti": ti}
         sensor._emit_datasets(ctx)
@@ -315,11 +315,11 @@ class TestConsumerEmitDatasets:
     @patch.object(DbtConsumerWatcherSensor, "register_dataset")
     def test_emit_datasets_pushes_xcom_when_enabled(self, mock_register):
         sensor = self._make_sensor()
-        sensor._outlet_uris = ["postgres://host:5432/db.schema.table"]
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
         ti = _MockTI()
         ctx = {"ti": ti}
         sensor._emit_datasets(ctx)
-        assert ti.store.get("uri") == ["postgres://host:5432/db.schema.table"]
+        assert ti.store.get("uri") == ["postgres://host:5432/db/schema/table"]
 
 
 class TestStoreDbtStatusFromLog:

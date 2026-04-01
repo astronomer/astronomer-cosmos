@@ -148,11 +148,11 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
 
     If the adapter type is recognised in ``_ADAPTER_NAMESPACE_RESOLVERS``, the
     corresponding resolver builds the namespace from connection details in the
-    profile dict. For unknown adapters, a generic ``<adapter_type>://`` namespace
-    is returned as a best-effort fallback.
+    profile dict.
 
     Returns ``None`` if the namespace cannot be determined (e.g. missing or
-    invalid profile configuration).
+    invalid profile configuration, or an unsupported adapter type). When
+    ``None`` is returned, dataset emission is skipped for the run.
     """
     try:
         adapter_type, profile_dict = _get_profile_dict(profile_config)
@@ -167,8 +167,14 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     if resolver:
         return str(resolver(profile_dict))
 
-    # Fallback: for adapters not in _ADAPTER_NAMESPACE_RESOLVERS, use a generic scheme
-    return f"{adapter_type}://"
+    # Unknown adapters: return None so dataset emission is skipped.
+    # Only adapters supported by the OpenLineage dbt integration are in
+    # _ADAPTER_NAMESPACE_RESOLVERS; emitting URIs for unsupported adapters
+    # would produce URIs that don't match LOCAL/VIRTUALENV behavior.
+    logger.debug(
+        "Adapter type '%s' is not supported for dataset namespace resolution; skipping dataset emission.", adapter_type
+    )
+    return None
 
 
 def construct_dataset_uri(namespace: str, name: str) -> str:

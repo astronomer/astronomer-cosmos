@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow import DAG
+from packaging.version import Version
 
 try:
     # Airflow 3.1 onwards
@@ -122,19 +123,112 @@ my_profile:
         profile_config.profiles_yml_filepath = "/nonexistent/path.yml"
         assert get_dataset_namespace(profile_config) is None
 
+    def test_returns_none_when_no_profile_info(self):
+        """When neither profile_mapping nor profiles_yml_filepath is set, returns None."""
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = None
+        assert get_dataset_namespace(profile_config) is None
+
+    def test_spark_with_thrift_method(self):
+        profile_config = MagicMock()
+        profile_config.profile_mapping = MagicMock()
+        profile_config.profile_mapping.dbt_profile_type = "spark"
+        profile_config.profile_mapping.profile = {"host": "spark-host", "method": "thrift"}
+        assert get_dataset_namespace(profile_config) == "spark://spark-host:10001"
+
+    def test_spark_with_http_method(self):
+        profile_config = MagicMock()
+        profile_config.profile_mapping = MagicMock()
+        profile_config.profile_mapping.dbt_profile_type = "spark"
+        profile_config.profile_mapping.profile = {"host": "spark-host", "method": "http"}
+        assert get_dataset_namespace(profile_config) == "spark://spark-host:443"
+
+    def test_spark_with_explicit_port(self):
+        profile_config = MagicMock()
+        profile_config.profile_mapping = MagicMock()
+        profile_config.profile_mapping.dbt_profile_type = "spark"
+        profile_config.profile_mapping.profile = {"host": "spark-host", "port": 9999}
+        assert get_dataset_namespace(profile_config) == "spark://spark-host:9999"
+
+    def test_spark_with_unknown_method(self):
+        profile_config = MagicMock()
+        profile_config.profile_mapping = MagicMock()
+        profile_config.profile_mapping.dbt_profile_type = "spark"
+        profile_config.profile_mapping.profile = {"host": "spark-host", "method": "session"}
+        assert get_dataset_namespace(profile_config) == "spark://spark-host:10000"
+
+    def test_glue_with_account_id(self):
+        profile_config = MagicMock()
+        profile_config.profile_mapping = MagicMock()
+        profile_config.profile_mapping.dbt_profile_type = "glue"
+        profile_config.profile_mapping.profile = {"region": "eu-west-1", "account_id": "123456789"}
+        assert get_dataset_namespace(profile_config) == "arn:aws:glue:eu-west-1:123456789"
+
+    def test_glue_with_role_arn(self):
+        profile_config = MagicMock()
+        profile_config.profile_mapping = MagicMock()
+        profile_config.profile_mapping.dbt_profile_type = "glue"
+        profile_config.profile_mapping.profile = {
+            "region": "us-east-1",
+            "role_arn": "arn:aws:iam::987654321:role/my-role",
+        }
+        assert get_dataset_namespace(profile_config) == "arn:aws:glue:us-east-1:987654321"
+
+    @patch("cosmos.dataset._resolve_snowflake_account")
+    def test_snowflake_calls_resolve(self, mock_resolve):
+        mock_resolve.return_value = "normalized-account"
+        profile_config = MagicMock()
+        profile_config.profile_mapping = MagicMock()
+        profile_config.profile_mapping.dbt_profile_type = "snowflake"
+        profile_config.profile_mapping.profile = {"account": "raw-account"}
+        result = get_dataset_namespace(profile_config)
+        assert result == "snowflake://normalized-account"
+        mock_resolve.assert_called_once_with("raw-account")
+
+
+class TestResolveSnowflakeAccount:
+    def test_with_openlineage_available(self):
+        from cosmos.dataset import _resolve_snowflake_account
+
+        # OL is installed in test env, so fix_account_name should be used
+        result = _resolve_snowflake_account("xy12345.us-east-1")
+        assert result == "xy12345.us-east-1.aws"
+
+    @patch.dict("sys.modules", {"openlineage.common.provider.snowflake": None})
+    def test_without_openlineage(self):
+        """Falls back to returning the raw account when OL is not installed."""
+        # Need to reimport to hit the ImportError branch
+        import importlib
+
+        import cosmos.dataset
+
+        importlib.reload(cosmos.dataset)
+        result = cosmos.dataset._resolve_snowflake_account("xy12345")
+        assert result == "xy12345"
+        # Reload again to restore normal state
+        importlib.reload(cosmos.dataset)
+
 
 # --- Tests for construct_dataset_uri ---
 
 
 class TestConstructDatasetUri:
-    @patch("cosmos.dataset.AIRFLOW_VERSION", new=MagicMock(__lt__=lambda self, other: True, major=2))
+    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("2.10.0"))
     @patch("cosmos.dataset.settings")
     def test_airflow2_default_uri(self, mock_settings):
         mock_settings.use_dataset_airflow3_uri_standard = False
         uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
         assert uri == "postgres://host:5432/mydb.public.customers"
 
-    @patch("cosmos.dataset.AIRFLOW_VERSION", new=MagicMock(__lt__=lambda self, other: False, major=3))
+    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("2.10.0"))
+    @patch("cosmos.dataset.settings")
+    def test_airflow2_with_airflow3_standard(self, mock_settings):
+        mock_settings.use_dataset_airflow3_uri_standard = True
+        uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
+        assert uri == "postgres://host:5432/mydb/public/customers"
+
+    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("3.0.0"))
     def test_airflow3_uri(self):
         uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
         assert uri == "postgres://host:5432/mydb/public/customers"

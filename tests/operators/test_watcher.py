@@ -274,6 +274,54 @@ def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
     assert str(excinfo.value) == expected_message
 
 
+class TestConsumerEmitDatasets:
+    """Tests for DbtConsumerWatcherSensor._emit_datasets."""
+
+    def _make_sensor(self, emit_datasets=True):
+        sensor = DbtConsumerWatcherSensor(
+            project_dir=".",
+            profile_config=profile_config,
+            task_id="test_sensor",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+            deferrable=False,
+        )
+        sensor.emit_datasets = emit_datasets
+        return sensor
+
+    def test_emit_datasets_skipped_when_disabled(self):
+        sensor = self._make_sensor(emit_datasets=False)
+        ctx = {"ti": _MockTI()}
+        # Should not raise
+        sensor._emit_datasets(ctx)
+
+    def test_emit_datasets_skipped_when_no_uris(self):
+        sensor = self._make_sensor()
+        sensor._outlet_uris = []
+        ctx = {"ti": _MockTI()}
+        sensor._emit_datasets(ctx)
+
+    @patch.object(DbtConsumerWatcherSensor, "register_dataset")
+    def test_emit_datasets_calls_register(self, mock_register):
+        sensor = self._make_sensor()
+        sensor._outlet_uris = ["postgres://host:5432/db.schema.table"]
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        sensor._emit_datasets(ctx)
+        mock_register.assert_called_once()
+        args = mock_register.call_args
+        assert len(args[0][1]) == 1  # one outlet
+
+    @patch("cosmos.settings.enable_uri_xcom", True)
+    @patch.object(DbtConsumerWatcherSensor, "register_dataset")
+    def test_emit_datasets_pushes_xcom_when_enabled(self, mock_register):
+        sensor = self._make_sensor()
+        sensor._outlet_uris = ["postgres://host:5432/db.schema.table"]
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        sensor._emit_datasets(ctx)
+        assert ti.store.get("uri") == ["postgres://host:5432/db.schema.table"]
+
+
 class TestStoreDbtStatusFromLog:
     """Tests for store_dbt_resource_status_from_log and _process_log_line_callable."""
 

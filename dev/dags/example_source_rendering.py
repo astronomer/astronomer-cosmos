@@ -50,7 +50,7 @@ source_rendering_dag = DbtDag(
 # [END cosmos_source_node_example]
 
 
-# Currently airflow dags test ignores priority_weight and  weight_rule, for this reason, we're setting the following in the CI only:
+# Airflow DAG tests currently ignore priority_weight and weight_rule, so in CI we explicitly set trigger_rule:
 if os.getenv("CI"):
     operator_args["trigger_rule"] = "all_success"
 

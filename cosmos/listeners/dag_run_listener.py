@@ -25,6 +25,7 @@ logger = get_logger(__name__)
 class EventStatus:
     SUCCESS = "success"
     FAILED = "failed"
+    SKIPPED = "skipped"
 
 
 DAG_RUN = "dag_run"

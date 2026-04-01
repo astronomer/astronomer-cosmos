@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 
 from cosmos import settings
 from cosmos.config import ProfileConfig
@@ -16,6 +16,7 @@ from cosmos.constants import (
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
 )
+from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
@@ -23,6 +24,7 @@ from cosmos.operators._watcher.state import (
     _log_dbt_event,
     build_producer_state_fetcher,
     get_xcom_val,
+    is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
     safe_xcom_push,
@@ -407,6 +409,17 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if not self.deferrable:
             super().execute(context)
         elif not self.poke(context):
+            if self.is_test_sensor:
+                xcom_key = get_tests_status_xcom_key(self.model_unique_id)
+            else:
+                xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
+            logger.info(
+                "Deferring %s '%s'. The trigger will poll XCom key '%s' from producer task '%s'.",
+                self._resource_label.lower(),
+                self.model_unique_id,
+                xcom_key,
+                self.producer_task_id,
+            )
             self.defer(
                 trigger=WatcherTrigger(
                     model_unique_id=self.model_unique_id,
@@ -439,6 +452,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
     def execute_complete(self, context: Context, event: dict[str, str]) -> None:
         status = event.get("status")
         reason = event.get("reason")
+
+        if status == EventStatus.SKIPPED:
+            raise AirflowSkipException(
+                f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
+            )
 
         if status == "success" and reason == WatcherEventReason.NODE_NOT_RUN:
             logger.info(
@@ -491,8 +509,19 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         """
         if self.is_test_sensor:
             xcom_key = get_tests_status_xcom_key(self.model_unique_id)
-            return get_xcom_val(ti, self.producer_task_id, xcom_key)
-        return get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+        else:
+            xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
+        return get_xcom_val(ti, self.producer_task_id, xcom_key)
+
+    def _cache_compiled_sql(self, ti: Any, context: Context) -> None:
+        """Pull compiled_sql from XCom and cache it on the sensor instance."""
+        compiled_sql = get_xcom_val(
+            ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
+        )
+        if compiled_sql:
+            self.compiled_sql = compiled_sql
+            if hasattr(self, "_override_rtif"):
+                self._override_rtif(context)
 
     def poke(self, context: Context) -> bool:
         """
@@ -502,11 +531,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         ti = context["ti"]
         try_number = ti.try_number
 
+        if self.is_test_sensor:
+            xcom_key = get_tests_status_xcom_key(self.model_unique_id)
+        else:
+            xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
         logger.info(
-            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for %s '%s'",
+            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' via XCom key '%s' for %s '%s'",
             try_number,
             self.poke_retry_number,
             self.producer_task_id,
+            xcom_key,
             self._resource_label.lower(),
             self.model_unique_id,
         )
@@ -521,13 +555,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
         if status is not None:
-            compiled_sql = get_xcom_val(
-                ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
-            )
-            if compiled_sql:
-                self.compiled_sql = compiled_sql
-                if hasattr(self, "_override_rtif"):
-                    self._override_rtif(context)
+            self._cache_compiled_sql(ti, context)
 
         dbt_events = get_xcom_val(
             task_instance=context["ti"],
@@ -550,6 +578,10 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             self.poke_retry_number += 1
 
             return False
+        elif is_dbt_node_status_skipped(status):
+            raise AirflowSkipException(
+                f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
+            )
         elif is_dbt_node_status_success(status):
             return True
         else:

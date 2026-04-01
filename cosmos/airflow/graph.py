@@ -695,6 +695,8 @@ def _add_watcher_producer_task(
     producer_task_args = task_args.copy()
     if tests_per_model is not None:
         producer_task_args["tests_per_model"] = tests_per_model
+    if render_config is not None and render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
+        producer_task_args["_check_source_freshness"] = True
 
     if render_config is not None:
         producer_task_args["select"] = _convert_list_to_str(render_config.select)
@@ -702,12 +704,13 @@ def _add_watcher_producer_task(
         producer_task_args["exclude"] = _convert_list_to_str(render_config.exclude)
 
         if render_config.test_behavior in [TestBehavior.NONE, TestBehavior.AFTER_ALL]:
-            additional_excludes = "resource_type:test resource_type:unit_test"
-            current_exclude = producer_task_args.get("exclude")
-            if current_exclude:
-                producer_task_args["exclude"] = f"{current_exclude} {additional_excludes}"
-            else:
-                producer_task_args["exclude"] = additional_excludes
+            # Use --resource-type to exclude tests from the producer dbt build command.
+            # This works both with and without selectors (--exclude is ignored by dbt when a selector is used).
+            existing_flags = producer_task_args.get("dbt_cmd_flags") or []
+            dbt_cmd_flags = list(existing_flags)
+            for resource_type in SUPPORTED_BUILD_RESOURCES:
+                dbt_cmd_flags.extend(["--resource-type", resource_type.value])  # type: ignore[attr-defined]
+            producer_task_args["dbt_cmd_flags"] = dbt_cmd_flags
 
     class_name = calculate_operator_class(execution_mode, "DbtProducer")
 

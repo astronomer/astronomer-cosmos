@@ -1,12 +1,12 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from airflow.models import DAG
 
-from cosmos.operators.watcher import DbtTestWatcherOperator
+from cosmos.operators.watcher import DbtProducerWatcherOperator, DbtTestWatcherOperator
 
 try:
     # Airflow 3.1 onwards
@@ -20,6 +20,7 @@ except ImportError:
 
 from cosmos.airflow.graph import (
     _add_teardown_task,
+    _add_watcher_producer_task,
     _convert_list_to_str,
     _snake_case_to_camelcase,
     build_airflow_graph,
@@ -33,6 +34,7 @@ from cosmos.airflow.graph import (
 )
 from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
+    SUPPORTED_BUILD_RESOURCES,
     DbtResourceType,
     ExecutionMode,
     SeedRenderingBehavior,
@@ -1334,6 +1336,84 @@ def test_test_behavior_for_watcher_mode(test_behavior):
         assert len(tasks) == 6
 
 
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])
+@pytest.mark.parametrize("selector", [None, "my_selector"])
+def test_watcher_producer_uses_resource_type_flag_to_exclude_tests(test_behavior, selector):
+    """The producer should use --resource-type to exclude tests, regardless of whether a selector is used."""
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    render_config = RenderConfig(test_behavior=test_behavior)
+    if selector:
+        render_config = RenderConfig(test_behavior=test_behavior, selector=selector)
+
+    build_airflow_graph(
+        nodes=sample_nodes,
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=render_config,
+        dbt_project_name="astro_shop",
+    )
+    producer_task = next(task for task in dag.tasks if isinstance(task, DbtProducerWatcherOperator))
+
+    # Should use --resource-type flags, not --exclude
+    expected_resource_types = [rt.value for rt in SUPPORTED_BUILD_RESOURCES]
+    flags = producer_task.dbt_cmd_flags
+    actual_resource_types = [flags[i + 1] for i in range(len(flags)) if flags[i] == "--resource-type"]
+    assert actual_resource_types == expected_resource_types
+    assert "resource_type:test" not in (producer_task.exclude or "")
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])
+def test_watcher_producer_preserves_existing_dbt_cmd_flags(test_behavior):
+    """The producer should not mutate the original dbt_cmd_flags list and should preserve existing flags."""
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        original_flags = ["--full-refresh"]
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "dbt_cmd_flags": original_flags,
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    build_airflow_graph(
+        nodes=sample_nodes,
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=RenderConfig(test_behavior=test_behavior),
+        dbt_project_name="astro_shop",
+    )
+    producer_task = next(task for task in dag.tasks if isinstance(task, DbtProducerWatcherOperator))
+
+    # Original flags should not be mutated
+    assert original_flags == ["--full-refresh"]
+    # Producer should have the original flag plus the resource-type flags
+    assert "--full-refresh" in producer_task.dbt_cmd_flags
+    assert "--resource-type" in producer_task.dbt_cmd_flags
+
+
 def test_custom_meta():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
@@ -2164,3 +2244,34 @@ class TestSelectExcludeAsStringsInOperators:
         assert metadata.arguments["select"] is None
         assert metadata.arguments["exclude"] is None
         assert metadata.arguments["selector"] is None
+
+
+@pytest.mark.parametrize(
+    "source_rendering_behavior, expected_flag",
+    [
+        (SourceRenderingBehavior.ALL, True),
+        (SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS, True),
+        (SourceRenderingBehavior.NONE, False),
+    ],
+)
+def test_add_watcher_producer_task_sets_check_source_freshness_flag(source_rendering_behavior, expected_flag):
+    """_add_watcher_producer_task passes _check_source_freshness based on source_rendering_behavior."""
+    render_config = RenderConfig(source_rendering_behavior=source_rendering_behavior)
+    task_args = {"project_dir": "/tmp/sample_project", "profile_config": None}
+
+    with patch("cosmos.airflow.graph.create_airflow_task") as mock_create_task:
+        mock_create_task.return_value = MagicMock()
+
+        _add_watcher_producer_task(
+            dag=MagicMock(),
+            task_group=None,
+            tasks_map={},
+            render_config=render_config,
+            task_args=task_args,
+        )
+
+        task_metadata = mock_create_task.call_args[0][0]
+        if expected_flag:
+            assert task_metadata.arguments["_check_source_freshness"] is True
+        else:
+            assert "_check_source_freshness" not in task_metadata.arguments

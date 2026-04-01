@@ -50,6 +50,7 @@ from cosmos.operators.local import (
     DbtSnapshotLocalOperator,
     DbtSourceLocalOperator,
     DbtTestLocalOperator,
+    _read_target_sources_json,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 from tests.utils import new_test_dag
@@ -747,6 +748,7 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
 )
 @pytest.mark.integration
+@pytest.mark.skip(reason="Multibyte model removed from altered_jaffle_shop; will be restored in a dedicated project")
 @patch("cosmos.settings.enable_dataset_alias", 0)
 def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     try:
@@ -784,6 +786,7 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
 )
 @pytest.mark.integration
+@pytest.mark.skip(reason="Multibyte model removed from altered_jaffle_shop; will be restored in a dedicated project")
 @patch("cosmos.settings.use_dataset_airflow3_uri_standard", 1)
 @patch("cosmos.settings.enable_dataset_alias", 0)
 def test_run_operator_dataset_url_encoded_names_in_airflow2_with_airflow3_uri(caplog):
@@ -2458,3 +2461,28 @@ def test_dbt_seed_local_operator_execute_skips_when_seed_unchanged(
 
             assert "has not changed since last execution. Skipping seed command" in caplog.text
             assert "seed.my_project.my_seed" in caplog.text
+
+
+class TestReadTargetSourcesJson:
+    def test_returns_dict_when_file_exists(self, tmp_path):
+        target = tmp_path / "target"
+        target.mkdir()
+        sources_file = target / "sources.json"
+        sources_file.write_text(json.dumps({"results": [{"unique_id": "source.pkg.src", "status": "pass"}]}))
+
+        result = _read_target_sources_json(tmp_path)
+        assert result is not None
+        assert result["results"][0]["unique_id"] == "source.pkg.src"
+
+    def test_returns_none_when_file_missing(self, tmp_path):
+        result = _read_target_sources_json(tmp_path)
+        assert result is None
+
+    def test_returns_none_on_invalid_json(self, tmp_path):
+        target = tmp_path / "target"
+        target.mkdir()
+        sources_file = target / "sources.json"
+        sources_file.write_text("not valid json {{{")
+
+        result = _read_target_sources_json(tmp_path)
+        assert result is None

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -203,22 +204,31 @@ def _log_dbt_msg(log_line: dict[str, Any]) -> None:
         logger.log(getattr(logging, level, logging.INFO), msg)
 
 
+_model_outlet_uris_lock = threading.Lock()
+
+
 def _ensure_subprocess_model_outlet_uris(
     model_outlet_uris: dict[str, list[str]] | None,
     dataset_namespace: str | None,
     project_dir: str | None,
 ) -> None:
-    """Lazily populate model_outlet_uris from the manifest when first needed (subprocess path)."""
+    """Lazily populate model_outlet_uris from the manifest when first needed.
+
+    Thread-safe: in DBT_RUNNER mode the log parser callback can be invoked from
+    multiple dbt threads. The lock prevents duplicate manifest reads and ensures
+    the dict is fully populated before any reader accesses it.
+    """
     if model_outlet_uris is None or not dataset_namespace or not project_dir:
         return
-    if model_outlet_uris:
-        # Already populated
-        return
-    from cosmos.dataset import compute_model_outlet_uris
+    with _model_outlet_uris_lock:
+        if model_outlet_uris:
+            # Already populated (double-check under lock)
+            return
+        from cosmos.dataset import compute_model_outlet_uris
 
-    manifest_path = Path(project_dir) / "target" / "manifest.json"
-    if manifest_path.exists():
-        model_outlet_uris.update(compute_model_outlet_uris(manifest_path, dataset_namespace))
+        manifest_path = Path(project_dir) / "target" / "manifest.json"
+        if manifest_path.exists():
+            model_outlet_uris.update(compute_model_outlet_uris(manifest_path, dataset_namespace))
 
 
 def store_dbt_resource_status_from_log(

@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from airflow.models import DAG
@@ -20,6 +20,7 @@ except ImportError:
 
 from cosmos.airflow.graph import (
     _add_teardown_task,
+    _add_watcher_producer_task,
     _convert_list_to_str,
     _snake_case_to_camelcase,
     build_airflow_graph,
@@ -2095,3 +2096,34 @@ class TestSelectExcludeAsStringsInOperators:
         assert metadata.arguments["select"] is None
         assert metadata.arguments["exclude"] is None
         assert metadata.arguments["selector"] is None
+
+
+@pytest.mark.parametrize(
+    "source_rendering_behavior, expected_flag",
+    [
+        (SourceRenderingBehavior.ALL, True),
+        (SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS, True),
+        (SourceRenderingBehavior.NONE, False),
+    ],
+)
+def test_add_watcher_producer_task_sets_check_source_freshness_flag(source_rendering_behavior, expected_flag):
+    """_add_watcher_producer_task passes _check_source_freshness based on source_rendering_behavior."""
+    render_config = RenderConfig(source_rendering_behavior=source_rendering_behavior)
+    task_args = {"project_dir": "/tmp/sample_project", "profile_config": None}
+
+    with patch("cosmos.airflow.graph.create_airflow_task") as mock_create_task:
+        mock_create_task.return_value = MagicMock()
+
+        _add_watcher_producer_task(
+            dag=MagicMock(),
+            task_group=None,
+            tasks_map={},
+            render_config=render_config,
+            task_args=task_args,
+        )
+
+        task_metadata = mock_create_task.call_args[0][0]
+        if expected_flag:
+            assert task_metadata.arguments["_check_source_freshness"] is True
+        else:
+            assert "_check_source_freshness" not in task_metadata.arguments

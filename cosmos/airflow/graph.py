@@ -687,6 +687,8 @@ def _add_watcher_producer_task(
     producer_task_args = task_args.copy()
     if tests_per_model is not None:
         producer_task_args["tests_per_model"] = tests_per_model
+    if render_config is not None and render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
+        producer_task_args["_check_source_freshness"] = True
 
     if render_config is not None:
         producer_task_args["select"] = _convert_list_to_str(render_config.select)

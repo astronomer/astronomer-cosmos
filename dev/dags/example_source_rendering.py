@@ -6,8 +6,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosmos import DbtDag, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import SourceRenderingBehavior
+from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.constants import ExecutionMode, SourceRenderingBehavior, TestBehavior
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -25,16 +25,19 @@ profile_config = ProfileConfig(
 
 # [START cosmos_source_node_example]
 
+
+operator_args = {
+    "install_deps": True,  # install any necessary dependencies before running any dbt command
+    "full_refresh": True,  # used only in dbt commands that support this flag
+}
+
 source_rendering_dag = DbtDag(
     # dbt/cosmos-specific parameters
     project_config=ProjectConfig(
         DBT_ROOT_PATH / "altered_jaffle_shop",
     ),
     profile_config=profile_config,
-    operator_args={
-        "install_deps": True,  # install any necessary dependencies before running any dbt command
-        "full_refresh": True,  # used only in dbt commands that support this flag
-    },
+    operator_args=operator_args,
     render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL),
     # normal dag parameters
     schedule="@daily",
@@ -45,3 +48,26 @@ source_rendering_dag = DbtDag(
     on_warning_callback=lambda context: print(context),
 )
 # [END cosmos_source_node_example]
+
+
+# Airflow DAG tests currently ignore priority_weight and weight_rule, so in CI we explicitly set trigger_rule:
+if os.getenv("CI"):
+    operator_args["trigger_rule"] = "all_success"
+
+watcher_source_rendering_dag = DbtDag(
+    # dbt/cosmos-specific parameters
+    project_config=ProjectConfig(
+        DBT_ROOT_PATH / "altered_jaffle_shop",
+    ),
+    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+    profile_config=profile_config,
+    operator_args=operator_args,
+    render_config=RenderConfig(test_behavior=TestBehavior.NONE, source_rendering_behavior=SourceRenderingBehavior.ALL),
+    # normal dag parameters
+    schedule="@daily",
+    start_date=datetime(2024, 1, 1),
+    catchup=False,
+    dag_id="watcher_source_rendering_dag",
+    default_args={"retries": 0},
+    on_warning_callback=lambda context: print(context),
+)

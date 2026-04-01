@@ -16,6 +16,7 @@ from cosmos.operators._watcher.state import (
     _log_dbt_event,
     build_producer_state_fetcher,
     is_dbt_node_status_failed,
+    is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
 )
@@ -217,6 +218,10 @@ class WatcherTrigger(BaseTrigger):
                     event_data["compiled_sql"] = compiled_sql
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
+            elif is_dbt_node_status_skipped(dbt_node_status):
+                logger.info("dbt node '%s' was skipped", self.model_unique_id)
+                yield TriggerEvent({"status": EventStatus.SKIPPED})  # type: ignore[no-untyped-call]
+                return
             elif is_dbt_node_status_failed(dbt_node_status):
                 logger.warning("dbt node '%s' failed", self.model_unique_id)
                 event_data = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
@@ -243,4 +248,9 @@ class WatcherTrigger(BaseTrigger):
 
             # Sleep briefly before re-polling
             await asyncio.sleep(self.poke_interval)
-            logger.debug("Polling again for node '%s' status...", self.model_unique_id)
+            logger.debug(
+                "Polling again for node '%s': status=%s, producer_state=%s",
+                self.model_unique_id,
+                dbt_node_status,
+                producer_task_state,
+            )

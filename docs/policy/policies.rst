@@ -1,8 +1,8 @@
-Cosmos security, compliance, and privacy policies
--------------------------------------------------
+Cosmos project policies
+-----------------------
 
 Project Repositories and Subprojects
-++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++
 
 The following repositories constitute the codebases for the Astronomer Cosmos project for compliance purposes (OSPS-QA-04.01):
 
@@ -29,10 +29,3 @@ Privacy Notice
 The application and this website collect telemetry to support the project's development. These can be disabled by the end-users.
 
 Read the `Privacy Notice <https://github.com/astronomer/astronomer-cosmos/blob/main/PRIVACY_NOTICE.rst>`_ to learn more about it.
-
-Security Policy
-+++++++++++++++
-
-Check the project's `Security Policy <https://github.com/astronomer/astronomer-cosmos/blob/main/SECURITY.rst>`_ to learn
-how to report security vulnerabilities in Astronomer Cosmos and how security issues reported to the Astronomer Cosmos
-security team are handled.

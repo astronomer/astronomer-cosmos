@@ -419,6 +419,11 @@ class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):  # t
 
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtSourceLocalOperator.template_fields  # type: ignore[operator]
 
+    @property
+    def _resource_label(self) -> str:
+        """Human-readable label for this sensor's dbt resource type."""
+        return "Source"
+
 
 class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
     """

@@ -110,6 +110,8 @@ class ExecutionMode(Enum):
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
     GCP_CLOUD_RUN_JOB = "gcp_cloud_run_job"
+    GCP_GKE = "gcp_gke"
+    WATCHER_GCP_GKE = "watcher_gcp_gke"
     WATCHER_KUBERNETES = "watcher_kubernetes"
 
 

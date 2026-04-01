@@ -1,10 +1,10 @@
 .. _kubernetes:
 
 
-Kubernetes execution mode
--------------------------
+Kubernetes and GCP GKE execution modes
+---------------------------------------
 
-The ``kubernetes`` execution mode provides a very isolated method to run ``dbt`` from within a Kubernetes Pod, usually in a separate host.
+The ``kubernetes`` and ``gcp_gke`` execution modes provide a very isolated method to run ``dbt`` from within a Kubernetes Pod, usually in a separate host. The ``gcp_gke`` variant uses GKE-specific authentication via ``GKEStartPodOperator``.
 
 Performance and maintenance considerations
 ++++++++++++++++++++++++++++++++++++++++++
@@ -164,12 +164,58 @@ Enable and trigger a run of the `jaffle_shop_k8s <https://github.com/astronomer/
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_k8s_dag_run.png
     :width: 800
 
+.. _gcp-gke-execution-mode:
+
+GCP GKE execution mode
++++++++++++++++++++++++
+
+``ExecutionMode.GCP_GKE`` works the same way as ``ExecutionMode.KUBERNETES`` but uses the
+`GKEStartPodOperator <https://airflow.apache.org/docs/apache-airflow-providers-google/stable/_api/airflow/providers/google/cloud/operators/kubernetes_engine/index.html>`_
+instead of ``KubernetesPodOperator``. This is the recommended mode for users running
+dbt on Google Kubernetes Engine, as it handles GKE authentication automatically and lets you select the cluster to use.
+
+The ``GKEStartPodOperator`` requires three additional parameters in ``operator_args``:
+
+- ``project_id``: Your GCP project ID
+- ``location``: The GKE cluster location (e.g. ``us-central1``)
+- ``cluster_name``: The GKE cluster name
+
+.. code-block:: python
+
+    from cosmos import DbtDag
+    from cosmos.config import ExecutionConfig
+    from cosmos.constants import ExecutionMode
+
+    dag = DbtDag(
+        dag_id="jaffle_shop_gcp_gke",
+        # ... other DAG parameters ...
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.GCP_GKE,
+            dbt_project_path="dags/dbt/jaffle_shop",
+        ),
+        operator_args={
+            "image": "dbt-jaffle-shop:1.0.0",
+            "get_logs": True,
+            "project_id": "my-gcp-project",
+            "location": "us-central1",
+            "cluster_name": "my-gke-cluster",
+        },
+    )
+
+All other configuration (Docker image, secrets, profiles) is the same as ``ExecutionMode.KUBERNETES``.
+
+To use this mode, install the Google Cloud provider:
+
+.. code-block:: bash
+
+    pip install "astronomer-cosmos[google]"
+
 .. _kubernetes-known-limitations:
 
 Known Limitations
 +++++++++++++++++
 
-The Kubernetes execution mode has the following limitations:
+The Kubernetes and GCP GKE execution modes share the following limitations:
 
 - Does not emit OpenLineage events (there is an `open ticket #496 <https://github.com/astronomer/astronomer-cosmos/issues/496>`__ to address this)
 - Does not emit Airflow datasets, assets, and dataset aliases (there is an `open ticket #2329 <https://github.com/astronomer/astronomer-cosmos/issues/2329>`__ to address this)

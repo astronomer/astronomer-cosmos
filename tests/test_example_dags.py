@@ -20,6 +20,8 @@ EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
+# DAGs that require seeds to be loaded first (run via dedicated ordered tests below)
+DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag"]
 IGNORED_DAG_FILES = [
     "performance_dag.py",
     "jaffle_shop_kubernetes.py",
@@ -121,9 +123,20 @@ def run_dag(dag_id: str):
 @pytest.mark.integration
 @pytest.mark.parametrize("dag_id", get_dag_ids())
 def test_example_dag(session, dag_id: str):
-    if dag_id in KUBERNETES_DAGS:
+    if dag_id in KUBERNETES_DAGS or dag_id in DAGS_WITH_SEED_DEPENDENCY:
         return
     run_dag(dag_id)
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
+)
+@pytest.mark.integration
+def test_watcher_source_rendering_dag(session):
+    """Run source_rendering_dag first to load seeds, then watcher_source_rendering_dag."""
+    run_dag("source_rendering_dag")
+    run_dag("watcher_source_rendering_dag")
 
 
 @pytest.mark.skipif(

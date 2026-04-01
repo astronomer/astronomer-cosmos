@@ -748,6 +748,7 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
 )
 @pytest.mark.integration
+@pytest.mark.skip(reason="Multibyte model removed from altered_jaffle_shop; will be restored in a dedicated project")
 @patch("cosmos.settings.enable_dataset_alias", 0)
 def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     try:
@@ -785,6 +786,7 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
 )
 @pytest.mark.integration
+@pytest.mark.skip(reason="Multibyte model removed from altered_jaffle_shop; will be restored in a dedicated project")
 @patch("cosmos.settings.use_dataset_airflow3_uri_standard", 1)
 @patch("cosmos.settings.enable_dataset_alias", 0)
 def test_run_operator_dataset_url_encoded_names_in_airflow2_with_airflow3_uri(caplog):

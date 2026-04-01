@@ -67,13 +67,6 @@ def get_dag_bag() -> DagBag:  # noqa: C901
             # This DAG is taking too long to run int the CI (https://github.com/astronomer/astronomer-cosmos/actions/runs/21902660682/job/63234728594)
             file.writelines("example_cosmos_python_models.py\n")
 
-        # Disabling these DAGs temporarily due to an Airflow 3 bug on processing DatasetAlias that contain non-ASCII characters:
-        # https://github.com/apache/airflow/issues/51566
-        # https://github.com/astronomer/astronomer-cosmos/issues/1802
-        if AIRFLOW_VERSION >= Version("3.0.0"):
-            file.writelines("example_source_rendering.py\n")
-            file.writelines("basic_cosmos_task_group_different_owners.py\n")
-
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)

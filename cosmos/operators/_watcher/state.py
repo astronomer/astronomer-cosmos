@@ -21,7 +21,7 @@ from packaging.version import Version
 ProducerStateFetcher = Callable[[], str | None]
 
 # dbt uses different status values for different node types (models/tests):"
-DBT_SUCCESS_STATUSES = frozenset({"success", "pass"})
+DBT_SUCCESS_STATUSES = frozenset({"success", "pass", "warn"})
 DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error", "runtime error"})
 DBT_SKIPPED_STATUSES = frozenset({"skipped"})
 

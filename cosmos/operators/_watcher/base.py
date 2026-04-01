@@ -409,6 +409,17 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if not self.deferrable:
             super().execute(context)
         elif not self.poke(context):
+            if self.is_test_sensor:
+                xcom_key = get_tests_status_xcom_key(self.model_unique_id)
+            else:
+                xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
+            logger.info(
+                "Deferring %s '%s'. The trigger will poll XCom key '%s' from producer task '%s'.",
+                self._resource_label.lower(),
+                self.model_unique_id,
+                xcom_key,
+                self.producer_task_id,
+            )
             self.defer(
                 trigger=WatcherTrigger(
                     model_unique_id=self.model_unique_id,
@@ -498,8 +509,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         """
         if self.is_test_sensor:
             xcom_key = get_tests_status_xcom_key(self.model_unique_id)
-            return get_xcom_val(ti, self.producer_task_id, xcom_key)
-        return get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+        else:
+            xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
+        return get_xcom_val(ti, self.producer_task_id, xcom_key)
 
     def _cache_compiled_sql(self, ti: Any, context: Context) -> None:
         """Pull compiled_sql from XCom and cache it on the sensor instance."""
@@ -519,11 +531,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         ti = context["ti"]
         try_number = ti.try_number
 
+        if self.is_test_sensor:
+            xcom_key = get_tests_status_xcom_key(self.model_unique_id)
+        else:
+            xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
         logger.info(
-            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' for %s '%s'",
+            "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' via XCom key '%s' for %s '%s'",
             try_number,
             self.poke_retry_number,
             self.producer_task_id,
+            xcom_key,
             self._resource_label.lower(),
             self.model_unique_id,
         )

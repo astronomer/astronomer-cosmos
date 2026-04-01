@@ -243,18 +243,26 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         safe_xcom_push(task_instance=ti, key=f"{uid_key}_status", value="skipped")
 
     def _run_source_freshness(self, context: Context) -> None:
-        """Run ``dbt source freshness`` via ``build_cmd`` and ``run_command``."""
+        """Run ``dbt source freshness`` via ``build_cmd`` and ``run_command``.
+
+        Temporarily overrides operator attributes that carry flags unsupported by
+        ``dbt source freshness`` (``--full-refresh``, ``--indirect-selection``).
+        User-supplied ``--select``/``--exclude`` are preserved.
+        """
         original_base_cmd = self.base_cmd
         original_indirect_selection = getattr(self, "indirect_selection", None)
+        original_full_refresh = getattr(self, "full_refresh", None)
         try:
             self.base_cmd = ["source", "freshness"]
             self.indirect_selection = None  # ``dbt source freshness`` does not support --indirect-selection
+            self.full_refresh = False  # type: ignore[assignment]  # ``dbt source freshness`` does not support --full-refresh
             full_cmd, env = self.build_cmd(context=context, cmd_flags=self.add_cmd_flags())
             context["_check_source_freshness"] = True  # type: ignore[typeddict-unknown-key]
             self.run_command(cmd=full_cmd, env=env, context=context)
         finally:
             self.base_cmd = original_base_cmd
             self.indirect_selection = original_indirect_selection
+            self.full_refresh = original_full_refresh  # type: ignore[assignment]
             context.pop("_check_source_freshness", None)  # type: ignore[typeddict-item]
 
     def _skipped_node_token(self, context: Context, node_unique_ids: list[str]) -> None:
@@ -281,9 +289,25 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         else:
             self.exclude = exclude_str
 
+    def _push_source_freshness_results(self, context: Context) -> None:
+        """Push per-source freshness status to XCom so source consumer sensors can read it."""
+        if not self._sources_json:
+            return
+        ti = context["ti"]
+        for result in self._sources_json.get("results", []):
+            unique_id = result.get("unique_id")
+            status = result.get("status")
+            if unique_id and status:
+                uid_key = unique_id.replace(".", "__")
+                safe_xcom_push(task_instance=ti, key=f"{uid_key}_status", value=status)
+
     def _apply_source_freshness(self, context: Context) -> None:
         """Run source freshness, invoke the callback, and mark affected nodes as skipped."""
         self._run_source_freshness(context)
+
+        # Push per-source freshness results so source consumer sensors can read them
+        self._push_source_freshness_results(context)
+
         dag = context.get("dag")
         task_group = getattr(context.get("task_instance"), "task", None)
         task_group = getattr(task_group, "task_group", None)
@@ -383,12 +407,17 @@ class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  #
     template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
 
 
-class DbtSourceWatcherOperator(DbtSourceLocalOperator):
-    """
-    Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
+class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):  # type: ignore[misc]
+    """Watches for source freshness results from the producer task.
+
+    When the producer has ``_check_source_freshness`` enabled it runs
+    ``dbt source freshness`` and pushes per-source status to XCom.
+    This sensor reads that status.  On retry (or when the producer did
+    not provide a result) it falls back to running ``dbt source freshness``
+    locally for its specific source.
     """
 
-    template_fields: Sequence[str] = DbtSourceLocalOperator.template_fields  # type: ignore[assignment]
+    template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtSourceLocalOperator.template_fields  # type: ignore[operator]
 
 
 class DbtRunWatcherOperator(DbtConsumerWatcherSensor):

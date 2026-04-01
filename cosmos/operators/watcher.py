@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import functools
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException

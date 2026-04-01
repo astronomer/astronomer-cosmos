@@ -248,7 +248,7 @@ class WatcherTrigger(BaseTrigger):
 
             # Sleep briefly before re-polling
             await asyncio.sleep(self.poke_interval)
-            logger.info(
+            logger.debug(
                 "Polling again for node '%s': status=%s, producer_state=%s",
                 self.model_unique_id,
                 dbt_node_status,

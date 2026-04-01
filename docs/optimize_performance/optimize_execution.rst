@@ -23,6 +23,12 @@ dbt's native threading to parallelize models, while still giving you model-level
 Benchmarks show **up to 80% reduction in DAG run time** compared to ``ExecutionMode.LOCAL``.
 See :ref:`watcher-execution-mode` for setup instructions and detailed benchmarks.
 
+.. note::
+
+   ``ExecutionMode.WATCHER`` is currently experimental. Review its
+   `known limitations <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html#known-limitations>`_
+   before adopting it in production.
+
 .. code-block:: python
 
    from cosmos import DbtDag, ExecutionConfig
@@ -50,9 +56,10 @@ achieving roughly **35% faster execution** compared to ``ExecutionMode.LOCAL``. 
 
 **Baseline: use** ``ExecutionMode.LOCAL`` **with** ``InvocationMode.DBT_RUNNER``
 
-If neither ``WATCHER`` nor ``AIRFLOW_ASYNC`` suits your setup, ensure that ``ExecutionMode.LOCAL`` uses
-``InvocationMode.DBT_RUNNER`` (the default since Cosmos 1.4) to run dbt as a library call rather than spawning a
-subprocess for each task. See :ref:`invocation-mode`.
+If neither ``WATCHER`` nor ``AIRFLOW_ASYNC`` suits your setup, configure ``ExecutionMode.LOCAL`` to use
+``InvocationMode.DBT_RUNNER`` to run dbt as a library call rather than spawning a subprocess for each task.
+Since Cosmos 1.4, ``DBT_RUNNER`` is the preferred invocation mode and is auto-selected when dbt is available in
+the same Python environment; otherwise Cosmos falls back to ``InvocationMode.SUBPROCESS``. See :ref:`invocation-mode`.
 
 
 2. Install dbt in the same Python environment as Airflow

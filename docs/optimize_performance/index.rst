@@ -8,7 +8,7 @@ and update in Airflow) and how fast tasks execute (affecting DAG run duration).
 
 - :ref:`optimize-rendering` -- Speed up DAG parsing by choosing the right LoadMode, reducing DAG granularity, and skipping stale sources.
 - :ref:`optimize-execution` -- Speed up DAG runs by choosing the right execution mode, sizing workers, and reducing per-task overhead.
-- :ref:`perf-troubleshooting` -- Diagnose common performance issues such as slow parsing, missing DAGs, and OOM errors.
+- :ref:`perf-troubleshooting` -- Diagnose common performance issues such as slow parsing, missing DAGs, and Out of Memory (OOM) errors.
 
 The following pages cover specific optimization mechanisms in more detail:
 

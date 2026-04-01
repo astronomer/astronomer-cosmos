@@ -52,9 +52,7 @@ To generate the manifest, run the following from your dbt project directory (typ
    dbt deps    # install packages first
    dbt compile # generates target/manifest.json
 
-Then make the resulting ``target/manifest.json`` available to Cosmos via a local path or a
-`remote path <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/parsing-methods.html#dbt-manifest>`_
-(S3, GCS, or Azure Blob Storage).
+Then make the resulting ``target/manifest.json`` available to Cosmos via a local path.
 
 For more details on all parsing methods, see :ref:`parsing-methods`.
 

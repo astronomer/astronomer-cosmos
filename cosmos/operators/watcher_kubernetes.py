@@ -70,6 +70,9 @@ class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerWatcherKubernete
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtSnapshotWatcherKubernetesOperator(DbtSnapshotMixin, DbtConsumerWatcherKubernetesSensor):  # type: ignore[misc]
     """
@@ -93,6 +96,9 @@ class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtTestWatcherKubernetesOperator(EmptyOperator):

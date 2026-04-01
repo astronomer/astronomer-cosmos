@@ -89,12 +89,13 @@ class TestGetDatasetNamespace:
         # fix_account_name normalizes account locator format (appends cloud suffix)
         assert get_dataset_namespace(profile_config) == "snowflake://xy12345.us-east-1.aws"
 
-    def test_unknown_adapter_fallback(self):
+    def test_unknown_adapter_returns_none(self):
+        """Unsupported adapters return None so dataset emission is skipped."""
         profile_config = MagicMock()
         profile_config.profile_mapping = MagicMock()
         profile_config.profile_mapping.dbt_profile_type = "custom_adapter"
         profile_config.profile_mapping.profile = {}
-        assert get_dataset_namespace(profile_config) == "custom_adapter://"
+        assert get_dataset_namespace(profile_config) is None
 
     def test_profiles_yml_filepath(self, tmp_path):
         profiles_yml = tmp_path / "profiles.yml"

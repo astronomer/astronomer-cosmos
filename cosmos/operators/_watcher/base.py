@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -203,12 +204,47 @@ def _log_dbt_msg(log_line: dict[str, Any]) -> None:
         logger.log(getattr(logging, level, logging.INFO), msg)
 
 
+_model_outlet_uris_lock = threading.Lock()
+
+
+_MODEL_OUTLET_URIS_ATTEMPTED_KEY = "__attempted__"
+
+
+def _ensure_subprocess_model_outlet_uris(
+    model_outlet_uris: dict[str, list[str]] | None,
+    dataset_namespace: str | None,
+    project_dir: str | None,
+) -> None:
+    """Lazily populate model_outlet_uris from the manifest when first needed.
+
+    Thread-safe: in DBT_RUNNER mode the log parser callback can be invoked from
+    multiple dbt threads. The lock prevents duplicate manifest reads and ensures
+    the dict is fully populated before any reader accesses it.
+
+    A sentinel key is set after the attempt completes so that an empty manifest
+    result does not cause repeated filesystem reads.
+    """
+    if model_outlet_uris is None or not dataset_namespace or not project_dir:
+        return
+    with _model_outlet_uris_lock:
+        if _MODEL_OUTLET_URIS_ATTEMPTED_KEY in model_outlet_uris:
+            return
+        from cosmos.dataset import compute_model_outlet_uris
+
+        manifest_path = Path(project_dir) / "target" / "manifest.json"
+        if manifest_path.exists():
+            model_outlet_uris.update(compute_model_outlet_uris(manifest_path, dataset_namespace))
+        model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []  # type: ignore[assignment]
+
+
 def store_dbt_resource_status_from_log(
     line: str,
     extra_kwargs: Any,
     *,
     tests_per_model: dict[str, list[str]] | None = None,
     test_results_per_model: dict[str, list[str]] | None = None,
+    model_outlet_uris: dict[str, list[str]] | None = None,
+    dataset_namespace: str | None = None,
 ) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
@@ -226,6 +262,9 @@ def store_dbt_resource_status_from_log(
         tests, collects the terminal statuses of those tests as they finish.
         Keyed by model unique_id, values are lists of test statuses (e.g. ``["pass", "pass"]``).
         Mutated in place by this function.
+    :param model_outlet_uris: Mutable dict mapping unique_id to outlet URIs.
+        Populated lazily from the manifest on first terminal status detection.
+    :param dataset_namespace: The OL-compatible dataset namespace for URI construction.
     """
     try:
         log_line = json.loads(line)
@@ -265,8 +304,22 @@ def store_dbt_resource_status_from_log(
                     unique_id, dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
                 )
             else:
+                # Lazily populate per-model outlet URIs from the manifest, but only for
+                # resource types that can emit datasets (models/seeds/snapshots).
+                outlet_uris: list[str] = []
+                if dbt_node_resource_type in {"model", "seed", "snapshot"}:
+                    project_dir = extra_kwargs.get("project_dir")
+                    _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
+                    outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
+
+                status_value: dict[str, Any] | str = {
+                    "status": dbt_node_status,
+                    "outlet_uris": outlet_uris,
+                }
                 safe_xcom_push(
-                    task_instance=context["ti"], key=f"{unique_id.replace('.', '__')}_status", value=dbt_node_status
+                    task_instance=context["ti"],
+                    key=f"{unique_id.replace('.', '__')}_status",
+                    value=status_value,
                 )
 
             # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
@@ -449,7 +502,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         else:
             self._execute_core(context)
 
-    def execute_complete(self, context: Context, event: dict[str, str]) -> None:
+    def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
         status = event.get("status")
         reason = event.get("reason")
 
@@ -506,12 +559,18 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         For test sensors, reads the aggregated ``_tests_status`` key.
         For model sensors, reads the per-model ``*_status`` key (same for both
         SUBPROCESS and DBT_RUNNER invocation modes).
+
+        Side effect: when outlet URIs are present in the XCom value,
+        stores them on ``self._outlet_uris`` for later dataset emission.
         """
         if self.is_test_sensor:
             xcom_key = get_tests_status_xcom_key(self.model_unique_id)
-        else:
-            xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
-        return get_xcom_val(ti, self.producer_task_id, xcom_key)
+            return get_xcom_val(ti, self.producer_task_id, xcom_key)
+        xcom_val = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+        if isinstance(xcom_val, dict):
+            self._outlet_uris = xcom_val.get("outlet_uris", [])
+            return xcom_val.get("status")
+        return xcom_val
 
     def _cache_compiled_sql(self, ti: Any, context: Context) -> None:
         """Pull compiled_sql from XCom and cache it on the sensor instance."""

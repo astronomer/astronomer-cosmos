@@ -20,6 +20,7 @@ from cosmos.constants import (
     WATCHER_TASK_WEIGHT_RULE,
     DbtResourceType,
 )
+from cosmos.dataset import get_dataset_namespace
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
 from cosmos.operators._watcher import safe_xcom_push
@@ -167,12 +168,21 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         super().__init__(task_id=task_id, *args, **kwargs)
         self.log_format = "json"
 
+        # Mutable dict populated lazily from the manifest; shared with the log parser.
+        self._dataset_namespace: str | None = None
+        self._model_outlet_uris: dict[str, list[str]] = {}
+
+    def _handle_datasets(self, context: Context) -> None:
+        """No-op override: consumer tasks handle their own dataset emission in WATCHER mode."""
+
     def _make_parse_callable(self) -> Callable[[str, Any], None]:
         """Returns store_dbt_resource_status_from_log with the operator's test maps pre-bound."""
         return functools.partial(
             store_dbt_resource_status_from_log,
             tests_per_model=self.tests_per_model,
             test_results_per_model=self.test_results_per_model,
+            model_outlet_uris=self._model_outlet_uris,
+            dataset_namespace=self._dataset_namespace,
         )
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> Any:
@@ -331,6 +341,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._skipped_node_token(context, node_ids_to_skip)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
+        # Pre-compute the dataset namespace for per-model outlet URI generation.
+        self._dataset_namespace = get_dataset_namespace(self.profile_config)
+        self._model_outlet_uris.clear()
+
         task_instance = context.get("ti")
         if task_instance is None:
             raise AirflowException("DbtProducerWatcherOperator expects a task instance in the execution context")
@@ -381,6 +395,41 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
             deferrable=deferrable,
             **kwargs,
         )
+
+    def _emit_datasets(self, context: Context) -> None:
+        """Emit Airflow datasets for this consumer task's model using outlet URIs from the producer."""
+        if not getattr(self, "emit_datasets", False):
+            return
+        outlet_uris = getattr(self, "_outlet_uris", [])
+        if not outlet_uris:
+            return
+
+        from cosmos import settings
+        from cosmos.constants import AIRFLOW_VERSION
+
+        if AIRFLOW_VERSION.major >= 3:
+            from airflow.sdk.definitions.asset import Asset
+        else:
+            from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
+
+        outlets = [Asset(uri=uri) for uri in outlet_uris]
+        logger.info("Emitting %d dataset(s) for model '%s': %s", len(outlets), self.model_unique_id, outlet_uris)
+        self.register_dataset([], outlets, context)
+
+        if settings.enable_uri_xcom:
+            context["ti"].xcom_push(key="uri", value=outlet_uris)
+
+    def execute(self, context: Context, **kwargs: Any) -> None:  # type: ignore[override]
+        super().execute(context, **kwargs)
+        # If we reach here without deferring, the model succeeded — emit datasets
+        self._emit_datasets(context)
+
+    def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
+        # Extract outlet URIs from trigger event before parent handles status
+        self._outlet_uris = event.get("outlet_uris", [])
+        super().execute_complete(context, event)
+        # If we reach here without raising, the model succeeded — emit datasets
+        self._emit_datasets(context)
 
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.

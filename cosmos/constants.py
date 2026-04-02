@@ -107,6 +107,7 @@ class ExecutionMode(Enum):
     KUBERNETES = "kubernetes"
     AWS_EKS = "aws_eks"
     AWS_ECS = "aws_ecs"
+    WATCHER_AWS_ECS = "watcher_aws_ecs"
     VIRTUALENV = "virtualenv"
     AZURE_CONTAINER_INSTANCE = "azure_container_instance"
     GCP_CLOUD_RUN_JOB = "gcp_cloud_run_job"

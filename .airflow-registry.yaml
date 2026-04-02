@@ -212,6 +212,20 @@ operators:
   - module: cosmos.operators.watcher_kubernetes.DbtTestWatcherKubernetesOperator
     description: Runs `dbt test` using the Kubernetes execution pattern, or acts as an `EmptyOperator` for `TestBehavior.AFTER_EACH`.
 
+  # Watcher pattern (AWS ECS)
+  # Run a single `dbt build` or `dbt run` command per pipeline (producer), via an ECS Task, and have Airflow deferrable sensors (consumers) tracking progress for individual dbt nodes.
+  - module: cosmos.operators.watcher_aws_ecs.DbtProducerWatcherOperator
+    description: Run a single dbt command (build or run) via a `ECSRunTaskOperator` for the entire dbt project and produce one XCom containing the status of each dbt node (model, seed, snapshot).
+  - module: cosmos.operators.watcher_aws_ecs.DbtRunWatcherAwsEcsOperator
+    description: Monitor a dbt model using Airflow XCom polling sensors. On retry, executes `dbt run` for the specific model via `DbtRunAwsEcsOperator`.
+  - module: cosmos.operators.watcher_aws_ecs.DbtSeedWatcherAwsEcsOperator
+    description: Monitor a dbt seed using Airflow XCom polling sensors. On retry, executes `dbt seed` for the specific seed via `DbtSeedAwsEcsOperator`.
+  - module: cosmos.operators.watcher_aws_ecs.DbtSnapshotWatcherAwsEcsOperator
+    description: Monitor a dbt snapshot using Airflow XCom polling sensors. On retry, executes `dbt snapshot` for the specific snapshot via `DbtSnapshotAwsEcsOperator`.
+  - module: cosmos.operators.watcher_aws_ecs.DbtTestWatcherAwsEcsOperator
+    description: Runs `dbt test` using the Kubernetes execution pattern, or acts as an `EmptyOperator` for `TestBehavior.AFTER_EACH`.
+
+
 other:
   - module: cosmos.airflow.dag.DbtDag
     description: Render a complete dbt project as an Airflow DAG

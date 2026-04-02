@@ -297,7 +297,7 @@ def test_build_and_run_cmd_stashes_context_before_ecs_execute(mock_store):
 
 
 @patch("cosmos.operators.watcher_aws_ecs.store_dbt_resource_status_from_log")
-def test_build_and_run_cmd_forwards_log_lines_to_store_1(mock_store):
+def test_build_and_run_cmd_forwards_log_lines_to_store(mock_store):
     op = make_producer()
     context = make_context(MagicMock())
 
@@ -312,10 +312,6 @@ def test_build_and_run_cmd_forwards_log_lines_to_store_1(mock_store):
     with (
         patch.object(op, "_start_task"),
         patch.object(op, "_wait_for_task_ended"),
-        patch("cosmos.operators.watcher_aws_ecs.EcsRunTaskOperator._check_success_task"),
-        patch(
-            "cosmos.operators.watcher_aws_ecs.EcsRunTaskOperator._get_logs_stream_name", return_value="ecs/dbt/task-123"
-        ),
         patch(
             "cosmos.operators.watcher_aws_ecs.DbtAwsTaskLogFetcher.is_stopped",
             side_effect=is_stopped_after_one_iteration,

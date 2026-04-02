@@ -48,7 +48,7 @@ class DbtAwsTaskLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
     arrives and forward it to a caller-supplied ``on_log_line`` callback.
 
     The base class polls CloudWatch on ``fetch_interval``, logs each event via
-    ``self.logger.info(self.event_to_str(log_event))``, and then sleeps.  We
+    ``self.log.info(self.event_to_str(log_event))``, and then sleeps.  We
     preserve that behaviour exactly and additionally call ``on_log_line`` with
     the raw message so that ``store_dbt_resource_status_from_log`` can parse
     dbt JSON log lines and push per-node status to XCom *while the ECS task is
@@ -62,12 +62,12 @@ class DbtAwsTaskLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.logger.debug("Initializing DbtAwsTaskLogFetcher with args %s kwargs %s", args, kwargs)
+        self.log.debug("Initializing DbtAwsTaskLogFetcher with args %s kwargs %s", args, kwargs)
         self.on_log_line = on_log_line
 
     def run(self) -> None:
         continuation_token = AwsLogsHook.ContinuationToken()
-        self.logger.info(
+        self.log.info(
             "Starting DbtAwsTaskLogFetcher with log group '%s' and stream '%s'", self.log_group, self.log_stream_name
         )
         while not self.is_stopped():
@@ -76,7 +76,7 @@ class DbtAwsTaskLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
                 self.on_log_line(log_event["message"])
 
 
-class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
+class DbtProducerWatcherOperator(DbtBuildAwsEcsOperator):
     """
     Executes a full ``dbt build`` command on AWS ECS and publishes per-node
     status to Airflow XCom as each model / seed / snapshot finishes, so that
@@ -143,7 +143,6 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
     # ------------------------------------------------------------------
 
     def _get_task_log_fetcher(self) -> DbtAwsTaskLogFetcher:
-        # TODO: consistently use self.log vs logger in this class (and the fetcher) — currently a mix of both.
         self.log.debug(
             "_get_task_log_fetcher called — context available: %s, ecs_task_id: %s",
             self._current_context is not None,
@@ -190,7 +189,7 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
     # ------------------------------------------------------------------
 
     def execute(self, context: Context, **kwargs: Any) -> Any:  # type: ignore[override]
-        logger.info("DbtProducerWatcherAwsEcsOperator execute called with context: %s", context)
+        self.log.info("DbtProducerWatcherAwsEcsOperator execute called with context: %s", context)
         task_instance = context.get("ti")
         if task_instance is None:
             raise AirflowException("DbtProducerWatcherAwsEcsOperator expects a task instance in the execution context.")

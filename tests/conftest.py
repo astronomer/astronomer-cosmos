@@ -4,8 +4,21 @@ from unittest.mock import patch
 import pytest
 from airflow.models.connection import Connection
 from packaging.version import Version
+from sqlalchemy import Table as SQLAlchemyTable
 
 from cosmos.constants import AIRFLOW_VERSION
+
+# Workaround for Airflow 3.0/3.1: avoid "Table 'dag_warning' is already defined for this
+# MetaData instance" when tests trigger duplicate table registration (e.g. DagBag, sync_bag_to_db).
+if AIRFLOW_VERSION >= Version("3.0"):
+    _original_table_init = SQLAlchemyTable.__init__
+
+    def _patched_table_init(self, *args, **kwargs):
+        if args and args[0] == "dag_warning":
+            kwargs["extend_existing"] = True
+        return _original_table_init(self, *args, **kwargs)
+
+    SQLAlchemyTable.__init__ = _patched_table_init
 
 if AIRFLOW_VERSION >= Version("3.1"):
     # Change introduced in Airflow 3.1.0

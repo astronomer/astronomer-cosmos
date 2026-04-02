@@ -410,11 +410,7 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         if AIRFLOW_VERSION.major >= 3:
             from airflow.sdk.definitions.asset import Asset
         else:
-            try:
-                from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
-            except ImportError:
-                logger.debug("Airflow Dataset/Asset not available, skipping dataset emission")
-                return
+            from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
 
         outlets = [Asset(uri=uri) for uri in outlet_uris]
         logger.info("Emitting %d dataset(s) for model '%s': %s", len(outlets), self.model_unique_id, outlet_uris)

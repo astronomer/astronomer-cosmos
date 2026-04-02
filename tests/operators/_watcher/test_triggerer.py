@@ -82,6 +82,21 @@ class TestWatcherTrigger:
                 none_result = await self.trigger.get_xcom_val_af2("test_key")
                 assert none_result is None
 
+    async def test_get_node_status_with_dict_xcom(self):
+        """When XCom value is a dict, extract status and outlet_uris."""
+        xcom_dict = {"status": "success", "outlet_uris": ["postgres://host:5432/db/schema/table"]}
+        with patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=xcom_dict)):
+            status = await self.trigger._get_node_status()
+        assert status == "success"
+        assert self.trigger._outlet_uris == ["postgres://host:5432/db/schema/table"]
+
+    async def test_get_node_status_with_string_xcom(self):
+        """When XCom value is a plain string, return it directly."""
+        with patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value="success")):
+            status = await self.trigger._get_node_status()
+        assert status == "success"
+        assert not hasattr(self.trigger, "_outlet_uris") or self.trigger._outlet_uris == []
+
     @pytest.mark.parametrize(
         "xcom_val, expected_status, expected_compiled_sql",
         [
@@ -164,6 +179,31 @@ class TestWatcherTrigger:
         ):
             events = [event async for event in self.trigger.run()]
             assert events[0].payload == expected
+
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    @patch("cosmos.operators._watcher.triggerer._log_dbt_event")
+    async def test_run_success_with_outlet_uris(self, mock_dbt_event, mock_startup_events):
+        """When model succeeds and outlet URIs are present, TriggerEvent includes them."""
+        outlet_uris = ["postgres://host:5432/db/schema/table"]
+        xcom_dict = {"status": "success", "outlet_uris": outlet_uris}
+
+        async def fake_get_xcom_val(key):
+            if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
+                return _STARTUP_EVENTS
+            if key.endswith("_compiled_sql"):
+                return None
+            if key.endswith("_status"):
+                return xcom_dict
+            return None
+
+        with (
+            patch.object(self.trigger, "get_xcom_val", side_effect=fake_get_xcom_val),
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="running")),
+        ):
+            events = [event async for event in self.trigger.run()]
+        assert len(events) == 1
+        assert events[0].payload["status"] == "success"
+        assert events[0].payload["outlet_uris"] == outlet_uris
 
     @pytest.mark.asyncio
     async def test_get_producer_task_status_airflow2(self):

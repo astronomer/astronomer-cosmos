@@ -52,14 +52,20 @@ def _resolve_spark_namespace(profile: dict[str, Any]) -> str:
 
 
 def _resolve_glue_namespace(profile: dict[str, Any]) -> str:
-    """Derive the AWS Glue namespace, matching OL's ARN logic."""
+    """Derive the AWS Glue namespace, matching OL's ARN logic.
+
+    Returns an empty string when the account ID cannot be determined,
+    which causes ``get_dataset_namespace`` to treat it as a failed resolution.
+    """
     region = profile.get("region", "us-east-1")
-    if "account_id" in profile:
+    if "account_id" in profile and profile["account_id"]:
         return f"arn:aws:glue:{region}:{profile['account_id']}"
-    role_arn = profile.get("role_arn", "")
-    parts = role_arn.split(":")
-    account_id = parts[4] if len(parts) > 4 else ""
-    return f"arn:aws:glue:{region}:{account_id}"
+    role_arn = profile.get("role_arn")
+    if isinstance(role_arn, str) and role_arn:
+        parts = role_arn.split(":")
+        if len(parts) > 4 and parts[4]:
+            return f"arn:aws:glue:{region}:{parts[4]}"
+    return ""
 
 
 # Mapping of dbt adapter type to a callable that derives the OL-compatible dataset namespace
@@ -165,7 +171,8 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
 
     resolver = _ADAPTER_NAMESPACE_RESOLVERS.get(adapter_type)
     if resolver:
-        return str(resolver(profile_dict))
+        namespace = str(resolver(profile_dict))
+        return namespace or None
 
     # Unknown adapters: return None so dataset emission is skipped.
     # Only adapters supported by the OpenLineage dbt integration are in

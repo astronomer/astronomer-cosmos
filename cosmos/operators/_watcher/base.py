@@ -207,6 +207,9 @@ def _log_dbt_msg(log_line: dict[str, Any]) -> None:
 _model_outlet_uris_lock = threading.Lock()
 
 
+_MODEL_OUTLET_URIS_ATTEMPTED_KEY = "__attempted__"
+
+
 def _ensure_subprocess_model_outlet_uris(
     model_outlet_uris: dict[str, list[str]] | None,
     dataset_namespace: str | None,
@@ -217,18 +220,21 @@ def _ensure_subprocess_model_outlet_uris(
     Thread-safe: in DBT_RUNNER mode the log parser callback can be invoked from
     multiple dbt threads. The lock prevents duplicate manifest reads and ensures
     the dict is fully populated before any reader accesses it.
+
+    A sentinel key is set after the attempt completes so that an empty manifest
+    result does not cause repeated filesystem reads.
     """
     if model_outlet_uris is None or not dataset_namespace or not project_dir:
         return
     with _model_outlet_uris_lock:
-        if model_outlet_uris:
-            # Already populated (double-check under lock)
+        if _MODEL_OUTLET_URIS_ATTEMPTED_KEY in model_outlet_uris:
             return
         from cosmos.dataset import compute_model_outlet_uris
 
         manifest_path = Path(project_dir) / "target" / "manifest.json"
         if manifest_path.exists():
             model_outlet_uris.update(compute_model_outlet_uris(manifest_path, dataset_namespace))
+        model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []  # type: ignore[assignment]
 
 
 def store_dbt_resource_status_from_log(

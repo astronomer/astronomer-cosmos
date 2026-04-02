@@ -176,6 +176,14 @@ my_profile:
         }
         assert get_dataset_namespace(profile_config) == "arn:aws:glue:us-east-1:987654321"
 
+    def test_glue_without_account_id_or_role_arn(self):
+        """When neither account_id nor role_arn is available, returns None."""
+        profile_config = MagicMock()
+        profile_config.profile_mapping = MagicMock()
+        profile_config.profile_mapping.dbt_profile_type = "glue"
+        profile_config.profile_mapping.profile = {"region": "us-east-1"}
+        assert get_dataset_namespace(profile_config) is None
+
     @patch("cosmos.dataset._resolve_snowflake_account")
     def test_snowflake_calls_resolve(self, mock_resolve):
         mock_resolve.return_value = "normalized-account"

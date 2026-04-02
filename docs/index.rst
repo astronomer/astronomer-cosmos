@@ -10,7 +10,7 @@
    Guides <guides/index>
    Optimize Performance <optimize_performance/index>
    Reference <reference/index>
-   Project Policies <policy/index>
+   Cosmos Policies <policy/index>
 
 
 .. |fury| image:: https://badge.fury.io/py/astronomer-cosmos.svg

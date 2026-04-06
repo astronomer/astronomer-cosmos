@@ -167,7 +167,7 @@ class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
         super().__init__(*args, **kwargs)
 
 
-class DbtTestWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):  # type: ignore[misc]
+class DbtTestWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
     """Sensor that watches the aggregated test status for a dbt model in WATCHER_KUBERNETES execution mode.
 
     The producer task collects individual test results as they finish and,

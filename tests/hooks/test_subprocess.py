@@ -98,7 +98,9 @@ def test_store_dbt_resource_status_from_log_param(status, context, expect_xcom_p
         store_dbt_resource_status_from_log(line, {"context": context}, tests_per_model={}, test_results_per_model={})
         if expect_xcom_push:
             mock_push.assert_called_with(
-                task_instance=context["ti"], key="model__jaffle_shop__stg_orders_status", value=status
+                task_instance=context["ti"],
+                key="model__jaffle_shop__stg_orders_status",
+                value={"status": status, "outlet_uris": []},
             )
             assert mock_push.call_count == 1
         else:

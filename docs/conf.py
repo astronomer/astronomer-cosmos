@@ -15,7 +15,7 @@ from docs.generate_mappings import generate_mapping_docs  # noqa: E402
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "Astronomer Cosmos"
-copyright = "2023, Astronomer"
+copyright = "2026, Astronomer"
 author = "Astronomer"
 
 # -- General configuration ---------------------------------------------------

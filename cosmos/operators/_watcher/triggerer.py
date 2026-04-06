@@ -118,8 +118,17 @@ class WatcherTrigger(BaseTrigger):
             return await self.get_xcom_val_af3(key)
 
     async def _get_node_status(self) -> Any | None:
+        """Return the dbt node status from XCom.
+
+        The XCom value is always a dict with ``status`` and ``outlet_uris`` keys.
+        Stores outlet URIs on ``self._outlet_uris`` for later dataset emission.
+        """
         status_key = f"{self.model_unique_id.replace('.', '__')}_status"
-        return await self.get_xcom_val(status_key)
+        xcom_val = await self.get_xcom_val(status_key)
+        if xcom_val is None:
+            return None
+        self._outlet_uris = xcom_val.get("outlet_uris", [])
+        return xcom_val.get("status")
 
     async def _parse_dbt_node_status_and_compiled_sql(self) -> tuple[str | None, str | None]:
         """
@@ -216,6 +225,10 @@ class WatcherTrigger(BaseTrigger):
                 event_data: dict[str, Any] = {"status": EventStatus.SUCCESS}
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
+                # Pass outlet URIs through TriggerEvent so consumer can emit datasets
+                outlet_uris = getattr(self, "_outlet_uris", [])
+                if outlet_uris:
+                    event_data["outlet_uris"] = outlet_uris
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif is_dbt_node_status_skipped(dbt_node_status):

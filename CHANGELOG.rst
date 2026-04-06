@@ -4,6 +4,16 @@ Changelog
 1.14.0a6 (2026-03-25)
 ---------------------
 
+Breaking Changes
+
+* ``ExecutionMode.WATCHER``: The per-node ``*_status`` XCom value is now a dict (``{"status": "<status>", "outlet_uris": [...]}``) instead of a plain string. Any custom code that reads these internal XCom keys directly will need to be updated. by @pankajkoti in #2507
+
+Enhancements
+
+* Move dataset emission for ``ExecutionMode.WATCHER`` from producer to consumer sensors by @pankajkoti in #2507
+
+Bug Fixes
+
 * Fix ``cosmos_debug_max_memory_mb`` XCom not pushed in Watcher sensor tasks by @tatiana in #2503
 
 1.13.1 (2026-02-25)

@@ -558,19 +558,20 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         For test sensors, reads the aggregated ``_tests_status`` key.
         For model sensors, reads the per-model ``*_status`` key (same for both
-        SUBPROCESS and DBT_RUNNER invocation modes).
+        SUBPROCESS and DBT_RUNNER invocation modes). The value is always a dict
+        with ``status`` and ``outlet_uris`` keys.
 
-        Side effect: when outlet URIs are present in the XCom value,
-        stores them on ``self._outlet_uris`` for later dataset emission.
+        Side effect: stores outlet URIs on ``self._outlet_uris`` for later
+        dataset emission.
         """
         if self.is_test_sensor:
             xcom_key = get_tests_status_xcom_key(self.model_unique_id)
             return get_xcom_val(ti, self.producer_task_id, xcom_key)
         xcom_val = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
-        if isinstance(xcom_val, dict):
-            self._outlet_uris = xcom_val.get("outlet_uris", [])
-            return xcom_val.get("status")
-        return xcom_val
+        if xcom_val is None:
+            return None
+        self._outlet_uris = xcom_val.get("outlet_uris", [])
+        return xcom_val.get("status")
 
     def _cache_compiled_sql(self, ti: Any, context: Context) -> None:
         """Pull compiled_sql from XCom and cache it on the sensor instance."""

@@ -992,8 +992,8 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        # xcom_pull calls: _log_startup_events=None, _get_node_status="success", compiled_sql=None, _dbt_event=None
-        ti.xcom_pull.side_effect = [None, "success", None, None]
+        # xcom_pull calls: _log_startup_events=None, _get_node_status=dict, compiled_sql=None, _dbt_event=None
+        ti.xcom_pull.side_effect = [None, {"status": "success", "outlet_uris": []}, None, None]
         context = self.make_context(ti)
 
         result = sensor.poke(context)
@@ -1008,8 +1008,8 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        # xcom_pull calls: _log_startup_events=None, _get_node_status="success", compiled_sql="SELECT * FROM orders", _dbt_event=None
-        ti.xcom_pull.side_effect = [None, "success", "SELECT * FROM orders", None]
+        # xcom_pull calls: _log_startup_events=None, _get_node_status=dict, compiled_sql="SELECT * FROM orders", _dbt_event=None
+        ti.xcom_pull.side_effect = [None, {"status": "success", "outlet_uris": []}, "SELECT * FROM orders", None]
         context = self.make_context(ti)
 
         assert sensor.compiled_sql == ""  # Initially empty
@@ -1024,8 +1024,8 @@ class TestDbtConsumerWatcherSensor:
 
         ti = MagicMock()
         ti.try_number = 1
-        # xcom_pull calls: _log_startup_events=None, _get_node_status="failed", compiled_sql=None, _dbt_event=None
-        ti.xcom_pull.side_effect = [None, "failed", None, None]
+        # xcom_pull calls: _log_startup_events=None, _get_node_status=dict, compiled_sql=None, _dbt_event=None
+        ti.xcom_pull.side_effect = [None, {"status": "failed", "outlet_uris": []}, None, None]
         context = self.make_context(ti)
 
         with pytest.raises(AirflowException):
@@ -1267,10 +1267,9 @@ class TestWatcherTrigger:
         """Test that compiled_sql is extracted from XCom in subprocess mode."""
         trigger = self.make_trigger()
 
-        # Mock get_xcom_val to return status and compiled_sql
         async def mock_get_xcom_val(key):
             if key == "model__pkg__my_model_status":
-                return "success"
+                return {"status": "success", "outlet_uris": []}
             elif key == "model__pkg__my_model_compiled_sql":
                 return "SELECT * FROM orders"
             return None
@@ -1287,10 +1286,9 @@ class TestWatcherTrigger:
         """Test that missing compiled_sql is handled gracefully in subprocess mode."""
         trigger = self.make_trigger()
 
-        # Mock get_xcom_val to return only status
         async def mock_get_xcom_val(key):
             if key == "model__pkg__my_model_status":
-                return "success"
+                return {"status": "success", "outlet_uris": []}
             return None
 
         trigger.get_xcom_val = mock_get_xcom_val

@@ -90,18 +90,17 @@ class TestWatcherTrigger:
         assert status == "success"
         assert self.trigger._outlet_uris == ["postgres://host:5432/db/schema/table"]
 
-    async def test_get_node_status_with_string_xcom(self):
-        """When XCom value is a plain string, return it directly."""
-        with patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value="success")):
+    async def test_get_node_status_with_none_xcom(self):
+        """When XCom value is None (not yet pushed), return None."""
+        with patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=None)):
             status = await self.trigger._get_node_status()
-        assert status == "success"
-        assert not hasattr(self.trigger, "_outlet_uris") or self.trigger._outlet_uris == []
+        assert status is None
 
     @pytest.mark.parametrize(
         "xcom_val, expected_status, expected_compiled_sql",
         [
-            ("failed", "failed", None),
-            ("success", "success", "SELECT * FROM table"),
+            ({"status": "failed", "outlet_uris": []}, "failed", None),
+            ({"status": "success", "outlet_uris": []}, "success", "SELECT * FROM table"),
             (None, None, None),
         ],
     )
@@ -150,11 +149,15 @@ class TestWatcherTrigger:
                     assert val == "af3"
 
     @pytest.mark.parametrize(
-        "dbt_node_status, producer_state, expected",
+        "xcom_status_val, producer_state, expected",
         [
-            ("success", "running", {"status": "success"}),
-            ("skipped", "running", {"status": "skipped"}),
-            ("failed", "running", {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}),
+            ({"status": "success", "outlet_uris": []}, "running", {"status": "success"}),
+            ({"status": "skipped", "outlet_uris": []}, "running", {"status": "skipped"}),
+            (
+                {"status": "failed", "outlet_uris": []},
+                "running",
+                {"status": "failed", "reason": WatcherEventReason.NODE_FAILED},
+            ),
             (None, "failed", {"status": "failed", "reason": WatcherEventReason.PRODUCER_FAILED}),
             (None, "success", {"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}),
         ],
@@ -162,7 +165,7 @@ class TestWatcherTrigger:
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
     @patch("cosmos.operators._watcher.triggerer._log_dbt_event")
     async def test_run_various_outcomes(
-        self, mock_dbt_event, mock_startup_events, dbt_node_status, producer_state, expected
+        self, mock_dbt_event, mock_startup_events, xcom_status_val, producer_state, expected
     ):
         async def fake_get_xcom_val(key):
             if key == _DBT_STARTUP_EVENTS_XCOM_KEY:
@@ -170,7 +173,7 @@ class TestWatcherTrigger:
             if key.endswith("_compiled_sql"):
                 return None
             if key.endswith("_status"):
-                return dbt_node_status
+                return xcom_status_val
             return None
 
         with (

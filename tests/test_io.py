@@ -56,12 +56,17 @@ def test_upload_artifacts_to_gcp_gs(dummy_kwargs):
 
 def test_upload_artifacts_to_gcp_gs_no_tarball(dummy_kwargs):
     """Test upload_artifacts_to_gcp_gs with use_tarball=False."""
-    with patch("airflow.providers.google.cloud.hooks.gcs.GCSHook") as mock_hook, patch("os.walk") as mock_walk:
+    with (
+        patch("airflow.providers.google.cloud.hooks.gcs.GCSHook") as mock_hook,
+        patch("os.walk") as mock_walk,
+        patch("tarfile.open") as mock_tarfile_open,
+    ):
         mock_walk.return_value = [("/target", [], ["file1.txt", "file2.txt"])]
 
         upload_to_gcp_gs("/project_dir", use_tarball=False, **dummy_kwargs)
 
         mock_walk.assert_called_once_with("/project_dir/target")
+        mock_tarfile_open.assert_not_called()
         hook_instance = mock_hook.return_value
         assert hook_instance.upload.call_count == 2
 

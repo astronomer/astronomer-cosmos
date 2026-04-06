@@ -86,7 +86,7 @@ def test_upload_artifacts_to_gcp_gs_tarball(dummy_kwargs):
         hook_instance = mock_hook.return_value
         hook_instance.upload.assert_called_once()
         call_kwargs = hook_instance.upload.call_args.kwargs
-        assert call_kwargs["object_name"].endswith("target.tar.gz")
+        assert call_kwargs["object_name"] == "test_dag/test_run_id/test_task/1/target.tar.gz"
         assert call_kwargs["mime_type"] == "application/gzip"
 
 

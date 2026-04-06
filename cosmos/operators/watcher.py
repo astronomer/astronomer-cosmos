@@ -313,7 +313,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             status = result.get("status")
             if unique_id and status:
                 uid_key = unique_id.replace(".", "__")
-                safe_xcom_push(task_instance=ti, key=f"{uid_key}_status", value=status)
+                safe_xcom_push(
+                    task_instance=ti,
+                    key=f"{uid_key}_status",
+                    value={"status": status, "outlet_uris": []},
+                )
 
     def _apply_source_freshness(self, context: Context) -> None:
         """Run source freshness, invoke the callback, and mark affected nodes as skipped."""

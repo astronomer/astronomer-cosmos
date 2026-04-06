@@ -5,7 +5,11 @@ import tempfile
 from pathlib import Path
 
 import airflow
-from airflow.configuration import conf
+
+try:
+    from airflow.providers.common.compat.sdk import conf
+except ImportError:
+    from airflow.configuration import conf
 
 from cosmos.constants import (
     DEFAULT_COSMOS_CACHE_DIR_NAME,
@@ -14,8 +18,8 @@ from cosmos.constants import (
 
 # In MacOS users may want to set the envvar `TMPDIR` if they do not want the value of the temp directory to change
 DEFAULT_CACHE_DIR = Path(tempfile.gettempdir(), DEFAULT_COSMOS_CACHE_DIR_NAME)
-cache_dir = Path(conf.get("cosmos", "cache_dir", fallback=DEFAULT_CACHE_DIR) or DEFAULT_CACHE_DIR)
-enable_cache = conf.getboolean("cosmos", "enable_cache", fallback=True)
+cache_dir: Path = Path(conf.get("cosmos", "cache_dir", fallback=DEFAULT_CACHE_DIR) or DEFAULT_CACHE_DIR)
+enable_cache: bool = conf.getboolean("cosmos", "enable_cache", fallback=True)
 enable_dag_versioning = conf.getboolean("cosmos", "enable_dag_versioning", fallback=True)
 enable_dataset_alias = conf.getboolean("cosmos", "enable_dataset_alias", fallback=True)
 enable_uri_xcom = conf.getboolean("cosmos", "enable_uri_xcom", fallback=False)
@@ -32,8 +36,8 @@ rich_logging = conf.getboolean("cosmos", "rich_logging", fallback=False)
 dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)
 dbt_docs_index_file_name = conf.get("cosmos", "dbt_docs_index_file_name", fallback="index.html")
-enable_cache_profile = conf.getboolean("cosmos", "enable_cache_profile", fallback=True)
-dbt_profile_cache_dir_name = conf.get("cosmos", "profile_cache_dir_name", fallback="profile")
+enable_cache_profile: bool = conf.getboolean("cosmos", "enable_cache_profile", fallback=True)
+dbt_profile_cache_dir_name: str = conf.get("cosmos", "profile_cache_dir_name", fallback="profile")
 virtualenv_max_retries_lock = conf.getint("cosmos", "virtualenv_max_retries_lock", fallback=120)
 default_copy_dbt_packages = conf.getboolean("cosmos", "default_copy_dbt_packages", fallback=False)
 pre_dbt_fusion = conf.getboolean("cosmos", "pre_dbt_fusion", fallback=False)

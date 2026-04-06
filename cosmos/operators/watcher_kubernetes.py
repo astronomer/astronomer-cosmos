@@ -172,8 +172,12 @@ class DbtTestWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
 
     The producer task collects individual test results as they finish and,
     once every test for a given model has reported, pushes a single
-    aggregated XCom (``"pass"`` or ``"fail"``) under the key
-    ``<model_unique_id>_tests_status``.
+    aggregated XCom (``"pass"`` or ``"fail"``) under the key returned by
+    ``get_tests_status_xcom_key(model_uid)``. This key sanitizes the dbt
+    model unique ID by replacing ``.`` with ``__`` before appending
+    ``_tests_status`` (for example,
+    ``model.jaffle_shop.stg_orders`` becomes
+    ``model__jaffle_shop__stg_orders_tests_status``).
 
     This sensor polls that key and returns success when ``"pass"`` or raises
     ``AirflowException`` when ``"fail"``.

@@ -192,16 +192,35 @@ def test_retry_executes_as_dbt_run_kubernetes_operator(mock_build_and_run_cmd):
     mock_build_and_run_cmd.assert_called_once()
 
 
-def test_producer_uses_watcher_kubernetes_callback():
-    """Test that the WatcherKubernetesCallback is included in the producer's callbacks."""
+class _CustomCallback:
+    pass
+
+
+class _CustomCallback2:
+    pass
+
+
+@pytest.mark.parametrize(
+    "callbacks_kwarg, expected_before_watcher",
+    [
+        pytest.param(None, [], id="none"),
+        pytest.param([], [], id="empty_list"),
+        pytest.param([_CustomCallback], [_CustomCallback], id="list"),
+        pytest.param((_CustomCallback,), [_CustomCallback], id="tuple"),
+        pytest.param(_CustomCallback, [_CustomCallback], id="single"),
+        pytest.param([_CustomCallback, _CustomCallback2], [_CustomCallback, _CustomCallback2], id="multiple"),
+    ],
+)
+def test_producer_normalizes_and_appends_watcher_callback(callbacks_kwarg, expected_before_watcher):
+    """User-supplied callbacks are preserved and WatcherKubernetesCallback is appended."""
     from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
 
-    op = DbtProducerWatcherKubernetesOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-    )
-    assert WatcherKubernetesCallback in op.callbacks
+    kwargs = {"project_dir": ".", "profile_config": None, "image": "dbt-image:latest"}
+    if callbacks_kwarg is not None:
+        kwargs["callbacks"] = callbacks_kwarg
+
+    op = DbtProducerWatcherKubernetesOperator(**kwargs)
+    assert op.callbacks == expected_before_watcher + [WatcherKubernetesCallback]
 
 
 def make_test_sensor(**kwargs):

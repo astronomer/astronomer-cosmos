@@ -72,8 +72,13 @@ watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", 
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
 
 try:
+    from airflow.sdk._shared.configuration.exceptions import AirflowConfigException as SdkConfigException
+except ImportError:
+    SdkConfigException = airflow.exceptions.AirflowConfigException  # type: ignore[misc]
+
+try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")
-except airflow.exceptions.AirflowConfigException:
+except SdkConfigException:
     LINEAGE_NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", DEFAULT_OPENLINEAGE_NAMESPACE)
 
 

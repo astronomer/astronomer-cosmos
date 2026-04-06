@@ -12,6 +12,7 @@ dbt-vertica
 dbt-databricks
 pyspark
 dbt-duckdb
+dbt-loom==0.9.4
 
 #s3fs==2025.9.0
 #fsspec==2025.9.0

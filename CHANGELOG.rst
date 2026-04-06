@@ -6,15 +6,11 @@ Changelog
 
 Breaking Changes
 
-* ``ExecutionMode.WATCHER``: The per-node ``*_status`` XCom value is now a dict
-  (``{"status": "<status>", "outlet_uris": [...]}``) instead of a plain string.
-  Any custom code that reads these internal XCom keys directly will need to be updated.
-  by @pankajkoti in #2507
+* ``ExecutionMode.WATCHER``: The per-node ``*_status`` XCom value is now a dict (``{"status": "<status>", "outlet_uris": [...]}``) instead of a plain string. Any custom code that reads these internal XCom keys directly will need to be updated. by @pankajkoti in #2507
 
 Enhancements
 
-* Move dataset emission for ``ExecutionMode.WATCHER`` from producer to consumer sensors
-  by @pankajkoti in #2507
+* Move dataset emission for ``ExecutionMode.WATCHER`` from producer to consumer sensors by @pankajkoti in #2507
 
 Bug Fixes
 

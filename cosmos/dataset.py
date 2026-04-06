@@ -162,7 +162,7 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     """
     try:
         adapter_type, profile_dict = _get_profile_dict(profile_config)
-    except (AttributeError, KeyError, TypeError, FileNotFoundError, yaml.YAMLError):
+    except (AttributeError, KeyError, TypeError, OSError, yaml.YAMLError):
         logger.debug("Unable to extract profile info for dataset namespace derivation", exc_info=True)
         return None
 
@@ -253,7 +253,7 @@ def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict
     try:
         with open(manifest_path) as f:
             manifest = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError):
         logger.warning(
             "Unable to read manifest at %s for dataset URI computation. Dataset emission will be skipped.",
             manifest_path,

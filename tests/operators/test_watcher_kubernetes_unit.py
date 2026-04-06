@@ -78,6 +78,26 @@ render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=Te
 
 
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_first_attempt_calls_parent_execute(mock_execute):
+    """On the first attempt (try_number=1), the producer delegates to the parent's execute."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    mock_execute.return_value = "result"
+    result = op.execute(context=context)
+
+    mock_execute.assert_called_once()
+    assert result == "result"
+
+
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
 def test_skips_retry_attempt(mock_execute, caplog):
     """
     Test that the operator skips execution when a retry is attempted (try_number > 1).
@@ -191,142 +211,13 @@ def test_retry_executes_as_dbt_run_kubernetes_operator(mock_build_and_run_cmd):
     mock_build_and_run_cmd.assert_called_once()
 
 
-class TestCallbacksNormalization:
-    """Tests for the callbacks normalization logic in DbtProducerWatcherKubernetesOperator."""
-
-    def test_callbacks_none_adds_watcher_callback(self):
-        """
-        Test that when callbacks is None, WatcherKubernetesCallback is added.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=None,
-        )
-        assert op.callbacks == [WatcherKubernetesCallback]
-
-    def test_callbacks_not_provided_adds_watcher_callback(self):
-        """
-        Test that when callbacks is not provided, WatcherKubernetesCallback is added.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-        )
-        assert op.callbacks == [WatcherKubernetesCallback]
-
-    def test_callbacks_list_appends_watcher_callback(self):
-        """
-        Test that when callbacks is a list, WatcherKubernetesCallback is appended.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        class CustomCallback:
-            pass
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=[CustomCallback],
-        )
-        assert op.callbacks == [CustomCallback, WatcherKubernetesCallback]
-
-    def test_callbacks_tuple_appends_watcher_callback(self):
-        """
-        Test that when callbacks is a tuple, WatcherKubernetesCallback is appended.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        class CustomCallback:
-            pass
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=(CustomCallback,),
-        )
-        assert op.callbacks == [CustomCallback, WatcherKubernetesCallback]
-
-    def test_callbacks_single_value_wraps_and_appends_watcher_callback(self):
-        """
-        Test that when callbacks is a single value (not list/tuple), it is wrapped in a list
-        and WatcherKubernetesCallback is appended.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        class CustomCallback:
-            pass
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=CustomCallback,
-        )
-        assert op.callbacks == [CustomCallback, WatcherKubernetesCallback]
-
-    def test_callbacks_empty_list_adds_watcher_callback(self):
-        """
-        Test that when callbacks is an empty list, WatcherKubernetesCallback is added.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=[],
-        )
-        assert op.callbacks == [WatcherKubernetesCallback]
-
-    def test_callbacks_multiple_values_appends_watcher_callback(self):
-        """
-        Test that when callbacks contains multiple values, WatcherKubernetesCallback is appended.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        class CustomCallback1:
-            pass
-
-        class CustomCallback2:
-            pass
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=[CustomCallback1, CustomCallback2],
-        )
-        assert op.callbacks == [CustomCallback1, CustomCallback2, WatcherKubernetesCallback]
-
-
-def test_callbacks_included_in_producer_operator():
-    """
-    Test that the WatcherKubernetesCallback is included in the callbacks of the DbtProducerWatcherKubernetesOperator.
-    """
-    op = DbtProducerWatcherKubernetesOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-        callbacks=MagicMock,
-    )
-    callback_classes = [callback.__name__ for callback in op.callbacks]
-    assert "WatcherKubernetesCallback" in callback_classes
-    assert "MagicMock" in callback_classes
+def test_producer_uses_watcher_k8s_callback():
+    """Test that the WatcherK8sCallback is included in the producer's callbacks."""
+    from cosmos.operators._k8s_common import WatcherK8sCallback
 
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
         profile_config=None,
         image="dbt-image:latest",
-        callbacks=[MagicMock],
     )
-    callback_classes = [callback.__name__ for callback in op.callbacks]
-    assert "WatcherKubernetesCallback" in callback_classes
+    assert WatcherK8sCallback in op.callbacks

@@ -1,12 +1,15 @@
 .. _watcher-kubernetes-execution-mode:
 
 
-Watcher Kubernetes execution mode (Experimental)
-------------------------------------------------
+Watcher Kubernetes and GCP GKE execution modes (Experimental)
+--------------------------------------------------------------
 
 .. versionadded:: 1.13.0
 
 The ``ExecutionMode.WATCHER_KUBERNETES`` combines the **speed of the** :ref:`watcher-execution-mode` **with the isolation of** :ref:`kubernetes`.
+
+A GCP GKE variant is also available as ``ExecutionMode.WATCHER_GCP_GKE``, which uses
+``GKEStartPodOperator`` instead of ``KubernetesPodOperator``. See :ref:`watcher-gcp-gke` below.
 
 This execution mode is ideal for users who:
 
@@ -198,10 +201,51 @@ For detailed setup instructions, refer to the :ref:`kubernetes` documentation.
 
 -------------------------------------------------------------------------------
 
+.. _watcher-gcp-gke:
+
+Watcher GCP GKE
+++++++++++++++++
+
+``ExecutionMode.WATCHER_GCP_GKE`` is the GCP GKE variant of ``ExecutionMode.WATCHER_KUBERNETES``.
+It uses ``GKEStartPodOperator`` instead of ``KubernetesPodOperator`` and requires the same
+additional parameters as :ref:`gcp-gke-execution-mode` (``project_id``, ``location``, ``cluster_name``).
+
+.. code-block:: python
+
+    from cosmos import DbtDag
+    from cosmos.config import ExecutionConfig
+    from cosmos.constants import ExecutionMode
+
+    dag = DbtDag(
+        dag_id="jaffle_shop_watcher_gcp_gke",
+        # ... other DAG parameters ...
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER_GCP_GKE,
+            dbt_project_path="dags/dbt/jaffle_shop",
+        ),
+        operator_args={
+            "image": "dbt-jaffle-shop:1.0.0",
+            "get_logs": True,
+            "project_id": "my-gcp-project",
+            "location": "us-central1",
+            "cluster_name": "my-gke-cluster",
+        },
+    )
+
+All limitations and configuration from ``ExecutionMode.WATCHER_KUBERNETES`` apply.
+
+To use this mode, install the Google Cloud provider:
+
+.. code-block:: bash
+
+    pip install "astronomer-cosmos[google]"
+
+-------------------------------------------------------------------------------
+
 Summary
 +++++++
 
-``ExecutionMode.WATCHER_KUBERNETES`` provides:
+``ExecutionMode.WATCHER_KUBERNETES`` (and ``ExecutionMode.WATCHER_GCP_GKE``) provides:
 
 * ✅ **~63% faster** dbt DAG runs compared to ``ExecutionMode.KUBERNETES``
 * ✅ **Isolation** between dbt and Airflow dependencies

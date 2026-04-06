@@ -19,7 +19,8 @@ def test_enable_memory_optimised_imports_true(monkeypatch):
             os.environ["AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS"] = "True"
             import cosmos
             assert cosmos.settings.enable_memory_optimised_imports is True
-            assert not hasattr(cosmos, "DbtDag")
+            # DbtDag is still accessible via lazy __getattr__ even in memory-optimised mode
+            assert hasattr(cosmos, "DbtDag")
         """)
 
     result = subprocess.run(["python", "-c", script], capture_output=True, text=True)

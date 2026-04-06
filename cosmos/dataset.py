@@ -172,7 +172,16 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     resolver = _ADAPTER_NAMESPACE_RESOLVERS.get(adapter_type)
     if resolver:
         namespace = str(resolver(profile_dict))
-        return namespace or None
+        # Reject empty or scheme-only namespaces (e.g. "snowflake://", "databricks://")
+        # that result from missing required profile fields.
+        if not namespace or namespace.endswith("://"):
+            logger.debug(
+                "Resolved namespace '%s' for adapter '%s' is incomplete; skipping dataset emission.",
+                namespace,
+                adapter_type,
+            )
+            return None
+        return namespace
 
     # Unknown adapters: return None so dataset emission is skipped.
     # Only adapters supported by the OpenLineage dbt integration are in

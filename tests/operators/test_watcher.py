@@ -2100,7 +2100,9 @@ class TestProducerSourceFreshness:
         producer = self._make_producer()
         ti = MagicMock()
         producer._push_skipped_xcom_for_model(ti, "model.pkg.my_model")
-        ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_status", value="skipped")
+        ti.xcom_push.assert_called_once_with(
+            key="model__pkg__my_model_status", value={"status": "skipped", "outlet_uris": []}
+        )
 
     def test_skipped_node_token_updates_exclude(self):
         producer = self._make_producer()

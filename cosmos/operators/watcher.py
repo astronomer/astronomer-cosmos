@@ -250,7 +250,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         Uses the unified ``*_status`` XCom key that consumer sensors already poll.
         """
         uid_key = unique_id.replace(".", "__")
-        safe_xcom_push(task_instance=ti, key=f"{uid_key}_status", value="skipped")
+        safe_xcom_push(task_instance=ti, key=f"{uid_key}_status", value={"status": "skipped", "outlet_uris": []})
 
     def _run_source_freshness(self, context: Context) -> None:
         """Run ``dbt source freshness`` via ``build_cmd`` and ``run_command``.

@@ -97,6 +97,14 @@ class TestGetDatasetNamespace:
         profile_config.profile_mapping.profile = {}
         assert get_dataset_namespace(profile_config) is None
 
+    def test_incomplete_namespace_returns_none(self):
+        """Adapters with missing required fields produce scheme-only namespaces; should return None."""
+        profile_config = MagicMock()
+        profile_config.profile_mapping = MagicMock()
+        profile_config.profile_mapping.dbt_profile_type = "databricks"
+        profile_config.profile_mapping.profile = {}  # no host
+        assert get_dataset_namespace(profile_config) is None
+
     def test_profiles_yml_filepath(self, tmp_path):
         profiles_yml = tmp_path / "profiles.yml"
         profiles_yml.write_text("""
@@ -204,19 +212,21 @@ class TestResolveSnowflakeAccount:
         result = _resolve_snowflake_account("xy12345.us-east-1")
         assert result == "xy12345.us-east-1.aws"
 
-    @patch.dict("sys.modules", {"openlineage.common.provider.snowflake": None})
     def test_without_openlineage(self):
         """Falls back to returning the raw account when OL is not installed."""
-        # Need to reimport to hit the ImportError branch
-        import importlib
+        from cosmos.dataset import _resolve_snowflake_account
 
-        import cosmos.dataset
+        original_import = __import__
 
-        importlib.reload(cosmos.dataset)
-        result = cosmos.dataset._resolve_snowflake_account("xy12345")
+        def import_raising_for_openlineage(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "openlineage.common.provider.snowflake":
+                raise ImportError("No module named 'openlineage.common.provider.snowflake'")
+            return original_import(name, globals, locals, fromlist, level)
+
+        with patch("builtins.__import__", side_effect=import_raising_for_openlineage):
+            result = _resolve_snowflake_account("xy12345")
+
         assert result == "xy12345"
-        # Reload again to restore normal state
-        importlib.reload(cosmos.dataset)
 
 
 # --- Tests for construct_dataset_uri ---

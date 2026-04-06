@@ -124,9 +124,6 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
 
-    def use_event(self) -> bool:
-        return False
-
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.
 # That said, it is important to raise an exception if users attempt to use TestBehavior.BUILD, until we have a better experience.

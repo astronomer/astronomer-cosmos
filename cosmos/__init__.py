@@ -8,7 +8,7 @@ Contains dags, task groups, and operators.
 
 from __future__ import annotations
 
-__version__ = "1.14.0a3"
+__version__ = "1.14.0a6"
 
 
 def _is_memory_optimised() -> bool:

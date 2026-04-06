@@ -1,29 +1,13 @@
 from unittest.mock import Mock, patch
 
 import pytest
+from airflow.exceptions import AirflowSkipException
 
 from cosmos.operators._watcher.base import BaseConsumerSensor, _process_dbt_log_event
 from cosmos.operators.local import DbtRunLocalOperator
 
 
 class TestBaseConsumerSensor:
-
-    def test__methods_to_be_implemented(self):
-        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
-            something_to_be_implemented = True
-
-        sensor = SubclassBaseConsumerSensor(
-            task_id="test_sensor",
-            model_unique_id="model.jaffle_shop.stg_orders",
-            producer_task_id="dbt_run_local",
-            profile_config=None,
-            project_dir="/tmp/sample_project",
-        )
-        with pytest.raises(NotImplementedError):
-            sensor.use_event()
-
-        with pytest.raises(NotImplementedError):
-            assert sensor._get_status_from_events(None, None) is None
 
     def test_extra_context_is_stored_on_instance(self):
         """Consumer sensor stores extra_context so it is available at runtime."""
@@ -106,3 +90,45 @@ class TestBaseConsumerSensor:
         with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
             _process_dbt_log_event(task_instance, dbt_log)
             mock_push.assert_not_called()
+
+    def test_execute_complete_raises_airflow_skip_exception_when_status_is_skipped(self):
+        """execute_complete raises AirflowSkipException when the trigger sends status='skipped'."""
+
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+        )
+        context = Mock()
+        with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
+            sensor.execute_complete(context, {"status": "skipped", "reason": "source_not_fresh"})
+
+    def test_poke_raises_airflow_skip_exception_when_status_is_skipped(self):
+        """poke raises AirflowSkipException when node status is 'skipped'."""
+
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+        )
+        mock_ti = Mock()
+        mock_ti.try_number = 1
+        context = {"ti": mock_ti, "run_id": "run_123"}
+
+        with (
+            patch.object(sensor, "_get_producer_task_status", return_value="running"),
+            patch.object(sensor, "_get_node_status", return_value="skipped"),
+            patch.object(sensor, "_log_startup_events"),
+        ):
+            with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
+                sensor.poke(context)

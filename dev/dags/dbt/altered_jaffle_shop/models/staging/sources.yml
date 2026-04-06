@@ -27,6 +27,6 @@ sources:
               - not_null
         freshness:
           warn_after:
-            count: 3650
-            period: day
+            count: 1
+            period: minute
         loaded_at_field: CAST(order_date AS TIMESTAMP)

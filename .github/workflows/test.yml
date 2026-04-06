@@ -27,7 +27,7 @@ jobs:
     steps:
       - run: true
 
-  # Skip unit/integration tests when only documentation changed (pre-commit/Type-Check still run).
+  # Skip unit/integration tests when only non-code files changed (Type-Check still runs).
   Check-changed-files:
     needs: Authorize
     runs-on: ubuntu-latest
@@ -69,12 +69,34 @@ jobs:
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             case "$f" in
-              README.md) ;;
+              # Documentation and metadata
+              README.rst|README.md) ;;
               CHANGELOG.rst) ;;
               CODE_OF_CONDUCT.md) ;;
               CONTRIBUTING.md) ;;
-              .github/pull_request_template.md) ;;
+              LICENSE) ;;
+              SECURITY.rst) ;;
+              PRIVACY_NOTICE.rst) ;;
+              CODEOWNERS) ;;
+              CLAUDE.md) ;;
               docs/*) ;;
+              # GitHub and CI config unrelated to tests
+              .github/pull_request_template.md) ;;
+              .github/ISSUE_TEMPLATE/*) ;;
+              .github/dependabot.yml) ;;
+              .github/workflows/docs.yml) ;;
+              .github/workflows/stale.yml) ;;
+              .github/workflows/actionlint.yml) ;;
+              .github/workflows/codeql.yml) ;;
+              .github/workflows/zizmor.yml) ;;
+              .github/workflows/deploy.yml) ;;
+              # Tooling config that does not affect test outcomes
+              .gitignore) ;;
+              .tiltignore) ;;
+              Tiltfile) ;;
+              .codespell-ignore-words) ;;
+              .pre-commit-config.yaml) ;;
+              .airflow-registry.yaml) ;;
               *) CODE_CHANGED=true; break ;;
             esac
           done <<< "$FILES"
@@ -97,7 +119,7 @@ jobs:
           architecture: "x64"
 
       - run: pip3 install "hatch>=1.14.2"
-      - run: hatch run tests.py3.10-2.10-1.9:type-check
+      - run: hatch run tests.py3.10-3.1-1.9:type-check
 
   Run-Unit-Tests:
     needs: [Authorize, Check-changed-files]
@@ -820,7 +842,7 @@ jobs:
           coverage report
           coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de  # v5.5.2
+        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad  # v5.5.3
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}

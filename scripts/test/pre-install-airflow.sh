@@ -36,7 +36,7 @@ elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
   uv pip install -r requirements/requirements-airflow-3.1-dbt-1.11.txt
 elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
   #uv pip install --prerelease=allow -r requirements/requirements-airflow-3.2-dbt-1.11.txt
-  uv pip install --pre apache-airflow==3.2.0b2
+  uv pip install --pre apache-airflow==3.2.0rc2
   uv pip install "apache-airflow-providers-amazon[s3fs]"
   uv pip install apache-airflow-providers-cncf-kubernetes
   uv pip install apache-airflow-providers-docker

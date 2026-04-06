@@ -1,6 +1,11 @@
 Changelog
 =========
 
+1.14.0a6 (2026-03-25)
+---------------------
+
+* Fix ``cosmos_debug_max_memory_mb`` XCom not pushed in Watcher sensor tasks by @tatiana in #2503
+
 1.13.1 (2026-02-25)
 -------------------
 

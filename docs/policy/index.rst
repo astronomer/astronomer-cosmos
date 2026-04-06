@@ -18,4 +18,5 @@ Cosmos project policies and compatibility
 
    airflow3-compatibility
    compatibility-policy
-   security-privacy
+   policies
+   security

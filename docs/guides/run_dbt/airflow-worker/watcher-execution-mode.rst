@@ -339,13 +339,13 @@ You can still invoke these operators using the default ``ExecutionMode.LOCAL`` m
 Test behavior
 '''''''''''''
 
-By default, the watcher mode runs tests alongside models via the ``dbt build`` command being executed by the producer ``DbtProducerWatcherOperator`` operator.
+``TestBehavior.AFTER_EACH`` (the default) creates a ``DbtTestWatcherOperator`` sensor per model that polls the producer's aggregated test results via XCom.
 
-As a starting point, this execution mode does not support the ``TestBehavior.AFTER_EACH`` behavior, since the tests are not run as individual tasks. Since this is the default ``TestBehavior`` in Cosmos, we are injecting ``EmptyOperator`` as a starting point to ensure a seamless transition to the new mode.
+``TestBehavior.AFTER_ALL`` creates a single ``DbtTestLocalOperator`` that runs ``dbt test`` independently after all models complete, behaving similarly to ``ExecutionMode.LOCAL``.
+
+``TestBehavior.NONE`` disables test tasks.
 
 The ``TestBehavior.BUILD`` behavior is embedded in the producer ``DbtProducerWatcherOperator`` operator.
-
-The ``TestBehavior.NONE`` and ``TestBehavior.AFTER_ALL`` behave similarly to ``ExecutionMode.LOCAL``.
 
 Airflow Datasets and Assets
 '''''''''''''''''''''''''''

@@ -23,7 +23,6 @@ echo "Detected Airflow version: [$AIRFLOW_VERSION]"
 if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
     echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db migrate'..."
     airflow db migrate
-
 else
     echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db init'..."
     airflow db init

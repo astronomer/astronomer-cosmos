@@ -22,14 +22,12 @@ def get_logger(name: str) -> logging.Logger:
     as long as the ``rich_logging`` setting is True:
     [2023-08-09T14:20:55.532+0100] {subprocess.py:94} INFO - (astronomer-cosmos) - 13:20:55  Completed successfully
     """
-    # Use getattr to tolerate cosmos.settings being partially initialized during
-    # circular imports (e.g. Airflow plugin discovery in Astro Runtime).
-    try:
-        import cosmos.settings as _settings
+    # Import cosmos.settings at call time (not module level) to avoid circular imports
+    # during Airflow plugin discovery. getattr tolerates the module being partially
+    # initialized (rich_logging not yet defined) by falling back to False.
+    import cosmos.settings as _settings
 
-        _rich = getattr(_settings, "rich_logging", False)
-    except ImportError:
-        _rich = False
+    _rich = getattr(_settings, "rich_logging", False)
 
     if _rich:
         cls = logging.getLoggerClass()

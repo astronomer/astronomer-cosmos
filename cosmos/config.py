@@ -9,7 +9,7 @@ import warnings
 from collections.abc import Callable, Iterator
 from dataclasses import InitVar, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -34,7 +34,9 @@ from cosmos.constants import (
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
-from cosmos.profiles import BaseProfileMapping
+
+if TYPE_CHECKING:
+    from cosmos.profiles import BaseProfileMapping
 
 logger = get_logger(__name__)
 
@@ -321,7 +323,9 @@ class ProfileConfig:
             raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
 
     def get_profile_type(self) -> str:
-        if isinstance(self.profile_mapping, BaseProfileMapping):
+        from cosmos.profiles import BaseProfileMapping as _BaseProfileMapping
+
+        if isinstance(self.profile_mapping, _BaseProfileMapping):
             return str(self.profile_mapping.dbt_profile_type)
 
         profile_path = self._get_profile_path()

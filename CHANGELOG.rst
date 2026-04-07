@@ -8,7 +8,7 @@ Breaking Changes
 
 * Drop support for Airflow versions earlier than **2.9** by @jedcunningham in #2288
 * Fix inclusion of package models and selection/exclusion behavior by @pankajkoti in #2357
-* ``ExecutionMode.WATCHER``: The per-node ``*_status`` XCom value is now a dict (``{"status": "<status>", "outlet_uris": [...]}``) instead of a plain string. Any custom code that reads these internal XCom keys directly will need to be updated. by @pankajkoti in #2507
+* ``ExecutionMode.WATCHER``: The per-node ``*_status`` XCom value is now a dict (``{"status": "<status>", "outlet_uris": [...]}``) instead of a plain string. Any custom code that reads these internal XCom keys directly will need to be updated by @pankajkoti in #2507
 
 Features
 

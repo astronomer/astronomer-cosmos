@@ -18,7 +18,6 @@ try:  # For Airflow 3
     from airflow.providers.standard.hooks.subprocess import SubprocessResult
 except ImportError:  # For Airflow 2
     from airflow.hooks.subprocess import SubprocessResult
-from airflow.models.taskinstance import TaskInstance
 
 try:
     from airflow.sdk.definitions.context import Context

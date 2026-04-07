@@ -202,30 +202,30 @@ You can also inspect the URIs emitted by a Cosmos DAG at runtime by enabling the
 How Dataset Emission Differs by Execution Mode
 '''''''''''''''''''''''''''''''''''''''''''''''
 
-+-------------------------------+---------------------------------------------+
-| Execution Mode                | How datasets are emitted                    |
-+===============================+=============================================+
-| ``LOCAL``, ``VIRTUALENV``     | Each dbt task emits its own datasets        |
-|                               | using the OpenLineage library to parse       |
-|                               | dbt artifacts (``manifest.json``,            |
-|                               | ``run_results.json``) after execution.       |
-+-------------------------------+---------------------------------------------+
-| ``WATCHER``                   | The **producer** task runs ``dbt build``     |
-|                               | once but does **not** emit datasets.         |
-|                               | Instead, it reads the manifest to compute    |
-|                               | per-model URIs and passes them to            |
-|                               | **consumer** sensor tasks via XCom.          |
-|                               | Each consumer emits the dataset for its      |
-|                               | own model upon successful completion.        |
-|                               | This preserves per-model granularity in      |
-|                               | Airflow's data-aware scheduling.             |
-+-------------------------------+---------------------------------------------+
-| ``AIRFLOW_ASYNC``             | Each task emits its own datasets after       |
-|                               | the async SQL execution completes.           |
-|                               | URIs are constructed directly from the       |
-|                               | task's BigQuery project, dataset, and        |
-|                               | table name (BigQuery only).                  |
-+-------------------------------+---------------------------------------------+
++-------------------------------+--------------------------------------------+
+| Execution Mode                | How datasets are emitted                   |
++===============================+============================================+
+| ``LOCAL``, ``VIRTUALENV``     | Each dbt task emits its own datasets       |
+|                               | using the OpenLineage library to parse     |
+|                               | dbt artifacts (``manifest.json``,          |
+|                               | ``run_results.json``) after execution.     |
++-------------------------------+--------------------------------------------+
+| ``WATCHER``                   | The **producer** task runs ``dbt build``   |
+|                               | once but does **not** emit datasets.       |
+|                               | Instead, it reads the manifest to compute  |
+|                               | per-model URIs and passes them to          |
+|                               | **consumer** sensor tasks via XCom.        |
+|                               | Each consumer emits the dataset for its    |
+|                               | own model upon successful completion.      |
+|                               | This preserves per-model granularity in    |
+|                               | Airflow's data-aware scheduling.           |
++-------------------------------+--------------------------------------------+
+| ``AIRFLOW_ASYNC``             | Each task emits its own datasets after     |
+|                               | the async SQL execution completes.         |
+|                               | URIs are constructed directly from the     |
+|                               | task's BigQuery project, dataset, and      |
+|                               | table name (BigQuery only).                |
++-------------------------------+--------------------------------------------+
 
 .. important::
 

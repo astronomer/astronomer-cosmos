@@ -20,7 +20,7 @@ Features
 * Implement TaskGroups by models folder by @maximilianoarcieri and @tatiana in #1566, #2469, and #2420
 * feat: implement DbtTestWatcherOperator by @michal-mrazek in #2447
 * Add source freshness aware execution for ``ExecutionMode.WATCHER`` by @pankajastro and @tatiana in #2467
-* feat: handle tests for ``ExecutionMode.WATCHER_KUBERNETES`` mode by @vricciardulli in #2529
+* Add Airflow 3.2 support by @pankajastro and @pankajkoti in #2472
 
 Enhancements
 

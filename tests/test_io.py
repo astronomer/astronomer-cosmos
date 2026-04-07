@@ -90,7 +90,6 @@ def test_upload_artifacts_to_gcp_gs_tarball(dummy_kwargs):
         assert call_kwargs["mime_type"] == "application/gzip"
 
 
-
 def test_upload_artifacts_to_azure_wasb(dummy_kwargs):
     """Test upload_artifacts_to_azure_wasb."""
     with patch("airflow.providers.microsoft.azure.hooks.wasb.WasbHook") as mock_hook, patch("os.walk") as mock_walk:

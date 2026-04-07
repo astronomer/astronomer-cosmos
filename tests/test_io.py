@@ -42,7 +42,6 @@ def test_upload_artifacts_to_aws_s3(dummy_kwargs):
         assert hook_instance.load_file.call_count == 2
 
 
-
 def test_upload_artifacts_to_gcp_gs_no_tarball(dummy_kwargs):
     """Test upload_artifacts_to_gcp_gs with use_tarball=False."""
     with (

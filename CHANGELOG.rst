@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.14.0a8 (2026-04-07)
+1.14.0a9 (2026-04-07)
 ---------------------
 
 Breaking Changes
@@ -20,6 +20,7 @@ Features
 * Implement TaskGroups by models folder by @maximilianoarcieri and @tatiana in #1566, #2469, and #2420
 * feat: implement DbtTestWatcherOperator by @michal-mrazek in #2447
 * Add source freshness aware execution for ``ExecutionMode.WATCHER`` by @pankajastro and @tatiana in #2467
+* feat: handle tests for ``ExecutionMode.WATCHER_KUBERNETES`` mode by @vricciardulli in #2529
 
 Enhancements
 
@@ -91,6 +92,7 @@ Docs
 * Split security-privacy policy doc and add dependency cooldown by @pankajkoti in #2519
 * Add performance optimization and troubleshooting docs by @pankajkoti in #2521
 * Update copyright year to 2026 by @tayloramurphy in #2527
+* docs: Updating "Project Policies" to "Policies" in menu bar by @jroachgolf84 in #2526
 
 Others
 
@@ -124,6 +126,7 @@ Others
 * Add commit message guidelines to CLAUDE.md by @pankajkoti in #2509
 * Extend skipping tests in CI for more non-code file changes by @pankajkoti in #2510
 * Add Dependabot pre-commit support with 7-day cooldown by @pankajkoti in #2517
+* Enforce zero warnings policy for documentation by @dnskr in #2513
 
 1.13.1 (2026-02-25)
 -------------------

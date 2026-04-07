@@ -1822,6 +1822,49 @@ def test_skip_test_task_when_only_detached_tests_exist():
         assert list(tasks_map.keys()) == expected_task_ids
 
 
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_EACH, TestBehavior.AFTER_ALL])
+def test_test_behavior_for_watcher_kubernetes_mode(test_behavior: TestBehavior) -> None:
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "image": "dbt-image:latest",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    build_airflow_graph(
+        nodes=sample_nodes,
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER_KUBERNETES,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=RenderConfig(
+            test_behavior=test_behavior,
+        ),
+        dbt_project_name="astro_shop",
+    )
+    tasks = dag.tasks
+    if test_behavior == TestBehavior.NONE:
+        assert len(tasks) == 5
+    if test_behavior == TestBehavior.AFTER_EACH:
+        from cosmos.operators.watcher_kubernetes import DbtTestWatcherKubernetesOperator
+
+        assert any(isinstance(task, DbtTestWatcherKubernetesOperator) for task in tasks)
+        assert len(tasks) == 6
+    if test_behavior == TestBehavior.AFTER_ALL:
+        from cosmos.operators.kubernetes import DbtTestKubernetesOperator
+
+        assert any(isinstance(task, DbtTestKubernetesOperator) for task in tasks)
+        assert len(tasks) == 6
+
+
 def test_create_test_task_metadata_watcher_kubernetes_after_all():
     """
     Test that create_test_task_metadata creates a DbtTestKubernetesOperator

@@ -163,9 +163,9 @@ Other Inherited Limitations
 
 The following limitations from ``ExecutionMode.WATCHER`` also apply to ``ExecutionMode.WATCHER_KUBERNETES``:
 
-* **Individual dbt Operators**: Only ``DbtSeedWatcherKubernetesOperator``, ``DbtSnapshotWatcherKubernetesOperator``, and ``DbtRunWatcherKubernetesOperator`` are implemented. The ``DbtTestWatcherKubernetesOperator`` is currently a placeholder.
+* **Individual dbt Operators**: ``DbtSeedWatcherKubernetesOperator``, ``DbtSnapshotWatcherKubernetesOperator``, ``DbtRunWatcherKubernetesOperator``, and ``DbtTestWatcherKubernetesOperator`` are implemented.
 
-* **Test behavior**: The ``TestBehavior.AFTER_EACH`` is not supported. Tests are run as part of the ``dbt build`` command by the producer task.
+* **Test behavior**: ``TestBehavior.AFTER_EACH`` (the default) creates a ``DbtTestWatcherKubernetesOperator`` sensor per model that polls the producer's aggregated test results via XCom. ``TestBehavior.AFTER_ALL`` creates a single ``DbtTestKubernetesOperator`` that runs ``dbt test`` in a dedicated Kubernetes pod after all models complete. ``TestBehavior.NONE`` disables test tasks.
 
 * **Source freshness nodes**: The ``dbt build`` command does not run source freshness checks.
 

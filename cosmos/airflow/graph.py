@@ -693,6 +693,8 @@ def _add_watcher_producer_task(
     The producer task is the task that will be used to produce the events for the watcher execution mode.
     """
     producer_task_args = task_args.copy()
+    # Producer should not emit datasets — consumer tasks handle their own emission
+    producer_task_args["emit_datasets"] = False
     if tests_per_model is not None:
         producer_task_args["tests_per_model"] = tests_per_model
     if render_config is not None and render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:

@@ -162,7 +162,7 @@ def test_first_execution_behaves_as_base_consumer_sensor(mock_startup_events):
 
     ti = MagicMock()
     ti.try_number = 1
-    ti.xcom_pull.return_value = "success"
+    ti.xcom_pull.return_value = {"status": "success", "outlet_uris": []}
     context = make_context(ti)
 
     result = sensor.poke(context)

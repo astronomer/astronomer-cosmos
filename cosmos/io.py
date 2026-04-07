@@ -87,11 +87,14 @@ def upload_to_gcp_gs(
     hook = GCSHook(gcp_conn_id=gcp_conn_id)
     context = kwargs["context"]
 
+    # Airflow 3 and Airflow 2 compatibility, respectively:
+    try_number = getattr(context["task_instance"], "try_number") or getattr(context["task_instance"], "_try_number")
+
     run_prefix = (
         f"{context['dag'].dag_id}"
         f"/{context['run_id']}"
         f"/{context['task_instance'].task_id}"
-        f"/{context['task_instance']._try_number}"
+        f"/{try_number}"
     )
 
     if use_tarball:

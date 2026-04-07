@@ -4,7 +4,7 @@ Changelog
 1.14.0a8 (2026-04-07)
 ---------------------
 
-Breaking changes
+Breaking Changes
 
 * Drop support for Airflow versions earlier than **2.9** by @jedcunningham in #2288
 * Fix inclusion of package models and selection/exclusion behavior by @pankajkoti in #2357

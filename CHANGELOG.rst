@@ -124,7 +124,6 @@ Others
 * Add commit message guidelines to CLAUDE.md by @pankajkoti in #2509
 * Extend skipping tests in CI for more non-code file changes by @pankajkoti in #2510
 * Add Dependabot pre-commit support with 7-day cooldown by @pankajkoti in #2517
->>>>>>> d9de772f (Release 1.14.0)
 
 1.13.1 (2026-02-25)
 -------------------

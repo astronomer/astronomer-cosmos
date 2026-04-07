@@ -22,7 +22,10 @@ try:  # Airflow 3
 except (ModuleNotFoundError, ImportError):  # Airflow 2
     from airflow.datasets import Dataset as Asset  # type: ignore
 
-from airflow.utils.context import Context  # type: ignore
+try:
+    from airflow.sdk.definitions.context import Context  # type: ignore[attr-defined]
+except ImportError:
+    from airflow.utils.context import Context  # type: ignore
 from packaging.version import Version
 
 from cosmos import settings

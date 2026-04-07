@@ -35,7 +35,7 @@ elif [ "$AIRFLOW_VERSION" = "3.0" ] ; then
 elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
   uv pip install -r requirements/requirements-airflow-3.1-dbt-1.11.txt
 elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
-  uv pip install --prerelease=allow -r requirements/requirements-airflow-3.2-dbt-1.11.txt
+  uv pip install -r requirements/requirements-airflow-3.2-dbt-1.11.txt
 else
   # Download Airflow constraints according to the version being used
   if [ "$AIRFLOW_VERSION" = "3.0" ] ; then

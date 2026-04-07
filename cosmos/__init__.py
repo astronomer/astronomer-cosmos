@@ -129,10 +129,13 @@ def __getattr__(name: str) -> object:
     # Submodule access (e.g. cosmos.settings)
     try:
         return importlib.import_module(f"{__name__}.{name}")
-    except ImportError:
-        pass
-
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    except ModuleNotFoundError as exc:
+        # Only convert to AttributeError when the *requested* submodule does not
+        # exist.  If the submodule exists but has an internal ImportError we must
+        # let it propagate so the real root cause is visible to the user.
+        if exc.name == f"{__name__}.{name}":
+            raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
+        raise
 
 
 __all__ = [

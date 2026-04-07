@@ -16,6 +16,11 @@ import kubernetes.client as k8s
 from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
 
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:  # pragma: no cover
+    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
@@ -167,24 +172,13 @@ class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
         super().__init__(*args, **kwargs)
 
 
-class DbtTestWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
-    """Sensor that watches the aggregated test status for a dbt model in WATCHER_KUBERNETES execution mode.
-
-    The producer task collects individual test results as they finish and,
-    once every test for a given model has reported, pushes a single
-    aggregated XCom (``"pass"`` or ``"fail"``) under the key returned by
-    ``get_tests_status_xcom_key(model_uid)``. This key sanitizes the dbt
-    model unique ID by replacing ``.`` with ``__`` before appending
-    ``_tests_status`` (for example,
-    ``model.jaffle_shop.stg_orders`` becomes
-    ``model__jaffle_shop__stg_orders_tests_status``).
-
-    This sensor polls that key and returns success when ``"pass"`` or raises
-    ``AirflowException`` when ``"fail"``.
+class DbtTestWatcherKubernetesOperator(EmptyOperator):
+    """
+    As a starting point, this operator does nothing.
+    We'll be implementing this operator as part of: https://github.com/astronomer/astronomer-cosmos/issues/1974
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields
-
-    @property
-    def is_test_sensor(self) -> bool:
-        return True
+    def __init__(self, *args: Any, **kwargs: Any):
+        desired_keys = ("dag", "task_group", "task_id")
+        new_kwargs = {key: value for key, value in kwargs.items() if key in desired_keys}
+        super().__init__(**new_kwargs)  # type: ignore[no-untyped-call]

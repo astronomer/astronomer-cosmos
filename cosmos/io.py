@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import os
+import tarfile
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -66,6 +68,7 @@ def upload_to_gcp_gs(
     bucket_name: str,
     gcp_conn_id: str | None = None,
     source_subpath: str = DEFAULT_TARGET_PATH,
+    use_tarball: bool = False,
     **kwargs: Any,
 ) -> None:
     """
@@ -75,30 +78,43 @@ def upload_to_gcp_gs(
     :param bucket_name: Name of the GCP GS bucket to upload to.
     :param gcp_conn_id: GCP connection ID to use when uploading files.
     :param source_subpath: Path of the source directory sub-path to upload files from.
+    :param use_tarball: If True, uploads a single tar.gz archive instead of individual files.
     """
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
 
     target_dir = f"{project_dir}/{source_subpath}"
     gcp_conn_id = gcp_conn_id if gcp_conn_id else GCSHook.default_conn_name
-    # bucket_name = kwargs["bucket_name"]
     hook = GCSHook(gcp_conn_id=gcp_conn_id)
     context = kwargs["context"]
 
-    # Iterate over the files in the target dir and upload them to GCP GS
-    for dirpath, _, filenames in os.walk(target_dir):
-        for filename in filenames:
-            object_name = (
-                f"{context['dag'].dag_id}"
-                f"/{context['run_id']}"
-                f"/{context['task_instance'].task_id}"
-                f"/{context['task_instance']._try_number}"
-                f"{dirpath.split(project_dir)[-1]}/{filename}"
-            )
-            hook.upload(
-                filename=f"{dirpath}/{filename}",
-                bucket_name=bucket_name,
-                object_name=object_name,
-            )
+    # Airflow 3 and Airflow 2 compatibility, respectively:
+    try_number = getattr(context["task_instance"], "try_number") or getattr(context["task_instance"], "_try_number")
+
+    run_prefix = (
+        f"{context['dag'].dag_id}" f"/{context['run_id']}" f"/{context['task_instance'].task_id}" f"/{try_number}"
+    )
+
+    if use_tarball:
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            tar.add(target_dir, arcname=source_subpath)
+        buf.seek(0)
+        hook.upload(
+            bucket_name=bucket_name,
+            object_name=f"{run_prefix}/{source_subpath}.tar.gz",
+            data=buf.read(),
+            mime_type="application/gzip",
+        )
+    else:
+        # Iterate over the files in the target dir and upload them to GCP GS
+        for dirpath, _, filenames in os.walk(target_dir):
+            for filename in filenames:
+                object_name = f"{run_prefix}{dirpath.split(project_dir)[-1]}/{filename}"
+                hook.upload(
+                    filename=f"{dirpath}/{filename}",
+                    bucket_name=bucket_name,
+                    object_name=object_name,
+                )
 
 
 def upload_to_azure_wasb(

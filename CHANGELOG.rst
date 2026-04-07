@@ -52,7 +52,7 @@ Bug Fixes
 * Remove forced ``retries=0`` from watcher producer operators by @tatiana in #2479
 * RFC: Add patch for newer versions of amazon provider when running dbt on EKS by @aoelvp94 in #2481
 * Fix ``cosmos_debug_max_memory_mb`` XCom not pushed in Watcher sensor tasks by @tatiana in #2503
-* Fix ``TestBehavior.NONE and`` ``TestBehavior.AFTER_ALL`` exclude ignored with selectors in ExecutionMode.Watcher by @pankajkoti in #2511
+* Fix ``TestBehavior.NONE`` and ``TestBehavior.AFTER_ALL`` exclude ignored with selectors in ``ExecutionMode.WATCHER`` by @pankajkoti in #2511
 * Move dataset emission for ``ExecutionMode.WATCHER`` from producer to consumer sensors by @pankajkoti in #2507
 
 Docs

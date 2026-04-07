@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import logging
 
-from cosmos.settings import rich_logging
-
 
 class CosmosRichLogger(logging.Logger):
     """Custom Logger that prepends ``(astronomer-cosmos)`` to each log message in the scheduler."""
@@ -24,6 +22,10 @@ def get_logger(name: str) -> logging.Logger:
     as long as the ``rich_logging`` setting is True:
     [2023-08-09T14:20:55.532+0100] {subprocess.py:94} INFO - (astronomer-cosmos) - 13:20:55  Completed successfully
     """
+    # Deferred import to avoid circular imports when cosmos.settings is still being initialized
+    # (e.g. during Airflow plugin discovery in Astro Runtime).
+    from cosmos.settings import rich_logging
+
     if rich_logging:
         cls = logging.getLoggerClass()
         try:

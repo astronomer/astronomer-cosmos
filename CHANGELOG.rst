@@ -34,6 +34,7 @@ Enhancements
 * Reduce XCom read/write for tracking node state and errors in ConsumerWatcher task by @pankajastro in #2471
 * Remove duplicate debug log in watcher subprocess path by @tatiana in #2494
 * Simplify and unify WATCHER implementation regardless of InvocationMode by @tatiana in #2498
+* Switch to lazy imports in cosmos/__init__.py by @pankajkoti in #2531
 
 Bug Fixes
 

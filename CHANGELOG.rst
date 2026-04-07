@@ -21,7 +21,7 @@ Features
 * feat: implement DbtTestWatcherOperator by @michal-mrazek in #2447
 * Add source freshness aware execution for ``ExecutionMode.WATCHER`` by @pankajastro and @tatiana in #2467
 
-    * Note: Like ExecutionMode.WATCHER, this feature is experimental and its interface and implementation can change in the future.
+    * Note: Like ``ExecutionMode.WATCHER``, this feature is experimental and its interface and implementation can change in the future.
 * Add Airflow 3.2 support by @pankajastro and @pankajkoti in #2472
 
 Enhancements

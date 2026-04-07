@@ -82,7 +82,7 @@ Docs
 * Add Mermaid diagrams and execution mode diagrams by @lzdanski and @tatiana in #2459
 * Add documentation for memory optimization options by @pankajastro in #2340
 * Fix typo in watcher execution mode docs by @evanvolgas in #2485
-* Fix minor documentation issues  @evanvolgas in #2489
+* Fix minor documentation issues by @evanvolgas in #2489
 * Add troubleshooting note for dbt debug logs in ExecutionMode.WATCHER by @tatiana in #2491
 * docs: unify RST header styles across documentation by @jigangz in #2473
 * docs: fix env var for rich logging by @vricciardulli in #2514

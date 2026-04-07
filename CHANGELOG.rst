@@ -18,7 +18,7 @@ Features
 * Introduce interceptors for Cosmos tasks by @tatiana in #2419
 * Add config to allow disabling dag versioning by @pankajkoti in #2470
 * Implement TaskGroups by models folder by @maximilianoarcieri and @tatiana in #1566, #2469, and #2420
-* feat: implement DbtTestWatcherOperator by @michal-mrazek in #2477
+* feat: implement DbtTestWatcherOperator by @michal-mrazek in #2447
 * Add source freshness aware execution for ``ExecutionMode.WATCHER`` by @pankajastro and @tatiana in #2467
 
 Enhancements

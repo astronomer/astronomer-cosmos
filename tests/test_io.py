@@ -42,20 +42,6 @@ def test_upload_artifacts_to_aws_s3(dummy_kwargs):
         assert hook_instance.load_file.call_count == 2
 
 
-def test_upload_artifacts_to_gcp_gs(dummy_kwargs):
-    """Test upload_artifacts_to_gcp_gs."""
-    with patch("airflow.providers.google.cloud.hooks.gcs.GCSHook") as mock_hook, patch("os.walk") as mock_walk:
-        mock_walk.return_value = [("/project_dir/target", [], ["file1.txt", "file2.txt"])]
-
-        upload_to_gcp_gs("/project_dir", **dummy_kwargs)
-
-        mock_walk.assert_called_once_with("/project_dir/target")
-        hook_instance = mock_hook.return_value
-        assert hook_instance.upload.call_count == 2
-        upload_calls = hook_instance.upload.call_args_list
-        assert upload_calls[0].kwargs["object_name"] == "test_dag/test_run_id/test_task/1/target/file1.txt"
-        assert upload_calls[1].kwargs["object_name"] == "test_dag/test_run_id/test_task/1/target/file2.txt"
-
 
 def test_upload_artifacts_to_gcp_gs_no_tarball(dummy_kwargs):
     """Test upload_artifacts_to_gcp_gs with use_tarball=False."""

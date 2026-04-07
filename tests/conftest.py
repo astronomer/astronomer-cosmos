@@ -1,4 +1,5 @@
 import json
+import logging
 from unittest.mock import Mock, patch
 
 import pytest
@@ -8,6 +9,24 @@ from airflow.models.taskinstance import TaskInstance
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION
+from cosmos.log import CosmosRichLogger
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_rich_loggers():
+    """Replace any CosmosRichLogger instances with standard loggers after each test.
+
+    get_logger() registers CosmosRichLogger instances in Python's global logging cache.
+    If a cosmos module is imported for the first time while rich_logging=True
+    (via monkeypatch in test_log.py), its module-level logger becomes a CosmosRichLogger
+    permanently, polluting subsequent tests with the (astronomer-cosmos) prefix.
+    """
+    yield
+    manager = logging.Logger.manager
+    for name in list(manager.loggerDict):
+        obj = manager.loggerDict[name]
+        if isinstance(obj, CosmosRichLogger):
+            obj.__class__ = logging.Logger
 
 
 def make_task_instance(task, **kwargs):

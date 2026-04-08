@@ -33,15 +33,23 @@ from cosmos.operators.kubernetes import (
 logger = get_logger(__name__)
 
 
-# This global variable is currently used to make the task context available to the K8s callback.
-# While the callback is set during the operator initialization, the context is only created during the operator's execution.
-producer_task_context = None
-
-
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
+    """Callback that parses dbt JSON logs from Kubernetes pod output.
 
-    @staticmethod
+    State (context, test maps) is bound to each instance by the producer.
+    """
+
+    def __init__(
+        self,
+        tests_per_model: dict[str, list[str]],
+        test_results_per_model: dict[str, list[str]],
+    ) -> None:
+        self.tests_per_model = tests_per_model
+        self.test_results_per_model = test_results_per_model
+        self.context: Context | None = None
+
     def progress_callback(
+        self,
         *,
         line: str,
         client: client_type,
@@ -62,19 +70,23 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param pod: the pod from which the log line was read.
         """
         if "context" not in kwargs:
-            # This global variable is used to make the task context available to the K8s callback.
-            # While the callback is set during the operator initialization, the context is only created during the operator's execution.
-            kwargs["context"] = producer_task_context
-        store_dbt_resource_status_from_log(line, kwargs)
+            kwargs["context"] = self.context
+        store_dbt_resource_status_from_log(
+            line,
+            kwargs,
+            tests_per_model=self.tests_per_model,
+            test_results_per_model=self.test_results_per_model,
+        )
 
 
 class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
-
     template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
     _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = store_dbt_resource_status_from_log
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
+        tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
+        self._watcher_callback = WatcherKubernetesCallback(tests_per_model, test_results_per_model={})
 
         existing_callbacks = kwargs.get("callbacks")
         if existing_callbacks is None:
@@ -83,7 +95,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             normalized_callbacks = list(existing_callbacks)
         else:
             normalized_callbacks = [existing_callbacks]
-        normalized_callbacks.append(WatcherKubernetesCallback)
+        normalized_callbacks.append(self._watcher_callback)
         kwargs["callbacks"] = normalized_callbacks
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
@@ -109,10 +121,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             )
             return None
 
-        # This global variable is used to make the task context available to the K8s callback.
-        # While the callback is set during the operator initialization, the context is only created during the operator's execution.
-        global producer_task_context
-        producer_task_context = context
+        self._watcher_callback.context = context
         return super().execute(context, **kwargs)
 
 

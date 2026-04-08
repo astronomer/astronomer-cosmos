@@ -220,7 +220,83 @@ def test_producer_normalizes_and_appends_watcher_callback(callbacks_kwarg, expec
         kwargs["callbacks"] = callbacks_kwarg
 
     op = DbtProducerWatcherKubernetesOperator(**kwargs)
-    assert op.callbacks == expected_before_watcher + [WatcherKubernetesCallback]
+    assert len(op.callbacks) == len(expected_before_watcher) + 1
+    assert op.callbacks[: len(expected_before_watcher)] == expected_before_watcher
+    assert isinstance(op.callbacks[-1], WatcherKubernetesCallback)
+
+
+def test_callback_tests_per_model_passed_through():
+    """tests_per_model kwarg flows from operator init to the callback instance."""
+    tests_per_model = {"model.pkg.orders": ["test.pkg.t1", "test.pkg.t2"]}
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        tests_per_model=tests_per_model,
+    )
+    assert op._watcher_callback.tests_per_model is tests_per_model
+    assert isinstance(op._watcher_callback.test_results_per_model, dict)
+    assert op._watcher_callback.test_results_per_model == {}
+
+
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_execute_sets_context_on_callback(mock_execute):
+    """execute() sets the Airflow context on the callback before delegating to super()."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    op.execute(context=context)
+
+    assert op._watcher_callback.context is context
+
+
+@patch("cosmos.operators.watcher_kubernetes.store_dbt_resource_status_from_log")
+def test_progress_callback_delegates_with_correct_args(mock_store):
+    """progress_callback passes instance state to store_dbt_resource_status_from_log."""
+    from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
+
+    tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
+    test_results = {}
+    callback = WatcherKubernetesCallback(tests_per_model, test_results)
+    callback.context = {"ti": MagicMock()}
+
+    callback.progress_callback(
+        line='{"info": {"msg": "test"}}',
+        client=MagicMock(),
+        mode="sync",
+        container_name="dbt",
+        timestamp=None,
+        pod=MagicMock(),
+    )
+
+    mock_store.assert_called_once()
+    _, call_kwargs = mock_store.call_args
+    assert call_kwargs["tests_per_model"] is tests_per_model
+    assert call_kwargs["test_results_per_model"] is test_results
+
+
+def test_callback_instances_are_independent():
+    """Two operators should not share callback state."""
+    op1 = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        tests_per_model={"model.pkg.a": ["test.pkg.t1"]},
+    )
+    op2 = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        tests_per_model={"model.pkg.b": ["test.pkg.t2"]},
+    )
+    assert op1._watcher_callback is not op2._watcher_callback
+    assert op1._watcher_callback.tests_per_model != op2._watcher_callback.tests_per_model
 
 
 def make_test_sensor(**kwargs):

@@ -42,7 +42,7 @@ def test_rich_logging(monkeypatch, caplog):
 
 def test_rich_logging_none_message(monkeypatch, caplog):
     """CosmosRichLogger should not crash when record.msg is None."""
-    monkeypatch.setattr(cosmos.log, "rich_logging", True)
+    monkeypatch.setattr("cosmos.settings.rich_logging", True)
     logger = get_logger("test-none-msg")
     with caplog.at_level("INFO"):
         logger.info(None)

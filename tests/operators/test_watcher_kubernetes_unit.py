@@ -268,9 +268,11 @@ def test_progress_callback_delegates_with_correct_args(mock_store):
     tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
     test_results = {}
 
-    with patch("cosmos.operators.watcher_kubernetes._producer_context", mock_context), \
-         patch("cosmos.operators.watcher_kubernetes._producer_tests_per_model", tests_per_model), \
-         patch("cosmos.operators.watcher_kubernetes._producer_test_results_per_model", test_results):
+    with (
+        patch("cosmos.operators.watcher_kubernetes._producer_context", mock_context),
+        patch("cosmos.operators.watcher_kubernetes._producer_tests_per_model", tests_per_model),
+        patch("cosmos.operators.watcher_kubernetes._producer_test_results_per_model", test_results),
+    ):
         WatcherKubernetesCallback.progress_callback(
             line='{"info": {"msg": "test"}}',
             client=MagicMock(),

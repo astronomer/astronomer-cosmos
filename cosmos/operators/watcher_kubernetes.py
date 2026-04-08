@@ -76,7 +76,6 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
 
 
 class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
-
     template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

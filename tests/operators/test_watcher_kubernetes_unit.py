@@ -319,11 +319,21 @@ def test_test_sensor_is_test_sensor_property():
 )
 def test_test_sensor_poke_status(xcom_return, expected):
     """Test that the test sensor correctly handles each aggregated test status."""
+    from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key
+
     sensor = make_test_sensor()
+    model_uid = "model.jaffle_shop.stg_orders"
+    tests_xcom_key = get_tests_status_xcom_key(model_uid)
 
     ti = MagicMock()
     ti.try_number = 1
-    ti.xcom_pull.return_value = xcom_return
+
+    def xcom_side_effect(task_ids=None, key=None):
+        if key == tests_xcom_key:
+            return xcom_return
+        return None
+
+    ti.xcom_pull.side_effect = xcom_side_effect
     context = make_context(ti)
 
     if expected is AirflowException:
@@ -331,6 +341,8 @@ def test_test_sensor_poke_status(xcom_return, expected):
             sensor.poke(context)
     else:
         assert sensor.poke(context) is expected
+
+    ti.xcom_pull.assert_any_call(sensor.producer_task_id, key=tests_xcom_key)
 
 
 def test_test_sensor_raises_on_retry():

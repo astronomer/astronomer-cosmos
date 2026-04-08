@@ -87,6 +87,14 @@ with DAG(
         task_id="generate_dbt_docs_aws",
         project_dir=K8S_PROJECT_DIR,
         secrets=[postgres_host_secret, postgres_password_secret],
+        profile_config=ProfileConfig(
+            profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="postgres_profile", target_name="dev"
+        ),
+        env_vars={
+            "POSTGRES_DB": "postgres",
+            "POSTGRES_SCHEMA": "public",
+            "POSTGRES_USER": "postgres",
+        },
         bucket_name="cosmos-ci-docs",
         install_deps=True,
         image=DBT_IMAGE,

@@ -41,6 +41,15 @@ def test_rich_logging(monkeypatch, caplog):
     assert caplog.text.count("\n") == 1
 
 
+def test_rich_logging_none_message(monkeypatch, caplog):
+    """CosmosRichLogger should not crash when record.msg is None."""
+    monkeypatch.setattr(cosmos.log, "rich_logging", True)
+    logger = get_logger("test-none-msg")
+    with caplog.at_level("INFO"):
+        logger.info(None)
+    assert len(caplog.records) == 1
+
+
 def test_get_provider_info():
     provider_info = get_provider_info()
     assert "cosmos" in provider_info.get("config").keys()

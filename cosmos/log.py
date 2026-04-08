@@ -9,7 +9,8 @@ class CosmosRichLogger(logging.Logger):
     """Custom Logger that prepends ``(astronomer-cosmos)`` to each log message in the scheduler."""
 
     def handle(self, record: logging.LogRecord) -> None:
-        record.msg = "\x1b[35m(astronomer-cosmos)\x1b[0m " + record.msg
+        if record.msg is not None:
+            record.msg = "\x1b[35m(astronomer-cosmos)\x1b[0m " + str(record.msg)
         return super().handle(record)
 
 

@@ -52,7 +52,18 @@ SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
 
 # File and directory names to skip when copying dbt project trees in tests (keeps fixture output deterministic).
-_DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES = (".user.yml", ".DS_Store", "logs", "target")
+_DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES = (
+    # Mirrors dbt .gitignore entries
+    "target",
+    "dbt_packages",
+    "dbt_internal_packages",
+    "logs",
+    # Local/OS artifacts
+    ".user.yml",
+    ".DS_Store",
+    "__pycache__",
+    "venv",
+)
 
 if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
     object_storage_path = "airflow.sdk.ObjectStoragePath"

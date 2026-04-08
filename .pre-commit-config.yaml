@@ -145,6 +145,7 @@ ci:
   autoupdate_commit_msg: ⬆ [pre-commit.ci] pre-commit autoupdate
   autofix_prs: false
   autoupdate_schedule: never
+  autoupdate_schedule: never
   autoupdate_schedule: false
   skip:
     - mypy # build of https://github.com/pre-commit/mirrors-mypy:types-PyYAML,types-attrs,attrs,types-requests,

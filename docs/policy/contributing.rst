@@ -1,7 +1,7 @@
 .. _contributing:
 
 Cosmos Contributing Guide
-=========================
+-------------------------
 
 All contributions, bug reports, bug fixes, documentation improvements and enhancements are welcome.
 
@@ -11,7 +11,7 @@ As contributors and maintainers to this project, you are expected to abide by th
 Learn more about the contributors' roles in :ref:`contributors-roles`.
 
 Overview
-________
+++++++++
 
 To contribute to the Cosmos project:
 
@@ -25,10 +25,10 @@ To contribute to the Cosmos project:
 .. _setting-up-cosmos-dev-env:
 
 Setting up the Cosmos development environment
-_____________________________________________
++++++++++++++++++++++++++++++++++++++++++++++
 
 Set up local development on the host machine
----------------------------------------------
+''''''''''''''''''''''''''''''''''''''''''''
 
 This guide will set up Astronomer development on the host machine, first clone the ``astronomer-cosmos`` repo and enter the repo directory:
 
@@ -65,7 +65,7 @@ Once Airflow is up, you can access the Airflow UI at ``http://localhost:8080``.
     Note: whenever you want to start the development server, you need to activate the ``virtualenv`` and set the ``environment variables``.
 
 Using Docker Compose for local development
---------------------------------------------
+''''''''''''''''''''''''''''''''''''''''''
 
 It is also possible to just build the development environment using Docker Compose.
 
@@ -94,7 +94,7 @@ Once the sandbox is up, you can access the Airflow UI at ``http://localhost:8080
 .. _setting-up-hatch:
 
 Working with Hatch
-------------------
+''''''''''''''''''
 
 `Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing Python dependencies and environment isolation. In Cosmos, we use it for building, distributing, running tests, and building documentation.
 
@@ -107,7 +107,7 @@ If you don't already have Hatch installed, `install it <https://hatch.pypa.io/la
 The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
 
 Testing the application with Hatch
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+..................................
 
 After following the steps described in :ref:`setting-up-hatch`, you are ready to run Cosmos tests locally.
 For instance, to run the tests using Python 3.11, `Apache Airflow® <https://airflow.apache.org/>`_ 2.10 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
@@ -154,7 +154,7 @@ If testing for the same Airflow and Python version, next runs of the integration
     hatch run tests.py3.11-2.10-1.9:test-integration
 
 Writing Docs
-~~~~~~~~~~~~
+............
 
 After following the steps described in :ref:`setting-up-hatch`, you are ready to build and serve the documentation locally.
 
@@ -165,7 +165,7 @@ You can run the docs locally by running the following:
     hatch run docs:serve
 
 Building
-~~~~~~~~
+........
 
 After following the steps described in :ref:`setting-up-hatch`, you are ready to build the project.
 
@@ -176,7 +176,7 @@ To build the project, run:
     hatch build
 
 Releasing
-~~~~~~~~~
+.........
 
 .. note::
     This section is intended for Cosmos maintainers only.
@@ -193,7 +193,7 @@ Hatch will automatically update the version for you. Then, create a new release 
     You can update the version in a few different ways. Check out the `Hatch docs <https://hatch.pypa.io/latest/version/#updating>`_ to learn more.
 
 pre-commit
-----------
+''''''''''
 
 We use pre-commit to run a number of checks on the code before committing. To install pre-commit, run:
 
@@ -208,7 +208,7 @@ To run the checks manually, run:
     pre-commit run --all-files
 
 Writing Docs
-____________
+++++++++++++
 
 `Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatch to declare the dependencies required for the project itself, as well as for tests and documentation builds.
 
@@ -228,7 +228,7 @@ You can run the docs locally by running the following:
 
 
 Building
-________
+++++++++
 
 We use ``hatch`` to build the project. To build the project, run:
 
@@ -238,7 +238,7 @@ We use ``hatch`` to build the project. To build the project, run:
 
 
 Releasing
-_________
++++++++++
 
 We use GitHub actions to create and deploy new releases. To create a new release, first create a new version using:
 

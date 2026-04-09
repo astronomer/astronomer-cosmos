@@ -19,12 +19,18 @@ try:  # For Airflow 3
 except ImportError:  # For Airflow 2
     from airflow.hooks.subprocess import SubprocessResult
 from airflow.models.taskinstance import TaskInstance
-from airflow.utils.context import Context
+
+try:
+    from airflow.sdk.definitions.context import Context
+except ImportError:
+    from airflow.utils.context import Context
+
+from airflow.utils.state import DagRunState
 from packaging import version
 from pendulum import datetime
 
 import cosmos.dbt.runner as dbt_runner
-from cosmos import cache
+from cosmos import DbtDag, DbtTaskGroup, ProjectConfig, RenderConfig, cache
 from cosmos.config import ProfileConfig
 from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
 from cosmos.dbt.parser.output import (
@@ -49,12 +55,15 @@ from cosmos.operators.local import (
     DbtSnapshotLocalOperator,
     DbtSourceLocalOperator,
     DbtTestLocalOperator,
+    _read_target_sources_json,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.conftest import make_task_instance
 from tests.utils import new_test_dag
 from tests.utils import test_dag as run_test_dag
 
 DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
+MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
 MINI_DBT_PROJ_DIR = Path(__file__).parent.parent / "sample/mini"
 MINI_DBT_PROJ_DIR_FAILING_SCHEMA = MINI_DBT_PROJ_DIR / "schema_failing_test.yml"
 MINI_DBT_PROJ_PROFILE = MINI_DBT_PROJ_DIR / "profiles.yml"
@@ -75,6 +84,16 @@ real_profile_config = ProfileConfig(
 )
 
 mini_profile_config = ProfileConfig(profile_name="mini", target_name="dev", profiles_yml_filepath=MINI_DBT_PROJ_PROFILE)
+
+multi_folder_profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="example_conn",
+        profile_args={"schema": "public"},
+        disable_event_tracking=True,
+    ),
+)
 
 
 @pytest.fixture
@@ -573,6 +592,78 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
     )
 
 
+@pytest.mark.integration
+def test_dbt_dag_with_group_nodes_by_folder():
+    """
+    Run a DbtDag with RenderConfig(group_nodes_by_folder=True) (ExecutionMode.LOCAL).
+    Confirm the DAG runs successfully and tasks are grouped by folder (seeds_a, seeds_b, models_a, models_b).
+    """
+    grouped_dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=MULTI_FOLDER_DBT_PROJ_DIR),
+        profile_config=multi_folder_profile_config,
+        render_config=RenderConfig(group_nodes_by_folder=True, emit_datasets=False),
+        operator_args={"install_deps": True},
+        start_date=datetime(2024, 1, 1),
+        dag_id="multi_folder_grouped_dag",
+        default_args={"retries": 0},
+    )
+    outcome = new_test_dag(grouped_dag)
+    assert outcome.state == DagRunState.SUCCESS
+
+    # multi_folder has seeds_a (products), seeds_b (regions, region_managers), models_a (stg_products, dim_products), models_b (stg_regions)
+    assert len(grouped_dag.dbt_graph.filtered_nodes) == 6  # 3 seeds + 3 models
+    task_ids = set(grouped_dag.task_dict)
+    assert len(task_ids) == 6  # 3 seeds + 3 model runs
+    assert "seeds.seeds_a.products_seed" in task_ids
+    assert "seeds.seeds_b.regions_seed" in task_ids
+    assert "seeds.seeds_b.region_managers_seed" in task_ids
+    assert "models.models_a.stg_products_run" in task_ids
+    assert "models.models_a.dim_products_run" in task_ids
+    assert "models.models_b.stg_regions_run" in task_ids
+
+    # Check dependencies
+    assert grouped_dag.task_dict["seeds.seeds_a.products_seed"].downstream_task_ids == {
+        "models.models_a.stg_products_run"
+    }
+    assert grouped_dag.task_dict["seeds.seeds_b.regions_seed"].downstream_task_ids == {
+        "models.models_b.stg_regions_run"
+    }
+    assert grouped_dag.task_dict["seeds.seeds_b.region_managers_seed"].downstream_task_ids == {
+        "models.models_b.stg_regions_run"
+    }
+
+
+@pytest.mark.integration
+def test_dbt_task_group_with_group_nodes_by_folder():
+    """
+    Run a DAG containing a DbtTaskGroup with RenderConfig(group_nodes_by_folder=True) (ExecutionMode.LOCAL).
+    Confirm the DAG runs successfully and tasks are grouped by folder.
+    """
+    with DAG(
+        dag_id="multi_folder_grouped_task_group_dag",
+        start_date=datetime(2024, 1, 1),
+        default_args={"retries": 0},
+    ) as dag:
+        DbtTaskGroup(
+            group_id="multi_folder_dbt",
+            project_config=ProjectConfig(dbt_project_path=MULTI_FOLDER_DBT_PROJ_DIR),
+            profile_config=multi_folder_profile_config,
+            render_config=RenderConfig(group_nodes_by_folder=True, emit_datasets=False),
+            operator_args={"install_deps": True},
+        )
+    outcome = new_test_dag(dag)
+    assert outcome.state == DagRunState.SUCCESS
+
+    task_ids = set(dag.task_dict)
+    assert len(task_ids) == 6  # 3 seeds + 3 model runs
+    assert "multi_folder_dbt.seeds.seeds_a.products_seed" in task_ids
+    assert "multi_folder_dbt.seeds.seeds_b.regions_seed" in task_ids
+    assert "multi_folder_dbt.seeds.seeds_b.region_managers_seed" in task_ids
+    assert "multi_folder_dbt.models.models_a.stg_products_run" in task_ids
+    assert "multi_folder_dbt.models.models_a.dim_products_run" in task_ids
+    assert "multi_folder_dbt.models.models_b.stg_regions_run" in task_ids
+
+
 @pytest.mark.skipif(
     version.parse(airflow_version).major < 3,
     reason="Airflow 3.0 only supports assets when setting enable_dataset_alias=True (default)",
@@ -663,6 +754,7 @@ def test_run_operator_dataset_emission_is_skipped(caplog):
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
 )
 @pytest.mark.integration
+@pytest.mark.skip(reason="Multibyte model removed from altered_jaffle_shop; will be restored in a dedicated project")
 @patch("cosmos.settings.enable_dataset_alias", 0)
 def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     try:
@@ -700,6 +792,7 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
 )
 @pytest.mark.integration
+@pytest.mark.skip(reason="Multibyte model removed from altered_jaffle_shop; will be restored in a dedicated project")
 @patch("cosmos.settings.use_dataset_airflow3_uri_standard", 1)
 @patch("cosmos.settings.enable_dataset_alias", 0)
 def test_run_operator_dataset_url_encoded_names_in_airflow2_with_airflow3_uri(caplog):
@@ -895,10 +988,7 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     )
     delattr(dbt_base_operator, "openlineage_events_completes")
 
-    if version.parse(airflow_version) >= version.Version("3.1"):
-        task_instance = TaskInstance(dbt_base_operator, dag_version_id=None)
-    else:
-        task_instance = TaskInstance(dbt_base_operator)
+    task_instance = make_task_instance(dbt_base_operator)
 
     facets = dbt_base_operator.get_openlineage_facets_on_complete(task_instance)
 
@@ -2329,3 +2419,28 @@ def test_handle_datasets_does_not_push_xcom_when_no_outlets():
     # Verify xcom_push was NOT called (no outlets to push)
     uri_xcom_calls = [call for call in mock_ti.xcom_push.call_args_list if call[1].get("key") == "uri"]
     assert len(uri_xcom_calls) == 0, "URI XCom should not be pushed when there are no outlets"
+
+
+class TestReadTargetSourcesJson:
+    def test_returns_dict_when_file_exists(self, tmp_path):
+        target = tmp_path / "target"
+        target.mkdir()
+        sources_file = target / "sources.json"
+        sources_file.write_text(json.dumps({"results": [{"unique_id": "source.pkg.src", "status": "pass"}]}))
+
+        result = _read_target_sources_json(tmp_path)
+        assert result is not None
+        assert result["results"][0]["unique_id"] == "source.pkg.src"
+
+    def test_returns_none_when_file_missing(self, tmp_path):
+        result = _read_target_sources_json(tmp_path)
+        assert result is None
+
+    def test_returns_none_on_invalid_json(self, tmp_path):
+        target = tmp_path / "target"
+        target.mkdir()
+        sources_file = target / "sources.json"
+        sources_file.write_text("not valid json {{{")
+
+        result = _read_target_sources_json(tmp_path)
+        assert result is None

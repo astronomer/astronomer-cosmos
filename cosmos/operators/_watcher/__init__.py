@@ -8,7 +8,6 @@ __all__ = [
     "is_dbt_node_status_failed",
     "is_dbt_node_status_terminal",
     "WatcherTrigger",
-    "_parse_compressed_xcom",
 ]
 
 from cosmos.operators._watcher.state import (
@@ -19,4 +18,4 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_terminal,
     safe_xcom_push,
 )
-from cosmos.operators._watcher.triggerer import WatcherTrigger, _parse_compressed_xcom
+from cosmos.operators._watcher.triggerer import WatcherTrigger

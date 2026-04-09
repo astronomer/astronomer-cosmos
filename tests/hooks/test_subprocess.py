@@ -81,37 +81,30 @@ def test_send_sigterm(mock_killpg, mock_getpgid):
 
 
 @pytest.mark.parametrize(
-    "status,context,should_push,expect_assert",
+    "status,context,expect_xcom_push",
     [
-        ("success", {"ti": MagicMock()}, True, False),
-        ("failed", {"ti": MagicMock()}, True, False),
-        ("running", {"ti": MagicMock()}, False, False),
-        (None, {"ti": MagicMock()}, False, False),
-        ("success", None, False, True),
-        ("failed", None, False, True),
+        ("success", {"ti": MagicMock()}, True),
+        ("failed", {"ti": MagicMock()}, True),
+        ("success", None, False),
+        ("failed", None, False),
     ],
 )
-def test_store_dbt_resource_status_from_log_param(status, context, should_push, expect_assert):
+def test_store_dbt_resource_status_from_log_param(status, context, expect_xcom_push):
     # Prepare log line
     log_line = {"data": {"node_info": {"node_status": status, "unique_id": "model.jaffle_shop.stg_orders"}}}
     line = json.dumps(log_line)
 
     with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
-        if expect_assert:
-            with pytest.raises(AssertionError):
-                store_dbt_resource_status_from_log(
-                    line, {"context": context}, tests_per_model={}, test_results_per_model={}
-                )
-        else:
-            store_dbt_resource_status_from_log(
-                line, {"context": context}, tests_per_model={}, test_results_per_model={}
+        store_dbt_resource_status_from_log(line, {"context": context}, tests_per_model={}, test_results_per_model={})
+        if expect_xcom_push:
+            mock_push.assert_called_with(
+                task_instance=context["ti"],
+                key="model__jaffle_shop__stg_orders_status",
+                value={"status": status, "outlet_uris": []},
             )
-            if should_push:
-                mock_push.assert_called_once_with(
-                    task_instance=context["ti"], key="model__jaffle_shop__stg_orders_status", value=status
-                )
-            else:
-                mock_push.assert_not_called()
+            assert mock_push.call_count == 1
+        else:
+            mock_push.assert_not_called()
 
 
 def test_store_dbt_resource_status_from_log_invalid_json():

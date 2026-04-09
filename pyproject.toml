@@ -172,7 +172,7 @@ pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow}
 
 [[tool.hatch.envs.tests.matrix]]
 python = ["3.10", "3.11", "3.12", "3.13"]
-airflow = ["2.9", "2.10", "2.11", "3.0", "3.1"]
+airflow = ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
 dbt = ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "2.0"]
 
 [tool.hatch.envs.tests.overrides]
@@ -194,6 +194,7 @@ test-integration-dbtf = 'sh scripts/test/integration-dbtf.sh'
 test-integration-dbt-1-5-4 = 'sh scripts/test/integration-dbt-1-5-4.sh'
 test-integration-dbt-async = 'sh scripts/test/integration-dbt-async.sh {matrix:dbt}'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
+test-telemetry = 'sh scripts/test/telemetry.sh'
 
 test-performance = 'sh scripts/test/performance.sh'
 test-performance-setup = 'sh scripts/test/performance-setup.sh {matrix:dbt}'
@@ -219,6 +220,7 @@ dependencies = [
     "sphinx-autoapi",
     "sphinx-autobuild",
     "sphinx-reredirects",
+    "sphinxcontrib.mermaid",
 ]
 
 [tool.hatch.envs.docs.scripts]

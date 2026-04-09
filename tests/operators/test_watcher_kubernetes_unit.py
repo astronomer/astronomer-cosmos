@@ -77,31 +77,6 @@ project_config = ProjectConfig(
 render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=TestBehavior.NONE)
 
 
-def test_retries_set_to_zero_on_init():
-    """
-    Test that the operator sets retries to 0 during initialization.
-    """
-    op = DbtProducerWatcherKubernetesOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-    )
-    assert op.retries == 0
-
-
-def test_retries_overridden_even_if_user_sets_them():
-    """
-    Test that even if a user explicitly sets retries, they are overridden to 0.
-    """
-    op = DbtProducerWatcherKubernetesOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-        retries=5,
-    )
-    assert op.retries == 0
-
-
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
 def test_skips_retry_attempt(mock_execute, caplog):
     """
@@ -187,7 +162,7 @@ def test_first_execution_behaves_as_base_consumer_sensor(mock_startup_events):
 
     ti = MagicMock()
     ti.try_number = 1
-    ti.xcom_pull.return_value = "success"
+    ti.xcom_pull.return_value = {"status": "success", "outlet_uris": []}
     context = make_context(ti)
 
     result = sensor.poke(context)
@@ -214,15 +189,6 @@ def test_retry_executes_as_dbt_run_kubernetes_operator(mock_build_and_run_cmd):
 
     assert result is True
     mock_build_and_run_cmd.assert_called_once()
-
-
-def test_use_event_returns_false():
-    """
-    DbtConsumerWatcherKubernetesSensor should return False for use_event(),
-    meaning it uses XCom-based status retrieval instead of events.
-    """
-    sensor = make_sensor()
-    assert sensor.use_event() is False
 
 
 class TestCallbacksNormalization:

@@ -7,3 +7,4 @@ sphinx
 sphinx-autoapi
 sphinx-autobuild
 sphinx-reredirects
+sphinxcontrib.mermaid

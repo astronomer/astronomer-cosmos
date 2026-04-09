@@ -1,0 +1,23 @@
+name: 'multi_folder'
+version: '0.1.0'
+config-version: 2
+
+profile: 'default'
+
+seed-paths: ["seeds"]
+model-paths: ["models"]
+
+test-paths: ["tests"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "logs"
+
+require-dbt-version: [">=1.0.0", "<2.0.0"]
+
+models:
+  multi_folder:
+    models_a:
+      +materialized: view
+    models_b:
+      +materialized: view

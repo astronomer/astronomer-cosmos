@@ -1,11 +1,46 @@
 import json
-from unittest.mock import patch
+import logging
+from unittest.mock import Mock, patch
 
 import pytest
+from airflow import __version__ as airflow_version
 from airflow.models.connection import Connection
+from airflow.models.taskinstance import TaskInstance
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION
+from cosmos.log import CosmosRichLogger
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_rich_loggers():
+    """Replace any CosmosRichLogger instances with standard loggers after each test.
+
+    get_logger() registers CosmosRichLogger instances in Python's global logging cache.
+    If a cosmos module is imported for the first time while rich_logging=True
+    (via monkeypatch in test_log.py), its module-level logger becomes a CosmosRichLogger
+    permanently, polluting subsequent tests with the (astronomer-cosmos) prefix.
+    """
+    yield
+    manager = logging.Logger.manager
+    for name in list(manager.loggerDict):
+        obj = manager.loggerDict[name]
+        if isinstance(obj, CosmosRichLogger):
+            obj.__class__ = logging.Logger
+
+
+def make_task_instance(task, **kwargs):
+    """
+    Create a TaskInstance from an operator, compatible with Airflow 3.2+ weight_rule API.
+    In 3.2+, WeightRule no longer has get_weight; ensure the task has a compatible weight_rule
+    before TaskInstance(...) calls refresh_from_task().
+    """
+    if not getattr(task.weight_rule, "get_weight", None):
+        task.weight_rule = Mock(get_weight=lambda ti: getattr(task, "priority_weight", 1))
+    if Version(airflow_version) >= Version("3.1"):
+        return TaskInstance(task, dag_version_id=None, **kwargs)
+    return TaskInstance(task, **kwargs)
+
 
 if AIRFLOW_VERSION >= Version("3.1"):
     # Change introduced in Airflow 3.1.0

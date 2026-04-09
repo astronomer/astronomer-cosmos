@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import json
-import zlib
 from collections.abc import AsyncIterator
+from enum import Enum
 from typing import Any
 
 from airflow.triggers.base import BaseTrigger, TriggerEvent
@@ -15,13 +13,23 @@ from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
+    _log_dbt_event,
     build_producer_state_fetcher,
     is_dbt_node_status_failed,
+    is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
 )
 
 logger = get_logger(__name__)
+
+
+class WatcherEventReason(str, Enum):
+    """Reason codes used in TriggerEvent payloads between WatcherTrigger and BaseConsumerSensor.execute_complete."""
+
+    NODE_FAILED = "node_failed"
+    PRODUCER_FAILED = "producer_failed"
+    NODE_NOT_RUN = "node_not_run"
 
 
 class WatcherTrigger(BaseTrigger):
@@ -33,16 +41,21 @@ class WatcherTrigger(BaseTrigger):
         dag_id: str,
         run_id: str,
         map_index: int | None,
-        use_event: bool,
         poke_interval: float = 5.0,
+        is_test_sensor: bool = False,
+        # Accepted for upgrade-compatibility only: triggers serialized before the
+        # invocation-mode unification may still carry this kwarg (Cosmos < 1.14.0). It is no longer
+        # used because both SUBPROCESS and DBT_RUNNER now push the same *_status
+        # XCom keys, so the trigger does not need to know the invocation mode.
+        use_event: bool = True,  # noqa: ARG002
     ):
         self.model_unique_id = model_unique_id
         self.producer_task_id = producer_task_id
         self.dag_id = dag_id
         self.run_id = run_id
         self.map_index = map_index
-        self.use_event = use_event
         self.poke_interval = poke_interval
+        self.is_test_sensor = is_test_sensor
 
     def serialize(self) -> tuple[str, dict[str, Any]]:
         return (
@@ -53,8 +66,8 @@ class WatcherTrigger(BaseTrigger):
                 "dag_id": self.dag_id,
                 "run_id": self.run_id,
                 "map_index": self.map_index,
-                "use_event": self.use_event,
                 "poke_interval": self.poke_interval,
+                "is_test_sensor": self.is_test_sensor,
             },
         )
 
@@ -105,30 +118,39 @@ class WatcherTrigger(BaseTrigger):
             return await self.get_xcom_val_af3(key)
 
     async def _get_node_status(self) -> Any | None:
-        status_key = (
-            f"nodefinished_{self.model_unique_id.replace('.', '__')}"
-            if self.use_event
-            else f"{self.model_unique_id.replace('.', '__')}_status"
-        )
+        """Return the dbt node status from XCom.
 
-        if self.use_event:
-            compressed_xcom_val = await self.get_xcom_val(status_key)
-            if not compressed_xcom_val:
-                return None
-            data_json = _parse_compressed_xcom(compressed_xcom_val)
-            status = data_json.get("data", {}).get("run_result", {}).get("status")
-        else:
-            status = await self.get_xcom_val(status_key)
-        return status
+        The XCom value is always a dict with ``status`` and ``outlet_uris`` keys.
+        Stores outlet URIs on ``self._outlet_uris`` for later dataset emission.
+        """
+        status_key = f"{self.model_unique_id.replace('.', '__')}_status"
+        xcom_val = await self.get_xcom_val(status_key)
+        if xcom_val is None:
+            return None
+        self._outlet_uris = xcom_val.get("outlet_uris", [])
+        return xcom_val.get("status")
 
     async def _parse_dbt_node_status_and_compiled_sql(self) -> tuple[str | None, str | None]:
         """
         Parse node status and compiled_sql from XCom.
 
         Returns a tuple of (status, compiled_sql).
-        Status comes from mode-specific keys (nodefinished_* for event, *_status for subprocess).
-        compiled_sql is always read from the canonical per-model key (same for both modes).
+
+        For test sensors (``is_test_sensor=True``), the aggregated test status is
+        read from the ``<model_uid>_tests_status`` key. No compiled_sql is relevant.
+
+        For regular sensors, status is read from the per-model ``*_status`` XCom key
+        pushed by store_dbt_resource_status_from_log (same key for both SUBPROCESS
+        and DBT_RUNNER invocation modes).
+        compiled_sql is always read from the canonical per-model ``*_compiled_sql`` key.
         """
+        if self.is_test_sensor:
+            from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key
+
+            status_key = get_tests_status_xcom_key(self.model_unique_id)
+            status = await self.get_xcom_val(status_key)
+            return status, None
+
         compiled_sql_key = f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
 
         status = await self._get_node_status()
@@ -195,17 +217,27 @@ class WatcherTrigger(BaseTrigger):
 
         while True:
             producer_task_state = await self._get_producer_task_status()
+            dbt_log_event = await self.get_xcom_val(f"{self.model_unique_id.replace('.', '__')}_dbt_event")
+            _log_dbt_event(dbt_log_event)
             dbt_node_status, compiled_sql = await self._parse_dbt_node_status_and_compiled_sql()
             if is_dbt_node_status_success(dbt_node_status):
-                logger.info("dbt node '%s' succeeded", self.model_unique_id)
+                logger.debug("dbt node '%s' succeeded", self.model_unique_id)
                 event_data: dict[str, Any] = {"status": EventStatus.SUCCESS}
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
+                # Pass outlet URIs through TriggerEvent so consumer can emit datasets
+                outlet_uris = getattr(self, "_outlet_uris", [])
+                if outlet_uris:
+                    event_data["outlet_uris"] = outlet_uris
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
+                return
+            elif is_dbt_node_status_skipped(dbt_node_status):
+                logger.info("dbt node '%s' was skipped", self.model_unique_id)
+                yield TriggerEvent({"status": EventStatus.SKIPPED})  # type: ignore[no-untyped-call]
                 return
             elif is_dbt_node_status_failed(dbt_node_status):
                 logger.warning("dbt node '%s' failed", self.model_unique_id)
-                event_data = {"status": EventStatus.FAILED, "reason": "model_failed"}
+                event_data = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
@@ -216,7 +248,7 @@ class WatcherTrigger(BaseTrigger):
                     self.producer_task_id,
                     self.model_unique_id,
                 )
-                yield TriggerEvent({"status": EventStatus.FAILED, "reason": "producer_failed"})  # type: ignore[no-untyped-call]
+                yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_FAILED})  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == "success" and dbt_node_status is None:
                 logger.info(
@@ -224,16 +256,14 @@ class WatcherTrigger(BaseTrigger):
                     self.producer_task_id,
                     self.model_unique_id,
                 )
-                yield TriggerEvent({"status": EventStatus.SUCCESS, "reason": "model_not_run"})  # type: ignore[no-untyped-call]
+                yield TriggerEvent({"status": EventStatus.SUCCESS, "reason": WatcherEventReason.NODE_NOT_RUN})  # type: ignore[no-untyped-call]
                 return
 
             # Sleep briefly before re-polling
             await asyncio.sleep(self.poke_interval)
-            logger.debug("Polling again for node '%s' status...", self.model_unique_id)
-
-
-def _parse_compressed_xcom(compressed_b64_event_msg: str) -> Any:
-    """Decode and decompress a base64-encoded, zlib-compressed XCom payload."""
-    compressed_bytes = base64.b64decode(compressed_b64_event_msg)
-    event_json_str = zlib.decompress(compressed_bytes).decode("utf-8")
-    return json.loads(event_json_str)
+            logger.debug(
+                "Polling again for node '%s': status=%s, producer_state=%s",
+                self.model_unique_id,
+                dbt_node_status,
+                producer_task_state,
+            )

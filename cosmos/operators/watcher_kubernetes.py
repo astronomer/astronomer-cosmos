@@ -81,12 +81,6 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
 
-        # Disable retries on producer task
-        default_args = dict(kwargs.get("default_args", {}) or {})
-        default_args["retries"] = 0
-        kwargs["default_args"] = default_args
-        kwargs["retries"] = 0
-
         existing_callbacks = kwargs.get("callbacks")
         if existing_callbacks is None:
             normalized_callbacks: list[Any] = []
@@ -129,9 +123,6 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
-
-    def use_event(self) -> bool:
-        return False
 
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.

@@ -24,7 +24,7 @@ def _cache_airflow_in_process_api():
     This fixture patches in_process_api_server() to return a cached instance,
     so the FastAPI app is created once and reused across all tasks and tests.
     """
-    if AIRFLOW_VERSION < Version("3.0"):
+    if AIRFLOW_VERSION < Version("3.1"):
         yield
         return
 
@@ -32,21 +32,23 @@ def _cache_airflow_in_process_api():
         from airflow.sdk.execution_time import supervisor as supervisor_module
 
         _original_fn = supervisor_module.in_process_api_server
-        _cached_api = None
-
-        def cached_in_process_api_server():
-            nonlocal _cached_api
-            if _cached_api is None:
-                _cached_api = _original_fn()
-            return _cached_api
-
-        supervisor_module.in_process_api_server = cached_in_process_api_server
     except (ImportError, AttributeError):
-        # ImportError: Airflow 2.x doesn't have this module
-        # AttributeError: Airflow 3.0 has the module but not in_process_api_server
-        pass
+        yield
+        return
 
-    yield
+    _cached_api = None
+
+    def cached_in_process_api_server():
+        nonlocal _cached_api
+        if _cached_api is None:
+            _cached_api = _original_fn()
+        return _cached_api
+
+    supervisor_module.in_process_api_server = cached_in_process_api_server
+    try:
+        yield
+    finally:
+        supervisor_module.in_process_api_server = _original_fn
 
 
 @pytest.fixture(autouse=True)

@@ -5,7 +5,7 @@ import pytest
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION
-from tests.utils import invalidate_dag_sync_cache, run_dag
+from tests.utils import run_dag
 
 if AIRFLOW_VERSION < Version("3.1"):
     pytest.skip("Skipping Airflow versioning tests on Airflow 2.x and 3.0", allow_module_level=True)
@@ -66,10 +66,8 @@ def dag_version_cleaner(test_dag_id):
             raise
 
     _cleanup(test_dag_id)
-    invalidate_dag_sync_cache(test_dag_id)
     yield
     _cleanup(test_dag_id)
-    invalidate_dag_sync_cache(test_dag_id)
 
 
 @pytest.fixture

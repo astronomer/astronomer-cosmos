@@ -13,10 +13,41 @@ NEXT_MINOR_VERSION=$(echo "$DBT_VERSION" | awk -F. '{print $1"."$2+1}')
 pip uninstall dbt-adapters dbt-common dbt-core dbt-extractor dbt-postgres dbt-semantic-interfaces -y
 pip install -U "dbt-core>=$DBT_VERSION,<$NEXT_MINOR_VERSION" dbt-postgres
 
+if [ -z "${AIRFLOW_CONN_AWS_S3_CONN:-}" ]; then
+  echo "AIRFLOW_CONN_AWS_S3_CONN must be set for kubernetes docs upload tests."
+  exit 1
+fi
+
+read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION <<EOF
+$(python - <<'PY'
+import os
+from urllib.parse import parse_qs, unquote, urlparse
+
+uri = os.environ["AIRFLOW_CONN_AWS_S3_CONN"]
+parsed = urlparse(uri)
+query = parse_qs(parsed.query)
+
+access_key = unquote(parsed.username or "")
+secret_key = unquote(parsed.password or "")
+region = query.get("region_name", [None])[0] or query.get("region", [None])[0] or "us-east-1"
+
+if not access_key or not secret_key:
+    raise SystemExit("AIRFLOW_CONN_AWS_S3_CONN must include AWS access key and secret key.")
+
+print(access_key, secret_key, region)
+PY
+)
+EOF
+
 # Create a Kubernetes secret named 'postgres-secrets' with the specified literals for host and password
 kubectl create secret generic postgres-secrets \
   --from-literal=host=postgres-postgresql.default.svc.cluster.local \
   --from-literal=password=postgres
+
+kubectl create secret generic aws-s3-secrets \
+  --from-literal=aws_access_key_id="$AWS_ACCESS_KEY_ID" \
+  --from-literal=aws_secret_access_key="$AWS_SECRET_ACCESS_KEY" \
+  --from-literal=aws_default_region="$AWS_DEFAULT_REGION"
 
 # Apply the PostgreSQL deployment configuration from the specified YAML file
 kubectl apply -f scripts/test/postgres-deployment.yaml

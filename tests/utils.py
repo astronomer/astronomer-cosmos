@@ -25,6 +25,72 @@ from cosmos.constants import AIRFLOW_VERSION
 
 log = logging.getLogger(__name__)
 
+# Airflow 3.1+ requires DAGs to be serialized to the database before dag.test()
+# can create a DagRun. These module-level caches avoid redundant DB operations
+# (DagBundleModel creation and sync_bag_to_db calls) across tests.
+_dag_bundle_created = False
+_synced_dag_ids: set[str] = set()
+
+
+def _ensure_dag_bundle_exists():
+    """Create the DagBundleModel record once (Airflow 3.1+ only).
+
+    Subsequent calls are no-ops thanks to the module-level flag.
+    """
+    global _dag_bundle_created
+    if _dag_bundle_created:
+        return
+
+    from airflow.models.dagbundle import DagBundleModel
+    from airflow.utils.session import create_session
+
+    with create_session() as session:
+        session.merge(DagBundleModel(name="test_bundle"))
+        session.commit()
+    _dag_bundle_created = True
+
+
+def _get_dagbag_and_sync():
+    """Return (DagBag class, sync_bag_to_db function), handling import differences across Airflow versions."""
+    try:
+        from airflow.dag_processing.dagbag import DagBag, sync_bag_to_db
+    except ImportError:
+        from airflow.models.dagbag import DagBag, sync_bag_to_db
+    return DagBag, sync_bag_to_db
+
+
+def sync_dags_to_db(dags: list[DAG]):
+    """Batch-sync multiple DAGs to the database for Airflow 3.1+.
+
+    Syncs all provided DAGs in a single sync_bag_to_db call,
+    skipping any that were already synced in this test session.
+    No-op for Airflow versions before 3.1.
+    """
+    if AIRFLOW_VERSION < version.Version("3.1"):
+        return
+
+    _ensure_dag_bundle_exists()
+
+    new_dags = [dag for dag in dags if dag.dag_id not in _synced_dag_ids]
+    if not new_dags:
+        return
+
+    DagBag, sync_bag_to_db = _get_dagbag_and_sync()
+    dagbag = DagBag(include_examples=False)
+    for dag in new_dags:
+        dagbag.bag_dag(dag)
+    sync_bag_to_db(dagbag, bundle_name="test_bundle", bundle_version="1")
+    _synced_dag_ids.update(dag.dag_id for dag in new_dags)
+
+
+def invalidate_dag_sync_cache(*dag_ids: str):
+    """Remove DAG IDs from the sync cache, forcing re-sync on next use.
+
+    Call this when DAG metadata records (DagModel, DagVersion) are deleted
+    outside the normal test flow, e.g. in versioning test cleanup fixtures.
+    """
+    _synced_dag_ids.difference_update(dag_ids)
+
 
 def run_dag(dag: DAG, conn_file_path: str | None = None) -> DagRun:
     return test_dag(dag=dag, conn_file_path=conn_file_path)
@@ -43,27 +109,9 @@ def check_dag_success(dag_run: DagRun | None, expect_success: bool = True) -> bo
 def new_test_dag(dag: DAG) -> DagRun:
     if AIRFLOW_VERSION >= version.Version("3.1"):
         # Airflow 3.1+ requires DAG to be serialized to database before calling dag.test()
-        # because create_dagrun() checks for DagVersion and DagModel records
-
-        try:
-            from airflow.dag_processing.dagbag import DagBag, sync_bag_to_db
-        except ImportError:
-            from airflow.models.dagbag import DagBag, sync_bag_to_db
-
-        from airflow.models.dagbundle import DagBundleModel
-        from airflow.utils.session import create_session
-
-        # Create DagBundle if it doesn't exist (required for DagModel foreign key)
-        # This mimics what get_bagged_dag does via manager.sync_bundles_to_db()
-        with create_session() as session:
-            dag_bundle = DagBundleModel(name="test_bundle")
-            session.merge(dag_bundle)
-            session.commit()
-
-        # This creates both DagModel and DagVersion records
-        dagbag = DagBag(include_examples=False)
-        dagbag.bag_dag(dag)
-        sync_bag_to_db(dagbag, bundle_name="test_bundle", bundle_version="1")
+        # because create_dagrun() checks for DagVersion and DagModel records.
+        # sync_dags_to_db caches per dag_id so repeated calls for the same DAG are skipped.
+        sync_dags_to_db([dag])
         dr = dag.test(logical_date=timezone.utcnow())
     elif AIRFLOW_VERSION >= version.Version("3.0"):
         dr = dag.test(logical_date=timezone.utcnow())

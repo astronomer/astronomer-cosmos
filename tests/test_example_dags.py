@@ -116,6 +116,18 @@ def run_dag(dag_id: str):
     test_utils.run_dag(dag)
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _presync_example_dags_to_db():
+    """Pre-sync all example DAGs to the database in one batch for Airflow 3.1+.
+
+    Without this, each test individually creates a DagBag and calls sync_bag_to_db,
+    adding significant per-test overhead. Batch-syncing up front lets individual tests
+    skip the sync entirely.
+    """
+    dag_bag = get_dagbag_depending_on_single_dag()
+    test_utils.sync_dags_to_db(list(dag_bag.dags.values()))
+
+
 @pytest.mark.skipif(
     AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
     reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",

@@ -664,7 +664,7 @@ def _add_dbt_setup_async_task(
             else [task_or_taskgroup]
         )
         for task in node_tasks:
-            task.producer_task_id = setup_airflow_task.task_id  # type: ignore[attr-defined]
+            task.producer_task_id = setup_airflow_task.task_id  # type: ignore[union-attr]
             if not task.upstream_list:
                 setup_airflow_task >> task
 
@@ -742,7 +742,7 @@ def _add_watcher_dependencies(
             else [task_or_taskgroup]
         )
         for task in node_tasks:
-            task.producer_task_id = producer_airflow_task.task_id  # type: ignore[attr-defined]
+            task.producer_task_id = producer_airflow_task.task_id  # type: ignore[union-attr]
 
         # Make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
         # We only managed to do this in the case of DbtDag.
@@ -761,7 +761,7 @@ def _add_watcher_dependencies(
                 else:
                     always_run_tasks = [task_or_taskgroup]
                 for task in always_run_tasks:
-                    task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[attr-defined]
+                    task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[union-attr]
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:

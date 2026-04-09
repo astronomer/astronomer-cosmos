@@ -41,7 +41,9 @@ def _cache_airflow_in_process_api():
             return _cached_api
 
         supervisor_module.in_process_api_server = cached_in_process_api_server
-    except ImportError:
+    except (ImportError, AttributeError):
+        # ImportError: Airflow 2.x doesn't have this module
+        # AttributeError: Airflow 3.0 has the module but not in_process_api_server
         pass
 
     yield

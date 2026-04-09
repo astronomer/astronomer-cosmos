@@ -24,7 +24,6 @@ from cosmos.converter import (
     validate_initial_user_config,
     validate_profile_config_dict,
 )
-
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping

@@ -12,6 +12,41 @@ from cosmos.constants import AIRFLOW_VERSION
 from cosmos.log import CosmosRichLogger
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _cache_airflow_in_process_api():
+    """Cache the InProcessExecutionAPI to avoid per-task FastAPI app creation in dag.test().
+
+    Airflow 3.x's dag.test() creates a new InProcessExecutionAPI — a full FastAPI
+    application with ASGI middleware, JWT auth, dependency injection, and an async
+    event loop — for every single task. This adds ~6-8s of overhead per task,
+    making a 13-task DAG take ~80s instead of ~2s.
+
+    This fixture patches in_process_api_server() to return a cached instance,
+    so the FastAPI app is created once and reused across all tasks and tests.
+    """
+    if AIRFLOW_VERSION < Version("3.0"):
+        yield
+        return
+
+    try:
+        from airflow.sdk.execution_time import supervisor as supervisor_module
+
+        _original_fn = supervisor_module.in_process_api_server
+        _cached_api = None
+
+        def cached_in_process_api_server():
+            nonlocal _cached_api
+            if _cached_api is None:
+                _cached_api = _original_fn()
+            return _cached_api
+
+        supervisor_module.in_process_api_server = cached_in_process_api_server
+    except ImportError:
+        pass
+
+    yield
+
+
 @pytest.fixture(autouse=True)
 def _cleanup_rich_loggers():
     """Replace any CosmosRichLogger instances with standard loggers after each test.

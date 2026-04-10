@@ -205,6 +205,7 @@ addopts = "--ignore-glob=**/dbt_packages/*"
 filterwarnings = ["ignore::DeprecationWarning"]
 minversion = "6.0"
 markers = ["integration", "perf", "dbtfusion"]
+log_cli = true
 
 ######################################
 # DOCS

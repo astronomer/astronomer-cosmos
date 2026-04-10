@@ -31,18 +31,21 @@ from cosmos.operators.kubernetes import (
 
 logger = get_logger(__name__)
 
-
-# Module-level globals make state available to the K8s callback's @staticmethod.
-# The callback class is registered at operator init time, but context and test maps
-# are only available during execution. Safe because only one producer task runs
-# per worker process at a time.
+# Module-level global for the execution context, which is only available during
+# execute() and cannot be passed at construction time.  Safe because only one
+# producer task runs per worker process at a time.
 _producer_context: Context | None = None
-_producer_tests_per_model: dict[str, list[str]] | None = None
-_producer_test_results_per_model: dict[str, list[str]] | None = None
 
 
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
-    """Callback that parses dbt JSON logs from Kubernetes pod output."""
+    """Callback that parses dbt JSON logs from Kubernetes pod output.
+
+    ``tests_per_model`` and ``test_results_per_model`` are forwarded by
+    ``CosmosKubernetesPodManager`` via its ``callback_extra_kwargs``,
+    which is spread into every ``progress_callback`` invocation as
+    ``**kwargs``.  ``context`` is read from a module-level global set by
+    the producer operator's ``execute()`` method.
+    """
 
     @staticmethod
     def progress_callback(
@@ -70,8 +73,8 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         store_dbt_resource_status_from_log(
             line,
             kwargs,
-            tests_per_model=_producer_tests_per_model,
-            test_results_per_model=_producer_test_results_per_model,
+            tests_per_model=kwargs.get("tests_per_model"),
+            test_results_per_model=kwargs.get("test_results_per_model"),
         )
 
 
@@ -97,7 +100,14 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
-        return CosmosKubernetesPodManager(kube_client=self.client, callbacks=self.callbacks)
+        return CosmosKubernetesPodManager(
+            kube_client=self.client,
+            callbacks=self.callbacks,
+            callback_extra_kwargs={
+                "tests_per_model": self.tests_per_model,
+                "test_results_per_model": self.test_results_per_model,
+            },
+        )
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         task_instance = context.get("ti")
@@ -116,10 +126,8 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             )
             return None
 
-        global _producer_context, _producer_tests_per_model, _producer_test_results_per_model
+        global _producer_context
         _producer_context = context
-        _producer_tests_per_model = self.tests_per_model
-        _producer_test_results_per_model = self.test_results_per_model
         return super().execute(context, **kwargs)
 
 

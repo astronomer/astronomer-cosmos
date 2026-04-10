@@ -23,6 +23,7 @@ else:
         DbtConsumerWatcherKubernetesSensor,
         DbtProducerWatcherKubernetesOperator,
         DbtTestWatcherKubernetesOperator,
+        WatcherKubernetesCallback,
     )
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -213,8 +214,6 @@ class _CustomCallback2:
 )
 def test_producer_normalizes_and_appends_watcher_callback(callbacks_kwarg, expected_before_watcher):
     """User-supplied callbacks are preserved and WatcherKubernetesCallback is appended."""
-    from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
     kwargs = {"project_dir": ".", "profile_config": None, "image": "dbt-image:latest"}
     if callbacks_kwarg is not None:
         kwargs["callbacks"] = callbacks_kwarg
@@ -237,8 +236,8 @@ def test_producer_stores_tests_per_model():
 
 
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_execute_sets_module_globals(mock_execute):
-    """execute() sets module-level globals for context and test maps."""
+def test_execute_sets_context_global(mock_execute):
+    """execute() sets the module-level _producer_context global."""
     import cosmos.operators.watcher_kubernetes as wk_module
 
     tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
@@ -255,24 +254,20 @@ def test_execute_sets_module_globals(mock_execute):
     op.execute(context=context)
 
     assert wk_module._producer_context is context
-    assert wk_module._producer_tests_per_model is tests_per_model
-    assert wk_module._producer_test_results_per_model is op.test_results_per_model
 
 
 @patch("cosmos.operators.watcher_kubernetes.store_dbt_resource_status_from_log")
 def test_progress_callback_delegates_with_correct_args(mock_store):
-    """progress_callback passes module globals to store_dbt_resource_status_from_log."""
-    from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
+    """progress_callback reads context from global and test maps from kwargs."""
+    import cosmos.operators.watcher_kubernetes as wk_module
 
     mock_context = {"ti": MagicMock()}
     tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
     test_results = {}
 
-    with (
-        patch("cosmos.operators.watcher_kubernetes._producer_context", mock_context),
-        patch("cosmos.operators.watcher_kubernetes._producer_tests_per_model", tests_per_model),
-        patch("cosmos.operators.watcher_kubernetes._producer_test_results_per_model", test_results),
-    ):
+    original_ctx = wk_module._producer_context
+    try:
+        wk_module._producer_context = mock_context
         WatcherKubernetesCallback.progress_callback(
             line='{"info": {"msg": "test"}}',
             client=MagicMock(),
@@ -280,7 +275,11 @@ def test_progress_callback_delegates_with_correct_args(mock_store):
             container_name="dbt",
             timestamp=None,
             pod=MagicMock(),
+            tests_per_model=tests_per_model,
+            test_results_per_model=test_results,
         )
+    finally:
+        wk_module._producer_context = original_ctx
 
     mock_store.assert_called_once()
     args, call_kwargs = mock_store.call_args

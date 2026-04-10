@@ -117,3 +117,22 @@ class TestOrjsonParserEquivalence:
             result_orjson = dbt_graph._load_manifest_from_file(manifest_file)
 
         assert result_std == result_orjson
+
+    def test_load_from_dbt_manifest_handles_null_manifest_root_per_loader_contract(self, tmp_path):
+        """load_from_dbt_manifest should follow the null-root behavior of _load_manifest_from_file."""
+        manifest_file = tmp_path / "manifest.json"
+        manifest_file.write_text("null")
+
+        dbt_graph = _make_dbt_graph(manifest_file)
+
+        with patch.object(settings, "enable_orjson_parser", False):
+            manifest = dbt_graph._load_manifest_from_file(manifest_file)
+
+        if manifest == {}:
+            with patch.object(settings, "enable_orjson_parser", False):
+                dbt_graph.load_from_dbt_manifest()
+            assert dbt_graph.nodes == {}
+        else:
+            with patch.object(settings, "enable_orjson_parser", False):
+                with pytest.raises(CosmosLoadDbtException):
+                    dbt_graph.load_from_dbt_manifest()

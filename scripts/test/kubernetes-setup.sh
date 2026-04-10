@@ -33,8 +33,6 @@ region = query.get("region_name", [None])[0] or query.get("region", [None])[0] o
 
 if not access_key or not secret_key:
     raise SystemExit("AIRFLOW_CONN_AWS_S3_CONN must include AWS access key and secret key.")
-
-print(access_key, secret_key, region)
 PY
 )
 EOF

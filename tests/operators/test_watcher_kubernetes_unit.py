@@ -123,7 +123,7 @@ def test_raises_exception_when_task_instance_missing():
 
 def test_dbt_build_watcher_kubernetes_operator_raises_not_implemented_error():
     expected_message = (
-        "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, "
+        "`ExecutionMode.WATCHER_KUBERNETES` does not expose a DbtBuild operator, "
         "since the build command is executed by the producer task."
     )
 
@@ -231,21 +231,18 @@ def test_producer_stores_tests_per_model():
         image="dbt-image:latest",
         tests_per_model=tests_per_model,
     )
-    assert op.tests_per_model is tests_per_model
-    assert op.test_results_per_model == {}
+    assert op._tests_per_model is tests_per_model
+    assert op._test_results_per_model == {}
 
 
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_execute_sets_context_global(mock_execute):
-    """execute() sets the module-level _producer_context global."""
-    import cosmos.operators.watcher_kubernetes as wk_module
-
-    tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
+def test_execute_sets_context_instance_attr(mock_execute):
+    """execute() stores context as an instance attribute for pod_manager to use."""
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
         profile_config=None,
         image="dbt-image:latest",
-        tests_per_model=tests_per_model,
+        tests_per_model={"model.pkg.orders": ["test.pkg.t1"]},
     )
     ti = MagicMock()
     ti.try_number = 1
@@ -253,33 +250,27 @@ def test_execute_sets_context_global(mock_execute):
 
     op.execute(context=context)
 
-    assert wk_module._producer_context is context
+    assert op._context is context
 
 
 @patch("cosmos.operators.watcher_kubernetes.store_dbt_resource_status_from_log")
 def test_progress_callback_delegates_with_correct_args(mock_store):
-    """progress_callback reads context from global and test maps from kwargs."""
-    import cosmos.operators.watcher_kubernetes as wk_module
-
+    """progress_callback forwards context and test maps from kwargs."""
     mock_context = {"ti": MagicMock()}
     tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
     test_results = {}
 
-    original_ctx = wk_module._producer_context
-    try:
-        wk_module._producer_context = mock_context
-        WatcherKubernetesCallback.progress_callback(
-            line='{"info": {"msg": "test"}}',
-            client=MagicMock(),
-            mode="sync",
-            container_name="dbt",
-            timestamp=None,
-            pod=MagicMock(),
-            tests_per_model=tests_per_model,
-            test_results_per_model=test_results,
-        )
-    finally:
-        wk_module._producer_context = original_ctx
+    WatcherKubernetesCallback.progress_callback(
+        line='{"info": {"msg": "test"}}',
+        client=MagicMock(),
+        mode="sync",
+        container_name="dbt",
+        timestamp=None,
+        pod=MagicMock(),
+        context=mock_context,
+        tests_per_model=tests_per_model,
+        test_results_per_model=test_results,
+    )
 
     mock_store.assert_called_once()
     args, call_kwargs = mock_store.call_args

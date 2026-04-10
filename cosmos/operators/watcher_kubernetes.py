@@ -31,20 +31,14 @@ from cosmos.operators.kubernetes import (
 
 logger = get_logger(__name__)
 
-# Module-level global for the execution context, which is only available during
-# execute() and cannot be passed at construction time.  Safe because only one
-# producer task runs per worker process at a time.
-_producer_context: Context | None = None
-
 
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
     """Callback that parses dbt JSON logs from Kubernetes pod output.
 
-    ``tests_per_model`` and ``test_results_per_model`` are forwarded by
-    ``CosmosKubernetesPodManager`` via its ``callback_extra_kwargs``,
-    which is spread into every ``progress_callback`` invocation as
-    ``**kwargs``.  ``context`` is read from a module-level global set by
-    the producer operator's ``execute()`` method.
+    ``tests_per_model``, ``test_results_per_model``, and ``context`` are
+    forwarded by ``CosmosKubernetesPodManager`` via its
+    ``callback_extra_kwargs``, which is spread into every
+    ``progress_callback`` invocation as ``**kwargs``.
     """
 
     @staticmethod
@@ -68,8 +62,6 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param timestamp: the timestamp of the log line.
         :param pod: the pod from which the log line was read.
         """
-        if "context" not in kwargs:
-            kwargs["context"] = _producer_context
         store_dbt_resource_status_from_log(
             line,
             kwargs,
@@ -83,8 +75,8 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
-        self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
-        self.test_results_per_model: dict[str, list[str]] = {}
+        self._tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
+        self._test_results_per_model: dict[str, list[str]] = {}
 
         existing_callbacks = kwargs.get("callbacks")
         if existing_callbacks is None:
@@ -104,8 +96,9 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             kube_client=self.client,
             callbacks=self.callbacks,
             callback_extra_kwargs={
-                "tests_per_model": self.tests_per_model,
-                "test_results_per_model": self.test_results_per_model,
+                "tests_per_model": self._tests_per_model,
+                "test_results_per_model": self._test_results_per_model,
+                "context": self._context,
             },
         )
 
@@ -126,8 +119,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             )
             return None
 
-        global _producer_context
-        _producer_context = context
+        self._context = context
         return super().execute(context, **kwargs)
 
 
@@ -140,7 +132,7 @@ class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOpe
 class DbtBuildWatcherKubernetesOperator:
     def __init__(self, *args: Any, **kwargs: Any):
         raise NotImplementedError(
-            "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, since the build command is executed by the producer task."
+            "`ExecutionMode.WATCHER_KUBERNETES` does not expose a DbtBuild operator, since the build command is executed by the producer task."
         )
 
 

@@ -1234,13 +1234,14 @@ class DbtGraph:
             CosmosLoadDbtException: If orjson is enabled but not installed
         """
         if settings.enable_orjson_parser and orjson:
-            return orjson.loads(manifest_path.read_bytes())  # type: ignore[no-any-return]
+            with manifest_path.open("rb") as fp:
+                return orjson.loads(fp.read())  # type: ignore[no-any-return]
         elif settings.enable_orjson_parser:
             raise CosmosLoadDbtException(
                 "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
             )
         else:
-            with manifest_path.open() as fp:
+            with manifest_path.open("r") as fp:
                 return json.load(fp)  # type: ignore[no-any-return]
 
     def load_from_dbt_manifest(self) -> None:

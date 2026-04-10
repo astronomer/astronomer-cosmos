@@ -1250,6 +1250,7 @@ class DbtGraph:
             )
 
         return manifest
+
     def load_from_dbt_manifest(self) -> None:
         """
         This approach accurately loads `dbt` projects using the `manifest.json` dbt manifest artifact.

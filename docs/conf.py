@@ -102,6 +102,7 @@ redirects = {
     "getting_started/operators": "../guides/run_dbt/operators/operators.html",
     "getting_started/watcher-execution-mode": "../guides/run_dbt/airflow-worker/watcher-execution-mode.html",
     "getting_started/watcher-kubernetes-execution-mode": "../guides/run_dbt/container/watcher-kubernetes-execution-mode.html",
+    "optimize_performance/partial-parsing": "../guides/run_dbt/customization/partial-parsing.html",
     "profiles/AthenaAccessKey": "../reference/profiles/AthenaAccessKey.html",
     "profiles/ClickhouseUserPassword": "../reference/profiles/ClickhouseUserPassword.html",
     "profiles/DatabricksOauth": "../reference/profiles/DatabricksOauth.html",

@@ -1231,19 +1231,25 @@ class DbtGraph:
             Parsed manifest dictionary
 
         Raises:
-            CosmosLoadDbtException: If orjson is enabled but not installed
+            CosmosLoadDbtException: If orjson is enabled but not installed, or if the parsed manifest root is not a dictionary
         """
         if settings.enable_orjson_parser and orjson:
             with manifest_path.open("rb") as fp:
-                return orjson.loads(fp.read())  # type: ignore[no-any-return]
+                manifest = orjson.loads(fp.read())
         elif settings.enable_orjson_parser:
             raise CosmosLoadDbtException(
                 "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
             )
         else:
             with manifest_path.open("r") as fp:
-                return json.load(fp)  # type: ignore[no-any-return]
+                manifest = json.load(fp)
 
+        if not isinstance(manifest, dict):
+            raise CosmosLoadDbtException(
+                f"Invalid dbt manifest file `{manifest_path}`: expected top-level JSON object, got {type(manifest).__name__}"
+            )
+
+        return manifest
     def load_from_dbt_manifest(self) -> None:
         """
         This approach accurately loads `dbt` projects using the `manifest.json` dbt manifest artifact.

@@ -48,10 +48,7 @@ def upload_to_aws_s3(
     try_number = getattr(context["task_instance"], "try_number") or getattr(context["task_instance"], "_try_number")
 
     run_prefix = (
-        f"{context['dag'].dag_id}"
-        f"/{context['run_id']}"
-        f"/{context['task_instance'].task_id}"
-        f"/{try_number}"
+        f"{context['dag'].dag_id}" f"/{context['run_id']}" f"/{context['task_instance'].task_id}" f"/{try_number}"
     )
 
     if use_tarball:
@@ -160,10 +157,7 @@ def upload_to_azure_wasb(
     try_number = getattr(context["task_instance"], "try_number") or getattr(context["task_instance"], "_try_number")
 
     run_prefix = (
-        f"{context['dag'].dag_id}"
-        f"/{context['run_id']}"
-        f"/{context['task_instance'].task_id}"
-        f"/{try_number}"
+        f"{context['dag'].dag_id}" f"/{context['run_id']}" f"/{context['task_instance'].task_id}" f"/{try_number}"
     )
 
     if use_tarball:

@@ -38,6 +38,7 @@ PY
 EOF
 
 # Create a Kubernetes secret named 'postgres-secrets' with the specified literals for host and password
+set +x
 kubectl create secret generic postgres-secrets \
   --from-literal=host=postgres-postgresql.default.svc.cluster.local \
   --from-literal=password=postgres
@@ -46,6 +47,7 @@ kubectl create secret generic aws-s3-secrets \
   --from-literal=aws_access_key_id="$AWS_ACCESS_KEY_ID" \
   --from-literal=aws_secret_access_key="$AWS_SECRET_ACCESS_KEY" \
   --from-literal=aws_default_region="$AWS_DEFAULT_REGION"
+set -x
 
 # Apply the PostgreSQL deployment configuration from the specified YAML file
 kubectl apply -f scripts/test/postgres-deployment.yaml

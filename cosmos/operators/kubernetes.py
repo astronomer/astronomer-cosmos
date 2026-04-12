@@ -57,6 +57,11 @@ try:
 except ImportError:
     from airflow.models import BaseOperator  # Airflow 2
 
+try:
+    from airflow.sdk.bases.hook import BaseHook
+except ImportError:  # Since Airflow 3.1, BaseHook is in the airflow.sdk.bases.hook module
+    from airflow.hooks.base import BaseHook
+
 
 class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type: ignore
     """
@@ -470,6 +475,10 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
         `docs_target` to cloud storage. Implemented by subclasses.
         """
 
+    @abstractmethod
+    def get_upload_env_vars(self) -> dict[str, str]:
+        """Return env vars required by the upload command."""
+
     def build_and_run_cmd(
         self,
         context: Context,
@@ -478,6 +487,8 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
         async_context: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Any:
+        self.inject_upload_env_vars(self.get_upload_env_vars())
+
         # Build base Kubernetes pod args (incl. dbt CLI command)
         self.build_kube_args(context, cmd_flags)
 
@@ -502,24 +513,42 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
         self.log.info(result)
         return result
 
+    def inject_upload_env_vars(self, env_vars: dict[str, str]) -> None:
+        declared_env_var_names = {env_var.name for env_var in self.env_vars or [] if getattr(env_var, "name", None)} | {
+            secret.deploy_target
+            for secret in self.secrets or []
+            if getattr(secret, "deploy_type", None) == "env" and getattr(secret, "deploy_target", None)
+        }
+
+        missing_env_vars = {
+            key: value for key, value in env_vars.items() if value and key not in declared_env_var_names
+        }
+
+        if not missing_env_vars:
+            return
+
+        self.env_vars = list(self.env_vars or []) + convert_env_vars(missing_env_vars)
+
 
 class DbtDocsS3KubernetesOperator(DbtDocsCloudKubernetesOperator):
     """
     Executes `dbt docs generate` inside a Kubernetes Pod and uploads the generated
     documentation to S3 *also inside that Pod* using `aws s3 sync`.
-        - Airflow S3Hook and `connection_id` are NOT used in Kubernetes mode.
-        - The Kubernetes Pod must have AWS credentials (IRSA, kube2iam, Secret env).
+        - The Kubernetes Pod receives AWS credentials resolved from the supplied
+          Airflow `connection_id`.
     """
 
     ui_color = "#FF9900"
 
     def __init__(
         self,
+        connection_id: str,
         bucket_name: str,
         folder_dir: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
+        self.connection_id = connection_id
         self.bucket_name = bucket_name
         self.folder_dir = folder_dir
 
@@ -530,3 +559,39 @@ class DbtDocsS3KubernetesOperator(DbtDocsCloudKubernetesOperator):
             s3_prefix = f"s3://{self.bucket_name}"
 
         return f"aws s3 sync {docs_target} {s3_prefix}"
+
+    def get_upload_env_vars(self) -> dict[str, str]:
+        return self.aws_env_vars_from_connection(self.connection_id)
+
+    def aws_env_vars_from_connection(self, connection_id: str) -> dict[str, str]:
+        conn = BaseHook.get_connection(connection_id)
+        conn_extra = conn.extra_dejson
+
+        access_key = conn.login or conn_extra.get("aws_access_key_id")
+        secret_key = conn.password or conn_extra.get("aws_secret_access_key")
+        session_token = conn_extra.get("aws_session_token") or conn_extra.get("session_token")
+
+        session_kwargs = conn_extra.get("session_kwargs", {})
+        config_kwargs = conn_extra.get("config_kwargs", {})
+        if not isinstance(session_kwargs, dict):
+            session_kwargs = {}
+        if not isinstance(config_kwargs, dict):
+            config_kwargs = {}
+        region_name = (
+            conn_extra.get("region_name")
+            or conn_extra.get("region")
+            or session_kwargs.get("region_name")
+            or config_kwargs.get("region_name")
+        )
+
+        env_vars = {}
+        if access_key:
+            env_vars["AWS_ACCESS_KEY_ID"] = access_key
+        if secret_key:
+            env_vars["AWS_SECRET_ACCESS_KEY"] = secret_key
+        if session_token:
+            env_vars["AWS_SESSION_TOKEN"] = session_token
+        if region_name:
+            env_vars["AWS_DEFAULT_REGION"] = region_name
+
+        return env_vars

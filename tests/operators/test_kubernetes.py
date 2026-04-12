@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 import kubernetes.client as k8s
 import pytest
 from airflow.models import DAG
+from airflow.models.connection import Connection
 
 try:
     from airflow.sdk.definitions.context import Context
@@ -30,7 +31,7 @@ from cosmos.operators.kubernetes import (
     DbtTestWarningHandler,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from tests.conftest import make_task_instance
+from tests.conftest import base_operator_get_connection_path, make_task_instance
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -661,7 +662,7 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_cmd):
 )
 def test_operator_execute_without_flags(operator_class):
     operator_class_kwargs = {
-        DbtDocsS3KubernetesOperator: {"bucket_name": "fake-bucket"},
+        DbtDocsS3KubernetesOperator: {"connection_id": "aws_s3_conn", "bucket_name": "fake-bucket"},
     }
     task = operator_class(
         profile_config=profile_config,
@@ -817,3 +818,33 @@ def test_dbt_docs_kubernetes_operator_ignores_graph_gpickle():
         dbt_cmd_global_flags=["--no-write-json"],
     )
     assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
+
+
+@patch(
+    "cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_cmd", return_value=(["dbt", "docs", "generate"], {})
+)
+def test_dbt_docs_s3_kubernetes_operator_uses_connection_id(mock_build_cmd, mock_kubernetes_execute):
+    conn = Connection(
+        conn_id="aws_s3_conn",
+        conn_type="aws",
+        login="l",
+        password="p",
+        extra='{"region_name": "us-east-1", "aws_session_token": "t"}',
+    )
+    operator = DbtDocsS3KubernetesOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        image="fake-image",
+        profile_config=profile_config,
+        connection_id="aws_s3_conn",
+        bucket_name="fake-bucket",
+    )
+
+    with patch(base_operator_get_connection_path, return_value=conn):
+        operator.build_and_run_cmd(context={})
+
+    env_vars = {env_var.name: env_var.value for env_var in operator.env_vars}
+    assert env_vars["AWS_ACCESS_KEY_ID"] == "l"
+    assert env_vars["AWS_SECRET_ACCESS_KEY"] == "p"
+    assert env_vars["AWS_SESSION_TOKEN"] == "t"
+    assert env_vars["AWS_DEFAULT_REGION"] == "us-east-1"

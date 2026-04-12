@@ -55,27 +55,6 @@ postgres_host_secret = Secret(
     key="host",
 )
 
-aws_access_key_secret = Secret(
-    deploy_type="env",
-    deploy_target="AWS_ACCESS_KEY_ID",
-    secret="aws-s3-secrets",
-    key="aws_access_key_id",
-)
-
-aws_secret_key_secret = Secret(
-    deploy_type="env",
-    deploy_target="AWS_SECRET_ACCESS_KEY",
-    secret="aws-s3-secrets",
-    key="aws_secret_access_key",
-)
-
-aws_region_secret = Secret(
-    deploy_type="env",
-    deploy_target="AWS_DEFAULT_REGION",
-    secret="aws-s3-secrets",
-    key="aws_default_region",
-)
-
 
 with DAG(
     dag_id="jaffle_shop_kubernetes",
@@ -107,13 +86,8 @@ with DAG(
     upload_docs_to_s3 = DbtDocsS3KubernetesOperator(
         task_id="generate_dbt_docs_aws",
         project_dir=K8S_PROJECT_DIR,
-        secrets=[
-            postgres_host_secret,
-            postgres_password_secret,
-            aws_access_key_secret,
-            aws_secret_key_secret,
-            aws_region_secret,
-        ],
+        connection_id="aws_s3_conn",
+        secrets=[postgres_host_secret, postgres_password_secret],
         profile_config=ProfileConfig(
             profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="postgres_profile", target_name="dev"
         ),

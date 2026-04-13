@@ -2,7 +2,7 @@ a2wsgi==1.10.10
 adal==1.2.7
 adlfs==2026.2.0
 agate==1.9.1
-aiobotocore==2.26.0
+aiobotocore==3.3.0
 aiofiles==25.1.0
 aiohappyeyeballs==2.6.1
 aiohttp-cors==0.8.1
@@ -65,8 +65,8 @@ babel==2.18.0
 backoff==2.2.1
 backports-tarfile==1.2.0
 beautifulsoup4==4.14.3
-boto3==1.41.5
-botocore==1.41.5
+boto3==1.42.70
+botocore==1.42.70
 cadwyn==6.2.0
 cattrs==26.1.0
 certifi==2026.2.25
@@ -117,11 +117,11 @@ fastjsonschema==2.21.2
 fastuuid==0.14.0
 filelock==3.25.2
 frozenlist==1.8.0
-fsspec==2025.12.0
+fsspec==2026.3.0
 gcloud-aio-auth==5.4.4
 gcloud-aio-bigquery==7.1.0
 gcloud-aio-storage==9.6.4
-gcsfs==2025.12.0
+gcsfs==2026.3.0
 google-ads==30.0.0
 google-analytics-admin==0.28.0
 google-api-core==2.30.2
@@ -167,7 +167,7 @@ google-cloud-spanner==3.64.0
 google-cloud-speech==2.38.0
 google-cloud-storage-control==1.11.0
 google-cloud-storage-transfer==1.20.0
-google-cloud-storage==3.1.1
+google-cloud-storage==3.10.1
 google-cloud-tasks==2.22.0
 google-cloud-texttospeech==2.36.0
 google-cloud-translate==3.25.0
@@ -325,8 +325,8 @@ rich==14.3.3
 rpds-py==0.30.0
 rsa==4.9.1
 ruamel-yaml==0.19.1
-s3fs==2025.12.0
-s3transfer==0.15.0
+s3fs==2026.3.0
+s3transfer==0.16.0
 sagemaker-studio==1.0.26
 scikit-learn==1.5.2
 scipy==1.15.3

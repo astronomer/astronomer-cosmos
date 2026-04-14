@@ -1,0 +1,69 @@
+version: 2
+
+models:
+  - name: model_a
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null
+      - name: email
+        tests:
+          - unique
+          - not_null
+
+  - name: model_b
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['active', 'inactive']
+
+  - name: model_c
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null
+      - name: email
+        tests:
+          - unique
+          - not_null
+
+  - name: model_d
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null
+      - name: age
+        tests:
+          - not_null
+      - name: score
+        tests:
+          - not_null
+
+  - name: model_e
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null
+      - name: country
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['US', 'UK', 'CA']
+
+  - name: model_f
+    description: This model will fail at execution time (references a nonexistent column)
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null

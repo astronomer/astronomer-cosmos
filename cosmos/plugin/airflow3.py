@@ -12,7 +12,11 @@ from unittest.mock import patch
 from urllib.parse import urlsplit
 
 import airflow
-from airflow.configuration import conf
+
+try:
+    from airflow.providers.common.compat.sdk import conf
+except ImportError:
+    from airflow.configuration import conf
 from airflow.plugins_manager import AirflowPlugin
 from airflow.sdk import ObjectStoragePath
 from fastapi import FastAPI

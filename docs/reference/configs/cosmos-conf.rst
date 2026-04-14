@@ -84,6 +84,15 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__PROPAGATE_LOGS``
 
+.. _rich_logging:
+
+`rich_logging`_:
+    Enable a custom logger implementation that adds ``(astronomer-cosmos)`` to each log message.
+    See :ref:`logging` for more details.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__RICH_LOGGING``
+
 .. _dbt_docs_projects:
 
 `dbt_docs_projects`_:
@@ -127,6 +136,14 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__DBT_DOCS_CONN_ID``
 
+.. _dbt_docs_index_file_name:
+
+`dbt_docs_index_file_name`_:
+    (Applicable to Airflow 2): The filename of the dbt docs index file within ``dbt_docs_dir``.
+
+    - Default: ``index.html``
+    - Environment Variable: ``AIRFLOW__COSMOS__DBT_DOCS_INDEX_FILE_NAME``
+
 .. _default_copy_dbt_packages:
 
 `default_copy_dbt_packages`_:
@@ -162,11 +179,13 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``profile``
     - Environment Variable: ``AIRFLOW__COSMOS__PROFILE_CACHE_DIR_NAME``
 
-.. `virtualenv_max_retries_lock`_:
-    When using ``ExecutionMode.VIRTUALENV`` and persisted virtualenv directories (`virtualenv_dir` argument),
+.. _virtualenv_max_retries_lock:
+
+`virtualenv_max_retries_lock`_:
+    When using ``ExecutionMode.VIRTUALENV`` and persisted virtualenv directories (``virtualenv_dir`` argument),
     users can define how many seconds Cosmos waits for the lock to be released.
 
-    - Default: 120
+    - Default: ``120``
     - Environment Variable: ``AIRFLOW__COSMOS__VIRTUALENV_MAX_RETRIES_LOCK``
 
 .. _remote_cache_dir:
@@ -248,36 +267,51 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
 `use_dataset_airflow3_uri_standard`_:
     (Introduced in Cosmos 1.10.0): Changes Cosmos Dataset (Asset) URIs to be Airflow 3 compliant. Since this would be a breaking change, it is False by default in Cosmos 1.x.
+
+    .. note::
+        The deprecated key ``enable_dataset_airflow3_uri`` is also accepted and takes precedence if set.
+
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD``
+
+.. _enable_dataset_alias:
+
+`enable_dataset_alias`_:
+    Enable or disable Airflow Dataset alias support when emitting datasets from Cosmos operators.
+    Requires Airflow >= 2.10. When disabled on Airflow 3+, dataset emission will fail with an error.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS``
+
+.. _enable_uri_xcom:
+
+`enable_uri_xcom`_:
+    When enabled, Cosmos operators push outlet dataset URIs to XCom under the key ``uri`` after each task run.
+    Useful for downstream tasks or external systems that need to know which datasets were produced.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_URI_XCOM``
 
 .. _enable_memory_optimised_imports:
 
 `enable_memory_optimised_imports`_:
-    (Introduced in Cosmos 1.10.1): Eager imports in cosmos/__init__.py expose all Cosmos classes at the top level,
-    which can significantly increase memory usage—even when Cosmos is just installed but not actively used. This option allows
-    disabling those eager imports to reduce memory footprint. When enabled, users must access Cosmos classes via their full
-    module paths, avoiding the overhead of importing unused modules and classes.
+    (Introduced in Cosmos 1.10.1): This setting is a no-op since Cosmos 1.14.0. All imports in ``cosmos/__init__.py``
+    are now lazy by default — modules are only loaded on first access. This provides the same memory optimization
+    automatically, without requiring users to change their import paths. The setting is still accepted but has no effect.
 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS``
 
-    .. note::
-        This option will become the default behavior in Cosmos 2.0.0, where all eager imports will be removed from ``cosmos/__init__.py``.
+.. _enable_telemetry:
 
-    As an example, when this option is enabled, the following is an example of specifying the imports with full module paths:
+`enable_telemetry`_:
+    Enable or disable Cosmos anonymous usage telemetry. Telemetry data is used to understand how Cosmos is used
+    and to improve the project. No personally identifiable information is collected. Telemetry can also be
+    disabled by setting the ``DO_NOT_TRACK`` or ``SCARF_NO_ANALYTICS`` environment variables to a truthy value;
+    any of the three knobs being set will suppress telemetry.
 
-    .. literalinclude:: ../../../dev/dags/basic_cosmos_dag_full_module_path_imports.py
-        :language: python
-        :start-after: [START cosmos_explicit_imports]
-        :end-before: [END cosmos_explicit_imports]
-
-    as opposed to the following approach you might have when this option is disabled (default):
-
-    .. literalinclude:: ../../../dev/dags/basic_cosmos_dag.py
-        :language: python
-        :start-after: [START cosmos_init_imports]
-        :end-before: [END cosmos_init_imports]
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_TELEMETRY``
 
 .. _enable_debug_mode:
 

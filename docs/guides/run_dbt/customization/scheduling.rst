@@ -131,6 +131,122 @@ From Cosmos 1.7 and Airflow 2.10, it is also possible to trigger DAGs be to be r
         t3
 
 
+Dataset URI Patterns
+''''''''''''''''''''
+
+Cosmos generates dataset URIs using the `OpenLineage naming convention <https://openlineage.io/docs/spec/naming/>`_.
+Each URI is composed of a **namespace** (derived from the database connection) and a **name** (derived from the dbt model's
+database, schema, and table/alias).
+
+The general format is:
+
+- **Airflow 2**: ``<namespace>/<database>.<schema>.<table>``
+- **Airflow 3**: ``<namespace>/<database>/<schema>/<table>``
+
+The namespace depends on your database adapter:
+
++---------------+-----------------------------------------------+------------------------------+
+| Adapter       | Namespace format                              | Example                      |
++===============+===============================================+==============================+
+| Postgres      | ``postgres://<host>:<port>``                  | ``postgres://myhost:5432``   |
++---------------+-----------------------------------------------+------------------------------+
+| Snowflake     | ``snowflake://<account>``                     | ``snowflake://xy12345``      |
++---------------+-----------------------------------------------+------------------------------+
+| BigQuery      | ``bigquery``                                  | ``bigquery``                 |
++---------------+-----------------------------------------------+------------------------------+
+| Redshift      | ``redshift://<host>:<port>``                  | ``redshift://myhost:5439``   |
++---------------+-----------------------------------------------+------------------------------+
+| Databricks    | ``databricks://<host>``                       | ``databricks://myhost``      |
++---------------+-----------------------------------------------+------------------------------+
+| Trino         | ``trino://<host>:<port>``                     | ``trino://myhost:8080``      |
++---------------+-----------------------------------------------+------------------------------+
+| SQL Server    | ``mssql://<server>:<port>``                   | ``mssql://myserver:1433``    |
++---------------+-----------------------------------------------+------------------------------+
+| Athena        | ``awsathena://athena.<region>.amazonaws.com`` | ``awsathena://athena...``    |
++---------------+-----------------------------------------------+------------------------------+
+| DuckDB        | ``duckdb://<path>``                           | ``duckdb:///tmp/my.db``      |
++---------------+-----------------------------------------------+------------------------------+
+| ClickHouse    | ``clickhouse://<host>:<port>``                | ``clickhouse://myhost:8123`` |
++---------------+-----------------------------------------------+------------------------------+
+| Spark         | ``spark://<host>:<port>``                     | ``spark://myhost:10001``     |
++---------------+-----------------------------------------------+------------------------------+
+
+.. note::
+
+   Dataset emission is only supported for adapters that the `OpenLineage dbt integration
+   <https://github.com/OpenLineage/OpenLineage/tree/main/integration/dbt>`_ supports.
+   Adapters like MySQL, Oracle, Vertica, Exasol, and Teradata do not emit datasets in any execution mode.
+
+For example, a Postgres model ``customers`` in database ``analytics`` and schema ``public`` running on
+host ``myhost:5432`` produces:
+
+- **Airflow 2**: ``postgres://myhost:5432/analytics.public.customers``
+- **Airflow 3**: ``postgres://myhost:5432/analytics/public/customers``
+
+To schedule a downstream DAG on this dataset, use the URI directly:
+
+.. code-block:: python
+
+    from airflow.datasets import Dataset
+
+    # Airflow 2
+    my_dataset = Dataset(uri="postgres://myhost:5432/analytics.public.customers")
+
+    # Airflow 3
+    my_dataset = Dataset(uri="postgres://myhost:5432/analytics/public/customers")
+
+You can also inspect the URIs emitted by a Cosmos DAG at runtime by enabling the
+``enable_uri_xcom`` setting — see `Emitting Dataset URIs as XCom`_ below.
+
+
+How Dataset Emission Differs by Execution Mode
+'''''''''''''''''''''''''''''''''''''''''''''''
+
++-------------------------------+--------------------------------------------+
+| Execution Mode                | How datasets are emitted                   |
++===============================+============================================+
+| ``LOCAL``, ``VIRTUALENV``     | Each dbt task emits its own datasets       |
+|                               | using the OpenLineage library to parse     |
+|                               | dbt artifacts (``manifest.json``,          |
+|                               | ``run_results.json``) after execution.     |
++-------------------------------+--------------------------------------------+
+| ``WATCHER``                   | The **producer** task runs ``dbt build``   |
+|                               | once but does **not** emit datasets.       |
+|                               | Instead, it reads the manifest to compute  |
+|                               | per-model URIs and passes them to          |
+|                               | **consumer** sensor tasks via XCom.        |
+|                               | Each consumer emits the dataset for its    |
+|                               | own model upon successful completion.      |
+|                               | This preserves per-model granularity in    |
+|                               | Airflow's data-aware scheduling.           |
++-------------------------------+--------------------------------------------+
+| ``AIRFLOW_ASYNC``             | Each task emits its own datasets after     |
+|                               | the async SQL execution completes.         |
+|                               | URIs are constructed directly from the     |
+|                               | task's BigQuery project, dataset, and      |
+|                               | table name (BigQuery only).                |
++-------------------------------+--------------------------------------------+
+
+.. important::
+
+   **WATCHER mode caveats for dataset emission:**
+
+   In ``LOCAL`` and ``VIRTUALENV`` modes, Cosmos delegates namespace resolution entirely to the
+   `OpenLineage dbt integration <https://pypi.org/project/openlineage-integration-common/>`_
+   library, which parses dbt artifacts at runtime. This means URIs always reflect the latest
+   OL naming conventions.
+
+   In ``WATCHER`` mode, Cosmos derives the dataset namespace from your ``ProfileConfig``
+   using its own adapter-to-namespace mapping. This mapping was aligned with the OpenLineage
+   library as of Cosmos 1.14.0. If a future OpenLineage release changes its namespace logic
+   (e.g. changes a scheme or adds a new adapter), there is a window where ``WATCHER`` mode
+   may produce slightly different URIs than ``LOCAL`` mode until Cosmos is updated to match.
+
+   If you depend on exact URI parity between execution modes, verify that both modes produce
+   the same URIs after upgrading either Cosmos or the OpenLineage library. You can inspect
+   emitted URIs by enabling the ``enable_uri_xcom`` setting (see `Emitting Dataset URIs as XCom`_).
+
+
 Known Limitations
 '''''''''''''''''
 

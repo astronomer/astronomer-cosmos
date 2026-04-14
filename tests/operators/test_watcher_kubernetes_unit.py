@@ -162,7 +162,7 @@ def test_first_execution_behaves_as_base_consumer_sensor(mock_startup_events):
 
     ti = MagicMock()
     ti.try_number = 1
-    ti.xcom_pull.return_value = "success"
+    ti.xcom_pull.return_value = {"status": "success", "outlet_uris": []}
     context = make_context(ti)
 
     result = sensor.poke(context)
@@ -189,15 +189,6 @@ def test_retry_executes_as_dbt_run_kubernetes_operator(mock_build_and_run_cmd):
 
     assert result is True
     mock_build_and_run_cmd.assert_called_once()
-
-
-def test_use_event_returns_false():
-    """
-    DbtConsumerWatcherKubernetesSensor should return False for use_event(),
-    meaning it uses XCom-based status retrieval instead of events.
-    """
-    sensor = make_sensor()
-    assert sensor.use_event() is False
 
 
 class TestCallbacksNormalization:

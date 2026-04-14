@@ -165,7 +165,7 @@ The following limitations from ``ExecutionMode.WATCHER`` also apply to ``Executi
 
 * **Individual dbt Operators**: Only ``DbtSeedWatcherKubernetesOperator``, ``DbtSnapshotWatcherKubernetesOperator``, and ``DbtRunWatcherKubernetesOperator`` are implemented. The ``DbtTestWatcherKubernetesOperator`` is currently a placeholder.
 
-* **Test behavior**: The ``TestBehavior.AFTER_EACH`` is not supported. Tests are run as part of the ``dbt build`` command by the producer task.
+* **Test behavior**: Unlike ``ExecutionMode.WATCHER`` (which fully supports ``TestBehavior.AFTER_EACH`` since Cosmos 1.14.0), ``ExecutionMode.WATCHER_KUBERNETES`` does not yet support ``TestBehavior.AFTER_EACH``. Tests are run as part of the ``dbt build`` command by the producer task, and test tasks are rendered as ``EmptyOperator`` placeholders. This is tracked in `#1974 <https://github.com/astronomer/astronomer-cosmos/issues/1974>`_.
 
 * **Source freshness nodes**: The ``dbt build`` command does not run source freshness checks.
 

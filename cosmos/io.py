@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import os
+import tarfile
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -23,6 +25,7 @@ def upload_to_aws_s3(
     bucket_name: str,
     aws_conn_id: str | None = None,
     source_subpath: str = DEFAULT_TARGET_PATH,
+    use_tarball: bool = False,
     **kwargs: Any,
 ) -> None:
     """
@@ -32,6 +35,7 @@ def upload_to_aws_s3(
     :param bucket_name: Name of the S3 bucket to upload to.
     :param aws_conn_id: AWS connection ID to use when uploading files.
     :param source_subpath: Path of the source directory sub-path to upload files from.
+    :param use_tarball: If True, uploads a single tar.gz archive instead of individual files.
     """
     from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
@@ -43,22 +47,32 @@ def upload_to_aws_s3(
     # Airflow 3 and Airflow 2 compatibility, respectively:
     try_number = getattr(context["task_instance"], "try_number") or getattr(context["task_instance"], "_try_number")
 
-    # Iterate over the files in the target dir and upload them to S3
-    for dirpath, _, filenames in os.walk(target_dir):
-        for filename in filenames:
-            s3_key = (
-                f"{context['dag'].dag_id}"
-                f"/{context['run_id']}"
-                f"/{context['task_instance'].task_id}"
-                f"/{try_number}"
-                f"{dirpath.split(project_dir)[-1]}/{filename}"
-            )
-            hook.load_file(
-                filename=f"{dirpath}/{filename}",
-                bucket_name=bucket_name,
-                key=s3_key,
-                replace=True,
-            )
+    run_prefix = (
+        f"{context['dag'].dag_id}" f"/{context['run_id']}" f"/{context['task_instance'].task_id}" f"/{try_number}"
+    )
+
+    if use_tarball:
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            tar.add(target_dir, arcname=source_subpath)
+        buf.seek(0)
+        hook.load_bytes(
+            bytes_data=buf.read(),
+            bucket_name=bucket_name,
+            key=f"{run_prefix}/{source_subpath}.tar.gz",
+            replace=True,
+        )
+    else:
+        # Iterate over the files in the target dir and upload them to S3
+        for dirpath, _, filenames in os.walk(target_dir):
+            for filename in filenames:
+                s3_key = f"{run_prefix}{dirpath.split(project_dir)[-1]}/{filename}"
+                hook.load_file(
+                    filename=f"{dirpath}/{filename}",
+                    bucket_name=bucket_name,
+                    key=s3_key,
+                    replace=True,
+                )
 
 
 def upload_to_gcp_gs(
@@ -66,6 +80,7 @@ def upload_to_gcp_gs(
     bucket_name: str,
     gcp_conn_id: str | None = None,
     source_subpath: str = DEFAULT_TARGET_PATH,
+    use_tarball: bool = False,
     **kwargs: Any,
 ) -> None:
     """
@@ -75,30 +90,43 @@ def upload_to_gcp_gs(
     :param bucket_name: Name of the GCP GS bucket to upload to.
     :param gcp_conn_id: GCP connection ID to use when uploading files.
     :param source_subpath: Path of the source directory sub-path to upload files from.
+    :param use_tarball: If True, uploads a single tar.gz archive instead of individual files.
     """
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
 
     target_dir = f"{project_dir}/{source_subpath}"
     gcp_conn_id = gcp_conn_id if gcp_conn_id else GCSHook.default_conn_name
-    # bucket_name = kwargs["bucket_name"]
     hook = GCSHook(gcp_conn_id=gcp_conn_id)
     context = kwargs["context"]
 
-    # Iterate over the files in the target dir and upload them to GCP GS
-    for dirpath, _, filenames in os.walk(target_dir):
-        for filename in filenames:
-            object_name = (
-                f"{context['dag'].dag_id}"
-                f"/{context['run_id']}"
-                f"/{context['task_instance'].task_id}"
-                f"/{context['task_instance']._try_number}"
-                f"{dirpath.split(project_dir)[-1]}/{filename}"
-            )
-            hook.upload(
-                filename=f"{dirpath}/{filename}",
-                bucket_name=bucket_name,
-                object_name=object_name,
-            )
+    # Airflow 3 and Airflow 2 compatibility, respectively:
+    try_number = getattr(context["task_instance"], "try_number") or getattr(context["task_instance"], "_try_number")
+
+    run_prefix = (
+        f"{context['dag'].dag_id}" f"/{context['run_id']}" f"/{context['task_instance'].task_id}" f"/{try_number}"
+    )
+
+    if use_tarball:
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            tar.add(target_dir, arcname=source_subpath)
+        buf.seek(0)
+        hook.upload(
+            bucket_name=bucket_name,
+            object_name=f"{run_prefix}/{source_subpath}.tar.gz",
+            data=buf.read(),
+            mime_type="application/gzip",
+        )
+    else:
+        # Iterate over the files in the target dir and upload them to GCP GS
+        for dirpath, _, filenames in os.walk(target_dir):
+            for filename in filenames:
+                object_name = f"{run_prefix}{dirpath.split(project_dir)[-1]}/{filename}"
+                hook.upload(
+                    filename=f"{dirpath}/{filename}",
+                    bucket_name=bucket_name,
+                    object_name=object_name,
+                )
 
 
 def upload_to_azure_wasb(
@@ -106,6 +134,7 @@ def upload_to_azure_wasb(
     container_name: str,
     azure_conn_id: str | None = None,
     source_subpath: str = DEFAULT_TARGET_PATH,
+    use_tarball: bool = False,
     **kwargs: Any,
 ) -> None:
     """
@@ -115,31 +144,44 @@ def upload_to_azure_wasb(
     :param container_name: Name of the Azure WASB container to upload files to.
     :param azure_conn_id: Azure connection ID to use when uploading files.
     :param source_subpath: Path of the source directory sub-path to upload files from.
+    :param use_tarball: If True, uploads a single tar.gz archive instead of individual files.
     """
     from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
 
     target_dir = f"{project_dir}/{source_subpath}"
     azure_conn_id = azure_conn_id if azure_conn_id else WasbHook.default_conn_name
-    # container_name = kwargs["container_name"]
     hook = WasbHook(wasb_conn_id=azure_conn_id)
     context = kwargs["context"]
 
-    # Iterate over the files in the target dir and upload them to WASB container
-    for dirpath, _, filenames in os.walk(target_dir):
-        for filename in filenames:
-            blob_name = (
-                f"{context['dag'].dag_id}"
-                f"/{context['run_id']}"
-                f"/{context['task_instance'].task_id}"
-                f"/{context['task_instance']._try_number}"
-                f"{dirpath.split(project_dir)[-1]}/{filename}"
-            )
-            hook.load_file(
-                file_path=f"{dirpath}/{filename}",
-                container_name=container_name,
-                blob_name=blob_name,
-                overwrite=True,
-            )
+    # Airflow 3 and Airflow 2 compatibility, respectively:
+    try_number = getattr(context["task_instance"], "try_number") or getattr(context["task_instance"], "_try_number")
+
+    run_prefix = (
+        f"{context['dag'].dag_id}" f"/{context['run_id']}" f"/{context['task_instance'].task_id}" f"/{try_number}"
+    )
+
+    if use_tarball:
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            tar.add(target_dir, arcname=source_subpath)
+        buf.seek(0)
+        hook.upload(
+            container_name=container_name,
+            blob_name=f"{run_prefix}/{source_subpath}.tar.gz",
+            data=buf,
+            overwrite=True,
+        )
+    else:
+        # Iterate over the files in the target dir and upload them to WASB container
+        for dirpath, _, filenames in os.walk(target_dir):
+            for filename in filenames:
+                blob_name = f"{run_prefix}{dirpath.split(project_dir)[-1]}/{filename}"
+                hook.load_file(
+                    file_path=f"{dirpath}/{filename}",
+                    container_name=container_name,
+                    blob_name=blob_name,
+                    overwrite=True,
+                )
 
 
 def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tuple[None, None]:

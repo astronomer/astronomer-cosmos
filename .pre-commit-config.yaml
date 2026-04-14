@@ -85,7 +85,7 @@ repos:
           - --py310-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.7
+    rev: v0.15.8
     hooks:
       - id: ruff-check
         args: [ --fix ]
@@ -99,10 +99,30 @@ repos:
     hooks:
       - id: blacken-docs
         alias: black
-        additional_dependencies: [black>=22.10.0]
+        additional_dependencies: [black>=26.3.1]
+  - repo: local
+    hooks:
+      - id: check-docs-build
+        name: Ensure the docs build without errors
+        entry: sphinx-build -b html docs docs/_build --fail-on-warning --fresh-env
+        language: python
+        additional_dependencies:
+          [
+            "aenum",
+            "deprecation",
+            "msgpack",
+            "apache-airflow",
+            "pydata-sphinx-theme>=0.16.0",
+            "sphinx",
+            "sphinx-autoapi",
+            "sphinx-autobuild",
+            "sphinx-reredirects",
+            "sphinxcontrib.mermaid",
+          ]
+        pass_filenames: false
+        files: ^docs/
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.19.1"
-
+    rev: "v1.20.0"
     hooks:
       - id: mypy
         name: mypy-python
@@ -122,7 +142,7 @@ exclude: "dev/dags/dbt/simple/dbt_packages/.*"
 
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks
-  autoupdate_commit_msg: ⬆ [pre-commit.ci] pre-commit autoupdate
+  autoupdate_schedule: quarterly
   skip:
     - mypy # build of https://github.com/pre-commit/mirrors-mypy:types-PyYAML,types-attrs,attrs,types-requests,
     #types-python-dateutil,apache-airflow@v1.5.0 for python@python3 exceeds tier max size 250MiB: 262.6MiB

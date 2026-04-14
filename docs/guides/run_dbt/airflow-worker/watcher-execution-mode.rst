@@ -341,7 +341,16 @@ Test behavior
 
 By default, the watcher mode runs tests alongside models via the ``dbt build`` command being executed by the producer ``DbtProducerWatcherOperator`` operator.
 
-As a starting point, this execution mode does not support the ``TestBehavior.AFTER_EACH`` behavior, since the tests are not run as individual tasks. Since this is the default ``TestBehavior`` in Cosmos, we are injecting ``EmptyOperator`` as a starting point to ensure a seamless transition to the new mode.
+.. versionchanged:: 1.14.0
+
+Starting with Cosmos 1.14.0, ``TestBehavior.AFTER_EACH`` is fully supported in ``ExecutionMode.WATCHER``.
+Each test task is rendered as a ``DbtTestWatcherOperator`` (a ``DbtConsumerWatcherSensor`` subclass) that watches
+the aggregated test results published by the producer via XCom. This means test tasks now behave as real sensors
+rather than no-op placeholders.
+
+In Cosmos versions prior to 1.14.0, ``TestBehavior.AFTER_EACH`` was not supported by the watcher mode because tests
+were not run as individual tasks. Since ``TestBehavior.AFTER_EACH`` is the default ``TestBehavior`` in Cosmos,
+``EmptyOperator`` tasks were injected as placeholders to ensure a seamless transition to the new mode.
 
 The ``TestBehavior.BUILD`` behavior is embedded in the producer ``DbtProducerWatcherOperator`` operator.
 
@@ -350,7 +359,14 @@ The ``TestBehavior.NONE`` and ``TestBehavior.AFTER_ALL`` behave similarly to ``E
 Airflow Datasets and Assets
 '''''''''''''''''''''''''''
 
-While the ``ExecutionMode.WATCHER`` supports the ``emit_datasets`` parameter, the Airflow Datasets and Assets are emitted from the ``DbtProducerWatcherOperator`` task instead of the consumer tasks, as done for other Cosmos' execution modes.
+.. versionchanged:: 1.14.0
+
+The ``ExecutionMode.WATCHER`` supports the ``emit_datasets`` parameter. Starting with Cosmos 1.14.0,
+each **consumer** sensor task emits the Airflow Dataset (Asset) for the dbt model it watches, matching
+the per-model granularity of other execution modes. The **producer** task does not emit datasets.
+
+For details on URI patterns and how dataset emission differs between execution modes, see
+:ref:`data-aware-scheduling`.
 
 Source freshness nodes
 ''''''''''''''''''''''

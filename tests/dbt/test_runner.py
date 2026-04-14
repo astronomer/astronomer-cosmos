@@ -299,11 +299,7 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
             )
             op2.invocation_mode = InvocationMode.DBT_RUNNER
 
-            class _DummyEv:
-                pass
-
-            with patch("cosmos.operators.watcher.EventMsg", _DummyEv):
-                op2.execute(context=mock_context)
+            op2.execute(context=mock_context)
 
             # Verify:
             # 1. We have two dbt Runner instances (cached + new with callbacks)

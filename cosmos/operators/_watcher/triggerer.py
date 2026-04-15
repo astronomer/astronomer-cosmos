@@ -29,6 +29,7 @@ class WatcherEventReason(str, Enum):
 
     NODE_FAILED = "node_failed"
     PRODUCER_FAILED = "producer_failed"
+    PRODUCER_SKIPPED = "producer_skipped"
     NODE_NOT_RUN = "node_not_run"
 
 
@@ -201,7 +202,7 @@ class WatcherTrigger(BaseTrigger):
             # logging the full list. Also ensures we exit if producer finishes before
             # ever pushing _DBT_STARTUP_EVENTS_XCOM_KEY.
             producer_task_state = await self._get_producer_task_status()
-            if producer_task_state in ("failed", "success"):
+            if producer_task_state in ("failed", "success", "skipped"):
                 return
 
             # Return if dbt node is in terminal state
@@ -249,6 +250,15 @@ class WatcherTrigger(BaseTrigger):
                     self.model_unique_id,
                 )
                 yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_FAILED})  # type: ignore[no-untyped-call]
+                return
+            elif producer_task_state == "skipped":
+                logger.info(
+                    "Watcher producer task '%s' was skipped (e.g. retry). "
+                    "Consumer will fall back to running dbt for node '%s'.",
+                    self.producer_task_id,
+                    self.model_unique_id,
+                )
+                yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_SKIPPED})  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == "success" and dbt_node_status is None:
                 logger.info(

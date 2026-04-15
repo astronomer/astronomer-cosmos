@@ -10,7 +10,9 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig
+from airflow.models import DAG
+
+from cosmos import DbtDag, DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
 from cosmos.constants import ExecutionMode, InvocationMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -30,24 +32,50 @@ profile_config = ProfileConfig(
     ),
 )
 
+execution_config = ExecutionConfig(
+    execution_mode=ExecutionMode.WATCHER,
+    invocation_mode=InvocationMode.SUBPROCESS,
+)
+
+operator_args = {
+    "install_deps": True,
+    "execution_timeout": timedelta(seconds=120),
+}
+
+# Currently airflow dags test ignores priority_weight and weight_rule, for this reason, we're setting the following in the CI only:
+if os.getenv("CI"):
+    operator_args["trigger_rule"] = "all_success"
+
+default_args = {
+    "retries": 2,
+    "retry_delay": timedelta(seconds=0),
+}
+
 
 example_watcher_failing_tests = DbtDag(
-    execution_config=ExecutionConfig(
-        execution_mode=ExecutionMode.WATCHER,
-        invocation_mode=InvocationMode.SUBPROCESS,
-    ),
+    execution_config=execution_config,
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
-    operator_args={
-        "install_deps": True,
-        "execution_timeout": timedelta(seconds=120),
-    },
+    operator_args=operator_args,
     schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
     dag_id="example_watcher_failing_tests",
-    default_args={
-        "retries": 2,
-        "retry_delay": timedelta(seconds=0),
-    },
+    default_args=default_args,
 )
+
+
+with DAG(
+    dag_id="example_watcher_failing_tests_taskgroup",
+    schedule="@daily",
+    start_date=datetime(2023, 1, 1),
+    catchup=False,
+    default_args=default_args,
+):
+    DbtTaskGroup(
+        group_id="watcher_failing_tests",
+        execution_config=execution_config,
+        project_config=ProjectConfig(DBT_PROJECT_PATH),
+        profile_config=profile_config,
+        operator_args=operator_args,
+    )

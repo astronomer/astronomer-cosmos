@@ -587,20 +587,20 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
     def _handle_retry(self, try_number: int, producer_task_state: str | None, context: Context) -> bool | None:
         """Handle sensor retry by checking whether the producer is still active.
 
-        Returns True if the fallback ran successfully, or None if the sensor
-        should continue polling (producer still active).
+        Returns the fallback result if the producer has terminated, or None if
+        the sensor should continue polling (producer still active).
         """
         if is_producer_task_terminated(producer_task_state):
             # Producer finished — this is either an automatic retry after
             # the producer completed or a manual task clear from the UI.
-            # Fall back to running the model locally.
+            # Fall back to a non-watcher run.
             return self._fallback_to_non_watcher_run(try_number, context)
         # Producer is still active — the sensor likely timed out while the
         # producer was still working.  Keep polling instead of launching a
         # duplicate dbt run.
         logger.info(
-            "Retry attempt #%s but producer '%s' is still %s — continuing to poll instead of fallback.",
-            try_number - 1,
+            "Try #%s but producer '%s' is still %s — continuing to poll instead of fallback.",
+            try_number,
             self.producer_task_id,
             producer_task_state or "unknown",
         )

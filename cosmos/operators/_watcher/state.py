@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import base64
+import json
 import logging
+import zlib
 from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
@@ -144,6 +147,80 @@ def build_producer_state_fetcher(
         return None
 
     return fetch_state_airflow3
+
+
+XCOM_BACKUP_VARIABLE_PREFIX = "cosmos_xcom_backup__"
+
+
+def _xcom_backup_variable_key(dag_id: str, task_group_id: str | None, run_id: str) -> str:
+    """Build a unique Airflow Variable key for the XCom backup of a watcher producer run."""
+    parts = [XCOM_BACKUP_VARIABLE_PREFIX, dag_id.replace(".", "___")]
+    if task_group_id:
+        parts.append(task_group_id.replace(".", "__"))
+    parts.append(run_id.replace(".", "_"))
+    return "__".join(parts)
+
+
+def _get_task_group_id(ti: Any) -> str | None:
+    """Extract the task_group_id from a task instance, if available."""
+    task = getattr(ti, "task", None)
+    return getattr(task, "task_group_id", None) if task else None
+
+
+def backup_xcom_to_variable(context: Any) -> None:
+    """Read all XCom entries for the current producer task and persist them in an Airflow Variable.
+
+    Called via ``on_retry_callback`` — at this point XCom has **not** been cleared yet,
+    so every value pushed during the attempt is still available in the DB.
+    """
+    from airflow.models import Variable
+    from airflow.models.xcom import XCom
+    from airflow.utils.session import create_session
+
+    ti = context["ti"]
+    dag_id = ti.dag_id
+    task_id = ti.task_id
+    run_id = context["run_id"]
+    task_group_id = _get_task_group_id(ti)
+
+    with create_session() as session:
+        rows = session.query(XCom.key, XCom.value).filter_by(dag_id=dag_id, task_id=task_id, run_id=run_id).all()
+        backup = {row.key: row.value for row in rows}
+
+    if not backup:
+        return
+
+    compressed = base64.b64encode(zlib.compress(json.dumps(backup, default=str).encode("utf-8"))).decode("utf-8")
+    var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
+    Variable.set(var_key, compressed)
+    logger.info("Backed up %d XCom entries to Variable '%s'", len(backup), var_key)
+
+
+def restore_xcom_from_variable(context: Any) -> bool:
+    """Restore XCom entries from an Airflow Variable backup created by a previous attempt.
+
+    Returns True if the restore succeeded, False if no backup was found.
+    """
+    from airflow.models import Variable
+
+    ti = context["ti"]
+    dag_id = ti.dag_id
+    run_id = context["run_id"]
+    task_group_id = _get_task_group_id(ti)
+
+    var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
+    compressed = Variable.get(var_key, default_var=None)
+    if compressed is None:
+        logger.info("No XCom backup Variable found at '%s'", var_key)
+        return False
+
+    backup: dict[str, Any] = json.loads(zlib.decompress(base64.b64decode(compressed.encode("utf-8"))).decode("utf-8"))
+    for key, value in backup.items():
+        safe_xcom_push(task_instance=ti, key=key, value=value)
+    logger.info("Restored %d XCom entries from Variable '%s'", len(backup), var_key)
+
+    Variable.delete(var_key)
+    return True
 
 
 def _iso_to_string(ts: Any) -> str | None:

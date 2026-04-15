@@ -745,7 +745,6 @@ def _add_watcher_dependencies(
             task.producer_task_id = producer_airflow_task.task_id  # type: ignore[union-attr]
 
 
-
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:
     """
     Decide if we should calculate / insert detached nodes into the graph.

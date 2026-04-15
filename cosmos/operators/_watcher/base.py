@@ -544,6 +544,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 f"Watcher producer task '{self.producer_task_id}' failed before reporting results for {self._resource_label.lower()} '{self.model_unique_id}'. Check its logs for the underlying error."
             )
 
+        if reason == WatcherEventReason.PRODUCER_SKIPPED:
+            logger.info(
+                "Watcher producer task '%s' was skipped. Falling back to running dbt for %s '%s'.",
+                self.producer_task_id,
+                self._resource_label.lower(),
+                self.model_unique_id,
+            )
+            self._fallback_to_non_watcher_run(try_number=2, context=context)
+            return
+
     def _log_startup_events(self, ti: Any) -> None:
         dbt_startup_events: list[dict[str, Any]] = ti.xcom_pull(
             task_ids=self.producer_task_id, key=_DBT_STARTUP_EVENTS_XCOM_KEY
@@ -634,6 +644,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 else:
                     # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
                     return self._fallback_to_non_watcher_run(try_number, context)
+
+            if producer_task_state == "skipped":
+                return self._fallback_to_non_watcher_run(try_number, context)
 
             self.poke_retry_number += 1
 

@@ -5,7 +5,7 @@ import functools
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 
 try:
     # Airflow 3.1 onwards
@@ -383,12 +383,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
-            self.log.info(
+            raise AirflowSkipException(
                 "Dbt WATCHER producer task does not support Airflow retries. "
-                "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
-                try_number,
+                f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
-            return None
 
         if self._check_source_freshness:
             self._apply_source_freshness(context)

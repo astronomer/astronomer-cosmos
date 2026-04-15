@@ -28,6 +28,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
 )
@@ -583,6 +584,28 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             if hasattr(self, "_override_rtif"):
                 self._override_rtif(context)
 
+    def _handle_retry(self, try_number: int, producer_task_state: str | None, context: Context) -> bool | None:
+        """Handle sensor retry by checking whether the producer is still active.
+
+        Returns True if the fallback ran successfully, or None if the sensor
+        should continue polling (producer still active).
+        """
+        if is_producer_task_terminated(producer_task_state):
+            # Producer finished — this is either an automatic retry after
+            # the producer completed or a manual task clear from the UI.
+            # Fall back to running the model locally.
+            return self._fallback_to_non_watcher_run(try_number, context)
+        # Producer is still active — the sensor likely timed out while the
+        # producer was still working.  Keep polling instead of launching a
+        # duplicate dbt run.
+        logger.info(
+            "Retry attempt #%s but producer '%s' is still %s — continuing to poll instead of fallback.",
+            try_number - 1,
+            self.producer_task_id,
+            producer_task_state or "unknown",
+        )
+        return None
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt node (model or aggregated tests) by pulling relevant XComs from the producer task.
@@ -605,10 +628,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             self.model_unique_id,
         )
 
-        if try_number > 1:
-            return self._fallback_to_non_watcher_run(try_number, context)
-
         producer_task_state = self._get_producer_task_status(context)
+
+        if try_number > 1:
+            retry_result = self._handle_retry(try_number, producer_task_state, context)
+            if retry_result is not None:
+                return retry_result
+
         if not self.is_test_sensor:
             self._log_startup_events(ti)
         status = self._get_node_status(ti, context)
@@ -624,8 +650,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         )
         _log_dbt_event(dbt_events)
 
-        if status is None:
+        return self._evaluate_node_status(status, producer_task_state, try_number, context)
 
+    def _evaluate_node_status(
+        self, status: Any, producer_task_state: str | None, try_number: int, context: Context
+    ) -> bool:
+        """Evaluate the dbt node status and return the poke result."""
+        if status is None:
             if producer_task_state == "failed":
                 if self.poke_retry_number > 0:
                     raise AirflowException(
@@ -636,13 +667,12 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     return self._fallback_to_non_watcher_run(try_number, context)
 
             self.poke_retry_number += 1
-
             return False
-        elif is_dbt_node_status_skipped(status):
+
+        if is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
-        elif is_dbt_node_status_success(status):
+        if is_dbt_node_status_success(status):
             return True
-        else:
-            raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
+        raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")

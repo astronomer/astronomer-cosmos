@@ -55,6 +55,17 @@ def is_dbt_node_status_terminal(status: str | None) -> bool:
     return is_dbt_node_status_success(status) or is_dbt_node_status_failed(status) or is_dbt_node_status_skipped(status)
 
 
+# Airflow task states that indicate the producer has finished and will not
+# deliver any more XCom updates.  Used to decide whether a sensor retry
+# should fall back to running the model locally or keep polling.
+PRODUCER_TERMINAL_STATES = frozenset({"success", "failed", "skipped", "upstream_failed", "removed"})
+
+
+def is_producer_task_terminated(state: str | None) -> bool:
+    """Return True when the producer task is in a terminal state."""
+    return state in PRODUCER_TERMINAL_STATES
+
+
 xcom_set_lock = Lock()
 
 

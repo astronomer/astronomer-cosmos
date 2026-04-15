@@ -1234,7 +1234,9 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
         should_store_compiled_sql=False,
     )
 
-    dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=dbt_base_operator.base_cmd + dbt_base_operator.dbt_cmd_flags)
+    dbt_base_operator.calculate_openlineage_events_completes(
+        env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=dbt_base_operator.base_cmd + dbt_base_operator.dbt_cmd_flags
+    )
 
     assert instance.parse.called
     assert "Unable to parse OpenLineage events" in caplog.text

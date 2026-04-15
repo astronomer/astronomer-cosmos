@@ -174,10 +174,11 @@ def test_first_execution_behaves_as_base_consumer_sensor(mock_startup_events):
 @patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_and_run_cmd")
 def test_retry_executes_as_dbt_run_kubernetes_operator(mock_build_and_run_cmd):
     """
-    On retry (try_number > 1), the sensor should fall back to executing
-    as DbtRunKubernetesOperator by calling build_and_run_cmd.
+    On retry (try_number > 1) with a terminated producer, the sensor should
+    fall back to executing as DbtRunKubernetesOperator by calling build_and_run_cmd.
     """
     sensor = make_sensor()
+    sensor._get_producer_task_status.return_value = "success"
 
     ti = MagicMock()
     ti.try_number = 2
@@ -189,6 +190,28 @@ def test_retry_executes_as_dbt_run_kubernetes_operator(mock_build_and_run_cmd):
 
     assert result is True
     mock_build_and_run_cmd.assert_called_once()
+
+
+@patch("cosmos.operators._watcher.base.get_xcom_val")
+@patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+def test_retry_keeps_polling_when_producer_still_running(mock_startup_events, mock_get_xcom_val):
+    """
+    On retry (try_number > 1) with the producer still running, the sensor
+    should keep polling instead of launching a duplicate dbt run.
+    """
+    sensor = make_sensor()
+    sensor._get_producer_task_status.return_value = "running"
+
+    ti = MagicMock()
+    ti.try_number = 2
+    ti.xcom_pull.return_value = None
+    mock_get_xcom_val.return_value = None
+    context = make_context(ti)
+
+    result = sensor.poke(context)
+
+    assert result is False
+    assert sensor.poke_retry_number == 1
 
 
 class TestCallbacksNormalization:

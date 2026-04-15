@@ -23,7 +23,7 @@ from cosmos.constants import (
 from cosmos.dataset import get_dataset_namespace
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from cosmos.operators._watcher import safe_xcom_push
+from cosmos.operators._watcher import backup_xcom_to_variable, restore_xcom_from_variable, safe_xcom_push
 from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
     store_dbt_resource_status_from_log,
@@ -176,6 +176,13 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
+        existing_retry_cb = kwargs.get("on_retry_callback")
+        if existing_retry_cb is None:
+            kwargs["on_retry_callback"] = backup_xcom_to_variable
+        elif isinstance(existing_retry_cb, list):
+            kwargs["on_retry_callback"] = [*existing_retry_cb, backup_xcom_to_variable]
+        else:
+            kwargs["on_retry_callback"] = [existing_retry_cb, backup_xcom_to_variable]
         kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
         # invocation_mode is intentionally NOT forced here; the parent's _discover_invocation_mode()
         # picks DBT_RUNNER when available and falls back to SUBPROCESS otherwise.
@@ -383,6 +390,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
+            restore_xcom_from_variable(context)
             raise AirflowSkipException(
                 "Dbt WATCHER producer task does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
@@ -399,6 +407,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         except Exception:
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             raise
+        finally:
+            backup_xcom_to_variable(context)
 
 
 class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type: ignore[misc]

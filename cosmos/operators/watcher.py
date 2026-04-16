@@ -212,9 +212,21 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         When a callback is registered, dbt's stdout is redirected to a null buffer so that the
         raw ``--log-format json`` lines do not appear in Airflow task logs alongside the
         human-readable messages already emitted by ``_log_dbt_msg`` inside the callback.
+
+        The callback is intentionally **not** registered during the source freshness pre-check
+        (``context["_check_source_freshness"] is True``).  Registering it there would leave a
+        stale entry in ``_dbt_runner_callbacks`` that fires again for every event during the
+        subsequent ``dbt build``, producing duplicate log lines.  Freshness results are read from
+        ``target/sources.json`` after the run and do not need per-event XCom pushes.
         """
         context = kwargs.get("context")
         if context is not None:
+            # During the source freshness pre-check suppress raw JSON stdout, but do not register
+            # the XCom-pushing callback so it cannot accumulate and duplicate build logs later.
+            if context.get("_check_source_freshness"):
+                with contextlib.redirect_stdout(_NullWriter()):
+                    return super().run_dbt_runner(command, env, cwd, **kwargs)
+
             extra_kwargs: dict[str, Any] = {"project_dir": cwd, "context": context}
             parse = self._make_parse_callable()
             # Collect callback errors rather than raising inside the callback: dbt catches

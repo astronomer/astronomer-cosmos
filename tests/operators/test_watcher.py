@@ -38,9 +38,11 @@ from tests.utils import AIRFLOW_VERSION, new_test_dag
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
 MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
+DBT_WATCHER_FAILING_TESTS_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_failing_tests"
 
 DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
+
 
 project_config = ProjectConfig(
     dbt_project_path=DBT_PROJECT_PATH,
@@ -1877,6 +1879,51 @@ def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
             assert task.execution_timeout == timedelta(seconds=2)
         else:
             assert task.execution_timeout == timedelta(seconds=1)
+
+
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_and_failing_model(caplog):
+    """
+    Run a DbtDag using `ExecutionMode.WATCHER` with a project where one model fails.
+    model_a succeeds, model_f fails (references nonexistent column).
+    The producer task fails, retries are skipped, and the DAG completes without hanging.
+    Reproduces https://github.com/astronomer/astronomer-cosmos/issues/2430
+    """
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
+
+    watcher_dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_FAILING_TESTS_PATH),
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_failing_tests",
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+        render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+        dagrun_timeout=timedelta(seconds=120),
+    )
+    outcome = new_test_dag(watcher_dag)
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 2
+    assert len(watcher_dag.task_dict) == 3
+    tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
+    assert tasks_names == ["dbt_producer_watcher", "model_a_run", "model_f_run"]
+
+    assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["model_a_run"], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["model_f_run"], DbtRunWatcherOperator)
+
+    # The DAG should complete (not hang) even though model_f fails
+    assert outcome.state == DagRunState.FAILED
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    assert tis["dbt_producer_watcher"].try_number == 2
+
+    assert tis["dbt_producer_watcher"].state == "skipped"
+    assert tis["model_a_run"].state == "success"
+    assert tis["model_f_run"].state == "failed"
+
+    dbt_error_message = """Database Error in model model_f (models/model_f.sql)\n  column "this_column_does_not_exist_at_all" does not exist\n  LINE 1"""
+    assert dbt_error_message in caplog.text
 
 
 def test_dbt_source_watcher_operator_template_fields():

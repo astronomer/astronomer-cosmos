@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
-from airflow.exceptions import AirflowException, TaskDeferred
+from airflow.exceptions import AirflowException, AirflowSkipException, TaskDeferred
 from airflow.utils.state import DagRunState
 
 try:
@@ -153,7 +153,10 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     context = {"ti": mock_ti}
 
     # Test success case
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        patch("cosmos.operators.watcher.backup_xcom_to_variable"),
+    ):
         op.execute(context=context)
 
         # Verify status was pushed
@@ -168,7 +171,10 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     class TestException(Exception):
         pass
 
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        patch("cosmos.operators.watcher.backup_xcom_to_variable"),
+    ):
         mock_execute.side_effect = TestException("test error")
 
         with pytest.raises(TestException):
@@ -223,14 +229,14 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     ti.try_number = 2
     context = {"ti": ti}
 
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
-        with caplog.at_level(logging.INFO):
-            result = op.execute(context=context)
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        patch("cosmos.operators.watcher.restore_xcom_from_variable"),
+    ):
+        with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+            op.execute(context=context)
 
     mock_execute.assert_not_called()
-    assert result is None
-    assert any("does not support Airflow retries" in message for message in caplog.messages)
-    assert any("skipping execution" in message for message in caplog.messages)
 
 
 @pytest.mark.parametrize(

@@ -63,6 +63,8 @@ class _MockTI:
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
         self.try_number = 1
+        self.dag_id = "test_dag"
+        self.task_id = "test_task"
 
     def xcom_push(self, key: str, value: str, **_):
         self.store[key] = value
@@ -152,14 +154,10 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     """Test that operator pushes 'completed' status to XCom in both success and failure cases."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     mock_ti = _MockTI()
-    context = {"ti": mock_ti}
+    context = {"ti": mock_ti, "run_id": "test_run"}
 
     # Test success case
-    with (
-        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
-        patch("cosmos.operators.watcher.init_xcom_backup"),
-        patch("cosmos.operators.watcher.backup_xcom_to_variable"),
-    ):
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
         op.execute(context=context)
 
         # Verify status was pushed
@@ -174,11 +172,7 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     class TestException(Exception):
         pass
 
-    with (
-        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
-        patch("cosmos.operators.watcher.init_xcom_backup"),
-        patch("cosmos.operators.watcher.backup_xcom_to_variable"),
-    ):
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
         mock_execute.side_effect = TestException("test error")
 
         with pytest.raises(TestException):
@@ -231,7 +225,7 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
     ti.try_number = 2
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
     with (
         patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,

@@ -157,7 +157,10 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     context = {"ti": mock_ti, "run_id": "test_run"}
 
     # Test success case
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        patch("cosmos.operators._watcher.state._persist_backup"),
+    ):
         op.execute(context=context)
 
         # Verify status was pushed
@@ -172,7 +175,10 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     class TestException(Exception):
         pass
 
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        patch("cosmos.operators._watcher.state._persist_backup"),
+    ):
         mock_execute.side_effect = TestException("test error")
 
         with pytest.raises(TestException):

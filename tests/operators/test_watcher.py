@@ -2169,6 +2169,92 @@ class TestDefaultFreshnessCallback:
         assert set(node_ids) == {"model.pkg.A", "model.pkg.B", "model.pkg.C", "model.pkg.D"}
         assert status == "skip"
 
+    def test_already_visited_dependent_not_processed_twice(self):
+        """A dependent reachable via two stale paths is only processed once.
+
+        Graph:  stale_src → A
+                stale_src → B
+                A, B → C
+
+        A and B are both direct dependents of stale_src.  C depends on both A and B.
+        When A is processed, C is added to visited.  When B is then processed, C is
+        already in visited → the ``if dependent_id in visited: continue`` branch fires.
+        All three (A, B, C) must still appear in the skip set.
+        """
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "model.pkg.A": DbtNode(
+                unique_id="model.pkg.A",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/a.sql"),
+            ),
+            "model.pkg.B": DbtNode(
+                unique_id="model.pkg.B",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/b.sql"),
+            ),
+            "model.pkg.C": DbtNode(
+                unique_id="model.pkg.C",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["model.pkg.A", "model.pkg.B"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/c.sql"),
+            ),
+        }
+        sources_json = {"results": [{"unique_id": "source.pkg.stale_src", "status": "error"}]}
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        assert set(node_ids) == {"model.pkg.A", "model.pkg.B", "model.pkg.C"}
+        assert status == "skip"
+
+    def test_dependent_node_missing_from_nodes_is_skipped(self):
+        """A dependent_id whose node cannot be resolved via ``nodes.get`` is silently ignored.
+
+        This covers the ``if dependent_node is None: continue`` guard.  In normal operation the
+        dependents reverse-map is built from ``nodes.items()`` so every id is present; this test
+        simulates a lookup returning ``None`` (e.g. a corrupt or trimmed nodes dict) by using a
+        dict subclass that overrides ``get`` to return ``None`` for the nominated key.
+        """
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        class _NullOnGet(dict):  # type: ignore[type-arg]
+            """dict that returns None for keys listed in ``_null_keys``."""
+
+            def __init__(self, null_keys: set, *args, **kwargs):  # type: ignore[type-arg]
+                super().__init__(*args, **kwargs)
+                self._null_keys = null_keys
+
+            def get(self, key, default=None):  # type: ignore[override]
+                if key in self._null_keys:
+                    return None
+                return super().get(key, default)
+
+        raw_nodes = {
+            "model.pkg.A": DbtNode(
+                unique_id="model.pkg.A",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/a.sql"),
+            ),
+        }
+        # nodes.get("model.pkg.A") will return None → the node is silently skipped
+        nodes = _NullOnGet({"model.pkg.A"}, raw_nodes)
+        sources_json = {"results": [{"unique_id": "source.pkg.stale_src", "status": "error"}]}
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        assert node_ids == []
+        assert status == "skip"
+
 
 class TestProducerSourceFreshness:
     """Tests for source freshness methods on DbtProducerWatcherOperator."""

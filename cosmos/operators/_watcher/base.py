@@ -593,6 +593,23 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             if hasattr(self, "_override_rtif"):
                 self._override_rtif(context)
 
+    def _handle_no_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
+        """Handle the case where no dbt node status has been reported yet."""
+        if producer_task_state == "failed":
+            if self.poke_retry_number > 0:
+                raise AirflowException(
+                    f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
+                )
+            else:
+                # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
+                return self._fallback_to_non_watcher_run(try_number, context)
+
+        if producer_task_state == "skipped":
+            return self._fallback_to_non_watcher_run(try_number, context)
+
+        self.poke_retry_number += 1
+        return False
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt node (model or aggregated tests) by pulling relevant XComs from the producer task.
@@ -635,22 +652,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         _log_dbt_event(dbt_events)
 
         if status is None:
-
-            if producer_task_state == "failed":
-                if self.poke_retry_number > 0:
-                    raise AirflowException(
-                        f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
-                    )
-                else:
-                    # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
-                    return self._fallback_to_non_watcher_run(try_number, context)
-
-            if producer_task_state == "skipped":
-                return self._fallback_to_non_watcher_run(try_number, context)
-
-            self.poke_retry_number += 1
-
-            return False
+            return self._handle_no_status(producer_task_state, try_number, context)
         elif is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."

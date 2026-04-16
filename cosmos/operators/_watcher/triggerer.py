@@ -212,6 +212,16 @@ class WatcherTrigger(BaseTrigger):
 
             await asyncio.sleep(self.poke_interval)
 
+    def _build_success_event(self, compiled_sql: str | None) -> dict[str, Any]:
+        """Build the TriggerEvent payload for a successful dbt node."""
+        event_data: dict[str, Any] = {"status": EventStatus.SUCCESS}
+        if compiled_sql:
+            event_data["compiled_sql"] = compiled_sql
+        outlet_uris = getattr(self, "_outlet_uris", [])
+        if outlet_uris:
+            event_data["outlet_uris"] = outlet_uris
+        return event_data
+
     async def run(self) -> AsyncIterator[TriggerEvent]:
         logger.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
         await self._log_startup_events()
@@ -223,14 +233,7 @@ class WatcherTrigger(BaseTrigger):
             dbt_node_status, compiled_sql = await self._parse_dbt_node_status_and_compiled_sql()
             if is_dbt_node_status_success(dbt_node_status):
                 logger.debug("dbt node '%s' succeeded", self.model_unique_id)
-                event_data: dict[str, Any] = {"status": EventStatus.SUCCESS}
-                if compiled_sql:
-                    event_data["compiled_sql"] = compiled_sql
-                # Pass outlet URIs through TriggerEvent so consumer can emit datasets
-                outlet_uris = getattr(self, "_outlet_uris", [])
-                if outlet_uris:
-                    event_data["outlet_uris"] = outlet_uris
-                yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
+                yield TriggerEvent(self._build_success_event(compiled_sql))  # type: ignore[no-untyped-call]
                 return
             elif is_dbt_node_status_skipped(dbt_node_status):
                 logger.info("dbt node '%s' was skipped", self.model_unique_id)

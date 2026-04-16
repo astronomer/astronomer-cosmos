@@ -26,21 +26,22 @@ from cosmos.constants import AIRFLOW_VERSION
 log = logging.getLogger(__name__)
 
 
-def run_dag(dag: DAG, conn_file_path: str | None = None) -> DagRun:
-    return test_dag(dag=dag, conn_file_path=conn_file_path)
+def run_dag(
+    dag: DAG,
+    conn_file_path: str | None = None,
+    expected_dag_state: DagRunState = DagRunState.SUCCESS,
+) -> DagRun:
+    return test_dag(dag=dag, conn_file_path=conn_file_path, expected_dag_state=expected_dag_state)
 
 
-def check_dag_success(dag_run: DagRun | None, expect_success: bool = True) -> bool:
-    """Check if a DAG was successful, if that Airflow version allows it."""
+def check_dag_state(dag_run: DagRun | None, expected_dag_state: DagRunState = DagRunState.SUCCESS) -> bool:
+    """Check if a DAG reached the expected state, if that Airflow version allows it."""
     if dag_run is not None:
-        if expect_success:
-            return dag_run.state == DagRunState.SUCCESS
-        else:
-            return dag_run.state == DagRunState.FAILED
+        return dag_run.state == expected_dag_state
     return True
 
 
-def new_test_dag(dag: DAG) -> DagRun:
+def new_test_dag(dag: DAG, expected_dag_state: DagRunState = DagRunState.SUCCESS) -> DagRun:
     if AIRFLOW_VERSION >= version.Version("3.1"):
         # Airflow 3.1+ requires DAG to be serialized to database before calling dag.test()
         # because create_dagrun() checks for DagVersion and DagModel records
@@ -73,14 +74,19 @@ def new_test_dag(dag: DAG) -> DagRun:
 
 
 def test_dag(
-    dag, conn_file_path: str | None = None, custom_tester: bool = False, expect_success: bool = True
+    dag,
+    conn_file_path: str | None = None,
+    custom_tester: bool = False,
+    expected_dag_state: DagRunState = DagRunState.SUCCESS,
 ) -> DagRun:
     dr = None
     if custom_tester:
         dr = test_old_dag(dag, conn_file_path)
     elif AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2"), Version("2.11.0")):
-        dr = new_test_dag(dag)
-        assert check_dag_success(dr, expect_success), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
+        dr = new_test_dag(dag, expected_dag_state=expected_dag_state)
+        assert check_dag_state(
+            dr, expected_dag_state
+        ), f"Dag {dag.dag_id} did not reach expected state {expected_dag_state}. State: {dr.state}. "
     else:
         # This is a work around until we fix the issue in Airflow:
         # https://github.com/apache/airflow/issues/42495
@@ -93,10 +99,10 @@ def test_dag(
         FAILED tests/test_example_dags.py::test_example_dag[user_defined_profile]
         """
         try:
-            dr = new_test_dag(dag)
-            assert check_dag_success(
-                dr, expect_success
-            ), f"Dag {dag.dag_id} did not run successfully. State: {dr.state}. "
+            dr = new_test_dag(dag, expected_dag_state=expected_dag_state)
+            assert check_dag_state(
+                dr, expected_dag_state
+            ), f"Dag {dag.dag_id} did not reach expected state {expected_dag_state}. State: {dr.state}. "
         except sqlalchemy.exc.PendingRollbackError:
             warnings.warn(
                 "Early versions of Airflow 2.10 and Airflow 2.11 have issues when running the test command with DatasetAlias / Datasets"

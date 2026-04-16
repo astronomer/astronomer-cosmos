@@ -99,10 +99,10 @@ def _default_freshness_callback(
         for dependent_id in dependents.get(current, set()):
             if dependent_id in visited:
                 continue
-            node = nodes.get(dependent_id)
-            if node is None:
+            dependent_node = nodes.get(dependent_id)
+            if dependent_node is None:
                 continue
-            if all(dep in stale_source_ids or dep in visited for dep in node.depends_on):
+            if all(dep in stale_source_ids or dep in visited for dep in dependent_node.depends_on):
                 visited.add(dependent_id)
                 queue.append(dependent_id)
 

@@ -2145,8 +2145,10 @@ class TestProducerSourceFreshness:
         context = MagicMock()
         context.get.side_effect = lambda key, default=None: True if key == "_check_source_freshness" else default
 
+        from cosmos.operators.local import DbtLocalBaseOperator
+
         with patch.object(
-            type(producer).__bases__[1],  # DbtLocalBaseOperator
+            DbtLocalBaseOperator,
             "run_dbt_runner",
             return_value=MagicMock(),
         ) as mock_super:

@@ -155,6 +155,7 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     # Test success case
     with (
         patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        patch("cosmos.operators.watcher.init_xcom_backup"),
         patch("cosmos.operators.watcher.backup_xcom_to_variable"),
     ):
         op.execute(context=context)
@@ -173,6 +174,7 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
 
     with (
         patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        patch("cosmos.operators.watcher.init_xcom_backup"),
         patch("cosmos.operators.watcher.backup_xcom_to_variable"),
     ):
         mock_execute.side_effect = TestException("test error")

@@ -61,6 +61,32 @@ def is_dbt_node_status_terminal(status: str | None) -> bool:
 xcom_set_lock = Lock()
 
 
+def init_xcom_backup(context: Any) -> None:
+    """Activate incremental XCom backup for the current producer execution (AF3).
+
+    After this call every ``safe_xcom_push`` will also persist the key/value
+    pair to an Airflow Variable so the backup is crash-safe.  The state is
+    stored on the task instance itself — no module-level globals.
+    """
+    ti = context["ti"]
+    dag_id = ti.dag_id
+    run_id = context["run_id"]
+    task_group_id = _get_task_group_id(ti)
+    ti._cosmos_xcom_backup_var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)  # type: ignore[attr-defined]
+    ti._cosmos_xcom_backup_buffer = {}  # type: ignore[attr-defined]
+
+
+def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
+    """Write the current backup buffer to an Airflow Variable."""
+    if not backup_buffer:
+        return
+    from airflow.models import Variable
+
+    compressed = base64.b64encode(zlib.compress(json.dumps(backup_buffer, default=str).encode("utf-8"))).decode("utf-8")
+    Variable.set(var_key, compressed)
+    logger.debug("Persisted %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
+
+
 def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
     """
     Safely set an XCom value in a thread-safe manner in Airflow 3.0 and 3.1.
@@ -71,6 +97,11 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
     """
     with xcom_set_lock:
         task_instance.xcom_push(key=key, value=value)
+        var_key = getattr(task_instance, "_cosmos_xcom_backup_var_key", None)
+        if isinstance(var_key, str):
+            backup_buffer: dict[str, Any] = task_instance._cosmos_xcom_backup_buffer  # type: ignore[attr-defined]
+            backup_buffer[key] = value
+            _persist_backup(var_key, backup_buffer)
 
 
 # TODO: Unify the Airflow call from cosmos/operators/_watcher/triggerer.py and cosmos/operators/watcher.py
@@ -168,32 +199,20 @@ def _get_task_group_id(ti: Any) -> str | None:
 
 
 def backup_xcom_to_variable(context: Any) -> None:
-    """Read all XCom entries for the current producer task and persist them in an Airflow Variable.
+    """Persist all XCom entries for the current producer task in an Airflow Variable.
 
-    Called via ``on_retry_callback`` — at this point XCom has **not** been cleared yet,
-    so every value pushed during the attempt is still available in the DB.
+    The backup is built incrementally by ``safe_xcom_push`` (see
+    ``init_xcom_backup``).  This call does a final flush.
     """
-    from airflow.models import Variable
-    from airflow.models.xcom import XCom
-    from airflow.utils.session import create_session
-
     ti = context["ti"]
-    dag_id = ti.dag_id
-    task_id = ti.task_id
-    run_id = context["run_id"]
-    task_group_id = _get_task_group_id(ti)
-
-    with create_session() as session:
-        rows = session.query(XCom.key, XCom.value).filter_by(dag_id=dag_id, task_id=task_id, run_id=run_id).all()
-        backup = {row.key: row.value for row in rows}
-
-    if not backup:
+    var_key = getattr(ti, "_cosmos_xcom_backup_var_key", None)
+    if not isinstance(var_key, str):
         return
 
-    compressed = base64.b64encode(zlib.compress(json.dumps(backup, default=str).encode("utf-8"))).decode("utf-8")
-    var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
-    Variable.set(var_key, compressed)
-    logger.info("Backed up %d XCom entries to Variable '%s'", len(backup), var_key)
+    backup_buffer = getattr(ti, "_cosmos_xcom_backup_buffer", {})
+    _persist_backup(var_key, backup_buffer)
+    if backup_buffer:
+        logger.info("Backed up %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
 
 
 def restore_xcom_from_variable(context: Any) -> bool:

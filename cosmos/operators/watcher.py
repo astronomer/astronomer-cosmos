@@ -89,7 +89,7 @@ def _default_freshness_callback(
     # DFS from each stale source.  A dependent is added to the skip set only when every entry in
     # its depends_on is either a known-stale source or already in the skip set.  This preserves
     # nodes that have at least one clean upstream path: they may succeed and should not be
-    # pre-emptively excluded.  When a new node is added to visited its own dependents are queued
+    # preemptively excluded.  When a new node is added to visited its own dependents are queued
     # so they can be re-evaluated with the updated skip set.
     _excludable_resource_types = {DbtResourceType.MODEL, DbtResourceType.SEED, DbtResourceType.SNAPSHOT}
     visited: set[str] = set()

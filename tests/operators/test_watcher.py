@@ -2133,3 +2133,25 @@ class TestProducerSourceFreshness:
         producer._skipped_node_token(context, [])
         ti.xcom_push.assert_not_called()
         assert producer.exclude is None
+
+    def test_run_dbt_runner_skips_callback_during_source_freshness(self):
+        """run_dbt_runner must not register the XCom-pushing callback during the source freshness
+        pre-check.  Registering it would leave a stale entry in _dbt_runner_callbacks that fires
+        again for every event during the subsequent dbt build, producing duplicate log lines.
+        """
+        producer = self._make_producer(_check_source_freshness=True)
+        producer._dbt_runner_callbacks = None
+
+        context = MagicMock()
+        context.get.side_effect = lambda key, default=None: True if key == "_check_source_freshness" else default
+
+        with patch.object(
+            type(producer).__bases__[1],  # DbtLocalBaseOperator
+            "run_dbt_runner",
+            return_value=MagicMock(),
+        ) as mock_super:
+            producer.run_dbt_runner(command=["dbt", "source", "freshness"], env={}, cwd="/tmp", context=context)
+
+        # The callback list must remain untouched — no watcher callback appended
+        assert producer._dbt_runner_callbacks is None
+        mock_super.assert_called_once()

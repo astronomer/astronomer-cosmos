@@ -23,7 +23,12 @@ from cosmos.constants import (
 from cosmos.dataset import get_dataset_namespace
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
-from cosmos.operators._watcher import backup_xcom_to_variable, restore_xcom_from_variable, safe_xcom_push
+from cosmos.operators._watcher import (
+    backup_xcom_to_variable,
+    init_xcom_backup,
+    restore_xcom_from_variable,
+    safe_xcom_push,
+)
 from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
     store_dbt_resource_status_from_log,
@@ -395,6 +400,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 "Dbt WATCHER producer task does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
+
+        init_xcom_backup(context)
 
         if self._check_source_freshness:
             self._apply_source_freshness(context)

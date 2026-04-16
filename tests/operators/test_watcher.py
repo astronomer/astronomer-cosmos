@@ -1902,7 +1902,7 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
         operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
         dagrun_timeout=timedelta(seconds=120),
     )
-    outcome = new_test_dag(watcher_dag)
+    outcome = new_test_dag(watcher_dag, expected_dag_state=DagRunState.FAILED)
 
     assert len(watcher_dag.dbt_graph.filtered_nodes) == 2
     assert len(watcher_dag.task_dict) == 3

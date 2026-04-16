@@ -2073,6 +2073,102 @@ class TestDefaultFreshnessCallback:
         assert node_ids == ["model.pkg.m1"]
         assert status == "skip"
 
+    def test_node_with_clean_upstream_not_skipped(self):
+        """A node that depends on both a stale source and a clean model should not be skipped.
+
+        Graph:  stale_src → A ← clean_model
+                              ↓
+                              C
+
+        A has a clean path via clean_model so A (and therefore C) should run.
+        """
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "model.pkg.clean_model": DbtNode(
+                unique_id="model.pkg.clean_model",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=[],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/clean.sql"),
+            ),
+            "model.pkg.A": DbtNode(
+                unique_id="model.pkg.A",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src", "model.pkg.clean_model"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/a.sql"),
+            ),
+            "model.pkg.C": DbtNode(
+                unique_id="model.pkg.C",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["model.pkg.A"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/c.sql"),
+            ),
+        }
+        sources_json = {"results": [{"unique_id": "source.pkg.stale_src", "status": "warn"}]}
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        # A has a clean path via clean_model → neither A nor C should be skipped
+        assert node_ids == []
+        assert status == "skip"
+
+    def test_node_skipped_only_when_all_upstreams_stale(self):
+        """A node whose every upstream is stale or already skipped must be skipped.
+
+        Graph:  stale_src1 → A
+                stale_src2 → B
+                             A, B → C   (both parents stale → C must be skipped)
+                             A    → D   (only A stale, but A has no clean path → D skipped)
+        """
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "model.pkg.A": DbtNode(
+                unique_id="model.pkg.A",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src1"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/a.sql"),
+            ),
+            "model.pkg.B": DbtNode(
+                unique_id="model.pkg.B",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src2"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/b.sql"),
+            ),
+            "model.pkg.C": DbtNode(
+                unique_id="model.pkg.C",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["model.pkg.A", "model.pkg.B"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/c.sql"),
+            ),
+            "model.pkg.D": DbtNode(
+                unique_id="model.pkg.D",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["model.pkg.A"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/d.sql"),
+            ),
+        }
+        sources_json = {
+            "results": [
+                {"unique_id": "source.pkg.stale_src1", "status": "error"},
+                {"unique_id": "source.pkg.stale_src2", "status": "error"},
+            ]
+        }
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        assert set(node_ids) == {"model.pkg.A", "model.pkg.B", "model.pkg.C", "model.pkg.D"}
+        assert status == "skip"
+
 
 class TestProducerSourceFreshness:
     """Tests for source freshness methods on DbtProducerWatcherOperator."""

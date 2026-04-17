@@ -2317,9 +2317,7 @@ class TestProducerSourceFreshness:
         ti = MagicMock()
         context = {"ti": ti}
         producer._apply_node_state_tokens(context, [("model.pkg.m1", "failed")])
-        ti.xcom_push.assert_called_once_with(
-            key="model__pkg__m1_status", value={"status": "failed", "outlet_uris": []}
-        )
+        ti.xcom_push.assert_called_once_with(key="model__pkg__m1_status", value={"status": "failed", "outlet_uris": []})
         assert producer.exclude is None
 
     def test_run_dbt_runner_skips_callback_during_source_freshness(self):

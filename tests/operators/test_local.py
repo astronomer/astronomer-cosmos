@@ -1280,6 +1280,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
         project_dir="my/dir",
         emit_datasets=False,
         install_deps=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
     )
 
     with patch("cosmos.operators.local.inspect.signature", return_value=mock_sig):

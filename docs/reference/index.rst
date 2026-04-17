@@ -24,6 +24,14 @@ Reference
 
    profiles/index
 
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :caption: Additional resources
+
+   glossary
+
+
 Configurations
 ++++++++++++++
 

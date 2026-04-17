@@ -9,14 +9,15 @@ After generating the dbt docs, you can host them natively within Airflow via the
 
 Alternatively, many users choose to serve these docs on a separate static website. This is a great way to share your data models with a broad array of stakeholders.
 
-Cosmos offers two pre-built ways of generating and uploading dbt docs and a fallback option to run custom code after the docs are generated:
+Cosmos offers pre-built ways of generating and uploading dbt docs, plus a fallback option to run custom code after the docs are generated:
 
 - :class:`~cosmos.operators.DbtDocsS3Operator`: generates and uploads docs to a S3 bucket.
+- :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator`: generates docs in a Kubernetes Pod and uploads them to a S3 bucket from inside that Pod.
 - :class:`~cosmos.operators.DbtDocsAzureStorageOperator`: generates and uploads docs to an Azure Blob Storage.
 - :class:`~cosmos.operators.DbtDocsGCSOperator`: generates and uploads docs to a GCS bucket.
 - :class:`~cosmos.operators.DbtDocsOperator`: generates docs and runs a custom callback.
 
-The first three operators require you to have a connection to the target storage. The last operator allows you to run custom code after the docs are generated in order to upload them to a storage of your choice.
+The first four operators require you to have a connection to the target storage. The last operator allows you to run custom code after the docs are generated in order to upload them to a storage of your choice.
 
 
 Examples
@@ -42,6 +43,33 @@ You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upl
         connection_id="test_aws",
         bucket_name="test_bucket",
     )
+
+Upload to S3 from Kubernetes
+''''''''''''''''''''''''''''
+
+If you run dbt in :ref:`kubernetes`, use :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator`.
+Unlike the local S3 operator, this operator generates the docs and uploads them to S3 from inside the Kubernetes Pod.
+
+This is important because the dbt ``target`` directory is created inside the Pod, not on the Airflow worker that launched it.
+
+Requirements specific to Kubernetes:
+
+- The container image must include your dbt project files.
+- The container image or mounted files must include a ``profiles.yml`` file, because Kubernetes execution mode does not support :doc:`../connect_database/use-profile-mapping`.
+- The container image must have the AWS CLI available because Cosmos uploads the generated docs with ``aws s3 sync``.
+- The Pod still needs the database credentials and any other secrets required to run ``dbt docs generate``.
+
+The following example extends the Kubernetes example DAG and uploads the generated docs to S3:
+
+.. literalinclude:: ../../../dev/dags/jaffle_shop_kubernetes.py
+   :language: python
+   :start-after: [START kubernetes_docs_to_s3_example]
+   :end-before: [END kubernetes_docs_to_s3_example]
+
+The ``connection_id`` is resolved from Airflow and translated into AWS environment variables that are injected into the Pod before ``aws s3 sync`` runs.
+
+.. note::
+    This Kubernetes integration currently supports S3 only. If you need another storage backend, use one of the local operators or extend Cosmos with another Kubernetes docs operator.
 
 Upload to Azure Blob Storage
 ''''''''''''''''''''''''''''

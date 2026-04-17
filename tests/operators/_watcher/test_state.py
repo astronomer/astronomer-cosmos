@@ -12,6 +12,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_producer_task_terminated,
 )
 
 
@@ -49,6 +50,18 @@ class TestNodeStatusHelpers:
     @pytest.mark.parametrize("status", ["running", None, ""])
     def test_is_dbt_node_status_terminal_false(self, status: str | None):
         assert is_dbt_node_status_terminal(status) is False
+
+
+class TestProducerTaskTerminated:
+    """Tests for is_producer_task_terminated helper."""
+
+    @pytest.mark.parametrize("state", ["success", "failed", "skipped", "upstream_failed", "removed"])
+    def test_terminal_states(self, state: str):
+        assert is_producer_task_terminated(state) is True
+
+    @pytest.mark.parametrize("state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule", None, ""])
+    def test_non_terminal_states(self, state: str | None):
+        assert is_producer_task_terminated(state) is False
 
 
 @pytest.mark.parametrize(

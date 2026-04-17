@@ -934,6 +934,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                 and AIRFLOW_VERSION >= Version("2.10")
             ):
                 from airflow.datasets import DatasetAlias
+                from airflow.models.dataset import DatasetAliasModel
 
                 # ignoring the type because older versions of Airflow raise the follow error in mypy
                 # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
@@ -941,7 +942,18 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                 task_group_id = kwargs.get("task_group")
 
                 # issue-1591: Handle passed-in outlets when enable_dataset_alias is True
-                outlets: list = kwargs.get("outlets", [])
+                outlets: list = []
+
+                for outlet in kwargs.get("outlets", []):
+                    if isinstance(outlet, DatasetAlias):
+                        outlets.append(outlet)  # Keep as-is
+                    # Handle DatasetAliasModel, which is not JSON serializable in 2.10
+                    elif isinstance(outlet, DatasetAliasModel):
+                        dataset_alias_name = outlet.name
+                        outlets.append(DatasetAlias(name=dataset_alias_name))
+                    else:
+                        logger.warning(f"Unknown outlet type {outlet}")  # Otherwise, pass
+
                 operator_kwargs["outlets"] = outlets + [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]  # type: ignore

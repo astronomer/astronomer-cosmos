@@ -118,6 +118,14 @@ class RenderConfig:
                 "RenderConfig.dbt_deps is deprecated since Cosmos 1.9 and will be removed in Cosmos 2.0. Use ProjectConfig.install_dbt_deps instead.",
                 DeprecationWarning,
             )
+        if self.source_rendering_behavior is None:
+            warnings.warn(
+                "Passing None for source_rendering_behavior is not supported. "
+                "Use SourceRenderingBehavior.NONE to disable source rendering. "
+                "Defaulting to SourceRenderingBehavior.NONE.",
+                UserWarning,
+            )
+            self.source_rendering_behavior = SourceRenderingBehavior.NONE
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
         # allows us to initiate this attribute from Path objects and str
         self.dbt_ls_path = Path(self.dbt_ls_path) if self.dbt_ls_path else None

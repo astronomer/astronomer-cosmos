@@ -2034,7 +2034,7 @@ class TestDefaultFreshnessCallback:
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
         assert {uid for uid, _ in result} == {"model.pkg.m1", "model.pkg.m2"}
-        assert all(state == "skip" for _, state in result)
+        assert all(state == "skipped" for _, state in result)
 
     def test_excludes_test_nodes(self):
         from cosmos.constants import DbtResourceType
@@ -2068,7 +2068,7 @@ class TestDefaultFreshnessCallback:
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
         # Only model nodes, not test nodes
-        assert result == [("model.pkg.m1", "skip")]
+        assert result == [("model.pkg.m1", "skipped")]
 
     def test_node_with_clean_upstream_not_skipped(self):
         """A node that depends on both a stale source and a clean model should not be skipped.
@@ -2163,7 +2163,7 @@ class TestDefaultFreshnessCallback:
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
         assert {uid for uid, _ in result} == {"model.pkg.A", "model.pkg.B", "model.pkg.C", "model.pkg.D"}
-        assert all(state == "skip" for _, state in result)
+        assert all(state == "skipped" for _, state in result)
 
     def test_already_visited_dependent_not_processed_twice(self):
         """A dependent reachable via two stale paths is only processed once.
@@ -2208,7 +2208,7 @@ class TestDefaultFreshnessCallback:
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
         assert {uid for uid, _ in result} == {"model.pkg.A", "model.pkg.B", "model.pkg.C"}
-        assert all(state == "skip" for _, state in result)
+        assert all(state == "skipped" for _, state in result)
 
     def test_dependent_node_missing_from_nodes_is_skipped(self):
         """A dependent_id whose node cannot be resolved via ``nodes.get`` is silently ignored.
@@ -2273,42 +2273,53 @@ class TestProducerSourceFreshness:
         producer = self._make_producer(_check_source_freshness=True)
         assert producer._check_source_freshness is True
 
-    def test_push_skipped_xcom_for_model(self):
+    def test_push_node_state_xcom(self):
         producer = self._make_producer()
         ti = MagicMock()
-        producer._push_skipped_xcom_for_model(ti, "model.pkg.my_model")
+        producer._push_node_state_xcom(ti, "model.pkg.my_model", "skipped")
         ti.xcom_push.assert_called_once_with(
             key="model__pkg__my_model_status", value={"status": "skipped", "outlet_uris": []}
         )
 
-    def test_skipped_node_token_updates_exclude(self):
+    def test_apply_node_state_tokens_updates_exclude(self):
         producer = self._make_producer()
         producer.exclude = None
         ti = MagicMock()
         context = {"ti": ti}
-        producer._skipped_node_token(context, ["model.pkg.m1", "model.pkg.m2"])
-        # Both models should be pushed as skipped
+        producer._apply_node_state_tokens(context, [("model.pkg.m1", "skipped"), ("model.pkg.m2", "skipped")])
+        # Both models should be pushed with their state
         assert ti.xcom_push.call_count == 2
         # Exclude should contain the model short names
         assert "m1" in producer.exclude
         assert "m2" in producer.exclude
 
-    def test_skipped_node_token_appends_to_existing_exclude(self):
+    def test_apply_node_state_tokens_appends_to_existing_exclude(self):
         producer = self._make_producer()
         producer.exclude = "existing_model"
         ti = MagicMock()
         context = {"ti": ti}
-        producer._skipped_node_token(context, ["model.pkg.m1"])
+        producer._apply_node_state_tokens(context, [("model.pkg.m1", "skipped")])
         assert "existing_model" in producer.exclude
         assert "m1" in producer.exclude
 
-    def test_skipped_node_token_noop_when_empty(self):
+    def test_apply_node_state_tokens_noop_when_empty(self):
         producer = self._make_producer()
         producer.exclude = None
         ti = MagicMock()
         context = {"ti": ti}
-        producer._skipped_node_token(context, [])
+        producer._apply_node_state_tokens(context, [])
         ti.xcom_push.assert_not_called()
+        assert producer.exclude is None
+
+    def test_apply_node_state_tokens_non_skipped_state_does_not_update_exclude(self):
+        producer = self._make_producer()
+        producer.exclude = None
+        ti = MagicMock()
+        context = {"ti": ti}
+        producer._apply_node_state_tokens(context, [("model.pkg.m1", "failed")])
+        ti.xcom_push.assert_called_once_with(
+            key="model__pkg__m1_status", value={"status": "failed", "outlet_uris": []}
+        )
         assert producer.exclude is None
 
     def test_run_dbt_runner_skips_callback_during_source_freshness(self):

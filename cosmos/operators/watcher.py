@@ -110,7 +110,7 @@ def _default_freshness_callback(
     # and test hash-suffixed unique_ids are not valid dbt --exclude selectors.
     excludable = [uid for uid in visited if nodes.get(uid) and nodes[uid].resource_type in _excludable_resource_types]
     logger.info("Nodes to skip due to stale sources: %s", excludable)
-    return [(uid, "skip") for uid in excludable]
+    return [(uid, "skipped") for uid in excludable]
 
 
 class _NullWriter:
@@ -271,13 +271,13 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             return result
         return super().run_dbt_runner(command, env, cwd, **kwargs)
 
-    def _push_skipped_xcom_for_model(self, ti: Any, unique_id: str) -> None:
-        """Push a synthetic ``"skipped"`` status XCom for a model excluded due to a stale upstream source.
+    def _push_node_state_xcom(self, ti: Any, unique_id: str, state: str) -> None:
+        """Push a synthetic status XCom for a node using the given ``state``.
 
         Uses the unified ``*_status`` XCom key that consumer sensors already poll.
         """
         uid_key = unique_id.replace(".", "__")
-        safe_xcom_push(task_instance=ti, key=f"{uid_key}_status", value={"status": "skipped", "outlet_uris": []})
+        safe_xcom_push(task_instance=ti, key=f"{uid_key}_status", value={"status": state, "outlet_uris": []})
 
     def _run_source_freshness(self, context: Context) -> None:
         """Run ``dbt source freshness`` via ``build_cmd`` and ``run_command``.
@@ -306,25 +306,25 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             self.dbt_cmd_flags = original_dbt_cmd_flags
             context.pop("_check_source_freshness", None)  # type: ignore[typeddict-item]
 
-    def _skipped_node_token(self, context: Context, node_unique_ids: list[str]) -> None:
-        if not node_unique_ids:
+    def _apply_node_state_tokens(self, context: Context, node_state_pairs: list[tuple[str, str]]) -> None:
+        if not node_state_pairs:
             return
 
         ti = context["ti"]
 
-        for unique_id in node_unique_ids:
-            logger.info(
-                "Marking resource '%s' as skipped (stale upstream source)",
-                unique_id,
-            )
-            self._push_skipped_xcom_for_model(ti, unique_id)
+        for unique_id, state in node_state_pairs:
+            logger.info("Marking resource '%s' as %s (stale upstream source)", unique_id, state)
+            self._push_node_state_xcom(ti, unique_id, state)
 
+        # Only exclude nodes in the "skipped" state from future dbt runs.
         # Use the same parsing as DbtNode.resource_name: unique_id.split(".", 2)[2]
         # This preserves version suffixes (e.g. model.pkg.my_model.v1 -> my_model.v1)
-        model_names = sorted({uid.split(".", 2)[2] for uid in node_unique_ids if len(uid.split(".", 2)) == 3})
-
-        current_exclude = getattr(self, "exclude", None)
+        skipped_ids = [uid for uid, state in node_state_pairs if state == "skipped"]
+        if not skipped_ids:
+            return
+        model_names = sorted({uid.split(".", 2)[2] for uid in skipped_ids if len(uid.split(".", 2)) == 3})
         exclude_str = " ".join(model_names)
+        current_exclude = getattr(self, "exclude", None)
         if current_exclude:
             self.exclude = f"{current_exclude} {exclude_str}"
         else:
@@ -369,8 +369,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             nodes = getattr(tg_dbt_graph, "nodes", None)
 
         freshness_results = self._freshness_callback(context, dag, task_group, nodes, self._sources_json)
-        node_ids_to_skip = [uid for uid, _ in freshness_results]
-        self._skipped_node_token(context, node_ids_to_skip)
+        self._apply_node_state_tokens(context, freshness_results)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         # Pre-compute the dataset namespace for per-model outlet URI generation.

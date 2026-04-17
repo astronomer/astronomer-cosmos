@@ -100,3 +100,6 @@ no_analytics = convert_to_boolean(os.getenv("SCARF_NO_ANALYTICS"))
 # Debug mode - when enabled, Cosmos will track and push memory utilization to XCom
 enable_debug_mode = conf.getboolean("cosmos", "enable_debug_mode", fallback=False)
 debug_memory_poll_interval_seconds = conf.getfloat("cosmos", "debug_memory_poll_interval_seconds", fallback=0.5)
+
+# Experimental: use orjson for faster dbt manifest.json parsing (disabled by default)
+enable_orjson_parser = conf.getboolean("cosmos", "enable_orjson_parser", fallback=False)

@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: >
+      Staging model for orders. Uses the "default" ProfileConfig
+      because no profile_config_key is specified.
+    columns:
+      - name: order_id
+        description: Unique order identifier.
+      - name: customer_id
+        description: Foreign key to customers.
+      - name: order_date
+        description: Date the order was placed.
+      - name: status
+        description: Current order status.
+
+  - name: stg_payments
+    description: >
+      Staging model for payments. Uses the "secondary" ProfileConfig
+      because profile_config_key is set to "secondary" in meta.cosmos.
+      This demonstrates running a model against a different database
+      connection within the same DAG.
+    meta:
+      cosmos:
+        profile_config_key: "secondary"
+    columns:
+      - name: payment_id
+        description: Unique payment identifier.
+      - name: order_id
+        description: Foreign key to orders.
+      - name: payment_method
+        description: Payment method used (e.g. credit_card, coupon).
+      - name: amount
+        description: Total payment amount in cents.

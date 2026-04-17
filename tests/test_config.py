@@ -5,7 +5,7 @@ from unittest.mock import Mock, PropertyMock, call, patch
 import pytest
 
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, InvocationMode
+from cosmos.constants import ExecutionMode, InvocationMode, SourceRenderingBehavior
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.athena.access_key import AthenaAccessKeyProfileMapping
 from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
@@ -269,6 +269,13 @@ def test_render_config_env_vars_deprecated():
     """RenderConfig.env_vars is deprecated since Cosmos 1.3, should warn user."""
     with pytest.deprecated_call():
         RenderConfig(env_vars={"VAR": "value"})
+
+
+def test_render_config_source_rendering_behavior_none_warns_and_normalizes():
+    """Passing None for source_rendering_behavior should warn and default to SourceRenderingBehavior.NONE."""
+    with pytest.warns(UserWarning, match="Passing None for source_rendering_behavior is not supported"):
+        config = RenderConfig(source_rendering_behavior=None)
+    assert config.source_rendering_behavior == SourceRenderingBehavior.NONE
 
 
 @pytest.mark.parametrize(

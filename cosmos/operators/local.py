@@ -939,7 +939,10 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                 # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
                 dag_id = kwargs.get("dag")
                 task_group_id = kwargs.get("task_group")
-                operator_kwargs["outlets"] = [
+
+                # issue-1591: Handle passed-in outlets when enable_dataset_alias is True
+                outlets: list = kwargs.get("outlets", [])
+                operator_kwargs["outlets"] = outlets + [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]  # type: ignore
 

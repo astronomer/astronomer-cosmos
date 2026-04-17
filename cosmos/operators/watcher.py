@@ -61,8 +61,8 @@ def _default_freshness_callback(
     task_group: TaskGroup | None,
     nodes: dict[str, DbtNode] | None,
     sources_json: dict[str, Any] | None,
-) -> tuple[list[str], str]:
-    """Return unique_ids of nodes that must be skipped due to stale sources, plus the status ``"skip"``.
+) -> list[tuple[str, str]]:
+    """Return a list of ``(unique_id, state)`` tuples for nodes that must be skipped due to stale sources.
 
     Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``.
 
@@ -74,11 +74,11 @@ def _default_freshness_callback(
     Traversal is a DFS over the reverse-dependency graph built from ``nodes``.
     """
     if not nodes or not sources_json:
-        return [], "skip"
+        return []
 
     stale_source_ids = {r["unique_id"] for r in sources_json.get("results", []) if r.get("status") in ("error", "warn")}
     if not stale_source_ids:
-        return [], "skip"
+        return []
 
     # Build reverse map: dep_id -> set of node_ids that directly depend on it
     dependents: dict[str, set[str]] = {}
@@ -110,7 +110,7 @@ def _default_freshness_callback(
     # and test hash-suffixed unique_ids are not valid dbt --exclude selectors.
     excludable = [uid for uid in visited if nodes.get(uid) and nodes[uid].resource_type in _excludable_resource_types]
     logger.info("Nodes to skip due to stale sources: %s", excludable)
-    return excludable, "skip"
+    return [(uid, "skip") for uid in excludable]
 
 
 class _NullWriter:
@@ -168,7 +168,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
         self._freshness_callback: Callable[
             [Context, Any, TaskGroup | None, dict[str, DbtNode] | None, dict[str, Any] | None],
-            tuple[list[str], str],
+            list[tuple[str, str]],
         ] = _default_freshness_callback
         # Do not publish compiled_sql to the producer's rendered_template: it would contain SQL for
         # all models run by the producer, is often truncated in the UI due to size, and is of no use
@@ -368,7 +368,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             tg_dbt_graph = getattr(task_group, "dbt_graph", None)
             nodes = getattr(tg_dbt_graph, "nodes", None)
 
-        node_ids_to_skip, _ = self._freshness_callback(context, dag, task_group, nodes, self._sources_json)
+        freshness_results = self._freshness_callback(context, dag, task_group, nodes, self._sources_json)
+        node_ids_to_skip = [uid for uid, _ in freshness_results]
         self._skipped_node_token(context, node_ids_to_skip)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:

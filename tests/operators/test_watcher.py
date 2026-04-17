@@ -1978,11 +1978,10 @@ class TestDefaultFreshnessCallback:
     """Tests for the _default_freshness_callback function."""
 
     def test_returns_empty_when_no_nodes(self):
-        node_ids, status = _default_freshness_callback(
+        result = _default_freshness_callback(
             context=MagicMock(), dag=None, task_group=None, nodes=None, sources_json=None
         )
-        assert node_ids == []
-        assert status == "skip"
+        assert result == []
 
     def test_returns_empty_when_no_stale_sources(self):
         from cosmos.constants import DbtResourceType
@@ -1998,11 +1997,10 @@ class TestDefaultFreshnessCallback:
             ),
         }
         sources_json = {"results": [{"unique_id": "source.pkg.src1", "status": "pass"}]}
-        node_ids, status = _default_freshness_callback(
+        result = _default_freshness_callback(
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
-        assert node_ids == []
-        assert status == "skip"
+        assert result == []
 
     def test_returns_transitive_dependents_of_stale_source(self):
         from cosmos.constants import DbtResourceType
@@ -2032,11 +2030,11 @@ class TestDefaultFreshnessCallback:
             ),
         }
         sources_json = {"results": [{"unique_id": "source.pkg.src1", "status": "error"}]}
-        node_ids, status = _default_freshness_callback(
+        result = _default_freshness_callback(
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
-        assert set(node_ids) == {"model.pkg.m1", "model.pkg.m2"}
-        assert status == "skip"
+        assert {uid for uid, _ in result} == {"model.pkg.m1", "model.pkg.m2"}
+        assert all(state == "skip" for _, state in result)
 
     def test_excludes_test_nodes(self):
         from cosmos.constants import DbtResourceType
@@ -2066,12 +2064,11 @@ class TestDefaultFreshnessCallback:
             ),
         }
         sources_json = {"results": [{"unique_id": "source.pkg.src1", "status": "warn"}]}
-        node_ids, status = _default_freshness_callback(
+        result = _default_freshness_callback(
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
         # Only model nodes, not test nodes
-        assert node_ids == ["model.pkg.m1"]
-        assert status == "skip"
+        assert result == [("model.pkg.m1", "skip")]
 
     def test_node_with_clean_upstream_not_skipped(self):
         """A node that depends on both a stale source and a clean model should not be skipped.
@@ -2109,12 +2106,11 @@ class TestDefaultFreshnessCallback:
             ),
         }
         sources_json = {"results": [{"unique_id": "source.pkg.stale_src", "status": "warn"}]}
-        node_ids, status = _default_freshness_callback(
+        result = _default_freshness_callback(
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
         # A has a clean path via clean_model → neither A nor C should be skipped
-        assert node_ids == []
-        assert status == "skip"
+        assert result == []
 
     def test_node_skipped_only_when_all_upstreams_stale(self):
         """A node whose every upstream is stale or already skipped must be skipped.
@@ -2163,11 +2159,11 @@ class TestDefaultFreshnessCallback:
                 {"unique_id": "source.pkg.stale_src2", "status": "error"},
             ]
         }
-        node_ids, status = _default_freshness_callback(
+        result = _default_freshness_callback(
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
-        assert set(node_ids) == {"model.pkg.A", "model.pkg.B", "model.pkg.C", "model.pkg.D"}
-        assert status == "skip"
+        assert {uid for uid, _ in result} == {"model.pkg.A", "model.pkg.B", "model.pkg.C", "model.pkg.D"}
+        assert all(state == "skip" for _, state in result)
 
     def test_already_visited_dependent_not_processed_twice(self):
         """A dependent reachable via two stale paths is only processed once.
@@ -2208,11 +2204,11 @@ class TestDefaultFreshnessCallback:
             ),
         }
         sources_json = {"results": [{"unique_id": "source.pkg.stale_src", "status": "error"}]}
-        node_ids, status = _default_freshness_callback(
+        result = _default_freshness_callback(
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
-        assert set(node_ids) == {"model.pkg.A", "model.pkg.B", "model.pkg.C"}
-        assert status == "skip"
+        assert {uid for uid, _ in result} == {"model.pkg.A", "model.pkg.B", "model.pkg.C"}
+        assert all(state == "skip" for _, state in result)
 
     def test_dependent_node_missing_from_nodes_is_skipped(self):
         """A dependent_id whose node cannot be resolved via ``nodes.get`` is silently ignored.
@@ -2249,11 +2245,10 @@ class TestDefaultFreshnessCallback:
         # nodes.get("model.pkg.A") will return None → the node is silently skipped
         nodes = _NullOnGet({"model.pkg.A"}, raw_nodes)
         sources_json = {"results": [{"unique_id": "source.pkg.stale_src", "status": "error"}]}
-        node_ids, status = _default_freshness_callback(
+        result = _default_freshness_callback(
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
-        assert node_ids == []
-        assert status == "skip"
+        assert result == []
 
 
 class TestProducerSourceFreshness:

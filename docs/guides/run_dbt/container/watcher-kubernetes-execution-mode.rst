@@ -163,9 +163,9 @@ Other Inherited Limitations
 
 The following limitations from ``ExecutionMode.WATCHER`` also apply to ``ExecutionMode.WATCHER_KUBERNETES``:
 
-* **Individual dbt Operators**: Only ``DbtSeedWatcherKubernetesOperator``, ``DbtSnapshotWatcherKubernetesOperator``, and ``DbtRunWatcherKubernetesOperator`` are implemented. The ``DbtTestWatcherKubernetesOperator`` is currently a placeholder.
+* **Individual dbt Operators**: ``DbtSeedWatcherKubernetesOperator``, ``DbtSnapshotWatcherKubernetesOperator``, ``DbtRunWatcherKubernetesOperator``, and ``DbtTestWatcherKubernetesOperator`` are implemented.
 
-* **Test behavior**: Unlike ``ExecutionMode.WATCHER`` (which fully supports ``TestBehavior.AFTER_EACH`` since Cosmos 1.14.0), ``ExecutionMode.WATCHER_KUBERNETES`` does not yet support ``TestBehavior.AFTER_EACH``. Tests are run as part of the ``dbt build`` command by the producer task, and test tasks are rendered as ``EmptyOperator`` placeholders. This is tracked in `#1974 <https://github.com/astronomer/astronomer-cosmos/issues/1974>`_.
+* **Test behavior**: ``TestBehavior.AFTER_EACH`` (the default) creates a ``DbtTestWatcherKubernetesOperator`` sensor per model that polls the producer's aggregated test results via XCom. ``TestBehavior.AFTER_ALL`` creates a single ``DbtTestKubernetesOperator`` that runs ``dbt test`` in a dedicated Kubernetes pod after all models complete. ``TestBehavior.NONE`` disables test tasks.
 
 * **Source freshness nodes**: The ``dbt build`` command does not run source freshness checks.
 

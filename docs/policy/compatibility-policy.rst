@@ -32,7 +32,7 @@ Python
 ''''''
 
 - **Minimum required**: Python 3.10
-- **Supported versions**: 3.10, 3.11, 3.12, 3.13
+- **Supported versions**: 3.10, 3.11, 3.12, 3.13, 3.14
 
 Apache Airflow
 ''''''''''''''

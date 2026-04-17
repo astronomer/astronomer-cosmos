@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, add_py314_ci]
   # Also run on pull requests originating from forks. Although this is insecure by default, we need it to run
   # integration tests on forked PRs. As a guardrail, we’ve added an Authorize step to each job, which requires manually
   # approving the workflow run for each pushed commit. Approval only happens after a careful code review of the changes.
@@ -130,7 +130,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
         dbt-version: ["1.10"]
         exclude:
@@ -143,6 +143,17 @@ jobs:
             airflow-version: "2.11"
           - python-version: "3.13"
             airflow-version: "3.0"
+          - python-version: "3.14"
+            airflow-version: "2.9"
+          - python-version: "3.14"
+            airflow-version: "2.10"
+          - python-version: "3.14"
+            airflow-version: "2.11"
+          - python-version: "3.14"
+            airflow-version: "3.0"
+          - python-version: "3.14"
+            airflow-version: "3.1"
+
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -187,7 +198,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
         dbt-version: [ "1.11" ]
         split-group: [1, 2, 3]
@@ -201,6 +212,16 @@ jobs:
             airflow-version: "2.11"
           - python-version: "3.13"
             airflow-version: "3.0"
+          - python-version: "3.14"
+            airflow-version: "2.9"
+          - python-version: "3.14"
+            airflow-version: "2.10"
+          - python-version: "3.14"
+            airflow-version: "2.11"
+          - python-version: "3.14"
+            airflow-version: "3.0"
+          - python-version: "3.14"
+            airflow-version: "3.1"
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18

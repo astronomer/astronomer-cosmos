@@ -553,6 +553,24 @@ class DbtGraph:
         logger.debug(f"Value of `dbt_yaml_selectors_cache_key` for <{self.cache_key}>: {cache_args}")
         return cache_args
 
+    def _save_cache_to_variable(self, cache_dict: dict[str, Any], cache_name: str) -> None:
+        """Write cache_dict to an Airflow Variable, warning on AirflowRuntimeError (Airflow 3 Task SDK only)."""
+        try:
+            from airflow.sdk.exceptions import AirflowRuntimeError
+        except ImportError:
+            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+        else:
+            try:
+                Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            except AirflowRuntimeError as e:
+                logger.warning(
+                    "Failed to save Cosmos %s cache to Airflow Variable '%s': %s. "
+                    "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching.",
+                    cache_name,
+                    self.cache_key,
+                    e,
+                )
+
     def save_dbt_ls_cache(self, dbt_ls_output: str) -> None:
         """
         Store compressed dbt ls output into an Airflow Variable.
@@ -582,25 +600,7 @@ class DbtGraph:
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
-            variable_set_exceptions: list[type[BaseException]] = []
-            try:
-                from airflow.sdk.exceptions import AirflowRuntimeError
-
-                variable_set_exceptions.append(AirflowRuntimeError)
-            except ImportError:
-                pass
-            if variable_set_exceptions:
-                try:
-                    Variable.set(self.cache_key, cache_dict, serialize_json=True)
-                except tuple(variable_set_exceptions) as e:
-                    logger.warning(
-                        "Failed to save Cosmos dbt ls cache to Airflow Variable '%s': %s. "
-                        "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching.",
-                        self.cache_key,
-                        e,
-                    )
-            else:
-                Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            self._save_cache_to_variable(cache_dict, "dbt ls")
 
     def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, str]:
         """Loads the remote cache for dbt ls."""
@@ -1122,25 +1122,7 @@ class DbtGraph:
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
-            variable_set_exceptions: list[type[BaseException]] = []
-            try:
-                from airflow.sdk.exceptions import AirflowRuntimeError
-
-                variable_set_exceptions.append(AirflowRuntimeError)
-            except ImportError:
-                pass
-            if variable_set_exceptions:
-                try:
-                    Variable.set(self.cache_key, cache_dict, serialize_json=True)
-                except tuple(variable_set_exceptions) as e:
-                    logger.warning(
-                        "Failed to save Cosmos YAML selectors cache to Airflow Variable '%s': %s. "
-                        "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching.",
-                        self.cache_key,
-                        e,
-                    )
-            else:
-                Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            self._save_cache_to_variable(cache_dict, "YAML selectors")
 
     def parse_yaml_selectors(self, selector_definitions: dict[str, Any]) -> YamlSelectors:
         """

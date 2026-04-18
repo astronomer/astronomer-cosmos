@@ -582,7 +582,25 @@ class DbtGraph:
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
-            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            variable_set_exceptions: list[type[BaseException]] = []
+            try:
+                from airflow.sdk.exceptions import AirflowRuntimeError
+
+                variable_set_exceptions.append(AirflowRuntimeError)
+            except ImportError:
+                pass
+            if variable_set_exceptions:
+                try:
+                    Variable.set(self.cache_key, cache_dict, serialize_json=True)
+                except tuple(variable_set_exceptions) as e:
+                    logger.warning(
+                        "Failed to save Cosmos dbt ls cache to Airflow Variable '%s': %s. "
+                        "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching.",
+                        self.cache_key,
+                        e,
+                    )
+            else:
+                Variable.set(self.cache_key, cache_dict, serialize_json=True)
 
     def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, str]:
         """Loads the remote cache for dbt ls."""
@@ -1104,7 +1122,25 @@ class DbtGraph:
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
-            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            variable_set_exceptions: list[type[BaseException]] = []
+            try:
+                from airflow.sdk.exceptions import AirflowRuntimeError
+
+                variable_set_exceptions.append(AirflowRuntimeError)
+            except ImportError:
+                pass
+            if variable_set_exceptions:
+                try:
+                    Variable.set(self.cache_key, cache_dict, serialize_json=True)
+                except tuple(variable_set_exceptions) as e:
+                    logger.warning(
+                        "Failed to save Cosmos YAML selectors cache to Airflow Variable '%s': %s. "
+                        "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching.",
+                        self.cache_key,
+                        e,
+                    )
+            else:
+                Variable.set(self.cache_key, cache_dict, serialize_json=True)
 
     def parse_yaml_selectors(self, selector_definitions: dict[str, Any]) -> YamlSelectors:
         """

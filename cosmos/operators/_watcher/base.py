@@ -544,6 +544,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 f"Watcher producer task '{self.producer_task_id}' failed before reporting results for {self._resource_label.lower()} '{self.model_unique_id}'. Check its logs for the underlying error."
             )
 
+        if reason == WatcherEventReason.PRODUCER_SKIPPED:
+            logger.info(
+                "Watcher producer task '%s' was skipped. Falling back to running dbt for %s '%s'.",
+                self.producer_task_id,
+                self._resource_label.lower(),
+                self.model_unique_id,
+            )
+            self._fallback_to_non_watcher_run(try_number=2, context=context)
+            return
+
     def _log_startup_events(self, ti: Any) -> None:
         dbt_startup_events: list[dict[str, Any]] = ti.xcom_pull(
             task_ids=self.producer_task_id, key=_DBT_STARTUP_EVENTS_XCOM_KEY
@@ -582,6 +592,23 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             self.compiled_sql = compiled_sql
             if hasattr(self, "_override_rtif"):
                 self._override_rtif(context)
+
+    def _handle_no_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
+        """Handle the case where no dbt node status has been reported yet."""
+        if producer_task_state == "failed":
+            if self.poke_retry_number > 0:
+                raise AirflowException(
+                    f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
+                )
+            else:
+                # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
+                return self._fallback_to_non_watcher_run(try_number, context)
+
+        if producer_task_state == "skipped":
+            return self._fallback_to_non_watcher_run(try_number, context)
+
+        self.poke_retry_number += 1
+        return False
 
     def poke(self, context: Context) -> bool:
         """
@@ -625,19 +652,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         _log_dbt_event(dbt_events)
 
         if status is None:
-
-            if producer_task_state == "failed":
-                if self.poke_retry_number > 0:
-                    raise AirflowException(
-                        f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
-                    )
-                else:
-                    # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
-                    return self._fallback_to_non_watcher_run(try_number, context)
-
-            self.poke_retry_number += 1
-
-            return False
+            return self._handle_no_status(producer_task_state, try_number, context)
         elif is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."

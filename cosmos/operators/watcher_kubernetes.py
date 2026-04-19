@@ -13,7 +13,7 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 import kubernetes.client as k8s
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
 
 try:
@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
+from cosmos.operators._watcher import backup_xcom_to_variable, restore_xcom_from_variable
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators.base import (
     DbtRunMixin,
@@ -90,6 +91,13 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             normalized_callbacks = [existing_callbacks]
         normalized_callbacks.append(WatcherKubernetesCallback)
         kwargs["callbacks"] = normalized_callbacks
+        existing_retry_cb = kwargs.get("on_retry_callback")
+        if existing_retry_cb is None:
+            kwargs["on_retry_callback"] = backup_xcom_to_variable
+        elif isinstance(existing_retry_cb, list):
+            kwargs["on_retry_callback"] = [*existing_retry_cb, backup_xcom_to_variable]
+        else:
+            kwargs["on_retry_callback"] = [existing_retry_cb, backup_xcom_to_variable]
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 
@@ -107,12 +115,11 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
-            self.log.info(
+            restore_xcom_from_variable(context)
+            raise AirflowSkipException(
                 "DbtProducerWatcherKubernetesOperator does not support Airflow retries. "
-                "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
-                try_number,
+                f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
-            return None
 
         # This global variable is used to make the task context available to the K8s callback.
         # While the callback is set during the operator initialization, the context is only created during the operator's execution.

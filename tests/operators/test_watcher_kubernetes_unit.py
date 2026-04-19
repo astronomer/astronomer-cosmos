@@ -1,10 +1,9 @@
-import logging
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
 from airflow.providers.cncf.kubernetes.secret import Secret
 from packaging.version import Version
@@ -92,13 +91,11 @@ def test_skips_retry_attempt(mock_execute, caplog):
     ti.try_number = 2
     context = {"ti": ti}
 
-    with caplog.at_level(logging.INFO):
-        result = op.execute(context=context)
+    with patch("cosmos.operators.watcher_kubernetes.restore_xcom_from_variable"):
+        with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+            op.execute(context=context)
 
     mock_execute.assert_not_called()
-    assert result is None
-    assert any("does not support Airflow retries" in message for message in caplog.messages)
-    assert any("skipping execution" in message for message in caplog.messages)
 
 
 def test_raises_exception_when_task_instance_missing():

@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
-from airflow.exceptions import AirflowException, TaskDeferred
+from airflow.exceptions import AirflowException, AirflowSkipException, TaskDeferred
 from airflow.utils.state import DagRunState
 
 try:
@@ -38,9 +38,11 @@ from tests.utils import AIRFLOW_VERSION, new_test_dag
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
 MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
+DBT_WATCHER_FAILING_TESTS_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_failing_tests"
 
 DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
+
 
 project_config = ProjectConfig(
     dbt_project_path=DBT_PROJECT_PATH,
@@ -61,6 +63,8 @@ class _MockTI:
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
         self.try_number = 1
+        self.dag_id = "test_dag"
+        self.task_id = "test_task"
 
     def xcom_push(self, key: str, value: str, **_):
         self.store[key] = value
@@ -150,10 +154,13 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     """Test that operator pushes 'completed' status to XCom in both success and failure cases."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     mock_ti = _MockTI()
-    context = {"ti": mock_ti}
+    context = {"ti": mock_ti, "run_id": "test_run"}
 
     # Test success case
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        patch("cosmos.operators._watcher.state._persist_backup"),
+    ):
         op.execute(context=context)
 
         # Verify status was pushed
@@ -168,7 +175,10 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
     class TestException(Exception):
         pass
 
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        patch("cosmos.operators._watcher.state._persist_backup"),
+    ):
         mock_execute.side_effect = TestException("test error")
 
         with pytest.raises(TestException):
@@ -221,16 +231,16 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
     ti.try_number = 2
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
-        with caplog.at_level(logging.INFO):
-            result = op.execute(context=context)
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
+        patch("cosmos.operators.watcher.restore_xcom_from_variable"),
+    ):
+        with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+            op.execute(context=context)
 
     mock_execute.assert_not_called()
-    assert result is None
-    assert any("does not support Airflow retries" in message for message in caplog.messages)
-    assert any("skipping execution" in message for message in caplog.messages)
 
 
 @pytest.mark.parametrize(
@@ -1869,6 +1879,51 @@ def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
             assert task.execution_timeout == timedelta(seconds=2)
         else:
             assert task.execution_timeout == timedelta(seconds=1)
+
+
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_and_failing_model(caplog):
+    """
+    Run a DbtDag using `ExecutionMode.WATCHER` with a project where one model fails.
+    model_a succeeds, model_f fails (references nonexistent column).
+    The producer task fails, retries are skipped, and the DAG completes without hanging.
+    Reproduces https://github.com/astronomer/astronomer-cosmos/issues/2430
+    """
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
+
+    watcher_dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_FAILING_TESTS_PATH),
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_failing_tests",
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+        render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+        dagrun_timeout=timedelta(seconds=120),
+    )
+    outcome = new_test_dag(watcher_dag, expected_dag_state=DagRunState.FAILED)
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 2
+    assert len(watcher_dag.task_dict) == 3
+    tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
+    assert tasks_names == ["dbt_producer_watcher", "model_a_run", "model_f_run"]
+
+    assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["model_a_run"], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["model_f_run"], DbtRunWatcherOperator)
+
+    # The DAG should complete (not hang) even though model_f fails
+    assert outcome.state == DagRunState.FAILED
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    assert tis["dbt_producer_watcher"].try_number == 2
+
+    assert tis["dbt_producer_watcher"].state == "skipped"
+    assert tis["model_a_run"].state == "success"
+    assert tis["model_f_run"].state == "failed"
+
+    dbt_error_message = """Database Error in model model_f (models/model_f.sql)\n  column "this_column_does_not_exist_at_all" does not exist\n  LINE 1"""
+    assert dbt_error_message in caplog.text
 
 
 def test_dbt_source_watcher_operator_template_fields():

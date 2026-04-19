@@ -297,6 +297,7 @@ def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
             DbtResourceType.SEED: "DbtBuild",
             DbtResourceType.TEST: "DbtTest",
             DbtResourceType.SOURCE: "DbtSource",
+            DbtResourceType.EXPOSURE: "DbtExposure"
         }
     else:
         dbt_resource_to_class = {
@@ -305,6 +306,7 @@ def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
             DbtResourceType.SEED: "DbtSeed",
             DbtResourceType.TEST: "DbtTest",
             DbtResourceType.SOURCE: "DbtSource",
+            DbtResourceType.EXPOSURE: "DbtExposure"
         }
     return dbt_resource_to_class
 
@@ -413,6 +415,24 @@ def create_task_metadata(  # noqa: C901
                 else:
                     args = {}
                 return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
+
+        elif node.resource_type == DbtResourceType.EXPOSURE:
+            # Build the task_id and update args
+            task_id, args = _get_task_id_and_args(
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=render_config.normalize_task_id,
+                normalize_task_display_name=render_config.normalize_task_display_name,
+                resource_suffix=r"exposure",
+                execution_mode=execution_mode,
+            )
+
+            # Strip down args to pass to EmptyOperator
+            args = {"task_display_name": args["task_display_name"]} if "task_display_name" in args else {}
+
+            return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
+
         else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"

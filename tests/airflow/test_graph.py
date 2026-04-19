@@ -706,6 +706,31 @@ def test_create_task_metadata_snapshot(caplog):
     assert metadata.arguments == {"select": "my_snapshot"}
 
 
+def test_create_task_metadata_exposure(caplog):
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.EXPOSURE.value}.my_folder.my_exposure",
+        resource_type=DbtResourceType.EXPOSURE,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+
+    metadata = create_task_metadata(
+        sample_node,
+        execution_mode=ExecutionMode.KUBERNETES,  # Can pick any ExecutionMode
+        args={
+            "task_display_name": "my_expose_display_name"
+        },
+        dbt_dag_task_group_identifier=""
+    )
+
+    assert metadata.id == "my_exposure_exposure"
+    assert metadata.operator_class == "airflow.operators.empty.EmptyOperator"
+    assert metadata.arguments == {"task_display_name": "my_expose_display_name"}
+
+
 def _normalize_task_id(node: DbtNode) -> str:
     """for test_create_task_metadata_normalize_task_id"""
     return f"new_task_id_{node.name}_{node.resource_type.value}"

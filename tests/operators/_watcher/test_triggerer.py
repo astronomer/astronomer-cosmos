@@ -396,3 +396,32 @@ class TestWatcherTrigger:
         # ensure terminal check was called
         mock_terminal.assert_any_call("running")
         mock_terminal.assert_any_call("error")
+
+
+class TestBuildSuccessEvent:
+    def setup_method(self):
+        self.trigger = WatcherTrigger(
+            model_unique_id="model.test",
+            producer_task_id="task_1",
+            dag_id="dag_1",
+            run_id="run_123",
+            map_index=None,
+        )
+
+    def test_basic_success(self):
+        event = self.trigger._build_success_event(compiled_sql=None)
+        assert event == {"status": "success"}
+
+    def test_with_compiled_sql(self):
+        event = self.trigger._build_success_event(compiled_sql="SELECT 1")
+        assert event["compiled_sql"] == "SELECT 1"
+
+    def test_with_outlet_uris(self):
+        self.trigger._outlet_uris = ["uri://dataset1"]
+        event = self.trigger._build_success_event(compiled_sql=None)
+        assert event["outlet_uris"] == ["uri://dataset1"]
+
+    def test_with_compiled_sql_and_outlet_uris(self):
+        self.trigger._outlet_uris = ["uri://dataset1"]
+        event = self.trigger._build_success_event(compiled_sql="SELECT 1")
+        assert event == {"status": "success", "compiled_sql": "SELECT 1", "outlet_uris": ["uri://dataset1"]}

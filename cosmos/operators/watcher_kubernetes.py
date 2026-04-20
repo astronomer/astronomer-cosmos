@@ -91,13 +91,13 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             normalized_callbacks = [existing_callbacks]
         normalized_callbacks.append(WatcherKubernetesCallback)
         kwargs["callbacks"] = normalized_callbacks
-        existing_retry_cb = kwargs.get("on_retry_callback")
-        if existing_retry_cb is None:
+        existing_on_retry_callback = kwargs.get("on_retry_callback")
+        if existing_on_retry_callback is None:
             kwargs["on_retry_callback"] = _backup_xcom_to_variable
-        elif isinstance(existing_retry_cb, list):
-            kwargs["on_retry_callback"] = [*existing_retry_cb, _backup_xcom_to_variable]
+        elif isinstance(existing_on_retry_callback, list):
+            kwargs["on_retry_callback"] = [*existing_on_retry_callback, _backup_xcom_to_variable]
         else:
-            kwargs["on_retry_callback"] = [existing_retry_cb, _backup_xcom_to_variable]
+            kwargs["on_retry_callback"] = [existing_on_retry_callback, _backup_xcom_to_variable]
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 

@@ -225,6 +225,32 @@ def test_dbt_producer_watcher_operator_keeps_backup_on_failure(mock_execute, moc
     mock_delete.assert_not_called()
 
 
+def test_dbt_producer_watcher_operator_on_retry_callback_default():
+    """Test that on_retry_callback defaults to _backup_xcom_to_variable."""
+    from cosmos.operators._watcher.state import _backup_xcom_to_variable
+
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    assert op.on_retry_callback == _backup_xcom_to_variable
+
+
+def test_dbt_producer_watcher_operator_on_retry_callback_appends_to_list():
+    """Test that on_retry_callback appends _backup_xcom_to_variable to existing list."""
+    from cosmos.operators._watcher.state import _backup_xcom_to_variable
+
+    existing_cb = MagicMock()
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, on_retry_callback=[existing_cb])
+    assert op.on_retry_callback == [existing_cb, _backup_xcom_to_variable]
+
+
+def test_dbt_producer_watcher_operator_on_retry_callback_wraps_single():
+    """Test that on_retry_callback wraps a single existing callback into a list."""
+    from cosmos.operators._watcher.state import _backup_xcom_to_variable
+
+    existing_cb = MagicMock()
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, on_retry_callback=existing_cb)
+    assert op.on_retry_callback == [existing_cb, _backup_xcom_to_variable]
+
+
 def test_dbt_producer_watcher_operator_requires_task_instance():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     context: dict[str, object] = {}
@@ -283,6 +309,7 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     [
         ({"status": "success"}, None),
         ({"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}, None),
+        ({"status": "failed", "reason": WatcherEventReason.PRODUCER_SKIPPED}, None),
         (
             {"status": "failed", "reason": WatcherEventReason.NODE_FAILED},
             "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher_operator' logs for details.",
@@ -293,7 +320,8 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
         ),
     ],
 )
-def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
+@patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+def test_dbt_consumer_watcher_sensor_execute_complete(mock_fallback, event, expected_message):
     sensor = DbtConsumerWatcherSensor(
         project_dir=".",
         profiles_dir=".",

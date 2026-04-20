@@ -2407,9 +2407,11 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")
 @patch("cosmos.dbt.graph.Variable.set")
 def test_save_dbt_ls_cache_variable_set_failure(mock_variable_set, tmp_dbt_project_dir, caplog):
+    from unittest.mock import MagicMock
+
     from airflow.sdk.exceptions import AirflowRuntimeError
 
-    mock_variable_set.side_effect = AirflowRuntimeError("no such table: variable")
+    mock_variable_set.side_effect = AirflowRuntimeError(MagicMock())
     graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
     with caplog.at_level(logging.WARNING, logger="cosmos.dbt.graph"):
         graph.save_dbt_ls_cache("some output")
@@ -2421,9 +2423,11 @@ def test_save_dbt_ls_cache_variable_set_failure(mock_variable_set, tmp_dbt_proje
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")
 @patch("cosmos.dbt.graph.Variable.set")
 def test_save_yaml_selectors_cache_variable_set_failure(mock_variable_set, tmp_dbt_project_dir, caplog):
+    from unittest.mock import MagicMock
+
     from airflow.sdk.exceptions import AirflowRuntimeError
 
-    mock_variable_set.side_effect = AirflowRuntimeError("no such table: variable")
+    mock_variable_set.side_effect = AirflowRuntimeError(MagicMock())
     graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
     selectors = YamlSelectors(
         {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},

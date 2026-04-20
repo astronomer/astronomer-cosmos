@@ -554,22 +554,29 @@ class DbtGraph:
         return cache_args
 
     def _save_cache_to_variable(self, cache_dict: dict[str, Any], cache_name: str) -> None:
-        """Write cache_dict to an Airflow Variable, warning on AirflowRuntimeError (Airflow 3 Task SDK only)."""
+        """Write cache_dict to an Airflow Variable, warning on AirflowRuntimeError.
+
+        This failure is expected when running with Astro Remote Execution (where workers
+        do not have direct access to the Airflow metadata database), and is not expected
+        in other deployments such as Astro Executor.
+        """
         try:
             from airflow.sdk.exceptions import AirflowRuntimeError
         except ImportError:
             Variable.set(self.cache_key, cache_dict, serialize_json=True)
-        else:
-            try:
-                Variable.set(self.cache_key, cache_dict, serialize_json=True)
-            except AirflowRuntimeError as e:
-                logger.warning(
-                    "Failed to save Cosmos %s cache to Airflow Variable '%s': %s. "
-                    "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching.",
-                    cache_name,
-                    self.cache_key,
-                    e,
-                )
+            return
+
+        try:
+            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+        except AirflowRuntimeError as e:
+            logger.warning(
+                "Failed to save Cosmos %s cache to Airflow Variable '%s': %s. "
+                "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching, "
+                "using LoadMode.MANIFEST, or disabling the cache via AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS.",
+                cache_name,
+                self.cache_key,
+                e,
+            )
 
     def save_dbt_ls_cache(self, dbt_ls_output: str) -> None:
         """

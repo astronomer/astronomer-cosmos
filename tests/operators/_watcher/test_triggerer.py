@@ -425,3 +425,52 @@ class TestBuildSuccessEvent:
         self.trigger._outlet_uris = ["uri://dataset1"]
         event = self.trigger._build_success_event(compiled_sql="SELECT 1")
         assert event == {"status": "success", "compiled_sql": "SELECT 1", "outlet_uris": ["uri://dataset1"]}
+
+
+@pytest.mark.asyncio
+class TestWatcherTriggerProducerSkipped:
+
+    def setup_method(self):
+        self.trigger = WatcherTrigger(
+            model_unique_id="model.test",
+            producer_task_id="task_1",
+            dag_id="dag_1",
+            run_id="run_123",
+            map_index=None,
+            poke_interval=0.001,
+        )
+
+    @patch("cosmos.operators._watcher.triggerer._log_dbt_event")
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    async def test_run_producer_skipped_yields_producer_skipped_event(
+        self, mock_startup_events, mock_dbt_event, caplog
+    ):
+        """Test that when producer is skipped, trigger yields failed with PRODUCER_SKIPPED reason."""
+        get_xcom_val_mock = AsyncMock(return_value=None)
+        get_producer_status_mock = AsyncMock(return_value="skipped")
+        parse_mock = AsyncMock(return_value=(None, None))
+
+        caplog.set_level("INFO")
+
+        with (
+            patch.object(self.trigger, "get_xcom_val", get_xcom_val_mock),
+            patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
+            patch.object(self.trigger, "_parse_dbt_node_status_and_compiled_sql", parse_mock),
+        ):
+            events = []
+            async for event in self.trigger.run():
+                events.append(event)
+
+        assert len(events) == 1
+        assert events[0].payload == {"status": "failed", "reason": WatcherEventReason.PRODUCER_SKIPPED}
+        assert "was skipped" in caplog.text
+
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._get_producer_task_status", new_callable=AsyncMock)
+    async def test_log_startup_events_returns_on_skipped_producer(self, mock_producer_status):
+        """Test that _log_startup_events returns early when producer is skipped."""
+        mock_producer_status.return_value = "skipped"
+        self.trigger.get_xcom_val = AsyncMock(return_value=None)
+
+        await self.trigger._log_startup_events()
+
+        mock_producer_status.assert_called_once()

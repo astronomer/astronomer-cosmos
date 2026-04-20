@@ -28,7 +28,7 @@ from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
     store_dbt_resource_status_from_log,
 )
-from cosmos.operators._watcher.state import (
+from cosmos.operators._watcher.xcom import (
     _backup_xcom_to_variable,
     _delete_xcom_backup_variable,
     _init_xcom_backup,

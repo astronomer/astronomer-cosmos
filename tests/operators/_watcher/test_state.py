@@ -11,17 +11,19 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cosmos.operators._watcher.state import (
-    _backup_xcom_to_variable,
-    _delete_xcom_backup_variable,
-    _init_xcom_backup,
     _log_dbt_event,
-    _persist_backup,
-    _restore_xcom_from_variable,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
     safe_xcom_push,
+)
+from cosmos.operators._watcher.xcom import (
+    _backup_xcom_to_variable,
+    _delete_xcom_backup_variable,
+    _init_xcom_backup,
+    _persist_backup,
+    _restore_xcom_from_variable,
 )
 
 
@@ -149,7 +151,7 @@ class TestPersistBackup:
 
 
 class TestSafeXcomPushBackup:
-    @patch("cosmos.operators._watcher.state._persist_backup")
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
     def test_accumulates_in_backup_buffer_when_active(self, mock_persist):
         ti = _MockTI()
         context = {"ti": ti, "run_id": "test_run"}
@@ -161,7 +163,7 @@ class TestSafeXcomPushBackup:
         assert ti._cosmos_xcom_backup_buffer["status_key"] == "success"
         mock_persist.assert_called_once()
 
-    @patch("cosmos.operators._watcher.state._persist_backup")
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
     def test_does_not_backup_without_init(self, mock_persist):
         ti = _MockTI()
 
@@ -172,7 +174,7 @@ class TestSafeXcomPushBackup:
 
 
 class TestBackupXcomToVariable:
-    @patch("cosmos.operators._watcher.state._persist_backup")
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
     def test_flushes_buffer(self, mock_persist):
         ti = _MockTI()
         context = {"ti": ti, "run_id": "test_run"}
@@ -183,7 +185,7 @@ class TestBackupXcomToVariable:
 
         mock_persist.assert_called_once_with(ti._cosmos_xcom_backup_var_key, {"k": "v"})
 
-    @patch("cosmos.operators._watcher.state._persist_backup")
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
     def test_noop_without_init(self, mock_persist):
         ti = _MockTI()
         context = {"ti": ti}
@@ -224,7 +226,7 @@ class TestDeleteXcomBackupVariable:
 
 
 class TestRestoreXcomFromVariable:
-    @patch("cosmos.operators._watcher.state._persist_backup")
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
     @patch("airflow.models.Variable")
     def test_restores_entries(self, mock_variable, mock_persist):
         ti = _MockTI()

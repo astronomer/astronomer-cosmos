@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
-from cosmos.operators._watcher.state import _backup_xcom_to_variable, _restore_xcom_from_variable
+from cosmos.operators._watcher.xcom import _backup_xcom_to_variable, _restore_xcom_from_variable
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,

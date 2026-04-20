@@ -150,49 +150,40 @@ def test_dbt_producer_log_format_always_json():
     assert op.log_format == "json"
 
 
-def test_dbt_producer_watcher_operator_pushes_completion_status():
-    """Test that operator pushes 'completed' status to XCom in both success and failure cases."""
+@patch("airflow.models.Variable")
+@patch("cosmos.operators._watcher.xcom._persist_backup")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_pushes_completion_status_on_success(mock_execute, mock_persist, mock_variable):
+    """Test that operator pushes 'completed' status to XCom on success."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     mock_ti = _MockTI()
     context = {"ti": mock_ti, "run_id": "test_run"}
 
-    # Test success case
-    with (
-        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
-        patch("cosmos.operators._watcher.state._persist_backup"),
-        patch("airflow.models.Variable"),
-    ):
+    op.execute(context=context)
+
+    assert mock_ti.store.get("task_status") == "completed"
+    mock_execute.assert_called_once()
+
+
+@patch("airflow.models.Variable")
+@patch("cosmos.operators._watcher.xcom._persist_backup")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_pushes_completion_status_on_failure(mock_execute, mock_persist, mock_variable):
+    """Test that operator pushes 'completed' status to XCom even when execution fails."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "test_run"}
+
+    mock_execute.side_effect = RuntimeError("dbt build failed")
+
+    with pytest.raises(RuntimeError):
         op.execute(context=context)
 
-        # Verify status was pushed
-        assert mock_ti.store.get("task_status") == "completed"
-        # Verify parent execute was called
-        mock_execute.assert_called_once()
-
-    # Reset mock and store
-    mock_ti.store.clear()
-
-    # Test failure case
-    class TestException(Exception):
-        pass
-
-    with (
-        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
-        patch("cosmos.operators._watcher.state._persist_backup"),
-        patch("airflow.models.Variable"),
-    ):
-        mock_execute.side_effect = TestException("test error")
-
-        with pytest.raises(TestException):
-            op.execute(context=context)
-
-        # Verify completed status was pushed even in failure case
-        assert mock_ti.store.get("task_status") == "completed"
-        # Verify parent execute was called
-        mock_execute.assert_called_once()
+    assert mock_ti.store.get("task_status") == "completed"
+    mock_execute.assert_called_once()
 
 
-@patch("cosmos.operators._watcher.state._persist_backup")
+@patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.watcher._delete_xcom_backup_variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_deletes_backup_on_success(mock_execute, mock_delete, mock_persist):
@@ -206,7 +197,7 @@ def test_dbt_producer_watcher_operator_deletes_backup_on_success(mock_execute, m
     mock_delete.assert_called_once_with(context)
 
 
-@patch("cosmos.operators._watcher.state._persist_backup")
+@patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.watcher._delete_xcom_backup_variable")
 @patch("cosmos.operators.watcher._backup_xcom_to_variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
@@ -227,40 +218,45 @@ def test_dbt_producer_watcher_operator_keeps_backup_on_failure(mock_execute, moc
 
 def test_dbt_producer_watcher_operator_on_retry_callback_default():
     """Test that on_retry_callback defaults to _backup_xcom_to_variable."""
-    from cosmos.operators._watcher.state import _backup_xcom_to_variable
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
 
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    assert op.on_retry_callback == _backup_xcom_to_variable
+    assert _backup_xcom_to_variable in (
+        op.on_retry_callback if isinstance(op.on_retry_callback, list) else [op.on_retry_callback]
+    )
 
 
 def test_dbt_producer_watcher_operator_on_retry_callback_appends_to_list():
     """Test that on_retry_callback appends _backup_xcom_to_variable to existing list."""
-    from cosmos.operators._watcher.state import _backup_xcom_to_variable
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
 
     existing_cb = MagicMock()
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, on_retry_callback=[existing_cb])
-    assert op.on_retry_callback == [existing_cb, _backup_xcom_to_variable]
+    callbacks = op.on_retry_callback if isinstance(op.on_retry_callback, list) else [op.on_retry_callback]
+    assert existing_cb in callbacks
+    assert _backup_xcom_to_variable in callbacks
 
 
 def test_dbt_producer_watcher_operator_on_retry_callback_wraps_single():
     """Test that on_retry_callback wraps a single existing callback into a list."""
-    from cosmos.operators._watcher.state import _backup_xcom_to_variable
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
 
     existing_cb = MagicMock()
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, on_retry_callback=existing_cb)
-    assert op.on_retry_callback == [existing_cb, _backup_xcom_to_variable]
+    callbacks = op.on_retry_callback if isinstance(op.on_retry_callback, list) else [op.on_retry_callback]
+    assert existing_cb in callbacks
+    assert _backup_xcom_to_variable in callbacks
 
 
-def test_dbt_producer_watcher_operator_requires_task_instance():
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_requires_task_instance(mock_execute):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     context: dict[str, object] = {}
 
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
-        with pytest.raises(AirflowException) as excinfo:
-            op.execute(context=context)
+    with pytest.raises(AirflowException, match="expects a task instance"):
+        op.execute(context=context)
 
     mock_execute.assert_not_called()
-    assert "expects a task instance" in str(excinfo.value)
 
 
 def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message(caplog):

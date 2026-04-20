@@ -76,8 +76,9 @@ project_config = ProjectConfig(
 render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=TestBehavior.NONE)
 
 
+@patch("cosmos.operators.watcher_kubernetes._restore_xcom_from_variable")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_skips_retry_attempt(mock_execute, caplog):
+def test_skips_retry_attempt(mock_execute, mock_restore, caplog):
     """
     Test that the operator skips execution when a retry is attempted (try_number > 1).
     """
@@ -91,9 +92,8 @@ def test_skips_retry_attempt(mock_execute, caplog):
     ti.try_number = 2
     context = {"ti": ti}
 
-    with patch("cosmos.operators.watcher_kubernetes._restore_xcom_from_variable"):
-        with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
-            op.execute(context=context)
+    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+        op.execute(context=context)
 
     mock_execute.assert_not_called()
 

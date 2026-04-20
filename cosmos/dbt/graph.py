@@ -1116,8 +1116,9 @@ class DbtGraph:
         Returns:
             YamlSelectors: A YamlSelectors instance
         """
-
-        yaml_selectors = YamlSelectors.parse(selector_definitions)
+        yaml_selectors = YamlSelectors.parse(
+            selector_definitions, lax_parsing_enabled=settings.enable_lax_selector_parsing
+        )
 
         if self.should_use_yaml_selectors_cache():
             self.save_yaml_selectors_cache(yaml_selectors)
@@ -1194,9 +1195,11 @@ class DbtGraph:
             yaml_selectors = self.load_parsed_selectors(selector_definitions)
             selections = yaml_selectors.get_parsed(self.render_config.selector)
             if not selections:
-                raise CosmosLoadDbtException(
-                    f"Selector `{self.render_config.selector}` not found in parsed YAML selectors `{selector_definitions}`"
-                )
+                error_message = f"Selector `{self.render_config.selector}` not found in parsed YAML selectors"
+                if settings.enable_lax_selector_parsing:
+                    error_message += ". Check logs - the selector may have parsing errors logged as warnings"
+                raise CosmosLoadDbtException(error_message)
+
             self.nodes = nodes
             self.filtered_nodes = select_nodes(
                 project_dir=project_dir,

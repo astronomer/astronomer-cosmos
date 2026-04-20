@@ -301,7 +301,8 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
             )
             op2.invocation_mode = InvocationMode.DBT_RUNNER
 
-            op2.execute(context=mock_context)
+            with patch("cosmos.operators._watcher.state._persist_backup"):
+                op2.execute(context=mock_context)
 
             # Verify:
             # 1. We have two dbt Runner instances (cached + new with callbacks)

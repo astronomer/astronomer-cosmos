@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import logging
+import zlib
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from cosmos.operators._watcher.state import (
+    _backup_xcom_to_variable,
+    _delete_xcom_backup_variable,
+    _init_xcom_backup,
     _log_dbt_event,
+    _persist_backup,
+    _restore_xcom_from_variable,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    safe_xcom_push,
 )
 
 
@@ -87,3 +97,155 @@ def test_log_dbt_event(caplog, dbt_event, expect_error, status):
 
     if status:
         assert any(status in msg for msg in messages)
+
+
+class _MockTI:
+    def __init__(self):
+        self.store = {}
+        self.dag_id = "test_dag"
+        self.task_id = "test_task"
+
+    def xcom_push(self, key, value, **_):
+        self.store[key] = value
+
+
+class TestInitXcomBackup:
+    def test_sets_var_key_and_buffer_on_ti(self):
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "manual__2026-01-01"}
+
+        _init_xcom_backup(context)
+
+        assert isinstance(ti._cosmos_xcom_backup_var_key, str)
+        assert "test_dag" in ti._cosmos_xcom_backup_var_key
+        assert ti._cosmos_xcom_backup_buffer == {}
+
+    def test_includes_task_group_id_when_present(self):
+        ti = _MockTI()
+        ti.task = MagicMock(task_group_id="my_group")
+        context = {"ti": ti, "run_id": "manual__2026-01-01"}
+
+        _init_xcom_backup(context)
+
+        assert "my_group" in ti._cosmos_xcom_backup_var_key
+
+
+class TestPersistBackup:
+    @patch("cosmos.operators._watcher.state.Variable")
+    def test_writes_compressed_data_to_variable(self, mock_variable):
+        _persist_backup("my_var_key", {"key1": "value1", "key2": "value2"})
+
+        mock_variable.set.assert_called_once()
+        var_key, compressed = mock_variable.set.call_args[0]
+        assert var_key == "my_var_key"
+        data = json.loads(zlib.decompress(base64.b64decode(compressed.encode("utf-8"))).decode("utf-8"))
+        assert data == {"key1": "value1", "key2": "value2"}
+
+    @patch("cosmos.operators._watcher.state.Variable")
+    def test_skips_empty_buffer(self, mock_variable):
+        _persist_backup("my_var_key", {})
+
+        mock_variable.set.assert_not_called()
+
+
+class TestSafeXcomPushBackup:
+    @patch("cosmos.operators._watcher.state._persist_backup")
+    def test_accumulates_in_backup_buffer_when_active(self, mock_persist):
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run"}
+        _init_xcom_backup(context)
+
+        safe_xcom_push(ti, "status_key", "success")
+
+        assert ti.store["status_key"] == "success"
+        assert ti._cosmos_xcom_backup_buffer["status_key"] == "success"
+        mock_persist.assert_called_once()
+
+    @patch("cosmos.operators._watcher.state._persist_backup")
+    def test_does_not_backup_without_init(self, mock_persist):
+        ti = _MockTI()
+
+        safe_xcom_push(ti, "key", "value")
+
+        assert ti.store["key"] == "value"
+        mock_persist.assert_not_called()
+
+
+class TestBackupXcomToVariable:
+    @patch("cosmos.operators._watcher.state._persist_backup")
+    def test_flushes_buffer(self, mock_persist):
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run"}
+        _init_xcom_backup(context)
+        ti._cosmos_xcom_backup_buffer = {"k": "v"}
+
+        _backup_xcom_to_variable(context)
+
+        mock_persist.assert_called_once_with(ti._cosmos_xcom_backup_var_key, {"k": "v"})
+
+    @patch("cosmos.operators._watcher.state._persist_backup")
+    def test_noop_without_init(self, mock_persist):
+        ti = _MockTI()
+        context = {"ti": ti}
+
+        _backup_xcom_to_variable(context)
+
+        mock_persist.assert_not_called()
+
+
+class TestDeleteXcomBackupVariable:
+    @patch("cosmos.operators._watcher.state.Variable")
+    def test_deletes_variable(self, mock_variable):
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run"}
+        _init_xcom_backup(context)
+
+        _delete_xcom_backup_variable(context)
+
+        mock_variable.delete.assert_called_once_with(ti._cosmos_xcom_backup_var_key)
+
+    @patch("cosmos.operators._watcher.state.Variable")
+    def test_noop_without_init(self, mock_variable):
+        ti = _MockTI()
+        context = {"ti": ti}
+
+        _delete_xcom_backup_variable(context)
+
+        mock_variable.delete.assert_not_called()
+
+    @patch("cosmos.operators._watcher.state.Variable")
+    def test_ignores_key_error(self, mock_variable):
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run"}
+        _init_xcom_backup(context)
+        mock_variable.delete.side_effect = KeyError("not found")
+
+        _delete_xcom_backup_variable(context)  # should not raise
+
+
+class TestRestoreXcomFromVariable:
+    @patch("cosmos.operators._watcher.state._persist_backup")
+    @patch("cosmos.operators._watcher.state.Variable")
+    def test_restores_entries(self, mock_variable, mock_persist):
+        ti = _MockTI()
+        backup = {"key1": "val1", "key2": "val2"}
+        compressed = base64.b64encode(zlib.compress(json.dumps(backup).encode("utf-8"))).decode("utf-8")
+        mock_variable.get.return_value = compressed
+        context = {"ti": ti, "run_id": "test_run"}
+
+        result = _restore_xcom_from_variable(context)
+
+        assert result is True
+        assert ti.store["key1"] == "val1"
+        assert ti.store["key2"] == "val2"
+        mock_variable.delete.assert_called_once()
+
+    @patch("cosmos.operators._watcher.state.Variable")
+    def test_returns_false_when_no_backup(self, mock_variable):
+        ti = _MockTI()
+        mock_variable.get.return_value = None
+        context = {"ti": ti, "run_id": "test_run"}
+
+        result = _restore_xcom_from_variable(context)
+
+        assert result is False

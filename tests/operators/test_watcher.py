@@ -190,6 +190,39 @@ def test_dbt_producer_watcher_operator_pushes_completion_status():
         mock_execute.assert_called_once()
 
 
+@patch("cosmos.operators._watcher.state._persist_backup")
+@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_deletes_backup_on_success(mock_execute, mock_delete, mock_persist):
+    """Test that the XCom backup Variable is deleted after a successful execution."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "test_run"}
+
+    op.execute(context=context)
+
+    mock_delete.assert_called_once_with(context)
+
+
+@patch("cosmos.operators._watcher.state._persist_backup")
+@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher._backup_xcom_to_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_keeps_backup_on_failure(mock_execute, mock_backup, mock_delete, mock_persist):
+    """Test that the XCom backup Variable is persisted (not deleted) when execution fails."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "test_run"}
+
+    mock_execute.side_effect = RuntimeError("dbt build failed")
+
+    with pytest.raises(RuntimeError):
+        op.execute(context=context)
+
+    mock_backup.assert_called_once_with(context)
+    mock_delete.assert_not_called()
+
+
 def test_dbt_producer_watcher_operator_requires_task_instance():
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     context: dict[str, object] = {}
@@ -235,7 +268,7 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
 
     with (
         patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
-        patch("cosmos.operators.watcher.restore_xcom_from_variable"),
+        patch("cosmos.operators.watcher._restore_xcom_from_variable"),
     ):
         with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
             op.execute(context=context)

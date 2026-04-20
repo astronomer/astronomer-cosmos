@@ -593,7 +593,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             if hasattr(self, "_override_rtif"):
                 self._override_rtif(context)
 
-    def _handle_no_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
+    def _handle_no_dbt_node_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
         """Handle the case where no dbt node status has been reported yet."""
         if producer_task_state == "failed":
             if self.poke_retry_number > 0:
@@ -652,7 +652,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         _log_dbt_event(dbt_events)
 
         if status is None:
-            return self._handle_no_status(producer_task_state, try_number, context)
+            return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
         elif is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."

@@ -91,7 +91,7 @@ def test_skips_retry_attempt(mock_execute, caplog):
     ti.try_number = 2
     context = {"ti": ti}
 
-    with patch("cosmos.operators.watcher_kubernetes.restore_xcom_from_variable"):
+    with patch("cosmos.operators.watcher_kubernetes._restore_xcom_from_variable"):
         with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
             op.execute(context=context)
 

@@ -61,7 +61,7 @@ def is_dbt_node_status_terminal(status: str | None) -> bool:
 xcom_set_lock = Lock()
 
 
-def init_xcom_backup(context: Any) -> None:
+def _init_xcom_backup(context: Any) -> None:
     """Activate incremental XCom backup for the current producer execution (AF3).
 
     After this call every ``safe_xcom_push`` will also persist the key/value
@@ -198,11 +198,11 @@ def _get_task_group_id(ti: Any) -> str | None:
     return getattr(task, "task_group_id", None) if task else None
 
 
-def backup_xcom_to_variable(context: Any) -> None:
+def _backup_xcom_to_variable(context: Any) -> None:
     """Persist all XCom entries for the current producer task in an Airflow Variable.
 
     The backup is built incrementally by ``safe_xcom_push`` (see
-    ``init_xcom_backup``).  This call does a final flush.
+    ``_init_xcom_backup``).  This call does a final flush.
     """
     ti = context["ti"]
     var_key = getattr(ti, "_cosmos_xcom_backup_var_key", None)
@@ -212,10 +212,25 @@ def backup_xcom_to_variable(context: Any) -> None:
     backup_buffer = getattr(ti, "_cosmos_xcom_backup_buffer", {})
     _persist_backup(var_key, backup_buffer)
     if backup_buffer:
-        logger.info("Backed up %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
+        logger.debug("Backed up %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
 
 
-def restore_xcom_from_variable(context: Any) -> bool:
+def _delete_xcom_backup_variable(context: Any) -> None:
+    """Delete the XCom backup Variable after a successful producer execution."""
+    ti = context["ti"]
+    var_key = getattr(ti, "_cosmos_xcom_backup_var_key", None)
+    if not isinstance(var_key, str):
+        return
+    try:
+        from airflow.models import Variable
+
+        Variable.delete(var_key)
+        logger.debug("Deleted XCom backup Variable '%s'", var_key)
+    except KeyError:
+        pass
+
+
+def _restore_xcom_from_variable(context: Any) -> bool:
     """Restore XCom entries from an Airflow Variable backup created by a previous attempt.
 
     Returns True if the restore succeeded, False if no backup was found.

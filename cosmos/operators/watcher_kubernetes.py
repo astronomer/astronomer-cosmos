@@ -23,8 +23,8 @@ except ImportError:  # pragma: no cover
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
-from cosmos.operators._watcher import backup_xcom_to_variable, restore_xcom_from_variable
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
+from cosmos.operators._watcher.state import _backup_xcom_to_variable, _restore_xcom_from_variable
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
@@ -93,11 +93,11 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         kwargs["callbacks"] = normalized_callbacks
         existing_retry_cb = kwargs.get("on_retry_callback")
         if existing_retry_cb is None:
-            kwargs["on_retry_callback"] = backup_xcom_to_variable
+            kwargs["on_retry_callback"] = _backup_xcom_to_variable
         elif isinstance(existing_retry_cb, list):
-            kwargs["on_retry_callback"] = [*existing_retry_cb, backup_xcom_to_variable]
+            kwargs["on_retry_callback"] = [*existing_retry_cb, _backup_xcom_to_variable]
         else:
-            kwargs["on_retry_callback"] = [existing_retry_cb, backup_xcom_to_variable]
+            kwargs["on_retry_callback"] = [existing_retry_cb, _backup_xcom_to_variable]
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
 
@@ -115,7 +115,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
-            restore_xcom_from_variable(context)
+            _restore_xcom_from_variable(context)
             raise AirflowSkipException(
                 "DbtProducerWatcherKubernetesOperator does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."

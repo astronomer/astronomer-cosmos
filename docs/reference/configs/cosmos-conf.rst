@@ -60,6 +60,15 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS``
 
+.. _enable_lax_selector_parsing:
+
+`enable_lax_selector_parsing`_:
+    Enable or disable lax parsing of YAML selectors when using ``LoadMode.DBT_MANIFEST`` with ``RenderConfig.selector``.
+    Lax parsing instructs the parser to log errors for selectors with malformed YAML structure instead of raising an exception.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING``
+
 .. _enable_cache_partial_parse:
 
 `enable_cache_partial_parse`_:

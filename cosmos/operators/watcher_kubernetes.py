@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
@@ -15,11 +14,6 @@ if TYPE_CHECKING:  # pragma: no cover
 import kubernetes.client as k8s
 from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
-
-try:
-    from airflow.providers.standard.operators.empty import EmptyOperator
-except ImportError:  # pragma: no cover
-    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
@@ -38,12 +32,17 @@ from cosmos.operators.kubernetes import (
 logger = get_logger(__name__)
 
 
-# This global variable is currently used to make the task context available to the K8s callback.
-# While the callback is set during the operator initialization, the context is only created during the operator's execution.
-producer_task_context = None
+# Module-level globals make state available to the K8s callback's @staticmethod.
+# The callback class is registered at operator init time, but context and test maps
+# are only available during execution. Safe because only one producer task runs
+# per worker process at a time.
+_producer_context: Context | None = None
+_producer_tests_per_model: dict[str, list[str]] | None = None
+_producer_test_results_per_model: dict[str, list[str]] | None = None
 
 
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
+    """Callback that parses dbt JSON logs from Kubernetes pod output."""
 
     @staticmethod
     def progress_callback(
@@ -67,19 +66,22 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param pod: the pod from which the log line was read.
         """
         if "context" not in kwargs:
-            # This global variable is used to make the task context available to the K8s callback.
-            # While the callback is set during the operator initialization, the context is only created during the operator's execution.
-            kwargs["context"] = producer_task_context
-        store_dbt_resource_status_from_log(line, kwargs)
+            kwargs["context"] = _producer_context
+        store_dbt_resource_status_from_log(
+            line,
+            kwargs,
+            tests_per_model=_producer_tests_per_model,
+            test_results_per_model=_producer_test_results_per_model,
+        )
 
 
 class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
-
     template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
-    _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = store_dbt_resource_status_from_log
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
+        self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
+        self.test_results_per_model: dict[str, list[str]] = {}
 
         existing_callbacks = kwargs.get("callbacks")
         if existing_callbacks is None:
@@ -114,10 +116,10 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             )
             return None
 
-        # This global variable is used to make the task context available to the K8s callback.
-        # While the callback is set during the operator initialization, the context is only created during the operator's execution.
-        global producer_task_context
-        producer_task_context = context
+        global _producer_context, _producer_tests_per_model, _producer_test_results_per_model
+        _producer_context = context
+        _producer_tests_per_model = self.tests_per_model
+        _producer_test_results_per_model = self.test_results_per_model
         return super().execute(context, **kwargs)
 
 
@@ -172,13 +174,24 @@ class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
         super().__init__(*args, **kwargs)
 
 
-class DbtTestWatcherKubernetesOperator(EmptyOperator):
-    """
-    As a starting point, this operator does nothing.
-    We'll be implementing this operator as part of: https://github.com/astronomer/astronomer-cosmos/issues/1974
+class DbtTestWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
+    """Sensor that watches the aggregated test status for a dbt model in WATCHER_KUBERNETES execution mode.
+
+    The producer task collects individual test results as they finish and,
+    once every test for a given model has reported, pushes a single
+    aggregated XCom (``"pass"`` or ``"fail"``) under the key returned by
+    ``get_tests_status_xcom_key(model_uid)``. This key sanitizes the dbt
+    model unique ID by replacing ``.`` with ``__`` before appending
+    ``_tests_status`` (for example,
+    ``model.jaffle_shop.stg_orders`` becomes
+    ``model__jaffle_shop__stg_orders_tests_status``).
+
+    This sensor polls that key and returns success when ``"pass"`` or raises
+    ``AirflowException`` when ``"fail"``.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any):
-        desired_keys = ("dag", "task_group", "task_id")
-        new_kwargs = {key: value for key, value in kwargs.items() if key in desired_keys}
-        super().__init__(**new_kwargs)  # type: ignore[no-untyped-call]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields
+
+    @property
+    def is_test_sensor(self) -> bool:
+        return True

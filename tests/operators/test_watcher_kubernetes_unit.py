@@ -22,6 +22,7 @@ else:
         DbtBuildWatcherKubernetesOperator,
         DbtConsumerWatcherKubernetesSensor,
         DbtProducerWatcherKubernetesOperator,
+        DbtTestWatcherKubernetesOperator,
     )
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -191,142 +192,169 @@ def test_retry_executes_as_dbt_run_kubernetes_operator(mock_build_and_run_cmd):
     mock_build_and_run_cmd.assert_called_once()
 
 
-class TestCallbacksNormalization:
-    """Tests for the callbacks normalization logic in DbtProducerWatcherKubernetesOperator."""
-
-    def test_callbacks_none_adds_watcher_callback(self):
-        """
-        Test that when callbacks is None, WatcherKubernetesCallback is added.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=None,
-        )
-        assert op.callbacks == [WatcherKubernetesCallback]
-
-    def test_callbacks_not_provided_adds_watcher_callback(self):
-        """
-        Test that when callbacks is not provided, WatcherKubernetesCallback is added.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-        )
-        assert op.callbacks == [WatcherKubernetesCallback]
-
-    def test_callbacks_list_appends_watcher_callback(self):
-        """
-        Test that when callbacks is a list, WatcherKubernetesCallback is appended.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        class CustomCallback:
-            pass
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=[CustomCallback],
-        )
-        assert op.callbacks == [CustomCallback, WatcherKubernetesCallback]
-
-    def test_callbacks_tuple_appends_watcher_callback(self):
-        """
-        Test that when callbacks is a tuple, WatcherKubernetesCallback is appended.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        class CustomCallback:
-            pass
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=(CustomCallback,),
-        )
-        assert op.callbacks == [CustomCallback, WatcherKubernetesCallback]
-
-    def test_callbacks_single_value_wraps_and_appends_watcher_callback(self):
-        """
-        Test that when callbacks is a single value (not list/tuple), it is wrapped in a list
-        and WatcherKubernetesCallback is appended.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        class CustomCallback:
-            pass
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=CustomCallback,
-        )
-        assert op.callbacks == [CustomCallback, WatcherKubernetesCallback]
-
-    def test_callbacks_empty_list_adds_watcher_callback(self):
-        """
-        Test that when callbacks is an empty list, WatcherKubernetesCallback is added.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=[],
-        )
-        assert op.callbacks == [WatcherKubernetesCallback]
-
-    def test_callbacks_multiple_values_appends_watcher_callback(self):
-        """
-        Test that when callbacks contains multiple values, WatcherKubernetesCallback is appended.
-        """
-        from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
-
-        class CustomCallback1:
-            pass
-
-        class CustomCallback2:
-            pass
-
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".",
-            profile_config=None,
-            image="dbt-image:latest",
-            callbacks=[CustomCallback1, CustomCallback2],
-        )
-        assert op.callbacks == [CustomCallback1, CustomCallback2, WatcherKubernetesCallback]
+class _CustomCallback:
+    pass
 
 
-def test_callbacks_included_in_producer_operator():
-    """
-    Test that the WatcherKubernetesCallback is included in the callbacks of the DbtProducerWatcherKubernetesOperator.
-    """
+class _CustomCallback2:
+    pass
+
+
+@pytest.mark.parametrize(
+    "callbacks_kwarg, expected_before_watcher",
+    [
+        pytest.param(None, [], id="none"),
+        pytest.param([], [], id="empty_list"),
+        pytest.param([_CustomCallback], [_CustomCallback], id="list"),
+        pytest.param((_CustomCallback,), [_CustomCallback], id="tuple"),
+        pytest.param(_CustomCallback, [_CustomCallback], id="single"),
+        pytest.param([_CustomCallback, _CustomCallback2], [_CustomCallback, _CustomCallback2], id="multiple"),
+    ],
+)
+def test_producer_normalizes_and_appends_watcher_callback(callbacks_kwarg, expected_before_watcher):
+    """User-supplied callbacks are preserved and WatcherKubernetesCallback is appended."""
+    from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
+
+    kwargs = {"project_dir": ".", "profile_config": None, "image": "dbt-image:latest"}
+    if callbacks_kwarg is not None:
+        kwargs["callbacks"] = callbacks_kwarg
+
+    op = DbtProducerWatcherKubernetesOperator(**kwargs)
+    assert op.callbacks == expected_before_watcher + [WatcherKubernetesCallback]
+
+
+def test_producer_stores_tests_per_model():
+    """tests_per_model kwarg is stored on the operator for later use in execute()."""
+    tests_per_model = {"model.pkg.orders": ["test.pkg.t1", "test.pkg.t2"]}
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
         profile_config=None,
         image="dbt-image:latest",
-        callbacks=MagicMock,
+        tests_per_model=tests_per_model,
     )
-    callback_classes = [callback.__name__ for callback in op.callbacks]
-    assert "WatcherKubernetesCallback" in callback_classes
-    assert "MagicMock" in callback_classes
+    assert op.tests_per_model is tests_per_model
+    assert op.test_results_per_model == {}
 
+
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_execute_sets_module_globals(mock_execute):
+    """execute() sets module-level globals for context and test maps."""
+    import cosmos.operators.watcher_kubernetes as wk_module
+
+    tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
         profile_config=None,
         image="dbt-image:latest",
-        callbacks=[MagicMock],
+        tests_per_model=tests_per_model,
     )
-    callback_classes = [callback.__name__ for callback in op.callbacks]
-    assert "WatcherKubernetesCallback" in callback_classes
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    op.execute(context=context)
+
+    assert wk_module._producer_context is context
+    assert wk_module._producer_tests_per_model is tests_per_model
+    assert wk_module._producer_test_results_per_model is op.test_results_per_model
+
+
+@patch("cosmos.operators.watcher_kubernetes.store_dbt_resource_status_from_log")
+def test_progress_callback_delegates_with_correct_args(mock_store):
+    """progress_callback passes module globals to store_dbt_resource_status_from_log."""
+    from cosmos.operators.watcher_kubernetes import WatcherKubernetesCallback
+
+    mock_context = {"ti": MagicMock()}
+    tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
+    test_results = {}
+
+    with (
+        patch("cosmos.operators.watcher_kubernetes._producer_context", mock_context),
+        patch("cosmos.operators.watcher_kubernetes._producer_tests_per_model", tests_per_model),
+        patch("cosmos.operators.watcher_kubernetes._producer_test_results_per_model", test_results),
+    ):
+        WatcherKubernetesCallback.progress_callback(
+            line='{"info": {"msg": "test"}}',
+            client=MagicMock(),
+            mode="sync",
+            container_name="dbt",
+            timestamp=None,
+            pod=MagicMock(),
+        )
+
+    mock_store.assert_called_once()
+    args, call_kwargs = mock_store.call_args
+    assert args[0] == '{"info": {"msg": "test"}}'
+    assert args[1]["context"] is mock_context
+    assert call_kwargs["tests_per_model"] is tests_per_model
+    assert call_kwargs["test_results_per_model"] is test_results
+
+
+def make_test_sensor(**kwargs):
+    extra_context = {"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}}
+    kwargs["extra_context"] = extra_context
+    sensor = DbtTestWatcherKubernetesOperator(
+        task_id="test.stg_orders",
+        project_dir="/tmp/project",
+        profile_config=None,
+        deferrable=False,
+        image="dbt-image:latest",
+        **kwargs,
+    )
+    sensor._get_producer_task_status = MagicMock(return_value=None)
+    return sensor
+
+
+def test_test_sensor_is_test_sensor_property():
+    """DbtTestWatcherKubernetesOperator should report is_test_sensor=True."""
+    sensor = make_test_sensor()
+    assert sensor.is_test_sensor is True
+
+
+@pytest.mark.parametrize(
+    "xcom_return, expected",
+    [
+        pytest.param("pass", True, id="pass"),
+        pytest.param("fail", AirflowException, id="fail"),
+        pytest.param(None, False, id="waiting"),
+    ],
+)
+def test_test_sensor_poke_status(xcom_return, expected):
+    """Test that the test sensor correctly handles each aggregated test status."""
+    from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key
+
+    sensor = make_test_sensor()
+    model_uid = "model.jaffle_shop.stg_orders"
+    tests_xcom_key = get_tests_status_xcom_key(model_uid)
+
+    ti = MagicMock()
+    ti.try_number = 1
+
+    def xcom_side_effect(task_ids=None, key=None):
+        if key == tests_xcom_key:
+            return xcom_return
+        return None
+
+    ti.xcom_pull.side_effect = xcom_side_effect
+    context = make_context(ti)
+
+    if expected is AirflowException:
+        with pytest.raises(AirflowException):
+            sensor.poke(context)
+    else:
+        assert sensor.poke(context) is expected
+
+    ti.xcom_pull.assert_any_call(sensor.producer_task_id, key=tests_xcom_key)
+
+
+def test_test_sensor_raises_on_retry():
+    """On retry (try_number > 1), poke should raise because test re-execution is not supported."""
+    sensor = make_test_sensor()
+
+    ti = MagicMock()
+    ti.try_number = 2
+    ti.xcom_pull.return_value = None
+    context = make_context(ti)
+
+    with pytest.raises(AirflowException, match="not yet supported"):
+        sensor.poke(context)

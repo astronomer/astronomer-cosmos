@@ -1881,6 +1881,10 @@ def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
             assert task.execution_timeout == timedelta(seconds=1)
 
 
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10"),
+    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
+)
 @pytest.mark.integration
 def test_dbt_dag_with_watcher_and_failing_model(caplog):
     """

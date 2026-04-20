@@ -301,7 +301,10 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
             )
             op2.invocation_mode = InvocationMode.DBT_RUNNER
 
-            with patch("cosmos.operators._watcher.state._persist_backup"):
+            with (
+                patch("cosmos.operators._watcher.state._persist_backup"),
+                patch("airflow.models.Variable"),
+            ):
                 op2.execute(context=mock_context)
 
             # Verify:

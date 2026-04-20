@@ -10,8 +10,6 @@ from enum import Enum
 from threading import Lock
 from typing import Any
 
-from airflow.models import Variable
-
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -82,6 +80,8 @@ def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
     """Write the current backup buffer to an Airflow Variable."""
     if not backup_buffer:
         return
+
+    from airflow.models import Variable
 
     compressed = base64.b64encode(zlib.compress(json.dumps(backup_buffer, default=str).encode("utf-8"))).decode("utf-8")
     Variable.set(var_key, compressed)
@@ -223,6 +223,7 @@ def _delete_xcom_backup_variable(context: Any) -> None:
     if not isinstance(var_key, str):
         return
     try:
+        from airflow.models import Variable
 
         Variable.delete(var_key)
         logger.debug("Deleted XCom backup Variable '%s'", var_key)
@@ -235,6 +236,7 @@ def _restore_xcom_from_variable(context: Any) -> bool:
 
     Returns True if the restore succeeded, False if no backup was found.
     """
+    from airflow.models import Variable
 
     ti = context["ti"]
     dag_id = ti.dag_id

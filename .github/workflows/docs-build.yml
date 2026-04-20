@@ -1,8 +1,7 @@
 name: Build Sphinx documentation
 
 on:
-  # TODO: remove `separate-out-docs-build` before merging; it is only here to
-  # validate the workflow end-to-end on this branch before the PR is opened.
+  # Run this workflow when documentation sources or this workflow definition change.
   push:
     branches: [main]
     paths:

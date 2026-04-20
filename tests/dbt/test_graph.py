@@ -569,7 +569,9 @@ def test_load_via_manifest_with_selectors_and_missing_definitions():
     assert err_info.value.args[0] == f"Selectors not found in manifest file `{project_config.manifest_path}`"
 
 
-def test_load_via_manifest_with_selectors_and_missing_selector():
+@pytest.mark.parametrize("enable_lax_selector_parsing", [True, False])
+def test_load_via_manifest_with_selectors_and_missing_selector(enable_lax_selector_parsing, monkeypatch):
+    monkeypatch.setattr("cosmos.settings.enable_lax_selector_parsing", enable_lax_selector_parsing)
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST_SELECTORS
     )
@@ -593,7 +595,13 @@ def test_load_via_manifest_with_selectors_and_missing_selector():
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_from_dbt_manifest()
 
-    assert "Selector `my_selector` not found in parsed YAML selectors" in err_info.value.args[0]
+    error_message = err_info.value.args[0]
+    assert "Selector `my_selector` not found in parsed YAML selectors" in error_message
+
+    if enable_lax_selector_parsing:
+        assert "Check logs" in error_message
+    else:
+        assert "Check logs" not in error_message
 
 
 def test_load_via_manifest_with_selectors():

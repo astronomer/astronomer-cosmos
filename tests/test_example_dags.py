@@ -41,6 +41,25 @@ def session():
     return get_session()
 
 
+@pytest.fixture(autouse=True)
+def _cleanup_dag_warning_metadata():
+    """Remove the dag_warning table from SQLAlchemy metadata after each test.
+
+    In Airflow 3.2, ``Variable.set()`` during ``dag.test()`` can trigger
+    registration of the ``DagWarning`` model on ``Base.metadata``.  If the
+    table is already present when the next test triggers the same import,
+    SQLAlchemy raises ``InvalidRequestError: Table 'dag_warning' is already
+    defined``.  Removing it after each test prevents the conflict.
+    """
+    yield
+    try:
+        from airflow.models.base import Base
+
+        Base.metadata.remove(Base.metadata.tables["dag_warning"])
+    except (ImportError, KeyError):
+        pass
+
+
 @cache
 def get_dag_bag() -> DagBag:  # noqa: C901
     """Create a DagBag by adding the files that are not supported to .airflowignore"""

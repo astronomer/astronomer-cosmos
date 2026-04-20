@@ -10,8 +10,6 @@ from enum import Enum
 from threading import Lock
 from typing import Any
 
-from sqlalchemy.exc import InvalidRequestError, OperationalError
-
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -82,16 +80,11 @@ def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
     """Write the current backup buffer to an Airflow Variable."""
     if not backup_buffer:
         return
-    try:
-        from airflow.models import Variable
+    from airflow.models import Variable
 
-        compressed = base64.b64encode(zlib.compress(json.dumps(backup_buffer, default=str).encode("utf-8"))).decode(
-            "utf-8"
-        )
-        Variable.set(var_key, compressed)
-        logger.debug("Persisted %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
-    except (ImportError, InvalidRequestError, OperationalError):
-        logger.warning("Failed to persist XCom backup to Variable '%s'", var_key, exc_info=True)
+    compressed = base64.b64encode(zlib.compress(json.dumps(backup_buffer, default=str).encode("utf-8"))).decode("utf-8")
+    Variable.set(var_key, compressed)
+    logger.debug("Persisted %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
 
 
 def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:

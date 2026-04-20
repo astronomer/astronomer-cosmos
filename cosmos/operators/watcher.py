@@ -62,10 +62,16 @@ def _default_freshness_callback(
     nodes: dict[str, DbtNode] | None,
     sources_json: dict[str, Any] | None,
 ) -> tuple[list[str], str]:
-    """Return unique_ids of all nodes that transitively depend on a stale source, plus the status ``"skip"``.
+    """Return unique_ids of nodes that must be skipped due to stale sources, plus the status ``"skip"``.
 
     Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``.
-    Traversal is DFS over the reverse-dependency graph built from ``nodes``.
+
+    A node is skipped only when **all** of its upstream dependencies are either stale sources or
+    already-skipped nodes.  If a node has at least one clean upstream path it may still execute
+    successfully — for example when a model depends on both a stale source and a clean model — so
+    it is excluded from the skip set and allowed to run.
+
+    Traversal is a DFS over the reverse-dependency graph built from ``nodes``.
     """
     if not nodes or not sources_json:
         return [], "skip"
@@ -80,14 +86,23 @@ def _default_freshness_callback(
         for dep_id in node.depends_on:
             dependents.setdefault(dep_id, set()).add(node_id)
 
-    # DFS from each stale source to collect all transitive dependents
+    # DFS from each stale source.  A dependent is added to the skip set only when every entry in
+    # its depends_on is either a known-stale source or already in the skip set.  This preserves
+    # nodes that have at least one clean upstream path: they may succeed and should not be
+    # preemptively excluded.  When a new node is added to visited its own dependents are queued
+    # so they can be re-evaluated with the updated skip set.
     _excludable_resource_types = {DbtResourceType.MODEL, DbtResourceType.SEED, DbtResourceType.SNAPSHOT}
     visited: set[str] = set()
     queue = list(stale_source_ids)
     while queue:
         current = queue.pop()
         for dependent_id in dependents.get(current, set()):
-            if dependent_id not in visited:
+            if dependent_id in visited:
+                continue
+            dependent_node = nodes.get(dependent_id)
+            if dependent_node is None:
+                continue
+            if all(dep in stale_source_ids or dep in visited for dep in dependent_node.depends_on):
                 visited.add(dependent_id)
                 queue.append(dependent_id)
 
@@ -212,9 +227,21 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         When a callback is registered, dbt's stdout is redirected to a null buffer so that the
         raw ``--log-format json`` lines do not appear in Airflow task logs alongside the
         human-readable messages already emitted by ``_log_dbt_msg`` inside the callback.
+
+        The callback is intentionally **not** registered during the source freshness pre-check
+        (``context["_check_source_freshness"] is True``).  Registering it there would leave a
+        stale entry in ``_dbt_runner_callbacks`` that fires again for every event during the
+        subsequent ``dbt build``, producing duplicate log lines.  Freshness results are read from
+        ``target/sources.json`` after the run and do not need per-event XCom pushes.
         """
         context = kwargs.get("context")
         if context is not None:
+            # During the source freshness pre-check suppress raw JSON stdout, but do not register
+            # the XCom-pushing callback so it cannot accumulate and duplicate build logs later.
+            if context.get("_check_source_freshness"):
+                with contextlib.redirect_stdout(_NullWriter()):
+                    return super().run_dbt_runner(command, env, cwd, **kwargs)
+
             extra_kwargs: dict[str, Any] = {"project_dir": cwd, "context": context}
             parse = self._make_parse_callable()
             # Collect callback errors rather than raising inside the callback: dbt catches

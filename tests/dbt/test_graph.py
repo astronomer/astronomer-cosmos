@@ -2393,7 +2393,7 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     hash_dir, hash_selectors, hash_impl = version.split(",")
 
     assert hash_selectors == "43303af03e84e3b51fbfcf598261fae4"
-    assert hash_impl == "4c93048c66ca45356e1677511447c7ba"
+    assert hash_impl == "86424c8b70c2e9b6d1f595c7ec9a8291"
 
     if sys.platform == "darwin":
         # Some macOS versions compute a different directory hash than Linux, while others match the Linux behavior.

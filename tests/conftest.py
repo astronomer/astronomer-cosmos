@@ -52,31 +52,6 @@ def _cache_airflow_in_process_api():
 
 
 @pytest.fixture(autouse=True)
-def _cleanup_sqlalchemy_metadata():
-    """Remove tables dynamically added to SQLAlchemy metadata during each test.
-
-    In Airflow 3.2, ``dag.test()`` can trigger lazy registration of models
-    (e.g. ``DagWarning``, ``ImportError``) on ``Base.metadata``.  If those
-    tables are already present when the next test triggers the same import,
-    SQLAlchemy raises ``InvalidRequestError: Table '...' is already defined``.
-    Restoring the metadata to its pre-test state prevents the conflict.
-    """
-    try:
-        from airflow.models.base import Base
-
-        tables_before = set(Base.metadata.tables)
-    except ImportError:
-        tables_before = None
-
-    yield
-
-    if tables_before is not None:
-        tables_after = set(Base.metadata.tables)
-        for table_name in tables_after - tables_before:
-            Base.metadata.remove(Base.metadata.tables[table_name])
-
-
-@pytest.fixture(autouse=True)
 def _cleanup_rich_loggers():
     """Replace any CosmosRichLogger instances with standard loggers after each test.
 

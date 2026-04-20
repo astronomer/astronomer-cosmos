@@ -1,0 +1,42 @@
+name: Build Sphinx documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "cosmos/**"
+      - ".github/workflows/docs-build.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "cosmos/**"
+      - ".github/workflows/docs-build.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install documentation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r docs/requirements.txt
+
+      - name: Build Sphinx documentation
+        run: sphinx-build -b html docs docs/_build --fail-on-warning --fresh-env

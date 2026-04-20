@@ -3,9 +3,10 @@ name: test
 on:
   push: # Run on pushes to the default branch
     branches: [main, security-approvals]
-  # Also run on pull requests originating from forks. Jobs that require secrets (integration tests, code coverage)
-  # depend on the Authorize job, which requires manually approving the workflow run for external PRs. Jobs that do not
-  # use secrets (type-check, unit tests, performance, telemetry, kubernetes) run without approval.
+  # Also run on pull requests originating from forks. Jobs that require sensitive secrets (integration tests,
+  # kubernetes, code coverage) depend on the Authorize job, which requires manually approving the workflow run for
+  # external PRs. Jobs that do not use sensitive secrets (type-check, unit tests, performance, telemetry) run
+  # without approval.
   pull_request_target:
     branches: [main] # zizmor: ignore[dangerous-triggers]
 
@@ -148,7 +149,16 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@v5
+      - if: github.event_name == 'push'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: unit-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+
+      - if: github.event_name != 'push'
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.cache/pip
@@ -634,7 +644,16 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - if: github.event_name == 'push'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: telemetry-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+
+      - if: github.event_name != 'push'
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.cache/pip
@@ -694,7 +713,16 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@v5
+      - if: github.event_name == 'push'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: perf-test-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+
+      - if: github.event_name != 'push'
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.cache/pip

@@ -566,21 +566,24 @@ class DbtGraph:
             Variable.set(self.cache_key, cache_dict, serialize_json=True)
             return
 
+        is_yaml_cache = "yaml" in cache_name.lower()
         disable_cache_env_var = (
             "AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS"
-            if "yaml" in cache_name.lower()
+            if is_yaml_cache
             else "AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS"
         )
+        cache_specific_workaround = "" if is_yaml_cache else ", using LoadMode.DBT_MANIFEST"
         try:
             Variable.set(self.cache_key, cache_dict, serialize_json=True)
         except AirflowRuntimeError as e:
             logger.warning(
                 "Failed to save Cosmos %s cache to Airflow Variable '%s': %s. "
-                "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching, "
-                "using LoadMode.DBT_MANIFEST, or disabling the cache via %s.",
+                "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching%s, "
+                "or disabling the cache via %s.",
                 cache_name,
                 self.cache_key,
                 e,
+                cache_specific_workaround,
                 disable_cache_env_var,
             )
 

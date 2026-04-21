@@ -2412,6 +2412,38 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
         assert hash_dir == "5c1aed937708e585054c874ff8f33fd1"
 
 
+@pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_dbt_ls_cache_variable_set_failure(mock_variable_set, tmp_dbt_project_dir, caplog):
+    from airflow.sdk.exceptions import AirflowRuntimeError
+
+    mock_variable_set.side_effect = AirflowRuntimeError(MagicMock())
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    with caplog.at_level(logging.WARNING, logger="cosmos.dbt.graph"):
+        graph.save_dbt_ls_cache("some output")
+    assert "Failed to save Cosmos dbt ls cache" in caplog.text
+    assert "cosmos_cache__something" in caplog.text
+    assert "AIRFLOW__COSMOS__REMOTE_CACHE_DIR" in caplog.text
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_yaml_selectors_cache_variable_set_failure(mock_variable_set, tmp_dbt_project_dir, caplog):
+    from airflow.sdk.exceptions import AirflowRuntimeError
+
+    mock_variable_set.side_effect = AirflowRuntimeError(MagicMock())
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    selectors = YamlSelectors(
+        {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+    with caplog.at_level(logging.WARNING, logger="cosmos.dbt.graph"):
+        graph.save_yaml_selectors_cache(selectors)
+    assert "Failed to save Cosmos YAML selectors cache" in caplog.text
+    assert "cosmos_cache__something" in caplog.text
+    assert "AIRFLOW__COSMOS__REMOTE_CACHE_DIR" in caplog.text
+
+
 @pytest.mark.integration
 def test_get_dbt_ls_cache_returns_empty_if_non_json_var(airflow_variable):
     graph = DbtGraph(project=ProjectConfig())

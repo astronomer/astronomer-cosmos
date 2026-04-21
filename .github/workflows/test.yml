@@ -33,6 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       code_changed: ${{ steps.check.outputs.code_changed }}
     steps:

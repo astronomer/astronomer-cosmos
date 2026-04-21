@@ -321,7 +321,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         ti = context["ti"]
 
         for unique_id, state in node_state_pairs:
-            logger.info("Marking resource '%s' as %s (stale upstream source)", unique_id, state)
+            logger.info("Pre-setting resource '%s' state to %s from source-freshness callback", unique_id, state)
             self._push_node_state_xcom(ti, unique_id, state)
 
         # Exclude any node whose pre-set state is non-success from the dbt build.

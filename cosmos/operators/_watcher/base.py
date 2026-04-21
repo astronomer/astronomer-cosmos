@@ -558,7 +558,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 self._resource_label.lower(),
                 self.model_unique_id,
             )
-            self._fallback_to_non_watcher_run(try_number=2, context=context)
+            self._fallback_to_non_watcher_run(try_number=context["ti"].try_number, context=context)
             return
 
     def _log_startup_events(self, ti: Any) -> None:

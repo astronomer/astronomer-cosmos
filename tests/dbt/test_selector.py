@@ -1552,7 +1552,7 @@ def test_exposure_selector():
 )
 def test_valid_method_yaml_selectors(selector_name, selector_definition, parsed_selector):
     selectors = {selector_name: selector_definition}
-    yaml_selectors = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors, lax_parsing_enabled=False)
 
     result = yaml_selectors.get_parsed(selector_name)
 
@@ -1651,7 +1651,7 @@ def test_valid_method_yaml_selectors(selector_name, selector_definition, parsed_
 )
 def test_valid_graph_operator_yaml_selectors(selector_name, selector_definition, parsed_selector):
     selectors = {selector_name: selector_definition}
-    yaml_selectors = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors, lax_parsing_enabled=False)
 
     result = yaml_selectors.get_parsed(selector_name)
 
@@ -1736,7 +1736,7 @@ def test_valid_graph_operator_yaml_selectors(selector_name, selector_definition,
 )
 def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition, exception_msg):
     selectors = {selector_name: selector_definition}
-    yaml_selectors = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors, lax_parsing_enabled=False)
 
     with pytest.raises(CosmosValueError) as err_info:
         _ = yaml_selectors.get_parsed(selector_name)
@@ -1962,7 +1962,7 @@ def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition
 )
 def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, exception_msg):
     selectors = {selector_name: selector_definition}
-    yaml_selectors = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors, lax_parsing_enabled=False)
 
     with pytest.raises(CosmosValueError) as err_info:
         _ = yaml_selectors.get_parsed(selector_name)
@@ -1992,14 +1992,20 @@ def test_invalid_dbt_method_yaml_selectors(selector_name, selector_definition, e
         ),
     ],
 )
-def test_invalid_yaml_structure_raises_immediately(selector_name, selector_definition, exception_msg):
-    """Test that structural YAML errors (missing name/definition) raise immediately from parse()."""
+@pytest.mark.parametrize("lax_parsing_enabled", [True, False])
+def test_invalid_yaml_structures(selector_name, selector_definition, exception_msg, lax_parsing_enabled, caplog):
     selectors = {selector_name: selector_definition}
 
-    with pytest.raises(CosmosValueError) as err_info:
-        _ = YamlSelectors.parse(selectors)
+    if lax_parsing_enabled:
+        yaml_selectors = YamlSelectors.parse(selectors, lax_parsing_enabled=lax_parsing_enabled)
+        result = yaml_selectors.get_parsed(selector_name)
 
-    assert exception_msg in str(err_info.value)
+        assert result is None
+        assert exception_msg in caplog.text
+    else:
+        with pytest.raises(CosmosValueError) as err_info:
+            _ = YamlSelectors.parse(selectors, lax_parsing_enabled=False)
+            assert exception_msg in str(err_info.value)
 
 
 @pytest.mark.parametrize(
@@ -2012,7 +2018,7 @@ def test_invalid_yaml_structure_raises_immediately(selector_name, selector_defin
 )
 def test_invalid_value_type_for_list_keys(selector_name, definition_key, invalid_value, expected_error_fragment):
     selectors = {selector_name: {"name": selector_name, "definition": {definition_key: invalid_value}}}
-    yaml_selectors = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors, lax_parsing_enabled=False)
 
     with pytest.raises(CosmosValueError) as err_info:
         _ = yaml_selectors.get_parsed(selector_name)
@@ -2039,7 +2045,7 @@ def test_invalid_items_in_selector_lists(selector_name, definition_key, invalid_
         }
     }
 
-    yaml_selectors = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors, lax_parsing_enabled=False)
 
     with pytest.raises(CosmosValueError) as err_info:
         _ = yaml_selectors.get_parsed(selector_name)
@@ -2068,7 +2074,7 @@ def test_non_string_keys_in_selector_dicts(selector_name, definition_key, non_st
         }
     }
 
-    yaml_selectors = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors, lax_parsing_enabled=False)
 
     with pytest.raises(CosmosValueError) as err_info:
         _ = yaml_selectors.get_parsed(selector_name)
@@ -2092,7 +2098,7 @@ def test_selector_reference_resolves_from_cache():
         },
     }
 
-    yaml_selectors = YamlSelectors.parse(selectors)
+    yaml_selectors = YamlSelectors.parse(selectors, lax_parsing_enabled=False)
 
     base_result = yaml_selectors.get_parsed("base_selector")
     reference_result = yaml_selectors.get_parsed("reference_selector")

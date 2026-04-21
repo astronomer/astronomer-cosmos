@@ -85,6 +85,7 @@ jobs:
               .github/ISSUE_TEMPLATE/*) ;;
               .github/dependabot.yml) ;;
               .github/workflows/docs.yml) ;;
+              .github/workflows/docs-build.yml) ;;
               .github/workflows/stale.yml) ;;
               .github/workflows/actionlint.yml) ;;
               .github/workflows/codeql.yml) ;;
@@ -172,7 +173,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-cov
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-unit-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -190,6 +191,7 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
         dbt-version: [ "1.11" ]
+        split-group: [1, 2, 3]
         exclude:
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
           - python-version: "3.13"
@@ -236,13 +238,16 @@ jobs:
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
-      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
+      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-setup
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration
         env:
+          PYTEST_SPLITS: 3
+          PYTEST_SPLIT_GROUP: ${{ matrix.split-group }}
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS: 0
+          AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING: 0
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 120
           AIRFLOW__CORE__DAG_FILE_PROCESSOR_TIMEOUT: 120
@@ -269,9 +274,9 @@ jobs:
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
+          name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-split${{ matrix.split-group }}
           path: .coverage
           include-hidden-files: true
 
@@ -349,7 +354,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-integration-expensive-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -493,7 +498,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-async
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-integration-dbt-async-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -575,6 +580,7 @@ jobs:
         env:
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS: 0
+          AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING: 0
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
@@ -588,7 +594,7 @@ jobs:
           RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -630,7 +636,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.cache/pip
@@ -653,7 +659,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-telemetry
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-telemetry-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -801,7 +807,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
       - name: Upload coverage to Github
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-integration-kubernetes-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage

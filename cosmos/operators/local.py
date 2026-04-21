@@ -690,7 +690,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     self.handle_exception(result)
                     return result
                 if is_openlineage_common_available:
-                    self.calculate_openlineage_events_completes(env, tmp_dir_path)
+                    self.calculate_openlineage_events_completes(env, tmp_dir_path, full_cmd)
                     if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
                         # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance,
                         # in that case we're storing as self.openlineage_events_completes
@@ -711,7 +711,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 return result
 
     def calculate_openlineage_events_completes(
-        self, env: dict[str, str | os.PathLike[Any] | bytes], project_dir: Path
+        self,
+        env: dict[str, str | os.PathLike[Any] | bytes],
+        project_dir: Path,
+        dbt_command_line: list[str] | None = None,
     ) -> None:
         """
         Use openlineage-integration-common to extract lineage events from the artifacts generated after running the dbt
@@ -728,13 +731,17 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         for key, value in env.items():
             os.environ[key] = str(value)
 
-        openlineage_processor = DbtLocalArtifactProcessor(
+        processor_kwargs: dict[str, Any] = dict(
             producer=OPENLINEAGE_PRODUCER,
             job_namespace=settings.LINEAGE_NAMESPACE,
             project_dir=project_dir,
             profile_name=self.profile_config.profile_name,
             target=self.profile_config.target_name,
         )
+        sig = inspect.signature(DbtLocalArtifactProcessor.__init__)
+        if "dbt_command_line" in sig.parameters and dbt_command_line is not None:
+            processor_kwargs["dbt_command_line"] = dbt_command_line
+        openlineage_processor = DbtLocalArtifactProcessor(**processor_kwargs)
         # Do not raise exception if a command is unsupported, following the openlineage-dbt processor:
         # https://github.com/OpenLineage/OpenLineage/blob/bdcaf828ebc117e0e5ffc5fab44ff8886eb7836b/integration/common/openlineage/common/provider/dbt/processor.py#L141
         openlineage_processor.should_raise_on_unsupported_command = False

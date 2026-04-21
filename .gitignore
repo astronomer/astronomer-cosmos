@@ -11,6 +11,9 @@ actionlint
 # dbt_packages is a directory that gets created when you run dbt deps
 dev/dags/dbt/jaffle_shop/dbt_packages/
 
+# dbt package lockfile — removed so dbt resolves the version range in packages.yml at runtime
+dev/dags/dbt/jaffle_shop/package-lock.yml
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

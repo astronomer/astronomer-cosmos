@@ -747,7 +747,7 @@ def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fai
 
     caplog.set_level(logging.ERROR)
     caplog.clear()
-    run_test_dag(dag, expect_success=False)
+    run_test_dag(dag, expected_dag_state=DagRunState.FAILED)
 
     assert "ERROR" in caplog.text
     assert "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)." in caplog.text
@@ -1297,10 +1297,69 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
         should_store_compiled_sql=False,
     )
 
-    dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR)
+    dbt_base_operator.calculate_openlineage_events_completes(
+        env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=dbt_base_operator.base_cmd + dbt_base_operator.dbt_cmd_flags
+    )
 
     assert instance.parse.called
     assert "Unable to parse OpenLineage events" in caplog.text
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator._handle_post_execution")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception")
+@patch("cosmos.operators.local.DbtLocalArtifactProcessor")
+@patch("cosmos.operators.local.is_openlineage_common_available", True)
+@patch("cosmos.config.ProfileConfig.ensure_profile")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.invoke_dbt")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._clone_project")
+@patch("cosmos.operators.local.tempfile.TemporaryDirectory")
+def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
+    mock_tmp_dir,
+    mock_clone_project,
+    mock_invoke_dbt,
+    mock_ensure_profile,
+    mock_processor,
+    mock_handle_exception,
+    mock_handle_post_execution,
+    tmp_path,
+):
+    """Tests that run_command forwards the full dbt CLI (including --profiles-dir) to DbtLocalArtifactProcessor."""
+    profile_path = tmp_path / "profiles" / "profiles.yml"
+    mock_tmp_dir.return_value.__enter__.return_value = str(tmp_path)
+    mock_ensure_profile.return_value.__enter__.return_value = (profile_path, {})
+    mock_invoke_dbt.return_value = MagicMock()
+
+    mock_processor_instance = MagicMock()
+    mock_processor_instance.parse.return_value = MagicMock(completes=[])
+    mock_processor.return_value = mock_processor_instance
+
+    # Simulate DbtLocalArtifactProcessor.__init__ accepting dbt_command_line
+    mock_sig = MagicMock()
+    mock_sig.parameters = {"dbt_command_line": MagicMock()}
+
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        emit_datasets=False,
+        install_deps=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+    )
+
+    with patch("cosmos.operators.local.inspect.signature", return_value=mock_sig):
+        operator.run_command(
+            cmd=["dbt", "cmd"],
+            env={},
+            context={"run_id": "test_run_id", "task_instance": MagicMock()},
+        )
+
+    mock_processor.assert_called_once()
+    call_kwargs = mock_processor.call_args.kwargs
+    assert "dbt_command_line" in call_kwargs
+    assert "--profiles-dir" in call_kwargs["dbt_command_line"]
+    # Verify the base command is also present (full_cmd = cmd + flags)
+    assert "dbt" in call_kwargs["dbt_command_line"]
+    assert "cmd" in call_kwargs["dbt_command_line"]
 
 
 @pytest.mark.parametrize(

@@ -118,5 +118,8 @@ def _restore_xcom_from_variable(context: Any) -> bool:
         safe_xcom_push(task_instance=ti, key=key, value=value)
     logger.info("Restored %d XCom entries from Variable '%s'", len(backup), var_key)
 
-    Variable.delete(var_key)
+    try:
+        Variable.delete(var_key)
+    except KeyError:
+        pass
     return True

@@ -120,6 +120,7 @@ def _restore_xcom_from_variable(context: Any) -> bool:
 
     try:
         Variable.delete(var_key)
+        logger.debug("Deleted XCom backup Variable '%s' after restore", var_key)
     except KeyError:
-        pass
+        logger.debug("XCom backup Variable '%s' already deleted", var_key)
     return True

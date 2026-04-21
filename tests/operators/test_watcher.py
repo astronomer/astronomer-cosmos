@@ -2428,3 +2428,327 @@ class TestProducerSourceFreshness:
         # The callback list must remain untouched — no watcher callback appended
         assert producer._dbt_runner_callbacks is None
         mock_super.assert_called_once()
+
+
+class TestDbtProducerRetry:
+    """Tests for the producer-internal dbt retry mechanism."""
+
+    @staticmethod
+    def _make_producer(**kwargs):
+        defaults = dict(project_dir=".", profile_config=None)
+        defaults.update(kwargs)
+        return DbtProducerWatcherOperator(**defaults)
+
+    def test_dbt_retry_count_default_is_zero(self):
+        op = self._make_producer()
+        assert op.dbt_retry_count == 0
+
+    def test_dbt_retry_count_custom(self):
+        op = self._make_producer(dbt_retry_count=3)
+        assert op.dbt_retry_count == 3
+
+    def test_pending_failures_not_used_when_retry_count_zero(self):
+        """When dbt_retry_count=0, pending_failures should not be passed to the log parser."""
+        op = self._make_producer(dbt_retry_count=0)
+        op._dataset_namespace = "test"
+        parse_fn = op._make_parse_callable()
+        # Inspect the partial's keywords
+        assert parse_fn.keywords.get("pending_failures") is None
+
+    def test_pending_failures_used_when_retry_count_positive(self):
+        """When dbt_retry_count>0, pending_failures dict should be passed to the log parser."""
+        op = self._make_producer(dbt_retry_count=2)
+        op._dataset_namespace = "test"
+        parse_fn = op._make_parse_callable()
+        assert parse_fn.keywords.get("pending_failures") is op._pending_failures
+
+    def test_store_dbt_resource_status_defers_failed_model(self):
+        """Failed models should be stored in pending_failures instead of XCom when retries are configured."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        pending = {}
+
+        log_line = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "error",
+                        "unique_id": "model.pkg.failing_model",
+                        "node_path": "failing_model.sql",
+                        "resource_type": "model",
+                    }
+                }
+            }
+        )
+
+        store_dbt_resource_status_from_log(log_line, {"context": ctx, "project_dir": "/tmp"}, pending_failures=pending)
+
+        # Should NOT be in XCom
+        assert "model__pkg__failing_model_status" not in ti.store
+        # Should be in pending_failures
+        assert "model.pkg.failing_model" in pending
+        assert pending["model.pkg.failing_model"]["status"] == "error"
+
+    def test_store_dbt_resource_status_defers_skipped_model(self):
+        """Skipped models (e.g. due to upstream failure) should also be deferred when retries are configured,
+        because dbt retry re-runs both failed nodes and their skipped downstream dependents."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        pending = {}
+
+        log_line = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "skipped",
+                        "unique_id": "model.pkg.downstream_model",
+                        "node_path": "downstream_model.sql",
+                        "resource_type": "model",
+                    }
+                }
+            }
+        )
+
+        store_dbt_resource_status_from_log(log_line, {"context": ctx, "project_dir": "/tmp"}, pending_failures=pending)
+
+        # Should NOT be in XCom
+        assert "model__pkg__downstream_model_status" not in ti.store
+        # Should be in pending_failures
+        assert "model.pkg.downstream_model" in pending
+        assert pending["model.pkg.downstream_model"]["status"] == "skipped"
+
+    def test_store_dbt_resource_status_pushes_success_immediately_with_pending(self):
+        """Successful models should be pushed to XCom immediately even when pending_failures is provided."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        pending = {}
+
+        log_line = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "success",
+                        "unique_id": "model.pkg.good_model",
+                        "node_path": "good_model.sql",
+                        "resource_type": "model",
+                    }
+                }
+            }
+        )
+
+        store_dbt_resource_status_from_log(log_line, {"context": ctx, "project_dir": "/tmp"}, pending_failures=pending)
+
+        # Should be in XCom
+        assert ti.store.get("model__pkg__good_model_status") == {"status": "success", "outlet_uris": []}
+        # Should NOT be in pending
+        assert "model.pkg.good_model" not in pending
+
+    def test_store_dbt_resource_status_clears_pending_on_retry_success(self):
+        """When a previously failed model succeeds on retry, it should be removed from pending_failures and pushed to XCom."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        pending = {"model.pkg.flaky_model": {"status": "error", "outlet_uris": []}}
+
+        log_line = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "success",
+                        "unique_id": "model.pkg.flaky_model",
+                        "node_path": "flaky_model.sql",
+                        "resource_type": "model",
+                    }
+                }
+            }
+        )
+
+        store_dbt_resource_status_from_log(log_line, {"context": ctx, "project_dir": "/tmp"}, pending_failures=pending)
+
+        # Should now be in XCom with success
+        assert ti.store.get("model__pkg__flaky_model_status") == {"status": "success", "outlet_uris": []}
+        # Should be removed from pending
+        assert "model.pkg.flaky_model" not in pending
+
+    def test_flush_pending_failures_pushes_to_xcom(self):
+        """_flush_pending_failures should push all remaining failures to XCom and clear the dict."""
+        op = self._make_producer(dbt_retry_count=1)
+        op._pending_failures = {
+            "model.pkg.model_a": {"status": "error", "outlet_uris": []},
+            "model.pkg.model_b": {"status": "failed", "outlet_uris": []},
+        }
+        ti = _MockTI()
+        context = {"ti": ti}
+
+        op._flush_pending_failures(context)
+
+        assert ti.store["model__pkg__model_a_status"] == {"status": "error", "outlet_uris": []}
+        assert ti.store["model__pkg__model_b_status"] == {"status": "failed", "outlet_uris": []}
+        assert op._pending_failures == {}
+
+    def test_flush_pending_failures_noop_when_empty(self):
+        """_flush_pending_failures should do nothing when there are no pending failures."""
+        op = self._make_producer(dbt_retry_count=1)
+        ti = _MockTI()
+        context = {"ti": ti}
+
+        op._flush_pending_failures(context)
+
+        assert ti.store == {}
+
+    def test_has_run_results(self, tmp_path):
+        target = tmp_path / "target"
+        target.mkdir()
+
+        op = self._make_producer()
+
+        assert not op._has_run_results(str(tmp_path))
+
+        (target / "run_results.json").write_text("{}")
+        assert op._has_run_results(str(tmp_path))
+
+    def test_build_retry_command(self):
+        op = self._make_producer(profile_config=profile_config)
+        op.dbt_executable_path = "dbt"
+        op.dbt_cmd_global_flags = []
+        op.partial_parse = False
+
+        cmd = op._build_retry_command("/tmp/project", Path("/tmp/profiles/profiles.yml"))
+        assert "retry" in cmd
+        assert "--no-partial-parse" in cmd
+        assert "--project-dir" in cmd
+
+    def test_post_dbt_invoke_no_retries_configured(self):
+        """When dbt_retry_count=0, _post_dbt_invoke should return the original result unchanged."""
+        op = self._make_producer(dbt_retry_count=0)
+        original_result = MagicMock()
+        context = {"ti": _MockTI()}
+
+        result = op._post_dbt_invoke(original_result, context, {}, "/tmp", Path("/tmp"))
+        assert result is original_result
+
+    def test_post_dbt_invoke_no_failures(self):
+        """When there are no pending failures, _post_dbt_invoke should return the original result."""
+        op = self._make_producer(dbt_retry_count=2)
+        op._pending_failures = {}
+        original_result = MagicMock()
+        context = {"ti": _MockTI()}
+
+        result = op._post_dbt_invoke(original_result, context, {}, "/tmp", Path("/tmp"))
+        assert result is original_result
+
+    @patch.object(DbtProducerWatcherOperator, "_run_dbt_retry_loop")
+    def test_post_dbt_invoke_all_retries_succeed(self, mock_retry_loop):
+        """When retries resolve all failures, should return the retry result."""
+        op = self._make_producer(dbt_retry_count=2)
+        op._pending_failures = {"model.pkg.flaky": {"status": "error", "outlet_uris": []}}
+        original_result = MagicMock()
+        retry_result = MagicMock()
+
+        # Simulate retry loop clearing all failures
+        def side_effect(*args, **kwargs):
+            op._pending_failures.clear()
+            return retry_result
+
+        mock_retry_loop.side_effect = side_effect
+        context = {"ti": _MockTI()}
+
+        result = op._post_dbt_invoke(original_result, context, {}, "/tmp", Path("/tmp"))
+        assert result is retry_result
+        mock_retry_loop.assert_called_once()
+
+    @patch.object(DbtProducerWatcherOperator, "_run_dbt_retry_loop")
+    def test_post_dbt_invoke_retries_exhausted_with_remaining_failures(self, mock_retry_loop):
+        """When retries don't resolve all failures, should flush them to XCom and return original result."""
+        op = self._make_producer(dbt_retry_count=1)
+        op._pending_failures = {"model.pkg.broken": {"status": "error", "outlet_uris": []}}
+        original_result = MagicMock()
+        ti = _MockTI()
+        context = {"ti": ti}
+
+        # Simulate retry loop NOT clearing failures
+        mock_retry_loop.return_value = MagicMock()
+
+        result = op._post_dbt_invoke(original_result, context, {}, "/tmp", Path("/tmp"))
+        assert result is original_result
+        # Failures should have been flushed to XCom
+        assert ti.store["model__pkg__broken_status"] == {"status": "error", "outlet_uris": []}
+
+    @patch.object(DbtProducerWatcherOperator, "invoke_dbt")
+    def test_retry_loop_invokes_dbt_retry(self, mock_invoke, tmp_path):
+        """The retry loop should invoke dbt retry for each attempt while failures exist."""
+        op = self._make_producer(dbt_retry_count=2, profile_config=profile_config)
+        op.dbt_executable_path = "dbt"
+        op.dbt_cmd_global_flags = []
+        op.partial_parse = False
+        op._pending_failures = {"model.pkg.flaky": {"status": "error", "outlet_uris": []}}
+
+        # Create run_results.json so the loop doesn't abort
+        target = tmp_path / "target"
+        target.mkdir()
+        (target / "run_results.json").write_text("{}")
+
+        # Simulate first retry succeeding (clears pending)
+        def side_effect(*args, **kwargs):
+            op._pending_failures.clear()
+            return MagicMock()
+
+        mock_invoke.return_value = MagicMock()
+        mock_invoke.side_effect = side_effect
+
+        context = {"ti": _MockTI()}
+        op._run_dbt_retry_loop(context, {}, str(tmp_path), Path("/tmp/profiles"))
+
+        # Should only call once since failures were cleared
+        assert mock_invoke.call_count == 1
+        cmd_called = mock_invoke.call_args[1].get("command") or mock_invoke.call_args[0][0]
+        assert "retry" in cmd_called
+
+    @patch.object(DbtProducerWatcherOperator, "invoke_dbt")
+    def test_retry_loop_stops_when_run_results_missing(self, mock_invoke, tmp_path):
+        """If run_results.json is missing, the retry loop should break without invoking dbt."""
+        op = self._make_producer(dbt_retry_count=2)
+        op._pending_failures = {"model.pkg.broken": {"status": "error", "outlet_uris": []}}
+
+        # No run_results.json — target dir doesn't even exist
+        context = {"ti": _MockTI()}
+        op._run_dbt_retry_loop(context, {}, str(tmp_path), Path("/tmp/profiles"))
+
+        mock_invoke.assert_not_called()
+        # Failures should still be pending (not cleared by the loop)
+        assert "model.pkg.broken" in op._pending_failures
+
+    @patch.object(DbtProducerWatcherOperator, "invoke_dbt")
+    def test_retry_loop_handles_invoke_exception(self, mock_invoke, tmp_path):
+        """If dbt retry raises an exception, the loop should catch it and continue."""
+        op = self._make_producer(dbt_retry_count=2, profile_config=profile_config)
+        op.dbt_executable_path = "dbt"
+        op.dbt_cmd_global_flags = []
+        op.partial_parse = False
+        op._pending_failures = {"model.pkg.broken": {"status": "error", "outlet_uris": []}}
+
+        target = tmp_path / "target"
+        target.mkdir()
+        (target / "run_results.json").write_text("{}")
+
+        mock_invoke.side_effect = Exception("dbt retry failed")
+
+        context = {"ti": _MockTI()}
+        result = op._run_dbt_retry_loop(context, {}, str(tmp_path), Path("/tmp/profiles"))
+
+        # Should have tried dbt_retry_count times
+        assert mock_invoke.call_count == 2
+        assert result is None
+        # Failures should still be pending
+        assert "model.pkg.broken" in op._pending_failures
+
+    def test_execute_clears_pending_failures(self):
+        """execute() should clear _pending_failures at the start."""
+        op = self._make_producer(dbt_retry_count=1)
+        op._pending_failures = {"model.pkg.stale": {"status": "error", "outlet_uris": []}}
+        ti = _MockTI()
+        context = {"ti": ti}
+
+        with patch("cosmos.operators.local.DbtLocalBaseOperator.execute"):
+            op.execute(context=context)
+
+        assert op._pending_failures == {}

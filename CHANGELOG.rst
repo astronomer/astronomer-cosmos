@@ -1,6 +1,16 @@
 Changelog
 =========
 
+1.14.1a1 (2026-04-21)
+-------------------
+
+Bug Fixes
+
+* Fix watcher producer retries behaviour by @tatiana in #2559
+
+(and others)
+
+
 1.14.0 (2026-04-07)
 ---------------------
 

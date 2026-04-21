@@ -1,7 +1,7 @@
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from airflow.exceptions import AirflowSkipException
+from airflow.exceptions import AirflowException, AirflowSkipException
 
 from cosmos.operators._watcher.base import BaseConsumerSensor, _process_dbt_log_event
 from cosmos.operators.local import DbtRunLocalOperator
@@ -132,3 +132,59 @@ class TestBaseConsumerSensor:
         ):
             with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
                 sensor.poke(context)
+
+
+class TestHandleNoDbtNodeStatus:
+    """Tests for BaseConsumerSensor._handle_no_dbt_node_status."""
+
+    def _make_sensor(self):
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        extra_context = {"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}}
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context=extra_context,
+        )
+        sensor._get_producer_task_status = MagicMock(return_value=None)
+        return sensor
+
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+    def test_producer_failed_with_no_poke_retries_falls_back(self, mock_fallback):
+        sensor = self._make_sensor()
+        sensor.poke_retry_number = 0
+        context = MagicMock()
+
+        result = sensor._handle_no_dbt_node_status("failed", try_number=1, context=context)
+
+        assert result is True
+        mock_fallback.assert_called_once_with(1, context)
+
+    def test_producer_failed_with_poke_retries_raises(self):
+        sensor = self._make_sensor()
+        sensor.poke_retry_number = 1
+
+        with pytest.raises(AirflowException, match="dbt build command failed"):
+            sensor._handle_no_dbt_node_status("failed", try_number=1, context=MagicMock())
+
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+    def test_producer_skipped_falls_back(self, mock_fallback):
+        sensor = self._make_sensor()
+        context = MagicMock()
+
+        result = sensor._handle_no_dbt_node_status("skipped", try_number=1, context=context)
+
+        assert result is True
+        mock_fallback.assert_called_once_with(1, context)
+
+    def test_no_status_increments_poke_retry(self):
+        sensor = self._make_sensor()
+        sensor.poke_retry_number = 0
+
+        result = sensor._handle_no_dbt_node_status(None, try_number=1, context=MagicMock())
+
+        assert result is False
+        assert sensor.poke_retry_number == 1

@@ -1,7 +1,7 @@
 """
 DAG to test watcher retry behaviour with group_nodes_by_folder=True.
 
-Uses the multi_folder dbt project with a failing model (dim_failing in models_b).
+Uses the multi_folder_failing dbt project with a failing model (dim_failing in models_b).
 """
 
 import os
@@ -14,7 +14,7 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent.parent / "dags/dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
-DBT_PROJECT_PATH = DBT_ROOT_PATH / "multi_folder"
+DBT_PROJECT_PATH = DBT_ROOT_PATH / "multi_folder_failing"
 
 profile_config = ProfileConfig(
     profile_name="default",

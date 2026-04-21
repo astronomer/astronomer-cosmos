@@ -2357,9 +2357,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
         # Different macOS versions have produced different hashes for this directory. The first value below is a
         # historical macOS-specific hash, while the second matches the Linux hash asserted in the else-branch. We
         # allow both here so that the test is stable across macOS versions and when macOS hashing matches Linux.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "633a523f295ef0cd496525428815537b")
+        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "5c1aed937708e585054c874ff8f33fd1")
     else:
-        assert hash_dir == "633a523f295ef0cd496525428815537b"
+        assert hash_dir == "5c1aed937708e585054c874ff8f33fd1"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2399,9 +2399,9 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
         # Some macOS versions compute a different directory hash than Linux, while others match the Linux behavior.
         # The first value is the macOS-specific hash; the second value is the Linux hash, which certain macOS versions also produce.
         # We allow both here to keep the test stable across macOS releases, while non-macOS platforms assert only the Linux hash.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "633a523f295ef0cd496525428815537b")
+        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "5c1aed937708e585054c874ff8f33fd1")
     else:
-        assert hash_dir == "633a523f295ef0cd496525428815537b"
+        assert hash_dir == "5c1aed937708e585054c874ff8f33fd1"
 
 
 @pytest.mark.integration

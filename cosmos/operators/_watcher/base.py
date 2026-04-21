@@ -413,12 +413,19 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 f"A future release will add fallback to local test execution."
             )
 
-        logger.info(
-            f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
-            try_number - 1,
-            self.model_unique_id,
-            self.project_dir,
-        )
+        if try_number > 1:
+            logger.info(
+                f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
+                try_number - 1,
+                self.model_unique_id,
+                self.project_dir,
+            )
+        else:
+            logger.info(
+                f"Falling back to running model '%s' from project '%s' using {self.__class__.__name__}",
+                self.model_unique_id,
+                self.project_dir,
+            )
 
         upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)
 

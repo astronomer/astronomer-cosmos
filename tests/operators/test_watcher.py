@@ -2396,13 +2396,24 @@ class TestProducerSourceFreshness:
         ti.xcom_push.assert_not_called()
         assert producer.exclude is None
 
-    def test_apply_node_state_tokens_non_skipped_state_does_not_update_exclude(self):
+    def test_apply_node_state_tokens_failed_state_updates_exclude(self):
         producer = self._make_producer()
         producer.exclude = None
         ti = MagicMock()
         context = {"ti": ti}
         producer._apply_node_state_tokens(context, [("model.pkg.m1", "failed")])
         ti.xcom_push.assert_called_once_with(key="model__pkg__m1_status", value={"status": "failed", "outlet_uris": []})
+        assert "m1" in producer.exclude
+
+    def test_apply_node_state_tokens_success_state_does_not_update_exclude(self):
+        producer = self._make_producer()
+        producer.exclude = None
+        ti = MagicMock()
+        context = {"ti": ti}
+        producer._apply_node_state_tokens(context, [("model.pkg.m1", "success")])
+        ti.xcom_push.assert_called_once_with(
+            key="model__pkg__m1_status", value={"status": "success", "outlet_uris": []}
+        )
         assert producer.exclude is None
 
     def test_run_dbt_runner_skips_callback_during_source_freshness(self):

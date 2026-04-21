@@ -159,7 +159,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     ``_add_watcher_producer_task`` when ``SourceRenderingBehavior`` is not ``NONE``), the
     producer first runs ``dbt source freshness``, identifies stale sources, marks all
     transitive dependents as ``"skipped"`` via XCom, and adds them to ``--exclude`` before
-    running the main ``dbt build``.
+    running the main ``dbt build``.  An optional ``freshness_callback`` kwarg
+    (exposed via ``RenderConfig.freshness_callback``) may be passed to override the default
+    skip-propagation logic.
     """
 
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]
@@ -175,7 +177,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._freshness_callback: Callable[
             [Context, Any, TaskGroup | None, dict[str, DbtNode] | None, dict[str, Any] | None],
             list[tuple[str, str]],
-        ] = _default_freshness_callback
+        ] = kwargs.pop("freshness_callback", _default_freshness_callback)
         # Do not publish compiled_sql to the producer's rendered_template: it would contain SQL for
         # all models run by the producer, is often truncated in the UI due to size, and is of no use
         # there; individual sensor tasks show the corresponding rendered_template per model.
@@ -322,19 +324,23 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             logger.info("Marking resource '%s' as %s (stale upstream source)", unique_id, state)
             self._push_node_state_xcom(ti, unique_id, state)
 
-        # Only exclude nodes in the "skipped" state from future dbt runs.
+        # Exclude any node whose pre-set state is non-success from the dbt build.
+        # This covers both "skipped" (default) and failure states ("failed", "fail",
+        # "error") that a custom freshness_callback may return.  Without exclusion,
+        # dbt would run the model anyway and either overwrite the pre-set XCom status
+        # or trigger a race condition with the consumer sensor.
         # Use the same parsing as DbtNode.resource_name: unique_id.split(".", 2)[2]
         # This preserves version suffixes (e.g. model.pkg.my_model.v1 -> my_model.v1)
-        skipped_ids = [uid for uid, state in node_state_pairs if state == "skipped"]
-        if not skipped_ids:
+        from cosmos.operators._watcher.state import DBT_SUCCESS_STATUSES
+
+        excluded_ids = [uid for uid, state in node_state_pairs if state not in DBT_SUCCESS_STATUSES]
+        if not excluded_ids:
             return
-        model_names = sorted({uid.split(".", 2)[2] for uid in skipped_ids if len(uid.split(".", 2)) == 3})
+        model_names = sorted({uid.split(".", 2)[2] for uid in excluded_ids if len(uid.split(".", 2)) == 3})
         exclude_str = " ".join(model_names)
-        current_exclude = getattr(self, "exclude", None)
-        if current_exclude:
-            self.exclude = f"{current_exclude} {exclude_str}"
-        else:
-            self.exclude = exclude_str
+        if exclude_str:
+            current_exclude = getattr(self, "exclude", None)
+            self.exclude = f"{current_exclude} {exclude_str}" if current_exclude else exclude_str
 
     def _push_source_freshness_results(self, context: Context) -> None:
         """Push per-source freshness status to XCom so source consumer sensors can read it."""

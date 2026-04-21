@@ -2127,3 +2127,22 @@ def test_add_watcher_producer_task_sets_check_source_freshness_flag(source_rende
             assert task_metadata.arguments["_check_source_freshness"] is True
         else:
             assert "_check_source_freshness" not in task_metadata.arguments
+
+
+def test_add_watcher_producer_task_passes_freshness_callback_when_set():
+    """freshness_callback is forwarded to the producer when source_rendering_behavior is active."""
+    my_callback = MagicMock()
+    render_config = RenderConfig(
+        source_rendering_behavior=SourceRenderingBehavior.ALL,
+        freshness_callback=my_callback,
+    )
+    task_args = {"project_dir": "/tmp/sample_project", "profile_config": None}
+
+    with patch("cosmos.airflow.graph.create_airflow_task") as mock_create_task:
+        mock_create_task.return_value = MagicMock()
+        _add_watcher_producer_task(
+            dag=MagicMock(), task_group=None, tasks_map={}, render_config=render_config, task_args=task_args
+        )
+
+    task_metadata = mock_create_task.call_args[0][0]
+    assert task_metadata.arguments["freshness_callback"] is my_callback

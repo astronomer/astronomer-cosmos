@@ -79,6 +79,13 @@ class RenderConfig:
     :param normalize_task_display_name: A callable that takes a dbt node as input and returns the task display name. This allows users to assign a custom task display name separate from the node ID.
     :param should_detach_multiple_parents_tests: A boolean that allows users to decide whether to run tests with multiple parent dependencies in separate tasks.
     :param enable_owner_inheritance: A boolean that allows users to enable the owner inheritance from dbt models to airflow tasks. Defaults to True.
+    :param freshness_callback: **Experimental**. Only applicable when ``execution_mode`` is
+        ``ExecutionMode.WATCHER`` and ``source_rendering_behavior`` is not ``NONE``.
+        A callable invoked on the producer task after ``dbt source freshness`` completes. Receives
+        ``(context, dag, task_group, nodes, sources_json)`` and must return a list of
+        ``(unique_id, state)`` tuples for nodes to be marked before the main ``dbt build`` runs.
+        Defaults to the built-in skip-propagation logic when not set.
+        Support for ``ExecutionMode.WATCHER_KUBERNETES`` is not yet implemented.
     """
 
     emit_datasets: bool = True
@@ -106,6 +113,7 @@ class RenderConfig:
     normalize_task_display_name: Callable[..., Any] | None = None
     should_detach_multiple_parents_tests: bool = False
     enable_owner_inheritance: bool | None = True
+    freshness_callback: Callable[..., Any] | None = None
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:

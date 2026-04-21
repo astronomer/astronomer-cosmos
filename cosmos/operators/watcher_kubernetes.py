@@ -24,7 +24,12 @@ except ImportError:  # pragma: no cover
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
-from cosmos.operators._watcher.xcom import _backup_xcom_to_variable, _restore_xcom_from_variable
+from cosmos.operators._watcher.xcom import (
+    _backup_xcom_to_variable,
+    _delete_xcom_backup_variable,
+    _init_xcom_backup,
+    _restore_xcom_from_variable,
+)
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
@@ -121,11 +126,20 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
 
+        _init_xcom_backup(context)
+
         # This global variable is used to make the task context available to the K8s callback.
         # While the callback is set during the operator initialization, the context is only created during the operator's execution.
         global producer_task_context
         producer_task_context = context
-        return super().execute(context, **kwargs)
+
+        try:
+            return_value = super().execute(context, **kwargs)
+            _delete_xcom_backup_variable(context)
+            return return_value
+        except Exception:
+            _backup_xcom_to_variable(context)
+            raise
 
 
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):

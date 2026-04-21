@@ -98,6 +98,54 @@ def test_skips_retry_attempt(mock_execute, mock_restore, caplog):
     mock_execute.assert_not_called()
 
 
+@patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_deletes_backup_on_success(mock_execute, mock_init, mock_delete):
+    """Test that the XCom backup Variable is deleted after a successful execution."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    op.execute(context=context)
+
+    mock_init.assert_called_once_with(context)
+    mock_delete.assert_called_once_with(context)
+    mock_execute.assert_called_once()
+
+
+@patch("cosmos.operators.watcher_kubernetes._backup_xcom_to_variable")
+@patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_keeps_backup_on_failure(mock_execute, mock_init, mock_delete, mock_backup):
+    """Test that the XCom backup Variable is persisted (not deleted) when execution fails."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    mock_execute.side_effect = RuntimeError("dbt build failed")
+
+    with pytest.raises(RuntimeError):
+        op.execute(context=context)
+
+    mock_init.assert_called_once_with(context)
+    mock_backup.assert_called_once_with(context)
+    mock_delete.assert_not_called()
+
+
 def test_raises_exception_when_task_instance_missing():
     """
     Test that the operator raises an AirflowException when task instance is missing from context.

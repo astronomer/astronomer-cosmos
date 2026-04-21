@@ -17,7 +17,7 @@ clean-targets:
     - "dbt_modules"
     - "logs"
 
-require-dbt-version: [">=1.0.0", "<2.0.0"]
+require-dbt-version: [">=1.0.0", "<3.0.0"]
 
 models:
   jaffle_shop:

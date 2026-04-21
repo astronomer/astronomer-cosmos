@@ -12,7 +12,7 @@ Alternatively, many users choose to serve these docs on a separate static websit
 Cosmos offers pre-built ways of generating and uploading dbt docs, plus a fallback option to run custom code after the docs are generated:
 
 - :class:`~cosmos.operators.DbtDocsS3Operator`: generates and uploads docs to a S3 bucket.
-- :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator`: generates docs in a Kubernetes Pod and uploads them to a S3 bucket from inside that Pod.
+- :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator` (introduced in Cosmos 1.15.0): generates docs in a Kubernetes Pod and uploads them to an S3 bucket from inside that Pod.
 - :class:`~cosmos.operators.DbtDocsAzureStorageOperator`: generates and uploads docs to an Azure Blob Storage.
 - :class:`~cosmos.operators.DbtDocsGCSOperator`: generates and uploads docs to a GCS bucket.
 - :class:`~cosmos.operators.DbtDocsOperator`: generates docs and runs a custom callback.
@@ -46,6 +46,8 @@ You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upl
 
 Upload to S3 from Kubernetes
 ''''''''''''''''''''''''''''
+
+.. versionadded:: 1.15.0
 
 If you run dbt in :ref:`kubernetes`, use :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator`.
 Unlike the local S3 operator, this operator generates the docs and uploads them to S3 from inside the Kubernetes Pod.

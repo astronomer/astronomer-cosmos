@@ -49,7 +49,7 @@ For instance,
    :start-after: [START kubernetes_tg_example]
    :end-before: [END kubernetes_tg_example]
 
-To generate dbt docs and upload them to S3 from the same Pod, use :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator`.
+To generate dbt docs and upload them to S3 from the same Pod, use :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator` and Cosmos 1.15.0 or higher.
 See :doc:`../../dbt_docs/generating-docs` for an end-to-end example and the extra requirements for this workflow.
 
 Step-by-step instructions
@@ -183,4 +183,4 @@ The Kubernetes execution mode has the following limitations:
 - Does not support :doc:`../callbacks/callbacks` (there is an `open ticket #1575 <https://github.com/astronomer/astronomer-cosmos/issues/1575>`__ to address this)
 - Does not expose Compiled SQL as a `templated field <https://astronomer.github.io/astronomer-cosmos/guides/cosmos_devex/compiled-sql.html>`_
 - Does not benefit from `Cosmos caching mechanisms <https://astronomer.github.io/astronomer-cosmos/optimize_performance/caching.html>`_
-- Supports generating dbt docs and uploading them to S3 with :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator`; other object stores and callback-based uploads remain unsupported in Kubernetes execution mode
+- Since 1.15.0, supports generating dbt docs and uploading them to S3 with :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator`; other object stores and callback-based uploads remain unsupported in Kubernetes execution mode

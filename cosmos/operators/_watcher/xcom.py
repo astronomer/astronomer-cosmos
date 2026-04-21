@@ -18,7 +18,7 @@ from cosmos.operators._watcher.state import safe_xcom_push
 
 logger = get_logger(__name__)
 
-XCOM_BACKUP_VARIABLE_PREFIX = "cosmos_xcom_backup__"
+XCOM_BACKUP_VARIABLE_PREFIX = "cosmos_xcom_backup"
 
 
 def _xcom_backup_variable_key(dag_id: str, task_group_id: str | None, run_id: str) -> str:

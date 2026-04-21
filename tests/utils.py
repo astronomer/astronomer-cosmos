@@ -70,6 +70,9 @@ def new_test_dag(dag: DAG, expected_dag_state: DagRunState = DagRunState.SUCCESS
         dr = dag.test(logical_date=timezone.utcnow())
     else:
         dr = dag.test()
+    assert check_dag_state(
+        dr, expected_dag_state
+    ), f"Dag {dag.dag_id} did not reach expected state {expected_dag_state}. State: {dr.state}."
     return dr
 
 

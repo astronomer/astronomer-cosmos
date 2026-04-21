@@ -544,6 +544,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
         # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
         # assert dataset_model == 1
 
+
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.parse("2.10"),

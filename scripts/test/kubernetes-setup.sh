@@ -24,8 +24,12 @@ kubectl apply -f scripts/test/postgres-deployment.yaml
 # Build the Docker image with tag 'dbt-jaffle-shop:1.0.0' using the specified Dockerfile
 cd dev && docker build --progress=plain --no-cache -t dbt-jaffle-shop:1.0.0 -f Dockerfile.postgres_profile_docker_k8s .
 
-# Load the Docker image into the local KIND cluster
+# Build the Docker image for the watcher failing tests project
+docker build --progress=plain --no-cache -t dbt-watcher-failing-tests:1.0.0 -f Dockerfile.watcher_failing_tests_k8s .
+
+# Load the Docker images into the local KIND cluster
 kind load docker-image dbt-jaffle-shop:1.0.0
+kind load docker-image dbt-watcher-failing-tests:1.0.0
 
 # Retrieve the name of the PostgreSQL pod using the label selector 'app=postgres'
 # The output is filtered to get the first pod's name

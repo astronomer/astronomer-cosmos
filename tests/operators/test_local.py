@@ -684,7 +684,7 @@ def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fai
 
     caplog.set_level(logging.ERROR)
     caplog.clear()
-    run_test_dag(dag, expect_success=False)
+    run_test_dag(dag, expected_dag_state=DagRunState.FAILED)
 
     assert "ERROR" in caplog.text
     assert "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)." in caplog.text

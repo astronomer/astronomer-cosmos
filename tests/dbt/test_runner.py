@@ -226,6 +226,8 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
         def __init__(self):
             self.openlineage_events_completes = []
             self.store = {}
+            self.dag_id = "test_dag"
+            self.task_id = "test_task"
 
         def xcom_push(self, key, value, **_):
             self.store[key] = value
@@ -299,7 +301,11 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
             )
             op2.invocation_mode = InvocationMode.DBT_RUNNER
 
-            op2.execute(context=mock_context)
+            with (
+                patch("cosmos.operators._watcher.xcom._persist_backup"),
+                patch("airflow.models.Variable"),
+            ):
+                op2.execute(context=mock_context)
 
             # Verify:
             # 1. We have two dbt Runner instances (cached + new with callbacks)

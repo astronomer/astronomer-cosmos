@@ -28,6 +28,7 @@ from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
     store_dbt_resource_status_from_log,
 )
+from cosmos.operators._watcher.state import DBT_SUCCESS_STATUSES
 from cosmos.operators._watcher.xcom import (
     _backup_xcom_to_variable,
     _delete_xcom_backup_variable,
@@ -331,8 +332,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # or trigger a race condition with the consumer sensor.
         # Use the same parsing as DbtNode.resource_name: unique_id.split(".", 2)[2]
         # This preserves version suffixes (e.g. model.pkg.my_model.v1 -> my_model.v1)
-        from cosmos.operators._watcher.state import DBT_SUCCESS_STATUSES
-
         excluded_ids = [uid for uid, state in node_state_pairs if state not in DBT_SUCCESS_STATUSES]
         if not excluded_ids:
             return

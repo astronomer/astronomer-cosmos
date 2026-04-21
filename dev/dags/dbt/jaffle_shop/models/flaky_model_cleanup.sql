@@ -1,6 +1,7 @@
 {{
   config(
     tags=["flaky"],
+    enabled=var("enable_flaky_models", false),
     materialized="table",
     post_hook=[
       "DELETE FROM {{ target.schema }}.retry_flag"

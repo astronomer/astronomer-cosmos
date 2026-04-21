@@ -45,7 +45,10 @@ example_watcher_retry = DbtDag(
             "dbt_retry_count": 2,
         },
     ),
-    project_config=ProjectConfig(DBT_PROJECT_PATH),
+    project_config=ProjectConfig(
+        DBT_PROJECT_PATH,
+        dbt_vars={"enable_flaky_models": True},
+    ),
     profile_config=profile_config,
     render_config=RenderConfig(exclude=["raw_payments"]),
     operator_args=operator_args,

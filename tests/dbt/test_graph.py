@@ -2366,12 +2366,12 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
         # historical macOS-specific hash, while the second matches the Linux hash asserted in the else-branch. We
         # allow both here so that the test is stable across macOS versions and when macOS hashing matches Linux.
         assert hash_dir in (
-            "835a0c9dd2d546fc98821b5dd4e783ee",
+            "0668e4412580793527a6a5a1fab88c3a",
             "9d95cbf6529e2ab51fadd6a3f0a3971f",
             "5c1aed937708e585054c874ff8f33fd1",
         )
     else:
-        assert hash_dir == "835a0c9dd2d546fc98821b5dd4e783ee"
+        assert hash_dir == "0668e4412580793527a6a5a1fab88c3a"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2412,12 +2412,12 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
         # The first value is the macOS-specific hash; the second value is the Linux hash, which certain macOS versions also produce.
         # We allow both here to keep the test stable across macOS releases, while non-macOS platforms assert only the Linux hash.
         assert hash_dir in (
-            "835a0c9dd2d546fc98821b5dd4e783ee",
+            "0668e4412580793527a6a5a1fab88c3a",
             "9d95cbf6529e2ab51fadd6a3f0a3971f",
             "5c1aed937708e585054c874ff8f33fd1",
         )
     else:
-        assert hash_dir == "835a0c9dd2d546fc98821b5dd4e783ee"
+        assert hash_dir == "0668e4412580793527a6a5a1fab88c3a"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")

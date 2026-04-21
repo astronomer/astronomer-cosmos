@@ -1,6 +1,7 @@
 {{
   config(
     tags=["flaky"],
+    enabled=var("enable_flaky_models", false),
     materialized="table",
     pre_hook=[
       "CREATE TABLE IF NOT EXISTS {{ target.schema }}.retry_flag (attempt integer)",

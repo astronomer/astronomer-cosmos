@@ -90,11 +90,12 @@ def test_skips_retry_attempt(mock_execute, mock_restore, caplog):
 
     ti = MagicMock()
     ti.try_number = 2
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
     with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
         op.execute(context=context)
 
+    mock_restore.assert_called_once_with(context)
     mock_execute.assert_not_called()
 
 

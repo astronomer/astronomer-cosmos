@@ -252,19 +252,18 @@ def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message
     assert any("ephemeral model or if the model sql file is empty" in message for message in caplog.messages)
 
 
-def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
+@patch("cosmos.operators.watcher._restore_xcom_from_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_skips_retry_attempt(mock_execute, mock_restore):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
     ti.try_number = 2
     context = {"ti": ti, "run_id": "test_run"}
 
-    with (
-        patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute,
-        patch("cosmos.operators.watcher._restore_xcom_from_variable"),
-    ):
-        with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
-            op.execute(context=context)
+    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+        op.execute(context=context)
 
+    mock_restore.assert_called_once_with(context)
     mock_execute.assert_not_called()
 
 

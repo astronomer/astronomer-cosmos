@@ -14,6 +14,11 @@ from pathlib import Path
 from airflow.models import DAG
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
+try:
+    from airflow.providers.standard.operators.empty import EmptyOperator
+except ImportError:
+    from airflow.operators.empty import EmptyOperator
+
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig
 from cosmos.constants import ExecutionMode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -47,6 +52,7 @@ if os.getenv("CI"):
 default_args = {
     "retries": 2,
     "retry_delay": timedelta(seconds=0),
+    "depends_on_past": True,
 }
 
 with DAG(
@@ -71,4 +77,7 @@ with DAG(
         trigger_rule="all_done",
     )
 
+    post_dbt = EmptyOperator(task_id="post_dbt")
+
+    dbt_group >> post_dbt
     dbt_group >> cleanup

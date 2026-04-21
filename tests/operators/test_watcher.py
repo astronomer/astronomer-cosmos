@@ -2741,14 +2741,16 @@ class TestDbtProducerRetry:
         # Failures should still be pending
         assert "model.pkg.broken" in op._pending_failures
 
-    def test_execute_clears_pending_failures(self):
+    @patch("airflow.models.Variable")
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
+    @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+    def test_execute_clears_pending_failures(self, mock_execute, mock_persist, mock_variable):
         """execute() should clear _pending_failures at the start."""
         op = self._make_producer(dbt_retry_count=1)
         op._pending_failures = {"model.pkg.stale": {"status": "error", "outlet_uris": []}}
         ti = _MockTI()
         context = {"ti": ti, "run_id": "test_run"}
 
-        with patch("cosmos.operators.local.DbtLocalBaseOperator.execute"):
-            op.execute(context=context)
+        op.execute(context=context)
 
         assert op._pending_failures == {}

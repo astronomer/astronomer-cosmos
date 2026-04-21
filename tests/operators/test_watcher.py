@@ -2746,7 +2746,7 @@ class TestDbtProducerRetry:
         op = self._make_producer(dbt_retry_count=1)
         op._pending_failures = {"model.pkg.stale": {"status": "error", "outlet_uris": []}}
         ti = _MockTI()
-        context = {"ti": ti}
+        context = {"ti": ti, "run_id": "test_run"}
 
         with patch("cosmos.operators.local.DbtLocalBaseOperator.execute"):
             op.execute(context=context)

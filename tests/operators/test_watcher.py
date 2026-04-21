@@ -216,38 +216,6 @@ def test_dbt_producer_watcher_operator_keeps_backup_on_failure(mock_execute, moc
     mock_delete.assert_not_called()
 
 
-def test_dbt_producer_watcher_operator_on_retry_callback_default():
-    """Test that on_retry_callback defaults to _backup_xcom_to_variable."""
-    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
-
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    assert _backup_xcom_to_variable in (
-        op.on_retry_callback if isinstance(op.on_retry_callback, list) else [op.on_retry_callback]
-    )
-
-
-def test_dbt_producer_watcher_operator_on_retry_callback_appends_to_list():
-    """Test that on_retry_callback appends _backup_xcom_to_variable to existing list."""
-    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
-
-    existing_cb = MagicMock()
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, on_retry_callback=[existing_cb])
-    callbacks = op.on_retry_callback if isinstance(op.on_retry_callback, list) else [op.on_retry_callback]
-    assert existing_cb in callbacks
-    assert _backup_xcom_to_variable in callbacks
-
-
-def test_dbt_producer_watcher_operator_on_retry_callback_wraps_single():
-    """Test that on_retry_callback wraps a single existing callback into a list."""
-    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
-
-    existing_cb = MagicMock()
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, on_retry_callback=existing_cb)
-    callbacks = op.on_retry_callback if isinstance(op.on_retry_callback, list) else [op.on_retry_callback]
-    assert existing_cb in callbacks
-    assert _backup_xcom_to_variable in callbacks
-
-
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_requires_task_instance(mock_execute):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)

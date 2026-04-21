@@ -182,13 +182,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
-        existing_on_retry_callback = kwargs.get("on_retry_callback")
-        if existing_on_retry_callback is None:
-            kwargs["on_retry_callback"] = _backup_xcom_to_variable
-        elif isinstance(existing_on_retry_callback, list):
-            kwargs["on_retry_callback"] = [*existing_on_retry_callback, _backup_xcom_to_variable]
-        else:
-            kwargs["on_retry_callback"] = [existing_on_retry_callback, _backup_xcom_to_variable]
         kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
         # invocation_mode is intentionally NOT forced here; the parent's _discover_invocation_mode()
         # picks DBT_RUNNER when available and falls back to SUBPROCESS otherwise.

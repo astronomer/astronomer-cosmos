@@ -375,39 +375,3 @@ def test_callbacks_included_in_producer_operator():
     )
     callback_classes = [callback.__name__ for callback in op.callbacks]
     assert "WatcherKubernetesCallback" in callback_classes
-
-
-class TestOnRetryCallbackNormalization:
-    """Tests for on_retry_callback normalization in DbtProducerWatcherKubernetesOperator."""
-
-    def test_on_retry_callback_default(self):
-        """Test that on_retry_callback defaults to _backup_xcom_to_variable."""
-        from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
-
-        op = DbtProducerWatcherKubernetesOperator(project_dir=".", profile_config=None, image="dbt-image:latest")
-        callbacks = op.on_retry_callback if isinstance(op.on_retry_callback, list) else [op.on_retry_callback]
-        assert _backup_xcom_to_variable in callbacks
-
-    def test_on_retry_callback_appends_to_list(self):
-        """Test that on_retry_callback appends _backup_xcom_to_variable to existing list."""
-        from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
-
-        existing_cb = MagicMock()
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".", profile_config=None, image="dbt-image:latest", on_retry_callback=[existing_cb]
-        )
-        callbacks = op.on_retry_callback if isinstance(op.on_retry_callback, list) else [op.on_retry_callback]
-        assert existing_cb in callbacks
-        assert _backup_xcom_to_variable in callbacks
-
-    def test_on_retry_callback_wraps_single(self):
-        """Test that on_retry_callback wraps a single existing callback into a list."""
-        from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
-
-        existing_cb = MagicMock()
-        op = DbtProducerWatcherKubernetesOperator(
-            project_dir=".", profile_config=None, image="dbt-image:latest", on_retry_callback=existing_cb
-        )
-        callbacks = op.on_retry_callback if isinstance(op.on_retry_callback, list) else [op.on_retry_callback]
-        assert existing_cb in callbacks
-        assert _backup_xcom_to_variable in callbacks

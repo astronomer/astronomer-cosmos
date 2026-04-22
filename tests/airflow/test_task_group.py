@@ -81,8 +81,10 @@ def test_rshift_sets_trigger_rule_on_downstream_task_group_roots():
     tg = _make_task_group(ExecutionMode.WATCHER)
 
     root_task = MagicMock(trigger_rule="all_success")
-    downstream_group = MagicMock(spec=TaskGroup)
+    downstream_group = MagicMock()
     downstream_group.get_roots.return_value = [root_task]
+    # isinstance(item, TaskGroup) check needs to pass
+    downstream_group.__class__ = TaskGroup
 
     tg >> downstream_group
 

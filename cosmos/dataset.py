@@ -278,3 +278,92 @@ def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict
         result[unique_id] = [uri]
 
     return result
+
+
+def register_dataset_on_task(
+    task: Any,
+    new_inlets: list[Any],
+    new_outlets: list[Any],
+    context: Any,
+) -> None:
+    """
+    Register a list of datasets as outlets of the given task at execution time.
+
+    Extracted from ``LocalDbtBaseOperator.register_dataset`` so operators in
+    other execution modes (e.g. ``WATCHER_KUBERNETES``) can reuse the same
+    logic without inheriting from the local operator class.
+
+    Picks one of three code paths based on Airflow version and the
+    ``enable_dataset_alias`` Cosmos setting:
+
+    1. **Airflow 3 with ``enable_dataset_alias=True`` (default)** — uses
+       ``AssetAlias`` with ``context["outlet_events"]``. This is the
+       recommended path and the one Cosmos tests against.
+    2. **Airflow 2.10+ with ``enable_dataset_alias=True``** — uses the
+       Airflow 2 ``DatasetAlias`` equivalent with ``context["outlet_events"]``.
+    3. **Airflow < 2.10 OR ``enable_dataset_alias=False``** — mutates
+       ``task.outlets`` / ``task.inlets`` directly and persists the DAG.
+       Carries the limitations described in
+       https://github.com/astronomer/astronomer-cosmos/issues/522.
+
+    Raises
+    ------
+    AirflowCompatibilityError
+        When running on Airflow 3 with ``enable_dataset_alias=False``. That
+        configuration isn't supported by Airflow 3's asset model.
+
+    Parameters
+    ----------
+    task
+        The Airflow task (operator or sensor instance) to attach outlets to.
+        Typed as ``Any`` because the Airflow 2 and 3 operator base classes
+        diverge and Cosmos supports both.
+    new_inlets
+        Airflow ``Asset`` / ``Dataset`` instances to add as inlets. Unused on
+        the ``outlet_events`` path (Airflow 2.10+ / 3); used by the legacy
+        direct-mutation path.
+    new_outlets
+        Airflow ``Asset`` / ``Dataset`` instances to add as outlets.
+    context
+        The Airflow task execution context. Must contain ``outlet_events``
+        on the 2.10+ / 3 path.
+    """
+    from airflow import DAG
+
+    from cosmos.exceptions import AirflowCompatibilityError
+
+    if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
+        raise AirflowCompatibilityError(
+            "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
+        )
+    if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
+        from airflow.utils.session import create_session
+
+        logger.info("Assigning inlets/outlets without DatasetAlias")
+        with create_session() as session:
+            task.outlets.extend(new_outlets)
+            task.inlets.extend(new_inlets)
+            for dag_task in task.dag.tasks:
+                if dag_task.task_id == task.task_id:
+                    dag_task.outlets.extend(new_outlets)
+                    dag_task.inlets.extend(new_inlets)
+            DAG.bulk_write_to_db([task.dag], session=session)  # type: ignore[attr-defined, call-arg, arg-type]
+            session.commit()
+        return
+
+    dataset_alias_name = get_dataset_alias_name(task.dag, task.task_group, task.task_id)
+
+    if AIRFLOW_VERSION.major == 2:
+        logger.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
+        for outlet in new_outlets:
+            context["outlet_events"][dataset_alias_name].add(outlet)
+    else:  # Airflow 3
+        logger.info("Assigning outlets with DatasetAlias in Airflow 3")
+        from airflow.sdk.definitions.asset import AssetAlias
+
+        # AssetAlias is registered on the task outlets as well as the
+        # outlet_events. This was required in Airflow 3.0.0; later releases
+        # may make it automatic, at which point this line becomes a no-op.
+        task.outlets.append(AssetAlias(dataset_alias_name))
+        for outlet in new_outlets:
+            context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)

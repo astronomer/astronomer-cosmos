@@ -1,17 +1,21 @@
 """
-Airflow DAG to verify that tasks downstream of a watcher DbtTaskGroup are not skipped
-when the producer task is skipped on retry.
+Airflow DAG to verify watcher downstream-task behavior when a producer task is skipped on
+retry.
 
 In watcher mode, when a dbt model fails the producer retries and raises AirflowSkipException.
-Without Cosmos handling this, the skip propagates to all tasks downstream of the TaskGroup
+Without Cosmos handling this, the skip can propagate to tasks downstream of the TaskGroup
 (e.g. post_dbt), even though the consumer tasks inside the group succeeded.
 
-This DAG demonstrates that:
+This DAG relies on the Cosmos watcher trigger-rule propagation setting being enabled via
+AIRFLOW__COSMOS__PROPAGATE_WATCHER_TRIGGER_RULE for downstream tasks to avoid being skipped.
+When that setting is enabled, this DAG demonstrates that:
 - model_a succeeds in the producer and the consumer reads the result from XCom
 - model_retry fails on the first attempt (via a fail_once sequence pre-hook) but succeeds
   on the consumer retry fallback
 - post_dbt (an EmptyOperator downstream of the group) runs successfully — it is NOT skipped
 
+When AIRFLOW__COSMOS__PROPAGATE_WATCHER_TRIGGER_RULE is disabled, the watcher skip may still
+propagate to downstream tasks, and post_dbt may be skipped.
 A cleanup task drops the PostgreSQL sequence so the DAG can be re-triggered.
 """
 

@@ -26,8 +26,9 @@ profile_config = ProfileConfig(
 )
 
 
+@patch("cosmos.settings.enable_cache", False)
 def _make_task_group(execution_mode):
-    """Create a DbtTaskGroup inside a DAG context."""
+    """Create a DbtTaskGroup inside a DAG context with caching disabled."""
     with DAG(dag_id="test_dag", start_date=datetime(2023, 1, 1)):
         return DbtTaskGroup(
             group_id="test_group",

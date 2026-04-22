@@ -12,6 +12,7 @@ import inspect
 import re
 from collections.abc import Callable
 from os import PathLike
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 import kubernetes.client as k8s
@@ -385,8 +386,14 @@ class K8sWatcherProducerProtocol(Protocol):
     _test_results_per_model: dict[str, dict[str, str]]
     _context_holder: dict[str, Context | None]
     _upstream_failure_skipped_ids: set[str]
+    _should_generate_model_uris: bool
+    _dataset_namespace: str | None
+    _model_outlet_uris: dict[str, list[str]]
+    manifest_filepath: str
+    profile_config: Any
     client: Any
     callbacks: Any
+    log: Any
 
 
 class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
@@ -443,6 +450,11 @@ class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
             extra_kwargs,
             tests_per_model=kwargs.get("tests_per_model"),
             test_results_per_model=kwargs.get("test_results_per_model"),
+            # The producer pre-populates model_outlet_uris from the scheduler-side manifest
+            # (the pod's manifest isn't reachable from here), so the parser's lazy fill --
+            # which needs project_dir -- is a no-op and dataset_namespace is left unset.
+            model_outlet_uris=kwargs.get("model_outlet_uris"),
+            should_generate_model_uris=kwargs.get("should_generate_model_uris", True),
             upstream_failure_skipped_ids=kwargs.get("upstream_failure_skipped_ids"),
         )
 
@@ -485,8 +497,56 @@ def build_watcher_pod_manager(operator: K8sWatcherProducerProtocol) -> CosmosKub
             "test_results_per_model": operator._test_results_per_model,
             CONTEXT_HOLDER_KEY: operator._context_holder,
             "upstream_failure_skipped_ids": operator._upstream_failure_skipped_ids,
+            # _model_outlet_uris is a dict shared by reference; execute_watcher_producer fills
+            # it in place before the pod runs, so the callback reads the populated map even
+            # though the pod manager (a cached_property) may be built earlier.
+            "model_outlet_uris": operator._model_outlet_uris,
+            "should_generate_model_uris": operator._should_generate_model_uris,
         },
     )
+
+
+def _populate_producer_model_outlet_uris(operator: K8sWatcherProducerProtocol) -> None:
+    """Resolve the dataset namespace and fill ``operator._model_outlet_uris`` from the manifest.
+
+    Mirrors the SUBPROCESS producer, but reads ``ProjectConfig.manifest_path`` (threaded as
+    ``manifest_filepath``) instead of ``{project_dir}/target/manifest.json``: in K8s the pod's
+    manifest isn't reachable from the scheduler. The map is mutated in place (never reassigned)
+    so the reference held by the pod manager's ``callback_extra_kwargs`` stays valid.
+
+    Degrades to a no-op -- dbt still runs and statuses are still reported, but no datasets are
+    emitted -- when generation is disabled, no ``ProfileConfig`` is set, no namespace resolves,
+    or the manifest is unavailable.
+    """
+    operator._model_outlet_uris.clear()
+    operator._dataset_namespace = None
+    if not operator._should_generate_model_uris:
+        return
+    # get_dataset_namespace requires a ProfileConfig; some constructions (e.g. inline profiles
+    # via profiles_yml_filepath only) don't supply one, so dataset emission degrades to a no-op.
+    if operator.profile_config is None:
+        return
+
+    from cosmos.dataset import compute_model_outlet_uris, get_dataset_namespace
+
+    operator._dataset_namespace = get_dataset_namespace(operator.profile_config)
+    if not operator._dataset_namespace:
+        return
+    if not operator.manifest_filepath:
+        operator.log.warning(
+            "manifest_filepath not supplied to %s; per-model dataset emission is disabled for this run. "
+            "Pass ProjectConfig.manifest_path to enable it.",
+            type(operator).__name__,
+        )
+        return
+    manifest_path = Path(operator.manifest_filepath)
+    if not manifest_path.exists():
+        operator.log.warning(
+            "Manifest not found at %s; per-model dataset emission is disabled for this run.",
+            manifest_path,
+        )
+        return
+    operator._model_outlet_uris.update(compute_model_outlet_uris(manifest_path, operator._dataset_namespace))
 
 
 def execute_watcher_producer(
@@ -520,6 +580,9 @@ def execute_watcher_producer(
 
     _init_xcom_backup(context, persist=reliable_retry)
 
+    # Resolve the namespace and build the per-model outlet URI map before the pod runs, so the
+    # log-parsing callback can attach outlet URIs to each model's status XCom for the consumers.
+    _populate_producer_model_outlet_uris(operator)
     operator._upstream_failure_skipped_ids.clear()
     # Publish the context through the mutable holder shared by reference with the pod
     # manager's callback_extra_kwargs, so the log-parsing callback sees the live context

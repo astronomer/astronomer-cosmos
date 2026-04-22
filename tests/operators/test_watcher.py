@@ -1986,16 +1986,16 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
 
     # Reset the fail_once sequence using credentials from the same Airflow connection
     airflow_conn = BaseHook.get_connection("example_conn")
-    conn = psycopg2.connect(
+    with psycopg2.connect(
         host=airflow_conn.host,
         port=airflow_conn.port or 5432,
         dbname=airflow_conn.schema or "postgres",
         user=airflow_conn.login,
         password=airflow_conn.password,
-    )
-    conn.autocommit = True
-    conn.cursor().execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
-    conn.close()
+    ) as conn:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
 
     caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
 
@@ -2062,16 +2062,16 @@ def test_dbt_task_group_watcher_downstream_not_skipped_with_setting(caplog):
 
     # Reset the fail_once sequence using credentials from the same Airflow connection
     airflow_conn = BaseHook.get_connection("example_conn")
-    conn = psycopg2.connect(
+    with psycopg2.connect(
         host=airflow_conn.host,
         port=airflow_conn.port or 5432,
         dbname=airflow_conn.schema or "postgres",
         user=airflow_conn.login,
         password=airflow_conn.password,
-    )
-    conn.autocommit = True
-    conn.cursor().execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
-    conn.close()
+    ) as conn:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
 
     try:
         from airflow.providers.standard.operators.empty import EmptyOperator

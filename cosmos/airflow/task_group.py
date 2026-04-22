@@ -46,7 +46,7 @@ class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):
     def _set_watcher_downstream_tasks_trigger_rule(self, downstream_tasks: Any) -> None:
         """In watcher mode the producer task may be skipped on retry.
 
-        Set ``trigger_rule="none_failed"`` on downstream tasks so the skip
+        Set ``trigger_rule="none_failed_min_one_success"`` on downstream tasks so the skip
         does not propagate outside the task group.
         """
         if not self.is_watcher_mode or not settings.propagate_watcher_trigger_rule:
@@ -59,9 +59,9 @@ class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):
                 # the group's internal dependency semantics.
                 for root_task in item.get_roots():
                     if hasattr(root_task, "trigger_rule"):
-                        root_task.trigger_rule = "none_failed"  # type: ignore[assignment]
+                        root_task.trigger_rule = "none_failed_min_one_success"  # type: ignore[assignment]
             elif hasattr(item, "trigger_rule"):
-                item.trigger_rule = "none_failed"  # type: ignore[assignment]
+                item.trigger_rule = "none_failed_min_one_success"  # type: ignore[assignment]
 
     def __rshift__(self, other: Any) -> Any:
         # dbt_group >> post_dbt — post_dbt is downstream of dbt_group

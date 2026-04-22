@@ -1932,7 +1932,7 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
         execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
         render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
         default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
-        operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+        operator_args={"trigger_rule": "none_failed_min_one_success", "execution_timeout": timedelta(seconds=120)},
         dagrun_timeout=timedelta(seconds=120),
     )
     outcome = new_test_dag(watcher_dag, expected_dag_state=DagRunState.FAILED)
@@ -2011,7 +2011,7 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
             project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH),
             profile_config=profile_config,
             render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
-            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+            operator_args={"trigger_rule": "none_failed_min_one_success", "execution_timeout": timedelta(seconds=120)},
         )
 
         # Force producer >> root consumers so dag.test() respects execution order.
@@ -2023,7 +2023,7 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
         for root_task in dbt_group.get_roots():
             if root_task != producer:
                 producer >> root_task
-                root_task.trigger_rule = "none_failed"
+                root_task.trigger_rule = "none_failed_min_one_success"
 
         post_dbt = EmptyOperator(task_id="post_dbt")
         dbt_group >> post_dbt
@@ -2092,7 +2092,7 @@ def test_dbt_task_group_watcher_downstream_not_skipped_with_setting(caplog):
             project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH),
             profile_config=profile_config,
             render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
-            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+            operator_args={"trigger_rule": "none_failed_min_one_success", "execution_timeout": timedelta(seconds=120)},
         )
 
         # Force producer >> root consumers so dag.test() respects execution order.
@@ -2101,7 +2101,7 @@ def test_dbt_task_group_watcher_downstream_not_skipped_with_setting(caplog):
         for root_task in dbt_group.get_roots():
             if root_task != producer:
                 producer >> root_task
-                root_task.trigger_rule = "none_failed"
+                root_task.trigger_rule = "none_failed_min_one_success"
 
         post_dbt = EmptyOperator(task_id="post_dbt")
         post_dbt_2 = EmptyOperator(task_id="post_dbt_2")

@@ -63,7 +63,7 @@ def test_rshift_sets_trigger_rule_in_watcher_mode():
 
     tg >> task
 
-    assert task.trigger_rule == "none_failed"
+    assert task.trigger_rule == "none_failed_min_one_success"
 
 
 @patch("cosmos.settings.propagate_watcher_trigger_rule", False)
@@ -88,7 +88,7 @@ def test_rshift_sets_trigger_rule_on_downstream_task_group_roots():
 
     tg >> downstream_group
 
-    assert root_task.trigger_rule == "none_failed"
+    assert root_task.trigger_rule == "none_failed_min_one_success"
 
 
 @patch("cosmos.settings.propagate_watcher_trigger_rule", True)
@@ -98,7 +98,7 @@ def test_set_downstream_sets_trigger_rule():
 
     tg.set_downstream(task)
 
-    assert task.trigger_rule == "none_failed"
+    assert task.trigger_rule == "none_failed_min_one_success"
 
 
 @patch("cosmos.settings.propagate_watcher_trigger_rule", True)
@@ -108,4 +108,4 @@ def test_rlshift_sets_trigger_rule():
 
     tg.__rlshift__(task)
 
-    assert task.trigger_rule == "none_failed"
+    assert task.trigger_rule == "none_failed_min_one_success"

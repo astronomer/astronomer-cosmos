@@ -362,7 +362,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     skipped on retry (via ``AirflowSkipException``). By default, this causes Airflow to skip any tasks
     downstream of the task group due to the default ``trigger_rule="all_success"``.
 
-    When this setting is enabled, Cosmos automatically sets ``trigger_rule="none_failed"`` on tasks wired
+    When this setting is enabled, Cosmos automatically sets ``trigger_rule="none_failed_min_one_success"`` on tasks wired
     downstream of a watcher ``DbtTaskGroup`` when the dependency is created from the ``DbtTaskGroup`` side:
 
     - ``dbt_group >> task``
@@ -373,7 +373,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Does not work when the dependency is created from the downstream task side
       (e.g., ``task.set_upstream(dbt_group)`` or ``task << dbt_group``), since Cosmos cannot
       intercept methods called on tasks it does not control.
-    - When enabled, overrides any user-defined ``trigger_rule`` on downstream tasks with ``"none_failed"``.
+    - When enabled, overrides any user-defined ``trigger_rule`` on downstream tasks with ``"none_failed_min_one_success"``.
 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__PROPAGATE_WATCHER_TRIGGER_RULE``

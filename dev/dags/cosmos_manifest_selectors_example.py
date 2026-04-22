@@ -58,7 +58,7 @@ with DAG(
         profile_config=profile_config,
         render_config=RenderConfig(
             load_method=LoadMode.DBT_MANIFEST,
-            select=["+customers", "raw_orders", "raw_payments"],
+            select=["+customers", "+orders", "raw_payments"],
             airflow_vars_to_purge_dbt_yaml_selectors_cache=["purge"],
         ),
         execution_config=execution_config,

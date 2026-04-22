@@ -643,7 +643,9 @@ class DbtGraph:
         """
         cache_dict: dict[str, str] = {}
 
-        airflow_variable_exceptions: list[type[BaseException]] = [json.decoder.JSONDecodeError, KeyError]
+        # ImportError is included because airflow.sdk.Variable.get() raises it when called
+        # outside a task execution context (e.g. during DAG parsing in Airflow 3.0+).
+        airflow_variable_exceptions: list[type[BaseException]] = [json.decoder.JSONDecodeError, KeyError, ImportError]
         try:
             from airflow.sdk.exceptions import AirflowRuntimeError
         except ImportError:
@@ -1066,7 +1068,9 @@ class DbtGraph:
         """
         cache_dict: dict[str, Any] = {}
 
-        airflow_variable_exceptions: list[type[BaseException]] = [json.decoder.JSONDecodeError, KeyError]
+        # ImportError is included because airflow.sdk.Variable.get() raises it when called
+        # outside a task execution context (e.g. during DAG parsing in Airflow 3.0+).
+        airflow_variable_exceptions: list[type[BaseException]] = [json.decoder.JSONDecodeError, KeyError, ImportError]
         try:
             from airflow.sdk.exceptions import AirflowRuntimeError
         except ImportError:

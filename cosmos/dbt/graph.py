@@ -1281,6 +1281,9 @@ class DbtGraph:
             with manifest_path.open("r") as fp:
                 manifest = json.load(fp)
 
+        if manifest is None:
+            return {}
+
         if not isinstance(manifest, dict):
             raise CosmosLoadDbtException(
                 f"Invalid dbt manifest file `{manifest_path}`: expected top-level JSON object, got {type(manifest).__name__}"

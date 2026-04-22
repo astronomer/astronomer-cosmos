@@ -5,9 +5,17 @@ An example DAG that uses Cosmos to render a dbt project into an Airflow DAG.
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
+
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, SourceRenderingBehavior
+from cosmos.dbt.graph import DbtNode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -40,7 +48,11 @@ if os.getenv("CI"):
 from cosmos.constants import InvocationMode
 
 
-def freshness_callback() -> list[tuple[str, str]]:
+def freshness_callback( context: Context,
+    dag: Any,
+    task_group: TaskGroup | None,
+    nodes: dict[str, DbtNode] | None,
+    sources_json: dict[str, Any] | None) -> list[tuple[str, str]]:
     return [("model.jaffle_shop.stg_orders", "failed")]
 
 

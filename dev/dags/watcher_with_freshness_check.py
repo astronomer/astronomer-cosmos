@@ -60,7 +60,7 @@ example_watcher_with_freshness = DbtDag(
     schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,
-    dag_id="example_watcher",
+    dag_id="example_watcher_with_freshness",
     default_args={"retries": 0},
 )
 # [END example_watcher_with_freshness]

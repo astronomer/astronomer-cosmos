@@ -159,7 +159,7 @@ def test_dbt_producer_log_format_always_json():
     assert op.log_format == "json"
 
 
-@patch("airflow.models.Variable")
+@patch("cosmos.operators._watcher.xcom.Variable")
 @patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_pushes_completion_status_on_success(mock_execute, mock_persist, mock_variable):
@@ -174,7 +174,7 @@ def test_dbt_producer_watcher_operator_pushes_completion_status_on_success(mock_
     mock_execute.assert_called_once()
 
 
-@patch("airflow.models.Variable")
+@patch("cosmos.operators._watcher.xcom.Variable")
 @patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_pushes_completion_status_on_failure(mock_execute, mock_persist, mock_variable):

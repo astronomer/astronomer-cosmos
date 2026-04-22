@@ -13,6 +13,11 @@ import json
 import zlib
 from typing import Any
 
+try:
+    from airflow.sdk import Variable
+except ImportError:
+    from airflow.models import Variable  # type: ignore[no-redef]
+
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import safe_xcom_push
 
@@ -56,11 +61,6 @@ def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
     if not backup_buffer:
         return
 
-    try:
-        from airflow.sdk import Variable
-    except ImportError:
-        from airflow.models import Variable
-
     compressed = base64.b64encode(zlib.compress(json.dumps(backup_buffer, default=str).encode("utf-8"))).decode("utf-8")
     Variable.set(var_key, compressed)
     logger.debug("Persisted %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
@@ -90,11 +90,6 @@ def _delete_xcom_backup_variable(context: Any) -> None:
     if not isinstance(var_key, str):
         return
     try:
-        try:
-            from airflow.sdk import Variable
-        except ImportError:
-            from airflow.models import Variable
-
         Variable.delete(var_key)
         logger.debug("Deleted XCom backup Variable '%s'", var_key)
     except KeyError:
@@ -106,18 +101,20 @@ def _restore_xcom_from_variable(context: Any) -> bool:
 
     Returns True if the restore succeeded, False if no backup was found.
     """
-    try:
-        from airflow.sdk import Variable
-    except ImportError:
-        from airflow.models import Variable
-
     ti = context["ti"]
     dag_id = ti.dag_id
     run_id = context["run_id"]
     task_group_id = _get_task_group_id(ti)
 
     var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
-    compressed = Variable.get(var_key, default_var=None)
+    try:
+        compressed = Variable.get(var_key, default_var=None)
+    except TypeError:
+        # airflow.sdk.Variable.get() does not support default_var
+        try:
+            compressed = Variable.get(var_key)
+        except Exception:
+            compressed = None
     if compressed is None:
         logger.info("No XCom backup Variable found at '%s'", var_key)
         return False

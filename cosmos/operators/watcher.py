@@ -160,7 +160,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     ``_add_watcher_producer_task`` when ``SourceRenderingBehavior`` is not ``NONE``), the
     producer first runs ``dbt source freshness``, identifies stale sources, marks all
     transitive dependents as ``"skipped"`` via XCom, and adds them to ``--exclude`` before
-    running the main ``dbt build``
+    running the main ``dbt build``.
     """
 
     template_fields = DbtLocalBaseOperator.template_fields + DbtBuildMixin.template_fields  # type: ignore[operator]

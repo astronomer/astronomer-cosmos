@@ -64,7 +64,7 @@ default_args = {
 }
 
 with DAG(
-    dag_id="example_watcher_retry_succeeds",
+    dag_id="example_watcher_downstream_not_skipped",
     schedule="@daily",
     start_date=datetime(2023, 1, 1),
     catchup=False,

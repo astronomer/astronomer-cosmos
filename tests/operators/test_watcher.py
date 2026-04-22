@@ -39,9 +39,6 @@ DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_sh
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
 MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
 DBT_WATCHER_FAILING_TESTS_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_failing_tests"
-DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH = (
-    Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_downstream_not_skipped"
-)
 
 DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
@@ -1987,9 +1984,9 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
         dagrun_timeout=timedelta(seconds=120),
     ) as dag:
         dbt_group = DbtTaskGroup(
-            group_id="watcher_downstream_not_skipped",
+            group_id="watcher_failing",
             execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
-            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_FAILING_TESTS_PATH),
             profile_config=profile_config,
             render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
             operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
@@ -2034,9 +2031,9 @@ def test_dbt_task_group_watcher_downstream_not_skipped_with_setting(caplog):
         dagrun_timeout=timedelta(seconds=120),
     ) as dag:
         dbt_group = DbtTaskGroup(
-            group_id="watcher_downstream_not_skipped",
+            group_id="watcher_failing",
             execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
-            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_FAILING_TESTS_PATH),
             profile_config=profile_config,
             render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
             operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},

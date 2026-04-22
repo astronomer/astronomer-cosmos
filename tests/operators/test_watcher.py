@@ -2023,7 +2023,10 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
         for root_task in dbt_group.get_roots():
             if root_task != producer:
                 producer >> root_task
-                root_task.trigger_rule = "none_failed_min_one_success"
+                # Use "none_failed" (not "none_failed_min_one_success") here because the producer
+                # is the only direct upstream and it will be skipped — "min_one_success" would
+                # block the consumer since a skip is not a success.
+                root_task.trigger_rule = "none_failed"
 
         post_dbt = EmptyOperator(task_id="post_dbt")
         dbt_group >> post_dbt
@@ -2101,7 +2104,10 @@ def test_dbt_task_group_watcher_downstream_not_skipped_with_setting(caplog):
         for root_task in dbt_group.get_roots():
             if root_task != producer:
                 producer >> root_task
-                root_task.trigger_rule = "none_failed_min_one_success"
+                # Use "none_failed" (not "none_failed_min_one_success") here because the producer
+                # is the only direct upstream and it will be skipped — "min_one_success" would
+                # block the consumer since a skip is not a success.
+                root_task.trigger_rule = "none_failed"
 
         post_dbt = EmptyOperator(task_id="post_dbt")
         post_dbt_2 = EmptyOperator(task_id="post_dbt_2")

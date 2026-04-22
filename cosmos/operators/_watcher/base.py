@@ -668,3 +668,29 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return True
         else:
             raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
+
+
+def create_producer_done_task(dag: Any, task_group: Any, task_id: str) -> Any:
+    """Create an EmptyOperator that absorbs the producer's skip state on retry.
+
+    This task sits downstream of the producer inside the DbtTaskGroup. When the producer
+    is skipped on retry, this task still succeeds (trigger_rule=NONE_FAILED), preventing
+    the skip from propagating to tasks downstream of the group.
+    """
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+
+    from airflow.utils.trigger_rule import TriggerRule
+
+    return EmptyOperator(  # type: ignore[no-untyped-call]
+        task_id=task_id,
+        dag=dag,
+        task_group=task_group,
+        trigger_rule=TriggerRule.NONE_FAILED,
+        doc_md=(
+            "**Cosmos internal task.** Absorbs the producer's skip state on retry "
+            "so it does not propagate to tasks downstream of this DbtTaskGroup."
+        ),
+    )

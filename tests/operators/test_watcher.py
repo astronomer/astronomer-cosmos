@@ -1717,12 +1717,13 @@ def test_dbt_task_group_with_watcher():
     # assert outcome.state == DagRunState.SUCCESS
     # Fortunately, when we trigger the DAG run manually, the weight is being respected and the producer task is being picked up in advance.
 
-    assert len(dag_dbt_task_group_watcher.task_dict) == 10
+    assert len(dag_dbt_task_group_watcher.task_dict) == 11
     tasks_names = [task.task_id for task in dag_dbt_task_group_watcher.topological_sort()]
 
     expected_task_names = [
         "pre_dbt",
         "dbt_task_group.dbt_producer_watcher",
+        "dbt_task_group.dbt_producer_watcher_done",
         "dbt_task_group.raw_customers_seed",
         "dbt_task_group.raw_orders_seed",
         "dbt_task_group.raw_payments_seed",

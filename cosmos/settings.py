@@ -32,6 +32,7 @@ enable_cache_partial_parse = conf.getboolean("cosmos", "enable_cache_partial_par
 enable_cache_package_lockfile = conf.getboolean("cosmos", "enable_cache_package_lockfile", fallback=True)
 enable_cache_dbt_ls = conf.getboolean("cosmos", "enable_cache_dbt_ls", fallback=True)
 enable_cache_dbt_yaml_selectors = conf.getboolean("cosmos", "enable_cache_dbt_yaml_selectors", fallback=True)
+enable_lax_selector_parsing = conf.getboolean("cosmos", "enable_lax_selector_parsing", fallback=False)
 rich_logging = conf.getboolean("cosmos", "rich_logging", fallback=False)
 dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)

@@ -1,6 +1,17 @@
 Changelog
 =========
 
+1.14.1a2 (2026-04-21)
+-------------------
+
+Bug Fixes
+
+* Fix watcher producer retries behaviour by @tatiana in #2559
++ K8s watcher fix
+
+(and others)
+
+
 1.14.0 (2026-04-07)
 ---------------------
 

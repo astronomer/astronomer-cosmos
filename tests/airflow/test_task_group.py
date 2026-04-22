@@ -9,6 +9,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from airflow import DAG
 
+try:
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
+
 from cosmos import DbtTaskGroup, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, TestBehavior
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -70,3 +75,18 @@ def test_rshift_noop_when_setting_disabled():
     tg >> task
 
     assert task.trigger_rule == "all_success"
+
+
+@patch("cosmos.settings.propagate_watcher_trigger_rule", True)
+def test_rshift_sets_trigger_rule_on_downstream_task_group_children():
+    tg = _make_task_group(ExecutionMode.WATCHER)
+
+    child_task_1 = MagicMock(trigger_rule="all_success")
+    child_task_2 = MagicMock(trigger_rule="all_success")
+    downstream_group = MagicMock(spec=TaskGroup)
+    downstream_group.children = {"t1": child_task_1, "t2": child_task_2}
+
+    tg >> downstream_group
+
+    assert child_task_1.trigger_rule == "none_failed"
+    assert child_task_2.trigger_rule == "none_failed"

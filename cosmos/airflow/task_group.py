@@ -51,10 +51,16 @@ class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):
         """
         if not self.is_watcher_mode or not settings.propagate_watcher_trigger_rule:
             return
-        tasks = downstream_tasks if isinstance(downstream_tasks, (list, tuple)) else [downstream_tasks]
-        for task in tasks:
-            if hasattr(task, "trigger_rule"):
-                task.trigger_rule = "none_failed"
+        items = downstream_tasks if isinstance(downstream_tasks, (list, tuple)) else [downstream_tasks]
+        for item in items:
+            if isinstance(item, TaskGroup):
+                # For downstream TaskGroups, set trigger_rule on their root tasks
+                # (tasks with no upstream within the group) so the skip doesn't propagate.
+                for child in item.children.values():
+                    if hasattr(child, "trigger_rule"):
+                        child.trigger_rule = "none_failed"
+            elif hasattr(item, "trigger_rule"):
+                item.trigger_rule = "none_failed"
 
     def __rshift__(self, other: Any) -> Any:
         # dbt_group >> post_dbt — post_dbt is downstream of dbt_group

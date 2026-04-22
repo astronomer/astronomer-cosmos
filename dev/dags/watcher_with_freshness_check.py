@@ -9,9 +9,14 @@ from typing import Any
 
 try:
     # Airflow 3.1 onwards
-    from airflow.sdk import TaskGroup
+    from airflow.sdk import TaskGroup, Context
 except ImportError:
     from airflow.utils.task_group import TaskGroup
+
+try:
+    from airflow.sdk.definitions.context import Context
+except ImportError:
+    from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, SourceRenderingBehavior

@@ -100,7 +100,10 @@ def _restore_xcom_from_variable(context: Any) -> bool:
 
     Returns True if the restore succeeded, False if no backup was found.
     """
-    from airflow.models import Variable
+    try:
+        from airflow.sdk import Variable
+    except ImportError:
+        from airflow.models import Variable
 
     ti = context["ti"]
     dag_id = ti.dag_id

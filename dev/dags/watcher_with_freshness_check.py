@@ -39,13 +39,19 @@ if os.getenv("CI"):
 
 from cosmos.constants import InvocationMode
 
+
 def freshness_callback() -> list[tuple[str, str]]:
     return [("model.jaffle_shop.stg_orders", "failed")]
+
 
 # [START example_watcher_with_freshness]
 example_watcher_with_freshness = DbtDag(
     # dbt/cosmos-specific parameters
-    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER, invocation_mode=InvocationMode.DBT_RUNNER, setup_operator_args={"freshness_callback": freshness_callback}),
+    execution_config=ExecutionConfig(
+        execution_mode=ExecutionMode.WATCHER,
+        invocation_mode=InvocationMode.DBT_RUNNER,
+        setup_operator_args={"freshness_callback": freshness_callback},
+    ),
     render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL),
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,

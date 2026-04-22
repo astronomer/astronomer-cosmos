@@ -1975,6 +1975,7 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
     """
     import psycopg2
     from airflow import DAG
+    from airflow.hooks.base import BaseHook
 
     from cosmos import DbtTaskGroup
 
@@ -1983,8 +1984,15 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
     except ImportError:
         from airflow.operators.empty import EmptyOperator
 
-    # Reset the fail_once sequence so model_retry fails on first attempt
-    conn = psycopg2.connect(host="localhost", dbname="postgres", user="postgres", password="postgres")
+    # Reset the fail_once sequence using credentials from the same Airflow connection
+    airflow_conn = BaseHook.get_connection("example_conn")
+    conn = psycopg2.connect(
+        host=airflow_conn.host,
+        port=airflow_conn.port or 5432,
+        dbname=airflow_conn.schema or "postgres",
+        user=airflow_conn.login,
+        password=airflow_conn.password,
+    )
     conn.autocommit = True
     conn.cursor().execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
     conn.close()
@@ -2033,11 +2041,19 @@ def test_dbt_task_group_watcher_downstream_not_skipped_with_setting(caplog):
     """
     import psycopg2
     from airflow import DAG
+    from airflow.hooks.base import BaseHook
 
     from cosmos import DbtTaskGroup
 
-    # Reset the fail_once sequence so model_retry fails on first attempt
-    conn = psycopg2.connect(host="localhost", dbname="postgres", user="postgres", password="postgres")
+    # Reset the fail_once sequence using credentials from the same Airflow connection
+    airflow_conn = BaseHook.get_connection("example_conn")
+    conn = psycopg2.connect(
+        host=airflow_conn.host,
+        port=airflow_conn.port or 5432,
+        dbname=airflow_conn.schema or "postgres",
+        user=airflow_conn.login,
+        password=airflow_conn.password,
+    )
     conn.autocommit = True
     conn.cursor().execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
     conn.close()

@@ -19,7 +19,7 @@ except ImportError:
     from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, SourceRenderingBehavior
+from cosmos.constants import ExecutionMode, InvocationMode, SourceRenderingBehavior
 from cosmos.dbt.graph import DbtNode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -50,9 +50,6 @@ if os.getenv("CI"):
     operator_args["trigger_rule"] = "all_success"
 
 
-from cosmos.constants import InvocationMode
-
-
 def freshness_callback(
     context: Context,
     dag: Any,
@@ -60,7 +57,7 @@ def freshness_callback(
     nodes: dict[str, DbtNode] | None,
     sources_json: dict[str, Any] | None,
 ) -> list[tuple[str, str]]:
-    return [("model.jaffle_shop.stg_orders", "failed")]
+    return [("model.jaffle_shop.stg_orders", "skipped")]
 
 
 # [START example_watcher_with_freshness]

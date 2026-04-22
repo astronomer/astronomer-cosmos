@@ -355,6 +355,24 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE``
 
+.. _propagate_watcher_trigger_rule:
+
+`propagate_watcher_trigger_rule`_:
+    (Introduced in Cosmos 1.14.1) When using ``DbtTaskGroup`` in watcher mode, the producer task may be
+    skipped on retry (via ``AirflowSkipException``). By default, this causes Airflow to skip any tasks
+    downstream of the task group due to the default ``trigger_rule="all_success"``.
+
+    When this setting is enabled, Cosmos automatically sets ``trigger_rule="none_failed"`` on tasks wired
+    downstream of a watcher ``DbtTaskGroup`` via ``>>``, ``<<``, or ``set_downstream()``.
+
+    **Limitations:**
+
+    - Does not work when ``set_upstream()`` is called on a non-Cosmos task targeting the ``DbtTaskGroup``.
+    - When enabled, overrides any user-defined ``trigger_rule`` on downstream tasks with ``"none_failed"``.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__PROPAGATE_WATCHER_TRIGGER_RULE``
+
 [openlineage]
 +++++++++++++
 

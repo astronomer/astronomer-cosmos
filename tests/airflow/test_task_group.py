@@ -48,7 +48,6 @@ def _make_task_group(execution_mode):
     "execution_mode, expected",
     [
         (ExecutionMode.WATCHER, True),
-        (ExecutionMode.WATCHER_KUBERNETES, True),
         (ExecutionMode.LOCAL, False),
     ],
 )

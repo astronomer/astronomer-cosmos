@@ -77,15 +77,33 @@ def test_rshift_noop_when_setting_disabled():
 
 
 @patch("cosmos.settings.propagate_watcher_trigger_rule", True)
-def test_rshift_sets_trigger_rule_on_downstream_task_group_children():
+def test_rshift_sets_trigger_rule_on_downstream_task_group_roots():
     tg = _make_task_group(ExecutionMode.WATCHER)
 
-    child_task_1 = MagicMock(trigger_rule="all_success")
-    child_task_2 = MagicMock(trigger_rule="all_success")
+    root_task = MagicMock(trigger_rule="all_success")
     downstream_group = MagicMock(spec=TaskGroup)
-    downstream_group.children = {"t1": child_task_1, "t2": child_task_2}
+    downstream_group.get_roots.return_value = [root_task]
 
     tg >> downstream_group
 
-    assert child_task_1.trigger_rule == "none_failed"
-    assert child_task_2.trigger_rule == "none_failed"
+    assert root_task.trigger_rule == "none_failed"
+
+
+@patch("cosmos.settings.propagate_watcher_trigger_rule", True)
+def test_set_downstream_sets_trigger_rule():
+    tg = _make_task_group(ExecutionMode.WATCHER)
+    task = MagicMock(trigger_rule="all_success")
+
+    tg.set_downstream(task)
+
+    assert task.trigger_rule == "none_failed"
+
+
+@patch("cosmos.settings.propagate_watcher_trigger_rule", True)
+def test_rlshift_sets_trigger_rule():
+    tg = _make_task_group(ExecutionMode.WATCHER)
+    task = MagicMock(trigger_rule="all_success")
+
+    tg.__rlshift__(task)
+
+    assert task.trigger_rule == "none_failed"

@@ -1,4 +1,4 @@
-name: 'watcher_retry_succeeds'
+name: 'watcher_downstream_not_skipped'
 
 config-version: 2
 version: '0.1'
@@ -22,5 +22,5 @@ on-run-start:
   - "CREATE SEQUENCE IF NOT EXISTS {{ target.schema }}._cosmos_fail_once_seq"
 
 models:
-  watcher_retry_succeeds:
+  watcher_downstream_not_skipped:
       +materialized: table

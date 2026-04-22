@@ -1,10 +1,18 @@
 """
-Airflow DAG to demonstrate watcher retry behaviour where a model fails on first attempt but succeeds on retry.
+Airflow DAG to verify that tasks downstream of a watcher DbtTaskGroup are not skipped
+when the producer task is skipped on retry.
 
-model_a always succeeds. model_retry uses the fail_once macro which creates a marker table
-and fails on the first invocation; on retry the marker exists and the model succeeds.
+In watcher mode, when a dbt model fails the producer retries and raises AirflowSkipException.
+Without Cosmos handling this, the skip propagates to all tasks downstream of the TaskGroup
+(e.g. post_dbt), even though the consumer tasks inside the group succeeded.
 
-A cleanup task at the end drops the marker table so the DAG can be re-triggered.
+This DAG demonstrates that:
+- model_a succeeds in the producer and the consumer reads the result from XCom
+- model_retry fails on the first attempt (via a fail_once sequence pre-hook) but succeeds
+  on the consumer retry fallback
+- post_dbt (an EmptyOperator downstream of the group) runs successfully — it is NOT skipped
+
+A cleanup task drops the PostgreSQL sequence so the DAG can be re-triggered.
 """
 
 import os
@@ -25,7 +33,7 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent.parent / "dags/dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
-DBT_PROJECT_PATH = DBT_ROOT_PATH / "watcher_retry_succeeds"
+DBT_PROJECT_PATH = DBT_ROOT_PATH / "watcher_downstream_not_skipped"
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -63,7 +71,7 @@ with DAG(
     default_args=default_args,
 ):
     dbt_group = DbtTaskGroup(
-        group_id="watcher_retry_succeeds",
+        group_id="watcher_downstream_not_skipped",
         execution_config=execution_config,
         project_config=ProjectConfig(DBT_PROJECT_PATH),
         profile_config=profile_config,

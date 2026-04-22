@@ -108,13 +108,10 @@ def _restore_xcom_from_variable(context: Any) -> bool:
 
     var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
     try:
-        compressed = Variable.get(var_key, default_var=None)
+        compressed = Variable.get(var_key, default=None)
     except TypeError:
-        # airflow.sdk.Variable.get() does not support default_var
-        try:
-            compressed = Variable.get(var_key)
-        except Exception:
-            compressed = None
+        # airflow.models.Variable.get() uses default_var instead of default
+        compressed = Variable.get(var_key, default_var=None)  # type: ignore[call-arg]
     if compressed is None:
         logger.info("No XCom backup Variable found at '%s'", var_key)
         return False

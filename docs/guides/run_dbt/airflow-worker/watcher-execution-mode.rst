@@ -275,7 +275,11 @@ When using ``DbtTaskGroup`` in watcher mode, the producer task may be skipped on
 this causes Airflow to skip any tasks downstream of the task group (due to ``trigger_rule="all_success"``).
 
 The ``propagate_watcher_trigger_rule`` setting makes Cosmos automatically set ``trigger_rule="none_failed"``
-on tasks wired downstream of a watcher ``DbtTaskGroup`` via ``>>``, ``<<``, or ``set_downstream()``.
+on tasks wired downstream of a watcher ``DbtTaskGroup`` when the dependency is created from the
+``DbtTaskGroup`` side:
+
+- ``dbt_group >> task``
+- ``dbt_group.set_downstream(task)``
 
 **Configuration:**
 
@@ -292,8 +296,9 @@ Or via environment variable:
 
 **Limitations:**
 
-- This does not work when ``set_upstream()`` is called on a non-Cosmos task targeting the ``DbtTaskGroup``,
-  since Cosmos cannot intercept methods on tasks it does not control.
+- This does not work when the dependency is created from the downstream task side
+  (e.g., ``task.set_upstream(dbt_group)`` or ``task << dbt_group``), since Cosmos cannot
+  intercept methods called on tasks it does not control.
 - When enabled, it overrides any user-defined ``trigger_rule`` on downstream tasks with ``"none_failed"``.
   If you need a different ``trigger_rule`` on a downstream task, do not enable this setting and instead
   set ``trigger_rule="none_failed"`` manually on the specific tasks that need it.

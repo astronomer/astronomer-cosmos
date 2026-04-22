@@ -56,7 +56,10 @@ def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
     if not backup_buffer:
         return
 
-    from airflow.models import Variable
+    try:
+        from airflow.sdk import Variable
+    except ImportError:
+        from airflow.models import Variable
 
     compressed = base64.b64encode(zlib.compress(json.dumps(backup_buffer, default=str).encode("utf-8"))).decode("utf-8")
     Variable.set(var_key, compressed)
@@ -87,7 +90,10 @@ def _delete_xcom_backup_variable(context: Any) -> None:
     if not isinstance(var_key, str):
         return
     try:
-        from airflow.models import Variable
+        try:
+            from airflow.sdk import Variable
+        except ImportError:
+            from airflow.models import Variable
 
         Variable.delete(var_key)
         logger.debug("Deleted XCom backup Variable '%s'", var_key)

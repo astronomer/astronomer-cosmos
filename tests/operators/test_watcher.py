@@ -2065,13 +2065,16 @@ def test_dbt_task_group_watcher_downstream_not_skipped_with_setting(caplog):
         )
 
         post_dbt = EmptyOperator(task_id="post_dbt")
+        post_dbt_2 = EmptyOperator(task_id="post_dbt_2")
         dbt_group >> post_dbt
+        dbt_group.set_downstream(post_dbt_2)
 
     outcome = new_test_dag(dag, expected_dag_state=DagRunState.SUCCESS)
 
     tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
-    # The downstream task runs because propagate_watcher_trigger_rule prevents skip propagation
+    # Both downstream tasks run because propagate_watcher_trigger_rule prevents skip propagation
     assert tis["post_dbt"].state == "success"
+    assert tis["post_dbt_2"].state == "success"
 
 
 def test_dbt_source_watcher_operator_template_fields():

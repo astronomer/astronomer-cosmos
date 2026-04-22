@@ -54,13 +54,14 @@ class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):
         items = downstream_tasks if isinstance(downstream_tasks, (list, tuple)) else [downstream_tasks]
         for item in items:
             if isinstance(item, TaskGroup):
-                # For downstream TaskGroups, set trigger_rule on their root tasks
-                # (tasks with no upstream within the group) so the skip doesn't propagate.
-                for child in item.children.values():
-                    if hasattr(child, "trigger_rule"):
-                        child.trigger_rule = "none_failed"
+                # For downstream TaskGroups, only set trigger_rule on root tasks
+                # (tasks with no upstream within the group) to avoid altering
+                # the group's internal dependency semantics.
+                for root_task in item.get_roots():
+                    if hasattr(root_task, "trigger_rule"):
+                        root_task.trigger_rule = "none_failed"  # type: ignore[assignment]
             elif hasattr(item, "trigger_rule"):
-                item.trigger_rule = "none_failed"
+                item.trigger_rule = "none_failed"  # type: ignore[assignment]
 
     def __rshift__(self, other: Any) -> Any:
         # dbt_group >> post_dbt — post_dbt is downstream of dbt_group

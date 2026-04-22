@@ -2014,8 +2014,23 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
             operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
         )
 
+        # Force producer >> root consumers so dag.test() respects execution order.
+        # Only root nodes (no upstream within the group) are wired, and their trigger_rule
+        # is set to none_failed so they run even when the producer is skipped.
+        # This workaround is only needed for dag.test() — the real scheduler uses priority_weight.
+        # See https://github.com/apache/airflow/issues/56723
+        producer = dag.task_dict["watcher_downstream_not_skipped.dbt_producer_watcher"]
+        for root_task in dbt_group.get_roots():
+            if root_task != producer:
+                producer >> root_task
+                root_task.trigger_rule = "none_failed"
+
         post_dbt = EmptyOperator(task_id="post_dbt")
         dbt_group >> post_dbt
+        # Also wire producer >> post_dbt so the producer skip propagates directly,
+        # simulating what happens in a real deployment where the producer is a leaf
+        # task in the group and its skip affects downstream tasks.
+        producer >> post_dbt
 
     outcome = new_test_dag(dag, expected_dag_state=DagRunState.SUCCESS)
 
@@ -2080,10 +2095,23 @@ def test_dbt_task_group_watcher_downstream_not_skipped_with_setting(caplog):
             operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
         )
 
+        # Force producer >> root consumers so dag.test() respects execution order.
+        # See https://github.com/apache/airflow/issues/56723
+        producer = dag.task_dict["watcher_downstream_not_skipped.dbt_producer_watcher"]
+        for root_task in dbt_group.get_roots():
+            if root_task != producer:
+                producer >> root_task
+                root_task.trigger_rule = "none_failed"
+
         post_dbt = EmptyOperator(task_id="post_dbt")
         post_dbt_2 = EmptyOperator(task_id="post_dbt_2")
         dbt_group >> post_dbt
         dbt_group.set_downstream(post_dbt_2)
+        # Wire producer >> downstream tasks so the producer skip propagates directly,
+        # simulating what happens in a real deployment where the producer is a leaf
+        # task in the group and its skip affects downstream tasks.
+        producer >> post_dbt
+        producer >> post_dbt_2
 
     outcome = new_test_dag(dag, expected_dag_state=DagRunState.SUCCESS)
 

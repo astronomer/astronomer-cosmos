@@ -9,7 +9,7 @@ from typing import Any
 
 try:
     # Airflow 3.1 onwards
-    from airflow.sdk import TaskGroup, Context
+    from airflow.sdk import Context, TaskGroup
 except ImportError:
     from airflow.utils.task_group import TaskGroup
 

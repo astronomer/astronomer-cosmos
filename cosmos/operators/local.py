@@ -56,7 +56,7 @@ from cosmos.dbt.project import (
     get_partial_parse_path,
     has_non_empty_dependencies_file,
 )
-from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
+from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
     remote_target_path,
     remote_target_path_conn_id,

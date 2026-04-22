@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -27,7 +28,7 @@ profile_config = ProfileConfig(
 
 def _make_task_group(execution_mode):
     """Create a DbtTaskGroup inside a DAG context."""
-    with DAG(dag_id="test_dag", start_date="2023-01-01"):
+    with DAG(dag_id="test_dag", start_date=datetime(2023, 1, 1)):
         return DbtTaskGroup(
             group_id="test_group",
             execution_config=ExecutionConfig(execution_mode=execution_mode),

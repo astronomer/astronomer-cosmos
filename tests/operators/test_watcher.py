@@ -1969,11 +1969,8 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
     Without propagate_watcher_trigger_rule, tasks downstream of a watcher DbtTaskGroup
     are skipped when the producer is skipped on retry.
     """
+    import psycopg2
     from airflow import DAG
-    from airflow.providers.postgres.hooks.postgres import PostgresHook
-
-    # Reset the fail_once sequence so model_retry fails on first attempt
-    PostgresHook(postgres_conn_id="example_conn").run("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
 
     from cosmos import DbtTaskGroup
 
@@ -1981,6 +1978,12 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
         from airflow.providers.standard.operators.empty import EmptyOperator
     except ImportError:
         from airflow.operators.empty import EmptyOperator
+
+    # Reset the fail_once sequence so model_retry fails on first attempt
+    conn = psycopg2.connect(host="localhost", dbname="postgres", user="postgres", password="postgres")
+    conn.autocommit = True
+    conn.cursor().execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
+    conn.close()
 
     caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
 
@@ -2020,13 +2023,16 @@ def test_dbt_task_group_watcher_downstream_not_skipped_with_setting(caplog):
     With propagate_watcher_trigger_rule=True, tasks downstream of a watcher DbtTaskGroup
     run successfully even when the producer is skipped on retry.
     """
+    import psycopg2
     from airflow import DAG
-    from airflow.providers.postgres.hooks.postgres import PostgresHook
 
     from cosmos import DbtTaskGroup
 
     # Reset the fail_once sequence so model_retry fails on first attempt
-    PostgresHook(postgres_conn_id="example_conn").run("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
+    conn = psycopg2.connect(host="localhost", dbname="postgres", user="postgres", password="postgres")
+    conn.autocommit = True
+    conn.cursor().execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
+    conn.close()
 
     try:
         from airflow.providers.standard.operators.empty import EmptyOperator

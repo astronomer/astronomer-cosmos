@@ -48,11 +48,13 @@ if os.getenv("CI"):
 from cosmos.constants import InvocationMode
 
 
-def freshness_callback( context: Context,
+def freshness_callback(
+    context: Context,
     dag: Any,
     task_group: TaskGroup | None,
     nodes: dict[str, DbtNode] | None,
-    sources_json: dict[str, Any] | None) -> list[tuple[str, str]]:
+    sources_json: dict[str, Any] | None,
+) -> list[tuple[str, str]]:
     return [("model.jaffle_shop.stg_orders", "failed")]
 
 

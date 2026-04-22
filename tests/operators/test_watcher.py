@@ -1960,8 +1960,12 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10"),
-    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
+    AIRFLOW_VERSION < Version("2.10") or AIRFLOW_VERSION == Version("3.1.0"),
+    reason=(
+        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
+        "Airflow 3.1.0 crashes during task finalization (SetRenderedFields) when retrying "
+        "tasks inside a DbtTaskGroup via dag.test()."
+    ),
 )
 @pytest.mark.integration
 def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
@@ -2013,8 +2017,12 @@ def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10"),
-    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
+    AIRFLOW_VERSION < Version("2.10") or AIRFLOW_VERSION == Version("3.1.0"),
+    reason=(
+        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
+        "Airflow 3.1.0 crashes during task finalization (SetRenderedFields) when retrying "
+        "tasks inside a DbtTaskGroup via dag.test()."
+    ),
 )
 @pytest.mark.integration
 @patch("cosmos.settings.propagate_watcher_trigger_rule", True)

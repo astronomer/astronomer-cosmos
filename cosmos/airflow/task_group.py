@@ -12,6 +12,7 @@ try:
 except ImportError:
     from airflow.utils.task_group import TaskGroup
 
+from cosmos import settings
 from cosmos.config import ExecutionConfig
 from cosmos.constants import ExecutionMode
 from cosmos.converter import DbtToAirflowConverter, airflow_kwargs, specific_kwargs
@@ -48,7 +49,7 @@ class DbtTaskGroup(TaskGroup, DbtToAirflowConverter):
         Set ``trigger_rule="none_failed"`` on downstream tasks so the skip
         does not propagate outside the task group.
         """
-        if not self.is_watcher_mode:
+        if not self.is_watcher_mode or not settings.propagate_watcher_trigger_rule:
             return
         tasks = downstream_tasks if isinstance(downstream_tasks, (list, tuple)) else [downstream_tasks]
         for task in tasks:

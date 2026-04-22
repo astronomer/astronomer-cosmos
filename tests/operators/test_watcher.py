@@ -39,6 +39,9 @@ DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_sh
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
 MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
 DBT_WATCHER_FAILING_TESTS_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_failing_tests"
+DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH = (
+    Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_downstream_not_skipped"
+)
 
 DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
@@ -1954,6 +1957,99 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
 
     dbt_error_message = """Database Error in model model_f (models/model_f.sql)\n  column "this_column_does_not_exist_at_all" does not exist\n  LINE 1"""
     assert dbt_error_message in caplog.text
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10"),
+    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
+)
+@pytest.mark.integration
+def test_dbt_task_group_watcher_downstream_skipped_by_default(caplog):
+    """
+    Without propagate_watcher_trigger_rule, tasks downstream of a watcher DbtTaskGroup
+    are skipped when the producer is skipped on retry.
+    """
+    from airflow import DAG
+
+    from cosmos import DbtTaskGroup
+
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator
+
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
+
+    with DAG(
+        dag_id="watcher_taskgroup_downstream_skipped",
+        start_date=datetime(2023, 1, 1),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        dagrun_timeout=timedelta(seconds=120),
+    ) as dag:
+        dbt_group = DbtTaskGroup(
+            group_id="watcher_downstream_not_skipped",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH),
+            profile_config=profile_config,
+            render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+        )
+
+        post_dbt = EmptyOperator(task_id="post_dbt")
+        dbt_group >> post_dbt
+
+    outcome = new_test_dag(dag, expected_dag_state=DagRunState.FAILED)
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    # The downstream task is skipped because the producer skip propagates
+    assert tis["post_dbt"].state == "skipped"
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10"),
+    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
+)
+@pytest.mark.integration
+@patch("cosmos.settings.propagate_watcher_trigger_rule", True)
+def test_dbt_task_group_watcher_downstream_not_skipped_with_setting(caplog):
+    """
+    With propagate_watcher_trigger_rule=True, tasks downstream of a watcher DbtTaskGroup
+    run successfully even when the producer is skipped on retry.
+    """
+    from airflow import DAG
+
+    from cosmos import DbtTaskGroup
+
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator
+
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
+
+    with DAG(
+        dag_id="watcher_taskgroup_downstream_not_skipped",
+        start_date=datetime(2023, 1, 1),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        dagrun_timeout=timedelta(seconds=120),
+    ) as dag:
+        dbt_group = DbtTaskGroup(
+            group_id="watcher_downstream_not_skipped",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH),
+            profile_config=profile_config,
+            render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+        )
+
+        post_dbt = EmptyOperator(task_id="post_dbt")
+        dbt_group >> post_dbt
+
+    outcome = new_test_dag(dag, expected_dag_state=DagRunState.FAILED)
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    # The downstream task runs because propagate_watcher_trigger_rule prevents skip propagation
+    assert tis["post_dbt"].state == "success"
 
 
 def test_dbt_source_watcher_operator_template_fields():

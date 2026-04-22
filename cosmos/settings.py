@@ -68,6 +68,7 @@ enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_ta
 # this setting allows retries to run on a queue with larger resources, which is often necessary for larger dbt projects
 # this would also be used to run the producer task
 watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
+propagate_watcher_trigger_rule = conf.getboolean("cosmos", "propagate_watcher_trigger_rule", fallback=False)
 
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"

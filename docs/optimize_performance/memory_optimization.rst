@@ -209,7 +209,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Default**: ``False``
 
------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 7. Enable Task Profiling with Debug Mode
 ++++++++++++++++++++++++++++++++++++++++

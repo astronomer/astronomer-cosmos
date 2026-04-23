@@ -269,7 +269,8 @@ to be skipped as well — even when all consumer tasks succeeded. **This makes
 ``ExecutionMode.WATCHER`` behave differently from ``ExecutionMode.LOCAL``** when used with
 ``DbtTaskGroup``.
 
-To prevent this, Cosmos automatically adds an internal gateway task called
+To prevent this (`#2594 <https://github.com/astronomer/astronomer-cosmos/issues/2594>`_),
+Cosmos automatically adds an internal gateway task called
 ``dbt_producer_watcher_done`` inside the ``DbtTaskGroup``. This task:
 
 - Sits directly downstream of the producer (``producer >> dbt_producer_watcher_done``)

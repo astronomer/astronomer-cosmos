@@ -39,6 +39,9 @@ DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_sh
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
 MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
 DBT_WATCHER_FAILING_TESTS_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_failing_tests"
+DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH = (
+    Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_downstream_not_skipped"
+)
 
 DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
@@ -1735,12 +1738,13 @@ def test_dbt_task_group_with_watcher():
     # assert outcome.state == DagRunState.SUCCESS
     # Fortunately, when we trigger the DAG run manually, the weight is being respected and the producer task is being picked up in advance.
 
-    assert len(dag_dbt_task_group_watcher.task_dict) == 10
+    assert len(dag_dbt_task_group_watcher.task_dict) == 11
     tasks_names = [task.task_id for task in dag_dbt_task_group_watcher.topological_sort()]
 
     expected_task_names = [
         "pre_dbt",
         "dbt_task_group.dbt_producer_watcher",
+        "dbt_task_group.dbt_producer_watcher_done",
         "dbt_task_group.raw_customers_seed",
         "dbt_task_group.raw_orders_seed",
         "dbt_task_group.raw_payments_seed",
@@ -1764,7 +1768,18 @@ def test_dbt_task_group_with_watcher():
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.customers_run"], DbtRunWatcherOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.orders_run"], DbtRunWatcherOperator)
 
-    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()
+    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == {
+        "dbt_task_group.dbt_producer_watcher_done",
+    }
+
+    done_task = dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher_done"]
+    assert done_task.__class__.__name__ == "EmptyOperator"
+    try:
+        from airflow.task.trigger_rule import TriggerRule
+    except ImportError:
+        from airflow.utils.trigger_rule import TriggerRule  # type: ignore[no-redef]
+
+    assert done_task.trigger_rule == TriggerRule.NONE_FAILED
 
 
 @pytest.mark.integration
@@ -1972,6 +1987,83 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
 
     dbt_error_message = """Database Error in model model_f (models/model_f.sql)\n  column "this_column_does_not_exist_at_all" does not exist\n  LINE 1"""
     assert dbt_error_message in caplog.text
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10") or (Version("3.1.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    reason=(
+        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
+        "Airflow 3.1.x crashes during task finalization (SetRenderedFields) when retrying "
+        "tasks inside a DbtTaskGroup via dag.test()."
+    ),
+)
+@pytest.mark.integration
+def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog):
+    """
+    Verify that the dbt_producer_watcher_done gateway task prevents the producer's skip
+    from propagating to tasks downstream of the DbtTaskGroup.
+    """
+    import psycopg2
+    from airflow import DAG
+    from airflow.hooks.base import BaseHook
+
+    from cosmos import DbtTaskGroup
+
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator
+
+    # Reset the fail_once sequence using credentials from the same Airflow connection
+    airflow_conn = BaseHook.get_connection("example_conn")
+    with psycopg2.connect(
+        host=airflow_conn.host,
+        port=airflow_conn.port or 5432,
+        dbname=airflow_conn.schema or "postgres",
+        user=airflow_conn.login,
+        password=airflow_conn.password,
+    ) as conn:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
+
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
+
+    with DAG(
+        dag_id="watcher_taskgroup_gateway_test",
+        start_date=datetime(2023, 1, 1),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        dagrun_timeout=timedelta(seconds=120),
+    ) as dag:
+        dbt_group = DbtTaskGroup(
+            group_id="watcher_downstream_not_skipped",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH),
+            profile_config=profile_config,
+            render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+        )
+
+        # Force gateway >> root consumers so dag.test() respects execution order.
+        # Using the gateway (not the producer) as upstream ensures consumers see a
+        # successful upstream even when the producer is skipped.
+        # This workaround is only needed for dag.test() — the real scheduler uses priority_weight.
+        # See https://github.com/apache/airflow/issues/56723
+        gateway = dag.task_dict["watcher_downstream_not_skipped.dbt_producer_watcher_done"]
+        for root_task in dbt_group.get_roots():
+            if root_task.task_id.endswith("_done") or root_task.task_id.endswith("dbt_producer_watcher"):
+                continue
+            gateway >> root_task
+
+        post_dbt = EmptyOperator(task_id="post_dbt")
+        dbt_group >> post_dbt
+
+    outcome = new_test_dag(dag, expected_dag_state=DagRunState.SUCCESS)
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    # The gateway task absorbs the producer skip — post_dbt runs successfully
+    assert tis["post_dbt"].state == "success"
+    assert tis["watcher_downstream_not_skipped.dbt_producer_watcher_done"].state == "success"
 
 
 def test_dbt_source_watcher_operator_template_fields():

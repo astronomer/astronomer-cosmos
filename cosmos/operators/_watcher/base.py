@@ -4,7 +4,7 @@ import json
 import logging
 import threading
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 
@@ -40,6 +40,15 @@ try:
 except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
     from airflow.utils.context import Context  # type: ignore[attr-defined]
+
+if TYPE_CHECKING:
+    from airflow.models.dag import DAG
+    from airflow.operators.empty import EmptyOperator
+
+    try:
+        from airflow.sdk import TaskGroup
+    except ImportError:
+        from airflow.utils.task_group import TaskGroup
 
 logger = get_logger(__name__)
 
@@ -694,3 +703,32 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return True
         else:
             raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
+
+
+def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> EmptyOperator:
+    """Create an EmptyOperator that absorbs the producer's skip state on retry.
+
+    This task sits downstream of the producer inside the DbtTaskGroup. When the producer
+    is skipped on retry, this task still succeeds (trigger_rule=NONE_FAILED), preventing
+    the skip from propagating to tasks downstream of the group.
+    """
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+
+    try:
+        from airflow.task.trigger_rule import TriggerRule
+    except ImportError:
+        from airflow.utils.trigger_rule import TriggerRule  # type: ignore[no-redef]
+
+    return EmptyOperator(  # type: ignore[no-untyped-call]
+        task_id=task_id,
+        dag=dag,
+        task_group=task_group,
+        trigger_rule=TriggerRule.NONE_FAILED,
+        doc_md=(
+            "**Cosmos internal task.** Absorbs the producer's skip state on retry "
+            "so it does not propagate to tasks downstream of this DbtTaskGroup."
+        ),
+    )

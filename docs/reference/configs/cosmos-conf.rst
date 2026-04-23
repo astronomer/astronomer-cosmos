@@ -319,7 +319,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
         import paths. On 1.14.0 and newer, this setting is accepted but has no effect. The guidance below is relevant
         only for users on Cosmos versions earlier than 1.14.0.
 
-    As an example, when this option is enabled, the following is an example of specifying the imports with full module paths:
+    When enabled, import Cosmos classes via their full module paths:
 
     .. literalinclude:: ../../../dev/dags/basic_cosmos_dag_full_module_path_imports.py
         :language: python

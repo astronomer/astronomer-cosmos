@@ -19,7 +19,12 @@ from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
-from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
+from cosmos.constants import (
+    _DBT_STARTUP_EVENTS_XCOM_KEY,
+    PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
+    ExecutionMode,
+    SourceRenderingBehavior,
+)
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
@@ -39,6 +44,7 @@ DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_sh
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
 MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
 DBT_WATCHER_FAILING_TESTS_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_failing_tests"
+ALTERED_JAFFLE_SHOP_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
 DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH = (
     Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_downstream_not_skipped"
 )
@@ -1990,6 +1996,73 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
 
 
 @pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10"),
+    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
+)
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
+    """
+    When freshness_callback returns a model with "skipped" state, the producer task:
+    - pre-sets a "skipped" XCom for that model
+    - adds it to dbt build's --exclude list so dbt never runs it
+
+    The consumer sensor for the excluded model reads the pre-set XCom and raises
+    AirflowSkipException. All other models run normally.
+
+    Pre-loads seeds via a local DbtDag first so that dbt source freshness can query
+    raw_orders (which has a freshness block in altered_jaffle_shop).
+    """
+    # Pre-load seeds and models so dbt source freshness has a table to check
+    preload_dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=ALTERED_JAFFLE_SHOP_PATH),
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="altered_jaffle_shop_preload",
+        render_config=RenderConfig(
+            source_rendering_behavior=SourceRenderingBehavior.NONE,
+            test_behavior=TestBehavior.NONE,
+            emit_datasets=False,
+        ),
+        operator_args={"install_deps": True, "full_refresh": True, "execution_timeout": timedelta(seconds=180)},
+    )
+    new_test_dag(preload_dag)
+
+    def skip_orders(context, dag, task_group, nodes, sources_json):
+        return [("model.altered_jaffle_shop.orders", "skipped")]
+
+    watcher_dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=ALTERED_JAFFLE_SHOP_PATH),
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_freshness_callback_exclude",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+            invocation_mode=InvocationMode.DBT_RUNNER,
+            setup_operator_args={"freshness_callback": skip_orders},
+        ),
+        render_config=RenderConfig(
+            source_rendering_behavior=SourceRenderingBehavior.ALL,
+            test_behavior=TestBehavior.NONE,
+            emit_datasets=False,
+        ),
+        operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
+        default_args={"retries": 0},
+    )
+    outcome = new_test_dag(watcher_dag)
+    assert outcome.state == DagRunState.SUCCESS
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    # orders was returned by the callback → excluded from dbt build → sensor reads "skipped" XCom
+    assert tis["orders_run"].state == "skipped"
+    # other models are unaffected and succeed
+    assert tis["customers_run"].state == "success"
+    # source sensor for raw_orders (has freshness block) must also complete successfully
+    # task ID derives from unique_id split: "postgres_db.raw_orders" → "postgres_db_raw_orders"
+    assert tis["postgres_db_raw_orders_source"].state == "success"
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10") or (Version("3.1.0") <= AIRFLOW_VERSION < Version("3.2.0")),
     AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
     reason=(
         "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
@@ -2522,13 +2595,24 @@ class TestProducerSourceFreshness:
         ti.xcom_push.assert_not_called()
         assert producer.exclude is None
 
-    def test_apply_node_state_tokens_non_skipped_state_does_not_update_exclude(self):
+    def test_apply_node_state_tokens_failed_state_updates_exclude(self):
         producer = self._make_producer()
         producer.exclude = None
         ti = MagicMock()
         context = {"ti": ti}
         producer._apply_node_state_tokens(context, [("model.pkg.m1", "failed")])
         ti.xcom_push.assert_called_once_with(key="model__pkg__m1_status", value={"status": "failed", "outlet_uris": []})
+        assert "m1" in producer.exclude
+
+    def test_apply_node_state_tokens_success_state_does_not_update_exclude(self):
+        producer = self._make_producer()
+        producer.exclude = None
+        ti = MagicMock()
+        context = {"ti": ti}
+        producer._apply_node_state_tokens(context, [("model.pkg.m1", "success")])
+        ti.xcom_push.assert_called_once_with(
+            key="model__pkg__m1_status", value={"status": "success", "outlet_uris": []}
+        )
         assert producer.exclude is None
 
     def test_run_dbt_runner_skips_callback_during_source_freshness(self):

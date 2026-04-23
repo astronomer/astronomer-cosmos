@@ -376,3 +376,193 @@ def test_callbacks_included_in_producer_operator():
     )
     callback_classes = [callback.__name__ for callback in op.callbacks]
     assert "WatcherKubernetesCallback" in callback_classes
+
+
+# -----------------------------------------------------------------------------
+# Outlet URI wiring: regression coverage for WATCHER_KUBERNETES dataset emission
+#
+# These tests exercise the two halves of the per-model dataset emission path:
+#
+#   producer execute()  ──► populates self._model_outlet_uris from the manifest
+#                        └─► publishes outlets + namespace into module globals
+#   progress_callback() ──► threads module globals into store_dbt_resource_status_from_log
+#                        └─► XCom carries outlet_uris on per-node status
+#   consumer execute() / execute_complete() ──► reads outlet_uris, emits Assets
+#
+# Without any one of these links the chain breaks and lineage catalogs show
+# empty inputs/outputs for WATCHER_KUBERNETES pipelines.
+# -----------------------------------------------------------------------------
+
+
+from cosmos.operators import watcher_kubernetes as watcher_kubernetes_module
+
+
+@pytest.fixture(autouse=True)
+def reset_watcher_kubernetes_globals():
+    """
+    Reset the module-level producer-state globals between tests.
+
+    These globals are the bridge between the producer operator's ``execute``
+    and the static ``WatcherKubernetesCallback.progress_callback``. Tests that
+    set them must not leak state into unrelated tests.
+    """
+    yield
+    watcher_kubernetes_module.producer_task_context = None
+    watcher_kubernetes_module.producer_task_model_outlet_uris = None
+    watcher_kubernetes_module.producer_task_dataset_namespace = None
+
+
+@patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+@patch("cosmos.operators.watcher_kubernetes.compute_model_outlet_uris")
+@patch("cosmos.operators.watcher_kubernetes.get_dataset_namespace")
+def test_producer_execute_populates_outlet_uris_and_globals(
+    mock_get_namespace, mock_compute, mock_super_execute, mock_init, mock_delete, tmp_path
+):
+    """Producer ``execute`` must resolve namespace, read manifest, publish globals.
+
+    Uses the module-level ``profile_config`` fixture (a real ProfileConfig pointing
+    at the jaffle_shop profiles.yml) because ``execute`` guards the
+    ``get_dataset_namespace`` call on ``profile_config is not None`` — passing
+    ``None`` here would skip the resolver entirely and never exercise the
+    populate path under test.
+    """
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text("{}")
+
+    mock_get_namespace.return_value = "bigquery"
+    mock_compute.return_value = {"model.jaffle.a": ["bigquery/db.schema.a"]}
+
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=profile_config,
+        image="dbt-image:latest",
+        manifest_filepath=str(manifest),
+    )
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    op.execute(context=context)
+
+    assert op._dataset_namespace == "bigquery"
+    assert op._model_outlet_uris == {"model.jaffle.a": ["bigquery/db.schema.a"]}
+    assert watcher_kubernetes_module.producer_task_context is context
+    assert watcher_kubernetes_module.producer_task_dataset_namespace == "bigquery"
+    assert watcher_kubernetes_module.producer_task_model_outlet_uris is op._model_outlet_uris
+
+    # compute_model_outlet_uris is always called with a Path; don't care about
+    # str-vs-Path equality here — assert the content of the call instead.
+    called_path, called_namespace = mock_compute.call_args[0]
+    assert str(called_path) == str(manifest)
+    assert called_namespace == "bigquery"
+
+
+@patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+@patch("cosmos.operators.watcher_kubernetes.compute_model_outlet_uris")
+@patch("cosmos.operators.watcher_kubernetes.get_dataset_namespace")
+def test_producer_execute_no_manifest_skips_silently(
+    mock_get_namespace, mock_compute, mock_super_execute, mock_init, mock_delete
+):
+    """
+    Missing manifest must not raise — dataset emission is optional, and dbt
+    execution / status reporting must continue to work without it. Matches the
+    SUBPROCESS watcher's graceful-degradation behaviour.
+    """
+    mock_get_namespace.return_value = "bigquery"
+
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+    # manifest_filepath defaults to ""
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    op.execute(context=context)
+
+    assert op._model_outlet_uris == {}
+    mock_compute.assert_not_called()
+
+
+@patch("cosmos.operators.watcher_kubernetes.store_dbt_resource_status_from_log")
+def test_progress_callback_passes_outlet_state_to_log_parser(mock_store):
+    """
+    ``progress_callback`` must forward the module-level outlet URI map and
+    namespace into ``store_dbt_resource_status_from_log``. Without this, the
+    parser writes empty ``outlet_uris`` to XCom regardless of what the
+    producer resolved.
+    """
+    sentinel_uris: dict[str, list[str]] = {"model.x": ["bigquery/a.b.c"]}
+    watcher_kubernetes_module.producer_task_context = {"run_id": "r"}
+    watcher_kubernetes_module.producer_task_model_outlet_uris = sentinel_uris
+    watcher_kubernetes_module.producer_task_dataset_namespace = "bigquery"
+
+    watcher_kubernetes_module.WatcherKubernetesCallback.progress_callback(
+        line="some log line",
+        client=MagicMock(),
+        mode="sync",
+        container_name="base",
+        timestamp=None,
+        pod=MagicMock(),
+    )
+
+    mock_store.assert_called_once()
+    _, call_kwargs = mock_store.call_args
+    assert call_kwargs["model_outlet_uris"] is sentinel_uris
+    assert call_kwargs["dataset_namespace"] == "bigquery"
+
+
+@patch("cosmos.operators.watcher_kubernetes.register_dataset_on_task")
+def test_consumer_emit_datasets_registers_assets(mock_register):
+    """Consumer sensor emits one Asset per outlet URI when ``_outlet_uris`` is populated."""
+    sensor = make_sensor(emit_datasets=True)
+    sensor._outlet_uris = ["bigquery/db.schema.a", "bigquery/db.schema.b"]
+    sensor.model_unique_id = "model.jaffle.a"
+
+    context: dict = {"outlet_events": {}}
+    sensor._emit_datasets(context)
+
+    mock_register.assert_called_once()
+    task_arg, inlets, outlets, _ctx = mock_register.call_args[0]
+    assert task_arg is sensor
+    assert inlets == []
+    assert [outlet.uri for outlet in outlets] == ["bigquery/db.schema.a", "bigquery/db.schema.b"]
+
+
+@patch("cosmos.operators.watcher_kubernetes.register_dataset_on_task")
+def test_consumer_emit_datasets_noop_when_disabled_or_empty(mock_register):
+    """Both no-op paths: ``emit_datasets=False`` and empty ``_outlet_uris``."""
+    # Path 1: emit_datasets disabled — outlets present but ignored.
+    sensor = make_sensor(emit_datasets=False)
+    sensor.model_unique_id = "model.jaffle.a"
+    sensor._outlet_uris = ["bigquery/db.schema.a"]
+    sensor._emit_datasets({})
+
+    # Path 2: emit_datasets enabled but producer resolved no outlets.
+    sensor = make_sensor(emit_datasets=True)
+    sensor.model_unique_id = "model.jaffle.a"
+    sensor._outlet_uris = []
+    sensor._emit_datasets({})
+
+    mock_register.assert_not_called()
+
+
+@patch("cosmos.operators.watcher_kubernetes.DbtConsumerWatcherKubernetesSensor._emit_datasets")
+@patch("cosmos.operators._watcher.base.BaseConsumerSensor.execute_complete")
+def test_consumer_execute_complete_extracts_outlet_uris_from_event(mock_super_complete, mock_emit):
+    """``execute_complete`` must stash ``outlet_uris`` off the trigger event before emitting."""
+    sensor = make_sensor()
+    event = {"status": "success", "outlet_uris": ["bigquery/db.schema.a"]}
+
+    sensor.execute_complete({}, event)
+
+    assert sensor._outlet_uris == ["bigquery/db.schema.a"]
+    mock_emit.assert_called_once()

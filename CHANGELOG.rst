@@ -7,6 +7,15 @@ Changelog
 Bug Fixes
 
 * Fix watcher producer retries behaviour by @tatiana in #2559
+* Emit per-model dataset outlets in ``ExecutionMode.WATCHER_KUBERNETES``. The
+  Kubernetes watcher producer now resolves the dataset namespace from the
+  profile, reads the scheduler-side manifest into a per-model outlet URI map,
+  and passes both through to the log-parsing callback. The Kubernetes
+  consumer sensor now overrides ``execute`` / ``execute_complete`` to emit
+  Airflow Assets for each model, matching the behaviour of
+  ``ExecutionMode.WATCHER``. Without this, OpenLineage events from
+  WATCHER_KUBERNETES task runs had empty inputs/outputs and downstream
+  lineage catalogs showed no table-level edges.
 + K8s watcher fix
 
 (and others)

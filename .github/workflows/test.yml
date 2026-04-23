@@ -8,7 +8,7 @@ on:
   # external PRs. Jobs that do not use sensitive secrets (type-check, unit tests, performance, telemetry) run
   # without approval.
   pull_request_target:
-    branches: [main] # zizmor: ignore[dangerous-triggers]
+    branches: [main, 'release-*'] # zizmor: ignore[dangerous-triggers]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}

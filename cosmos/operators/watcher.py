@@ -386,14 +386,34 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         freshness_results = self._freshness_callback(context, dag, task_group, nodes, self._sources_json)
         self._apply_node_state_tokens(context, freshness_results)
 
-    def _build_retry_command(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
-        """Build a ``dbt retry`` command with the same project/profile flags as the original build.
+    # Flags that ``dbt retry`` does not accept — it derives the node set from
+    # ``run_results.json`` and does not support selection or refresh overrides.
+    _RETRY_UNSUPPORTED_FLAGS = frozenset({"--select", "--exclude", "--selector", "--models", "--full-refresh"})
 
-        Includes ``--log-format json`` so the log parser can update
-        ``_pending_failures`` during retry. Build-specific flags like
-        ``--full-refresh``, ``--select``, ``--exclude`` are omitted because
-        ``dbt retry`` does not accept them — it derives the node set from
-        ``run_results.json``.
+    @classmethod
+    def _filter_retry_unsupported_flags(cls, flags: list[str]) -> list[str]:
+        """Remove flags that ``dbt retry`` does not accept from a flag list."""
+        filtered: list[str] = []
+        skip_next = False
+        for token in flags:
+            if skip_next:
+                # Skip the value that follows a flag-with-value like --select X
+                if not token.startswith("--"):
+                    continue
+                skip_next = False
+            if token in cls._RETRY_UNSUPPORTED_FLAGS:
+                skip_next = True
+                continue
+            filtered.append(token)
+        return filtered
+
+    def _build_retry_command(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
+        """Build a ``dbt retry`` command with the same global/profile flags as the original build.
+
+        Uses ``add_global_flags()`` and ``add_cmd_flags()`` to include flags
+        like ``--vars``, ``--quiet``, ``--warn-error``, and ``--log-format json``,
+        then filters out flags that ``dbt retry`` does not accept (``--select``,
+        ``--exclude``, ``--selector``, ``--models``, ``--full-refresh``).
         """
         retry_cmd = [self.dbt_executable_path]
         retry_cmd.extend(self.dbt_cmd_global_flags)
@@ -401,8 +421,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             retry_cmd.append("--no-partial-parse")
         retry_cmd.append("retry")
         retry_cmd.extend(self._generate_dbt_flags(tmp_project_dir, profile_path))
-        if self.log_format:
-            retry_cmd.extend(["--log-format", self.log_format])
+        retry_cmd.extend(self._filter_retry_unsupported_flags(self.add_global_flags()))
+        retry_cmd.extend(self._filter_retry_unsupported_flags(self.add_cmd_flags()))
         return retry_cmd
 
     def _has_run_results(self, tmp_project_dir: str) -> bool:
@@ -487,6 +507,19 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             )
         self._pending_failures.clear()
 
+    @staticmethod
+    def _is_dbt_result_failure(result: Any) -> bool:
+        """Check if a dbt invocation result indicates failure.
+
+        Works for both ``dbtRunnerResult`` (has ``.success``) and
+        ``FullOutputSubprocessResult`` (has ``.exit_code``).
+        """
+        if hasattr(result, "success"):
+            return bool(not result.success)
+        if hasattr(result, "exit_code"):
+            return bool(result.exit_code != 0)
+        return False
+
     def _post_dbt_invoke(
         self,
         result: Any,
@@ -497,11 +530,17 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     ) -> Any:
         """Run ``dbt retry`` for failed nodes, then flush any remaining failures to XCom.
 
+        The retry loop fires when ``dbt_retry_count > 0`` and either:
+        - ``_pending_failures`` is non-empty (model/seed/snapshot failures), or
+        - the dbt result indicates failure (covers test-only failures that bypass
+          ``_pending_failures``).
+
         If all retries succeed, returns the last retry result (which is successful)
         so that ``handle_exception`` does not raise. Otherwise returns the original
         failed build result.
         """
-        if self.dbt_retry_count > 0 and self._pending_failures:
+        should_retry = self.dbt_retry_count > 0 and (self._pending_failures or self._is_dbt_result_failure(result))
+        if should_retry:
             last_retry_result = self._run_dbt_retry_loop(context, env, tmp_project_dir, profile_path)
             all_retries_succeeded = not self._pending_failures
             self._flush_pending_failures(context)

@@ -2639,6 +2639,33 @@ class TestDbtProducerRetry:
         assert result is original_result
 
     @patch.object(DbtProducerWatcherOperator, "_run_dbt_retry_loop")
+    def test_post_dbt_invoke_triggers_retry_on_test_only_failure(self, mock_retry_loop):
+        """When dbt build fails only due to tests (no model failures), the retry loop should
+        still fire based on the dbt result, not just _pending_failures."""
+        op = self._make_producer(dbt_retry_count=1)
+        op._pending_failures = {}  # No model failures
+        original_result = MagicMock(success=False)  # dbt result indicates failure (tests failed)
+        retry_result = MagicMock(success=True)
+        mock_retry_loop.return_value = retry_result
+        context = {"ti": _MockTI()}
+
+        result = op._post_dbt_invoke(original_result, context, {}, "/tmp", Path("/tmp"))
+        mock_retry_loop.assert_called_once()
+        assert result is retry_result
+
+    @patch.object(DbtProducerWatcherOperator, "_run_dbt_retry_loop")
+    def test_post_dbt_invoke_skips_retry_when_result_is_success(self, mock_retry_loop):
+        """When dbt build succeeds and _pending_failures is empty, no retry should fire."""
+        op = self._make_producer(dbt_retry_count=2)
+        op._pending_failures = {}
+        original_result = MagicMock(success=True)
+        context = {"ti": _MockTI()}
+
+        result = op._post_dbt_invoke(original_result, context, {}, "/tmp", Path("/tmp"))
+        mock_retry_loop.assert_not_called()
+        assert result is original_result
+
+    @patch.object(DbtProducerWatcherOperator, "_run_dbt_retry_loop")
     def test_post_dbt_invoke_all_retries_succeed(self, mock_retry_loop):
         """When retries resolve all failures, should return the retry result."""
         op = self._make_producer(dbt_retry_count=2)

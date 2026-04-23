@@ -43,6 +43,10 @@ except ImportError:  # pragma: no cover
 
 logger = get_logger(__name__)
 
+# Protects mutations of the ``pending_failures`` dict passed to
+# ``_push_or_defer_status`` from concurrent dbt runner callback threads.
+_pending_failures_lock = threading.Lock()
+
 # Subset of dbt event types that represent errors/failures.
 # Used (together with node status lifecycle events like NodeStart/NodeCompiling/
 # NodeExecuting/NodeFinished) to build _DBT_EVENT_ALLOWLIST, which controls which
@@ -252,26 +256,33 @@ def _push_or_defer_status(
       because ``dbt retry`` re-runs both failed nodes and their skipped dependents.
     - Nodes that were previously pending but now succeeded are removed from
       ``pending_failures`` and pushed to XCom immediately.
+
+    All mutations of ``pending_failures`` are performed under
+    ``_pending_failures_lock`` because dbt runner callbacks are invoked from
+    multiple threads.
     """
     should_defer = pending_failures is not None and (
         is_dbt_node_status_failed(dbt_node_status) or is_dbt_node_status_skipped(dbt_node_status)
     )
     if should_defer:
         assert pending_failures is not None  # narrowing for mypy
-        pending_failures[unique_id] = status_value
+        with _pending_failures_lock:
+            pending_failures[unique_id] = status_value
         logger.info(
             "Deferring XCom push for node '%s' (status='%s') — will retry",
             unique_id,
             dbt_node_status,
         )
     else:
-        if pending_failures is not None and unique_id in pending_failures:
-            del pending_failures[unique_id]
-            logger.info(
-                "Node '%s' succeeded on retry (status='%s') — pushing XCom now",
-                unique_id,
-                dbt_node_status,
-            )
+        if pending_failures is not None:
+            with _pending_failures_lock:
+                removed = pending_failures.pop(unique_id, None)
+            if removed is not None:
+                logger.info(
+                    "Node '%s' succeeded on retry (status='%s') — pushing XCom now",
+                    unique_id,
+                    dbt_node_status,
+                )
         safe_xcom_push(
             task_instance=task_instance,
             key=f"{unique_id.replace('.', '__')}_status",

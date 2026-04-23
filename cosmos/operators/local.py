@@ -178,6 +178,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
+        Defaults to True on Airflow 2.x and False on Airflow 3+ to avoid a race condition where
+        Airflow rotates the task instance ID on retry, causing a 404 when Cosmos writes the
+        rendered template fields post-execution.
     :param append_env: If True(default), inherits the environment variables
         from current process and then environment variable passed by the user will either update the existing
         inherited environment variables or the new variables gets appended to it.
@@ -202,7 +205,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
         callback_args: dict[str, Any] | None = None,
-        should_store_compiled_sql: bool = True,
+        should_store_compiled_sql: bool = AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION,
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
         dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]

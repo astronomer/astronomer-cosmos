@@ -682,7 +682,10 @@ def create_producer_done_task(dag: Any, task_group: Any, task_id: str) -> Any:
     except ImportError:
         from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
 
-    from airflow.utils.trigger_rule import TriggerRule
+    try:
+        from airflow.task.trigger_rule import TriggerRule
+    except ImportError:
+        from airflow.utils.trigger_rule import TriggerRule  # type: ignore[no-redef]
 
     return EmptyOperator(  # type: ignore[no-untyped-call]
         task_id=task_id,

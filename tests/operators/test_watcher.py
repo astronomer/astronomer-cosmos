@@ -1756,7 +1756,10 @@ def test_dbt_task_group_with_watcher():
 
     done_task = dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher_done"]
     assert done_task.__class__.__name__ == "EmptyOperator"
-    from airflow.utils.trigger_rule import TriggerRule
+    try:
+        from airflow.task.trigger_rule import TriggerRule
+    except ImportError:
+        from airflow.utils.trigger_rule import TriggerRule  # type: ignore[no-redef]
 
     assert done_task.trigger_rule == TriggerRule.NONE_FAILED
 

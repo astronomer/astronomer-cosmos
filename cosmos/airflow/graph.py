@@ -25,6 +25,7 @@ from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
+    PRODUCER_WATCHER_DONE_TASK_ID,
     PRODUCER_WATCHER_TASK_ID,
     SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
@@ -726,7 +727,7 @@ def _add_watcher_producer_task(
         producer_done_task = create_producer_done_task(
             dag=dag,
             task_group=task_group,
-            task_id=f"{PRODUCER_WATCHER_TASK_ID}_done",
+            task_id=PRODUCER_WATCHER_DONE_TASK_ID,
         )
         producer_airflow_task >> producer_done_task
 
@@ -747,7 +748,7 @@ def _add_watcher_dependencies(
     """
     for node_id, task_or_taskgroup in tasks_map.items():
         # We do not want to set a dependency between the producer task (or its gate) and itself
-        if node_id in (PRODUCER_WATCHER_TASK_ID, f"{PRODUCER_WATCHER_TASK_ID}_done"):
+        if node_id in (PRODUCER_WATCHER_TASK_ID, PRODUCER_WATCHER_DONE_TASK_ID):
             continue
 
         node_tasks = (

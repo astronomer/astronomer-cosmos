@@ -28,6 +28,7 @@ Others
 * Fix CI failures caused by docs build memory exhaustion by @pankajkoti in #2580
 * Fix dbt Fusion broken integration tests by @tatiana in #2581
 * Fix flaky ``cosmos_manifest_selectors_example`` DAG in CI by @pankajkoti in #2593
+* Reduce pre-commit autoupdate frequency PRs by @tatiana in #2544
 
 1.14.0 (2026-04-07)
 ---------------------

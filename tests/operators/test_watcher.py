@@ -2616,6 +2616,8 @@ class TestDbtProducerRetry:
         assert "retry" in cmd
         assert "--no-partial-parse" in cmd
         assert "--project-dir" in cmd
+        assert "--log-format" in cmd
+        assert "json" in cmd
 
     def test_post_dbt_invoke_no_retries_configured(self):
         """When dbt_retry_count=0, _post_dbt_invoke should return the original result unchanged."""
@@ -2740,6 +2742,37 @@ class TestDbtProducerRetry:
         assert result is None
         # Failures should still be pending
         assert "model.pkg.broken" in op._pending_failures
+
+    @patch.object(DbtProducerWatcherOperator, "invoke_dbt")
+    def test_retry_loop_resets_test_results_per_model(self, mock_invoke, tmp_path):
+        """test_results_per_model should be cleared before each retry so stale test
+        failures from the previous attempt don't contaminate the aggregated result."""
+        op = self._make_producer(dbt_retry_count=2, profile_config=profile_config)
+        op.dbt_executable_path = "dbt"
+        op.dbt_cmd_global_flags = []
+        op.partial_parse = False
+        op._pending_failures = {"model.pkg.flaky": {"status": "error", "outlet_uris": []}}
+        op.test_results_per_model = {"model.pkg.flaky": ["fail"]}
+
+        target = tmp_path / "target"
+        target.mkdir()
+        (target / "run_results.json").write_text("{}")
+
+        captured_test_results = []
+
+        def side_effect(*args, **kwargs):
+            # Capture the state of test_results_per_model at the time invoke_dbt is called
+            captured_test_results.append(dict(op.test_results_per_model))
+            op._pending_failures.clear()
+            return MagicMock()
+
+        mock_invoke.side_effect = side_effect
+
+        context = {"ti": _MockTI()}
+        op._run_dbt_retry_loop(context, {}, str(tmp_path), Path("/tmp/profiles"))
+
+        # test_results_per_model should have been empty when invoke_dbt was called
+        assert captured_test_results[0] == {}
 
     @patch("airflow.models.Variable")
     @patch("cosmos.operators._watcher.xcom._persist_backup")

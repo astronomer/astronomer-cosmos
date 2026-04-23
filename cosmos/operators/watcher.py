@@ -387,13 +387,22 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._apply_node_state_tokens(context, freshness_results)
 
     def _build_retry_command(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
-        """Build a ``dbt retry`` command using the same project/profile flags as the original build."""
+        """Build a ``dbt retry`` command with the same project/profile flags as the original build.
+
+        Includes ``--log-format json`` so the log parser can update
+        ``_pending_failures`` during retry. Build-specific flags like
+        ``--full-refresh``, ``--select``, ``--exclude`` are omitted because
+        ``dbt retry`` does not accept them — it derives the node set from
+        ``run_results.json``.
+        """
         retry_cmd = [self.dbt_executable_path]
         retry_cmd.extend(self.dbt_cmd_global_flags)
         if not self.partial_parse:
             retry_cmd.append("--no-partial-parse")
         retry_cmd.append("retry")
         retry_cmd.extend(self._generate_dbt_flags(tmp_project_dir, profile_path))
+        if self.log_format:
+            retry_cmd.extend(["--log-format", self.log_format])
         return retry_cmd
 
     def _has_run_results(self, tmp_project_dir: str) -> bool:
@@ -434,11 +443,17 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             if not self._has_run_results(tmp_project_dir):
                 logger.warning(
                     "run_results.json not found in %s/target/ — cannot run dbt retry. "
-                    "Flushing %d remaining failure(s) to XCom.",
+                    "%d failure(s) will be flushed to XCom after the retry loop.",
                     tmp_project_dir,
                     len(self._pending_failures),
                 )
                 break
+
+            # Reset the test results accumulator before each retry so that
+            # stale test failures from the previous attempt don't contaminate
+            # the aggregated result.  dbt retry re-runs failed tests, so
+            # the accumulator will be repopulated with fresh results.
+            self.test_results_per_model.clear()
 
             retry_cmd = self._build_retry_command(tmp_project_dir, profile_path)
             try:

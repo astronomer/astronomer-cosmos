@@ -224,22 +224,65 @@ If a branch of the DAG fails, users can clear the status of a failed consumer ta
 
 **Producer retry behavior**
 
-.. versionadded:: 1.12.2
+.. versionchanged:: 1.14.1
 
-When the ``DbtProducerWatcherOperator`` is triggered for a retry (try_number > 1), it will not re-run the dbt build command and will succeed. In previous versions of Cosmos, the producer task would fail during retries.
-This behavior is designed to support TaskGroup-level retries, as reported in `#2282 <https://github.com/astronomer/astronomer-cosmos/issues/2282>`_.
+When the ``DbtProducerWatcherOperator`` is triggered for a retry (``try_number > 1``), it raises
+``AirflowSkipException`` instead of re-running the ``dbt build`` command. Before skipping, it restores
+XCom values from a backup so that consumer sensors can still read model statuses from the first attempt.
 
-**Why this matters:**
+**XCom backup and restore:**
 
-- In earlier versions, attempting to retry the producer task would raise an ``AirflowException``, causing the retry to fail immediately.
-- Now, the producer gracefully skips execution on retries, logging an informational message explaining that the retry was skipped to avoid running a second ``dbt build``.
-- This allows users to retry entire TaskGroups and/or DAGs without the producer task blocking the retry flow.
+During execution, each XCom push is incrementally backed up to an Airflow Variable. This ensures that
+when the producer fails and Airflow clears XCom entries before the retry, the backed-up values can be
+restored. On a successful run, the backup Variable is automatically deleted to avoid stale data
+accumulating over time.
+
+**How consumer retries work:**
+
+1. The producer runs ``dbt build`` — some models succeed, some fail.
+2. The producer task fails, and XCom values are backed up to a Variable.
+3. On retry, the producer restores XCom from the Variable and raises ``AirflowSkipException``.
+4. Consumer sensors read model statuses from the restored XCom.
+5. Consumers for successful models complete immediately.
+6. Consumers for failed models detect the error status and raise ``AirflowException``.
+7. On their own retry, failed consumers fall back to running dbt individually for their model
+   (via ``_fallback_to_non_watcher_run``), behaving like ``ExecutionMode.LOCAL``.
 
 **Important considerations:**
 
-- Retries are no longer forced to ``0`` by Cosmos, since 1.14.0. Users may configure ``retries`` freely on the producer task. On any retry attempt (``try_number > 1``), the producer gracefully skips execution and returns success — it will not re-run the ``dbt build`` command. This means retrying the producer (or clearing an entire TaskGroup) is safe and will not cause duplicate dbt builds. During the retry of the sensor tasks, they will effectively run the corresponding dbt commands.
+- Users may configure ``retries`` freely on the producer task. On any retry attempt (``try_number > 1``),
+  the producer gracefully skips execution — it will not re-run the ``dbt build`` command.
+- Retrying the producer (or clearing an entire TaskGroup) is safe and will not cause duplicate dbt builds.
+- During the retry of the sensor tasks, they will effectively run the corresponding dbt commands.
 
 The overall retry behavior will be further improved once `#1978 <https://github.com/astronomer/astronomer-cosmos/issues/1978>`_ is implemented.
+
+Producer done gateway task (DbtTaskGroup only)
+...............................................
+
+.. versionadded:: 1.14.1
+
+When using ``DbtTaskGroup`` in watcher mode, the producer task may be skipped on retry
+(via ``AirflowSkipException``). Because the producer is a leaf task inside the ``TaskGroup``,
+Airflow's default ``trigger_rule="all_success"`` would cause any tasks downstream of the group
+to be skipped as well — even when all consumer tasks succeeded. **This makes
+``ExecutionMode.WATCHER`` behave differently from ``ExecutionMode.LOCAL``** when used with
+``DbtTaskGroup``.
+
+To prevent this, Cosmos automatically adds an internal gateway task called
+``dbt_producer_watcher_done`` inside the ``DbtTaskGroup``. This task:
+
+- Sits directly downstream of the producer (``producer >> dbt_producer_watcher_done``)
+- Uses ``trigger_rule="none_failed"`` so it succeeds even when the producer is skipped
+- Absorbs the producer's skip state, preventing it from propagating to tasks downstream of the group
+
+This gateway is only added for ``DbtTaskGroup`` — ``DbtDag`` does not need it because it handles
+the producer-to-consumer dependency differently (``producer >> consumers`` with
+``trigger_rule="always"``).
+
+.. note::
+   The ``dbt_producer_watcher_done`` task is visible in the Airflow UI. Click on it to see a
+   description of its purpose in the "Doc" tab.
 
 Watcher dbt Execution Queue
 ...........................

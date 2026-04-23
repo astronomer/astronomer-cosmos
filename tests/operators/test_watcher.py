@@ -2057,7 +2057,8 @@ def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
     # other models are unaffected and succeed
     assert tis["customers_run"].state == "success"
     # source sensor for raw_orders (has freshness block) must also complete successfully
-    assert tis["raw_orders_source"].state == "success"
+    # task ID derives from unique_id split: "postgres_db.raw_orders" → "postgres_db_raw_orders"
+    assert tis["postgres_db_raw_orders_source"].state == "success"
 
 
 @pytest.mark.skipif(

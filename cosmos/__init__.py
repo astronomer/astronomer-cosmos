@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import importlib
 
-__version__ = "1.14.1a2"
+__version__ = "1.14.1"
 
 
 # Mapping of public names to their module paths for lazy loading via __getattr__.

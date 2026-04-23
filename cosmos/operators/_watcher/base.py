@@ -28,7 +28,6 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
-    is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
 )
@@ -610,28 +609,6 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             if hasattr(self, "_override_rtif"):
                 self._override_rtif(context)
 
-    def _handle_retry(self, try_number: int, producer_task_state: str | None, context: Context) -> bool | None:
-        """Handle sensor retry by checking whether the producer is still active.
-
-        Returns the fallback result if the producer has terminated, or None if
-        the sensor should continue polling (producer still active).
-        """
-        if is_producer_task_terminated(producer_task_state):
-            # Producer finished — this is either an automatic retry after
-            # the producer completed or a manual task clear from the UI.
-            # Fall back to a non-watcher run.
-            return self._fallback_to_non_watcher_run(try_number, context)
-        # Producer is still active — the sensor likely timed out while the
-        # producer was still working.  Keep polling instead of launching a
-        # duplicate dbt run.
-        logger.info(
-            "Try #%s but producer '%s' is still %s — continuing to poll instead of fallback.",
-            try_number,
-            self.producer_task_id,
-            producer_task_state or "unknown",
-        )
-        return None
-
     def _handle_no_dbt_node_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
         """Handle the case where no dbt node status has been reported yet."""
         if producer_task_state == "failed":
@@ -671,13 +648,10 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             self.model_unique_id,
         )
 
-        producer_task_state = self._get_producer_task_status(context)
-
         if try_number > 1:
-            retry_result = self._handle_retry(try_number, producer_task_state, context)
-            if retry_result is not None:
-                return retry_result
+            return self._fallback_to_non_watcher_run(try_number, context)
 
+        producer_task_state = self._get_producer_task_status(context)
         if not self.is_test_sensor:
             self._log_startup_events(ti)
         status = self._get_node_status(ti, context)

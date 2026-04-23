@@ -1071,10 +1071,8 @@ class TestDbtConsumerWatcherSensor:
             sensor.poke(context)
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase.build_and_run_cmd")
-    def test_task_retry_fallback_when_producer_terminated(self, mock_build_and_run_cmd):
-        """On retry, if the producer has already finished, fall back to running the model locally."""
+    def test_task_retry(self, mock_build_and_run_cmd):
         sensor = self.make_sensor()
-        sensor._get_producer_task_status.return_value = "success"
         ti = MagicMock()
         ti.try_number = 2
         ti.xcom_pull.return_value = None
@@ -1082,22 +1080,6 @@ class TestDbtConsumerWatcherSensor:
 
         sensor.poke(context)
         mock_build_and_run_cmd.assert_called_once()
-
-    @patch("cosmos.operators._watcher.base.get_xcom_val")
-    def test_task_retry_keeps_polling_when_producer_still_running(self, mock_get_xcom_val):
-        """On retry, if the producer is still running, keep polling instead of launching a duplicate dbt run."""
-        sensor = self.make_sensor()
-        sensor._get_producer_task_status.return_value = "running"
-        ti = MagicMock()
-        ti.try_number = 2
-        # _log_startup_events=None, _get_node_status=None, compiled_sql (skipped), _dbt_event=None
-        ti.xcom_pull.return_value = None
-        mock_get_xcom_val.return_value = None
-        context = self.make_context(ti)
-
-        result = sensor.poke(context)
-        assert result is False
-        assert sensor.poke_retry_number == 1
 
     def test_fallback_to_non_watcher_run(self):
         sensor = self.make_sensor()
@@ -2159,27 +2141,14 @@ class TestDbtTestWatcherOperator:
         assert self.TESTS_STATUS_XCOM_KEY in xcom_keys_used
 
     def test_fallback_raises_on_retry(self):
-        """On retry (try_number > 1) with a terminated producer, the test sensor should raise since test re-execution is not yet supported."""
+        """On retry (try_number > 1), the test sensor should raise since test re-execution is not yet supported."""
         sensor = self.make_sensor()
-        sensor._get_producer_task_status.return_value = "success"
         ti = MagicMock()
         ti.try_number = 2
         context = self.make_context(ti)
 
         with pytest.raises(AirflowException, match="Test re-execution is not yet supported"):
             sensor.poke(context)
-
-    def test_retry_keeps_polling_when_producer_still_running(self):
-        """On retry, if the producer is still running, the test sensor should keep polling instead of raising."""
-        sensor = self.make_sensor()
-        sensor._get_producer_task_status.return_value = "running"
-        ti = MagicMock()
-        ti.try_number = 2
-        ti.xcom_pull.return_value = None
-        context = self.make_context(ti)
-
-        result = sensor.poke(context)
-        assert result is False
 
 
 class TestDefaultFreshnessCallback:

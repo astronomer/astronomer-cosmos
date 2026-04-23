@@ -15,6 +15,7 @@ Bug Fixes
 * Warn and normalize when ``source_rendering_behavior=None`` is passed by @pankajastro in #2570
 * Gracefully handle ``Variable.set()`` failures on Astro Remote Execution by @hkc-8010 in #2573
 * Skip malformed YAML selectors instead of failing entirely by @YourRoyalLinus in #2577
+* Keep watcher sensor polling when producer is still running by @pankajkoti in #2592
 
 Docs
 

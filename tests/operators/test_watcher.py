@@ -1756,7 +1756,9 @@ def test_dbt_task_group_with_watcher():
 
     done_task = dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher_done"]
     assert done_task.__class__.__name__ == "EmptyOperator"
-    assert str(done_task.trigger_rule) == "none_failed"
+    from airflow.utils.trigger_rule import TriggerRule
+
+    assert done_task.trigger_rule == TriggerRule.NONE_FAILED
 
 
 @pytest.mark.integration

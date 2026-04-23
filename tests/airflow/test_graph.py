@@ -255,6 +255,7 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
 
 def test_generate_task_or_group_with_dynamic_node_type_and_converter():
     """A node whose resource_type is not in dbt_resource_to_class should be rendered via a user-supplied converter."""
+
     def _convert_dynamic(dag: DAG, task_group: TaskGroup, node: DbtNode, task_id: str, **kwargs):
         return EmptyOperator(dag=dag, task_group=task_group, task_id=task_id)
 

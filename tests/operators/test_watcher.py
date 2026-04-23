@@ -2063,8 +2063,12 @@ def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
 
 @pytest.mark.skipif(
     AIRFLOW_VERSION < Version("2.10") or (Version("3.1.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
     reason=(
         "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
+        "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
+        "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
+        "the watcher sensor cannot detect producer termination on retry. "
         "Airflow 3.1.x crashes during task finalization (SetRenderedFields) when retrying "
         "tasks inside a DbtTaskGroup via dag.test()."
     ),

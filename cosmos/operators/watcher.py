@@ -357,7 +357,18 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     def _apply_source_freshness(self, context: Context) -> None:
         """Run source freshness, invoke the callback, and mark affected nodes as skipped."""
-        self._run_source_freshness(context)
+        try:
+            self._run_source_freshness(context)
+        except Exception as exc:
+            # dbt source freshness exits non-zero for WARN/ERROR freshness status, which is
+            # expected and handled by the callback. Re-raise only for genuine failures where
+            # sources.json was never written (e.g. connection error, bad project config).
+            if self._sources_json is None:
+                raise
+            logger.warning(
+                "dbt source freshness completed with non-zero exit code: %s. " "Proceeding with freshness results.",
+                exc,
+            )
 
         # Push per-source freshness results so source consumer sensors can read them
         self._push_source_freshness_results(context)

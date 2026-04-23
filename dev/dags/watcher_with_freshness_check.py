@@ -55,7 +55,7 @@ def freshness_callback(
     nodes: dict[str, DbtNode] | None,
     sources_json: dict[str, Any] | None,
 ) -> list[tuple[str, str]]:
-    return [("model.jaffle_shop.orders", "skipped")]
+    return [("model.altered_jaffle_shop.orders", "skipped")]
 
 
 # [START example_watcher_with_freshness]

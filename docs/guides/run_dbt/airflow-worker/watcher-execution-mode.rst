@@ -423,6 +423,15 @@ This use case is not currently supported by the ``ExecutionMode.WATCHER``, since
 
 We have a follow-up ticket to `further investigate this use case <https://github.com/astronomer/astronomer-cosmos/issues/2053>`_.
 
+Concurrent DAG runs with ``depends_on_past``
+''''''''''''''''''''''''''''''''''''''''''''
+
+When ``depends_on_past=True`` is used together with concurrent DAG runs, a race can occur between consecutive runs where the next run's producer starts while the previous run's consumer fallback is still executing, causing two dbt processes to write to the same models concurrently.
+
+As a workaround, set ``max_active_runs=1`` on the DAG.
+
+For details, see `#2596 <https://github.com/astronomer/astronomer-cosmos/issues/2596>`_.
+
 
 Advanced config
 +++++++++++++++

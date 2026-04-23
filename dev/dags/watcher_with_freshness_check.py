@@ -25,8 +25,6 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
-DBT_PROJECT_NAME = os.getenv("DBT_PROJECT_NAME", "altered_jaffle_shop")
-DBT_PROJECT_PATH = DBT_ROOT_PATH / DBT_PROJECT_NAME
 
 
 profile_config = ProfileConfig(
@@ -57,7 +55,7 @@ def freshness_callback(
     nodes: dict[str, DbtNode] | None,
     sources_json: dict[str, Any] | None,
 ) -> list[tuple[str, str]]:
-    return [("model.jaffle_shop.stg_orders", "skipped")]
+    return [("model.jaffle_shop.orders", "skipped")]
 
 
 # [START example_watcher_with_freshness]
@@ -69,7 +67,7 @@ example_watcher_with_freshness = DbtDag(
         setup_operator_args={"freshness_callback": freshness_callback},
     ),
     render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL),
-    project_config=ProjectConfig(DBT_PROJECT_PATH),
+    project_config=ProjectConfig(DBT_ROOT_PATH / "altered_jaffle_shop"),
     profile_config=profile_config,
     operator_args=operator_args,
     # normal dag parameters

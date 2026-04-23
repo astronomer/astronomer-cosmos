@@ -174,7 +174,44 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 -------------------------------------------------------------------------------
 
-6. Enable Task Profiling with Debug Mode
+6. Enable Memory-Optimized Imports (Cosmos < 1.14.0 only)
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+**Applies to**: Cosmos versions **earlier than 1.14.0**. Since Cosmos 1.14.0, ``cosmos/__init__.py`` uses lazy imports by default and this setting is a no-op. If you are on 1.14.0 or newer, skip this section.
+
+**Impact**: High - Reduces memory footprint both at the DAG processor and at worker nodes.
+
+**Configuration**:
+
+.. code-block:: cfg
+
+   # In airflow.cfg
+   [cosmos]
+   enable_memory_optimised_imports = True
+
+.. code-block:: bash
+
+   # Or via environment variable
+   export AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS=True
+
+**What it does**: Disables eager imports in ``cosmos/__init__.py``, preventing unused modules and classes from being loaded into memory.
+
+**Note**: When enabled, you must use full module paths for importing classes, functions and objects from Cosmos:
+
+.. code-block:: python
+
+   # Instead of:
+   from cosmos import DbtDag, ProjectConfig, RenderConfig
+
+   # Use:
+   from cosmos.airflow.dag import DbtDag
+   from cosmos.config import ProjectConfig, RenderConfig
+
+**Default**: ``False``
+
+-------------------------------------------------------------------------------
+
+7. Enable Task Profiling with Debug Mode
 ++++++++++++++++++++++++++++++++++++++++
 
 **Impact**: Low - Provides visibility into memory usage patterns to help identify optimization opportunities and prevent OOM issues.

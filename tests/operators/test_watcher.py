@@ -1994,7 +1994,7 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
     dbt_error_message = """Database Error in model model_f (models/model_f.sql)\n  column "this_column_does_not_exist_at_all" does not exist\n  LINE 1"""
     assert dbt_error_message in caplog.text
 
- 
+
 @pytest.mark.skipif(
     AIRFLOW_VERSION < Version("2.10"),
     reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
@@ -2058,7 +2058,7 @@ def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
     assert tis["customers_run"].state == "success"
     # source sensor for raw_orders (has freshness block) must also complete successfully
     assert tis["raw_orders_source"].state == "success"
-    
+
 
 @pytest.mark.skipif(
     AIRFLOW_VERSION < Version("2.10") or (Version("3.1.0") <= AIRFLOW_VERSION < Version("3.2.0")),

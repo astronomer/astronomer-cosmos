@@ -26,6 +26,7 @@ Docs
 
 Others
 
+* Speed up Airflow 3.1+ integration tests by caching InProcessExecutionAPI by @pankajkoti in #2547
 * Improve stability of cache hash unit tests by @tatiana in #2539
 * Fix mypy 1.20.0 type check failures by @pankajkoti in #2546
 * Fix CI failures caused by docs build memory exhaustion by @pankajkoti in #2580

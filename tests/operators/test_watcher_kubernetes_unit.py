@@ -1,10 +1,9 @@
-import logging
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
 from airflow.providers.cncf.kubernetes.secret import Secret
 from packaging.version import Version
@@ -77,8 +76,9 @@ project_config = ProjectConfig(
 render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=TestBehavior.NONE)
 
 
+@patch("cosmos.operators.watcher_kubernetes._restore_xcom_from_variable")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_skips_retry_attempt(mock_execute, caplog):
+def test_skips_retry_attempt(mock_execute, mock_restore, caplog):
     """
     Test that the operator skips execution when a retry is attempted (try_number > 1).
     """
@@ -90,15 +90,61 @@ def test_skips_retry_attempt(mock_execute, caplog):
 
     ti = MagicMock()
     ti.try_number = 2
+    context = {"ti": ti, "run_id": "test_run"}
+
+    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+        op.execute(context=context)
+
+    mock_restore.assert_called_once_with(context)
+    mock_execute.assert_not_called()
+
+
+@patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_deletes_backup_on_success(mock_execute, mock_init, mock_delete):
+    """Test that the XCom backup Variable is deleted after a successful execution."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+
+    ti = MagicMock()
+    ti.try_number = 1
     context = {"ti": ti}
 
-    with caplog.at_level(logging.INFO):
-        result = op.execute(context=context)
+    op.execute(context=context)
 
-    mock_execute.assert_not_called()
-    assert result is None
-    assert any("does not support Airflow retries" in message for message in caplog.messages)
-    assert any("skipping execution" in message for message in caplog.messages)
+    mock_init.assert_called_once_with(context)
+    mock_delete.assert_called_once_with(context)
+    mock_execute.assert_called_once()
+
+
+@patch("cosmos.operators.watcher_kubernetes._backup_xcom_to_variable")
+@patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_keeps_backup_on_failure(mock_execute, mock_init, mock_delete, mock_backup):
+    """Test that the XCom backup Variable is persisted (not deleted) when execution fails."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    mock_execute.side_effect = RuntimeError("dbt build failed")
+
+    with pytest.raises(RuntimeError):
+        op.execute(context=context)
+
+    mock_init.assert_called_once_with(context)
+    mock_backup.assert_called_once_with(context)
+    mock_delete.assert_not_called()
 
 
 def test_raises_exception_when_task_instance_missing():
@@ -174,10 +220,11 @@ def test_first_execution_behaves_as_base_consumer_sensor(mock_startup_events):
 @patch("cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_and_run_cmd")
 def test_retry_executes_as_dbt_run_kubernetes_operator(mock_build_and_run_cmd):
     """
-    On retry (try_number > 1), the sensor should fall back to executing
-    as DbtRunKubernetesOperator by calling build_and_run_cmd.
+    On retry (try_number > 1) with a terminated producer, the sensor should
+    fall back to executing as DbtRunKubernetesOperator by calling build_and_run_cmd.
     """
     sensor = make_sensor()
+    sensor._get_producer_task_status.return_value = "success"
 
     ti = MagicMock()
     ti.try_number = 2
@@ -189,6 +236,28 @@ def test_retry_executes_as_dbt_run_kubernetes_operator(mock_build_and_run_cmd):
 
     assert result is True
     mock_build_and_run_cmd.assert_called_once()
+
+
+@patch("cosmos.operators._watcher.base.get_xcom_val")
+@patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")
+def test_retry_keeps_polling_when_producer_still_running(mock_startup_events, mock_get_xcom_val):
+    """
+    On retry (try_number > 1) with the producer still running, the sensor
+    should keep polling instead of launching a duplicate dbt run.
+    """
+    sensor = make_sensor()
+    sensor._get_producer_task_status.return_value = "running"
+
+    ti = MagicMock()
+    ti.try_number = 2
+    ti.xcom_pull.return_value = None
+    mock_get_xcom_val.return_value = None
+    context = make_context(ti)
+
+    result = sensor.poke(context)
+
+    assert result is False
+    assert sensor.poke_retry_number == 1
 
 
 class TestCallbacksNormalization:

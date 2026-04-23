@@ -4,7 +4,7 @@ import json
 import logging
 import threading
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 
@@ -28,6 +28,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
 )
@@ -39,6 +40,15 @@ try:
 except ImportError:  # pragma: no cover
     from airflow.sensors.base import BaseSensorOperator
     from airflow.utils.context import Context  # type: ignore[attr-defined]
+
+if TYPE_CHECKING:
+    from airflow.models.dag import DAG
+    from airflow.operators.empty import EmptyOperator
+
+    try:
+        from airflow.sdk import TaskGroup
+    except ImportError:
+        from airflow.utils.task_group import TaskGroup
 
 logger = get_logger(__name__)
 
@@ -413,12 +423,19 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 f"A future release will add fallback to local test execution."
             )
 
-        logger.info(
-            f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
-            try_number - 1,
-            self.model_unique_id,
-            self.project_dir,
-        )
+        if try_number > 1:
+            logger.info(
+                f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
+                try_number - 1,
+                self.model_unique_id,
+                self.project_dir,
+            )
+        else:
+            logger.info(
+                f"Falling back to running model '%s' from project '%s' using {self.__class__.__name__}",
+                self.model_unique_id,
+                self.project_dir,
+            )
 
         upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)
 
@@ -544,6 +561,16 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 f"Watcher producer task '{self.producer_task_id}' failed before reporting results for {self._resource_label.lower()} '{self.model_unique_id}'. Check its logs for the underlying error."
             )
 
+        if reason == WatcherEventReason.PRODUCER_SKIPPED:
+            logger.info(
+                "Watcher producer task '%s' was skipped. Falling back to running dbt for %s '%s'.",
+                self.producer_task_id,
+                self._resource_label.lower(),
+                self.model_unique_id,
+            )
+            self._fallback_to_non_watcher_run(try_number=context["ti"].try_number, context=context)
+            return
+
     def _log_startup_events(self, ti: Any) -> None:
         dbt_startup_events: list[dict[str, Any]] = ti.xcom_pull(
             task_ids=self.producer_task_id, key=_DBT_STARTUP_EVENTS_XCOM_KEY
@@ -583,6 +610,45 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             if hasattr(self, "_override_rtif"):
                 self._override_rtif(context)
 
+    def _handle_retry(self, try_number: int, producer_task_state: str | None, context: Context) -> bool | None:
+        """Handle sensor retry by checking whether the producer is still active.
+
+        Returns the fallback result if the producer has terminated, or None if
+        the sensor should continue polling (producer still active).
+        """
+        if is_producer_task_terminated(producer_task_state):
+            # Producer finished — this is either an automatic retry after
+            # the producer completed or a manual task clear from the UI.
+            # Fall back to a non-watcher run.
+            return self._fallback_to_non_watcher_run(try_number, context)
+        # Producer is still active — the sensor likely timed out while the
+        # producer was still working.  Keep polling instead of launching a
+        # duplicate dbt run.
+        logger.info(
+            "Try #%s but producer '%s' is still %s — continuing to poll instead of fallback.",
+            try_number,
+            self.producer_task_id,
+            producer_task_state or "unknown",
+        )
+        return None
+
+    def _handle_no_dbt_node_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
+        """Handle the case where no dbt node status has been reported yet."""
+        if producer_task_state == "failed":
+            if self.poke_retry_number > 0:
+                raise AirflowException(
+                    f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
+                )
+            else:
+                # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
+                return self._fallback_to_non_watcher_run(try_number, context)
+
+        if producer_task_state == "skipped":
+            return self._fallback_to_non_watcher_run(try_number, context)
+
+        self.poke_retry_number += 1
+        return False
+
     def poke(self, context: Context) -> bool:
         """
         Checks the status of a dbt node (model or aggregated tests) by pulling relevant XComs from the producer task.
@@ -605,10 +671,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             self.model_unique_id,
         )
 
-        if try_number > 1:
-            return self._fallback_to_non_watcher_run(try_number, context)
-
         producer_task_state = self._get_producer_task_status(context)
+
+        if try_number > 1:
+            retry_result = self._handle_retry(try_number, producer_task_state, context)
+            if retry_result is not None:
+                return retry_result
+
         if not self.is_test_sensor:
             self._log_startup_events(ti)
         status = self._get_node_status(ti, context)
@@ -625,19 +694,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         _log_dbt_event(dbt_events)
 
         if status is None:
-
-            if producer_task_state == "failed":
-                if self.poke_retry_number > 0:
-                    raise AirflowException(
-                        f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
-                    )
-                else:
-                    # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
-                    return self._fallback_to_non_watcher_run(try_number, context)
-
-            self.poke_retry_number += 1
-
-            return False
+            return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
         elif is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
@@ -646,3 +703,32 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             return True
         else:
             raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
+
+
+def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> EmptyOperator:
+    """Create an EmptyOperator that absorbs the producer's skip state on retry.
+
+    This task sits downstream of the producer inside the DbtTaskGroup. When the producer
+    is skipped on retry, this task still succeeds (trigger_rule=NONE_FAILED), preventing
+    the skip from propagating to tasks downstream of the group.
+    """
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+
+    try:
+        from airflow.task.trigger_rule import TriggerRule
+    except ImportError:
+        from airflow.utils.trigger_rule import TriggerRule  # type: ignore[no-redef]
+
+    return EmptyOperator(  # type: ignore[no-untyped-call]
+        task_id=task_id,
+        dag=dag,
+        task_group=task_group,
+        trigger_rule=TriggerRule.NONE_FAILED,
+        doc_md=(
+            "**Cosmos internal task.** Absorbs the producer's skip state on retry "
+            "so it does not propagate to tasks downstream of this DbtTaskGroup."
+        ),
+    )

@@ -25,6 +25,7 @@ from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
+    PRODUCER_WATCHER_DONE_TASK_ID,
     PRODUCER_WATCHER_TASK_ID,
     SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
@@ -664,7 +665,7 @@ def _add_dbt_setup_async_task(
             else [task_or_taskgroup]
         )
         for task in node_tasks:
-            task.producer_task_id = setup_airflow_task.task_id  # type: ignore[attr-defined]
+            task.producer_task_id = setup_airflow_task.task_id  # type: ignore[union-attr]
             if not task.upstream_list:
                 setup_airflow_task >> task
 
@@ -716,6 +717,20 @@ def _add_watcher_producer_task(
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
+
+    # For DbtTaskGroup, add a gate task that absorbs the producer's skip state
+    # so it does not propagate to tasks downstream of the group.
+    # Not needed for DbtDag where producer >> consumers with trigger_rule="always" handles this.
+    if task_group is not None:
+        from cosmos.operators._watcher.base import create_producer_done_task
+
+        producer_done_task = create_producer_done_task(
+            dag=dag,
+            task_group=task_group,
+            task_id=PRODUCER_WATCHER_DONE_TASK_ID,
+        )
+        producer_airflow_task >> producer_done_task
+
     return producer_airflow_task
 
 
@@ -732,8 +747,8 @@ def _add_watcher_dependencies(
     - make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
     """
     for node_id, task_or_taskgroup in tasks_map.items():
-        # We do not want to set a dependency between the producer task and itself
-        if node_id == PRODUCER_WATCHER_TASK_ID:
+        # We do not want to set a dependency between the producer task (or its gate) and itself
+        if node_id in (PRODUCER_WATCHER_TASK_ID, PRODUCER_WATCHER_DONE_TASK_ID):
             continue
 
         node_tasks = (
@@ -742,7 +757,7 @@ def _add_watcher_dependencies(
             else [task_or_taskgroup]
         )
         for task in node_tasks:
-            task.producer_task_id = producer_airflow_task.task_id  # type: ignore[attr-defined]
+            task.producer_task_id = producer_airflow_task.task_id  # type: ignore[union-attr]
 
         # Make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
         # We only managed to do this in the case of DbtDag.
@@ -761,7 +776,7 @@ def _add_watcher_dependencies(
                 else:
                     always_run_tasks = [task_or_taskgroup]
                 for task in always_run_tasks:
-                    task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[attr-defined]
+                    task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[union-attr]
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:

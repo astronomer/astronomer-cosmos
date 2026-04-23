@@ -9,7 +9,7 @@ import warnings
 from collections.abc import Callable, Iterator
 from dataclasses import InitVar, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -34,7 +34,9 @@ from cosmos.constants import (
 from cosmos.dbt.executable import get_system_dbt
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
-from cosmos.profiles import BaseProfileMapping
+
+if TYPE_CHECKING:
+    from cosmos.profiles import BaseProfileMapping
 
 logger = get_logger(__name__)
 
@@ -116,6 +118,14 @@ class RenderConfig:
                 "RenderConfig.dbt_deps is deprecated since Cosmos 1.9 and will be removed in Cosmos 2.0. Use ProjectConfig.install_dbt_deps instead.",
                 DeprecationWarning,
             )
+        if self.source_rendering_behavior is None:
+            warnings.warn(
+                "Passing None for source_rendering_behavior is not supported. "
+                "Use SourceRenderingBehavior.NONE to disable source rendering. "
+                "Defaulting to SourceRenderingBehavior.NONE.",
+                UserWarning,
+            )
+            self.source_rendering_behavior = SourceRenderingBehavior.NONE
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
         # allows us to initiate this attribute from Path objects and str
         self.dbt_ls_path = Path(self.dbt_ls_path) if self.dbt_ls_path else None
@@ -321,7 +331,9 @@ class ProfileConfig:
             raise CosmosValueError(f"The file {self.profiles_yml_filepath} does not exist.")
 
     def get_profile_type(self) -> str:
-        if isinstance(self.profile_mapping, BaseProfileMapping):
+        from cosmos.profiles.base import BaseProfileMapping as _BaseProfileMapping
+
+        if isinstance(self.profile_mapping, _BaseProfileMapping):
             return str(self.profile_mapping.dbt_profile_type)
 
         profile_path = self._get_profile_path()

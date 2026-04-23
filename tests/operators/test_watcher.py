@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
-from airflow.exceptions import AirflowException, TaskDeferred
+from airflow.exceptions import AirflowException, AirflowSkipException, TaskDeferred
 from airflow.utils.state import DagRunState
 
 try:
@@ -38,9 +38,14 @@ from tests.utils import AIRFLOW_VERSION, new_test_dag
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
 MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
+DBT_WATCHER_FAILING_TESTS_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_failing_tests"
+DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH = (
+    Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_downstream_not_skipped"
+)
 
 DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
+
 
 project_config = ProjectConfig(
     dbt_project_path=DBT_PROJECT_PATH,
@@ -61,6 +66,8 @@ class _MockTI:
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
         self.try_number = 1
+        self.dag_id = "test_dag"
+        self.task_id = "test_task"
 
     def xcom_push(self, key: str, value: str, **_):
         self.store[key] = value
@@ -146,50 +153,81 @@ def test_dbt_producer_log_format_always_json():
     assert op.log_format == "json"
 
 
-def test_dbt_producer_watcher_operator_pushes_completion_status():
-    """Test that operator pushes 'completed' status to XCom in both success and failure cases."""
+@patch("airflow.models.Variable")
+@patch("cosmos.operators._watcher.xcom._persist_backup")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_pushes_completion_status_on_success(mock_execute, mock_persist, mock_variable):
+    """Test that operator pushes 'completed' status to XCom on success."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     mock_ti = _MockTI()
-    context = {"ti": mock_ti}
+    context = {"ti": mock_ti, "run_id": "test_run"}
 
-    # Test success case
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
+    op.execute(context=context)
+
+    assert mock_ti.store.get("task_status") == "completed"
+    mock_execute.assert_called_once()
+
+
+@patch("airflow.models.Variable")
+@patch("cosmos.operators._watcher.xcom._persist_backup")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_pushes_completion_status_on_failure(mock_execute, mock_persist, mock_variable):
+    """Test that operator pushes 'completed' status to XCom even when execution fails."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "test_run"}
+
+    mock_execute.side_effect = RuntimeError("dbt build failed")
+
+    with pytest.raises(RuntimeError):
         op.execute(context=context)
 
-        # Verify status was pushed
-        assert mock_ti.store.get("task_status") == "completed"
-        # Verify parent execute was called
-        mock_execute.assert_called_once()
-
-    # Reset mock and store
-    mock_ti.store.clear()
-
-    # Test failure case
-    class TestException(Exception):
-        pass
-
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
-        mock_execute.side_effect = TestException("test error")
-
-        with pytest.raises(TestException):
-            op.execute(context=context)
-
-        # Verify completed status was pushed even in failure case
-        assert mock_ti.store.get("task_status") == "completed"
-        # Verify parent execute was called
-        mock_execute.assert_called_once()
+    assert mock_ti.store.get("task_status") == "completed"
+    mock_execute.assert_called_once()
 
 
-def test_dbt_producer_watcher_operator_requires_task_instance():
+@patch("cosmos.operators._watcher.xcom._persist_backup")
+@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_deletes_backup_on_success(mock_execute, mock_delete, mock_persist):
+    """Test that the XCom backup Variable is deleted after a successful execution."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "test_run"}
+
+    op.execute(context=context)
+
+    mock_delete.assert_called_once_with(context)
+
+
+@patch("cosmos.operators._watcher.xcom._persist_backup")
+@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher._backup_xcom_to_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_keeps_backup_on_failure(mock_execute, mock_backup, mock_delete, mock_persist):
+    """Test that the XCom backup Variable is persisted (not deleted) when execution fails."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "test_run"}
+
+    mock_execute.side_effect = RuntimeError("dbt build failed")
+
+    with pytest.raises(RuntimeError):
+        op.execute(context=context)
+
+    mock_backup.assert_called_once_with(context)
+    mock_delete.assert_not_called()
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_requires_task_instance(mock_execute):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     context: dict[str, object] = {}
 
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
-        with pytest.raises(AirflowException) as excinfo:
-            op.execute(context=context)
+    with pytest.raises(AirflowException, match="expects a task instance"):
+        op.execute(context=context)
 
     mock_execute.assert_not_called()
-    assert "expects a task instance" in str(excinfo.value)
 
 
 def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message(caplog):
@@ -217,20 +255,19 @@ def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message
     assert any("ephemeral model or if the model sql file is empty" in message for message in caplog.messages)
 
 
-def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
+@patch("cosmos.operators.watcher._restore_xcom_from_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_skips_retry_attempt(mock_execute, mock_restore):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
     ti.try_number = 2
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
-    with patch("cosmos.operators.local.DbtLocalBaseOperator.execute") as mock_execute:
-        with caplog.at_level(logging.INFO):
-            result = op.execute(context=context)
+    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+        op.execute(context=context)
 
+    mock_restore.assert_called_once_with(context)
     mock_execute.assert_not_called()
-    assert result is None
-    assert any("does not support Airflow retries" in message for message in caplog.messages)
-    assert any("skipping execution" in message for message in caplog.messages)
 
 
 @pytest.mark.parametrize(
@@ -238,6 +275,7 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
     [
         ({"status": "success"}, None),
         ({"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}, None),
+        ({"status": "failed", "reason": WatcherEventReason.PRODUCER_SKIPPED}, None),
         (
             {"status": "failed", "reason": WatcherEventReason.NODE_FAILED},
             "dbt model 'model.pkg.m' failed. Review the producer task 'dbt_producer_watcher_operator' logs for details.",
@@ -248,7 +286,8 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(caplog):
         ),
     ],
 )
-def test_dbt_consumer_watcher_sensor_execute_complete(event, expected_message):
+@patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+def test_dbt_consumer_watcher_sensor_execute_complete(mock_fallback, event, expected_message):
     sensor = DbtConsumerWatcherSensor(
         project_dir=".",
         profiles_dir=".",
@@ -1032,8 +1071,10 @@ class TestDbtConsumerWatcherSensor:
             sensor.poke(context)
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase.build_and_run_cmd")
-    def test_task_retry(self, mock_build_and_run_cmd):
+    def test_task_retry_fallback_when_producer_terminated(self, mock_build_and_run_cmd):
+        """On retry, if the producer has already finished, fall back to running the model locally."""
         sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "success"
         ti = MagicMock()
         ti.try_number = 2
         ti.xcom_pull.return_value = None
@@ -1041,6 +1082,22 @@ class TestDbtConsumerWatcherSensor:
 
         sensor.poke(context)
         mock_build_and_run_cmd.assert_called_once()
+
+    @patch("cosmos.operators._watcher.base.get_xcom_val")
+    def test_task_retry_keeps_polling_when_producer_still_running(self, mock_get_xcom_val):
+        """On retry, if the producer is still running, keep polling instead of launching a duplicate dbt run."""
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "running"
+        ti = MagicMock()
+        ti.try_number = 2
+        # _log_startup_events=None, _get_node_status=None, compiled_sql (skipped), _dbt_event=None
+        ti.xcom_pull.return_value = None
+        mock_get_xcom_val.return_value = None
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+        assert result is False
+        assert sensor.poke_retry_number == 1
 
     def test_fallback_to_non_watcher_run(self):
         sensor = self.make_sensor()
@@ -1681,12 +1738,13 @@ def test_dbt_task_group_with_watcher():
     # assert outcome.state == DagRunState.SUCCESS
     # Fortunately, when we trigger the DAG run manually, the weight is being respected and the producer task is being picked up in advance.
 
-    assert len(dag_dbt_task_group_watcher.task_dict) == 10
+    assert len(dag_dbt_task_group_watcher.task_dict) == 11
     tasks_names = [task.task_id for task in dag_dbt_task_group_watcher.topological_sort()]
 
     expected_task_names = [
         "pre_dbt",
         "dbt_task_group.dbt_producer_watcher",
+        "dbt_task_group.dbt_producer_watcher_done",
         "dbt_task_group.raw_customers_seed",
         "dbt_task_group.raw_orders_seed",
         "dbt_task_group.raw_payments_seed",
@@ -1710,7 +1768,18 @@ def test_dbt_task_group_with_watcher():
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.customers_run"], DbtRunWatcherOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.orders_run"], DbtRunWatcherOperator)
 
-    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()
+    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == {
+        "dbt_task_group.dbt_producer_watcher_done",
+    }
+
+    done_task = dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher_done"]
+    assert done_task.__class__.__name__ == "EmptyOperator"
+    try:
+        from airflow.task.trigger_rule import TriggerRule
+    except ImportError:
+        from airflow.utils.trigger_rule import TriggerRule  # type: ignore[no-redef]
+
+    assert done_task.trigger_rule == TriggerRule.NONE_FAILED
 
 
 @pytest.mark.integration
@@ -1871,6 +1940,135 @@ def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
             assert task.execution_timeout == timedelta(seconds=1)
 
 
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10"),
+    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
+)
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_and_failing_model(caplog):
+    """
+    Run a DbtDag using `ExecutionMode.WATCHER` with a project where one model fails.
+    model_a succeeds, model_f fails (references nonexistent column).
+    The producer task fails, retries are skipped, and the DAG completes without hanging.
+    Reproduces https://github.com/astronomer/astronomer-cosmos/issues/2430
+    """
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
+
+    watcher_dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_FAILING_TESTS_PATH),
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_failing_tests",
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+        render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+        dagrun_timeout=timedelta(seconds=120),
+    )
+    outcome = new_test_dag(watcher_dag, expected_dag_state=DagRunState.FAILED)
+
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == 2
+    assert len(watcher_dag.task_dict) == 3
+    tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
+    assert tasks_names == ["dbt_producer_watcher", "model_a_run", "model_f_run"]
+
+    assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["model_a_run"], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict["model_f_run"], DbtRunWatcherOperator)
+
+    # The DAG should complete (not hang) even though model_f fails
+    assert outcome.state == DagRunState.FAILED
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    assert tis["dbt_producer_watcher"].try_number == 2
+
+    assert tis["dbt_producer_watcher"].state == "skipped"
+    assert tis["model_a_run"].state == "success"
+    assert tis["model_f_run"].state == "failed"
+
+    dbt_error_message = """Database Error in model model_f (models/model_f.sql)\n  column "this_column_does_not_exist_at_all" does not exist\n  LINE 1"""
+    assert dbt_error_message in caplog.text
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    reason=(
+        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
+        "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
+        "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
+        "the watcher sensor cannot detect producer termination on retry. "
+        "Airflow 3.1.x crashes during task finalization (SetRenderedFields) when retrying "
+        "tasks inside a DbtTaskGroup via dag.test()."
+    ),
+)
+@pytest.mark.integration
+def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog):
+    """
+    Verify that the dbt_producer_watcher_done gateway task prevents the producer's skip
+    from propagating to tasks downstream of the DbtTaskGroup.
+    """
+    import psycopg2
+    from airflow import DAG
+    from airflow.hooks.base import BaseHook
+
+    from cosmos import DbtTaskGroup
+
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator
+
+    # Reset the fail_once sequence using credentials from the same Airflow connection
+    airflow_conn = BaseHook.get_connection("example_conn")
+    with psycopg2.connect(
+        host=airflow_conn.host,
+        port=airflow_conn.port or 5432,
+        dbname=airflow_conn.schema or "postgres",
+        user=airflow_conn.login,
+        password=airflow_conn.password,
+    ) as conn:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
+
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
+
+    with DAG(
+        dag_id="watcher_taskgroup_gateway_test",
+        start_date=datetime(2023, 1, 1),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        dagrun_timeout=timedelta(seconds=120),
+    ) as dag:
+        dbt_group = DbtTaskGroup(
+            group_id="watcher_downstream_not_skipped",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH),
+            profile_config=profile_config,
+            render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+        )
+
+        # Force gateway >> root consumers so dag.test() respects execution order.
+        # Using the gateway (not the producer) as upstream ensures consumers see a
+        # successful upstream even when the producer is skipped.
+        # This workaround is only needed for dag.test() — the real scheduler uses priority_weight.
+        # See https://github.com/apache/airflow/issues/56723
+        gateway = dag.task_dict["watcher_downstream_not_skipped.dbt_producer_watcher_done"]
+        for root_task in dbt_group.get_roots():
+            if root_task.task_id.endswith("_done") or root_task.task_id.endswith("dbt_producer_watcher"):
+                continue
+            gateway >> root_task
+
+        post_dbt = EmptyOperator(task_id="post_dbt")
+        dbt_group >> post_dbt
+
+    outcome = new_test_dag(dag, expected_dag_state=DagRunState.SUCCESS)
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    # The gateway task absorbs the producer skip — post_dbt runs successfully
+    assert tis["post_dbt"].state == "success"
+    assert tis["watcher_downstream_not_skipped.dbt_producer_watcher_done"].state == "success"
+
+
 def test_dbt_source_watcher_operator_template_fields():
     """Test that DbtSourceWatcherOperator includes model_unique_id as a consumer sensor."""
     from cosmos.operators._watcher.base import BaseConsumerSensor
@@ -1964,14 +2162,27 @@ class TestDbtTestWatcherOperator:
         assert self.TESTS_STATUS_XCOM_KEY in xcom_keys_used
 
     def test_fallback_raises_on_retry(self):
-        """On retry (try_number > 1), the test sensor should raise since test re-execution is not yet supported."""
+        """On retry (try_number > 1) with a terminated producer, the test sensor should raise since test re-execution is not yet supported."""
         sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "success"
         ti = MagicMock()
         ti.try_number = 2
         context = self.make_context(ti)
 
         with pytest.raises(AirflowException, match="Test re-execution is not yet supported"):
             sensor.poke(context)
+
+    def test_retry_keeps_polling_when_producer_still_running(self):
+        """On retry, if the producer is still running, the test sensor should keep polling instead of raising."""
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "running"
+        ti = MagicMock()
+        ti.try_number = 2
+        ti.xcom_pull.return_value = None
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+        assert result is False
 
 
 class TestDefaultFreshnessCallback:
@@ -2073,6 +2284,188 @@ class TestDefaultFreshnessCallback:
         assert node_ids == ["model.pkg.m1"]
         assert status == "skip"
 
+    def test_node_with_clean_upstream_not_skipped(self):
+        """A node that depends on both a stale source and a clean model should not be skipped.
+
+        Graph:  stale_src → A ← clean_model
+                              ↓
+                              C
+
+        A has a clean path via clean_model so A (and therefore C) should run.
+        """
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "model.pkg.clean_model": DbtNode(
+                unique_id="model.pkg.clean_model",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=[],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/clean.sql"),
+            ),
+            "model.pkg.A": DbtNode(
+                unique_id="model.pkg.A",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src", "model.pkg.clean_model"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/a.sql"),
+            ),
+            "model.pkg.C": DbtNode(
+                unique_id="model.pkg.C",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["model.pkg.A"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/c.sql"),
+            ),
+        }
+        sources_json = {"results": [{"unique_id": "source.pkg.stale_src", "status": "warn"}]}
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        # A has a clean path via clean_model → neither A nor C should be skipped
+        assert node_ids == []
+        assert status == "skip"
+
+    def test_node_skipped_only_when_all_upstreams_stale(self):
+        """A node whose every upstream is stale or already skipped must be skipped.
+
+        Graph:  stale_src1 → A
+                stale_src2 → B
+                             A, B → C   (both parents stale → C must be skipped)
+                             A    → D   (only A stale, but A has no clean path → D skipped)
+        """
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "model.pkg.A": DbtNode(
+                unique_id="model.pkg.A",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src1"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/a.sql"),
+            ),
+            "model.pkg.B": DbtNode(
+                unique_id="model.pkg.B",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src2"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/b.sql"),
+            ),
+            "model.pkg.C": DbtNode(
+                unique_id="model.pkg.C",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["model.pkg.A", "model.pkg.B"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/c.sql"),
+            ),
+            "model.pkg.D": DbtNode(
+                unique_id="model.pkg.D",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["model.pkg.A"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/d.sql"),
+            ),
+        }
+        sources_json = {
+            "results": [
+                {"unique_id": "source.pkg.stale_src1", "status": "error"},
+                {"unique_id": "source.pkg.stale_src2", "status": "error"},
+            ]
+        }
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        assert set(node_ids) == {"model.pkg.A", "model.pkg.B", "model.pkg.C", "model.pkg.D"}
+        assert status == "skip"
+
+    def test_already_visited_dependent_not_processed_twice(self):
+        """A dependent reachable via two stale paths is only processed once.
+
+        Graph:  stale_src → A
+                stale_src → B
+                A, B → C
+
+        A and B are both direct dependents of stale_src.  C depends on both A and B.
+        When A is processed, C is added to visited.  When B is then processed, C is
+        already in visited → the ``if dependent_id in visited: continue`` branch fires.
+        All three (A, B, C) must still appear in the skip set.
+        """
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "model.pkg.A": DbtNode(
+                unique_id="model.pkg.A",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/a.sql"),
+            ),
+            "model.pkg.B": DbtNode(
+                unique_id="model.pkg.B",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/b.sql"),
+            ),
+            "model.pkg.C": DbtNode(
+                unique_id="model.pkg.C",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["model.pkg.A", "model.pkg.B"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/c.sql"),
+            ),
+        }
+        sources_json = {"results": [{"unique_id": "source.pkg.stale_src", "status": "error"}]}
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        assert set(node_ids) == {"model.pkg.A", "model.pkg.B", "model.pkg.C"}
+        assert status == "skip"
+
+    def test_dependent_node_missing_from_nodes_is_skipped(self):
+        """A dependent_id whose node cannot be resolved via ``nodes.get`` is silently ignored.
+
+        This covers the ``if dependent_node is None: continue`` guard.  In normal operation the
+        dependents reverse-map is built from ``nodes.items()`` so every id is present; this test
+        simulates a lookup returning ``None`` (e.g. a corrupt or trimmed nodes dict) by using a
+        dict subclass that overrides ``get`` to return ``None`` for the nominated key.
+        """
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        class _NullOnGet(dict):  # type: ignore[type-arg]
+            """dict that returns None for keys listed in ``_null_keys``."""
+
+            def __init__(self, null_keys: set, *args, **kwargs):  # type: ignore[type-arg]
+                super().__init__(*args, **kwargs)
+                self._null_keys = null_keys
+
+            def get(self, key, default=None):  # type: ignore[override]
+                if key in self._null_keys:
+                    return None
+                return super().get(key, default)
+
+        raw_nodes = {
+            "model.pkg.A": DbtNode(
+                unique_id="model.pkg.A",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.stale_src"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/a.sql"),
+            ),
+        }
+        # nodes.get("model.pkg.A") will return None → the node is silently skipped
+        nodes = _NullOnGet({"model.pkg.A"}, raw_nodes)
+        sources_json = {"results": [{"unique_id": "source.pkg.stale_src", "status": "error"}]}
+        node_ids, status = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        assert node_ids == []
+        assert status == "skip"
+
 
 class TestProducerSourceFreshness:
     """Tests for source freshness methods on DbtProducerWatcherOperator."""
@@ -2133,3 +2526,27 @@ class TestProducerSourceFreshness:
         producer._skipped_node_token(context, [])
         ti.xcom_push.assert_not_called()
         assert producer.exclude is None
+
+    def test_run_dbt_runner_skips_callback_during_source_freshness(self):
+        """run_dbt_runner must not register the XCom-pushing callback during the source freshness
+        pre-check.  Registering it would leave a stale entry in _dbt_runner_callbacks that fires
+        again for every event during the subsequent dbt build, producing duplicate log lines.
+        """
+        producer = self._make_producer(_check_source_freshness=True)
+        producer._dbt_runner_callbacks = None
+
+        context = MagicMock()
+        context.get.side_effect = lambda key, default=None: True if key == "_check_source_freshness" else default
+
+        from cosmos.operators.local import DbtLocalBaseOperator
+
+        with patch.object(
+            DbtLocalBaseOperator,
+            "run_dbt_runner",
+            return_value=MagicMock(),
+        ) as mock_super:
+            producer.run_dbt_runner(command=["dbt", "source", "freshness"], env={}, cwd="/tmp", context=context)
+
+        # The callback list must remain untouched — no watcher callback appended
+        assert producer._dbt_runner_callbacks is None
+        mock_super.assert_called_once()

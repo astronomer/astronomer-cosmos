@@ -52,7 +52,18 @@ SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
 
 # File and directory names to skip when copying dbt project trees in tests (keeps fixture output deterministic).
-_DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES = (".user.yml", ".DS_Store", "logs", "target")
+_DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES = (
+    # Mirrors dbt .gitignore entries
+    "target",
+    "dbt_packages",
+    "dbt_internal_packages",
+    "logs",
+    # Local/OS artifacts
+    ".user.yml",
+    ".DS_Store",
+    "__pycache__",
+    "venv",
+)
 
 if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
     object_storage_path = "airflow.sdk.ObjectStoragePath"
@@ -558,7 +569,9 @@ def test_load_via_manifest_with_selectors_and_missing_definitions():
     assert err_info.value.args[0] == f"Selectors not found in manifest file `{project_config.manifest_path}`"
 
 
-def test_load_via_manifest_with_selectors_and_missing_selector():
+@pytest.mark.parametrize("enable_lax_selector_parsing", [True, False])
+def test_load_via_manifest_with_selectors_and_missing_selector(enable_lax_selector_parsing, monkeypatch):
+    monkeypatch.setattr("cosmos.settings.enable_lax_selector_parsing", enable_lax_selector_parsing)
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST_SELECTORS
     )
@@ -582,7 +595,13 @@ def test_load_via_manifest_with_selectors_and_missing_selector():
     with pytest.raises(CosmosLoadDbtException) as err_info:
         dbt_graph.load_from_dbt_manifest()
 
-    assert "Selector `my_selector` not found in parsed YAML selectors" in err_info.value.args[0]
+    error_message = err_info.value.args[0]
+    assert "Selector `my_selector` not found in parsed YAML selectors" in error_message
+
+    if enable_lax_selector_parsing:
+        assert "Check logs" in error_message
+    else:
+        assert "Check logs" not in error_message
 
 
 def test_load_via_manifest_with_selectors():
@@ -2346,9 +2365,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
         # Different macOS versions have produced different hashes for this directory. The first value below is a
         # historical macOS-specific hash, while the second matches the Linux hash asserted in the else-branch. We
         # allow both here so that the test is stable across macOS versions and when macOS hashing matches Linux.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "633a523f295ef0cd496525428815537b")
+        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "5c1aed937708e585054c874ff8f33fd1")
     else:
-        assert hash_dir == "633a523f295ef0cd496525428815537b"
+        assert hash_dir == "5c1aed937708e585054c874ff8f33fd1"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2382,15 +2401,47 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     hash_dir, hash_selectors, hash_impl = version.split(",")
 
     assert hash_selectors == "43303af03e84e3b51fbfcf598261fae4"
-    assert hash_impl == "4c93048c66ca45356e1677511447c7ba"
+    assert hash_impl == "86424c8b70c2e9b6d1f595c7ec9a8291"
 
     if sys.platform == "darwin":
         # Some macOS versions compute a different directory hash than Linux, while others match the Linux behavior.
         # The first value is the macOS-specific hash; the second value is the Linux hash, which certain macOS versions also produce.
         # We allow both here to keep the test stable across macOS releases, while non-macOS platforms assert only the Linux hash.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "633a523f295ef0cd496525428815537b")
+        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "5c1aed937708e585054c874ff8f33fd1")
     else:
-        assert hash_dir == "633a523f295ef0cd496525428815537b"
+        assert hash_dir == "5c1aed937708e585054c874ff8f33fd1"
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_dbt_ls_cache_variable_set_failure(mock_variable_set, tmp_dbt_project_dir, caplog):
+    from airflow.sdk.exceptions import AirflowRuntimeError
+
+    mock_variable_set.side_effect = AirflowRuntimeError(MagicMock())
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    with caplog.at_level(logging.WARNING, logger="cosmos.dbt.graph"):
+        graph.save_dbt_ls_cache("some output")
+    assert "Failed to save Cosmos dbt ls cache" in caplog.text
+    assert "cosmos_cache__something" in caplog.text
+    assert "AIRFLOW__COSMOS__REMOTE_CACHE_DIR" in caplog.text
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_yaml_selectors_cache_variable_set_failure(mock_variable_set, tmp_dbt_project_dir, caplog):
+    from airflow.sdk.exceptions import AirflowRuntimeError
+
+    mock_variable_set.side_effect = AirflowRuntimeError(MagicMock())
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    selectors = YamlSelectors(
+        {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+    with caplog.at_level(logging.WARNING, logger="cosmos.dbt.graph"):
+        graph.save_yaml_selectors_cache(selectors)
+    assert "Failed to save Cosmos YAML selectors cache" in caplog.text
+    assert "cosmos_cache__something" in caplog.text
+    assert "AIRFLOW__COSMOS__REMOTE_CACHE_DIR" in caplog.text
 
 
 @pytest.mark.integration

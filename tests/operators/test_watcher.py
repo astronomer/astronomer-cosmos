@@ -2619,6 +2619,48 @@ class TestDbtProducerRetry:
         assert "--log-format" in cmd
         assert "json" in cmd
 
+    def test_filter_retry_unsupported_flags(self):
+        """_filter_retry_unsupported_flags should strip --select, --exclude, --full-refresh
+        and their values, while keeping other flags intact."""
+        flags = [
+            "--select",
+            "model_a model_b",
+            "--vars",
+            "{key: value}",
+            "--exclude",
+            "model_c",
+            "--full-refresh",
+            "--quiet",
+            "--models",
+            "model_d",
+            "--selector",
+            "my_selector",
+        ]
+        filtered = DbtProducerWatcherOperator._filter_retry_unsupported_flags(flags)
+        assert "--select" not in filtered
+        assert "model_a model_b" not in filtered
+        assert "--exclude" not in filtered
+        assert "--full-refresh" not in filtered
+        assert "--models" not in filtered
+        assert "--selector" not in filtered
+        assert "--vars" in filtered
+        assert "{key: value}" in filtered
+        assert "--quiet" in filtered
+
+    def test_is_dbt_result_failure_subprocess(self):
+        """_is_dbt_result_failure should detect subprocess failures via exit_code."""
+        result = MagicMock(spec=[])  # no .success attribute
+        result.exit_code = 1
+        assert DbtProducerWatcherOperator._is_dbt_result_failure(result) is True
+
+        result.exit_code = 0
+        assert DbtProducerWatcherOperator._is_dbt_result_failure(result) is False
+
+    def test_is_dbt_result_failure_unknown_result(self):
+        """_is_dbt_result_failure should return False for unknown result types."""
+        result = object()
+        assert DbtProducerWatcherOperator._is_dbt_result_failure(result) is False
+
     def test_post_dbt_invoke_no_retries_configured(self):
         """When dbt_retry_count=0, _post_dbt_invoke should return the original result unchanged."""
         op = self._make_producer(dbt_retry_count=0)

@@ -8,6 +8,7 @@ Bug Fixes
 
 * Fix ``ExecutionMode.WATCHER`` producer retry behaviour by @tatiana in #2559
 * Prevent watcher producer skip propagating to downstream tasks via gateway task by @johnhoran and @tatiana in #2597
+* Keep watcher sensor polling when producer is still running by @pankajkoti in #2592
 * Fix circular import error in Cosmos plugin discovery under Astro Runtime by @tatiana in #2538
 * Fix ``CosmosRichLogger`` crash on ``None`` log message by @tatiana in #2540
 * Enable inlets and outlets using dbt Fusion on Airflow 3 by @ichirotakami in #2561
@@ -34,6 +35,7 @@ Others
 * Fix flaky ``cosmos_manifest_selectors_example`` DAG in CI by @pankajkoti in #2593
 * Reduce pre-commit autoupdate frequency PRs by @tatiana in #2544
 * Bump ``reviewdog/action-actionlint`` from 1.71.0 to 1.72.0 by @dependabot in #2542
+* Skip watcher gateway test on Airflow 3.0 by @tatiana in #2607
 
 1.14.0 (2026-04-07)
 ---------------------

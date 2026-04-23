@@ -179,7 +179,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Applies to**: Cosmos versions **earlier than 1.14.0**. Since Cosmos 1.14.0, ``cosmos/__init__.py`` uses lazy imports by default and this setting is a no-op. If you are on 1.14.0 or newer, skip this section.
 
-**Impact**: High - Reduces memory footprint both at the DAG Processor and at Worker nodes.
+**Impact**: High - Reduces memory footprint both at the DAG processor and at worker nodes.
 
 **Configuration**:
 

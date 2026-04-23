@@ -1972,10 +1972,10 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10") or AIRFLOW_VERSION == Version("3.1.0"),
+    AIRFLOW_VERSION < Version("2.10") or (Version("3.1.0") <= AIRFLOW_VERSION < Version("3.2.0")),
     reason=(
         "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
-        "Airflow 3.1.0 crashes during task finalization (SetRenderedFields) when retrying "
+        "Airflow 3.1.x crashes during task finalization (SetRenderedFields) when retrying "
         "tasks inside a DbtTaskGroup via dag.test()."
     ),
 )

@@ -7,7 +7,7 @@ Changelog
 Bug Fixes
 
 * Fix ``ExecutionMode.WATCHER`` producer retry behaviour by @tatiana in #2559
-* Prevent watcher producer skip propagating to downstream tasks via gateway task by @johnhoran  @tatiana in #2597
+* Prevent watcher producer skip propagating to downstream tasks via gateway task by @johnhoran and @tatiana in #2597
 * Keep watcher sensor polling when producer is still running by @pankajkoti in #2592
 * Fix circular import error in Cosmos plugin discovery under Astro Runtime by @tatiana in #2538
 * Fix ``CosmosRichLogger`` crash on ``None`` log message by @tatiana in #2540
@@ -22,6 +22,8 @@ Docs
 
 * Update watcher test behavior docs for Cosmos 1.14.0 by @tatiana in #2549
 * Add redirect for moved partial-parsing docs page by @tatiana in #2550
+* Document ``ExecutionMode.WATCHER`` and ``depends_on_past`` limitation by @tatiana in #2602
+* Restore memory-optimised imports docs for Cosmos < 1.14.0 by @pankajkoti in #2604
 
 Others
 
@@ -31,6 +33,7 @@ Others
 * Fix dbt Fusion broken integration tests by @tatiana in #2581
 * Fix flaky ``cosmos_manifest_selectors_example`` DAG in CI by @pankajkoti in #2593
 * Reduce pre-commit autoupdate frequency PRs by @tatiana in #2544
+* Bump ``reviewdog/action-actionlint`` from 1.71.0 to 1.72.0 by @dependabot in #2542
 
 1.14.0 (2026-04-07)
 ---------------------

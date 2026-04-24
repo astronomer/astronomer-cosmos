@@ -1,0 +1,32 @@
+version: 2
+
+sources:
+  - name: jaffle_shop
+    schema: public
+    description: Raw jaffle shop data loaded into the default database.
+    tables:
+      - name: raw_orders
+        description: Raw order records.
+        columns:
+          - name: id
+            description: Primary key.
+          - name: user_id
+            description: Foreign key to customers.
+          - name: order_date
+            description: Date the order was placed.
+          - name: status
+            description: Current order status.
+
+      - name: raw_payments
+        description: >
+          Raw payment records. Intentionally placed in the "secondary" database
+          to demonstrate running a model against a different ProfileConfig.
+        columns:
+          - name: id
+            description: Primary key.
+          - name: order_id
+            description: Foreign key to orders.
+          - name: payment_method
+            description: Payment method used (e.g. credit_card, coupon).
+          - name: amount
+            description: Total payment amount in cents.

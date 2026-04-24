@@ -62,7 +62,11 @@ def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
         return
 
     compressed = base64.b64encode(zlib.compress(json.dumps(backup_buffer, default=str).encode("utf-8"))).decode("utf-8")
-    Variable.set(var_key, compressed)
+    try:
+        Variable.set(var_key, compressed)
+    except (ImportError, NameError) as exc:
+        logger.warning("Could not persist XCom backup to Variable '%s': %s", var_key, exc)
+        return
     logger.debug("Persisted %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
 
 
@@ -92,7 +96,7 @@ def _delete_xcom_backup_variable(context: Any) -> None:
     try:
         Variable.delete(var_key)
         logger.debug("Deleted XCom backup Variable '%s'", var_key)
-    except KeyError:
+    except (KeyError, ImportError, NameError):
         pass
 
 
@@ -108,10 +112,13 @@ def _restore_xcom_from_variable(context: Any) -> bool:
 
     var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
     try:
-        compressed = Variable.get(var_key, default=None)
-    except TypeError:
-        # airflow.models.Variable.get() uses default_var instead of default
-        compressed = Variable.get(var_key, default_var=None)  # type: ignore[call-arg]
+        try:
+            compressed = Variable.get(var_key, default=None)
+        except TypeError:
+            compressed = Variable.get(var_key, default_var=None)  # type: ignore[call-arg]
+    except (ImportError, NameError) as exc:
+        logger.warning("Could not restore XCom backup from Variable '%s': %s", var_key, exc)
+        return False
     if compressed is None:
         logger.info("No XCom backup Variable found at '%s'", var_key)
         return False
@@ -124,6 +131,6 @@ def _restore_xcom_from_variable(context: Any) -> bool:
     try:
         Variable.delete(var_key)
         logger.debug("Deleted XCom backup Variable '%s' after restore", var_key)
-    except KeyError:
-        logger.debug("XCom backup Variable '%s' already deleted", var_key)
+    except (KeyError, ImportError, NameError):
+        logger.debug("XCom backup Variable '%s' already deleted or unavailable", var_key)
     return True

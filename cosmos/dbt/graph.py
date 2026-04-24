@@ -21,6 +21,18 @@ try:
 except ImportError:
     from airflow.models import Variable
 
+
+def _variable_get(key: str, default: str = "") -> str:
+    """Get an Airflow Variable, falling back to airflow.models.Variable when the SDK
+    raises ImportError or NameError (e.g. Airflow 3.0 without a running supervisor)."""
+    try:
+        return Variable.get(key, default)  # type: ignore[no-any-return]
+    except (ImportError, NameError):
+        from airflow.models import Variable as _ModelVariable
+
+        return _ModelVariable.get(key, default_var=default)  # type: ignore[no-any-return]
+
+
 if TYPE_CHECKING:
     try:
         # Airflow 3 onwards
@@ -528,7 +540,7 @@ class DbtGraph:
             cache_args.append(envvars_str)
         if self.render_config.airflow_vars_to_purge_dbt_ls_cache:
             for var_name in self.render_config.airflow_vars_to_purge_dbt_ls_cache:
-                airflow_vars = [var_name, Variable.get(var_name, "")]
+                airflow_vars = [var_name, _variable_get(var_name)]
                 cache_args.extend(airflow_vars)
 
         logger.debug(f"Value of `dbt_ls_cache_key_args` for <{self.cache_key}>: {cache_args}")
@@ -543,7 +555,7 @@ class DbtGraph:
         cache_args = []
         if self.render_config.airflow_vars_to_purge_dbt_yaml_selectors_cache:
             for var_name in self.render_config.airflow_vars_to_purge_dbt_yaml_selectors_cache:
-                airflow_vars = [var_name, Variable.get(var_name, "")]
+                airflow_vars = [var_name, _variable_get(var_name)]
                 cache_args.extend(airflow_vars)
         return cache_args
 

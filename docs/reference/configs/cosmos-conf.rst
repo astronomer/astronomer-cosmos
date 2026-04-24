@@ -363,6 +363,23 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``0.5``
     - Environment Variable: ``AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS``
 
+.. _enable_orjson_parser:
+
+`enable_orjson_parser`_:
+    (Experimental, introduced in Cosmos 1.15.0) When enabled, Cosmos uses `orjson <https://github.com/ijl/orjson>`_ to parse
+    ``manifest.json`` files instead of the standard library ``json`` module. orjson is a fast, Rust-based JSON
+    library that can significantly reduce DAG parsing time for large dbt projects with big manifests.
+
+    Benchmarks show up to 40% faster parsing compared to the standard ``json`` module, with the improvement
+    scaling with manifest file size.
+
+    Requires the optional ``orjson`` dependency: ``pip install 'astronomer-cosmos[orjson]'``.
+    If this setting is ``True`` but ``orjson`` is not installed, Cosmos raises a
+    ``CosmosLoadDbtException`` at parse time with an actionable error message.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_ORJSON_PARSER``
+
 .. _watcher_dbt_execution_queue:
 
 `watcher_dbt_execution_queue`_:

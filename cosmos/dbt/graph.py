@@ -18,6 +18,11 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
 
+try:
+    import orjson
+except ImportError:  # pragma: no cover
+    orjson = None  # type: ignore[assignment]
+
 if TYPE_CHECKING:
     try:
         # Airflow 3 onwards
@@ -1250,6 +1255,42 @@ class DbtGraph:
                 exclude=self.render_config.exclude,
             )
 
+    def _load_manifest_from_file(self, manifest_path: Path | ObjectStoragePath) -> dict[str, Any]:
+        """
+        Load and parse a dbt manifest JSON file.
+
+        Uses orjson for faster parsing if enabled and available, otherwise falls back to standard json.
+
+        Args:
+            manifest_path: Path to the manifest.json file
+
+        Returns:
+            Parsed manifest dictionary
+
+        Raises:
+            CosmosLoadDbtException: If orjson is enabled but not installed, or if the parsed manifest root is not a dictionary
+        """
+        if settings.enable_orjson_parser and orjson:
+            with manifest_path.open("rb") as fp:
+                manifest = orjson.loads(fp.read())
+        elif settings.enable_orjson_parser:
+            raise CosmosLoadDbtException(
+                "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
+            )
+        else:
+            with manifest_path.open("r") as fp:
+                manifest = json.load(fp)
+
+        if manifest is None:
+            return {}
+
+        if not isinstance(manifest, dict):
+            raise CosmosLoadDbtException(
+                f"Invalid dbt manifest file `{manifest_path}`: expected top-level JSON object, got {type(manifest).__name__}"
+            )
+
+        return manifest
+
     def load_from_dbt_manifest(self) -> None:
         """
         This approach accurately loads `dbt` projects using the `manifest.json` dbt manifest artifact.
@@ -1273,8 +1314,7 @@ class DbtGraph:
         if TYPE_CHECKING:
             assert self.project.manifest_path is not None  # pragma: no cover
 
-        with self.project.manifest_path.open() as fp:
-            manifest = json.load(fp) or {}
+        manifest = self._load_manifest_from_file(self.project.manifest_path)
 
         project_path = self.execution_config.project_path
         nodes = self._load_nodes_from_manifest_data(manifest, project_path)

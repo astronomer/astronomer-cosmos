@@ -13,6 +13,11 @@ import json
 import zlib
 from typing import Any
 
+try:
+    from airflow.sdk import Variable
+except ImportError:
+    from airflow.models import Variable  # type: ignore[no-redef]
+
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import safe_xcom_push
 
@@ -56,10 +61,12 @@ def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
     if not backup_buffer:
         return
 
-    from airflow.models import Variable
-
     compressed = base64.b64encode(zlib.compress(json.dumps(backup_buffer, default=str).encode("utf-8"))).decode("utf-8")
-    Variable.set(var_key, compressed)
+    try:
+        Variable.set(var_key, compressed)
+    except (ImportError, NameError) as exc:
+        logger.warning("Could not persist XCom backup to Variable '%s': %s", var_key, exc)
+        return
     logger.debug("Persisted %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
 
 
@@ -87,11 +94,9 @@ def _delete_xcom_backup_variable(context: Any) -> None:
     if not isinstance(var_key, str):
         return
     try:
-        from airflow.models import Variable
-
         Variable.delete(var_key)
         logger.debug("Deleted XCom backup Variable '%s'", var_key)
-    except KeyError:
+    except (KeyError, ImportError, NameError):
         pass
 
 
@@ -100,15 +105,20 @@ def _restore_xcom_from_variable(context: Any) -> bool:
 
     Returns True if the restore succeeded, False if no backup was found.
     """
-    from airflow.models import Variable
-
     ti = context["ti"]
     dag_id = ti.dag_id
     run_id = context["run_id"]
     task_group_id = _get_task_group_id(ti)
 
     var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
-    compressed = Variable.get(var_key, default_var=None)
+    try:
+        try:
+            compressed = Variable.get(var_key, default=None)
+        except TypeError:
+            compressed = Variable.get(var_key, default_var=None)  # type: ignore[call-arg]
+    except (ImportError, NameError) as exc:
+        logger.warning("Could not restore XCom backup from Variable '%s': %s", var_key, exc)
+        return False
     if compressed is None:
         logger.info("No XCom backup Variable found at '%s'", var_key)
         return False
@@ -121,6 +131,6 @@ def _restore_xcom_from_variable(context: Any) -> bool:
     try:
         Variable.delete(var_key)
         logger.debug("Deleted XCom backup Variable '%s' after restore", var_key)
-    except KeyError:
-        logger.debug("XCom backup Variable '%s' already deleted", var_key)
+    except (KeyError, ImportError, NameError):
+        logger.debug("XCom backup Variable '%s' already deleted or unavailable", var_key)
     return True

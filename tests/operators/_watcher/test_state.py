@@ -146,7 +146,7 @@ class TestInitXcomBackup:
 
 
 class TestPersistBackup:
-    @patch("airflow.models.Variable")
+    @patch("cosmos.operators._watcher.xcom.Variable")
     def test_writes_compressed_data_to_variable(self, mock_variable):
         _persist_backup("my_var_key", {"key1": "value1", "key2": "value2"})
 
@@ -156,7 +156,7 @@ class TestPersistBackup:
         data = json.loads(zlib.decompress(base64.b64decode(compressed.encode("utf-8"))).decode("utf-8"))
         assert data == {"key1": "value1", "key2": "value2"}
 
-    @patch("airflow.models.Variable")
+    @patch("cosmos.operators._watcher.xcom.Variable")
     def test_skips_empty_buffer(self, mock_variable):
         _persist_backup("my_var_key", {})
 
@@ -209,7 +209,7 @@ class TestBackupXcomToVariable:
 
 
 class TestDeleteXcomBackupVariable:
-    @patch("airflow.models.Variable")
+    @patch("cosmos.operators._watcher.xcom.Variable")
     def test_deletes_variable(self, mock_variable):
         ti = _MockTI()
         context = {"ti": ti, "run_id": "test_run"}
@@ -219,7 +219,7 @@ class TestDeleteXcomBackupVariable:
 
         mock_variable.delete.assert_called_once_with(ti._cosmos_xcom_backup_var_key)
 
-    @patch("airflow.models.Variable")
+    @patch("cosmos.operators._watcher.xcom.Variable")
     def test_noop_without_init(self, mock_variable):
         ti = _MockTI()
         context = {"ti": ti}
@@ -228,7 +228,7 @@ class TestDeleteXcomBackupVariable:
 
         mock_variable.delete.assert_not_called()
 
-    @patch("airflow.models.Variable")
+    @patch("cosmos.operators._watcher.xcom.Variable")
     def test_ignores_key_error(self, mock_variable):
         ti = _MockTI()
         context = {"ti": ti, "run_id": "test_run"}
@@ -240,7 +240,7 @@ class TestDeleteXcomBackupVariable:
 
 class TestRestoreXcomFromVariable:
     @patch("cosmos.operators._watcher.xcom._persist_backup")
-    @patch("airflow.models.Variable")
+    @patch("cosmos.operators._watcher.xcom.Variable")
     def test_restores_entries(self, mock_variable, mock_persist):
         ti = _MockTI()
         backup = {"key1": "val1", "key2": "val2"}
@@ -255,7 +255,7 @@ class TestRestoreXcomFromVariable:
         assert ti.store["key2"] == "val2"
         mock_variable.delete.assert_called_once()
 
-    @patch("airflow.models.Variable")
+    @patch("cosmos.operators._watcher.xcom.Variable")
     def test_returns_false_when_no_backup(self, mock_variable):
         ti = _MockTI()
         mock_variable.get.return_value = None

@@ -303,7 +303,7 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
 
             with (
                 patch("cosmos.operators._watcher.xcom._persist_backup"),
-                patch("airflow.models.Variable"),
+                patch("cosmos.operators._watcher.xcom.Variable"),
             ):
                 op2.execute(context=mock_context)
 

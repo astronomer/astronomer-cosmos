@@ -16,7 +16,22 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import TYPE_CHECKING, Any
 
-from airflow.models import Variable
+try:
+    from airflow.sdk import Variable
+except ImportError:
+    from airflow.models import Variable
+
+
+def _variable_get(key: str, default: str = "") -> str:
+    """Get an Airflow Variable, falling back to airflow.models.Variable when the SDK
+    raises ImportError or NameError (e.g. Airflow 3.0 without a running supervisor)."""
+    try:
+        return Variable.get(key, default)  # type: ignore[no-any-return]
+    except (ImportError, NameError):
+        from airflow.models import Variable as _ModelVariable
+
+        return _ModelVariable.get(key, default_var=default)  # type: ignore[no-any-return]
+
 
 if TYPE_CHECKING:
     try:
@@ -525,7 +540,7 @@ class DbtGraph:
             cache_args.append(envvars_str)
         if self.render_config.airflow_vars_to_purge_dbt_ls_cache:
             for var_name in self.render_config.airflow_vars_to_purge_dbt_ls_cache:
-                airflow_vars = [var_name, Variable.get(var_name, "")]
+                airflow_vars = [var_name, _variable_get(var_name)]
                 cache_args.extend(airflow_vars)
 
         logger.debug(f"Value of `dbt_ls_cache_key_args` for <{self.cache_key}>: {cache_args}")
@@ -540,7 +555,7 @@ class DbtGraph:
         cache_args = []
         if self.render_config.airflow_vars_to_purge_dbt_yaml_selectors_cache:
             for var_name in self.render_config.airflow_vars_to_purge_dbt_yaml_selectors_cache:
-                airflow_vars = [var_name, Variable.get(var_name, "")]
+                airflow_vars = [var_name, _variable_get(var_name)]
                 cache_args.extend(airflow_vars)
         return cache_args
 
@@ -575,7 +590,7 @@ class DbtGraph:
         cache_specific_workaround = "" if is_yaml_cache else ", using LoadMode.DBT_MANIFEST"
         try:
             Variable.set(self.cache_key, cache_dict, serialize_json=True)
-        except AirflowRuntimeError as e:
+        except (AirflowRuntimeError, ImportError) as e:
             logger.warning(
                 "Failed to save Cosmos %s cache to Airflow Variable '%s': %s. "
                 "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching%s, "
@@ -640,7 +655,9 @@ class DbtGraph:
         """
         cache_dict: dict[str, str] = {}
 
-        airflow_variable_exceptions: list[type[BaseException]] = [json.decoder.JSONDecodeError, KeyError]
+        # ImportError is included because airflow.sdk.Variable.get() raises it when called
+        # outside a task execution context (e.g. during DAG parsing in Airflow 3.0+).
+        airflow_variable_exceptions: list[type[BaseException]] = [json.decoder.JSONDecodeError, KeyError, ImportError]
         try:
             from airflow.sdk.exceptions import AirflowRuntimeError
         except ImportError:
@@ -1063,7 +1080,9 @@ class DbtGraph:
         """
         cache_dict: dict[str, Any] = {}
 
-        airflow_variable_exceptions: list[type[BaseException]] = [json.decoder.JSONDecodeError, KeyError]
+        # ImportError is included because airflow.sdk.Variable.get() raises it when called
+        # outside a task execution context (e.g. during DAG parsing in Airflow 3.0+).
+        airflow_variable_exceptions: list[type[BaseException]] = [json.decoder.JSONDecodeError, KeyError, ImportError]
         try:
             from airflow.sdk.exceptions import AirflowRuntimeError
         except ImportError:

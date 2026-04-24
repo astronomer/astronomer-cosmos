@@ -636,6 +636,24 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             async_op_configurator(self, sql=sql)
             async_context["async_operator"].execute(self, context)
 
+    def _post_dbt_invoke(
+        self,
+        result: Any,
+        context: Context,
+        env: dict[str, str | bytes | os.PathLike[Any]],
+        tmp_project_dir: str,
+        profile_path: Path,
+    ) -> Any:
+        """Hook called after the main dbt command finishes, before post-processing and exception handling.
+
+        The temporary project directory is still available at this point. Subclasses
+        can override this to perform additional work (e.g. run ``dbt retry`` for
+        failed nodes in the watcher producer). The returned value replaces ``result``
+        for downstream exception handling — return a successful result to suppress
+        the original failure.
+        """
+        return result
+
     def run_command(  # noqa: C901
         self,
         cmd: list[str],
@@ -689,6 +707,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     self._sources_json = _read_target_sources_json(tmp_dir_path)
                     self.handle_exception(result)
                     return result
+
+                result = self._post_dbt_invoke(result, context, env, tmp_project_dir, profile_path)
+
                 if is_openlineage_common_available:
                     self.calculate_openlineage_events_completes(env, tmp_dir_path, full_cmd)
                     if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:

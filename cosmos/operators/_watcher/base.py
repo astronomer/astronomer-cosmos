@@ -25,6 +25,7 @@ from cosmos.operators._watcher.state import (
     _log_dbt_event,
     build_producer_state_fetcher,
     get_xcom_val,
+    is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
@@ -51,6 +52,10 @@ if TYPE_CHECKING:
         from airflow.utils.task_group import TaskGroup
 
 logger = get_logger(__name__)
+
+# Protects mutations of the ``pending_failures`` dict passed to
+# ``_push_or_defer_status`` from concurrent dbt runner callback threads.
+_pending_failures_lock = threading.Lock()
 
 # Subset of dbt event types that represent errors/failures.
 # Used (together with node status lifecycle events like NodeStart/NodeCompiling/
@@ -247,6 +252,54 @@ def _ensure_subprocess_model_outlet_uris(
         model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []  # type: ignore[assignment]
 
 
+def _push_or_defer_status(
+    task_instance: Any,
+    unique_id: str,
+    dbt_node_status: str,
+    status_value: dict[str, Any],
+    pending_failures: dict[str, dict[str, Any]] | None,
+) -> None:
+    """Push a node's status to XCom, or defer it into pending_failures for retry.
+
+    When ``pending_failures`` is provided:
+    - Failed/skipped nodes are stored in ``pending_failures`` instead of XCom,
+      because ``dbt retry`` re-runs both failed nodes and their skipped dependents.
+    - Nodes that were previously pending but now succeeded are removed from
+      ``pending_failures`` and pushed to XCom immediately.
+
+    All mutations of ``pending_failures`` are performed under
+    ``_pending_failures_lock`` because dbt runner callbacks are invoked from
+    multiple threads.
+    """
+    should_defer = pending_failures is not None and (
+        is_dbt_node_status_failed(dbt_node_status) or is_dbt_node_status_skipped(dbt_node_status)
+    )
+    if should_defer:
+        assert pending_failures is not None  # narrowing for mypy
+        with _pending_failures_lock:
+            pending_failures[unique_id] = status_value
+        logger.info(
+            "Deferring XCom push for node '%s' (status='%s') — will retry",
+            unique_id,
+            dbt_node_status,
+        )
+    else:
+        if pending_failures is not None:
+            with _pending_failures_lock:
+                removed = pending_failures.pop(unique_id, None)
+            if removed is not None:
+                logger.info(
+                    "Node '%s' succeeded on retry (status='%s') — pushing XCom now",
+                    unique_id,
+                    dbt_node_status,
+                )
+        safe_xcom_push(
+            task_instance=task_instance,
+            key=f"{unique_id.replace('.', '__')}_status",
+            value=status_value,
+        )
+
+
 def store_dbt_resource_status_from_log(
     line: str,
     extra_kwargs: Any,
@@ -255,6 +308,7 @@ def store_dbt_resource_status_from_log(
     test_results_per_model: dict[str, list[str]] | None = None,
     model_outlet_uris: dict[str, list[str]] | None = None,
     dataset_namespace: str | None = None,
+    pending_failures: dict[str, dict[str, Any]] | None = None,
 ) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
@@ -275,6 +329,11 @@ def store_dbt_resource_status_from_log(
     :param model_outlet_uris: Mutable dict mapping unique_id to outlet URIs.
         Populated lazily from the manifest on first terminal status detection.
     :param dataset_namespace: The OL-compatible dataset namespace for URI construction.
+    :param pending_failures: When not None, failed model/seed/snapshot statuses are
+        stored in this dict instead of being pushed to XCom immediately. This allows
+        the producer to retry failed nodes via ``dbt retry`` before consumers see a
+        failure. Keyed by unique_id, values are the status dicts. Test results are
+        never deferred (they use a separate aggregation mechanism).
     """
     try:
         log_line = json.loads(line)
@@ -322,15 +381,11 @@ def store_dbt_resource_status_from_log(
                     _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
                     outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
 
-                status_value: dict[str, Any] | str = {
+                status_value: dict[str, Any] = {
                     "status": dbt_node_status,
                     "outlet_uris": outlet_uris,
                 }
-                safe_xcom_push(
-                    task_instance=context["ti"],
-                    key=f"{unique_id.replace('.', '__')}_status",
-                    value=status_value,
-                )
+                _push_or_defer_status(context["ti"], unique_id, dbt_node_status, status_value, pending_failures)
 
             # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
             # compiled_sql is available for both success and failed models - it's compiled before execution

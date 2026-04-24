@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import os
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException, AirflowSkipException
@@ -173,6 +175,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self.test_results_per_model: dict[str, list[str]] = {}
         self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
+        self.dbt_retry_count: int = kwargs.pop("dbt_retry_count", 0)
         self._freshness_callback: Callable[
             [Context, Any, TaskGroup | None, dict[str, DbtNode] | None, dict[str, Any] | None],
             list[tuple[str, str]],
@@ -194,6 +197,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._dataset_namespace: str | None = None
         self._model_outlet_uris: dict[str, list[str]] = {}
 
+        # Holds failed model statuses during the retry loop so that consumers
+        # don't see intermediate "failed" XCom values that will be retried.
+        # Maps unique_id -> {"status": ..., "outlet_uris": ...}
+        self._pending_failures: dict[str, dict[str, Any]] = {}
+
     def _handle_datasets(self, context: Context) -> None:
         """No-op override: consumer tasks handle their own dataset emission in WATCHER mode."""
 
@@ -205,6 +213,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             test_results_per_model=self.test_results_per_model,
             model_outlet_uris=self._model_outlet_uris,
             dataset_namespace=self._dataset_namespace,
+            pending_failures=self._pending_failures if self.dbt_retry_count > 0 else None,
         )
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> Any:
@@ -391,10 +400,175 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         freshness_results = self._freshness_callback(context, dag, task_group, nodes, self._sources_json)
         self._apply_node_state_tokens(context, freshness_results)
 
+    # Flags that ``dbt retry`` does not accept — it derives the node set from
+    # ``run_results.json`` and does not support selection or refresh overrides.
+    _RETRY_UNSUPPORTED_FLAGS = frozenset({"--select", "--exclude", "--selector", "--models", "--full-refresh"})
+
+    @classmethod
+    def _filter_retry_unsupported_flags(cls, flags: list[str]) -> list[str]:
+        """Remove flags that ``dbt retry`` does not accept from a flag list."""
+        filtered: list[str] = []
+        skip_next = False
+        for token in flags:
+            if skip_next:
+                # Skip the value that follows a flag-with-value like --select X
+                if not token.startswith("--"):
+                    continue
+                skip_next = False
+            if token in cls._RETRY_UNSUPPORTED_FLAGS:
+                skip_next = True
+                continue
+            filtered.append(token)
+        return filtered
+
+    def _build_retry_command(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
+        """Build a ``dbt retry`` command with the same global/profile flags as the original build.
+
+        Uses ``add_global_flags()`` and ``add_cmd_flags()`` to include flags
+        like ``--vars``, ``--quiet``, ``--warn-error``, and ``--log-format json``,
+        then filters out flags that ``dbt retry`` does not accept (``--select``,
+        ``--exclude``, ``--selector``, ``--models``, ``--full-refresh``).
+        """
+        retry_cmd = [self.dbt_executable_path]
+        retry_cmd.extend(self.dbt_cmd_global_flags)
+        if not self.partial_parse:
+            retry_cmd.append("--no-partial-parse")
+        retry_cmd.append("retry")
+        retry_cmd.extend(self._generate_dbt_flags(tmp_project_dir, profile_path))
+        retry_cmd.extend(self._filter_retry_unsupported_flags(self.add_global_flags()))
+        retry_cmd.extend(self._filter_retry_unsupported_flags(self.add_cmd_flags()))
+        return retry_cmd
+
+    def _has_run_results(self, tmp_project_dir: str) -> bool:
+        """Check if run_results.json exists in the target directory."""
+        return (Path(tmp_project_dir) / "target" / "run_results.json").is_file()
+
+    def _run_dbt_retry_loop(
+        self,
+        context: Context,
+        env: dict[str, str | bytes | os.PathLike[Any]],
+        tmp_project_dir: str,
+        profile_path: Path,
+    ) -> Any:
+        """Run ``dbt retry`` up to ``dbt_retry_count`` times for any pending failures.
+
+        After each retry iteration the log-parsing callback updates
+        ``self._pending_failures``: nodes that now succeed are removed and their
+        XCom status is pushed immediately; nodes that still fail remain pending.
+
+        Returns the result of the last ``dbt retry`` invocation (or ``None`` if
+        no retry was executed), so the caller can decide whether to propagate the
+        original build failure.
+        """
+        last_result = None
+        for attempt in range(1, self.dbt_retry_count + 1):
+            if not self._pending_failures:
+                break
+
+            failed_nodes = list(self._pending_failures.keys())
+            logger.info(
+                "dbt retry attempt %d/%d — retrying %d failed node(s): %s",
+                attempt,
+                self.dbt_retry_count,
+                len(failed_nodes),
+                failed_nodes,
+            )
+
+            if not self._has_run_results(tmp_project_dir):
+                logger.warning(
+                    "run_results.json not found in %s/target/ — cannot run dbt retry. "
+                    "%d failure(s) will be flushed to XCom after the retry loop.",
+                    tmp_project_dir,
+                    len(self._pending_failures),
+                )
+                break
+
+            # Reset the test results accumulator before each retry so that
+            # stale test failures from the previous attempt don't contaminate
+            # the aggregated result.  dbt retry re-runs failed tests, so
+            # the accumulator will be repopulated with fresh results.
+            self.test_results_per_model.clear()
+
+            retry_cmd = self._build_retry_command(tmp_project_dir, profile_path)
+            try:
+                last_result = self.invoke_dbt(
+                    command=retry_cmd,
+                    env=env,
+                    cwd=tmp_project_dir,
+                    context=context,
+                )
+            except Exception:
+                logger.warning(
+                    "dbt retry attempt %d/%d raised an exception — %d failure(s) remain pending",
+                    attempt,
+                    self.dbt_retry_count,
+                    len(self._pending_failures),
+                    exc_info=True,
+                )
+        return last_result
+
+    def _flush_pending_failures(self, context: Context) -> None:
+        """Push all remaining pending failure statuses to XCom."""
+        if not self._pending_failures:
+            return
+        ti = context["ti"]
+        for unique_id, status_value in self._pending_failures.items():
+            logger.info("Pushing final failed status for node '%s' after exhausting retry budget", unique_id)
+            safe_xcom_push(
+                task_instance=ti,
+                key=f"{unique_id.replace('.', '__')}_status",
+                value=status_value,
+            )
+        self._pending_failures.clear()
+
+    @staticmethod
+    def _is_dbt_result_failure(result: Any) -> bool:
+        """Check if a dbt invocation result indicates failure.
+
+        Works for both ``dbtRunnerResult`` (has ``.success``) and
+        ``FullOutputSubprocessResult`` (has ``.exit_code``).
+        """
+        if hasattr(result, "success"):
+            return bool(not result.success)
+        if hasattr(result, "exit_code"):
+            return bool(result.exit_code != 0)
+        return False
+
+    def _post_dbt_invoke(
+        self,
+        result: Any,
+        context: Context,
+        env: dict[str, str | bytes | os.PathLike[Any]],
+        tmp_project_dir: str,
+        profile_path: Path,
+    ) -> Any:
+        """Run ``dbt retry`` for failed nodes, then flush any remaining failures to XCom.
+
+        The retry loop fires when ``dbt_retry_count > 0`` and either:
+        - ``_pending_failures`` is non-empty (model/seed/snapshot failures), or
+        - the dbt result indicates failure (covers test-only failures that bypass
+          ``_pending_failures``).
+
+        If all retries succeed, returns the last retry result (which is successful)
+        so that ``handle_exception`` does not raise. Otherwise returns the original
+        failed build result.
+        """
+        should_retry = self.dbt_retry_count > 0 and (self._pending_failures or self._is_dbt_result_failure(result))
+        if should_retry:
+            last_retry_result = self._run_dbt_retry_loop(context, env, tmp_project_dir, profile_path)
+            all_retries_succeeded = not self._pending_failures
+            self._flush_pending_failures(context)
+            # All retries succeeded — return the successful retry result so
+            # handle_exception does not raise for the original build failure.
+            if all_retries_succeeded and last_retry_result is not None:
+                return last_retry_result
+        return result
+
     def execute(self, context: Context, **kwargs: Any) -> Any:
         # Pre-compute the dataset namespace for per-model outlet URI generation.
         self._dataset_namespace = get_dataset_namespace(self.profile_config)
         self._model_outlet_uris.clear()
+        self._pending_failures.clear()
 
         task_instance = context.get("ti")
         if task_instance is None:

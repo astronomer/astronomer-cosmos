@@ -22,6 +22,13 @@ from cosmos.log import get_logger
 logger = get_logger(__name__)
 
 
+ALLOWED_OPERATOR_MODULE_PREFIXES = (
+    "cosmos.operators.",
+    "airflow.operators.",
+    "airflow.providers.",
+)
+
+
 def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) -> BaseOperator:
     """
     Get the Airflow Operator class for a Task.
@@ -35,7 +42,14 @@ def get_airflow_task(task: Task, dag: DAG, task_group: TaskGroup | None = None) 
     """
     # first, import the operator class from the
     # fully qualified name defined in the task
-    module_name, class_name = task.operator_class.rsplit(".", 1)
+    try:
+        module_name, class_name = task.operator_class.rsplit(".", 1)
+    except ValueError as err:
+        raise ValueError(f"Invalid operator class path: {task.operator_class}") from err
+
+    if not module_name.startswith(ALLOWED_OPERATOR_MODULE_PREFIXES):
+        raise ValueError(f"Unsupported operator module: {module_name}")
+
     Operator = load_method_from_module(module_name, class_name)
 
     task_kwargs = task.arguments

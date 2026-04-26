@@ -69,7 +69,7 @@ render_config = RenderConfig(
 )
 
 project_config = ProjectConfig(
-    DBT_ROOT_PATH / "jaffle_shop",
+    DBT_ROOT_PATH / "altered_jaffle_shop",
     dbt_vars={"animation_alias": "top_5_animated_movies"},
 )
 

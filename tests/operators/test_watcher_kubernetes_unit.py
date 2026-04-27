@@ -315,7 +315,9 @@ def test_execute_sets_context_instance_attr(mock_execute):
     )
     ti = MagicMock()
     ti.try_number = 1
-    context = {"ti": ti}
+    ti.dag_id = "test_dag"
+    ti.task.task_group_id = None
+    context = {"ti": ti, "run_id": "test_run"}
 
     op.execute(context=context)
 
@@ -407,8 +409,9 @@ def test_test_sensor_poke_status(xcom_return, expected):
 
 
 def test_test_sensor_raises_on_retry():
-    """On retry (try_number > 1), poke should raise because test re-execution is not supported."""
+    """On retry (try_number > 1) with a terminated producer, poke should raise because test re-execution is not supported."""
     sensor = make_test_sensor()
+    sensor._get_producer_task_status.return_value = "success"
 
     ti = MagicMock()
     ti.try_number = 2

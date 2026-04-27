@@ -553,6 +553,40 @@ class DbtGraph:
         logger.debug(f"Value of `dbt_yaml_selectors_cache_key` for <{self.cache_key}>: {cache_args}")
         return cache_args
 
+    def _save_cache_to_variable(self, cache_dict: dict[str, Any], cache_name: str) -> None:
+        """Write cache_dict to an Airflow Variable, warning on AirflowRuntimeError.
+
+        This failure can be expected in DAG parsing environments where the scheduler or
+        DAG processor does not have direct access to a usable Airflow metadata database
+        (for example, when the ``variable`` table is unavailable).
+        """
+        try:
+            from airflow.sdk.exceptions import AirflowRuntimeError
+        except ImportError:
+            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            return
+
+        is_yaml_cache = "yaml" in cache_name.lower()
+        disable_cache_env_var = (
+            "AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS"
+            if is_yaml_cache
+            else "AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS"
+        )
+        cache_specific_workaround = "" if is_yaml_cache else ", using LoadMode.DBT_MANIFEST"
+        try:
+            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+        except AirflowRuntimeError as e:
+            logger.warning(
+                "Failed to save Cosmos %s cache to Airflow Variable '%s': %s. "
+                "Consider setting AIRFLOW__COSMOS__REMOTE_CACHE_DIR to use object storage for caching%s, "
+                "or disabling the cache via %s.",
+                cache_name,
+                self.cache_key,
+                e,
+                cache_specific_workaround,
+                disable_cache_env_var,
+            )
+
     def save_dbt_ls_cache(self, dbt_ls_output: str) -> None:
         """
         Store compressed dbt ls output into an Airflow Variable.
@@ -582,7 +616,7 @@ class DbtGraph:
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
-            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            self._save_cache_to_variable(cache_dict, "dbt ls")
 
     def _get_dbt_ls_remote_cache(self, remote_cache_dir: Path | ObjectStoragePath) -> dict[str, str]:
         """Loads the remote cache for dbt ls."""
@@ -1104,7 +1138,7 @@ class DbtGraph:
             with remote_cache_key_path.open("w") as fp:
                 json.dump(cache_dict, fp)
         else:
-            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            self._save_cache_to_variable(cache_dict, "YAML selectors")
 
     def parse_yaml_selectors(self, selector_definitions: dict[str, Any]) -> YamlSelectors:
         """
@@ -1116,8 +1150,9 @@ class DbtGraph:
         Returns:
             YamlSelectors: A YamlSelectors instance
         """
-
-        yaml_selectors = YamlSelectors.parse(selector_definitions)
+        yaml_selectors = YamlSelectors.parse(
+            selector_definitions, lax_parsing_enabled=settings.enable_lax_selector_parsing
+        )
 
         if self.should_use_yaml_selectors_cache():
             self.save_yaml_selectors_cache(yaml_selectors)
@@ -1194,9 +1229,11 @@ class DbtGraph:
             yaml_selectors = self.load_parsed_selectors(selector_definitions)
             selections = yaml_selectors.get_parsed(self.render_config.selector)
             if not selections:
-                raise CosmosLoadDbtException(
-                    f"Selector `{self.render_config.selector}` not found in parsed YAML selectors `{selector_definitions}`"
-                )
+                error_message = f"Selector `{self.render_config.selector}` not found in parsed YAML selectors"
+                if settings.enable_lax_selector_parsing:
+                    error_message += ". Check logs - the selector may have parsing errors logged as warnings"
+                raise CosmosLoadDbtException(error_message)
+
             self.nodes = nodes
             self.filtered_nodes = select_nodes(
                 project_dir=project_dir,

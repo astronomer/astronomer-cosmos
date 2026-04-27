@@ -12,12 +12,18 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 import kubernetes.client as k8s
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
+from cosmos.operators._watcher.xcom import (
+    _backup_xcom_to_variable,
+    _delete_xcom_backup_variable,
+    _init_xcom_backup,
+    _restore_xcom_from_variable,
+)
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
@@ -112,15 +118,23 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         try_number = getattr(task_instance, "try_number", 1)
 
         if try_number > 1:
-            self.log.info(
+            _restore_xcom_from_variable(context)
+            raise AirflowSkipException(
                 "DbtProducerWatcherKubernetesOperator does not support Airflow retries. "
-                "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
-                try_number,
+                f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
-            return None
+
+        _init_xcom_backup(context)
 
         self._context = context
-        return super().execute(context, **kwargs)
+
+        try:
+            return_value = super().execute(context, **kwargs)
+            _delete_xcom_backup_variable(context)
+            return return_value
+        except Exception:
+            _backup_xcom_to_variable(context)
+            raise
 
 
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):

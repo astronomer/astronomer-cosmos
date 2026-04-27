@@ -221,6 +221,8 @@ Cosmos distinguishes between two types of errors when parsing YAML selectors:
   - Missing required ``definition`` key
 
   These errors indicate malformed YAML structure and will raise a ``CosmosValueError`` immediately when calling ``YamlSelectors.parse()``.
+  You can modify this behavior to log instead of raising an exception by setting ``AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING=1``.
+  This allows DAGs referencing a manifest with one or more malformed selectors to render as long as the ``selector`` argument is valid.
 
 - **Selector Definition Errors** - These are isolated and surfaced when accessing the selector:
 

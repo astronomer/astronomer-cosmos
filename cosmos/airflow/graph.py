@@ -745,7 +745,13 @@ def _add_watcher_dependencies(
     Iterate through the watcher consumer tasks and:
     - set the producer task ID in all of them
     - make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
+    - if the producer task has depends_on_past=True, set wait_for_downstream=True in the producer and all its downstream tasks
     """
+    producer_watcher_done_task = next((t for t in producer_airflow_task.downstream_list if t.task_id.endswith(PRODUCER_WATCHER_DONE_TASK_ID)), None)
+    needs_wait_for_downstream = producer_watcher_done_task is not None and producer_airflow_task.depends_on_past
+    if needs_wait_for_downstream:
+        producer_airflow_task.wait_for_downstream = True
+
     for node_id, task_or_taskgroup in tasks_map.items():
         # We do not want to set a dependency between the producer task (or its gate) and itself
         if node_id in (PRODUCER_WATCHER_TASK_ID, PRODUCER_WATCHER_DONE_TASK_ID):
@@ -758,6 +764,11 @@ def _add_watcher_dependencies(
         )
         for task in node_tasks:
             task.producer_task_id = producer_airflow_task.task_id  # type: ignore[union-attr]
+            if needs_wait_for_downstream:
+                task.wait_for_downstream = True
+
+        if needs_wait_for_downstream and not task_or_taskgroup.downstream_task_ids:
+                task_or_taskgroup >> producer_watcher_done_task
 
         # Make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
         # We only managed to do this in the case of DbtDag.
@@ -1008,6 +1019,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
+        tasks_map[f"{dbt_project_name}_test"] = test_task
     elif render_config.test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH):
         # Handle detached test nodes
         for node_id, node in detached_nodes.items():

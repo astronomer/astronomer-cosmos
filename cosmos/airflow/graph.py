@@ -746,8 +746,9 @@ def _add_watcher_dependencies(
     Iterate through the watcher consumer tasks and:
     - set the producer task ID in all of them
     - make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
-    - if the producer task has depends_on_past=True, set wait_for_downstream=True in the producer and all its downstream
-        tasks so the entire task group behaves as a single unit that needs to succeed for the next run to start.
+    - if the producer task has depends_on_past=True, set wait_for_downstream=True in the producer and all its
+        watcher tasks, and put them upstream of the producer_watcher_done task so the entire task group
+        behaves as a single unit that needs to succeed for the next run to start.
     """
     producer_watcher_done_task = tasks_map.get(PRODUCER_WATCHER_DONE_TASK_ID)
     needs_wait_for_downstream = producer_watcher_done_task is not None and producer_airflow_task.depends_on_past

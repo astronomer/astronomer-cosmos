@@ -749,7 +749,7 @@ def _add_watcher_dependencies(
     - if the producer task has depends_on_past=True, set wait_for_downstream=True in the producer and all its downstream
         tasks so the entire task group behaves as a single unit that needs to succeed for the next run to start.
     """
-    producer_watcher_done_task = next((t for t in producer_airflow_task.downstream_list if t.task_id.endswith(PRODUCER_WATCHER_DONE_TASK_ID)), None)
+    producer_watcher_done_task = tasks_map.get(PRODUCER_WATCHER_DONE_TASK_ID)
     needs_wait_for_downstream = producer_watcher_done_task is not None and producer_airflow_task.depends_on_past
     if needs_wait_for_downstream:
         producer_airflow_task.wait_for_downstream = True

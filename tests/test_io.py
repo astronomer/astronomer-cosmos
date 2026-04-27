@@ -30,16 +30,44 @@ def dummy_kwargs():
     }
 
 
-def test_upload_artifacts_to_aws_s3(dummy_kwargs):
-    """Test upload_artifacts_to_aws_s3."""
-    with patch("airflow.providers.amazon.aws.hooks.s3.S3Hook") as mock_hook, patch("os.walk") as mock_walk:
-        mock_walk.return_value = [("/target", [], ["file1.txt", "file2.txt"])]
+def test_upload_artifacts_to_aws_s3_no_tarball(dummy_kwargs):
+    """Test upload_to_aws_s3 with use_tarball=False."""
+    with (
+        patch("airflow.providers.amazon.aws.hooks.s3.S3Hook") as mock_hook,
+        patch("os.walk") as mock_walk,
+        patch("tarfile.open") as mock_tarfile_open,
+    ):
+        mock_walk.return_value = [("/project_dir/target", [], ["file1.txt", "file2.txt"])]
 
-        upload_to_aws_s3("/project_dir", **dummy_kwargs)
+        upload_to_aws_s3("/project_dir", use_tarball=False, **dummy_kwargs)
 
         mock_walk.assert_called_once_with("/project_dir/target")
+        mock_tarfile_open.assert_not_called()
         hook_instance = mock_hook.return_value
         assert hook_instance.load_file.call_count == 2
+        load_file_calls = hook_instance.load_file.call_args_list
+        assert load_file_calls[0].kwargs["key"] == "test_dag/test_run_id/test_task/1/target/file1.txt"
+        assert load_file_calls[1].kwargs["key"] == "test_dag/test_run_id/test_task/1/target/file2.txt"
+
+
+def test_upload_artifacts_to_aws_s3_tarball(dummy_kwargs):
+    """Test upload_to_aws_s3 with use_tarball=True."""
+    with (
+        patch("airflow.providers.amazon.aws.hooks.s3.S3Hook") as mock_hook,
+        patch("tarfile.open") as mock_tarfile_open,
+    ):
+        mock_tar = MagicMock()
+        mock_tarfile_open.return_value.__enter__.return_value = mock_tar
+
+        upload_to_aws_s3("/project_dir", use_tarball=True, **dummy_kwargs)
+
+        mock_tar.add.assert_called_once_with("/project_dir/target", arcname="target")
+        hook_instance = mock_hook.return_value
+        hook_instance.load_bytes.assert_called_once()
+        call_kwargs = hook_instance.load_bytes.call_args.kwargs
+        assert call_kwargs["key"] == "test_dag/test_run_id/test_task/1/target.tar.gz"
+        assert "bytes_data" in call_kwargs
+        hook_instance.load_file.assert_not_called()
 
 
 def test_upload_artifacts_to_gcp_gs_no_tarball(dummy_kwargs):
@@ -83,16 +111,44 @@ def test_upload_artifacts_to_gcp_gs_tarball(dummy_kwargs):
         assert "filename" not in call_kwargs
 
 
-def test_upload_artifacts_to_azure_wasb(dummy_kwargs):
-    """Test upload_artifacts_to_azure_wasb."""
-    with patch("airflow.providers.microsoft.azure.hooks.wasb.WasbHook") as mock_hook, patch("os.walk") as mock_walk:
-        mock_walk.return_value = [("/target", [], ["file1.txt", "file2.txt"])]
+def test_upload_artifacts_to_azure_wasb_no_tarball(dummy_kwargs):
+    """Test upload_to_azure_wasb with use_tarball=False."""
+    with (
+        patch("airflow.providers.microsoft.azure.hooks.wasb.WasbHook") as mock_hook,
+        patch("os.walk") as mock_walk,
+        patch("tarfile.open") as mock_tarfile_open,
+    ):
+        mock_walk.return_value = [("/project_dir/target", [], ["file1.txt", "file2.txt"])]
 
-        upload_to_azure_wasb("/project_dir", **dummy_kwargs)
+        upload_to_azure_wasb("/project_dir", use_tarball=False, **dummy_kwargs)
 
         mock_walk.assert_called_once_with("/project_dir/target")
+        mock_tarfile_open.assert_not_called()
         hook_instance = mock_hook.return_value
         assert hook_instance.load_file.call_count == 2
+        load_file_calls = hook_instance.load_file.call_args_list
+        assert load_file_calls[0].kwargs["blob_name"] == "test_dag/test_run_id/test_task/1/target/file1.txt"
+        assert load_file_calls[1].kwargs["blob_name"] == "test_dag/test_run_id/test_task/1/target/file2.txt"
+
+
+def test_upload_artifacts_to_azure_wasb_tarball(dummy_kwargs):
+    """Test upload_to_azure_wasb with use_tarball=True."""
+    with (
+        patch("airflow.providers.microsoft.azure.hooks.wasb.WasbHook") as mock_hook,
+        patch("tarfile.open") as mock_tarfile_open,
+    ):
+        mock_tar = MagicMock()
+        mock_tarfile_open.return_value.__enter__.return_value = mock_tar
+
+        upload_to_azure_wasb("/project_dir", use_tarball=True, **dummy_kwargs)
+
+        mock_tar.add.assert_called_once_with("/project_dir/target", arcname="target")
+        hook_instance = mock_hook.return_value
+        hook_instance.upload.assert_called_once()
+        call_kwargs = hook_instance.upload.call_args.kwargs
+        assert call_kwargs["blob_name"] == "test_dag/test_run_id/test_task/1/target.tar.gz"
+        assert "data" in call_kwargs
+        hook_instance.load_file.assert_not_called()
 
 
 @patch("cosmos.io.settings.remote_target_path", None)

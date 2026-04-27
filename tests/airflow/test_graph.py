@@ -2192,7 +2192,7 @@ def test_watcher_dependency_wiring(test_behavior, depends_on_past):
             test_behavior=test_behavior,
         ),
         dbt_project_name="astro_shop",
-        task_group=TaskGroup("tg", dag=dag)
+        task_group=TaskGroup("tg", dag=dag),
     )
     if not depends_on_past:
         assert dag.task_dict["tg.dbt_producer_watcher_done"].upstream_task_ids == {"tg.dbt_producer_watcher"}

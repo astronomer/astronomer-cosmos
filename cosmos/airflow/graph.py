@@ -771,7 +771,7 @@ def _add_watcher_dependencies(
                 task.wait_for_downstream = True
 
         if needs_wait_for_downstream and not task_or_taskgroup.downstream_task_ids:
-                task_or_taskgroup >> producer_watcher_done_task
+            task_or_taskgroup >> producer_watcher_done_task
 
         # Make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
         # We only managed to do this in the case of DbtDag.

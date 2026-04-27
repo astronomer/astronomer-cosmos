@@ -768,7 +768,7 @@ def _add_watcher_dependencies(
             if hasattr(task, "producer_task_id"):
                 task.producer_task_id = producer_airflow_task.task_id  # type: ignore[union-attr]
             if needs_wait_for_downstream:
-                task.wait_for_downstream = True
+                task.wait_for_downstream = True # type: ignore[union-attr]
 
         if needs_wait_for_downstream and not task_or_taskgroup.downstream_task_ids:
             task_or_taskgroup >> producer_watcher_done_task

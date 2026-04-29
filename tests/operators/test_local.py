@@ -652,7 +652,10 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
         seed_operator >> run_operator >> test_operator
 
     assert seed_operator.outlets == []  # because emit_datasets=False,
-    assert run_operator.outlets == [DatasetAliasModel(name="manual_outlet__run"), DatasetAliasModel(name="test_id_1__run")]
+    assert run_operator.outlets == [
+        DatasetAliasModel(name="manual_outlet__run"),
+        DatasetAliasModel(name="test_id_1__run"),
+    ]
     assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
 
     with pytest.raises(FlushError):

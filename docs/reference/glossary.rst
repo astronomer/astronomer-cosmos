@@ -5,7 +5,7 @@ Glossary
 
 Cosmos
     An open-source Python package that allows you to write data transformations using dbt
-    and then use  Apache Airflow®'s orchestration to integrate dbt projects into end-to-end workflows.
+    and then use Apache Airflow®'s orchestration to integrate dbt projects into end-to-end workflows.
 
 Dag
     An Airflow term derived from the mathematical structure called **Directed Acyclic Graph**. The Dag provides

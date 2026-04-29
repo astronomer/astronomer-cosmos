@@ -15,12 +15,12 @@ Glossary
    DbtDag
        A Cosmos class that wraps a full Airflow DAG around a dbt project, rendering each dbt node as an
        Airflow task. Use ``DbtDag`` when the entire Airflow DAG is dedicated to running a dbt project.
-       See :ref:`dbt-dag`.
+       See :ref:`core-concepts`.
 
    DbtTaskGroup
        A Cosmos class that embeds a dbt project as an Airflow ``TaskGroup`` inside a larger DAG. Use
        ``DbtTaskGroup`` when dbt is one stage of a broader pipeline (e.g. ingestion → dbt → reporting).
-       See :ref:`dbt-task-group`.
+       See :ref:`core-concepts`.
 
    dbt deps
        A `dbt command <https://docs.getdbt.com/reference/commands/deps>`_ that pulls the most recent

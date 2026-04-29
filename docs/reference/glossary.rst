@@ -1,62 +1,89 @@
+Glossary
+========
+
 .. glossary::
 
-Glossary
-=========
+   Cosmos
+       An open-source Python package that allows you to write data transformations using dbt
+       and then use Apache Airflow®'s orchestration to integrate dbt projects into end-to-end workflows.
 
-Cosmos
-    An open-source Python package that allows you to write data transformations using dbt
-    and then use Apache Airflow®'s orchestration to integrate dbt projects into end-to-end workflows.
+   DAG
+       An Airflow term derived from the mathematical structure called **Directed Acyclic Graph**. A DAG
+       provides a model that includes everything needed to execute an Airflow workflow.
+       See `DAG <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html>`_.
 
-Dag
-    An Airflow term derived from the mathematical structure called **Directed Acyclic Graph**. The Dag provides
-    a model that includes everything needed to execute an Airflow workflow. See `Dag <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html>`_.
+   DbtDag
+       A Cosmos class that wraps a full Airflow DAG around a dbt project, rendering each dbt node as an
+       Airflow task. Use ``DbtDag`` when the entire Airflow DAG is dedicated to running a dbt project.
+       See :ref:`dbt-dag`.
 
-dbt deps
-    A `dbt command <https://docs.getdbt.com/reference/commands/deps?version=1.12>`_ that pulls the most recent version of dependencies contained in your packages.yml file.
+   DbtTaskGroup
+       A Cosmos class that embeds a dbt project as an Airflow ``TaskGroup`` inside a larger DAG. Use
+       ``DbtTaskGroup`` when dbt is one stage of a broader pipeline (e.g. ingestion → dbt → reporting).
+       See :ref:`dbt-task-group`.
 
-Execution mode
-    The execution mode describes where and how Cosmos runs dbt commands. You configure it using the ``ExecutionConfig``. See :ref:`execution-modes`.
+   dbt deps
+       A `dbt command <https://docs.getdbt.com/reference/commands/deps>`_ that pulls the most recent
+       version of dependencies listed in your ``packages.yml`` file.
 
-Load mode
-    The method that Cosmos uses to parse your dbt project. See :ref:`parsing-methods`.
+   Execution mode
+       Describes where and how Cosmos runs dbt commands. You configure it using ``ExecutionConfig``.
+       See :ref:`execution-modes`.
 
-Manifest
-    A dbt artifact that This file contains a full representation of the dbt project's resources, including all node configurations and resource properties.
-    See `Manifest JSON file <https://docs.getdbt.com/reference/artifacts/manifest-json?version=1.12>`_ in the dbt docs.
+   ExecutionConfig
+       The Cosmos class used to configure the execution mode and related runtime options such as the
+       dbt executable path and invocation mode. See :ref:`execution-config`.
 
-Node
-    A dbt concept that encapsulates a step within a pipeline.
+   Load mode
+       The method that Cosmos uses to parse your dbt project. See :ref:`parsing-methods`.
 
-Partial parsing
-    Partial parsing is a dbt feature that can greatly speed up dbt parsing and execution when using the ``dbt_ls``
-    load mode. See :ref:`partial-parsing`.
+   Manifest
+       A dbt artifact that contains a full representation of the dbt project's resources, including all
+       node configurations and resource properties.
+       See `Manifest JSON file <https://docs.getdbt.com/reference/artifacts/manifest-json>`_ in the dbt docs.
 
-Profile
-    The authentication information used by dbt to connect to your data warehouse. See `profile <https://docs.getdbt.com/reference/project-configs/profile?version=1.12>`_.
+   Node
+       A dbt concept that encapsulates a step within a pipeline, such as a model, test, seed, or source.
 
-ProfileConfig
-    The class that determines which data warehouse Cosmos connects to when executing the dbt SQL. See :ref:`connect_database`.
+   Partial parsing
+       A dbt feature that can greatly speed up parsing and execution when using the ``dbt_ls`` load mode
+       by only re-parsing files that have changed. See :ref:`partial-parsing`.
 
-Profile mapping
-    A Cosmos-provided resource that translate Airflow connections into dbt profiles. See :ref:`use-profile-mapping`.
+   Profile
+       The authentication information used by dbt to connect to your data warehouse.
+       See `profile <https://docs.getdbt.com/reference/project-configs/profile>`_.
 
-profiles.yml
-    The file where dbt stores connection information for each data warehouse connection. See :ref:`connect_database`, :ref:`use-your-profiles-yml`,
-    or `The profiles.yml file <https://docs.getdbt.com/docs/local/connect-data-platform/connection-profiles?version=1.12#about-the-profilesyml-file>`_ in the dbt docs.
+   ProfileConfig
+       The Cosmos class that determines which data warehouse Cosmos connects to when executing dbt SQL.
+       See :ref:`connect_database`.
 
-ProjectConfig
-    The Cosmos class that allows you to specify information about where your dbt project is located and project variables that should be used for rendering and execution.
+   Profile mapping
+       A Cosmos-provided resource that translates Airflow connections into dbt profiles.
+       See :ref:`use-profile-mapping`.
 
-RenderConfig
-    The configuration in Cosmos that controls how Cosmos turns your dbt project into an Airflow dag or task group. :ref:`render-config`.
+   profiles.yml
+       The file where dbt stores connection information for each data warehouse connection.
+       See :ref:`connect_database`, :ref:`use-your-profiles-yml`, or
+       `The profiles.yml file <https://docs.getdbt.com/docs/core/connect-data-platform/connection-profiles>`_
+       in the dbt docs.
 
-Task
-    An Airflow term describing a step within a pipeline. See `Task <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/tasks.html>`_.
+   ProjectConfig
+       The Cosmos class used to specify where your dbt project is located and any project variables
+       that should be used for rendering and execution.
 
-Test
-    Refers to the the `dbt test command <https://docs.getdbt.com/reference/commands/test?version=1.12>`_. You can configure how you want
-    Cosmos to handle running ``dbt test`` with :ref:`testing-behavior`.
+   RenderConfig
+       The Cosmos class that controls how a dbt project is turned into an Airflow DAG or TaskGroup,
+       including node selection, test behaviour, and source rendering. See :ref:`render-config`.
 
-Workflow
-    A dbt term describing a pipeline that contains a group of steps. dbt can run a subset
-    of tasks assuming upstream tasks were run. This is similar to the Airflow concept of a `Dag <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html>`_.
+   Task
+       An Airflow term describing a single unit of work within a DAG.
+       See `Task <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/tasks.html>`_.
+
+   Test
+       Refers to the `dbt test command <https://docs.getdbt.com/reference/commands/test>`_. You can
+       configure how Cosmos runs ``dbt test`` with :ref:`testing-behavior`.
+
+   Workflow
+       A dbt term describing a pipeline that contains a group of steps. dbt can run a subset of tasks
+       assuming upstream tasks were already run. This is similar to the Airflow concept of a
+       `DAG <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html>`_.

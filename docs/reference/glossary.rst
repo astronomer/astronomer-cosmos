@@ -27,9 +27,12 @@ Glossary
        version of dependencies listed in your ``packages.yml`` file.
 
    Callbacks
-       User-defined functions that Cosmos calls before or after a dbt task executes. Useful for
-       custom logging, alerting, or side effects without modifying the operator. Configured via
-       ``operator_args``. See :ref:`callbacks`.
+       User-defined functions that Cosmos invokes after the dbt command completes, during
+       post-execution handling and before the temporary project directory is cleaned up.
+       Useful for custom logging, alerting, or side effects without modifying the operator.
+       Configure them on Cosmos operators via ``callback`` and ``callback_args``; when using
+       ``DbtDag`` or ``DbtTaskGroup``, these can be passed through ``operator_args``.
+       See :ref:`callbacks`.
 
    ExecutionConfig
        The Cosmos class used to configure the execution mode and related runtime options such as the

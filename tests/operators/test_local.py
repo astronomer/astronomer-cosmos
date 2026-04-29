@@ -616,7 +616,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
-    from airflow.models.dataset import DatasetAliasModel, DatasetAlias
+    from airflow.models.dataset import DatasetAlias, DatasetAliasModel
     from sqlalchemy.orm.exc import FlushError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
@@ -665,13 +665,14 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
 
     # Handling DatasetAlias
     assert run_operator_alias.outlets == [
-        DatasetAlias(name="manual_outlet__run_alias"), DatasetAlias(name="test_id_1__run_operator_alias")
+        DatasetAlias(name="manual_outlet__run_alias"),
+        DatasetAlias(name="test_id_1__run_operator_alias"),
     ]
 
     # Handling DatasetAliasModel passed by user and the DatasetAlias outlet by the Operator
     assert run_operator_alias_model.outlets == [
         DatasetAliasModel(name="manual_outlet__run_alias_model"),
-        DatasetAlias(name="test_id_1__run_operator_alias_model")
+        DatasetAlias(name="test_id_1__run_operator_alias_model"),
     ]
 
     assert test_operator.outlets == [DatasetAlias(name="test_id_1__test")]

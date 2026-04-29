@@ -26,24 +26,32 @@ Glossary
        A `dbt command <https://docs.getdbt.com/reference/commands/deps>`_ that pulls the most recent
        version of dependencies listed in your ``packages.yml`` file.
 
-   Execution mode
-       Describes where and how Cosmos runs dbt commands. You configure it using ``ExecutionConfig``.
-       See :ref:`execution-modes`.
+   Callbacks
+       User-defined functions that Cosmos calls before or after a dbt task executes. Useful for
+       custom logging, alerting, or side effects without modifying the operator. Configured via
+       ``operator_args``. See :ref:`callbacks`.
 
    ExecutionConfig
        The Cosmos class used to configure the execution mode and related runtime options such as the
        dbt executable path and invocation mode. See :ref:`execution-config`.
 
-   Load mode
-       The method that Cosmos uses to parse your dbt project. See :ref:`parsing-methods`.
+   ExecutionMode
+       Describes where and how Cosmos runs dbt commands (e.g. ``LOCAL``, ``WATCHER``, ``DOCKER``).
+       Configured via ``ExecutionConfig``. See :ref:`execution-modes`.
+
+   InvocationMode
+       Controls how Cosmos calls dbt: ``DBT_RUNNER`` imports dbt as a Python library in the same
+       process (faster, no subprocess overhead), while ``SUBPROCESS`` spawns a separate process
+       (better isolation when dbt and Airflow share a Python environment).
+
+   LoadMode
+       The method Cosmos uses to parse your dbt project (e.g. ``DBT_MANIFEST``, ``DBT_LS``).
+       Configured via ``RenderConfig``. See :ref:`parsing-methods`.
 
    Manifest
        A dbt artifact that contains a full representation of the dbt project's resources, including all
        node configurations and resource properties.
        See `Manifest JSON file <https://docs.getdbt.com/reference/artifacts/manifest-json>`_ in the dbt docs.
-
-   Node
-       A dbt concept that encapsulates a step within a pipeline, such as a model, test, seed, or source.
 
    Partial parsing
        A dbt feature that can greatly speed up parsing and execution when using the ``dbt_ls`` load mode
@@ -71,19 +79,22 @@ Glossary
        The Cosmos class used to specify where your dbt project is located and any project variables
        that should be used for rendering and execution.
 
+   node_converters
+       A ``RenderConfig`` option that accepts a dictionary mapping a ``DbtResourceType`` to a
+       callable, allowing users to replace how specific node types are rendered as Airflow tasks.
+       See :ref:`render-config`.
+
    RenderConfig
        The Cosmos class that controls how a dbt project is turned into an Airflow DAG or TaskGroup,
        including node selection, test behaviour, and source rendering. See :ref:`render-config`.
 
-   Task
-       An Airflow term describing a single unit of work within a DAG.
-       See `Task <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/tasks.html>`_.
+   SourceRenderingBehavior
+       Controls whether dbt source nodes are rendered as Airflow tasks. ``NONE`` (default) skips
+       source nodes entirely; ``ALL`` renders every source; ``WITH_TESTS_OR_FRESHNESS`` renders only
+       sources that have tests or a freshness check defined. Configured via ``RenderConfig``.
 
-   Test
-       Refers to the `dbt test command <https://docs.getdbt.com/reference/commands/test>`_. You can
-       configure how Cosmos runs ``dbt test`` with :ref:`testing-behavior`.
-
-   Workflow
-       A dbt term describing a pipeline that contains a group of steps. dbt can run a subset of tasks
-       assuming upstream tasks were already run. This is similar to the Airflow concept of a
-       `DAG <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html>`_.
+   TestBehavior
+       Controls when and how Cosmos runs dbt tests. ``AFTER_EACH`` (default) adds a test task after
+       each model; ``AFTER_ALL`` runs all tests in a single task at the end; ``BUILD`` runs tests as
+       part of ``dbt build`` inside the model task; ``NONE`` skips tests entirely.
+       Configured via ``RenderConfig``. See :ref:`testing-behavior`.

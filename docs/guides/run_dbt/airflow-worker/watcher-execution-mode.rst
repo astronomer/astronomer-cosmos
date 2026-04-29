@@ -419,8 +419,8 @@ Since Cosmos 1.6, it `supports the rendering of source nodes <https://www.astron
 
 Starting with Cosmos 1.15.0, ``ExecutionMode.WATCHER`` supports source freshness aware execution. When
 ``source_rendering_behavior`` is not ``NONE``, the producer task automatically runs ``dbt source freshness``
-before ``dbt build`` and skips all downstream models whose sources are stale. See
-:ref:`watcher-source-freshness` for details.
+before ``dbt build``, and the freshness callback determines which dependent nodes are skipped based on
+stale sources. See :ref:`watcher-source-freshness` for details.
 
 Concurrent DAG runs with ``depends_on_past``
 ''''''''''''''''''''''''''''''''''''''''''''

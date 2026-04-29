@@ -616,10 +616,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
-    try:
-        from airflow.models.asset import AssetAliasModel
-    except ModuleNotFoundError:
-        from airflow.models.dataset import DatasetAliasModel as AssetAliasModel
+    from airflow.models.dataset import DatasetAliasModel
     from sqlalchemy.orm.exc import FlushError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
@@ -641,7 +638,7 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
             append_env=True,
-            outlets=[AssetAliasModel(name="manual_outlet__run")],
+            outlets=[DatasetAliasModel(name="manual_outlet__run")],
         )
         test_operator = DbtTestLocalOperator(
             profile_config=real_profile_config,
@@ -655,8 +652,8 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
         seed_operator >> run_operator >> test_operator
 
     assert seed_operator.outlets == []  # because emit_datasets=False,
-    assert run_operator.outlets == [AssetAliasModel(name="manual_outlet__run"), AssetAliasModel(name="test_id_1__run")]
-    assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
+    assert run_operator.outlets == [DatasetAliasModel(name="manual_outlet__run"), DatasetAliasModel(name="test_id_1__run")]
+    assert test_operator.outlets == [DatasetAliasModel(name="test_id_1__test")]
 
     with pytest.raises(FlushError):
         run_test_dag(dag, custom_tester=True)

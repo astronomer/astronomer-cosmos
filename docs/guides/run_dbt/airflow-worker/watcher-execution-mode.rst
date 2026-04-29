@@ -454,10 +454,11 @@ Source freshness aware execution (Experimental)
    This feature is **experimental** and may change without a deprecation period.
 
 When ``source_rendering_behavior`` is set to ``ALL`` or ``WITH_TESTS_OR_FRESHNESS`` in ``RenderConfig``,
-the producer automatically runs ``dbt source freshness`` before ``dbt build`` and then invokes the
-freshness callback.  The callback returns a list of ``(unique_id, state)`` tuples for any nodes that
-should be pre-marked.  Each returned node receives a pre-populated XCom entry; nodes returned with a
-non-success state are also added to ``--exclude`` so dbt skips them entirely.
+the producer automatically runs ``dbt source freshness`` before ``dbt build`` and always invokes the
+freshness callback afterward. The callback inspects the freshness results (``sources_json``) and returns
+a list of ``(unique_id, state)`` tuples for any nodes that should be pre-marked; it may return an empty
+list when no nodes need special handling. Each returned node receives a pre-populated XCom entry; nodes
+returned with a non-success state are also added to ``--exclude`` so dbt skips them entirely.
 
 The consumer sensor recognises three state families: ``"skipped"`` raises ``AirflowSkipException``,
 ``"success"`` / ``"pass"`` / ``"warn"`` marks the task as succeeded, and anything else (e.g.

@@ -17,7 +17,7 @@ Overview
 
 
 Apache Airflow® 3
-+++++++++++++++++
+++++++++++++++++++
 
 The dbt docs are available in the Airflow menu under ``Browse``:
 
@@ -54,7 +54,7 @@ Endpoints per project (``<slug>``):
 
 
 Local vs Remote docs (Apache Airflow® 3)
-''''''''''''''''''''''''''''''''''''''''
+'''''''''''''''''''''''''''''''''''''''''
 
 Local docs (filesystem paths)
 .............................
@@ -94,7 +94,7 @@ Notes and behavior
 - If you deploy behind a path prefix (e.g. Astronomer hosted Airflow deployments), menu links include the prefix automatically using ``AIRFLOW__API__BASE_URL``.
 
 Apache Airflow® 2
-+++++++++++++++++
+++++++++++++++++++
 
 .. important::
    The remainder of this page applies to Airflow 2 (Flask-AppBuilder) plugins only.

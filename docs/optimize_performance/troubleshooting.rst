@@ -27,7 +27,7 @@ If the parse time is high, see :ref:`optimize-rendering` for strategies to reduc
 
 
 Apache Airflow® DAG processor configuration
-+++++++++++++++++++++++++++++++++++++++++++
+++++++++++++++++++++++++++++++++++++++++++++
 
 The Airflow DAG processor controls how often and how quickly DAG files are parsed. Understanding these settings helps
 you diagnose issues where DAGs are slow to appear or update.

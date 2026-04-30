@@ -1,5 +1,5 @@
 Run dbt in an Apache Airflow® worker
-------------------------------------
+-------------------------------------
 
 .. toctree::
    :maxdepth: 1

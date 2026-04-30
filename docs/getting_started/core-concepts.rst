@@ -7,7 +7,7 @@ Cosmos core concepts
 
 
 Similar dbt and Apache Airflow® concepts
-++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++
 
 dbt and Airflow each solve different kinds of data engineering problems. However, they do share some useful concepts. See :ref:`dbt-airflow-concepts`.
 

@@ -37,7 +37,7 @@ Clone the demo repo
     git clone https://github.com/astronomer/cosmos-demo.git
 
 Start Apache Airflow® locally
-+++++++++++++++++++++++++++++
+++++++++++++++++++++++++++++++
 
 1. Open a terminal at the root of the ``cosmos-demo`` repo.
 2. Run ``astro dev start --verbosity debug`` to start your Aiflow instance. Including the ``--verbosity debug`` flag allows the command to display the steps the Astro CLI takes to set up your Airflow project.

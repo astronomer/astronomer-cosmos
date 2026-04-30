@@ -328,7 +328,7 @@ Or via environment variable:
   ``watcher_dbt_execution_queue`` > explicit ``queue`` on the producer (from ``setup_operator_args``) > ``operator_args`` > your Airflow deployment’s default queue.
 
 Installation of Apache Airflow® and dbt
-'''''''''''''''''''''''''''''''''''''''
+''''''''''''''''''''''''''''''''''''''''
 
 Since Cosmos 1.12.0, ``ExecutionMode.WATCHER`` works well regardless of whether dbt and Airflow are installed in the same Python virtual environment.
 
@@ -401,7 +401,7 @@ The ``TestBehavior.BUILD`` behavior is embedded in the producer ``DbtProducerWat
 The ``TestBehavior.NONE`` and ``TestBehavior.AFTER_ALL`` behave similarly to ``ExecutionMode.LOCAL``.
 
 Apache Airflow® Datasets and Assets
-'''''''''''''''''''''''''''''''''''
+''''''''''''''''''''''''''''''''''''
 
 .. versionchanged:: 1.14.0
 

@@ -1,7 +1,7 @@
 .. _oss-quickstart:
 
 Run Cosmos in open-source Apache Airflow®
------------------------------------------
+------------------------------------------
 
 Quickly get started working locally with `Apache Airflow® <https://airflow.apache.org/>`_, dbt, and Astronomer Cosmos using the `Open-source Airflow <https://airflow.apache.org/docs/apache-airflow/stable/index.html>`_.
 

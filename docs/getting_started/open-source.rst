@@ -1,7 +1,7 @@
 .. _open-source:
 
 Getting Started with Cosmos on Open-source Apache Airflow®
-----------------------------------------------------------
+-----------------------------------------------------------
 
 When running open-source `Apache Airflow® <https://airflow.apache.org/>`_, your setup may vary. This guide assumes you have access to edit the underlying image.
 

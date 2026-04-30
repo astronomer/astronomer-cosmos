@@ -36,7 +36,7 @@ The following example setup steps include setting up the following:
 - dbt DAG with dbt Docker operators in the Airflow DAGs directory to run in Airflow
 
 1. Install Apache Airflow® and Cosmos
-'''''''''''''''''''''''''''''''''''''
+''''''''''''''''''''''''''''''''''''''
 
 Create a python virtualenv, activate it, upgrade pip to the latest version, and install `Apache Airflow® <https://airflow.apache.org/>`_ & ``astronomer-postgres``:
 
@@ -93,7 +93,7 @@ Read the following example Dockerfiles to understand what it does so that you ca
 
 
 4. Set up and trigger the Dag with Apache Airflow®
-''''''''''''''''''''''''''''''''''''''''''''''''''
+'''''''''''''''''''''''''''''''''''''''''''''''''''
 
 1. Copy the ``dags`` directory from the ``cosmos-example`` repo to your Airflow home
 

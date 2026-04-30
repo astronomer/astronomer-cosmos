@@ -61,7 +61,7 @@ dbt-related
 
 
 Apache Airflow®-related
-'''''''''''''''''''''''
+''''''''''''''''''''''''
 
 - ``cancel_query_on_kill``: If true, cancel any running queries when the task's ``on_kill()`` is executed.
 - ``output_encoding``: Declare the character encoding to parse the ``dbt`` command output.

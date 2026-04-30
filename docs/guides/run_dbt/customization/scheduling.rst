@@ -88,11 +88,11 @@ Will trigger the following Dag to be run:
 .. code-block:: python
 
     from datetime import datetime
-    from airflow import Dag
+    from airflow import DAG
     from airflow.datasets import Dataset
     from airflow.operators.empty import EmptyOperator
 
-    with Dag(
+    with DAG(
         "dataset_triggered_dag",
         description="A Dag that should be triggered via Dataset",
         start_date=datetime(2024, 9, 1),
@@ -113,11 +113,11 @@ From Cosmos 1.7 and Airflow 2.10, it is also possible to trigger Dags be to be r
 .. code-block:: python
 
     from datetime import datetime
-    from airflow import Dag
+    from airflow import DAG
     from airflow.datasets import DatasetAlias
     from airflow.operators.empty import EmptyOperator
 
-    with Dag(
+    with DAG(
         "datasetalias_triggered_dag",
         description="A Dag that should be triggered via Dataset alias",
         start_date=datetime(2024, 9, 1),

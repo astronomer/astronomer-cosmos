@@ -171,11 +171,11 @@ If your Airflow Dag includes multiple stages or integrations (e.g., data ingesti
    :caption: example_watcher_taskgroup.py
    :name: example_watcher_taskgroup
 
-    from airflow.models import Dag
+    from airflow.models import DAG
     from airflow.operators.empty import EmptyOperator
     from cosmos import DbtTaskGroup
 
-    with Dag(
+    with DAG(
         dag_id="example_watcher_taskgroup",
         schedule="@daily",
         start_date=datetime(2023, 1, 1),

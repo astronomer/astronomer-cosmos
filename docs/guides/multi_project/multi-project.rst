@@ -286,14 +286,14 @@ add a final task that emits a custom asset:
 
 .. code-block:: python
 
-    from airflow import Dag
+    from airflow import DAG
     from airflow.sdk import Asset
     from airflow.operators.empty import EmptyOperator
     from cosmos import DbtTaskGroup, ProfileConfig, ProjectConfig
 
     UPSTREAM_COMPLETE = Asset("upstream_platform_complete")
 
-    with Dag(
+    with DAG(
         dag_id="upstream_dag",
         schedule="@daily",
         # ...

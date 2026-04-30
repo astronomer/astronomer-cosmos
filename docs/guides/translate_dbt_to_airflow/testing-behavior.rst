@@ -40,7 +40,7 @@ Example when changing the behavior to use ``TestBehavior.AFTER_ALL``:
 .. image:: ../../_static/test_behavior_after_all.png
 
 
-Finally, an example DAG and how it is rendered in the Airflow UI when using ``TestBehavior.BUILD`` (available since Cosmos 1.8):
+Finally, an example DAG and how it is rendered in the `Apache Airflow® <https://airflow.apache.org/>`_ UI when using ``TestBehavior.BUILD`` (available since Cosmos 1.8):
 
 .. literalinclude::  ../../../dev/dags/example_cosmos_dbt_build.py
     :language: python

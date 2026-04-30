@@ -27,7 +27,7 @@ This tutorial will guide you through the steps required to use Cloud Run Job ins
 Prerequisites
 +++++++++++++
 1. Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
-2. Airflow
+2. `Apache Airflow® <https://airflow.apache.org/>`_
 3. Google Cloud SDK (`install guide <https://cloud.google.com/sdk/docs/install>`_)
 4. Astronomer-cosmos package containing the dbt Cloud Run Job operators
 5. GCP account with:

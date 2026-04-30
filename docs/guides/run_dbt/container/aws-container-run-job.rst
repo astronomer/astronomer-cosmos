@@ -41,7 +41,7 @@ Before you begin, ensure you have the following:
 Step-by-step guide
 ++++++++++++++++++
 
-**Install Airflow and Cosmos**
+**Install Apache Airflow® and Cosmos**
 
 Create a python virtualenv, activate it, upgrade pip to the latest version and install ``apache airflow`` & ``astronomer cosmos``:
 

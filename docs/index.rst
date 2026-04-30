@@ -32,7 +32,7 @@
 
 Welcome to Astronomer Cosmos! Whether you're an experienced data practitioner or just getting started, Cosmos makes it
 simple to manage and orchestrate your dbt workflows using `Apache Airflow® <https://airflow.apache.org/>`_, saving you
-time and effort. By automatically turning dbt workflows into Airflow DAGs, Cosmos allows you to focus on building
+time and effort. By automatically turning dbt workflows into Airflow Dags, Cosmos allows you to focus on building
 high-quality data models without the hassle of managing complex integrations.
 
 What Is Astronomer Cosmos?

@@ -29,7 +29,7 @@ If you want to use the Airflow 3 URI standard while still using Airflow 2, pleas
     export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1
 
 .. warning::
-    Remember to update any DAGs that are triggered using Cosmos-generated datasets or aliases to the new URI format.
+    Remember to update any Dags that are triggered using Cosmos-generated datasets or aliases to the new URI format.
 
 
 What Works
@@ -38,7 +38,7 @@ What Works
 With the changes contributed in Cosmos 1.10.0 to bring in compatibility with Airflow 3, we have validated Cosmos’
 functionality with Airflow 3 by extending our CI infrastructure:
 
-- **All example DAGs** in the `dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_ directory of the repository are tested against Airflow 3.
+- **All example Dags** in the `dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_ directory of the repository are tested against Airflow 3.
 - Our `CI test matrix <https://github.com/astronomer/astronomer-cosmos/blob/main/.github/workflows/test.yml>`_ now includes explicit entries to run the following tests on Airflow 3:
   - Unit Tests
   - Integration Tests

@@ -3,16 +3,16 @@
 Optimize Task Execution
 -----------------------
 
-Once your DAG is parsed, performance depends on how quickly tasks execute. Each Cosmos task runs one or more dbt
-commands, and the overhead of those invocations adds up across a DAG run. This page covers the most impactful ways
-to reduce DAG run time.
+Once your Dag is parsed, performance depends on how quickly tasks execute. Each Cosmos task runs one or more dbt
+commands, and the overhead of those invocations adds up across a Dag run. This page covers the most impactful ways
+to reduce Dag run time.
 
 
 1. Use an efficient execution mode
 +++++++++++++++++++++++++++++++++++
 
 The execution mode determines how Cosmos runs dbt commands at task execution time. Choosing the right mode is the
-single most impactful change for DAG run performance.
+single most impactful change for Dag run performance.
 
 **Recommended: use** ``ExecutionMode.WATCHER``
 
@@ -20,7 +20,7 @@ In the default ``ExecutionMode.LOCAL``, every model runs as a separate ``dbt run
 per-task overhead. ``ExecutionMode.WATCHER`` runs a single ``dbt build`` across the entire project and uses
 dbt's native threading to parallelize models, while still giving you model-level visibility in Airflow.
 
-Benchmarks show **up to 80% reduction in DAG run time** compared to ``ExecutionMode.LOCAL``.
+Benchmarks show **up to 80% reduction in Dag run time** compared to ``ExecutionMode.LOCAL``.
 See :ref:`watcher-execution-mode` for setup instructions and detailed benchmarks.
 
 .. note::
@@ -67,7 +67,7 @@ the same Python environment; otherwise Cosmos falls back to ``InvocationMode.SUB
 
 When dbt is installed alongside Airflow, Cosmos uses dbt's programmatic API (``dbtRunner``) instead of spawning
 subprocesses. This eliminates process creation overhead and reduces both CPU and memory usage during task execution
-and DAG parsing.
+and Dag parsing.
 
 This is required for ``InvocationMode.DBT_RUNNER`` and yields the best performance with ``ExecutionMode.WATCHER``.
 
@@ -77,7 +77,7 @@ For more details, see :ref:`invocation-mode`.
 3. Pre-install dbt dependencies
 +++++++++++++++++++++++++++++++
 
-By default, Cosmos runs ``dbt deps`` during both DAG parsing and task execution to ensure packages are available.
+By default, Cosmos runs ``dbt deps`` during both Dag parsing and task execution to ensure packages are available.
 For large projects with many packages, this adds significant overhead to every task.
 
 **Pre-install packages in your Docker image:**
@@ -138,7 +138,7 @@ The following table provides recommended concurrency ratios based on execution m
 
 .. note::
 
-   Keep in mind that Airflow re-parses the DAG file on the worker node every time a task runs. If you are using
+   Keep in mind that Airflow re-parses the Dag file on the worker node every time a task runs. If you are using
    ``LoadMode.DBT_LS``, this means each task also triggers a dbt project parse. Consider using
    ``LoadMode.DBT_MANIFEST`` to reduce worker-side parsing overhead. See :ref:`optimize-rendering`.
 

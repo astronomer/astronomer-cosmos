@@ -11,7 +11,7 @@ To emit lineage events, Cosmos can use one of the following:
 1. Airflow `official OpenLineage provider <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_, or
 2. `Additional libraries <https://openlineage.io/docs/integrations/airflow/>`_.
 
-No change to the user DAG files is required to use OpenLineage.
+No change to the user Dag files is required to use OpenLineage.
 
 
 Known limitations

@@ -43,10 +43,10 @@ Add Cosmos to your project's ``requirements.txt``.
     astronomer-cosmos
 
 
-Move your dbt project into the DAGs directory
+Move your dbt project into the Dags directory
 +++++++++++++++++++++++++++++++++++++++++++++
 
-Make a new folder, ``dbt``, inside your local project's ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your DAGs directory. Your project structure should look like this:
+Make a new folder, ``dbt``, inside your local project's ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your Dags directory. Your project structure should look like this:
 
 .. code-block:: text
 
@@ -65,9 +65,9 @@ Make a new folder, ``dbt``, inside your local project's ``dags`` folder. Then, c
     ├── requirements.txt
     └── ...
 
-Note: dbt projects can be placed anywhere in the Airflow image or mounted independently via the `astro dbt deploy <https://www.astronomer.io/docs/astro/cli/astro-dbt-deploy>`__ command. You can customise where the dbt project is by setting the ``dbt_project_path`` parameter on ``ProjectConfig`` when you create your DAG instance.
+Note: dbt projects can be placed anywhere in the Airflow image or mounted independently via the `astro dbt deploy <https://www.astronomer.io/docs/astro/cli/astro-dbt-deploy>`__ command. You can customise where the dbt project is by setting the ``dbt_project_path`` parameter on ``ProjectConfig`` when you create your Dag instance.
 
-For example, if you wanted to put your dbt project in a directory relative to your DAG file (for example, ``dbt/my_dbt_project``, corresponding to ``dags/dbt/my_dbt_project`` in your project), you would do:
+For example, if you wanted to put your dbt project in a directory relative to your Dag file (for example, ``dbt/my_dbt_project``, corresponding to ``dags/dbt/my_dbt_project`` in your project), you would do:
 
 .. code-block:: python
 
@@ -86,7 +86,7 @@ For example, if you wanted to put your dbt project in a directory relative to yo
 Create a dagfile
 ++++++++++++++++
 
-In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and create a new DAG instance. Make sure to use the ``dbt_executable_path`` argument to point to the virtual environment you created in step 1.
+In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and create a new Dag instance. Make sure to use the ``dbt_executable_path`` argument to point to the virtual environment you created in step 1.
 
 .. code-block:: python
 
@@ -130,8 +130,8 @@ In your ``my_cosmos_dag.py`` file, import the ``DbtDag`` class from Cosmos and c
 Start your project
 ++++++++++++++++++
 
-Start your project with ``astro dev start``. You should see your Airflow DAG in the Airflow UI (``localhost:8080`` by default), where you can trigger it.
+Start your project with ``astro dev start``. You should see your Airflow Dag in the Airflow UI (``localhost:8080`` by default), where you can trigger it.
 
 .. image:: /_static/dbt_dag.png
-    :alt: Cosmos dbt DAG
+    :alt: Cosmos dbt Dag
     :align: center

@@ -168,7 +168,7 @@ For example:
         --task-definition cosmos-job \
         --network-configuration "awsvpcConfiguration={subnets=[subnet-12345678,subnet-87654321],securityGroups=[sg-abcdef12],assignPublicIp=ENABLED}"
 
-   Once the test is ok, we are able to run the dbt commands in our Cosmos DAG:
+   Once the test is ok, we are able to run the dbt commands in our Cosmos Dag:
 
    .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_aws_ecs_dag_run.png
     :width: 800
@@ -176,7 +176,7 @@ For example:
    .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_aws_ecs_dag_run_logs.png
     :width: 800
 
-   Remember to config your DAG for connecting to AWS ECS and the database connection where you are performing your SQL queries!
+   Remember to config your Dag for connecting to AWS ECS and the database connection where you are performing your SQL queries!
 
 
 **Monitor and Debug Your Job**
@@ -203,4 +203,4 @@ For more detailed information on AWS ECS, please refer to the `AWS ECS Developer
 Happy deploying! :rocket:
 
 
-Remember to config your DAG for connecting to AWS ECS and the database connection where you are performing your SQL queries!
+Remember to config your Dag for connecting to AWS ECS and the database connection where you are performing your SQL queries!

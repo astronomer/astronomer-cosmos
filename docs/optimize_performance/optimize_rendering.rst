@@ -1,10 +1,10 @@
 .. _optimize-rendering:
 
-Optimize DAG Parsing
+Optimize Dag Parsing
 --------------------
 
-Every time Airflow parses a DAG file that contains a ``DbtDag`` or ``DbtTaskGroup``, Cosmos must load and process the
-dbt project to build the corresponding Airflow task graph. The time this takes directly affects how quickly your DAGs
+Every time Airflow parses a Dag file that contains a ``DbtDag`` or ``DbtTaskGroup``, Cosmos must load and process the
+dbt project to build the corresponding Airflow task graph. The time this takes directly affects how quickly your Dags
 appear and update in Airflow. This page covers the most impactful ways to reduce that parse time.
 
 .. tip::
@@ -13,9 +13,9 @@ appear and update in Airflow. This page covers the most impactful ways to reduce
 
    .. code-block:: text
 
-      Cosmos performance (<cache_id>) - [<hostname>|<pid>]: It took 0.068s to parse the dbt project for DAG using LoadMode.DBT_LS_CACHE
+      Cosmos performance (<cache_id>) - [<hostname>|<pid>]: It took 0.068s to parse the dbt project for Dag using LoadMode.DBT_LS_CACHE
 
-   Search your Airflow scheduler or DAG processor logs for ``Cosmos performance`` to measure your current parse time.
+   Search your Airflow scheduler or Dag processor logs for ``Cosmos performance`` to measure your current parse time.
 
 
 1. Choose the right LoadMode
@@ -72,17 +72,17 @@ Use ``LoadMode.DBT_LS`` with the following optimizations to minimize parse-time 
          install_dbt_deps=False,  # skip dbt deps at parse time
      )
 
-  This avoids running ``dbt deps`` on every DAG parse, which can be slow when packages need to be fetched.
+  This avoids running ``dbt deps`` on every Dag parse, which can be slow when packages need to be fetched.
 
 
-2. Reduce DAG granularity
+2. Reduce Dag granularity
 +++++++++++++++++++++++++
 
-Fewer nodes in the Airflow DAG means faster parsing. There are two ways to reduce the number of nodes Cosmos generates.
+Fewer nodes in the Airflow Dag means faster parsing. There are two ways to reduce the number of nodes Cosmos generates.
 
 **Select only the nodes you need**
 
-Use ``select``, ``exclude``, or ``selector`` in ``RenderConfig`` to limit which dbt nodes are included in the DAG.
+Use ``select``, ``exclude``, or ``selector`` in ``RenderConfig`` to limit which dbt nodes are included in the Dag.
 For example, to run only models tagged ``daily``:
 
 .. code-block:: python
@@ -96,7 +96,7 @@ For the full selection syntax, see :ref:`selecting-excluding`.
 **Choose an efficient TestBehavior**
 
 The default ``TestBehavior.AFTER_EACH`` creates a separate test task after every model, which can significantly
-increase the number of tasks in the DAG. Consider these alternatives:
+increase the number of tasks in the Dag. Consider these alternatives:
 
 - ``TestBehavior.NONE`` -- no test tasks are created. Use this if tests are not needed or are run separately.
 - ``TestBehavior.BUILD`` -- tests run as part of the model task itself (via ``dbt build``), so no additional tasks are created.
@@ -114,7 +114,7 @@ increase the number of tasks in the DAG. Consider these alternatives:
 3. Skip stale sources
 +++++++++++++++++++++
 
-If your DAG includes multiple data sources and some may not have fresh data, you can avoid running unnecessary
+If your Dag includes multiple data sources and some may not have fresh data, you can avoid running unnecessary
 branches by rendering source nodes with freshness checks. When a source is not fresh, the downstream branch can be
 skipped.
 

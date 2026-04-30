@@ -6,19 +6,19 @@ Troubleshooting Performance
 This page helps you diagnose common performance issues when running Cosmos.
 
 
-Measuring DAG parse time
+Measuring Dag parse time
 +++++++++++++++++++++++++
 
 Cosmos logs the time it takes to parse each dbt project at the ``INFO`` level. Search your Airflow scheduler or
-DAG processor logs for messages like:
+Dag processor logs for messages like:
 
 .. code-block:: text
 
-   Cosmos performance (my_dbt_dag) - [worker-1|12345]: It took 0.068s to parse the dbt project for DAG using LoadMode.DBT_LS_CACHE
+   Cosmos performance (my_dbt_dag) - [worker-1|12345]: It took 0.068s to parse the dbt project for Dag using LoadMode.DBT_LS_CACHE
 
 This tells you:
 
-- Which DAG was parsed (``my_dbt_dag``)
+- Which Dag was parsed (``my_dbt_dag``)
 - Which node and process performed the parse
 - How long parsing took (``0.068s``)
 - Which ``LoadMode`` was used (``LoadMode.DBT_LS_CACHE``)
@@ -26,11 +26,11 @@ This tells you:
 If the parse time is high, see :ref:`optimize-rendering` for strategies to reduce it.
 
 
-Airflow DAG processor configuration
+Airflow Dag processor configuration
 ++++++++++++++++++++++++++++++++++++
 
-The Airflow DAG processor controls how often and how quickly DAG files are parsed. Understanding these settings helps
-you diagnose issues where DAGs are slow to appear or update.
+The Airflow Dag processor controls how often and how quickly Dag files are parsed. Understanding these settings helps
+you diagnose issues where Dags are slow to appear or update.
 
 .. list-table::
    :header-rows: 1
@@ -40,7 +40,7 @@ you diagnose issues where DAGs are slow to appear or update.
      - Airflow 3 setting
      - Default
      - Airflow 2 setting
-   * - How often new DAG files are detected
+   * - How often new Dag files are detected
      - ``[dag_processor] refresh_interval``
      - 5 min
      - ``[scheduler] dag_dir_list_interval``
@@ -52,7 +52,7 @@ you diagnose issues where DAGs are slow to appear or update.
      - ``[dag_processor] parsing_processes``
      - 2
      - ``[scheduler] max_threads``
-   * - Maximum time to parse a single DAG file
+   * - Maximum time to parse a single Dag file
      - ``[dag_processor] dag_file_processor_timeout``
      - 50s
      - ``[core] dag_file_processor_timeout``
@@ -63,23 +63,23 @@ you diagnose issues where DAGs are slow to appear or update.
 
 .. note::
 
-   In Airflow 3, DAG processor settings moved from the ``[core]`` and ``[scheduler]`` sections to the
+   In Airflow 3, Dag processor settings moved from the ``[core]`` and ``[scheduler]`` sections to the
    ``[dag_processor]`` section. Environment variable overrides follow the same pattern:
    ``AIRFLOW__DAG_PROCESSOR__DAGBAG_IMPORT_TIMEOUT`` instead of ``AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT``.
 
 
-DAGs not appearing
+Dags not appearing
 ++++++++++++++++++
 
-If your ``DbtDag`` or ``DbtTaskGroup`` does not appear in Airflow, the most likely cause is that DAG parsing exceeds
+If your ``DbtDag`` or ``DbtTaskGroup`` does not appear in Airflow, the most likely cause is that Dag parsing exceeds
 the ``dagbag_import_timeout``.
 
 **Diagnosis steps:**
 
 1. Check the Cosmos parse time log (see above). If the time exceeds the ``dagbag_import_timeout`` (default 30s),
-   the DAG file will be silently dropped.
+   the Dag file will be silently dropped.
 
-2. Check the Airflow DAG processor logs for timeout or import errors related to your DAG file.
+2. Check the Airflow Dag processor logs for timeout or import errors related to your Dag file.
 
 **Solutions (in order of preference):**
 

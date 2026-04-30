@@ -40,8 +40,8 @@ Prerequisites
         * Cloud Run Admin API
         * BigQuery API
     4. A service account with BigQuery roles: `JobUser <https://cloud.google.com/iam/docs/understanding-roles#bigquery.jobUser>`_ and `DataEditor <https://cloud.google.com/iam/docs/understanding-roles#bigquery.dataEditor>`_
-6. Docker image built with required dbt project and dbt DAG
-7. dbt DAG with Cloud Run Job operators in the Airflow DAGs directory to run in Airflow
+6. Docker image built with required dbt project and dbt Dag
+7. dbt Dag with Cloud Run Job operators in the Airflow Dags directory to run in Airflow
 
 .. note::
 
@@ -220,11 +220,11 @@ Now, when you have the required Google Cloud infrastructure, you still need to c
 
 Check out an `example <https://github.com/astronomer/cosmos-example/blob/main/airflow_settings.yaml>`_ of the ``airflow-settings.yml`` file. If you are using Astro CLI, filling in the right values here will be enough for this to work.
 
-**Setup and Trigger the DAG with Airflow**
+**Setup and Trigger the Dag with Airflow**
 
-Open `jaffle_shop_gcp_cloud_run_job <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_gcp_cloud_run_job.py>`_ DAG file and update ``GCP_PROJECT_ID`` and ``GCP_LOCATION`` constants with your GCP project id and project region.
+Open `jaffle_shop_gcp_cloud_run_job <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_gcp_cloud_run_job.py>`_ Dag file and update ``GCP_PROJECT_ID`` and ``GCP_LOCATION`` constants with your GCP project id and project region.
 
-When the DAG is configured, copy the ``dags`` directory from ``cosmos-example`` repo to your Airflow home:
+When the Dag is configured, copy the ``dags`` directory from ``cosmos-example`` repo to your Airflow home:
 
 .. code-block:: bash
 
@@ -242,7 +242,7 @@ Run Airflow:
 
 Log in to Airflow through a web browser ``http://localhost:8080/``, using the user ``airflow`` and the password described in the ``standalone_admin_password.txt`` file.
 
-Enable and trigger a run of the `jaffle_shop_gcp_cloud_run_job <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_gcp_cloud_run_job.py>`_ DAG. You will be able to see the following successful DAG run.
+Enable and trigger a run of the `jaffle_shop_gcp_cloud_run_job <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_gcp_cloud_run_job.py>`_ Dag. You will be able to see the following successful Dag run.
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_gcp_cloud_run_job.png
     :width: 800

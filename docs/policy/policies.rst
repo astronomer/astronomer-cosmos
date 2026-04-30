@@ -12,7 +12,7 @@ The following repositories constitute the codebases for the Astronomer Cosmos pr
 
 **Additional repositories / subprojects**
 
-- `cosmos-demo <https://github.com/astronomer/cosmos-demo>`_ - Example DAGs and demo project for Cosmos
+- `cosmos-demo <https://github.com/astronomer/cosmos-demo>`_ - Example Dags and demo project for Cosmos
 
 Note: There are no additional subproject codebases beyond the repositories listed above for OSPS-QA-04.01 compliance purposes.
 

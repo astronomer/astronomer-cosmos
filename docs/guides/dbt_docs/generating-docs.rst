@@ -34,7 +34,7 @@ You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upl
 
     from cosmos.operators import DbtDocsS3Operator
 
-    # then, in your DAG code:
+    # then, in your Dag code:
     generate_dbt_docs_aws = DbtDocsS3Operator(
         task_id="generate_dbt_docs_aws",
         project_dir="path/to/jaffle_shop",
@@ -61,7 +61,7 @@ Requirements specific to Kubernetes:
 - The container image must have the AWS CLI available because Cosmos uploads the generated docs with ``aws s3 sync``.
 - The Pod still needs the database credentials and any other secrets required to run ``dbt docs generate``.
 
-The following example extends the Kubernetes example DAG and uploads the generated docs to S3:
+The following example extends the Kubernetes example Dag and uploads the generated docs to S3:
 
 .. literalinclude:: ../../../dev/dags/jaffle_shop_kubernetes.py
    :language: python
@@ -84,7 +84,7 @@ You can use the :class:`~cosmos.operators.DbtDocsAzureStorageOperator` to genera
 
     from cosmos.operators import DbtDocsAzureStorageOperator
 
-    # then, in your DAG code:
+    # then, in your Dag code:
     generate_dbt_docs_azure = DbtDocsAzureStorageOperator(
         task_id="generate_dbt_docs_azure",
         project_dir="path/to/jaffle_shop",
@@ -105,7 +105,7 @@ You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and up
 
     from cosmos.operators import DbtDocsGCSOperator
 
-    # then, in your DAG code:
+    # then, in your Dag code:
     generate_dbt_docs_gcs = DbtDocsGCSOperator(
         task_id="generate_dbt_docs_gcs",
         project_dir="path/to/jaffle_shop",
@@ -138,7 +138,7 @@ The following code snippet shows how to provide this flag with the default jaffl
 
     from cosmos.operators import DbtDocsGCSOperator
 
-    # then, in your DAG code:
+    # then, in your Dag code:
     generate_dbt_docs_gcs = DbtDocsGCSOperator(
         task_id="generate_dbt_docs_gcs",
         project_dir="path/to/jaffle_shop",
@@ -185,7 +185,7 @@ If you want to run custom code after the docs are generated, you can use the :cl
         pass
 
 
-    # then, in your DAG code:
+    # then, in your Dag code:
     generate_dbt_docs = DbtDocsOperator(
         task_id="generate_dbt_docs",
         project_dir="path/to/jaffle_shop",

@@ -215,7 +215,7 @@ Compatibility will depend on the managed Airflow system, as each one works diffe
 For example, Astronomer does not update the resources available to the webserver instance when ``--dags`` is specified during deployment, meaning that the dbt dcs will not be updated when this flag is used.
 
 .. note::
-    Managed Airflow on Astronomer Cloud does not provide the webserver access to the DAGs folder.
+    Managed Airflow on Astronomer Cloud does not provide the webserver access to the Dags folder.
     If you want to host your docs in local storage with Astro, you should host them in a directory other than ``dags/``.
     For example, you can set your ``AIRFLOW__COSMOS__DBT_DOCS_DIR`` to ``/usr/local/airflow/dbt_docs_dir`` with the following pre-deployment script:
 

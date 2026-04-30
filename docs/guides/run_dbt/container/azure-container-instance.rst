@@ -34,8 +34,8 @@ Prerequisites
     2. A service principal with `Contributor` permissions on the resource group
     3. A Container Registry
     4. A Postgres instance accessible from Azure. (we use an Azure Postgres instance in the example)
-6. Docker image built with required dbt project and dbt DAG
-7. dbt DAG with dbt Azure Container Instance operators in the Airflow DAGs directory to run in Airflow
+6. Docker image built with required dbt project and dbt Dag
+7. dbt Dag with dbt Azure Container Instance operators in the Airflow Dags directory to run in Airflow
 
 More information on how to achieve 2-6 is detailed below.
 
@@ -74,7 +74,7 @@ In order to run a container in Azure Container Instance, it needs access to the 
 
 **Build the dbt Docker image**
 
-For the Docker operators to work, you need to create a docker image that will be supplied as image parameter to the dbt docker operators used in the DAG.
+For the Docker operators to work, you need to create a docker image that will be supplied as image parameter to the dbt docker operators used in the Dag.
 
 Clone the `cosmos-example <https://github.com/astronomer/cosmos-example.git>`_ repo
 
@@ -146,7 +146,7 @@ Run Airflow
 
 Log in to Airflow through a web browser ``http://localhost:8080/``, using the user ``airflow`` and the password described in the ``standalone_admin_password.txt`` file.
 
-Enable and trigger a run of the `jaffle_shop_azure_container_instance <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_azure_container_instance.py>`_ DAG. You will be able to see the following successful DAG run.
+Enable and trigger a run of the `jaffle_shop_azure_container_instance <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_azure_container_instance.py>`_ Dag. You will be able to see the following successful Dag run.
 
 .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_azure_container_instance.png
     :width: 800

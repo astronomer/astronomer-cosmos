@@ -25,12 +25,12 @@ Caching the dbt ls output
 (Introduced in Cosmos 1.5)
 
 While parsing a dbt project using `LoadMode.DBT_LS <./parsing-methods.html#dbt-ls>`_, Cosmos uses subprocess to run ``dbt ls``.
-This operation can be very costly; it can increase the DAG parsing times and affect not only the scheduler DAG processing but
+This operation can be very costly; it can increase the Dag parsing times and affect not only the scheduler Dag processing but
 also the tasks queueing time.
 
 Cosmos 1.5 introduced a feature to mitigate the performance issue associated with ``LoadMode.DBT_LS`` by caching the output
 of this command as an  `Airflow Variable <https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/variables.html>`_.
-Based on an initial `analysis <https://github.com/astronomer/astronomer-cosmos/pull/1014>`_, enabling this setting reduced some DAGs task queueing from 30s to 0s. Additionally, some users `reported improvements of 84% <https://github.com/astronomer/astronomer-cosmos/pull/1014#issuecomment-2168185343>`_ in the DAG run time.
+Based on an initial `analysis <https://github.com/astronomer/astronomer-cosmos/pull/1014>`_, enabling this setting reduced some Dags task queueing from 30s to 0s. Additionally, some users `reported improvements of 84% <https://github.com/astronomer/astronomer-cosmos/pull/1014#issuecomment-2168185343>`_ in the Dag run time.
 
 This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS=0``.
 
@@ -56,7 +56,7 @@ Cosmos will refresh the cache in a few circumstances:
 
 To evaluate if the dbt project changed, it calculates the changes using a few of the MD5 of all the files in the directory.
 
-Additionally, if any of the following DAG configurations are changed, we'll automatically purge the cache of the DAGs that use that specific configuration:
+Additionally, if any of the following Dag configurations are changed, we'll automatically purge the cache of the Dags that use that specific configuration:
 
 * ``ProjectConfig.dbt_vars``
 * ``ProjectConfig.env_vars``
@@ -80,9 +80,9 @@ Example:
 
 Not rarely, Cosmos DbtDags and DbtTaskGroups may be renamed or deleted. In those cases, to clean up the Airflow metadata database, it is possible to use the method ``delete_unused_dbt_ls_cache``.
 
-The method deletes the Cosmos cache stored in Airflow Variables based on the last execution of their associated DAGs.
+The method deletes the Cosmos cache stored in Airflow Variables based on the last execution of their associated Dags.
 
-As an example, the following clean-up DAG will delete any cache associated with Cosmos that has not been used for the last five days:
+As an example, the following clean-up Dag will delete any cache associated with Cosmos that has not been used for the last five days:
 
 .. literalinclude:: ../../dev/dags/example_cosmos_cleanup_dag.py
     :language: python
@@ -92,12 +92,12 @@ As an example, the following clean-up DAG will delete any cache associated with 
 **Cache key**
 
 The Airflow variables that represent the dbt ls cache are prefixed by ``cosmos_cache``.
-When using ``DbtDag``, the keys use the DAG name. When using ``DbtTaskGroup``, they contain the ``TaskGroup`` and parent task groups and DAG.
+When using ``DbtDag``, the keys use the Dag name. When using ``DbtTaskGroup``, they contain the ``TaskGroup`` and parent task groups and Dag.
 
 Examples:
 
 * The ``DbtDag`` "cosmos_dag" will have the cache represented by "cosmos_cache__basic_cosmos_dag".
-* The ``DbtTaskGroup`` "customers" declared inside the DAG "basic_cosmos_task_group" will have the cache key "cosmos_cache__basic_cosmos_task_group__customers".
+* The ``DbtTaskGroup`` "customers" declared inside the Dag "basic_cosmos_task_group" will have the cache key "cosmos_cache__basic_cosmos_task_group__customers".
 
 **Cache value**
 
@@ -106,7 +106,7 @@ The cache values contain a few properties:
 * ``last_modified`` timestamp, represented using the ISO 8601 format.
 * ``version`` is a hash that represents the version of the dbt project and arguments used to run dbt ls by the time Cosmos created the cache
 * ``dbt_ls_compressed`` represents the dbt ls output compressed using zlib and encoded to base64 so Cosmos can record the value as a compressed string in the Airflow metadata database.
-* ``dag_id`` is the DAG associated to this cache
+* ``dag_id`` is the Dag associated to this cache
 * ``task_group_id`` is the TaskGroup associated to this cache
 * ``cosmos_type`` is either ``DbtDag`` or ``DbtTaskGroup``
 
@@ -116,7 +116,7 @@ Caching the YAML selectors
 (Introduced in Cosmos 1.13)
 
 While parsing a dbt project using `LoadMode.DBT_MANIFEST <./parsing-methods.html#dbt-manifest>`_, if a ``selector`` argument is provided to the `RenderConfig <./render-config.html>`_ instance passed to the ``DbtDag`` or ``DbtTaskGroup``,
-Cosmos will parse the preprocessed YAML selectors found in the manifest. The YAML selectors will be parsed into selection criteria that Cosmos will use to filter the dbt nodes to include in the Airflow DAG. The parsed selectors will be cached to improve performance during DAG parsing.
+Cosmos will parse the preprocessed YAML selectors found in the manifest. The YAML selectors will be parsed into selection criteria that Cosmos will use to filter the dbt nodes to include in the Airflow Dag. The parsed selectors will be cached to improve performance during Dag parsing.
 
 This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS=0``.
 
@@ -157,9 +157,9 @@ Example:
 
 Not rarely, Cosmos DbtDags and DbtTaskGroups may be renamed or deleted. In those cases, to clean up the Airflow metadata database, it is possible to use the method ``delete_unused_dbt_yaml_selectors_cache``.
 
-The method deletes the Cosmos cache stored in Airflow Variables based on the last execution of their associated DAGs.
+The method deletes the Cosmos cache stored in Airflow Variables based on the last execution of their associated Dags.
 
-As an example, the following clean-up DAG will delete any cache associated with Cosmos that has not been used for the last five days:
+As an example, the following clean-up Dag will delete any cache associated with Cosmos that has not been used for the last five days:
 
 .. literalinclude:: ../../dev/dags/example_cosmos_cleanup_dag.py
     :language: python
@@ -168,17 +168,17 @@ As an example, the following clean-up DAG will delete any cache associated with 
 
 .. warning::
     Because the backing Airflow Variable is shared between the dbt ls cache and the YAML selectors cache, delete methods for the non-remote cache delete the same Airflow Variable.
-    In other words, if you call ``delete_unused_dbt_ls_cache``, it will also delete the YAML selectors cache for the same DAG or TaskGroup, and vice versa, and calling ``delete_unused_dbt_yaml_selectors_cache`` will delete the corresponding dbt ls cache.
+    In other words, if you call ``delete_unused_dbt_ls_cache``, it will also delete the YAML selectors cache for the same Dag or TaskGroup, and vice versa, and calling ``delete_unused_dbt_yaml_selectors_cache`` will delete the corresponding dbt ls cache.
 
 **Cache key**
 
 The Airflow variables that represent the yaml selectors cache are prefixed by ``cosmos_cache``.
-When using ``DbtDag``, the keys use the DAG name. When using ``DbtTaskGroup``, they contain the ``TaskGroup`` and parent task groups and DAG.
+When using ``DbtDag``, the keys use the Dag name. When using ``DbtTaskGroup``, they contain the ``TaskGroup`` and parent task groups and Dag.
 
 Examples:
 
 * The ``DbtDag`` "cosmos_dag" will have the cache represented by "cosmos_cache__basic_cosmos_dag".
-* The ``DbtTaskGroup`` "customers" declared inside the DAG "basic_cosmos_task_group" will have the cache key "cosmos_cache__basic_cosmos_task_group__customers".
+* The ``DbtTaskGroup`` "customers" declared inside the Dag "basic_cosmos_task_group" will have the cache key "cosmos_cache__basic_cosmos_task_group__customers".
 
 **Cache value**
 
@@ -188,7 +188,7 @@ The cache values contain a few properties:
 * ``version`` is a hash that represents the version of the dbt project, the raw YAML selectors, and a hash of the YAML selector parser implementation version combined with the keys specified by ``airflow_vars_to_purge_dbt_yaml_selectors_cache``
 * ``raw_selectors_compressed`` represents the raw YAML selector definitions compressed using zlib and encoded to base64
 * ``parsed_selectors_compressed`` represents the parsed YAML selector definitions compressed using zlib and encoded to base64
-* ``dag_id`` is the DAG associated to this cache
+* ``dag_id`` is the Dag associated to this cache
 * ``task_group_id`` is the TaskGroup associated to this cache
 * ``cosmos_type`` is either ``DbtDag`` or ``DbtTaskGroup``
 

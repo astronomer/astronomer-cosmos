@@ -956,7 +956,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
     template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
@@ -1003,7 +1003,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                 task_group_id = kwargs.get("task_group")
 
                 # issue-1591: Handle passed-in outlets when enable_dataset_alias is True
-                outlets: list = []
+                outlets: list[DatasetAlias] | list[DatasetAliasModel] = []
 
                 for outlet in kwargs.get("outlets", []):
                     if isinstance(outlet, DatasetAlias):

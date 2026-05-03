@@ -50,6 +50,25 @@ def mock_bigquery_conn_with_dict(request):  # type: ignore
         yield conn
 
 
+@pytest.fixture(params=get_fixture_params())
+def mock_bigquery_conn_extra__gcp__project_with_dict(request):  # type: ignore
+    """
+    Mocks and returns an Airflow BigQuery connection with extra__google_cloud_platform__project.
+    """
+    extra = {
+        "dataset": "my_dataset",
+        "extra__google_cloud_platform__project": "my_project",  # Update key
+        request.param.keyfile_json_extra_key: request.param.keyfile_dict,
+    }
+    conn = Connection(
+        conn_id="my_bigquery_connection",
+        conn_type="google_cloud_platform",
+        extra=json.dumps(extra),
+    )
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        yield conn
+
+
 def test_bigquery_mapping_selected(mock_bigquery_conn_with_dict: Connection):
     profile_mapping = get_automatic_profile_mapping(
         mock_bigquery_conn_with_dict.conn_id,
@@ -72,6 +91,26 @@ def test_connection_claiming_fails(mock_bigquery_conn_with_dict: Connection):
 
 def test_profile(mock_bigquery_conn_with_dict: Connection):
     profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_with_dict, {})
+    expected = {
+        "type": "bigquery",
+        "method": "service-account-json",
+        "project": "my_project",
+        "dataset": "my_dataset",
+        "threads": 1,
+        "keyfile_json": {
+            "type": "service_account",
+            "private_key_id": "{{ env_var('COSMOS_CONN_GOOGLE_CLOUD_PLATFORM_PRIVATE_KEY_ID') }}",
+            "private_key": "{{ env_var('COSMOS_CONN_GOOGLE_CLOUD_PLATFORM_PRIVATE_KEY') }}",
+        },
+    }
+    assert profile_mapping.profile == expected
+
+
+def test_extra__gcp__project(mock_bigquery_conn_extra__gcp__project_with_dict: Connection):
+    """
+    Validate that using extra__google_cloud_platform__project properly sets the project field.
+    """
+    profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_extra__gcp__project_with_dict, {})
     expected = {
         "type": "bigquery",
         "method": "service-account-json",

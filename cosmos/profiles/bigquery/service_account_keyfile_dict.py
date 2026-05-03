@@ -32,7 +32,7 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
     secret_fields = ["private_key_id", "private_key"]
 
     airflow_param_mapping = {
-        "project": "extra.project",
+        "project": ["extra.project", "extra__google_cloud_platform__project"],
         # multiple options for dataset because of older Airflow versions
         "dataset": "extra.dataset",
         # multiple options for keyfile_dict param name because of older Airflow versions

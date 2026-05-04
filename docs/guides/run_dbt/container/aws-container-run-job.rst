@@ -176,7 +176,7 @@ For example:
    .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_aws_ecs_dag_run_logs.png
     :width: 800
 
-   Remember to config your Dag for connecting to AWS ECS and the database connection where you are performing your SQL queries!
+   Remember to configure your Dag for connecting to AWS ECS and the database connection where you are performing your SQL queries!
 
 
 **Monitor and Debug Your Job**

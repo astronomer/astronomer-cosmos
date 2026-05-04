@@ -205,7 +205,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 **Default**: ``False``
 
 
-7. Enable Task Profiling with Debug Mode
+7. Enable task profiling with debug mode
 ++++++++++++++++++++++++++++++++++++++++
 
 **Impact**: Low - Provides visibility into memory usage patterns to help identify optimization opportunities and prevent OOM issues.

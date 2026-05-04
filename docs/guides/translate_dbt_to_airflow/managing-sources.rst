@@ -37,7 +37,7 @@ Example:
     )
 
 
-Source Pruning
+Source pruning
 ++++++++++++++
 
 The ``source_pruning`` is a boolean parameter available in the ``RenderConfig``.

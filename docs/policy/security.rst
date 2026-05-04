@@ -1,7 +1,7 @@
 Cosmos security
 ---------------
 
-Security Policy
+Security policy
 +++++++++++++++
 
 Check the project's `Security Policy <https://github.com/astronomer/astronomer-cosmos/blob/main/SECURITY.rst>`_ to learn

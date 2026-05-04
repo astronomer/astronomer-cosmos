@@ -18,7 +18,7 @@ Committers
 - Tatiana Al-Chueyr (`@tatiana <https://github.com/tatiana>`_)
 
 
-Emeritus Committers
+Emeritus committers
 +++++++++++++++++++
 
 - Chris Hronek (`@chrishronek <https://github.com/chrishronek>`_)

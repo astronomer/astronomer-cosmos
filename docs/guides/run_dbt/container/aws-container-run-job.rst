@@ -201,5 +201,3 @@ By following this guide, you can deploy Astronomer Cosmos jobs on AWS ECS using 
 For more detailed information on AWS ECS, please refer to the `AWS ECS Developer Guide <https://docs.aws.amazon.com/AmazonECS/latest/developerguide/Welcome.html>`_.
 
 Happy deploying! :rocket:
-
-

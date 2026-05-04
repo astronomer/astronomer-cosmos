@@ -14,7 +14,6 @@ This execution mode is ideal for users who:
 * Need to run dbt in isolated Kubernetes pods
 * Prefer not to install dbt in their `Apache Airflow® <https://airflow.apache.org/>`_ deployment
 
--------------------------------------------------------------------------------
 
 Background
 ++++++++++
@@ -25,7 +24,6 @@ However, the original ``ExecutionMode.WATCHER`` requires dbt to be installed alo
 
 For more details on the watcher concept and how it works, please refer to the :ref:`watcher-execution-mode` documentation.
 
--------------------------------------------------------------------------------
 
 How to Use
 ++++++++++
@@ -62,7 +60,6 @@ The following example shows how to configure a ``DbtDag`` with ``ExecutionMode.W
 
 For the complete setup including Kubernetes secrets, Docker image configuration, and profile setup, refer to the :ref:`kubernetes` documentation.
 
--------------------------------------------------------------------------------
 
 Performance Gains
 +++++++++++++++++
@@ -85,7 +82,6 @@ The performance improvement comes from:
 * Leveraging dbt's native threading capabilities
 * Eliminating repeated dbt initialization for each model
 
--------------------------------------------------------------------------------
 
 Known Limitations
 +++++++++++++++++
@@ -173,7 +169,6 @@ For more details on these limitations, refer to the :ref:`watcher-execution-mode
 
 Additionally, the limitations from ``ExecutionMode.KUBERNETES`` also apply to ``ExecutionMode.WATCHER_KUBERNETES``. For details, refer to the :ref:`kubernetes-known-limitations` documentation.
 
--------------------------------------------------------------------------------
 
 Example DAG
 +++++++++++
@@ -183,7 +178,6 @@ Below is a complete example of a DAG using ``ExecutionMode.WATCHER_KUBERNETES``:
 .. literalinclude:: ../../../../dev/dags/jaffle_shop_watcher_kubernetes.py
     :language: python
 
--------------------------------------------------------------------------------
 
 Prerequisites
 +++++++++++++
@@ -196,7 +190,6 @@ Before using ``ExecutionMode.WATCHER_KUBERNETES``, ensure you have:
 
 For detailed setup instructions, refer to the :ref:`kubernetes` documentation.
 
--------------------------------------------------------------------------------
 
 Summary
 +++++++

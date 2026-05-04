@@ -42,10 +42,20 @@ Glossary
        Describes where and how Cosmos runs dbt commands (e.g. ``LOCAL``, ``WATCHER``, ``DOCKER``).
        Configured via ``ExecutionConfig``. See :ref:`execution-modes`.
 
+   Interceptors
+       An optional list of callables (new in Cosmos 1.14) that run before Cosmos builds the dbt
+       command for each task. Each callable receives ``(context, operator)`` and may modify
+       ``operator.vars`` and ``operator.env``; the modified values are then used when building and
+       running the dbt command. Useful for injecting runtime variables or environment values per task
+       run. Configured via ``operator_args={"interceptors": [...]}`` on ``DbtDag`` or ``DbtTaskGroup``.
+       See :ref:`operator-args`.
+
    InvocationMode
        Controls how Cosmos calls dbt: ``DBT_RUNNER`` imports dbt as a Python library in the same
-       process (faster, no subprocess overhead), while ``SUBPROCESS`` spawns a separate process
-       (better isolation when dbt and Airflow share a Python environment).
+       process (no subprocess overhead, lower CPU and memory usage), while ``SUBPROCESS`` spawns a
+       separate process (better isolation when dbt and Airflow share a Python environment).
+       Running as a subprocess roughly doubles memory usage compared to ``DBT_RUNNER``.
+       See :ref:`invocation-mode`.
 
    LoadMode
        The method Cosmos uses to parse your dbt project (e.g. ``DBT_MANIFEST``, ``DBT_LS``).
@@ -57,8 +67,10 @@ Glossary
        See `Manifest JSON file <https://docs.getdbt.com/reference/artifacts/manifest-json>`_ in the dbt docs.
 
    Partial parsing
-       A dbt feature that can greatly speed up parsing and execution when using the ``dbt_ls`` load mode
-       by only re-parsing files that have changed. See :ref:`partial-parsing`.
+       A dbt feature, enabled in Cosmos since v1.4, that skips re-parsing files that have not
+       changed. Each Airflow node performs a full dbt project parse only once; subsequent task runs
+       reuse the cached ``partial_parse.msgpack`` artifact, reducing parse time and CPU usage.
+       See :ref:`partial-parsing`.
 
    Profile
        The authentication information used by dbt to connect to your data warehouse.

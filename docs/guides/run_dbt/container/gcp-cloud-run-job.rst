@@ -238,7 +238,7 @@ Run Airflow:
 
 .. note::
 
-    You might need to run airflow standalone with ``sudo`` if your Airflow user is not able to access the docker socket URL or pull the images in the Kind cluster.
+    You might need to run airflow standalone with ``sudo`` if your Airflow user is not able to access the Docker socket URL or pull the images in the Kind cluster.
 
 Log in to Airflow through a web browser ``http://localhost:8080/``, using the user ``airflow`` and the password described in the ``standalone_admin_password.txt`` file.
 

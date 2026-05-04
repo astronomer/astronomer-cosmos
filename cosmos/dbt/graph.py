@@ -683,7 +683,7 @@ class DbtGraph:
         self._add_vars_arg(deps_command)
         run_command(deps_command, dbt_project_path, env, self.render_config.invocation_mode, self.log_dir)
 
-    def _copy_or_create_symbolic_links(self, source_dir_path: Path, dest_dir_path: Path) -> None:
+    def _copy_or_create_symbolic_links(self, source_dir_path: Path, dest_dir_path: Path) -> Path:
         """
         This method handles creating symbolic links and/or copying files from the original file to a destination folder.
 
@@ -710,6 +710,8 @@ class DbtGraph:
 
         The current settings make sense for Cosmos 1.x and allow users to set things in different ways, while being backwards
         compatible. We should review this for Cosmos 2.x.
+
+        :returns: The effective project directory inside dest_dir_path (may differ when external model paths are used).
         """
 
         should_not_create_dbt_deps_symbolic_link = self.should_install_dbt_deps or self.project.copy_dbt_packages
@@ -731,10 +733,17 @@ class DbtGraph:
         # C. (Non-practical) Middle performance and deps may become outdated: Users manage `dbt deps` outside of Cosmos and give pre-generated dbt packages. Dependencies may become outdated. More expensive than A, similar behaviour.
         # D. Middle performance and up-to-date deps: Users run `dbt deps` outside of Cosmos and give pre-generated dbt packages. Cosmos runs dbt deps taking into account those user-generated files.
 
-        create_symlinks(source_dir_path, dest_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link)
+        effective_dir = create_symlinks(
+            source_dir_path,
+            dest_dir_path,
+            ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link,
+            model_relative_paths=self.project.model_relative_paths,
+        )
 
         if self.project.copy_dbt_packages:
-            copy_dbt_packages(source_dir_path, dest_dir_path)
+            copy_dbt_packages(source_dir_path, effective_dir)
+
+        return effective_dir
 
     def load_via_dbt_ls_without_cache(self) -> None:
         """
@@ -759,7 +768,7 @@ class DbtGraph:
             logger.debug(f"Content of the dbt project dir {project_path}: `{os.listdir(project_path)}`")
             tmpdir_path = Path(tmpdir)
 
-            self._copy_or_create_symbolic_links(project_path, tmpdir_path)
+            effective_dir = self._copy_or_create_symbolic_links(project_path, tmpdir_path)
 
             latest_partial_parse = None
             if self.project.partial_parse:
@@ -770,7 +779,7 @@ class DbtGraph:
 
             if latest_partial_parse is not None and latest_partial_parse.exists():
                 logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
-                cache._copy_partial_parse_to_project(latest_partial_parse, tmpdir_path)
+                cache._copy_partial_parse_to_project(latest_partial_parse, effective_dir)
 
             with (
                 self.profile_config.ensure_profile(
@@ -784,7 +793,7 @@ class DbtGraph:
 
                 self.local_flags = [
                     "--project-dir",
-                    str(tmpdir),
+                    str(effective_dir),
                     "--profiles-dir",
                     str(profile_path.parent),
                     "--profile",
@@ -793,25 +802,25 @@ class DbtGraph:
                     self.profile_config.target_name,
                 ]
 
-                self.target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or tmpdir_path / DBT_TARGET_DIR_NAME)
+                self.target_dir = Path(env.get(DBT_TARGET_PATH_ENVVAR) or effective_dir / DBT_TARGET_DIR_NAME)
                 env[DBT_TARGET_PATH_ENVVAR] = str(self.target_dir)
 
-                self.log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or tmpdir_path / DBT_LOG_DIR_NAME)
+                self.log_dir = Path(env.get(DBT_LOG_PATH_ENVVAR) or effective_dir / DBT_LOG_DIR_NAME)
                 env[DBT_LOG_PATH_ENVVAR] = str(self.log_dir)
 
                 if self.should_install_dbt_deps and has_non_empty_dependencies_file(self.project_path):
                     if is_cache_package_lockfile_enabled(project_path):
                         latest_package_lockfile = _get_latest_cached_package_lockfile(project_path)
                         if latest_package_lockfile:
-                            _copy_cached_package_lockfile_to_project(latest_package_lockfile, tmpdir_path)
-                    self.run_dbt_deps(dbt_cmd, tmpdir_path, env)
+                            _copy_cached_package_lockfile_to_project(latest_package_lockfile, effective_dir)
+                    self.run_dbt_deps(dbt_cmd, effective_dir, env)
 
-                nodes = self.run_dbt_ls(dbt_cmd, self.project_path, tmpdir_path, env)
+                nodes = self.run_dbt_ls(dbt_cmd, self.project_path, effective_dir, env)
                 self.nodes = nodes
                 self.filtered_nodes = nodes
 
             if self.should_use_partial_parse_cache():
-                partial_parse_file = get_partial_parse_path(tmpdir_path)
+                partial_parse_file = get_partial_parse_path(effective_dir)
                 if partial_parse_file.exists() and self.cache_dir:
                     cache._update_partial_parse_cache(partial_parse_file, self.cache_dir)
 

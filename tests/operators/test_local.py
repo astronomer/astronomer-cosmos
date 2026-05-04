@@ -1783,8 +1783,10 @@ def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog
     )
     operator._clone_project(tmp_dir_path)
 
-    create_symlinks_mock.assert_called_once_with(project_dir, tmp_dir_path, ignore_dbt_packages=True)
-    copy_dbt_packages_mock.assert_called_once_with(project_dir, tmp_dir_path)
+    create_symlinks_mock.assert_called_once_with(
+        project_dir, tmp_dir_path, ignore_dbt_packages=True, model_relative_paths=None
+    )
+    copy_dbt_packages_mock.assert_called_once_with(project_dir, create_symlinks_mock.return_value)
 
     assert f"Cloning project to writable temp directory {tmp_dir_path} from {project_dir}" in caplog.text
     assert "Copying dbt packages to temporary folder." in caplog.text

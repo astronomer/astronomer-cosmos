@@ -5,8 +5,9 @@ The ``cosmos.config.ProjectConfig`` allows you to specify information about wher
 variables that should be used for rendering and execution. It takes the following arguments:
 
 - ``dbt_project_path``: The full path to your dbt project. This directory should have a ``dbt_project.yml`` file
-- ``models_relative_path``: The path to your models directory, relative to the ``dbt_project_path``. This defaults to
-  ``models/``
+- ``models_relative_path``: The path to your models directory, relative to the ``dbt_project_path``. Accepts a single
+  path or a list of paths, mirroring dbt's ``model-paths`` configuration. When a list is provided, all paths are
+  validated and symlinked during DAG parsing and task execution. This defaults to ``models/``
 - ``seeds_relative_path``: The path to your seeds directory, relative to the ``dbt_project_path``. This defaults to
   ``data/``
 - ``snapshots_relative_path``: The path to your snapshots directory, relative to the ``dbt_project_path``. This defaults
@@ -49,4 +50,10 @@ Project Config Example
             "start_time": "{{ data_interval_start.strftime('%Y%m%d%H%M%S') }}",
             "end_time": "{{ data_interval_end.strftime('%Y%m%d%H%M%S') }}",
         },
+    )
+
+    # Multiple model paths (mirrors dbt's model-paths configuration)
+    config_with_multiple_model_paths = ProjectConfig(
+        dbt_project_path="/path/to/dbt/project",
+        models_relative_path=["models", "../shared_sources"],
     )

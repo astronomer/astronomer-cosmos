@@ -24,11 +24,39 @@ def test_init_with_project_path_only():
     project_config = ProjectConfig(dbt_project_path="path/to/dbt/project")
     assert project_config.dbt_project_path == Path("path/to/dbt/project")
     assert project_config.models_path == Path("path/to/dbt/project/models")
+    assert project_config.models_paths == [Path("path/to/dbt/project/models")]
     assert project_config.seeds_path == Path("path/to/dbt/project/seeds")
     assert project_config.snapshots_path == Path("path/to/dbt/project/snapshots")
     assert project_config.project_name == "project"
     assert project_config.manifest_path is None
     assert project_config.install_dbt_deps is True
+
+
+def test_init_with_multiple_model_paths():
+    """
+    Passing a list of model-relative paths should set models_path to the first entry
+    and models_paths to all resolved entries.
+    """
+    project_config = ProjectConfig(
+        dbt_project_path="path/to/dbt/project",
+        models_relative_path=["models", "../shared_sources"],
+    )
+    assert project_config.models_path == Path("path/to/dbt/project/models")
+    assert project_config.models_paths == [
+        Path("path/to/dbt/project/models"),
+        Path("path/to/dbt/project/../shared_sources"),
+    ]
+    assert project_config.model_relative_paths == ["models", "../shared_sources"]
+
+
+def test_init_with_single_model_path_normalizes_to_list():
+    """
+    Passing a single string for models_relative_path should normalize model_relative_paths to a single-element list.
+    """
+    project_config = ProjectConfig(dbt_project_path="path/to/dbt/project", models_relative_path="custom_models")
+    assert project_config.models_path == Path("path/to/dbt/project/custom_models")
+    assert project_config.models_paths == [Path("path/to/dbt/project/custom_models")]
+    assert project_config.model_relative_paths == ["custom_models"]
 
 
 def test_init_with_project_path_and_install_dbt_deps_succeeds():

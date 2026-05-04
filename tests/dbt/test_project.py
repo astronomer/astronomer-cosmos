@@ -7,6 +7,7 @@ import yaml
 
 from cosmos.constants import DBT_DEFAULT_PACKAGES_FOLDER, DBT_PROJECT_FILENAME, PACKAGE_LOCKFILE_YML
 from cosmos.dbt.project import (
+    _get_external_model_paths,
     change_working_directory,
     copy_dbt_packages,
     copy_manifest_file_if_exists,
@@ -83,10 +84,71 @@ def test_create_symlinks(tmp_path):
     tmp_dir = tmp_path / "dbt-project"
     tmp_dir.mkdir()
 
-    create_symlinks(DBT_PROJECTS_ROOT_DIR / "altered_jaffle_shop", tmp_dir, False)
+    effective_dir = create_symlinks(DBT_PROJECTS_ROOT_DIR / "altered_jaffle_shop", tmp_dir, False)
+    assert effective_dir == tmp_dir
     for child in tmp_dir.iterdir():
         assert child.is_symlink()
         assert child.name not in ("logs", "target", "profiles.yml", "dbt_packages")
+
+
+def test_create_symlinks_with_internal_model_paths(tmp_path):
+    """When all model paths are inside the project root, behavior is unchanged."""
+    tmp_dir = tmp_path / "dbt-project"
+    tmp_dir.mkdir()
+
+    effective_dir = create_symlinks(
+        DBT_PROJECTS_ROOT_DIR / "altered_jaffle_shop",
+        tmp_dir,
+        False,
+        model_relative_paths=["models"],
+    )
+    assert effective_dir == tmp_dir
+
+
+def test_create_symlinks_with_external_model_paths(tmp_path):
+    """When model paths point outside the project root, symlinks are created for them."""
+    project_dir = tmp_path / "workspace" / "my_project"
+    project_dir.mkdir(parents=True)
+    (project_dir / "models").mkdir()
+    (project_dir / "dbt_project.yml").write_text("name: test")
+
+    external_sources = tmp_path / "workspace" / "shared_sources"
+    external_sources.mkdir()
+    (external_sources / "source_file.yml").write_text("version: 2")
+
+    tmp_dir = tmp_path / "tmpdir"
+    tmp_dir.mkdir()
+
+    effective_dir = create_symlinks(
+        project_dir,
+        tmp_dir,
+        ignore_dbt_packages=False,
+        model_relative_paths=["models", "../shared_sources"],
+    )
+
+    assert effective_dir == tmp_dir / "my_project"
+    assert effective_dir.exists()
+    assert (effective_dir / "models").is_symlink()
+    assert (effective_dir / "dbt_project.yml").is_symlink()
+
+    external_symlink = (effective_dir / ".." / "shared_sources").resolve()
+    assert external_symlink.exists()
+    assert external_symlink.is_dir()
+
+
+def test_get_external_model_paths(tmp_path):
+    """_get_external_model_paths correctly identifies paths outside the project root."""
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    result = _get_external_model_paths(project_dir, ["models", "../shared", "subdir/models"])
+    assert result == ["../shared"]
+
+
+def test_get_external_model_paths_none():
+    """_get_external_model_paths returns empty list for None input."""
+    result = _get_external_model_paths(Path("/some/path"), None)
+    assert result == []
 
 
 @patch.dict(os.environ, {"VAR1": "value1", "VAR2": "value2"})

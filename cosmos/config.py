@@ -163,7 +163,8 @@ class ProjectConfig:
     :param dbt_project_path: The path to the dbt project directory. Example: /path/to/dbt/project. Defaults to None
     :param install_dbt_deps: Run dbt deps during DAG parsing and task execution. Defaults to True.
     :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages (False by default).
-    :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
+    :param models_relative_path: The relative path(s) to the dbt models directory within the project. Accepts a single
+        path or a list of paths, mirroring dbt's ``model-paths`` configuration. Defaults to models
     :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
     :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to
     snapshots
@@ -186,16 +187,18 @@ class ProjectConfig:
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
     manifest_path: Path | ObjectStoragePath | None = None
     models_path: Path | None = None
+    models_paths: list[Path] | None = None
     seeds_path: Path | None = None
     snapshots_path: Path | None = None
     project_name: str
+    model_relative_paths: list[str | Path] | None = None
 
     def __init__(
         self,
         dbt_project_path: str | Path | None = None,
         install_dbt_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
-        models_relative_path: str | Path = "models",
+        models_relative_path: str | Path | list[str | Path] = "models",
         seeds_relative_path: str | Path = "seeds",
         snapshots_relative_path: str | Path = "snapshots",
         manifest_path: str | Path | None = None,
@@ -216,9 +219,16 @@ class ProjectConfig:
         if project_name:
             self.project_name = project_name
 
+        if isinstance(models_relative_path, list):
+            normalized_model_paths = models_relative_path
+        else:
+            normalized_model_paths = [models_relative_path]
+        self.model_relative_paths = normalized_model_paths
+
         if dbt_project_path:
             self.dbt_project_path = Path(dbt_project_path)
-            self.models_path = self.dbt_project_path / Path(models_relative_path)
+            self.models_paths = [self.dbt_project_path / Path(p) for p in normalized_model_paths]
+            self.models_path = self.models_paths[0]
             self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
             self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
             if not project_name:
@@ -268,12 +278,13 @@ class ProjectConfig:
         # map works correctly for all paths, thereby validating the project.
         if self.dbt_project_path:
             project_yml_path = self.dbt_project_path / "dbt_project.yml"
-            mandatory_paths.update(
-                {
-                    "dbt_project.yml": Path(project_yml_path) if project_yml_path else None,
-                    "models directory ": Path(self.models_path) if self.models_path else None,
-                }
-            )
+            mandatory_paths["dbt_project.yml"] = Path(project_yml_path) if project_yml_path else None
+            if self.models_paths:
+                for i, models_path in enumerate(self.models_paths):
+                    label = "models directory" if i == 0 else f"models directory ({models_path.name})"
+                    mandatory_paths[label] = Path(models_path) if models_path else None
+            elif self.models_path:
+                mandatory_paths["models directory"] = Path(self.models_path)
         if self.manifest_path:
             mandatory_paths["manifest"] = self.manifest_path
 

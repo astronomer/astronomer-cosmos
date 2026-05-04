@@ -110,16 +110,65 @@ def copy_manifest_file_if_exists(source_manifest: str | Path, dbt_project_folder
         shutil.copy(source_manifest, tmp_manifest_filepath)
 
 
-def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool) -> None:
-    """Helper function to create symlinks to the dbt project files."""
+def _get_external_model_paths(
+    project_path: Path, model_relative_paths: list[str | Path] | None
+) -> list[str | Path]:
+    """Return model relative paths that resolve to locations outside the project root."""
+    if not model_relative_paths:
+        return []
+    resolved_project = project_path.resolve()
+    external = []
+    for rel_path in model_relative_paths:
+        resolved = (project_path / rel_path).resolve()
+        try:
+            resolved.relative_to(resolved_project)
+        except ValueError:
+            external.append(rel_path)
+    return external
+
+
+def create_symlinks(
+    project_path: Path,
+    tmp_dir: Path,
+    ignore_dbt_packages: bool,
+    model_relative_paths: list[str | Path] | None = None,
+) -> Path:
+    """Helper function to create symlinks to the dbt project files.
+
+    When ``model_relative_paths`` contains paths that resolve outside the project root
+    (e.g. ``../shared_sources``), the project is nested inside ``tmp_dir`` so that
+    external symlinks remain within the temporary workspace for automatic cleanup.
+
+    :param project_path: The path to the real dbt project.
+    :param tmp_dir: The temporary directory to create symlinks in.
+    :param ignore_dbt_packages: Whether to skip symlinking the dbt_packages directory.
+    :param model_relative_paths: List of model-relative paths as configured in ProjectConfig.
+    :returns: The effective project directory inside ``tmp_dir``.
+    """
+    external_model_paths = _get_external_model_paths(project_path, model_relative_paths)
+
+    if external_model_paths:
+        effective_dir = tmp_dir / project_path.name
+        effective_dir.mkdir(exist_ok=True)
+    else:
+        effective_dir = tmp_dir
+
     ignore_paths = [DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, PACKAGE_LOCKFILE_YML, "profiles.yml"]
     if ignore_dbt_packages:
         dbt_packages_subpath = get_dbt_packages_subpath(project_path)
-        # this is linked to dbt deps so if dbt deps is true then ignore existing dbt_packages folder
         ignore_paths.append(dbt_packages_subpath)
     for child_name in os.listdir(project_path):
         if child_name not in ignore_paths:
-            os.symlink(project_path / child_name, tmp_dir / child_name)
+            os.symlink(project_path / child_name, effective_dir / child_name)
+
+    for rel_path in external_model_paths:
+        source = (project_path / rel_path).resolve()
+        target = (effective_dir / Path(rel_path)).resolve()
+        if source.exists() and not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(source, target)
+
+    return effective_dir
 
 
 def get_partial_parse_path(project_dir_path: Path) -> Path:

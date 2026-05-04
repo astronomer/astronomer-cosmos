@@ -196,6 +196,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
         dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]
+        model_relative_paths: list[str | Path] | None = None,
         **kwargs: Any,
     ) -> None:
         self.task_id = task_id
@@ -210,6 +211,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
         self._dbt_runner_callbacks = dbt_runner_callbacks
+        self.model_relative_paths = model_relative_paths
 
         super().__init__(task_id=task_id, **kwargs)
 
@@ -495,22 +497,26 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             sql_content: str = sql_file.read()
         return sql_content
 
-    def _clone_project(self, tmp_dir_path: Path) -> None:
+    def _clone_project(self, tmp_dir_path: Path) -> Path:
         logger.info(
             "Cloning project to writable temp directory %s from %s",
             tmp_dir_path,
             self.project_dir,
         )
         should_not_create_dbt_deps_symbolic_link = self.install_deps or self.copy_dbt_packages
-        create_symlinks(
-            Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
+        effective_dir = create_symlinks(
+            Path(self.project_dir),
+            tmp_dir_path,
+            ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link,
+            model_relative_paths=self.model_relative_paths,
         )
         if self.copy_dbt_packages:
             logger.info("Copying dbt packages to temporary folder.")
-            copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
+            copy_dbt_packages(Path(self.project_dir), effective_dir)
             logger.info("Completed copying dbt packages to temporary folder.")
 
-        copy_manifest_file_if_exists(self.manifest_filepath, Path(tmp_dir_path))
+        copy_manifest_file_if_exists(self.manifest_filepath, Path(effective_dir))
+        return effective_dir
 
     def _handle_partial_parse(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
@@ -659,21 +665,22 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
 
-            self._clone_project(tmp_dir_path)
+            effective_dir = self._clone_project(tmp_dir_path)
+            effective_dir_str = str(effective_dir)
 
             if self.partial_parse:
-                self._handle_partial_parse(tmp_dir_path)
+                self._handle_partial_parse(effective_dir)
 
             with self.profile_config.ensure_profile() as profile_values:
                 (profile_path, env_vars) = profile_values
                 env.update(env_vars)
                 logger.debug("Using environment variables keys: %s", env.keys())
 
-                flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
+                flags = self._generate_dbt_flags(effective_dir_str, profile_path)
 
                 if self.install_deps:
                     self._install_dependencies(
-                        tmp_dir_path, flags + self._process_global_flag("--vars", self.vars), env
+                        effective_dir, flags + self._process_global_flag("--vars", self.vars), env
                     )
 
                 if run_as_async and not settings.enable_setup_async_task:
@@ -683,10 +690,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 result = self.invoke_dbt(
                     command=full_cmd,
                     env=env,
-                    cwd=tmp_project_dir,
+                    cwd=effective_dir_str,
                 )
                 if is_openlineage_common_available:
-                    self.calculate_openlineage_events_completes(env, tmp_dir_path)
+                    self.calculate_openlineage_events_completes(env, effective_dir)
                     if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
                         # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance,
                         # in that case we're storing as self.openlineage_events_completes
@@ -696,13 +703,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     self._handle_datasets(context)
 
                 if self.partial_parse:
-                    self._update_partial_parse_cache(tmp_dir_path)
+                    self._update_partial_parse_cache(effective_dir)
 
-                self._handle_post_execution(tmp_project_dir, context, push_run_results_to_xcom)
+                self._handle_post_execution(effective_dir_str, context, push_run_results_to_xcom)
                 self.handle_exception(result)
 
                 if run_as_async and async_context:
-                    self._handle_async_execution(tmp_project_dir, context, async_context)
+                    self._handle_async_execution(effective_dir_str, context, async_context)
 
                 return result
 

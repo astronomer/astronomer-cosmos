@@ -224,51 +224,51 @@ The type of execution mode that you choose directly affects how fast your Cosmos
    :widths: 25 25 25 25
    :header-rows: 1
 
-   - - Execution Mode
+   * - Execution Mode
      - Task Duration
      - Environment Isolation
      - Cosmos Profile Management
-   - - Local
+   * - Local
      - Fast
      - None/Lightweight
      - Yes
-   - - Watcher
+   * - Watcher
      - Very Fast
      - None/Lightweight
      - Yes
-   - - Virtualenv
+   * - Virtualenv
      - Medium
      - Lightweight
      - Yes
-   - - Airflow Async
+   * - Airflow Async
      - Very Fast
      - Lightweight/Medium
      - Yes
-   - - Docker
+   * - Docker
      - Slow
      - Medium
      - No
-   - - Kubernetes
+   * - Kubernetes
      - Slow
      - High
      - No
-   - - Watcher Kubernetes
+   * - Watcher Kubernetes
      - Fast
      - High
      - No
-   - - AWS ECS
+   * - AWS ECS
      - Slow
      - High
      - No
-   - - AWS_EKS
+   * - AWS_EKS
      - Slow
      - High
      - No
-   - - Azure Container Instance
+   * - Azure Container Instance
      - Slow
      - High
      - No
-   - - GCP Cloud Run Job Instance
+   * - GCP Cloud Run Job Instance
      - Slow
      - High
      - No

@@ -127,13 +127,13 @@ The following table provides recommended concurrency ratios based on execution m
    :header-rows: 1
    :widths: 50 20
 
-   - - Execution mode
+   * - Execution mode
      - Ratio
-   - - ``ExecutionMode.LOCAL`` with dbt in the same Python environment
+   * - ``ExecutionMode.LOCAL`` with dbt in the same Python environment
      - 2:1
-   - - ``ExecutionMode.LOCAL`` with dbt in a separate virtual environment
+   * - ``ExecutionMode.LOCAL`` with dbt in a separate virtual environment
      - 1:1
-   - - ``ExecutionMode.AIRFLOW_ASYNC`` (BigQuery)
+   * - ``ExecutionMode.AIRFLOW_ASYNC`` (BigQuery)
      - 4:1
 
 .. note::

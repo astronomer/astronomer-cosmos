@@ -74,7 +74,7 @@ In order to run a container in Azure Container Instance, it needs access to the 
 
 **Build the dbt Docker image**
 
-For the Docker operators to work, you need to create a docker image that will be supplied as image parameter to the dbt docker operators used in the DAG.
+For the Docker operators to work, you need to create a Docker image that will be supplied as image parameter to the dbt Docker operators used in the DAG.
 
 Clone the `cosmos-example <https://github.com/astronomer/cosmos-example.git>`_ repo
 
@@ -83,7 +83,7 @@ Clone the `cosmos-example <https://github.com/astronomer/cosmos-example.git>`_ r
     git clone https://github.com/astronomer/cosmos-example.git
     cd cosmos-example
 
-Create a docker image containing the dbt project files and dbt profile by using the `Dockerfile <https://github.com/astronomer/cosmos-example/blob/main/Dockerfile.azure_container_instance>`_, which will be supplied to the Docker operators.
+Create a Docker image containing the dbt project files and dbt profile by using the `Dockerfile <https://github.com/astronomer/cosmos-example/blob/main/Dockerfile.azure_container_instance>`_, which will be supplied to the Docker operators.
 
 .. code-block:: bash
 
@@ -96,14 +96,14 @@ After this, the image needs to be pushed to the registry of your choice. Note th
 
 .. note::
 
-    You may need to ensure docker knows to use the right credentials. If using Azure Container Registry, this can be done by running the following command:
+    You may need to ensure Docker knows to use the right credentials. If using Azure Container Registry, this can be done by running the following command:
     .. code-block:: bash
 
         az acr login
 
 .. note::
 
-    If running on M1, you may need to set the following envvars for running the docker build command in case it fails
+    If running on M1, you may need to set the following envvars for running the ``docker build`` command in case it fails
 
     .. code-block:: bash
 
@@ -142,7 +142,7 @@ Run Airflow
 
 .. note::
 
-    You might need to run airflow standalone with ``sudo`` if your Airflow user is not able to access the docker socket URL or pull the images in the Kind cluster.
+    You might need to run airflow standalone with ``sudo`` if your Airflow user is not able to access the Docker socket URL or pull the images in the Kind cluster.
 
 Log in to Airflow through a web browser ``http://localhost:8080/``, using the user ``airflow`` and the password described in the ``standalone_admin_password.txt`` file.
 

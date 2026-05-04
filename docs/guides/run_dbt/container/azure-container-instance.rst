@@ -26,7 +26,7 @@ Prerequisites
 +++++++++++++
 
 1. Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
-2. Airflow
+2. `Apache Airflow® <https://airflow.apache.org/>`_
 3. Azure CLI (install guide here: `Azure CLI <https://docs.microsoft.com/en-us/cli/azure/install-azure-cli>`_)
 4. Astronomer-cosmos package containing the dbt Azure Container Instance operators
 5. Azure account with:

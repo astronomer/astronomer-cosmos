@@ -3,7 +3,7 @@
 Use a profile mapping
 ---------------------
 
-Profile mappings are utilities provided by Cosmos that translate Airflow connections to dbt profiles. This means that
+Profile mappings are utilities provided by Cosmos that translate `Apache Airflow® <https://airflow.apache.org/>`_ connections to dbt profiles. This means that
 you can use the same connection objects you use in Airflow to authenticate with your database in dbt. To do so, there's
 a class in Cosmos for each Airflow connection to dbt profile mapping.
 

@@ -12,7 +12,7 @@ This execution mode is ideal for users who:
 
 * Want to leverage the performance benefits of the watcher execution mode
 * Need to run dbt in isolated Kubernetes pods
-* Prefer not to install dbt in their Airflow deployment
+* Prefer not to install dbt in their `Apache Airflow® <https://airflow.apache.org/>`_ deployment
 
 -------------------------------------------------------------------------------
 

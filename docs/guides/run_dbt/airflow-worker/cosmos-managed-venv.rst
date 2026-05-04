@@ -5,7 +5,7 @@ Cosmos-managed virtual environment execution mode
 
 The ``virtualenv`` mode runs dbt commands from Python virtual environments created and managed by Cosmos. This mode removes the need to create a virtual environment at build time, unlike ``ExecutionMode.LOCAL``, while avoiding package conflicts. It is intended for cases where:
 
-- You can't install dbt directly in the Airflow environment, either in the same environment or a dedicated one.
+- You can't install dbt directly in the `Apache Airflow® <https://airflow.apache.org/>`_ environment, either in the same environment or a dedicated one.
 - Multiple dbt installations are required, and you prefer Cosmos to manage them without modifying the Airflow deployment.
 - Speed is not a concern, and you can afford for Cosmos to create and update the Python virtual environment during the execution of each dbt node.
 

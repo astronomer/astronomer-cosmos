@@ -3,7 +3,7 @@
 Cosmos Config
 -------------
 
-This page lists all available Airflow configurations that affect ``astronomer-cosmos`` Astronomer Cosmos behavior. They can be set in the ``airflow.cfg file`` or using environment variables.
+This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ configurations that affect Astronomer Cosmos behavior. They can be set in the ``airflow.cfg`` file or using environment variables.
 
 .. note::
     For more information, see `Setting Configuration Options <https://airflow.apache.org/docs/apache-airflow/stable/howto/set-config.html>`_.

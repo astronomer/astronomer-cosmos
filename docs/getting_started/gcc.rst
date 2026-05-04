@@ -20,7 +20,7 @@ Move your dbt project into the Dags directory
 
 Make a new folder, ``dbt``, inside your local ``dags`` folder. Then, copy/paste your dbt project into the directory and create a file called ``my_cosmos_dag.py`` in the root of your Dags directory.
 
-Note: your dbt projects can go anywhere that Airflow can read. By default, Cosmos looks in the ``/usr/local/airflow/dags/dbt`` directory, but you can change this by setting the ``dbt_project_dir`` argument when you create your Dag instance.
+Note: your dbt projects can go anywhere that `Apache Airflow® <https://airflow.apache.org/>`_ can read. By default, Cosmos looks in the ``/usr/local/airflow/dags/dbt`` directory, but you can change this by setting the ``dbt_project_dir`` argument when you create your Dag instance.
 
 For more accurate parsing of your dbt project, you should pre-compile your dbt project's ``manifest.json`` (include ``dbt deps && dbt compile`` as part of your deployment process).
 

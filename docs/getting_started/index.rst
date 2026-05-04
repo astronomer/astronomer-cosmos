@@ -19,7 +19,7 @@ Learn the important concepts and key ideas for how Cosmos works with Airflow and
    :caption: Cosmos Fundamentals
 
    How Cosmos works <how-cosmos-works>
-   Similar dbt and Airflow concepts <dbt-airflow-concepts>
+   Similar dbt and Apache Airflow® concepts <dbt-airflow-concepts>
    Cosmos core concepts <core-concepts>
 
 Quickstart
@@ -45,7 +45,7 @@ An example workflow for setting up Cosmos, depending on how you run Airflow. For
    :caption: Bring your own project
 
    Get started with your dbt project <bring-your-own>
-   Open-source Airflow <open-source>
+   Open-source Apache Airflow® <open-source>
    Astro <astro>
-   Amazon Managed Workflows for Apache Airflow (MWAA) <mwaa>
+   Amazon Managed Workflows for Apache Airflow® (MWAA) <mwaa>
    Google Cloud Composer (GCC) <gcc>

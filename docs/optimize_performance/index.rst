@@ -4,7 +4,7 @@ Optimize Performance
 --------------------
 
 Cosmos performance can be tuned across two dimensions: how fast Dags are parsed (affecting how quickly they appear
-and update in Airflow) and how fast tasks execute (affecting Dag run duration).
+and update in `Apache Airflow® <https://airflow.apache.org/>`_) and how fast tasks execute (affecting Dag run duration).
 
 - :ref:`optimize-rendering` -- Speed up Dag parsing by choosing the right LoadMode, reducing Dag granularity, and skipping stale sources.
 - :ref:`optimize-execution` -- Speed up Dag runs by choosing the right execution mode, sizing workers, and reducing per-task overhead.

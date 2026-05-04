@@ -9,7 +9,7 @@ This page helps you diagnose common performance issues when running Cosmos.
 Measuring Dag parse time
 +++++++++++++++++++++++++
 
-Cosmos logs the time it takes to parse each dbt project at the ``INFO`` level. Search your Airflow scheduler or
+Cosmos logs the time it takes to parse each dbt project at the ``INFO`` level. Search your `Apache Airflow® <https://airflow.apache.org/>`_ scheduler or
 Dag processor logs for messages like:
 
 .. code-block:: text
@@ -26,8 +26,8 @@ This tells you:
 If the parse time is high, see :ref:`optimize-rendering` for strategies to reduce it.
 
 
-Airflow Dag processor configuration
-++++++++++++++++++++++++++++++++++++
+Apache Airflow® Dag processor configuration
+++++++++++++++++++++++++++++++++++++++++++++
 
 The Airflow Dag processor controls how often and how quickly Dag files are parsed. Understanding these settings helps
 you diagnose issues where Dags are slow to appear or update.

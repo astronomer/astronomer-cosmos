@@ -21,7 +21,7 @@ To get started, you should have:
 Create a virtual environment
 ++++++++++++++++++++++++++++
 
-Create a virtual environment in your ``Dockerfile`` using the sample below. Be sure to replace ``<your-dbt-adapter>`` with the actual adapter you need (i.e. ``dbt-redshift``, ``dbt-snowflake``). It's recommended to use a virtual environment because dbt and Airflow can have conflicting dependencies.
+Create a virtual environment in your ``Dockerfile`` using the sample below. Be sure to replace ``<your-dbt-adapter>`` with the actual adapter you need (i.e. ``dbt-redshift``, ``dbt-snowflake``). It's recommended to use a virtual environment because dbt and `Apache Airflow® <https://airflow.apache.org/>`_ can have conflicting dependencies.
 
 .. code-block:: docker
 

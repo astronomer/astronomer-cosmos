@@ -3,10 +3,11 @@
 
 Each rule is a small function registered in :data:`RULES`. ``check_file``
 walks every line of an ``.rst`` / ``.jinja2`` file, tracks whether the
-current line is inside a code block, and dispatches each line to every
-prose-applicable rule. Add a new rule by writing a function that takes a
-:class:`LineContext` and yields ``(lineno, message)`` pairs, then append
-it to ``RULES``.
+current line is inside a literal-block directive (code, include, or
+table) where structural markers must not be treated as prose, and
+dispatches every other line to each rule. Add a new rule by writing a
+function that takes a :class:`LineContext` and yields
+``(lineno, message)`` pairs, then append it to ``RULES``.
 
 The script exits non-zero when any rule reports a violation. Style guide
 text and rationale belong in ``docs/policy/contributing-docs.rst``, not
@@ -21,7 +22,9 @@ from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-CODE_BLOCK_DIRECTIVE_RE = re.compile(r"^(?P<indent>\s*)\.\. (code-block|sourcecode|literalinclude|highlight)::")
+LITERAL_DIRECTIVE_RE = re.compile(
+    r"^(?P<indent>\s*)\.\. (code-block|sourcecode|literalinclude|highlight|list-table|csv-table)::"
+)
 BULLET_RE = re.compile(r"^(\s*)\* ")
 UNDERLINE_CHARS = set("=-~+^*#\"'")
 
@@ -50,8 +53,11 @@ class LineContext:
 Rule = Callable[[LineContext], Iterable[tuple[int, str]]]
 
 
-class CodeBlockTracker:
-    """Track whether a line index is inside an RST code-block directive.
+class LiteralBlockTracker:
+    """Track whether the current line is inside an RST directive whose
+    content should not be treated as prose — code blocks, includes, and
+    table directives where the markers (``* -``) are structural, not
+    bullets.
 
     A directive like ``.. code-block:: python`` opens a region whose
     content lines are indented strictly further than the directive
@@ -64,11 +70,12 @@ class CodeBlockTracker:
         self._content_indent: int | None = None
 
     def feed(self, line: str) -> bool:
-        """Advance state with one line; return True if the line is code."""
+        """Advance state with one line; return True if the line is inside
+        a literal-block directive."""
         stripped = line.lstrip()
         line_indent = len(line) - len(stripped)
 
-        m = CODE_BLOCK_DIRECTIVE_RE.match(line)
+        m = LITERAL_DIRECTIVE_RE.match(line)
         if m:
             self._directive_indent = len(m.group("indent"))
             self._content_indent = None
@@ -147,12 +154,11 @@ RULES: list[Rule] = [
 
 def check_file(path: Path, rules: list[Rule] = RULES) -> list[str]:
     lines = path.read_text().split("\n")
-    tracker = CodeBlockTracker()
+    tracker = LiteralBlockTracker()
     errors: list[str] = []
 
     for i, line in enumerate(lines):
-        in_code = tracker.feed(line)
-        if in_code:
+        if tracker.feed(line):
             continue
         ctx = LineContext(path=path, lineno=i + 1, line=line, lines=lines)
         for rule in rules:

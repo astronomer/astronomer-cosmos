@@ -471,16 +471,16 @@ is consistent across all projects:
    :widths: 30 35 35
    :header-rows: 1
 
-   * - Approach
+   - - Approach
      - Pros
      - Cons
-   * - Shared dbt Package
+   - - Shared dbt Package
      - Single source of truth, versioned
      - Requires package management setup
-   * - Copy Macros
+   - - Copy Macros
      - Simple, no dependencies
      - Hard to keep in sync
-   * - Consistent Overrides
+   - - Consistent Overrides
      - Works for built-in macros
      - Limited to override scenarios
 

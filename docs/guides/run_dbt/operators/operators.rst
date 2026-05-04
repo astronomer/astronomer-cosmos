@@ -13,8 +13,8 @@ Clone
 
 Requirement
 
-* Cosmos >= 1.8.0
-* dbt-core >= 1.6.0
+- Cosmos >= 1.8.0
+- dbt-core >= 1.6.0
 
 The ``DbtCloneLocalOperator`` implement `dbt clone <https://docs.getdbt.com/reference/commands/clone>`_ command.
 

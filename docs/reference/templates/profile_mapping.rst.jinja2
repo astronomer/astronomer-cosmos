@@ -27,12 +27,12 @@ to the ``profile_args`` dict.
 .. list-table::
    :header-rows: 1
 
-   * - dbt Field Name
+   - - dbt Field Name
      - Required
      - Airflow Field Name
 
    {% for field in fields %}
-   * - ``{{ field.dbt_name }}``
+   - - ``{{ field.dbt_name }}``
      - {{ field.required }}
     {% if field.airflow_name %}
      - ``{{ field.airflow_name }}``
@@ -65,11 +65,11 @@ them in ``profile_args``.
 .. list-table::
    :header-rows: 1
 
-   * - Field Name
+   - - Field Name
      - Default Value
 
    {% for key, value in profile_defaults.items() %}
-   * - ``{{ key }}``
+   - - ``{{ key }}``
      - ``{{ value }}``
    {% endfor %}
 {% endif %}

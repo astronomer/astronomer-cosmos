@@ -51,24 +51,24 @@ in the remote store.
 
 Cosmos will refresh the cache in a few circumstances:
 
-* if any files of the dbt project change
-* if one of the arguments that affect the dbt ls command execution changes
+- if any files of the dbt project change
+- if one of the arguments that affect the dbt ls command execution changes
 
 To evaluate if the dbt project changed, it calculates the changes using a few of the MD5 of all the files in the directory.
 
 Additionally, if any of the following DAG configurations are changed, we'll automatically purge the cache of the DAGs that use that specific configuration:
 
-* ``ProjectConfig.dbt_vars``
-* ``ProjectConfig.env_vars``
-* ``ProjectConfig.partial_parse``
-* ``RenderConfig.env_vars``
-* ``RenderConfig.exclude``
-* ``RenderConfig.select``
-* ``RenderConfig.selector``
+- ``ProjectConfig.dbt_vars``
+- ``ProjectConfig.env_vars``
+- ``ProjectConfig.partial_parse``
+- ``RenderConfig.env_vars``
+- ``RenderConfig.exclude``
+- ``RenderConfig.select``
+- ``RenderConfig.selector``
 
 Finally, if users would like to define specific Airflow variables that, if changed, will cause the recreation of the cache, they can specify those by using:
 
-* ``RenderConfig.airflow_vars_to_purge_dbt_ls_cache``
+- ``RenderConfig.airflow_vars_to_purge_dbt_ls_cache``
 
 Example:
 
@@ -96,19 +96,19 @@ When using ``DbtDag``, the keys use the DAG name. When using ``DbtTaskGroup``, t
 
 Examples:
 
-* The ``DbtDag`` "cosmos_dag" will have the cache represented by "cosmos_cache__basic_cosmos_dag".
-* The ``DbtTaskGroup`` "customers" declared inside the DAG "basic_cosmos_task_group" will have the cache key "cosmos_cache__basic_cosmos_task_group__customers".
+- The ``DbtDag`` "cosmos_dag" will have the cache represented by "cosmos_cache__basic_cosmos_dag".
+- The ``DbtTaskGroup`` "customers" declared inside the DAG "basic_cosmos_task_group" will have the cache key "cosmos_cache__basic_cosmos_task_group__customers".
 
 **Cache value**
 
 The cache values contain a few properties:
 
-* ``last_modified`` timestamp, represented using the ISO 8601 format.
-* ``version`` is a hash that represents the version of the dbt project and arguments used to run dbt ls by the time Cosmos created the cache
-* ``dbt_ls_compressed`` represents the dbt ls output compressed using zlib and encoded to base64 so Cosmos can record the value as a compressed string in the Airflow metadata database.
-* ``dag_id`` is the DAG associated to this cache
-* ``task_group_id`` is the TaskGroup associated to this cache
-* ``cosmos_type`` is either ``DbtDag`` or ``DbtTaskGroup``
+- ``last_modified`` timestamp, represented using the ISO 8601 format.
+- ``version`` is a hash that represents the version of the dbt project and arguments used to run dbt ls by the time Cosmos created the cache
+- ``dbt_ls_compressed`` represents the dbt ls output compressed using zlib and encoded to base64 so Cosmos can record the value as a compressed string in the Airflow metadata database.
+- ``dag_id`` is the DAG associated to this cache
+- ``task_group_id`` is the TaskGroup associated to this cache
+- ``cosmos_type`` is either ``DbtDag`` or ``DbtTaskGroup``
 
 Caching the YAML selectors
 ++++++++++++++++++++++++++
@@ -135,17 +135,17 @@ in the remote store.
 
 Cosmos will refresh the cache in a few circumstances:
 
-* if any files of the dbt project change
-* if the YAML selectors in the manifest file change
-* if the implementation of the YAML selector parsing logic changes
+- if any files of the dbt project change
+- if the YAML selectors in the manifest file change
+- if the implementation of the YAML selector parsing logic changes
 
-  * For new definitions of the dbt YAML selector specification.
+  - For new definitions of the dbt YAML selector specification.
 
 To evaluate if the dbt project changed, it calculates the changes using a few of the MD5 of all the files in the directory.
 
 Finally, if users would like to define specific Airflow variables that, if changed, will cause the recreation of the cache, they can specify those by using:
 
-* ``RenderConfig.airflow_vars_to_purge_dbt_yaml_selectors_cache``
+- ``RenderConfig.airflow_vars_to_purge_dbt_yaml_selectors_cache``
 
 Example:
 
@@ -177,20 +177,20 @@ When using ``DbtDag``, the keys use the DAG name. When using ``DbtTaskGroup``, t
 
 Examples:
 
-* The ``DbtDag`` "cosmos_dag" will have the cache represented by "cosmos_cache__basic_cosmos_dag".
-* The ``DbtTaskGroup`` "customers" declared inside the DAG "basic_cosmos_task_group" will have the cache key "cosmos_cache__basic_cosmos_task_group__customers".
+- The ``DbtDag`` "cosmos_dag" will have the cache represented by "cosmos_cache__basic_cosmos_dag".
+- The ``DbtTaskGroup`` "customers" declared inside the DAG "basic_cosmos_task_group" will have the cache key "cosmos_cache__basic_cosmos_task_group__customers".
 
 **Cache value**
 
 The cache values contain a few properties:
 
-* ``last_modified`` timestamp, represented using the ISO 8601 format.
-* ``version`` is a hash that represents the version of the dbt project, the raw YAML selectors, and a hash of the YAML selector parser implementation version combined with the keys specified by ``airflow_vars_to_purge_dbt_yaml_selectors_cache``
-* ``raw_selectors_compressed`` represents the raw YAML selector definitions compressed using zlib and encoded to base64
-* ``parsed_selectors_compressed`` represents the parsed YAML selector definitions compressed using zlib and encoded to base64
-* ``dag_id`` is the DAG associated to this cache
-* ``task_group_id`` is the TaskGroup associated to this cache
-* ``cosmos_type`` is either ``DbtDag`` or ``DbtTaskGroup``
+- ``last_modified`` timestamp, represented using the ISO 8601 format.
+- ``version`` is a hash that represents the version of the dbt project, the raw YAML selectors, and a hash of the YAML selector parser implementation version combined with the keys specified by ``airflow_vars_to_purge_dbt_yaml_selectors_cache``
+- ``raw_selectors_compressed`` represents the raw YAML selector definitions compressed using zlib and encoded to base64
+- ``parsed_selectors_compressed`` represents the parsed YAML selector definitions compressed using zlib and encoded to base64
+- ``dag_id`` is the DAG associated to this cache
+- ``task_group_id`` is the TaskGroup associated to this cache
+- ``cosmos_type`` is either ``DbtDag`` or ``DbtTaskGroup``
 
 **Shared Cache Behavior**
 

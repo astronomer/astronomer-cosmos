@@ -36,27 +36,27 @@ you diagnose issues where DAGs are slow to appear or update.
    :header-rows: 1
    :widths: 35 30 10 25
 
-   * - What it controls
+   - - What it controls
      - Airflow 3 setting
      - Default
      - Airflow 2 setting
-   * - How often new DAG files are detected
+   - - How often new DAG files are detected
      - ``[dag_processor] refresh_interval``
      - 5 min
      - ``[scheduler] dag_dir_list_interval``
-   * - Minimum interval between reparses of the same file
+   - - Minimum interval between reparses of the same file
      - ``[dag_processor] min_file_process_interval``
      - 30s
      - ``[scheduler] min_file_process_interval``
-   * - Number of concurrent parsing processes
+   - - Number of concurrent parsing processes
      - ``[dag_processor] parsing_processes``
      - 2
      - ``[scheduler] max_threads``
-   * - Maximum time to parse a single DAG file
+   - - Maximum time to parse a single DAG file
      - ``[dag_processor] dag_file_processor_timeout``
      - 50s
      - ``[core] dag_file_processor_timeout``
-   * - Maximum time to import a single Python file
+   - - Maximum time to import a single Python file
      - ``[dag_processor] dagbag_import_timeout``
      - 30s
      - ``[core] dagbag_import_timeout``

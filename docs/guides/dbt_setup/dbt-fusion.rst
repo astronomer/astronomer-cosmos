@@ -12,7 +12,7 @@ Context
 dbt Labs `launched <https://www.getdbt.com/blog/dbt-launch-showcase-2025-recap>`_ `dbt Fusion <https://github.com/dbt-labs/dbt-fusion>`_ on 28 May 2025. dbt Fusion is the next-generation dbt engine that enables real-time model validation, improved SQL parsing and state-aware orchestration.
 It is a unified approach that aims to merge dbt Core and dbt Cloud features via a completely new CLI,
 implemented in a different programming language (Rust, as opposed to Python).
-As part of this, dbt Labs are `rewriting all dbt adapters <https://github.com/dbt-labs/dbt-fusion/tree/main/crates/dbt-fusion-adapter/src/adapters>`_ (equivalent to Airflow providers) in Rust, starting from Snowflake.
+As part of this, dbt Labs are `rewriting all dbt adapters <https://github.com/dbt-labs/dbt-fusion/tree/main/crates/dbt-fusion-adapter/src/adapters>`_ (equivalent to `Apache Airflow® <https://airflow.apache.org/>`_ providers) in Rust, starting from Snowflake.
 They are also changing the `licensing model <https://github.com/dbt-labs/dbt-fusion/blob/main/LICENSES.md>`_ to a hybrid Open-Source and commercial license. We're supporting dbt Fusion with a license-complaint integration. This integration enables teams to:
 
 - Use dbt Fusion locally for enhanced development experience with real-time validation

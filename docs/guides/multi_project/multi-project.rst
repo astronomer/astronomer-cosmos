@@ -35,7 +35,7 @@ When Cosmos parses a dbt project that uses dbt-loom, it encounters two types of 
 Cosmos automatically:
 
 - **Skips external nodes** during DAG generation (they don't have file paths)
-- **Creates Airflow tasks only for local nodes** in each project
+- **Creates** `Apache Airflow® <https://airflow.apache.org/>`_ **tasks only for local nodes** in each project
 - **Maintains proper dependency tracking** within each project
 
 This means you don't need any special configuration - Cosmos works with dbt-loom projects automatically.

@@ -1,9 +1,9 @@
 .. _dbt-airflow-concepts:
 
-Similar dbt and Airflow concepts
---------------------------------
+Similar dbt and Apache Airflow® concepts
+-----------------------------------------
 
-While dbt is an open source tool for data transformations and analysis, using SQL, Airflow focuses on being a platform
+While dbt is an open source tool for data transformations and analysis, using SQL, `Apache Airflow® <https://airflow.apache.org/>`_ focuses on being a platform
 for the development, scheduling and monitoring of batch-oriented workflows, using Python. Although both tools have many
 differences, they also share similar concepts.
 

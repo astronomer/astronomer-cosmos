@@ -6,8 +6,8 @@ Cosmos core concepts
 **Cosmos** is an open-source library that helps you to run dbt code in Apache Airflow. Because it operates at the interface between Airflow and dbt, becoming familiar with the commonly used terminology and foundational concepts can help you get started.
 
 
-Similar dbt and Airflow concepts
-++++++++++++++++++++++++++++++++
+Similar dbt and Apache Airflow® concepts
++++++++++++++++++++++++++++++++++++++++++
 
 dbt and Airflow each solve different kinds of data engineering problems. However, they do share some useful concepts. See :ref:`dbt-airflow-concepts`.
 

@@ -41,7 +41,7 @@ Source Pruning
 ++++++++++++++
 
 The ``source_pruning`` is a boolean parameter available in the ``RenderConfig``.
-When set to ``True``, it automatically removes (or "prunes") any dbt source nodes from your Airflow DAG that do not have any downstream dependencies within the selected portion of the dbt graph.
+When set to ``True``, it automatically removes (or "prunes") any dbt source nodes from your `Apache Airflow® <https://airflow.apache.org/>`_ DAG that do not have any downstream dependencies within the selected portion of the dbt graph.
 
 This is particularly useful for keeping your DAGs clean and focused, especially in large dbt projects where you might be selecting only a subset of models to run.
 

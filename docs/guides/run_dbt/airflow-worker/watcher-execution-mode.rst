@@ -3,7 +3,7 @@
 Watcher execution mode (Experimental)
 -------------------------------------
 
-With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in Airflow.
+With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in `Apache Airflow® <https://airflow.apache.org/>`_.
 
 Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime **by up to 80%**, bringing performance **on par with running dbt CLI locally**. Since this execution mode improves the performance by leveraging `dbt threading <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ and Airflow deferrable sensors, the performance gains will depend on three major factors:
 
@@ -327,8 +327,8 @@ Or via environment variable:
 
   ``watcher_dbt_execution_queue`` > explicit ``queue`` on the producer (from ``setup_operator_args``) > ``operator_args`` > your Airflow deployment’s default queue.
 
-Installation of Airflow and dbt
-'''''''''''''''''''''''''''''''
+Installation of Apache Airflow® and dbt
+''''''''''''''''''''''''''''''''''''''''
 
 Since Cosmos 1.12.0, ``ExecutionMode.WATCHER`` works well regardless of whether dbt and Airflow are installed in the same Python virtual environment.
 
@@ -400,8 +400,8 @@ The ``TestBehavior.BUILD`` behavior is embedded in the producer ``DbtProducerWat
 
 The ``TestBehavior.NONE`` and ``TestBehavior.AFTER_ALL`` behave similarly to ``ExecutionMode.LOCAL``.
 
-Airflow Datasets and Assets
-'''''''''''''''''''''''''''
+Apache Airflow® Datasets and Assets
+''''''''''''''''''''''''''''''''''''
 
 .. versionchanged:: 1.14.0
 

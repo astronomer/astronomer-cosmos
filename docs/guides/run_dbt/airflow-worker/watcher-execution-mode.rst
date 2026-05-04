@@ -417,7 +417,7 @@ Source freshness nodes
 
 Since Cosmos 1.6, it `supports the rendering of source nodes <https://www.astronomer.io/blog/native-support-for-source-node-rendering-in-cosmos/>`_.
 
-Starting with Cosmos 1.15.0, ``ExecutionMode.WATCHER`` supports source freshness aware execution. When
+Starting with Cosmos 1.14.0, ``ExecutionMode.WATCHER`` supports source freshness aware execution. When
 ``source_rendering_behavior`` is not ``NONE``, the producer task automatically runs ``dbt source freshness``
 before ``dbt build``, and the freshness callback determines which dependent nodes are skipped based on
 stale sources. See :ref:`watcher-source-freshness` for details.
@@ -447,7 +447,7 @@ You can define different ``callback`` behaviors for producer and consumer nodes 
 Source freshness aware execution (Experimental)
 ''''''''''''''''''''''''''''''''''''''''''''''''
 
-.. versionadded:: 1.15.0
+.. versionadded:: 1.14.0
 
 .. warning::
 
@@ -471,7 +471,8 @@ are stale or already skipped.
     :start-after: [START example_watcher_with_freshness]
     :end-before: [END example_watcher_with_freshness]
 
-To override the default logic, pass a ``freshness_callback`` via ``setup_operator_args``:
+To override the default logic, pass a ``freshness_callback`` via ``setup_operator_args``
+(custom callback support added in Cosmos 1.15.0):
 
 .. code-block:: python
 

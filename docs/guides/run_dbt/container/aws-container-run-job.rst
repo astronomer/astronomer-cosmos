@@ -203,4 +203,3 @@ For more detailed information on AWS ECS, please refer to the `AWS ECS Developer
 Happy deploying! :rocket:
 
 
-Remember to config your Dag for connecting to AWS ECS and the database connection where you are performing your SQL queries!

@@ -13,7 +13,7 @@ appear and update in Airflow. This page covers the most impactful ways to reduce
 
    .. code-block:: text
 
-      Cosmos performance (<cache_id>) - [<hostname>|<pid>]: It took 0.068s to parse the dbt project for Dag using LoadMode.DBT_LS_CACHE
+      Cosmos performance (<cache_id>) - [<hostname>|<pid>]: It took 0.068s to parse the dbt project for DAG using LoadMode.DBT_LS_CACHE
 
    Search your Airflow scheduler or Dag processor logs for ``Cosmos performance`` to measure your current parse time.
 

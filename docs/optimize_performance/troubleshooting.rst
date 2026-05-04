@@ -14,7 +14,7 @@ Dag processor logs for messages like:
 
 .. code-block:: text
 
-   Cosmos performance (my_dbt_dag) - [worker-1|12345]: It took 0.068s to parse the dbt project for Dag using LoadMode.DBT_LS_CACHE
+   Cosmos performance (my_dbt_dag) - [worker-1|12345]: It took 0.068s to parse the dbt project for DAG using LoadMode.DBT_LS_CACHE
 
 This tells you:
 

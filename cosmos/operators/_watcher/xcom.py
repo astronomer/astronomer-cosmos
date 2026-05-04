@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import zlib
 from typing import Any
 
@@ -20,14 +21,35 @@ logger = get_logger(__name__)
 
 XCOM_BACKUP_VARIABLE_PREFIX = "cosmos_xcom_backup"
 
+# Characters that secrets backends commonly reject in Variable keys. AWS
+# Secrets Manager allows alphanumerics + ``-/_+=.@!``; GCP Secret Manager is
+# stricter at ``[A-Za-z0-9_-]``. Run IDs routinely contain ``:`` and ``+``
+# (timestamps and timezone offsets, e.g. ``scheduled__2026-05-04T10:15:00+00:00``)
+# and dag/task-group IDs can contain ``.``. Sanitize all components down to
+# ``[A-Za-z0-9_-]`` so the resulting key is portable across backends and does
+# not log a ``ValidationException`` on every ``Variable.set`` call when an
+# external secrets backend is configured (Airflow walks the backend chain on
+# set as well as get).
+_DISALLOWED_VARIABLE_KEY_CHAR_RE = re.compile(r"[^A-Za-z0-9_-]")
+
 
 def _xcom_backup_variable_key(dag_id: str, task_group_id: str | None, run_id: str) -> str:
-    """Build a unique Airflow Variable key for the XCom backup of a watcher producer run."""
-    parts = [XCOM_BACKUP_VARIABLE_PREFIX, dag_id.replace(".", "___")]
+    """Build a unique Airflow Variable key for the XCom backup of a watcher producer run.
+
+    The component-specific period-replacement counts (3 underscores for dag_id,
+    2 for task_group_id, 1 for run_id) are preserved so keys remain visually
+    parseable, then any remaining disallowed character is normalized to ``_``.
+    """
+    parts = [XCOM_BACKUP_VARIABLE_PREFIX, _sanitize_key_component(dag_id.replace(".", "___"))]
     if task_group_id:
-        parts.append(task_group_id.replace(".", "__"))
-    parts.append(run_id.replace(".", "_"))
+        parts.append(_sanitize_key_component(task_group_id.replace(".", "__")))
+    parts.append(_sanitize_key_component(run_id.replace(".", "_")))
     return "__".join(parts)
+
+
+def _sanitize_key_component(value: str) -> str:
+    """Replace characters that secrets backends reject in Variable keys with ``_``."""
+    return _DISALLOWED_VARIABLE_KEY_CHAR_RE.sub("_", value)
 
 
 def _get_task_group_id(ti: Any) -> str | None:

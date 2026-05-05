@@ -1,6 +1,6 @@
 .. _testing-behavior:
 
-Testing Behavior
+Testing behavior
 ----------------
 
 Testing configuration

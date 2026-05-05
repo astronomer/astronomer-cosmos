@@ -36,7 +36,7 @@ We have `observed <https://github.com/astronomer/astronomer-cosmos/pull/1934>`_ 
 +----------------------------------------------+--------------------------+
 
 
-Getting Started with Airflow Async mode
+Getting started with Airflow async mode
 +++++++++++++++++++++++++++++++++++++++
 
 This guide walks you through setting up an Astro CLI project and running a Cosmos-based DAG with a deferrable operator, enabling asynchronous task execution in Apache Airflow.

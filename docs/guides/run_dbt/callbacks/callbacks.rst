@@ -13,9 +13,9 @@ alongside the artifacts created by dbt.
 
 Many users care about those artifacts and want to perform additional actions after running the dbt command. Some examples of usage:
 
-* Upload the artifacts to an object storage;
-* Run a command after the dbt command runs, such as `montecarlo <https://docs.getmontecarlo.com/docs/dbt-core>`_; or
-* Define other custom behaviours based on a specific artifact.
+- Upload the artifacts to an object storage;
+- Run a command after the dbt command runs, such as `montecarlo <https://docs.getmontecarlo.com/docs/dbt-core>`_; or
+- Define other custom behaviours based on a specific artifact.
 
 To support these use cases, Cosmos allows users to define functions called callbacks that can run as part of the task execution before deleting the target's folder.
 
@@ -24,8 +24,8 @@ These functions illustrate how to upload the generated dbt artifacts to remote c
 
 There are two ways users can leverage using Cosmos auxiliary callback functions:
 
-* When instantiating a Cosmos operator;
-* When using ``DbtDag`` or ``DbtTaskGroup`` (users can define a callback that will apply to all tasks).
+- When instantiating a Cosmos operator;
+- When using ``DbtDag`` or ``DbtTaskGroup`` (users can define a callback that will apply to all tasks).
 
 
 Example: Using Callbacks with a Single Operator
@@ -57,12 +57,12 @@ An example of how the data uploaded to GCS looks like when using ``upload_to_gcp
 
 The path naming convention is:
 
-* Bucket configured by the user
-* Name of the DAG
-* DAG Run identifier
-* Task ID
-* Task retry identifier
-* Target folder with its contents
+- Bucket configured by the user
+- Name of the DAG
+- DAG Run identifier
+- Task ID
+- Task retry identifier
+- Target folder with its contents
 
 If users are unhappy with this structure or format, they can implement similar methods, which can be based (or not) on the Cosmos standard ones.
 

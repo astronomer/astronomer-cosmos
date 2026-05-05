@@ -10,9 +10,9 @@ The ``ExecutionMode.WATCHER_KUBERNETES`` combines the **speed of the** :ref:`wat
 
 This execution mode is ideal for users who:
 
-* Want to leverage the performance benefits of the watcher execution mode
-* Need to run dbt in isolated Kubernetes pods
-* Prefer not to install dbt in their `Apache Airflow® <https://airflow.apache.org/>`_ deployment
+- Want to leverage the performance benefits of the watcher execution mode
+- Need to run dbt in isolated Kubernetes pods
+- Prefer not to install dbt in their `Apache Airflow® <https://airflow.apache.org/>`_ deployment
 
 
 Background
@@ -54,9 +54,9 @@ The following example shows how to configure a ``DbtDag`` with ``ExecutionMode.W
 
 **Key differences from** ``ExecutionMode.KUBERNETES``:
 
-* The ``execution_mode`` is set to ``ExecutionMode.WATCHER_KUBERNETES`` instead of ``ExecutionMode.KUBERNETES``
-* The producer task runs the entire ``dbt build`` command in a single Kubernetes pod
-* Consumer tasks (sensors) watch for the completion of their corresponding dbt models
+- The ``execution_mode`` is set to ``ExecutionMode.WATCHER_KUBERNETES`` instead of ``ExecutionMode.KUBERNETES``
+- The producer task runs the entire ``dbt build`` command in a single Kubernetes pod
+- Consumer tasks (sensors) watch for the completion of their corresponding dbt models
 
 For the complete setup including Kubernetes secrets, Docker image configuration, and profile setup, refer to the :ref:`kubernetes` documentation.
 
@@ -78,9 +78,9 @@ This represents approximately a **63% reduction** in total DAG runtime.
 
 The performance improvement comes from:
 
-* Running dbt as a single command (reducing Kubernetes pod startup overhead)
-* Leveraging dbt's native threading capabilities
-* Eliminating repeated dbt initialization for each model
+- Running dbt as a single command (reducing Kubernetes pod startup overhead)
+- Leveraging dbt's native threading capabilities
+- Eliminating repeated dbt initialization for each model
 
 
 Known Limitations
@@ -159,11 +159,11 @@ Other Inherited Limitations
 
 The following limitations from ``ExecutionMode.WATCHER`` also apply to ``ExecutionMode.WATCHER_KUBERNETES``:
 
-* **Individual dbt Operators**: Only ``DbtSeedWatcherKubernetesOperator``, ``DbtSnapshotWatcherKubernetesOperator``, and ``DbtRunWatcherKubernetesOperator`` are implemented. The ``DbtTestWatcherKubernetesOperator`` is currently a placeholder.
+- **Individual dbt Operators**: Only ``DbtSeedWatcherKubernetesOperator``, ``DbtSnapshotWatcherKubernetesOperator``, and ``DbtRunWatcherKubernetesOperator`` are implemented. The ``DbtTestWatcherKubernetesOperator`` is currently a placeholder.
 
-* **Test behavior**: Unlike ``ExecutionMode.WATCHER`` (which fully supports ``TestBehavior.AFTER_EACH`` since Cosmos 1.14.0), ``ExecutionMode.WATCHER_KUBERNETES`` does not yet support ``TestBehavior.AFTER_EACH``. Tests are run as part of the ``dbt build`` command by the producer task, and test tasks are rendered as ``EmptyOperator`` placeholders. This is tracked in `#1974 <https://github.com/astronomer/astronomer-cosmos/issues/1974>`_.
+- **Test behavior**: Unlike ``ExecutionMode.WATCHER`` (which fully supports ``TestBehavior.AFTER_EACH`` since Cosmos 1.14.0), ``ExecutionMode.WATCHER_KUBERNETES`` does not yet support ``TestBehavior.AFTER_EACH``. Tests are run as part of the ``dbt build`` command by the producer task, and test tasks are rendered as ``EmptyOperator`` placeholders. This is tracked in `#1974 <https://github.com/astronomer/astronomer-cosmos/issues/1974>`_.
 
-* **Source freshness nodes**: The ``dbt build`` command does not run source freshness checks.
+- **Source freshness nodes**: The ``dbt build`` command does not run source freshness checks.
 
 For more details on these limitations, refer to the :ref:`watcher-execution-mode` documentation.
 
@@ -196,9 +196,9 @@ Summary
 
 ``ExecutionMode.WATCHER_KUBERNETES`` provides:
 
-* ✅ **~63% faster** dbt DAG runs compared to ``ExecutionMode.KUBERNETES``
-* ✅ **Isolation** between dbt and Airflow dependencies
-* ✅ **Model-level visibility** in Airflow
-* ✅ **Easy migration** from ``ExecutionMode.KUBERNETES``
+- ✅ **~63% faster** dbt DAG runs compared to ``ExecutionMode.KUBERNETES``
+- ✅ **Isolation** between dbt and Airflow dependencies
+- ✅ **Model-level visibility** in Airflow
+- ✅ **Easy migration** from ``ExecutionMode.KUBERNETES``
 
 This execution mode is ideal for teams who want the performance benefits of the watcher mode while maintaining the isolation provided by Kubernetes execution.

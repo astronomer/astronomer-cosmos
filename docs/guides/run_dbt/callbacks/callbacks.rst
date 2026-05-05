@@ -59,7 +59,7 @@ The path naming convention is:
 
 - Bucket configured by the user
 - Name of the Dag
-- Dag Run identifier
+- Dag run identifier
 - Task ID
 - Task retry identifier
 - Target folder with its contents

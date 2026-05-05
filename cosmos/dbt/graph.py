@@ -1274,9 +1274,7 @@ class DbtGraph:
             with manifest_path.open("rb") as fp:
                 manifest = orjson.loads(fp.read())
         elif settings.enable_orjson_parser:
-            raise CosmosLoadDbtException(
-                "orjson is not installed. Install it with: pip install orjson"
-            )
+            raise CosmosLoadDbtException("orjson is not installed. Install it with: pip install orjson")
         else:
             with manifest_path.open("r") as fp:
                 manifest = json.load(fp)

@@ -32,7 +32,6 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Requirements**: You need a ``manifest.json`` file (can be generated with ``dbt compile`` or ``dbt run``).
 
----------------------------------
 
 2. Use DBT_RUNNER Invocation Mode
 +++++++++++++++++++++++++++++++++
@@ -64,7 +63,6 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Default**: default behaviour for ``ExecutionMode.LOCAL`` since 1.4.0, default behaviour for ``RenderConfig.DBT_LS`` since Cosmos 1.9.0
 
--------------------------------------------------------------------------------
 
 3. Use Partial Parse (Keep Enabled)
 +++++++++++++++++++++++++++++++++++
@@ -91,7 +89,6 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Default**: ``True`` since Cosmos 1.4.0
 
--------------------------------------------------------------------------------
 
 4. Use ExecutionMode.WATCHER
 ++++++++++++++++++++++++++++
@@ -103,7 +100,6 @@ Cosmos provides various configuration options and execution modes to optimize me
 - `Getting Started with ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html>`_
 - `Configure a Custom Queue for Producer and Watcher Tasks in ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html#watcher-dbt-execution-queue>`_
 
--------------------------------------------------------------------------------
 
 5. Control DAG-Level Concurrency with ``concurrency`` Parameter
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -172,7 +168,6 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Reference**: `Airflow Scaling Workers Documentation <https://www.astronomer.io/docs/learn/airflow-scaling-workers>`_
 
--------------------------------------------------------------------------------
 
 6. Enable Memory-Optimized Imports (Cosmos < 1.14.0 only)
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -209,7 +204,6 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Default**: ``False``
 
--------------------------------------------------------------------------------
 
 7. Enable Task Profiling with Debug Mode
 ++++++++++++++++++++++++++++++++++++++++

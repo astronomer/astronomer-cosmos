@@ -11,7 +11,6 @@ Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime *
 - The topology of the dbt pipeline
 - The ``poke_interval`` and ``timeout`` settings of the ``DbtConsumerWatcherSensor`` operator, which determine the frequency and duration of the sensor's polling.
 
--------------------------------------------------------------------------------
 
 Background: The Problem with the Local Execution Mode in Cosmos
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -32,7 +31,6 @@ Consider the `google/fhir-dbt-analytics <https://github.com/google/fhir-dbt-anal
 
 This difference motivated a rethinking of how Cosmos interacts with dbt.
 
--------------------------------------------------------------------------------
 
 Concept: ``ExecutionMode.WATCHER``
 ++++++++++++++++++++++++++++++++++
@@ -53,7 +51,6 @@ Together, these operators let you:
 * Retain model-level observability (for clarity)
 * Retry specific models (for resilience)
 
--------------------------------------------------------------------------------
 
 Performance Gains
 +++++++++++++++++
@@ -130,7 +127,6 @@ If you prefer to manage threads through Cosmos profile mappings instead of editi
    )
 
 
--------------------------------------------------------------------------------
 
 Example Usage of ``ExecutionMode.WATCHER``
 ++++++++++++++++++++++++++++++++++++++++++
@@ -208,7 +204,6 @@ If your Airflow DAG includes multiple stages or integrations (e.g., data ingesti
     :alt: Cosmos DbtDag with `ExecutionMode.WATCHER`
     :align: center
 
--------------------------------------------------------------------------------
 
 Additional details
 ++++++++++++++++++
@@ -345,7 +340,6 @@ Starting with Cosmos 1.12.0, the ``DbtConsumerWatcherSensor`` supports
 `deferrable (asynchronous) execution <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`_. Deferrable execution frees up the Airflow worker slot, while task status monitoring is handled by the Airflow triggerer component,
 which increases overall task throughput. By default, the sensor now runs in deferrable mode.
 
--------------------------------------------------------------------------------
 
 Known Limitations
 +++++++++++++++++
@@ -497,7 +491,6 @@ To override the default logic, pass a ``freshness_callback`` via ``setup_operato
 * ``dbt source freshness`` is always re-executed at runtime; ``LoadMode.DBT_MANIFEST`` freshness data is not consulted.
 * Not supported for ``ExecutionMode.WATCHER_KUBERNETES``.
 
--------------------------------------------------------------------------------
 
 Overriding ``operator_args``
 ''''''''''''''''''''''''''''
@@ -565,7 +558,6 @@ To disable asynchronous execution, set the ``deferrable`` flag to ``False`` in t
    :start-after: [START example_watcher_synchronous]
    :end-before: [END example_watcher_synchronous]
 
--------------------------------------------------------------------------------
 
 Troubleshooting
 +++++++++++++++

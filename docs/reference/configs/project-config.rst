@@ -1,6 +1,6 @@
 .. _project-config:
 
-Project Config
+Project config
 --------------
 
 The ``cosmos.config.ProjectConfig`` allows you to specify information about where your dbt project is located and project
@@ -28,7 +28,7 @@ variables that should be used for rendering and execution. It takes the followin
   for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``
   execution modes. Due to the way that dbt `partial parsing works <https://docs.getdbt.com/reference/parsing#known-limitations>`_, it does not work with Cosmos profile mapping classes. To benefit from this feature, users have to set the ``profiles_yml_filepath`` argument in ``ProfileConfig``.
 
-Project Config Example
+Project config example
 ++++++++++++++++++++++
 
 .. code-block:: python

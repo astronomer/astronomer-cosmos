@@ -25,6 +25,7 @@ from cosmos.operators._watcher.xcom import (
     _init_xcom_backup,
     _persist_backup,
     _restore_xcom_from_variable,
+    _xcom_backup_variable_key,
 )
 
 
@@ -122,6 +123,40 @@ class _MockTI:
 
     def xcom_push(self, key, value, **_):
         self.store[key] = value
+
+
+class TestXcomBackupVariableKey:
+    """Tests for ``_xcom_backup_variable_key`` covering secrets-backend
+    compatibility (AWS Secrets Manager and similar reject ``:``, ``+`` etc.)."""
+
+    AWS_ALLOWED = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+
+    def test_period_replacement_preserved(self):
+        key = _xcom_backup_variable_key("a.b", "g.h", "r.s")
+        assert key == "cosmos_xcom_backup__a___b__g__h__r_s"
+
+    def test_run_id_with_colon_and_plus_is_sanitized(self):
+        key = _xcom_backup_variable_key(
+            dag_id="dbt_daily",
+            task_group_id=None,
+            run_id="scheduled__2026-05-04T10:15:00+00:00",
+        )
+        assert key == "cosmos_xcom_backup__dbt_daily__scheduled__2026-05-04T10_15_00_00_00"
+        assert ":" not in key and "+" not in key
+
+    @pytest.mark.parametrize(
+        "dag_id,task_group_id,run_id",
+        [
+            ("dbt_daily", None, "scheduled__2026-05-04T10:15:00+00:00"),
+            ("dag.with.dots", "group.id", "manual__2026-01-01T00:00:00+00:00"),
+            ("dag with spaces", None, "manual__2026-01-01"),
+            ("dag(parens)", None, "run/with/slashes"),
+            ("dag*star", "group:colon", "run+plus"),
+        ],
+    )
+    def test_result_contains_only_safe_characters(self, dag_id, task_group_id, run_id):
+        key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
+        assert all(c in self.AWS_ALLOWED for c in key), key
 
 
 class TestInitXcomBackup:

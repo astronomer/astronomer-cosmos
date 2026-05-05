@@ -207,7 +207,7 @@ To run the checks manually, run:
 
     pre-commit run --all-files
 
-Writing Docs
+Writing docs
 ++++++++++++
 
 `Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatch to declare the dependencies required for the project itself, as well as for tests and documentation builds.

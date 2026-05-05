@@ -121,7 +121,7 @@ Choosing a folder
 All the DbtDocsOperators support specification of a custom folder (prefix) to place documentation in on the target cloud storage. This can be done by
 adding a ``folder_dir`` parameter to the operator definition.
 
-Static Flag
+Static flag
 '''''''''''
 
 All of the DbtDocsOperator accept the ``--static`` flag. To learn more about the static flag, check out the `original PR on dbt-core <https://github.com/dbt-labs/dbt-docs/pull/465>`_.
@@ -149,7 +149,7 @@ The following code snippet shows how to provide this flag with the default jaffl
         dbt_cmd_flags=["--static"],
     )
 
-Custom Callback
+Custom callback
 '''''''''''''''
 
 If you want to run custom code after the docs are generated, you can use the :class:`~cosmos.operators.DbtDocsOperator`. The following code snippet shows how to do this with the default jaffle_shop project:

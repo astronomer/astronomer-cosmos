@@ -1,6 +1,6 @@
 .. _managing-sources:
 
-Managing Sources
+Managing sources
 ----------------
 
 .. note::
@@ -37,7 +37,7 @@ Example:
     )
 
 
-Source Pruning
+Source pruning
 ++++++++++++++
 
 The ``source_pruning`` is a boolean parameter available in the ``RenderConfig``.
@@ -63,7 +63,7 @@ Example:
 In this example, if the ``jaffle_shop`` project has multiple sources, but only some of them are upstream of the ``customers`` model, Cosmos will only render the necessary sources and prune the rest.
 
 
-on_warning_callback Callback
+on_warning_callback callback
 ++++++++++++++++++++++++++++
 
 The ``on_warning_callback`` is a callback parameter available on the ``DbtSourceLocalOperator``. This callback is triggered when a warning occurs during the execution of the ``dbt source freshness`` command. The callback accepts the task context, which includes additional parameters: test_names and test_results

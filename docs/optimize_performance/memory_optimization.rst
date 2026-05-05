@@ -169,7 +169,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 **Reference**: `Airflow Scaling Workers Documentation <https://www.astronomer.io/docs/learn/airflow-scaling-workers>`_
 
 
-6. Enable Memory-Optimized Imports (Cosmos < 1.14.0 only)
+6. Enable memory-optimized imports (Cosmos < 1.14.0 only)
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 **Applies to**: Cosmos versions **earlier than 1.14.0**. Since Cosmos 1.14.0, ``cosmos/__init__.py`` uses lazy imports by default and this setting is a no-op. If you are on 1.14.0 or newer, skip this section.

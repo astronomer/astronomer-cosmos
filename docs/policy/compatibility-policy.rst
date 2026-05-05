@@ -1,6 +1,6 @@
 .. _compatibility-policy:
 
-Compatibility Policy
+Compatibility policy
 --------------------
 
 This document outlines Astronomer Cosmos's compatibility policy for Python,
@@ -150,7 +150,7 @@ If you encounter compatibility issues:
 3. **Include versions**: Specify Python, Airflow, dbt Core, and Cosmos versions
    in your report
 
-Contributor Guidance
+Contributor guidance
 ++++++++++++++++++++
 
 Proposing version changes

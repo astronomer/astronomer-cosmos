@@ -1,6 +1,6 @@
 .. _project-config:
 
-Project Config
+Project config
 --------------
 
 The ``cosmos.config.ProjectConfig`` allows you to specify information about where your dbt project is located and project

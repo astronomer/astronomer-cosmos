@@ -25,6 +25,10 @@ DBT_SUCCESS_STATUSES = frozenset({"success", "pass", "warn"})
 DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error", "runtime error"})
 DBT_SKIPPED_STATUSES = frozenset({"skipped"})
 
+# Airflow task states that indicate the producer has finished and will not deliver any more XCom updates.
+# Used to decide whether a sensor retry should fall back to a non-watcher run or keep polling.
+PRODUCER_TERMINAL_STATES = frozenset({"success", "failed", "skipped", "upstream_failed", "removed"})
+
 
 class DbtTestStatus(str, Enum):
     """Aggregated status of all tests for a given model."""
@@ -53,6 +57,11 @@ def is_dbt_node_status_skipped(status: str | None) -> bool:
 def is_dbt_node_status_terminal(status: str | None) -> bool:
     """Check if the dbt node status is terminal (success, failed, or skipped)."""
     return is_dbt_node_status_success(status) or is_dbt_node_status_failed(status) or is_dbt_node_status_skipped(status)
+
+
+def is_producer_task_terminated(state: str | None) -> bool:
+    """Return True when the producer task is in a terminal state."""
+    return state in PRODUCER_TERMINAL_STATES
 
 
 xcom_set_lock = Lock()

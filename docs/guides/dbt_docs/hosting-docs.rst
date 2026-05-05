@@ -16,8 +16,8 @@ Overview
 ++++++++
 
 
-Airflow 3
-+++++++++
+Apache Airflow® 3
+++++++++++++++++++
 
 The dbt docs are available in the Airflow menu under ``Browse``:
 
@@ -53,8 +53,8 @@ Endpoints per project (``<slug>``):
 - ``/cosmos/<slug>/manifest.json`` and ``/cosmos/<slug>/catalog.json``
 
 
-Local vs Remote docs (Airflow 3)
-''''''''''''''''''''''''''''''''
+Local vs Remote docs (Apache Airflow® 3)
+'''''''''''''''''''''''''''''''''''''''''
 
 Local docs (filesystem paths)
 .............................
@@ -93,8 +93,8 @@ Notes and behavior
 - The docs iframe page (``/cosmos/<slug>/dbt_docs``) links to the index and shows within the Airflow UI; the index adds a small inline script to keep browser back/forward behavior intuitive.
 - If you deploy behind a path prefix (e.g. Astronomer hosted Airflow deployments), menu links include the prefix automatically using ``AIRFLOW__API__BASE_URL``.
 
-Airflow 2
-+++++++++
+Apache Airflow® 2
+++++++++++++++++++
 
 .. important::
    The remainder of this page applies to Airflow 2 (Flask-AppBuilder) plugins only.

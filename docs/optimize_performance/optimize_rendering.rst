@@ -3,7 +3,7 @@
 Optimize DAG Parsing
 --------------------
 
-Every time Airflow parses a DAG file that contains a ``DbtDag`` or ``DbtTaskGroup``, Cosmos must load and process the
+Every time `Apache Airflow® <https://airflow.apache.org/>`_ parses a DAG file that contains a ``DbtDag`` or ``DbtTaskGroup``, Cosmos must load and process the
 dbt project to build the corresponding Airflow task graph. The time this takes directly affects how quickly your DAGs
 appear and update in Airflow. This page covers the most impactful ways to reduce that parse time.
 

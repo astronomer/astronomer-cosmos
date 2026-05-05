@@ -19,7 +19,12 @@ from packaging.version import Version
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig, TestBehavior
 from cosmos.config import InvocationMode
-from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT, ExecutionMode
+from cosmos.constants import (
+    _DBT_STARTUP_EVENTS_XCOM_KEY,
+    PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
+    ExecutionMode,
+    SourceRenderingBehavior,
+)
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
@@ -39,6 +44,10 @@ DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_sh
 DBT_PROFILES_YAML_FILEPATH = DBT_PROJECT_PATH / "profiles.yml"
 MULTI_FOLDER_DBT_PROJ_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt/multi_folder"
 DBT_WATCHER_FAILING_TESTS_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_failing_tests"
+ALTERED_JAFFLE_SHOP_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
+DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH = (
+    Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_downstream_not_skipped"
+)
 
 DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
@@ -1068,8 +1077,10 @@ class TestDbtConsumerWatcherSensor:
             sensor.poke(context)
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase.build_and_run_cmd")
-    def test_task_retry(self, mock_build_and_run_cmd):
+    def test_task_retry_fallback_when_producer_terminated(self, mock_build_and_run_cmd):
+        """On retry, if the producer has already finished, fall back to running the model locally."""
         sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "success"
         ti = MagicMock()
         ti.try_number = 2
         ti.xcom_pull.return_value = None
@@ -1077,6 +1088,22 @@ class TestDbtConsumerWatcherSensor:
 
         sensor.poke(context)
         mock_build_and_run_cmd.assert_called_once()
+
+    @patch("cosmos.operators._watcher.base.get_xcom_val")
+    def test_task_retry_keeps_polling_when_producer_still_running(self, mock_get_xcom_val):
+        """On retry, if the producer is still running, keep polling instead of launching a duplicate dbt run."""
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "running"
+        ti = MagicMock()
+        ti.try_number = 2
+        # _log_startup_events=None, _get_node_status=None, compiled_sql (skipped), _dbt_event=None
+        ti.xcom_pull.return_value = None
+        mock_get_xcom_val.return_value = None
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+        assert result is False
+        assert sensor.poke_retry_number == 1
 
     def test_fallback_to_non_watcher_run(self):
         sensor = self.make_sensor()
@@ -1717,12 +1744,13 @@ def test_dbt_task_group_with_watcher():
     # assert outcome.state == DagRunState.SUCCESS
     # Fortunately, when we trigger the DAG run manually, the weight is being respected and the producer task is being picked up in advance.
 
-    assert len(dag_dbt_task_group_watcher.task_dict) == 10
+    assert len(dag_dbt_task_group_watcher.task_dict) == 11
     tasks_names = [task.task_id for task in dag_dbt_task_group_watcher.topological_sort()]
 
     expected_task_names = [
         "pre_dbt",
         "dbt_task_group.dbt_producer_watcher",
+        "dbt_task_group.dbt_producer_watcher_done",
         "dbt_task_group.raw_customers_seed",
         "dbt_task_group.raw_orders_seed",
         "dbt_task_group.raw_payments_seed",
@@ -1746,7 +1774,18 @@ def test_dbt_task_group_with_watcher():
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.customers_run"], DbtRunWatcherOperator)
     assert isinstance(dag_dbt_task_group_watcher.task_dict["dbt_task_group.orders_run"], DbtRunWatcherOperator)
 
-    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == set()
+    assert dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher"].downstream_task_ids == {
+        "dbt_task_group.dbt_producer_watcher_done",
+    }
+
+    done_task = dag_dbt_task_group_watcher.task_dict["dbt_task_group.dbt_producer_watcher_done"]
+    assert done_task.__class__.__name__ == "EmptyOperator"
+    try:
+        from airflow.task.trigger_rule import TriggerRule
+    except ImportError:
+        from airflow.utils.trigger_rule import TriggerRule  # type: ignore[no-redef]
+
+    assert done_task.trigger_rule == TriggerRule.NONE_FAILED
 
 
 @pytest.mark.integration
@@ -1956,6 +1995,153 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
     assert dbt_error_message in caplog.text
 
 
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10"),
+    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
+)
+@pytest.mark.integration
+def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
+    """
+    When freshness_callback returns a model with "skipped" state, the producer task:
+    - pre-sets a "skipped" XCom for that model
+    - adds it to dbt build's --exclude list so dbt never runs it
+
+    The consumer sensor for the excluded model reads the pre-set XCom and raises
+    AirflowSkipException. All other models run normally.
+
+    Pre-loads seeds via a local DbtDag first so that dbt source freshness can query
+    raw_orders (which has a freshness block in altered_jaffle_shop).
+    """
+    # Pre-load seeds and models so dbt source freshness has a table to check
+    preload_dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=ALTERED_JAFFLE_SHOP_PATH),
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="altered_jaffle_shop_preload",
+        render_config=RenderConfig(
+            source_rendering_behavior=SourceRenderingBehavior.NONE,
+            test_behavior=TestBehavior.NONE,
+            emit_datasets=False,
+        ),
+        operator_args={"install_deps": True, "full_refresh": True, "execution_timeout": timedelta(seconds=180)},
+    )
+    new_test_dag(preload_dag)
+
+    def skip_orders(context, dag, task_group, nodes, sources_json):
+        return [("model.altered_jaffle_shop.orders", "skipped")]
+
+    watcher_dag = DbtDag(
+        project_config=ProjectConfig(dbt_project_path=ALTERED_JAFFLE_SHOP_PATH),
+        profile_config=profile_config,
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_freshness_callback_exclude",
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+            invocation_mode=InvocationMode.DBT_RUNNER,
+            setup_operator_args={"freshness_callback": skip_orders},
+        ),
+        render_config=RenderConfig(
+            source_rendering_behavior=SourceRenderingBehavior.ALL,
+            test_behavior=TestBehavior.NONE,
+            emit_datasets=False,
+        ),
+        operator_args={"trigger_rule": "all_success", "execution_timeout": timedelta(seconds=120)},
+        default_args={"retries": 0},
+    )
+    outcome = new_test_dag(watcher_dag)
+    assert outcome.state == DagRunState.SUCCESS
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    # orders was returned by the callback → excluded from dbt build → sensor reads "skipped" XCom
+    assert tis["orders_run"].state == "skipped"
+    # other models are unaffected and succeed
+    assert tis["customers_run"].state == "success"
+    # source sensor for raw_orders (has freshness block) must also complete successfully
+    # task ID derives from unique_id split: "postgres_db.raw_orders" → "postgres_db_raw_orders"
+    assert tis["postgres_db_raw_orders_source"].state == "success"
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10") or (Version("3.1.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    reason=(
+        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
+        "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
+        "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
+        "the watcher sensor cannot detect producer termination on retry. "
+        "Airflow 3.1.x crashes during task finalization (SetRenderedFields) when retrying "
+        "tasks inside a DbtTaskGroup via dag.test()."
+    ),
+)
+@pytest.mark.integration
+def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog):
+    """
+    Verify that the dbt_producer_watcher_done gateway task prevents the producer's skip
+    from propagating to tasks downstream of the DbtTaskGroup.
+    """
+    import psycopg2
+    from airflow import DAG
+    from airflow.hooks.base import BaseHook
+
+    from cosmos import DbtTaskGroup
+
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator
+
+    # Reset the fail_once sequence using credentials from the same Airflow connection
+    airflow_conn = BaseHook.get_connection("example_conn")
+    with psycopg2.connect(
+        host=airflow_conn.host,
+        port=airflow_conn.port or 5432,
+        dbname=airflow_conn.schema or "postgres",
+        user=airflow_conn.login,
+        password=airflow_conn.password,
+    ) as conn:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
+
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
+
+    with DAG(
+        dag_id="watcher_taskgroup_gateway_test",
+        start_date=datetime(2023, 1, 1),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        dagrun_timeout=timedelta(seconds=120),
+    ) as dag:
+        dbt_group = DbtTaskGroup(
+            group_id="watcher_downstream_not_skipped",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH),
+            profile_config=profile_config,
+            render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=120)},
+        )
+
+        # Force gateway >> root consumers so dag.test() respects execution order.
+        # Using the gateway (not the producer) as upstream ensures consumers see a
+        # successful upstream even when the producer is skipped.
+        # This workaround is only needed for dag.test() — the real scheduler uses priority_weight.
+        # See https://github.com/apache/airflow/issues/56723
+        gateway = dag.task_dict["watcher_downstream_not_skipped.dbt_producer_watcher_done"]
+        for root_task in dbt_group.get_roots():
+            if root_task.task_id.endswith("_done") or root_task.task_id.endswith("dbt_producer_watcher"):
+                continue
+            gateway >> root_task
+
+        post_dbt = EmptyOperator(task_id="post_dbt")
+        dbt_group >> post_dbt
+
+    outcome = new_test_dag(dag, expected_dag_state=DagRunState.SUCCESS)
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    # The gateway task absorbs the producer skip — post_dbt runs successfully
+    assert tis["post_dbt"].state == "success"
+    assert tis["watcher_downstream_not_skipped.dbt_producer_watcher_done"].state == "success"
+
+
 def test_dbt_source_watcher_operator_template_fields():
     """Test that DbtSourceWatcherOperator includes model_unique_id as a consumer sensor."""
     from cosmos.operators._watcher.base import BaseConsumerSensor
@@ -2049,14 +2235,27 @@ class TestDbtTestWatcherOperator:
         assert self.TESTS_STATUS_XCOM_KEY in xcom_keys_used
 
     def test_fallback_raises_on_retry(self):
-        """On retry (try_number > 1), the test sensor should raise since test re-execution is not yet supported."""
+        """On retry (try_number > 1) with a terminated producer, the test sensor should raise since test re-execution is not yet supported."""
         sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "success"
         ti = MagicMock()
         ti.try_number = 2
         context = self.make_context(ti)
 
         with pytest.raises(AirflowException, match="Test re-execution is not yet supported"):
             sensor.poke(context)
+
+    def test_retry_keeps_polling_when_producer_still_running(self):
+        """On retry, if the producer is still running, the test sensor should keep polling instead of raising."""
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "running"
+        ti = MagicMock()
+        ti.try_number = 2
+        ti.xcom_pull.return_value = None
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+        assert result is False
 
 
 class TestDefaultFreshnessCallback:
@@ -2396,13 +2595,24 @@ class TestProducerSourceFreshness:
         ti.xcom_push.assert_not_called()
         assert producer.exclude is None
 
-    def test_apply_node_state_tokens_non_skipped_state_does_not_update_exclude(self):
+    def test_apply_node_state_tokens_failed_state_updates_exclude(self):
         producer = self._make_producer()
         producer.exclude = None
         ti = MagicMock()
         context = {"ti": ti}
         producer._apply_node_state_tokens(context, [("model.pkg.m1", "failed")])
         ti.xcom_push.assert_called_once_with(key="model__pkg__m1_status", value={"status": "failed", "outlet_uris": []})
+        assert "m1" in producer.exclude
+
+    def test_apply_node_state_tokens_success_state_does_not_update_exclude(self):
+        producer = self._make_producer()
+        producer.exclude = None
+        ti = MagicMock()
+        context = {"ti": ti}
+        producer._apply_node_state_tokens(context, [("model.pkg.m1", "success")])
+        ti.xcom_push.assert_called_once_with(
+            key="model__pkg__m1_status", value={"status": "success", "outlet_uris": []}
+        )
         assert producer.exclude is None
 
     def test_run_dbt_runner_skips_callback_during_source_freshness(self):

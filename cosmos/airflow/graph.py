@@ -25,6 +25,7 @@ from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
+    PRODUCER_WATCHER_DONE_TASK_ID,
     PRODUCER_WATCHER_TASK_ID,
     SUPPORTED_BUILD_RESOURCES,
     TESTABLE_DBT_RESOURCES,
@@ -561,6 +562,23 @@ def generate_task_or_group(
         filtered_nodes=filtered_nodes,
     )
 
+    # create_task_metadata() returns None for node types not in dbt_resource_to_class (e.g.dynamically-resolved types
+    # like "exposure", "analysis", or user-defined types). When the user has supplied a node_converter for that type,
+    # create a stub TaskMetadata so that generate_or_convert_task() can pass the node through to the converter.
+    if task_meta is None and node.resource_type in node_converters:
+        task_id, _ = _get_task_id_and_args(
+            node=node,
+            args={},
+            use_task_group=False,
+            normalize_task_id=render_config.normalize_task_id,
+            normalize_task_display_name=render_config.normalize_task_display_name,
+            resource_suffix=node.resource_type.value,
+            execution_mode=execution_mode,
+        )
+
+        # Stub for task_meta, "" operator class
+        task_meta = TaskMetadata(id=task_id, operator_class="", arguments={})
+
     generate_or_convert_task_args = {
         "task_meta": task_meta,
         "dbt_project_name": dbt_project_name,
@@ -716,6 +734,20 @@ def _add_watcher_producer_task(
     )
     producer_airflow_task = create_airflow_task(producer_task_metadata, dag, task_group=task_group)
     tasks_map[PRODUCER_WATCHER_TASK_ID] = producer_airflow_task
+
+    # For DbtTaskGroup, add a gate task that absorbs the producer's skip state
+    # so it does not propagate to tasks downstream of the group.
+    # Not needed for DbtDag where producer >> consumers with trigger_rule="always" handles this.
+    if task_group is not None:
+        from cosmos.operators._watcher.base import create_producer_done_task
+
+        producer_done_task = create_producer_done_task(
+            dag=dag,
+            task_group=task_group,
+            task_id=PRODUCER_WATCHER_DONE_TASK_ID,
+        )
+        producer_airflow_task >> producer_done_task
+
     return producer_airflow_task
 
 
@@ -732,8 +764,8 @@ def _add_watcher_dependencies(
     - make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
     """
     for node_id, task_or_taskgroup in tasks_map.items():
-        # We do not want to set a dependency between the producer task and itself
-        if node_id == PRODUCER_WATCHER_TASK_ID:
+        # We do not want to set a dependency between the producer task (or its gate) and itself
+        if node_id in (PRODUCER_WATCHER_TASK_ID, PRODUCER_WATCHER_DONE_TASK_ID):
             continue
 
         node_tasks = (

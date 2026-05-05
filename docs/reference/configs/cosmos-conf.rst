@@ -3,7 +3,7 @@
 Cosmos Config
 -------------
 
-This page lists all available Airflow configurations that affect ``astronomer-cosmos`` Astronomer Cosmos behavior. They can be set in the ``airflow.cfg file`` or using environment variables.
+This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ configurations that affect Astronomer Cosmos behavior. They can be set in the ``airflow.cfg`` file or using environment variables.
 
 .. note::
     For more information, see `Setting Configuration Options <https://airflow.apache.org/docs/apache-airflow/stable/howto/set-config.html>`_.
@@ -304,12 +304,34 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 .. _enable_memory_optimised_imports:
 
 `enable_memory_optimised_imports`_:
-    (Introduced in Cosmos 1.10.1): This setting is a no-op since Cosmos 1.14.0. All imports in ``cosmos/__init__.py``
-    are now lazy by default — modules are only loaded on first access. This provides the same memory optimization
-    automatically, without requiring users to change their import paths. The setting is still accepted but has no effect.
+    (Introduced in Cosmos 1.10.1): On Cosmos versions earlier than 1.14.0, eager imports in ``cosmos/__init__.py``
+    exposed all Cosmos classes at the top level, which could significantly increase memory usage—even when Cosmos was
+    just installed but not actively used. This option allowed disabling those eager imports to reduce memory footprint.
+    When enabled, users had to access Cosmos classes via their full module paths, avoiding the overhead of importing
+    unused modules and classes.
 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS``
+
+    .. note::
+        Since Cosmos 1.14.0, all imports in ``cosmos/__init__.py`` are lazy by default — modules are only loaded on
+        first access. This provides the same memory optimization automatically, without requiring users to change their
+        import paths. On 1.14.0 and newer, this setting is accepted but has no effect. The guidance below is relevant
+        only for users on Cosmos versions earlier than 1.14.0.
+
+    When enabled, import Cosmos classes via their full module paths:
+
+    .. literalinclude:: ../../../dev/dags/basic_cosmos_dag_full_module_path_imports.py
+        :language: python
+        :start-after: [START cosmos_explicit_imports]
+        :end-before: [END cosmos_explicit_imports]
+
+    as opposed to the following approach you might have when this option is disabled (default):
+
+    .. literalinclude:: ../../../dev/dags/basic_cosmos_dag.py
+        :language: python
+        :start-after: [START cosmos_init_imports]
+        :end-before: [END cosmos_init_imports]
 
 .. _enable_telemetry:
 

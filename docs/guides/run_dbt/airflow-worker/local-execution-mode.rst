@@ -4,7 +4,7 @@ Local execution mode
 --------------------
 
 By default, Cosmos uses the ``local`` execution mode. It is the fastest way to run Cosmos operators, since it runs dbt either as a library or as a local subprocess.
-For situations where dbt and Airflow dependencies conflict, :ref:`execution-modes-local-conflicts`, you most likely have the option to pre-install dbt in an isolated Python virtual environment, either as part of the container image or as part of a pre-start script.
+For situations where dbt and `Apache Airflow® <https://airflow.apache.org/>`_ dependencies conflict, :ref:`execution-modes-local-conflicts`, you most likely have the option to pre-install dbt in an isolated Python virtual environment, either as part of the container image or as part of a pre-start script.
 
 The ``local`` execution mode assumes that the Airflow worker node can access a ``dbt`` binary. If ``dbt`` was not installed alongside Cosmos, you can create a dedicated virtual environment and define a custom path to ``dbt`` by declaring the argument ``ExecutionConfig.dbt_executable_path``.
 

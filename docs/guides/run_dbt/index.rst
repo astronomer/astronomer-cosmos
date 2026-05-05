@@ -3,7 +3,7 @@
 How Cosmos runs dbt
 -------------------
 
-Cosmos can run dbt commands directly using operators, or, after the dbt project has been parsed and turned into an Airflow Dag or task group, you can execute it.
+Cosmos can run dbt commands directly using operators, or, after the dbt project has been parsed and turned into an `Apache Airflow® <https://airflow.apache.org/>`_ Dag or task group, you can execute it.
 
 In many execution modes, Cosmos ``DbtDag`` and ``DbtTaskGroup`` create a separate task for each dbt node (model, seed, snapshot).
 This leads to improved visibility and the

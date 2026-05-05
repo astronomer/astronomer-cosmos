@@ -10,6 +10,7 @@
    Guides <guides/index>
    Optimize Performance <optimize_performance/index>
    Reference <reference/index>
+   FAQ <faq>
    Policies <policy/index>
 
 

@@ -58,7 +58,7 @@ An example of how the data uploaded to GCS looks like when using ``upload_to_gcp
 The path naming convention is:
 
 - Bucket configured by the user
-- Name of the DAG
+- Name of the Dag
 - Dag Run identifier
 - Task ID
 - Task retry identifier

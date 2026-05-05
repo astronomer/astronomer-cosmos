@@ -1275,7 +1275,7 @@ class DbtGraph:
                 manifest = orjson.loads(fp.read())
         elif settings.enable_orjson_parser:
             raise CosmosLoadDbtException(
-                "orjson is not installed. Install it with: pip install 'astronomer-cosmos[orjson]'"
+                "orjson is not installed. Install it with: pip install orjson"
             )
         else:
             with manifest_path.open("r") as fp:

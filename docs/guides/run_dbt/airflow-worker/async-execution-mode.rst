@@ -36,7 +36,7 @@ We have `observed <https://github.com/astronomer/astronomer-cosmos/pull/1934>`_ 
 +----------------------------------------------+--------------------------+
 
 
-Getting Started with Airflow Async Mode
+Getting started with Airflow async mode
 +++++++++++++++++++++++++++++++++++++++
 
 This guide walks you through setting up an Astro CLI project and running a Cosmos-based DAG with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
@@ -47,7 +47,7 @@ Prerequisites
 - `Astro CLI <https://www.astronomer.io/docs/astro/cli/install-cli>`_
 - Airflow>=2.9
 
-1. Create Astro-CLI Project
+1. Create Astro-CLI project
 '''''''''''''''''''''''''''
 
 Run the following command in your terminal:
@@ -82,7 +82,7 @@ Edit your Dockerfile to ensure all necessary requirements are included.
     FROM astrocrpublic.azurecr.io/runtime:3.0-2
 
 
-3. Add astronomer-cosmos Dependency
+3. Add astronomer-cosmos dependency
 '''''''''''''''''''''''''''''''''''
 
 In your ``requirements.txt``, add:

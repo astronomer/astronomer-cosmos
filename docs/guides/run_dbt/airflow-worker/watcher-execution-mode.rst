@@ -1,6 +1,6 @@
 .. _watcher-execution-mode:
 
-Watcher execution mode (Experimental)
+Watcher execution mode (experimental)
 -------------------------------------
 
 With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in `Apache Airflow® <https://airflow.apache.org/>`_.
@@ -12,7 +12,7 @@ Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime *
 - The ``poke_interval`` and ``timeout`` settings of the ``DbtConsumerWatcherSensor`` operator, which determine the frequency and duration of the sensor's polling.
 
 
-Background: The Problem with the Local Execution Mode in Cosmos
+Background: The problem with the local execution mode in Cosmos
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 When running dbt via Cosmos using the default ``ExecutionMode.LOCAL``, each dbt model is executed as a separate Airflow task.
@@ -52,7 +52,7 @@ Together, these operators let you:
 - Retry specific models (for resilience)
 
 
-Performance Gains
+Performance gains
 +++++++++++++++++
 
 We used a dbt project developed by Google, the `google/fhir-dbt-analytics <https://github.com/google/fhir-dbt-analytics>`_ project, that interfaces with BigQuery. It contains:
@@ -128,7 +128,7 @@ If you prefer to manage threads through Cosmos profile mappings instead of editi
 
 
 
-Example Usage of ``ExecutionMode.WATCHER``
+Example usage of ``ExecutionMode.WATCHER``
 ++++++++++++++++++++++++++++++++++++++++++
 
 There are two main ways to use the new execution mode in Cosmos — directly within a ``DbtDag``, or embedded as part of a ``DbtTaskGroup`` inside a larger DAG.
@@ -341,7 +341,7 @@ Starting with Cosmos 1.12.0, the ``DbtConsumerWatcherSensor`` supports
 which increases overall task throughput. By default, the sensor now runs in deferrable mode.
 
 
-Known Limitations
+Known limitations
 +++++++++++++++++
 
 Producer task implementation

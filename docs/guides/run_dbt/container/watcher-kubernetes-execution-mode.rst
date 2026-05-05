@@ -1,7 +1,7 @@
 .. _watcher-kubernetes-execution-mode:
 
 
-Watcher Kubernetes execution mode (Experimental)
+Watcher Kubernetes execution mode (experimental)
 ------------------------------------------------
 
 .. versionadded:: 1.13.0
@@ -25,7 +25,7 @@ However, the original ``ExecutionMode.WATCHER`` requires dbt to be installed alo
 For more details on the watcher concept and how it works, please refer to the :ref:`watcher-execution-mode` documentation.
 
 
-How to Use
+How to use
 ++++++++++
 
 Users previously using ``ExecutionMode.KUBERNETES`` can simply replace the ``execution_mode`` to use ``ExecutionMode.WATCHER_KUBERNETES``.
@@ -61,7 +61,7 @@ The following example shows how to configure a ``DbtDag`` with ``ExecutionMode.W
 For the complete setup including Kubernetes secrets, Docker image configuration, and profile setup, refer to the :ref:`kubernetes` documentation.
 
 
-Performance Gains
+Performance gains
 +++++++++++++++++
 
 Early benchmarks using the ``jaffle_shop_watcher_kubernetes`` DAG show significant improvements:
@@ -83,10 +83,10 @@ The performance improvement comes from:
 - Eliminating repeated dbt initialization for each model
 
 
-Known Limitations
+Known limitations
 +++++++++++++++++
 
-Kubernetes Provider Version Compatibility
+Kubernetes provider version compatibility
 '''''''''''''''''''''''''''''''''''''''''
 
 ``ExecutionMode.WATCHER_KUBERNETES`` does not work with older versions of the ``apache-airflow-providers-cncf-kubernetes`` provider (<=10.7.0).
@@ -154,7 +154,7 @@ The  ``operator_args`` must define ``get_logs`` and ``log_events_on_failure``:
     )
 
 
-Other Inherited Limitations
+Other inherited limitations
 '''''''''''''''''''''''''''
 
 The following limitations from ``ExecutionMode.WATCHER`` also apply to ``ExecutionMode.WATCHER_KUBERNETES``:

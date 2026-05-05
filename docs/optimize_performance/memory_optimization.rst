@@ -1,13 +1,13 @@
 .. _memory-optimization:
 
-Memory Optimization Options for Astronomer Cosmos
--------------------------------------------------
+Memory optimization options for Astronomer Cosmos
+--------------------------------------------------
 
 When running dbt pipelines with Astronomer Cosmos, the framework executes dbt commands that can consume significant memory resources. In high-memory scenarios, tasks may reach a zombie state or workers may be killed due to Out of Memory (OOM) errors, leading to pipeline failures and reduced reliability.
 
 Cosmos provides various configuration options and execution modes to optimize memory usage, reduce worker resource consumption, and prevent OOM issues. This document outlines these memory optimization strategies, from simple configuration changes to advanced execution modes that can dramatically reduce memory footprint while maintaining or improving pipeline performance.
 
-1. Use DBT_MANIFEST Load Mode
+1. Use DBT_MANIFEST load mode
 +++++++++++++++++++++++++++++
 
 **Impact**: High - Avoids running ``dbt ls`` subprocess which can consume significant CPU and memory. This reduces memory consumption when a cache miss occurs in the DBT LS method. It may not significantly reduce the memory footprint if there is a cache hit.
@@ -33,7 +33,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 **Requirements**: You need a ``manifest.json`` file (can be generated with ``dbt compile`` or ``dbt run``).
 
 
-2. Use DBT_RUNNER Invocation Mode
+2. Use DBT_RUNNER invocation mode
 +++++++++++++++++++++++++++++++++
 
 - (default for ``ExecutionMode.LOCAL`` since 1.4.0, default for ``RenderConfig.DBT_LS`` since Cosmos 1.9.0)
@@ -64,7 +64,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 **Default**: default behaviour for ``ExecutionMode.LOCAL`` since 1.4.0, default behaviour for ``RenderConfig.DBT_LS`` since Cosmos 1.9.0
 
 
-3. Use Partial Parse (Keep Enabled)
+3. Use partial parse (keep enabled)
 +++++++++++++++++++++++++++++++++++
 
 **Impact**: Low - Actually reduces memory by avoiding full project parsing.
@@ -101,7 +101,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 - `Configure a Custom Queue for Producer and Watcher Tasks in ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html#watcher-dbt-execution-queue>`_
 
 
-5. Control DAG-Level Concurrency with ``concurrency`` Parameter
+5. Control DAG-level concurrency with ``concurrency`` parameter
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 **Impact**: High - Limits concurrent task execution per DAG based on available resources.
@@ -169,7 +169,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 **Reference**: `Airflow Scaling Workers Documentation <https://www.astronomer.io/docs/learn/airflow-scaling-workers>`_
 
 
-6. Enable Memory-Optimized Imports (Cosmos < 1.14.0 only)
+6. Enable memory-optimized imports (Cosmos < 1.14.0 only)
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 **Applies to**: Cosmos versions **earlier than 1.14.0**. Since Cosmos 1.14.0, ``cosmos/__init__.py`` uses lazy imports by default and this setting is a no-op. If you are on 1.14.0 or newer, skip this section.
@@ -205,7 +205,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 **Default**: ``False``
 
 
-7. Enable Task Profiling with Debug Mode
+7. Enable task profiling with debug mode
 ++++++++++++++++++++++++++++++++++++++++
 
 **Impact**: Low - Provides visibility into memory usage patterns to help identify optimization opportunities and prevent OOM issues.

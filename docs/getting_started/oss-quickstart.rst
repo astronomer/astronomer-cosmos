@@ -1,9 +1,9 @@
 .. _oss-quickstart:
 
-Run Cosmos in open-source Airflow
----------------------------------
+Run Cosmos in open-source Apache Airflow®
+------------------------------------------
 
-Quickly get started working locally with Airflow, dbt, and Astronomer Cosmos using the `Open-source Airflow <https://airflow.apache.org/docs/apache-airflow/stable/index.html>`_.
+Quickly get started working locally with `Apache Airflow® <https://airflow.apache.org/>`_, dbt, and Astronomer Cosmos using the `Open-source Airflow <https://airflow.apache.org/docs/apache-airflow/stable/index.html>`_.
 
 This quickstart guide shows you how to set up a simple demo project, run a simple Dag locally with Cosmos, and then view the results with an open-source database viewer. If you want to get started working with your own project and configurations, see `Get started with Open-source Airflow <open-source.html>`_.
 

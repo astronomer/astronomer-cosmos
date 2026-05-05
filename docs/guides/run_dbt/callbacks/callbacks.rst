@@ -32,7 +32,7 @@ Example: Using Callbacks with a Single Operator
 +++++++++++++++++++++++++++++++++++++++++++++++
 
 To demonstrate how to specify a callback function for uploading files from the target directory, here’s an example
-using a single operator in an Airflow DAG:
+using a single operator in an `Apache Airflow® <https://airflow.apache.org/>`_ DAG:
 
 .. literalinclude:: ../../../../dev/dags/example_operators.py
     :language: python

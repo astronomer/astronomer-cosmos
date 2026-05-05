@@ -27,7 +27,7 @@ This tutorial will guide you through the steps required to use Cloud Run Job ins
 Prerequisites
 +++++++++++++
 1. Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
-2. Airflow
+2. `Apache Airflow® <https://airflow.apache.org/>`_
 3. Google Cloud SDK (`install guide <https://cloud.google.com/sdk/docs/install>`_)
 4. Astronomer-cosmos package containing the dbt Cloud Run Job operators
 5. GCP account with:
@@ -238,7 +238,7 @@ Run Airflow:
 
 .. note::
 
-    You might need to run airflow standalone with ``sudo`` if your Airflow user is not able to access the docker socket URL or pull the images in the Kind cluster.
+    You might need to run airflow standalone with ``sudo`` if your Airflow user is not able to access the Docker socket URL or pull the images in the Kind cluster.
 
 Log in to Airflow through a web browser ``http://localhost:8080/``, using the user ``airflow`` and the password described in the ``standalone_admin_password.txt`` file.
 

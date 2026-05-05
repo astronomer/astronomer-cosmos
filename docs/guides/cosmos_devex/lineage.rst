@@ -8,7 +8,7 @@ to parse artefacts generated with dbt commands and create lineage events.
 
 To emit lineage events, Cosmos can use one of the following:
 
-1. Airflow `official OpenLineage provider <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_, or
+1. The `Apache Airflow® <https://airflow.apache.org/>`_ `official OpenLineage provider <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/1.0.2/guides/user.html>`_, or
 2. `Additional libraries <https://openlineage.io/docs/integrations/airflow/>`_.
 
 No change to the user DAG files is required to use OpenLineage.

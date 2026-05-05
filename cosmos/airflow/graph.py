@@ -562,6 +562,23 @@ def generate_task_or_group(
         filtered_nodes=filtered_nodes,
     )
 
+    # create_task_metadata() returns None for node types not in dbt_resource_to_class (e.g.dynamically-resolved types
+    # like "exposure", "analysis", or user-defined types). When the user has supplied a node_converter for that type,
+    # create a stub TaskMetadata so that generate_or_convert_task() can pass the node through to the converter.
+    if task_meta is None and node.resource_type in node_converters:
+        task_id, _ = _get_task_id_and_args(
+            node=node,
+            args={},
+            use_task_group=False,
+            normalize_task_id=render_config.normalize_task_id,
+            normalize_task_display_name=render_config.normalize_task_display_name,
+            resource_suffix=node.resource_type.value,
+            execution_mode=execution_mode,
+        )
+
+        # Stub for task_meta, "" operator class
+        task_meta = TaskMetadata(id=task_id, operator_class="", arguments={})
+
     generate_or_convert_task_args = {
         "task_meta": task_meta,
         "dbt_project_name": dbt_project_name,

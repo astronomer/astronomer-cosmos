@@ -96,7 +96,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 4. Use ExecutionMode.WATCHER
 ++++++++++++++++++++++++++++
 
-**Impact**: Very High - Dramatically reduces Airflow worker slot usage and memory consumption.
+**Impact**: Very High - Dramatically reduces `Apache Airflow® <https://airflow.apache.org/>`_ worker slot usage and memory consumption.
 
 **Configuration**
 

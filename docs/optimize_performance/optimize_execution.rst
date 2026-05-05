@@ -18,7 +18,7 @@ single most impactful change for DAG run performance.
 
 In the default ``ExecutionMode.LOCAL``, every model runs as a separate ``dbt run`` invocation, which introduces
 per-task overhead. ``ExecutionMode.WATCHER`` runs a single ``dbt build`` across the entire project and uses
-dbt's native threading to parallelize models, while still giving you model-level visibility in Airflow.
+dbt's native threading to parallelize models, while still giving you model-level visibility in `Apache Airflow® <https://airflow.apache.org/>`_.
 
 Benchmarks show **up to 80% reduction in DAG run time** compared to ``ExecutionMode.LOCAL``.
 See :ref:`watcher-execution-mode` for setup instructions and detailed benchmarks.

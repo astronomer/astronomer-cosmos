@@ -27,7 +27,7 @@ Their logs will contain multiple ``INFO`` messages similar to the following, mea
 dbt vars
 ++++++++
 
-If the Airflow scheduler and worker processes run in the same node, users must ensure the dbt ``--vars`` flag is the same in the ``RenderConfig`` and ``ExecutionConfig``.
+If the `Apache Airflow® <https://airflow.apache.org/>`_ scheduler and worker processes run in the same node, users must ensure the dbt ``--vars`` flag is the same in the ``RenderConfig`` and ``ExecutionConfig``.
 
 Otherwise, users may see messages similar to the following in their logs:
 

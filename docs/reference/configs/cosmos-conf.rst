@@ -351,7 +351,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     Benchmarks show up to 40% faster parsing compared to the standard ``json`` module, with the improvement
     scaling with manifest file size.
 
-    Requires the optional ``orjson`` dependency: ``pip install 'astronomer-cosmos[orjson]'``.
+    Requires the optional ``orjson`` dependency: ``pip install orjson``.
     If this setting is ``True`` but ``orjson`` is not installed, Cosmos raises a
     ``CosmosLoadDbtException`` at parse time with an actionable error message.
 

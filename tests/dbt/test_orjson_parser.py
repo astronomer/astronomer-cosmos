@@ -50,7 +50,7 @@ class TestOrjsonParserMissingDependency:
         error_msg = str(exc_info.value)
         assert "orjson" in error_msg.lower()
         assert "not installed" in error_msg.lower()
-        assert "astronomer-cosmos[orjson]" in error_msg
+        assert "pip install orjson" in error_msg
 
     @patch.object(settings, "enable_orjson_parser", True)
     @patch("cosmos.dbt.graph.orjson", None)
@@ -59,7 +59,7 @@ class TestOrjsonParserMissingDependency:
         manifest_file.write_text('{"nodes": {}, "sources": {}, "exposures": {}}')
         dbt_graph = _make_dbt_graph()
 
-        with pytest.raises(CosmosLoadDbtException, match="astronomer-cosmos\\[orjson\\]"):
+        with pytest.raises(CosmosLoadDbtException, match="pip install orjson"):
             dbt_graph._load_manifest_from_file(manifest_file)
 
 

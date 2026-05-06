@@ -117,12 +117,16 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         # BigQueryInsertJobOperator parameters and hence fails to initialise the operator due to missing arguments.
         # To fix this, we temporarily set the base class to only BigQueryInsertJobOperator during initialization,
         # then restore the full inheritance chain afterward.
-        deferrable = kwargs.pop("deferrable", True)
+        if kwargs.pop("deferrable", True) is False:
+            self.log.warning(
+                "DbtRunAirflowAsyncBigqueryOperator requires deferrable=True. "
+                "The provided value of False has been ignored."
+            )
         DbtRunAirflowAsyncBigqueryOperator.__bases__ = (BigQueryInsertJobOperator,)
         super().__init__(
             gcp_conn_id=self.gcp_conn_id,
             configuration=self.configuration,
-            deferrable=deferrable,
+            deferrable=True,
             **kwargs,
         )
         self.async_context = extra_context or {}

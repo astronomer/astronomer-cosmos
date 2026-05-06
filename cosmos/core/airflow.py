@@ -8,7 +8,10 @@ try:  # Airflow 3
     from airflow.sdk.bases.operator import BaseOperator
 except ImportError:  # Airflow 2
     from airflow.models import BaseOperator
-from airflow.models.dag import DAG
+try:
+    from airflow.sdk import DAG
+except ImportError:
+    from airflow.models.dag import DAG  # type: ignore[assignment]
 
 try:
     # Airflow 3.1 onwards

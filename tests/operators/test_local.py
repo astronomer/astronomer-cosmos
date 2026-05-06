@@ -1598,6 +1598,22 @@ def test_handle_exception_subprocess_nothing_to_do(caplog):
     assert "dbt command output included 'Nothing to do'. Selector may be incorrect." in str(err_context.value)
 
 
+def test_handle_exception_subprocess_nothing_to_do_flag_off(caplog):
+    """Test that output including 'Nothing to do ...' is properly handled when flag is off."""
+    caplog.set_level(logging.ERROR)
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=None,
+        task_id="my-task",
+        project_dir="my/dir",
+        fail_on_nothing_to_do=False
+    )
+    full_output = ["Nothing to do ..."]
+    result = FullOutputSubprocessResult(exit_code=0, output="test", full_output=full_output)
+
+    # Should not raise any exception
+    operator.handle_exception_subprocess(result)
+
+
 @pytest.fixture
 def mock_context():
     return MagicMock()

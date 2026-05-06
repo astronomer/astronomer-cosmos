@@ -131,6 +131,25 @@ def test_manifest_and_catalog_error_500(tmp_path: Path):
 
 
 @skip_pre_airflow_31
+def test_dbt_docs_view_iframe_src_uses_api_base_path(tmp_path: Path):
+    # Regression: iframe src must include the deployment path prefix (e.g. Astronomer /de3jzcwo)
+    # so browsers don't strip it and hit the wrong URL.
+    docs_dir = tmp_path / "target"
+    docs_dir.mkdir(parents=True)
+    (docs_dir / "index.html").write_text("<head></head><body>dbt</body>")
+
+    af3 = _reload_af3_module(api_base="https://host/de3jzcwo")
+    projects = {"core": {"dir": str(docs_dir), "index": "index.html"}}
+    with patch("cosmos.plugin.airflow3._load_projects_from_conf", return_value=projects):
+        app = af3.create_cosmos_fastapi_app()
+
+    client = TestClient(app)
+    r = client.get("/core/dbt_docs")
+    assert r.status_code == 200
+    assert "/de3jzcwo/cosmos/core/dbt_docs_index.html" in r.text
+
+
+@skip_pre_airflow_31
 def test_external_view_href_uses_api_base_path():
     # Ensure base path is respected (e.g., Astronomer deployment prefix)
     _reload_af3_module(api_base="https://host/prefix/")

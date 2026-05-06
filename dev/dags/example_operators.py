@@ -10,7 +10,15 @@ try:
 except ImportError:
     from airflow.operators.python import PythonOperator
 
-from cosmos import DbtCloneLocalOperator, DbtRunLocalOperator, DbtSeedLocalOperator, ProfileConfig
+from cosmos import (
+    DbtBuildLocalOperator,
+    DbtCloneLocalOperator,
+    DbtRunLocalOperator,
+    DbtSeedLocalOperator,
+    DbtSnapshotLocalOperator,
+    DbtTestLocalOperator,
+    ProfileConfig,
+)
 from cosmos.io import upload_to_aws_s3
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -71,6 +79,7 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
         },
     )
 
+    # [START run_local_example]
     run_operator = DbtRunLocalOperator(
         profile_config=profile_config,
         project_dir=DBT_PROJ_DIR,
@@ -79,6 +88,38 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
         install_deps=True,
         append_env=True,
     )
+    # [END run_local_example]
+
+    # [START test_local_example]
+    test_operator = DbtTestLocalOperator(
+        profile_config=profile_config,
+        project_dir=DBT_PROJ_DIR,
+        task_id="test",
+        dbt_cmd_flags=["--models", "stg_customers"],
+        install_deps=True,
+        append_env=True,
+    )
+    # [END test_local_example]
+
+    # [START snapshot_local_example]
+    snapshot_operator = DbtSnapshotLocalOperator(
+        profile_config=profile_config,
+        project_dir=DBT_PROJ_DIR,
+        task_id="snapshot",
+        install_deps=True,
+        append_env=True,
+    )
+    # [END snapshot_local_example]
+
+    # [START build_local_example]
+    build_operator = DbtBuildLocalOperator(
+        profile_config=profile_config,
+        project_dir=DBT_PROJ_DIR,
+        task_id="build",
+        install_deps=True,
+        append_env=True,
+    )
+    # [END build_local_example]
 
     # [START clone_example]
     clone_operator = DbtCloneLocalOperator(

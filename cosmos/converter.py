@@ -12,12 +12,11 @@ from collections.abc import Callable
 from typing import Any
 from warnings import warn
 
-from airflow.exceptions import ParamValidationError
-
 try:
-    from airflow.sdk import DAG
+    from airflow.sdk.exceptions import ParamValidationError
 except ImportError:
-    from airflow.models.dag import DAG
+    from airflow.exceptions import ParamValidationError
+from airflow.models.dag import DAG
 
 try:
     # Airflow 3.0 onwards

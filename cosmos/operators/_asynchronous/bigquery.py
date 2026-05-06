@@ -33,8 +33,11 @@ from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
+from cosmos.log import get_logger
 from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
+
+logger = get_logger(__name__)
 
 DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
 
@@ -117,6 +120,11 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         # BigQueryInsertJobOperator parameters and hence fails to initialise the operator due to missing arguments.
         # To fix this, we temporarily set the base class to only BigQueryInsertJobOperator during initialization,
         # then restore the full inheritance chain afterward.
+        if kwargs.pop("deferrable", True) is False:
+            logger.warning(
+                "DbtRunAirflowAsyncBigqueryOperator requires deferrable=True. "
+                "The provided value of False has been ignored."
+            )
         DbtRunAirflowAsyncBigqueryOperator.__bases__ = (BigQueryInsertJobOperator,)
         super().__init__(
             gcp_conn_id=self.gcp_conn_id,

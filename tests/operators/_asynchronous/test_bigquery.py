@@ -49,7 +49,7 @@ def test_dbt_run_airflow_async_bigquery_operator_init_with_deferrable_false_warn
     """Passing deferrable=False must not raise TypeError, be overridden to True, and log a warning."""
     import logging
 
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.WARNING, logger="cosmos.operators._asynchronous.bigquery"):
         operator = DbtRunAirflowAsyncBigqueryOperator(
             task_id="test_task",
             project_dir="/path/to/project",

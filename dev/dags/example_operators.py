@@ -142,5 +142,12 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
     )
     # [END seed_local_example]
 
-    [seed_operator, seed_raw_orders] >> run_operator >> clone_operator
+    (
+        [seed_operator, seed_raw_orders]
+        >> run_operator
+        >> test_operator
+        >> snapshot_operator
+        >> build_operator
+        >> clone_operator
+    )
     [seed_operator, seed_raw_orders] >> check_file_uploaded_task

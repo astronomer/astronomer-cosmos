@@ -1,5 +1,3 @@
-# type: ignore # ignores "Cannot assign to a type" MyPy error
-
 """
 Astronomer Cosmos is a library for rendering dbt workflows in Airflow.
 
@@ -9,6 +7,7 @@ Contains dags, task groups, and operators.
 from __future__ import annotations
 
 import importlib
+from typing import TYPE_CHECKING
 
 __version__ = "1.14.1"
 
@@ -107,6 +106,134 @@ _OPTIONAL_DEPS: dict[str, str] = {
     "cosmos.operators.aws_ecs": "aws-ecs",
     "cosmos.operators.gcp_cloud_run_job": "gcp-cloud-run-job",
 }
+
+# TYPE_CHECKING block gives static type checkers (mypy, Pylance, pyright) the
+# concrete types they need. At runtime TYPE_CHECKING is False, so nothing is
+# imported eagerly here — __getattr__ below still handles lazy loading.
+# The `import X as X` form is the PEP 484 / ruff-recognised pattern for
+# intentional re-exports; it suppresses F401 "imported but unused" warnings.
+if TYPE_CHECKING:
+    from cosmos.airflow.dag import DbtDag as DbtDag
+    from cosmos.airflow.task_group import DbtTaskGroup as DbtTaskGroup
+    from cosmos.config import ExecutionConfig as ExecutionConfig
+    from cosmos.config import ProfileConfig as ProfileConfig
+    from cosmos.config import ProjectConfig as ProjectConfig
+    from cosmos.config import RenderConfig as RenderConfig
+    from cosmos.constants import DbtResourceType as DbtResourceType
+    from cosmos.constants import ExecutionMode as ExecutionMode
+    from cosmos.constants import InvocationMode as InvocationMode
+    from cosmos.constants import LoadMode as LoadMode
+    from cosmos.constants import SourceRenderingBehavior as SourceRenderingBehavior
+    from cosmos.constants import TestBehavior as TestBehavior
+    from cosmos.constants import TestIndirectSelection as TestIndirectSelection
+    from cosmos.operators.aws_ecs import DbtBuildAwsEcsOperator as DbtBuildAwsEcsOperator  # type: ignore[import]
+    from cosmos.operators.aws_ecs import DbtLSAwsEcsOperator as DbtLSAwsEcsOperator  # type: ignore[import]
+    from cosmos.operators.aws_ecs import DbtRunAwsEcsOperator as DbtRunAwsEcsOperator  # type: ignore[import]
+    from cosmos.operators.aws_ecs import (
+        DbtRunOperationAwsEcsOperator as DbtRunOperationAwsEcsOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.aws_ecs import DbtSeedAwsEcsOperator as DbtSeedAwsEcsOperator  # type: ignore[import]
+    from cosmos.operators.aws_ecs import DbtSnapshotAwsEcsOperator as DbtSnapshotAwsEcsOperator  # type: ignore[import]
+    from cosmos.operators.aws_ecs import DbtSourceAwsEcsOperator as DbtSourceAwsEcsOperator  # type: ignore[import]
+    from cosmos.operators.aws_ecs import DbtTestAwsEcsOperator as DbtTestAwsEcsOperator  # type: ignore[import]
+    from cosmos.operators.aws_eks import DbtBuildAwsEksOperator as DbtBuildAwsEksOperator  # type: ignore[import]
+    from cosmos.operators.aws_eks import DbtCloneAwsEksOperator as DbtCloneAwsEksOperator  # type: ignore[import]
+    from cosmos.operators.aws_eks import DbtLSAwsEksOperator as DbtLSAwsEksOperator  # type: ignore[import]
+    from cosmos.operators.aws_eks import DbtRunAwsEksOperator as DbtRunAwsEksOperator  # type: ignore[import]
+    from cosmos.operators.aws_eks import (
+        DbtRunOperationAwsEksOperator as DbtRunOperationAwsEksOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.aws_eks import DbtSeedAwsEksOperator as DbtSeedAwsEksOperator  # type: ignore[import]
+    from cosmos.operators.aws_eks import DbtSnapshotAwsEksOperator as DbtSnapshotAwsEksOperator  # type: ignore[import]
+    from cosmos.operators.aws_eks import DbtTestAwsEksOperator as DbtTestAwsEksOperator  # type: ignore[import]
+    from cosmos.operators.azure_container_instance import (
+        DbtBuildAzureContainerInstanceOperator as DbtBuildAzureContainerInstanceOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.azure_container_instance import (
+        DbtCloneAzureContainerInstanceOperator as DbtCloneAzureContainerInstanceOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.azure_container_instance import (
+        DbtLSAzureContainerInstanceOperator as DbtLSAzureContainerInstanceOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.azure_container_instance import (
+        DbtRunAzureContainerInstanceOperator as DbtRunAzureContainerInstanceOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.azure_container_instance import (
+        DbtRunOperationAzureContainerInstanceOperator as DbtRunOperationAzureContainerInstanceOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.azure_container_instance import (
+        DbtSeedAzureContainerInstanceOperator as DbtSeedAzureContainerInstanceOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.azure_container_instance import (
+        DbtSnapshotAzureContainerInstanceOperator as DbtSnapshotAzureContainerInstanceOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.azure_container_instance import (
+        DbtTestAzureContainerInstanceOperator as DbtTestAzureContainerInstanceOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.docker import DbtBuildDockerOperator as DbtBuildDockerOperator  # type: ignore[import]
+    from cosmos.operators.docker import DbtCloneDockerOperator as DbtCloneDockerOperator  # type: ignore[import]
+    from cosmos.operators.docker import DbtLSDockerOperator as DbtLSDockerOperator  # type: ignore[import]
+    from cosmos.operators.docker import DbtRunDockerOperator as DbtRunDockerOperator  # type: ignore[import]
+    from cosmos.operators.docker import (
+        DbtRunOperationDockerOperator as DbtRunOperationDockerOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.docker import DbtSeedDockerOperator as DbtSeedDockerOperator  # type: ignore[import]
+    from cosmos.operators.docker import DbtSnapshotDockerOperator as DbtSnapshotDockerOperator  # type: ignore[import]
+    from cosmos.operators.docker import DbtTestDockerOperator as DbtTestDockerOperator  # type: ignore[import]
+    from cosmos.operators.gcp_cloud_run_job import (
+        DbtBuildGcpCloudRunJobOperator as DbtBuildGcpCloudRunJobOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.gcp_cloud_run_job import (
+        DbtCloneGcpCloudRunJobOperator as DbtCloneGcpCloudRunJobOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.gcp_cloud_run_job import (
+        DbtLSGcpCloudRunJobOperator as DbtLSGcpCloudRunJobOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.gcp_cloud_run_job import (
+        DbtRunGcpCloudRunJobOperator as DbtRunGcpCloudRunJobOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.gcp_cloud_run_job import (
+        DbtRunOperationGcpCloudRunJobOperator as DbtRunOperationGcpCloudRunJobOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.gcp_cloud_run_job import (
+        DbtSeedGcpCloudRunJobOperator as DbtSeedGcpCloudRunJobOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.gcp_cloud_run_job import (
+        DbtSnapshotGcpCloudRunJobOperator as DbtSnapshotGcpCloudRunJobOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.gcp_cloud_run_job import (
+        DbtTestGcpCloudRunJobOperator as DbtTestGcpCloudRunJobOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.kubernetes import (
+        DbtBuildKubernetesOperator as DbtBuildKubernetesOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.kubernetes import (
+        DbtCloneKubernetesOperator as DbtCloneKubernetesOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.kubernetes import DbtLSKubernetesOperator as DbtLSKubernetesOperator  # type: ignore[import]
+    from cosmos.operators.kubernetes import DbtRunKubernetesOperator as DbtRunKubernetesOperator  # type: ignore[import]
+    from cosmos.operators.kubernetes import (
+        DbtRunOperationKubernetesOperator as DbtRunOperationKubernetesOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.kubernetes import (
+        DbtSeedKubernetesOperator as DbtSeedKubernetesOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.kubernetes import (
+        DbtSnapshotKubernetesOperator as DbtSnapshotKubernetesOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.kubernetes import (
+        DbtTestKubernetesOperator as DbtTestKubernetesOperator,  # type: ignore[import]
+    )
+    from cosmos.operators.lazy_load import MissingPackage as MissingPackage
+    from cosmos.operators.local import DbtBuildLocalOperator as DbtBuildLocalOperator
+    from cosmos.operators.local import DbtCloneLocalOperator as DbtCloneLocalOperator
+    from cosmos.operators.local import DbtDepsLocalOperator as DbtDepsLocalOperator
+    from cosmos.operators.local import DbtLSLocalOperator as DbtLSLocalOperator
+    from cosmos.operators.local import DbtRunLocalOperator as DbtRunLocalOperator
+    from cosmos.operators.local import DbtRunOperationLocalOperator as DbtRunOperationLocalOperator
+    from cosmos.operators.local import DbtSeedLocalOperator as DbtSeedLocalOperator
+    from cosmos.operators.local import DbtSnapshotLocalOperator as DbtSnapshotLocalOperator
+    from cosmos.operators.local import DbtTestLocalOperator as DbtTestLocalOperator
 
 
 def __getattr__(name: str) -> object:

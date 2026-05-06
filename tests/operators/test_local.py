@@ -1602,10 +1602,7 @@ def test_handle_exception_subprocess_nothing_to_do_flag_off(caplog):
     """Test that output including 'Nothing to do ...' is properly handled when flag is off."""
     caplog.set_level(logging.ERROR)
     operator = ConcreteDbtLocalBaseOperator(
-        profile_config=None,
-        task_id="my-task",
-        project_dir="my/dir",
-        fail_on_nothing_to_do=False
+        profile_config=None, task_id="my-task", project_dir="my/dir", fail_on_nothing_to_do=False
     )
     full_output = ["Nothing to do ..."]
     result = FullOutputSubprocessResult(exit_code=0, output="test", full_output=full_output)

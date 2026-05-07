@@ -11,6 +11,8 @@ You can see the full example DAG in the `dev/dags directory <https://github.com/
 Run
 +++
 
+Requires Cosmos >= 0.6.0.
+
 The ``DbtRunLocalOperator`` implements the `dbt run <https://docs.getdbt.com/reference/commands/run>`_ command.
 
 .. literalinclude:: ../../../../dev/dags/example_operators.py
@@ -21,6 +23,8 @@ The ``DbtRunLocalOperator`` implements the `dbt run <https://docs.getdbt.com/ref
 
 Test
 ++++
+
+Requires Cosmos >= 0.6.0.
 
 The ``DbtTestLocalOperator`` implements the `dbt test <https://docs.getdbt.com/reference/commands/test>`_ command.
 
@@ -33,6 +37,8 @@ The ``DbtTestLocalOperator`` implements the `dbt test <https://docs.getdbt.com/r
 Snapshot
 ++++++++
 
+Requires Cosmos >= 0.6.0.
+
 The ``DbtSnapshotLocalOperator`` implements the `dbt snapshot <https://docs.getdbt.com/reference/commands/snapshot>`_ command.
 
 .. literalinclude:: ../../../../dev/dags/example_operators.py
@@ -43,6 +49,8 @@ The ``DbtSnapshotLocalOperator`` implements the `dbt snapshot <https://docs.getd
 
 Build
 +++++
+
+Requires Cosmos >= 1.4.0.
 
 The ``DbtBuildLocalOperator`` implements the `dbt build <https://docs.getdbt.com/reference/commands/build>`_ command.
 
@@ -55,6 +63,8 @@ The ``DbtBuildLocalOperator`` implements the `dbt build <https://docs.getdbt.com
 Seed
 ++++
 
+Requires Cosmos >= 0.6.0.
+
 The ``DbtSeedLocalOperator`` implements the `dbt seed <https://docs.getdbt.com/reference/commands/seed>`_ command.
 
 .. literalinclude:: ../../../../dev/dags/example_operators.py
@@ -65,6 +75,8 @@ The ``DbtSeedLocalOperator`` implements the `dbt seed <https://docs.getdbt.com/r
 
 Clone
 +++++
+
+Requires Cosmos >= 1.8.0.
 
 The ``DbtCloneLocalOperator`` implements the `dbt clone <https://docs.getdbt.com/reference/commands/clone>`_ command.
 

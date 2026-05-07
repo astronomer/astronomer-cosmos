@@ -126,7 +126,7 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
         profile_config=profile_config,
         project_dir=DBT_PROJ_DIR,
         task_id="clone",
-        dbt_cmd_flags=["--models", "stg_customers", "--state", DBT_ARTIFACT],
+        dbt_cmd_flags=["--select", "stg_customers", "--state", DBT_ARTIFACT],
         install_deps=True,
         append_env=True,
     )

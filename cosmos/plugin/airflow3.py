@@ -142,7 +142,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             cfg_local = projects.get(slug_alias, {})
             if not cfg_local.get("dir"):
                 return "<div>dbt Docs are not configured.</div>"
-            iframe_src = f"/cosmos/{slug_alias}/dbt_docs_index.html"
+            iframe_src = f"{API_BASE_PATH}/cosmos/{slug_alias}/dbt_docs_index.html"
             safe_iframe_src = html.escape(iframe_src, quote=True)
             return (
                 '<div style="height:100%;display:flex;flex-direction:column;">'

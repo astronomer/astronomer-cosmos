@@ -11,7 +11,11 @@ except ImportError:  # Airflow 2
     from airflow.models import BaseOperator
 
 from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
-from airflow.models.dag import DAG
+
+try:
+    from airflow.sdk import DAG
+except ImportError:
+    from airflow.models.dag import DAG  # type: ignore[assignment]
 
 try:
     # Airflow 3.1 onwards

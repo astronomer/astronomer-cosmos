@@ -35,6 +35,7 @@ from cosmos.operators.watcher import (
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
     _default_freshness_callback,
+    _StdoutFilter,
     store_dbt_resource_status_from_log,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
@@ -2638,3 +2639,81 @@ class TestProducerSourceFreshness:
         # The callback list must remain untouched — no watcher callback appended
         assert producer._dbt_runner_callbacks is None
         mock_super.assert_called_once()
+
+
+class TestStdoutFilter:
+    """Tests for ``_StdoutFilter``, the stdout proxy used during DBT_RUNNER execution.
+
+    Regression coverage for issue #2649: non-JSON stdout written by third-party libraries
+    (e.g. the Snowflake connector's externalbrowser auth URL) must surface to the task log
+    instead of being silently discarded.
+    """
+
+    LOGGER_NAME = "cosmos.operators.watcher"
+
+    def test_json_line_is_dropped(self, caplog):
+        f = _StdoutFilter()
+        with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME):
+            f.write('{"info": {"msg": "raw dbt json"}}\n')
+        assert "raw dbt json" not in caplog.text
+
+    def test_non_json_line_is_forwarded_at_info(self, caplog):
+        f = _StdoutFilter()
+        snowflake_prompt = "Going to open: https://login.snowflakecomputing.com/oauth/authorize?... to authenticate..."
+        with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME):
+            f.write(snowflake_prompt + "\n")
+        assert snowflake_prompt in caplog.text
+
+    def test_partial_writes_buffer_until_newline(self, caplog):
+        f = _StdoutFilter()
+        with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME):
+            f.write("hello ")
+            assert "hello" not in caplog.text
+            f.write("world\n")
+        assert "hello world" in caplog.text
+
+    def test_flush_emits_trailing_partial_line(self, caplog):
+        f = _StdoutFilter()
+        with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME):
+            f.write("trailing line without newline")
+            assert "trailing" not in caplog.text
+            f.flush()
+        assert "trailing line without newline" in caplog.text
+
+    def test_mixed_json_and_plain_lines(self, caplog):
+        f = _StdoutFilter()
+        with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME):
+            f.write('{"info": {"msg": "json line"}}\n')
+            f.write("plain text from third-party lib\n")
+            f.write('{"info": {"msg": "another json"}}\n')
+        assert "plain text from third-party lib" in caplog.text
+        assert "json line" not in caplog.text
+        assert "another json" not in caplog.text
+
+
+class TestStoreDbtResourceStatusFromLogNonJson:
+    """Regression coverage for issue #2649: in SUBPROCESS mode, non-JSON stdout lines
+    (e.g. Snowflake externalbrowser auth URL) must surface to the task log instead of
+    being silently demoted to DEBUG.
+    """
+
+    def test_non_json_line_is_logged_at_info(self, caplog):
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        snowflake_prompt = "Going to open: https://login.snowflakecomputing.com/oauth/authorize?... to authenticate..."
+        with caplog.at_level(logging.INFO, logger="cosmos.operators._watcher.base"):
+            store_dbt_resource_status_from_log(
+                snowflake_prompt,
+                {"context": ctx},
+                tests_per_model={},
+                test_results_per_model={},
+            )
+        assert snowflake_prompt in caplog.text
+        assert len(ti.store) == 0  # parser must not push XCom for non-JSON lines
+
+    def test_empty_line_is_not_logged(self, caplog):
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        with caplog.at_level(logging.INFO, logger="cosmos.operators._watcher.base"):
+            store_dbt_resource_status_from_log("", {"context": ctx}, tests_per_model={}, test_results_per_model={})
+        assert caplog.text == ""

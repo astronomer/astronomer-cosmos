@@ -107,7 +107,7 @@ If you don't already have Hatch installed, `install it <https://hatch.pypa.io/la
 The `pyproject.toml <https://github.com/astronomer/astronomer-cosmos/blob/main/pyproject.toml>`_ file defines a matrix of supported versions of Python, Airflow and dbt-core for which a user can run the tests against.
 
 Testing the application with Hatch
-..................................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 After following the steps described in :ref:`setting-up-hatch`, you are ready to run Cosmos tests locally.
 For instance, to run the tests using Python 3.11, `Apache Airflow® <https://airflow.apache.org/>`_ 2.10 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
@@ -154,7 +154,7 @@ If testing for the same Airflow and Python version, next runs of the integration
     hatch run tests.py3.11-2.10-1.9:test-integration
 
 Writing Docs
-............
+^^^^^^^^^^^^
 
 After following the steps described in :ref:`setting-up-hatch`, you are ready to build and serve the documentation locally.
 
@@ -165,7 +165,7 @@ You can run the docs locally by running the following:
     hatch run docs:serve
 
 Building
-........
+^^^^^^^^
 
 After following the steps described in :ref:`setting-up-hatch`, you are ready to build the project.
 
@@ -176,7 +176,7 @@ To build the project, run:
     hatch build
 
 Releasing
-.........
+^^^^^^^^^
 
 .. note::
     This section is intended for Cosmos maintainers only.
@@ -210,7 +210,7 @@ To run the checks manually, run:
 Writing docs
 ~~~~~~~~~~~~
 
-`Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatch to declare the dependencies required for the project itself, as well as for tests and documentation builds.
+`Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use Hatch to declare the dependencies required for the project itself, as well as for tests and documentation builds.
 
 If you don’t already have Hatch installed, please `install it <https://hatch.pypa.io/latest/install/>`_ before proceeding. As an example, on macOS, you can do so with:
 
@@ -240,7 +240,7 @@ We use ``hatch`` to build the project. To build the project, run:
 Releasing
 ~~~~~~~~~
 
-We use GitHub actions to create and deploy new releases. To create a new release, first create a new version using:
+We use GitHub Actions to create and deploy new releases. To create a new release, first create a new version using:
 
 .. code-block:: bash
 

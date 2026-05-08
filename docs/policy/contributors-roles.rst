@@ -29,7 +29,7 @@ Contributors are responsible for:
 Committers
 ~~~~~~~~~~
 
-Committers are community members with write access to the `Astronomer Cosmos Github repository <https://github.com/astronomer/astronomer-cosmos>`_.
+Committers are community members with write access to the `Astronomer Cosmos GitHub repository <https://github.com/astronomer/astronomer-cosmos>`_.
 They can modify the code and the documentation and accept others' contributions to the repo.
 
 Check :ref:`contributors` for the official list of Astronomer Cosmos committers.

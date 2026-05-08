@@ -1,7 +1,7 @@
 .. _optimize-performance:
 
 Optimize Performance
---------------------
+====================
 
 Cosmos performance can be tuned across two dimensions: how fast DAGs are parsed (affecting how quickly they appear
 and update in `Apache Airflow® <https://airflow.apache.org/>`_) and how fast tasks execute (affecting DAG run duration).

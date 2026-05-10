@@ -1003,7 +1003,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                 task_group_id = kwargs.get("task_group")
 
                 # issue-1591: Handle passed-in outlets when enable_dataset_alias is True
-                outlets: list[DatasetAlias] | list[DatasetAliasModel] = []
+                outlets: list[DatasetAlias] = []
 
                 for outlet in kwargs.get("outlets", []):
                     if isinstance(outlet, DatasetAlias):

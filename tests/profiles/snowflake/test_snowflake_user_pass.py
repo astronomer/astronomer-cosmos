@@ -260,6 +260,43 @@ def test_appends_region() -> None:
         }
 
 
+def test_query_tag() -> None:
+    """
+    Tests that query_tag from connection extras is mapped to the dbt profile.
+    """
+    conn = Connection(
+        conn_id="my_snowflake_connection",
+        conn_type="snowflake",
+        login="my_user",
+        password="my_password",
+        schema="my_schema",
+        extra=json.dumps(
+            {
+                "account": "my_account",
+                "database": "my_database",
+                "warehouse": "my_warehouse",
+                "query_tag": "my_query_tag",
+            }
+        ),
+    )
+
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = SnowflakeUserPasswordProfileMapping(conn)
+        assert profile_mapping.profile["query_tag"] == "my_query_tag"
+
+
+def test_query_tag_absent_when_not_set(
+    mock_snowflake_conn: Connection,
+) -> None:
+    """
+    Tests that query_tag is omitted from the profile when not set on the connection.
+    """
+    profile_mapping = get_automatic_profile_mapping(
+        mock_snowflake_conn.conn_id,
+    )
+    assert "query_tag" not in profile_mapping.profile
+
+
 def test_appends_host_and_port() -> None:
     """
     Tests that host/port extras are appended to the connection settings.

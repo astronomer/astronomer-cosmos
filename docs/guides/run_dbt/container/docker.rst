@@ -10,7 +10,7 @@ Performance and maintenance considerations
 
 You can have better environment isolation with ``docker`` than when using ``local`` or ``virtualenv`` modes, but this mode also requires more maintenance and has some performance tradeoffs, depending on your project configurations.
 
-Using ``docker`` requires that you ensure the Docker container you use has up-to-date files and you might potentially need to manage secrets in multiple places. Another challenge of working with ``docker`` occurs when the Airflow worker is already running in Docker, which can cause problems related to running `Docker in Docker <https://devops.stackexchange.com/questions/676/why-is-docker-in-docker-considered-bad>`__.
+Using ``docker`` requires that you ensure the Docker container you use has up-to-date files and you might potentially need to manage secrets in multiple places. Another challenge of working with ``docker`` occurs when the `Apache Airflow® <https://airflow.apache.org/>`_ worker is already running in Docker, which can cause problems related to running `Docker in Docker <https://devops.stackexchange.com/questions/676/why-is-docker-in-docker-considered-bad>`__.
 
 Also, the Docker execution mode approach can be significantly slower than ``virtualenv``, since it might require building the ``Docker`` container before executing dbt commands, which is slower than creating a Virtualenv with ``dbt-core``.
 
@@ -35,8 +35,8 @@ The following example setup steps include setting up the following:
 - Docker image built with required dbt project and dbt DAG
 - dbt DAG with dbt Docker operators in the Airflow DAGs directory to run in Airflow
 
-1. Install Airflow and Cosmos
-'''''''''''''''''''''''''''''
+1. Install Apache Airflow® and Cosmos
+''''''''''''''''''''''''''''''''''''''
 
 Create a python virtualenv, activate it, upgrade pip to the latest version, and install `Apache Airflow® <https://airflow.apache.org/>`_ & ``astronomer-postgres``:
 
@@ -92,8 +92,8 @@ Read the following example Dockerfiles to understand what it does so that you ca
 - The ``dbt_project.yml`` is replaced with `postgres_profile_dbt_project.yml <https://github.com/astronomer/cosmos-example/blob/main/postgres_profile_dbt_project.yml>`_, which contains the profile key pointing to ``postgres_profile`` because profile creation is not handled for K8s operators, like in local mode.
 
 
-4. Set up and trigger the Dag with Airflow
-''''''''''''''''''''''''''''''''''''''''''
+4. Set up and trigger the Dag with Apache Airflow®
+'''''''''''''''''''''''''''''''''''''''''''''''''''
 
 1. Copy the ``dags`` directory from the ``cosmos-example`` repo to your Airflow home
 

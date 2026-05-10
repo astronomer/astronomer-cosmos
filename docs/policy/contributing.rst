@@ -45,7 +45,7 @@ Then install ``airflow`` and ``astronomer-cosmos`` using python-venv:
     pip3 install "apache-airflow[cncf.kubernetes,openlineage]"
     pip3 install -e ".[dbt-postgres,dbt-databricks]"
 
-Set Airflow home to the ``dev/`` directory and disable loading example DAGs:
+Set `Apache Airflow® <https://airflow.apache.org/>`_ home to the ``dev/`` directory and disable loading example DAGs:
 
 .. code-block:: bash
 
@@ -207,7 +207,7 @@ To run the checks manually, run:
 
     pre-commit run --all-files
 
-Writing Docs
+Writing docs
 ++++++++++++
 
 `Hatch <https://hatch.pypa.io/latest/>`_ is a unified command-line tool for managing dependencies and environment isolation for Python developers. In Cosmos, we use a Hatch to declare the dependencies required for the project itself, as well as for tests and documentation builds.

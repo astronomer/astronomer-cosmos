@@ -1,14 +1,14 @@
 Cosmos security
 ---------------
 
-Security Policy
+Security policy
 +++++++++++++++
 
 Check the project's `Security Policy <https://github.com/astronomer/astronomer-cosmos/blob/main/SECURITY.rst>`_ to learn
 how to report security vulnerabilities in Astronomer Cosmos and how security issues reported to the Astronomer Cosmos
 security team are handled.
 
-Dependency Update Cooldown
+Dependency update cooldown
 ++++++++++++++++++++++++++
 
 To mitigate the risk of supply chain attacks from newly released versions, Cosmos enforces a **7-day cooldown period**

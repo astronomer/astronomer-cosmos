@@ -4,7 +4,7 @@ Render Config
 -------------
 
 
-Cosmos aims to give you control over how your dbt project is rendered as an Airflow DAG or Task Group.
+Cosmos aims to give you control over how your dbt project is rendered as an `Apache Airflow® <https://airflow.apache.org/>`_ DAG or Task Group.
 It does this by exposing a ``cosmos.config.RenderConfig`` class that you can use to configure how your DAGs are rendered.
 
 The ``RenderConfig`` class takes the following arguments:

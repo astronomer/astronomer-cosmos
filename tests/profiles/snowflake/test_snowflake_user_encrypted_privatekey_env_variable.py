@@ -246,6 +246,44 @@ def test_profile_env_vars_with_base64(
     }
 
 
+def test_query_tag() -> None:
+    """
+    Tests that query_tag from connection extras is mapped to the dbt profile.
+    """
+    conn = Connection(
+        conn_id="my_snowflake_connection",
+        conn_type="snowflake",
+        login="my_user",
+        schema="my_schema",
+        password="secret",
+        extra=json.dumps(
+            {
+                "account": "my_account",
+                "database": "my_database",
+                "warehouse": "my_warehouse",
+                "private_key_content": "my_private_key",
+                "query_tag": "my_query_tag",
+            }
+        ),
+    )
+
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        assert profile_mapping.profile["query_tag"] == "my_query_tag"
+
+
+def test_query_tag_absent_when_not_set(
+    mock_snowflake_conn: Connection,
+) -> None:
+    """
+    Tests that query_tag is omitted from the profile when not set on the connection.
+    """
+    profile_mapping = get_automatic_profile_mapping(
+        mock_snowflake_conn.conn_id,
+    )
+    assert "query_tag" not in profile_mapping.profile
+
+
 def test_old_snowflake_format() -> None:
     """
     Tests that the old format still works.

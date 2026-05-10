@@ -15,7 +15,11 @@ from typing import TYPE_CHECKING, Any
 import msgpack
 import yaml
 from airflow.models import DagRun, Variable
-from airflow.models.dag import DAG
+
+try:
+    from airflow.sdk import DAG
+except ImportError:
+    from airflow.models.dag import DAG  # type: ignore[assignment]
 from airflow.utils.session import provide_session
 from sqlalchemy import select
 from sqlalchemy.orm import Session

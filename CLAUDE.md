@@ -32,7 +32,17 @@ Type checking:
 hatch run tests.py3.10-2.10-1.9:type-check
 ```
 
-Other available matrix versions: Python `3.10`, `3.11`, `3.12`, `3.13` × Airflow `2.9`, `2.10`, `2.11`, `3.0`, `3.1` × dbt `1.5`–`2.0`.
+Other available matrix versions: Python `3.10`, `3.11`, `3.12`, `3.13` × Airflow `2.9`, `2.10`, `2.11`, `3.0`, `3.1`, `3.2` × dbt `1.5`–`2.0`.
+
+### Building and Serving Docs
+
+```bash
+hatch run docs:build              # build HTML into docs/_build
+hatch run docs:serve              # sphinx-autobuild with live reload
+hatch run docs:serve-no-reload    # static build served on http://127.0.0.1:8000
+```
+
+Always run `hatch run docs:build` before committing any change that touches `docs/`, and verify the build succeeds without warnings or errors.
 
 ### Linting and Formatting
 

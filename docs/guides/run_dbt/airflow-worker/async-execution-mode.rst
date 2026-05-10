@@ -1,11 +1,11 @@
 .. _async-execution-mode:
 
-Airflow async execution mode
-----------------------------
+Apache Airflow® async execution mode
+-------------------------------------
 
 This execution mode can reduce the runtime by 35% in comparison to Cosmos ``LOCAL`` execution mode, but is currently only available for BigQuery. While this mode was introduced in Cosmos 1.9, we strongly encourage users to use the latest version of Cosmos, which has significant performance improvements.
 
-The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using Apache Airflow's
+The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using the `Apache Airflow® <https://airflow.apache.org/>`_
 `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 This execution mode is well-suited for when you have long-running resources and you want to run them asynchronously by
 leveraging Airflow's deferrable operators. With deferrable operators, you can potentially observe higher throughput of tasks
@@ -36,7 +36,7 @@ We have `observed <https://github.com/astronomer/astronomer-cosmos/pull/1934>`_ 
 +----------------------------------------------+--------------------------+
 
 
-Getting Started with Airflow Async Mode
+Getting started with Airflow async mode
 +++++++++++++++++++++++++++++++++++++++
 
 This guide walks you through setting up an Astro CLI project and running a Cosmos-based DAG with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
@@ -47,7 +47,7 @@ Prerequisites
 - `Astro CLI <https://www.astronomer.io/docs/astro/cli/install-cli>`_
 - Airflow>=2.9
 
-1. Create Astro-CLI Project
+1. Create Astro-CLI project
 '''''''''''''''''''''''''''
 
 Run the following command in your terminal:
@@ -82,7 +82,7 @@ Edit your Dockerfile to ensure all necessary requirements are included.
     FROM astrocrpublic.azurecr.io/runtime:3.0-2
 
 
-3. Add astronomer-cosmos Dependency
+3. Add astronomer-cosmos dependency
 '''''''''''''''''''''''''''''''''''
 
 In your ``requirements.txt``, add:

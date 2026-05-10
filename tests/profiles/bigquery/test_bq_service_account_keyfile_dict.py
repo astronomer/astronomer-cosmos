@@ -51,12 +51,12 @@ def mock_bigquery_conn_with_dict(request):  # type: ignore
 
 
 @pytest.fixture(params=get_fixture_params())
-def mock_bigquery_conn_extra__gcp__project_with_dict(request):  # type: ignore
+def mock_bigquery_conn_extra__gcp__with_dict(request):  # type: ignore
     """
     Mocks and returns an Airflow BigQuery connection with extra__google_cloud_platform__project.
     """
     extra = {
-        "dataset": "my_dataset",
+        "extra__google_cloud_platform__dataset": "my_dataset",
         "extra__google_cloud_platform__project": "my_project",  # Update key
         request.param.keyfile_json_extra_key: request.param.keyfile_dict,
     }
@@ -106,11 +106,31 @@ def test_profile(mock_bigquery_conn_with_dict: Connection):
     assert profile_mapping.profile == expected
 
 
-def test_extra__gcp__project(mock_bigquery_conn_extra__gcp__project_with_dict: Connection):
+def test_extra__gcp__project(mock_bigquery_conn_extra__gcp__with_dict: Connection):
     """
     Validate that using extra__google_cloud_platform__project properly sets the project field.
     """
-    profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_extra__gcp__project_with_dict, {})
+    profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_extra__gcp__with_dict, {})
+    expected = {
+        "type": "bigquery",
+        "method": "service-account-json",
+        "project": "my_project",
+        "dataset": "my_dataset",
+        "threads": 1,
+        "keyfile_json": {
+            "type": "service_account",
+            "private_key_id": "{{ env_var('COSMOS_CONN_GOOGLE_CLOUD_PLATFORM_PRIVATE_KEY_ID') }}",
+            "private_key": "{{ env_var('COSMOS_CONN_GOOGLE_CLOUD_PLATFORM_PRIVATE_KEY') }}",
+        },
+    }
+    assert profile_mapping.profile == expected
+
+
+def test_extra__gcp__dataset(mock_bigquery_conn_extra__gcp__with_dict: Connection):
+    """
+    Validate that using extra__google_cloud_platform__dataset properly sets the dataset field.
+    """
+    profile_mapping = GoogleCloudServiceAccountDictProfileMapping(mock_bigquery_conn_extra__gcp__with_dict, {})
     expected = {
         "type": "bigquery",
         "method": "service-account-json",

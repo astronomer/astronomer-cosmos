@@ -34,7 +34,7 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
     airflow_param_mapping = {
         "project": ["extra.project", "extra__google_cloud_platform__project"],
         # multiple options for dataset because of older Airflow versions
-        "dataset": "extra.dataset",
+        "dataset": ["extra.dataset", "extra__google_cloud_platform__dataset"],
         # multiple options for keyfile_dict param name because of older Airflow versions
         "keyfile_json": ["extra.keyfile_dict", "keyfile_dict", "extra__google_cloud_platform__keyfile_dict"],
     }

@@ -1,7 +1,7 @@
 .. _execution-modes-local-conflicts:
 
-Airflow and dbt dependencies conflicts
---------------------------------------
+Apache Airflow® and dbt dependencies conflicts
+-----------------------------------------------
 
 When using the :ref:`local-execution` without defining a custom ``ExecutionConfig.dbt_executable_path``, you might have dependency conflicts between
 `Apache Airflow® <https://airflow.apache.org/>`_ and dbt. The number of conflicts can increase depending on the Airflow providers and dbt adapters you use.

@@ -35,14 +35,14 @@ simple to manage and orchestrate your dbt workflows using `Apache Airflow® <htt
 time and effort. By automatically turning dbt workflows into Airflow DAGs, Cosmos allows you to focus on building
 high-quality data models without the hassle of managing complex integrations.
 
-What Is Astronomer Cosmos?
+What is Astronomer Cosmos?
 --------------------------
 
 Astronomer Cosmos is an open-source library that bridges Apache Airflow and dbt, allowing you to easily transform your
 dbt projects into Airflow Dags and manage everything seamlessly. With Cosmos, you can write your data transformations
 using dbt and then schedule and orchestrate them with Airflow, making the entire process smooth and straightforward.
 
-Why Should You Use Cosmos?
+Why should you use Cosmos?
 --------------------------
 
 Integrating dbt and Airflow can be complex, but Cosmos simplifies it by seamlessly connecting these
@@ -66,7 +66,7 @@ Check out the Cosmos Fundamentals, get started locally with the Quickstart Guide
 You can also explore more examples in `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_
 or in the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
 
-Join the Community
+Join the community
 ------------------
 
 Have questions, need help, or interested in contributing? We welcome all contributions and feedback!

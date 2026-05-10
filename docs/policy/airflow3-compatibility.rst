@@ -1,7 +1,7 @@
 .. _airflow3-compatibility:
 
-Airflow 3 Compatibility (First Iteration)
------------------------------------------
+Apache Airflow® 3 compatibility (first iteration)
+--------------------------------------------------
 
 The Cosmos 1.10.0 release marks the **first iteration** of adding compatibility for `Apache Airflow® 3 <https://airflow.apache.org/>`_
 This is an important milestone as we work towards ensuring that Cosmos seamlessly integrates with the latest advancements in the Airflow ecosystem.
@@ -32,7 +32,7 @@ If you want to use the Airflow 3 URI standard while still using Airflow 2, pleas
     Remember to update any DAGs that are triggered using Cosmos-generated datasets or aliases to the new URI format.
 
 
-What Works
+What works
 ++++++++++
 
 With the changes contributed in Cosmos 1.10.0 to bring in compatibility with Airflow 3, we have validated Cosmos’
@@ -48,8 +48,8 @@ functionality with Airflow 3 by extending our CI infrastructure:
 These additions ensure that all core functionality, workflows, and integrations provided by Cosmos continue to operate
 reliably under Airflow 3.
 
-Multiple dbt docs in Airflow 3 UI
-+++++++++++++++++++++++++++++++++
+Multiple dbt docs in Apache Airflow® 3 UI
+++++++++++++++++++++++++++++++++++++++++++
 
 There have been significant changes to how plugins work in Airflow 3.x. Cosmos now supports Airflow 3 FastAPI plugins for UI integration and hosting dbt docs via external views.
 
@@ -87,7 +87,7 @@ You can set the same mapping via the Airflow config environment variable ``AIRFL
 
 Docs are available at ``/cosmos/<slug>/dbt_docs_index.html``. Static assets are served directly for local directories or proxied for remote storage (S3/GCS/Azure/HTTP).
 
-Validation in Progress
+Validation in progress
 ++++++++++++++++++++++
 
 We are actively validating the combined support for `Assets <https://airflow.apache.org/docs/apache-airflow/3.0.0/authoring-and-scheduling/assets.html>`_
@@ -96,13 +96,13 @@ This may be **unstable** in Cosmos 1.10.0. Bug reports are very welcome.
 We encourage users to try it out and provide feedback, but note that certain edge cases may still be under
 investigation.
 
-Known Limitations
+Known limitations
 +++++++++++++++++
 
 Airflow 3 DatasetAlias no longer support ASCII characters. This issue has been reported to the `Airflow community <https://github.com/apache/airflow/issues/51566>`_
 and we are also tracking it in the `Cosmos repository <https://github.com/astronomer/astronomer-cosmos/issues/1802>`_.
 
-What's Next
+What's next
 +++++++++++
 
 We are actively tracking open issues and enhancements related to **Airflow 3 compatibility** in Cosmos.

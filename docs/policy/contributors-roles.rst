@@ -18,12 +18,12 @@ Cosmos contributors can be found in the Astronomer Cosmos Github `insights page 
 
 Contributors are responsible for:
 
-* Fixing bugs
-* Refactoring code
-* Improving processes and tooling
-* Adding features
-* Improving the documentation
-* Making/answering questions in the #airflow-dbt Slack channel
+- Fixing bugs
+- Refactoring code
+- Improving processes and tooling
+- Adding features
+- Improving the documentation
+- Making/answering questions in the #airflow-dbt Slack channel
 
 
 Committers
@@ -36,8 +36,8 @@ Check :ref:`contributors` for the official list of Astronomer Cosmos committers.
 
 Committers have the same responsibilities as standard contributors and also perform the following actions:
 
-* Reviewing & merging pull-requests
-* Scanning and responding to GitHub issues, helping triaging them
+- Reviewing & merging pull-requests
+- Scanning and responding to GitHub issues, helping triaging them
 
 If you know you are not going to be able to contribute for a long time (for instance, due to a change of job or circumstances), you should inform other maintainers, and we will mark you as "emeritus".
 Emeritus committers will no longer have write access to the repo.

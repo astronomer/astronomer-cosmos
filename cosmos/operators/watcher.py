@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import functools
 import json
+import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -138,8 +139,16 @@ class _StdoutFilter:
 
     def __init__(self) -> None:
         self._buffer = ""
+        # Per-thread reentrancy guard. ``_emit`` forwards non-JSON lines via
+        # ``logger.info``; if any log handler is bound to ``sys.stdout`` — which is this
+        # filter while ``redirect_stdout`` is active — its emit() would call back into
+        # ``write`` and recurse without bound. Dropping reentrant writes breaks the
+        # cycle; the log record is still delivered to non-stdout handlers (file, caplog).
+        self._tls = threading.local()
 
     def write(self, s: str) -> int:
+        if getattr(self._tls, "emitting", False):
+            return len(s)
         self._buffer += s
         while "\n" in self._buffer:
             line, self._buffer = self._buffer.split("\n", 1)
@@ -151,14 +160,17 @@ class _StdoutFilter:
             self._emit(self._buffer)
             self._buffer = ""
 
-    @staticmethod
-    def _emit(line: str) -> None:
+    def _emit(self, line: str) -> None:
         if not line:
             return
         try:
             json.loads(line)
         except (json.JSONDecodeError, ValueError):
-            logger.info(line)
+            self._tls.emitting = True
+            try:
+                logger.info(line)
+            finally:
+                self._tls.emitting = False
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):

@@ -2690,6 +2690,26 @@ class TestStdoutFilter:
         assert "json line" not in caplog.text
         assert "another json" not in caplog.text
 
+    def test_no_recursion_when_log_handler_writes_back_to_filter(self, caplog):
+        """Regression: if any log handler is bound to ``sys.stdout`` while the filter is
+        active, its ``stream.write`` re-enters ``_StdoutFilter.write``. Without the
+        reentrancy guard this recurses without bound. The filter must drop the reentrant
+        write and return cleanly.
+        """
+        import contextlib
+
+        f = _StdoutFilter()
+        watcher_logger = logging.getLogger(self.LOGGER_NAME)
+        handler = logging.StreamHandler(stream=f)
+        handler.setLevel(logging.INFO)
+        watcher_logger.addHandler(handler)
+        try:
+            with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME), contextlib.redirect_stdout(f):
+                watcher_logger.info("Trying to run dbtRunner with stdout redirected to filter")
+        finally:
+            watcher_logger.removeHandler(handler)
+        assert "Trying to run dbtRunner" in caplog.text
+
 
 class TestStoreDbtResourceStatusFromLogNonJson:
     """Regression coverage for issue #2649: in SUBPROCESS mode, non-JSON stdout lines

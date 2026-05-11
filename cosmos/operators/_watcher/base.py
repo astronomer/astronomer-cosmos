@@ -447,7 +447,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             raw_flags = upstream_task.add_cmd_flags()
             extra_flags = self._filter_flags(raw_flags)
 
-        model_selector = self.model_unique_id.split(".")[-1]
+        model_selector = self.model_unique_id.split(".", 2)[2]
         cmd_flags = extra_flags + ["--select", model_selector]
 
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]

@@ -141,9 +141,12 @@ class _StdoutFilter:
         self._buffer = ""
         # Per-thread reentrancy guard. ``_emit`` forwards non-JSON lines via
         # ``logger.info``; if any log handler is bound to ``sys.stdout`` — which is this
-        # filter while ``redirect_stdout`` is active — its emit() would call back into
-        # ``write`` and recurse without bound. Dropping reentrant writes breaks the
-        # cycle; the log record is still delivered to non-stdout handlers (file, caplog).
+        # filter while ``redirect_stdout`` is active — its ``emit`` calls ``stream.write``
+        # *and* ``stream.flush`` on every record, both of which re-enter this class.
+        # Without the guard the cycle (``_emit`` → ``logger.info`` → handler ``emit``
+        # → ``stream.flush`` → ``_emit``) recurses without bound. The guard makes
+        # reentrant ``write`` and ``flush`` calls no-ops, breaking the cycle; the log
+        # record is still delivered to non-stdout handlers (file, caplog).
         self._tls = threading.local()
 
     def write(self, s: str) -> int:
@@ -156,6 +159,8 @@ class _StdoutFilter:
         return len(s)
 
     def flush(self) -> None:
+        if getattr(self._tls, "emitting", False):
+            return
         if self._buffer:
             self._emit(self._buffer)
             self._buffer = ""

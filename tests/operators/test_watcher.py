@@ -2692,9 +2692,11 @@ class TestStdoutFilter:
 
     def test_no_recursion_when_log_handler_writes_back_to_filter(self, caplog):
         """Regression: if any log handler is bound to ``sys.stdout`` while the filter is
-        active, its ``stream.write`` re-enters ``_StdoutFilter.write``. Without the
-        reentrancy guard this recurses without bound. The filter must drop the reentrant
-        write and return cleanly.
+        active, its ``stream.write`` and ``stream.flush`` re-enter the filter. Without
+        the reentrancy guard this recurses without bound — production hit the flush
+        path because cosmos.dbt.runner logs a multi-line message ("Trying to run
+        dbtRunner with:\\n %s\\n in %s"), leaving partial-line content in the buffer
+        that a nested ``StreamHandler.emit``'s flush would re-emit.
         """
         import contextlib
 
@@ -2702,10 +2704,14 @@ class TestStdoutFilter:
         watcher_logger = logging.getLogger(self.LOGGER_NAME)
         handler = logging.StreamHandler(stream=f)
         handler.setLevel(logging.INFO)
+        handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
         watcher_logger.addHandler(handler)
         try:
             with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME), contextlib.redirect_stdout(f):
-                watcher_logger.info("Trying to run dbtRunner with stdout redirected to filter")
+                # Mirror cosmos.dbt.runner.run_command's log call: embedded newlines force
+                # the buffer to hold a partial line across the _emit boundary, which is
+                # what triggers the flush-recursion path.
+                watcher_logger.info("Trying to run dbtRunner with:\n %s\n in %s", ["build"], "/tmp/x")
         finally:
             watcher_logger.removeHandler(handler)
         assert "Trying to run dbtRunner" in caplog.text

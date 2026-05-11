@@ -608,8 +608,8 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):  # type: ignore[misc]
                 self.project_dir,
             )
 
-        model_selector = self.model_unique_id.split(".")[-1]
+        model_selector = self.model_unique_id.split(".", 2)[2]
         cmd_flags = ["--select", model_selector]
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
-        logger.info("dbt test completed successfully on retry for model '%s'", self.model_unique_id)
+        logger.info("dbt test completed successfully for model '%s'", self.model_unique_id)
         return True

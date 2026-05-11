@@ -2250,7 +2250,7 @@ class TestDbtTestWatcherOperator:
         assert result is True
         sensor.build_and_run_cmd.assert_called_once()
         _, kwargs = sensor.build_and_run_cmd.call_args
-        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".")[-1]]
+        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".", 2)[2]]
 
     def test_fallback_to_non_watcher_run_invokes_dbt_test(self):
         """``_fallback_to_non_watcher_run`` should call ``build_and_run_cmd`` with only
@@ -2269,9 +2269,32 @@ class TestDbtTestWatcherOperator:
 
         assert result is True
         _, kwargs = sensor.build_and_run_cmd.call_args
-        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".")[-1]]
+        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".", 2)[2]]
         assert "--full-refresh" not in kwargs["cmd_flags"]
         assert sensor.base_cmd == ["test"]
+
+    def test_fallback_selector_preserves_version_suffix(self):
+        """Versioned dbt models (e.g. ``model.pkg.my_model.v1``) must select the full
+        ``my_model.v1`` resource name, not just the trailing ``v1`` segment.
+        """
+        versioned_uid = "model.jaffle_shop.stg_orders.v1"
+        extra_context = {"dbt_node_config": {"unique_id": versioned_uid}}
+        sensor = DbtTestWatcherOperator(
+            task_id="stg_orders_v1.test",
+            project_dir="/tmp/project",
+            profile_config=None,
+            deferrable=True,
+            extra_context=extra_context,
+        )
+        sensor.build_and_run_cmd = MagicMock()
+        ti = MagicMock()
+        context = self.make_context(ti)
+
+        result = sensor._fallback_to_non_watcher_run(try_number=2, context=context)
+
+        assert result is True
+        _, kwargs = sensor.build_and_run_cmd.call_args
+        assert kwargs["cmd_flags"] == ["--select", "stg_orders.v1"]
 
     def test_retry_keeps_polling_when_producer_still_running(self):
         """On retry, if the producer is still running, the test sensor should keep polling instead of raising."""

@@ -6,12 +6,8 @@ from airflow import DAG
 from airflow.models.dataset import Dataset, DatasetAlias
 
 from cosmos import (
-    DbtBuildLocalOperator,
-    DbtCloneLocalOperator,
     DbtRunLocalOperator,
     DbtSeedLocalOperator,
-    DbtSnapshotLocalOperator,
-    DbtTestLocalOperator,
     ProfileConfig,
 )
 
@@ -46,7 +42,6 @@ with DAG("example_outlets", start_date=datetime(2024, 1, 1), catchup=False) as d
         install_deps=True,
     )
 
-
     run_operator__dataset = DbtRunLocalOperator(
         profile_config=profile_config,
         project_dir=DBT_PROJ_DIR,
@@ -55,7 +50,7 @@ with DAG("example_outlets", start_date=datetime(2024, 1, 1), catchup=False) as d
         install_deps=True,
         append_env=True,
         emit_datasets=True,
-        outlets=[Dataset("stg_customers__dataset")]
+        outlets=[Dataset("stg_customers__dataset")],
     )
 
     run_operator__dataset_alias = DbtRunLocalOperator(
@@ -66,7 +61,7 @@ with DAG("example_outlets", start_date=datetime(2024, 1, 1), catchup=False) as d
         install_deps=True,
         append_env=True,
         emit_datasets=True,
-        outlets=[DatasetAlias("stg_orders__dataset_alias")]
+        outlets=[DatasetAlias("stg_orders__dataset_alias")],
     )
 
     [seed_operator, seed_raw_orders] >> run_operator__dataset >> run_operator__dataset_alias

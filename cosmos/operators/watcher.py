@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import functools
 import json
-import threading
+import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -126,32 +126,33 @@ class _StdoutFilter:
     """Write-only sink used as ``sys.stdout`` proxy during DBT_RUNNER execution.
 
     Discards lines that parse as JSON (those are dbt's ``--log-format json`` output and are
-    already handled by the registered ``EventMsg`` callback). Forwards every other line to the
-    task logger so output written to stdout by third-party libraries — e.g. the Snowflake
-    connector's ``Going to open: <URL>`` externalbrowser auth prompt — remains visible in the
-    Airflow task log.
+    already handled by the registered ``EventMsg`` callback). Forwards every other line to
+    the pre-redirect ``sys.stdout`` so output written to stdout by third-party libraries —
+    e.g. the Snowflake connector's ``Going to open: <URL>`` externalbrowser auth prompt —
+    remains visible in the Airflow task log.
 
-    Memory footprint stays bounded: only the partial trailing line (no terminating newline yet)
-    is buffered; complete lines are emitted and discarded immediately. This is preferred over
-    ``io.StringIO()``, which would buffer every byte for the lifetime of the context manager and
-    grow proportionally to dbt's verbosity on large projects.
+    Forwarding goes directly to the captured stdout (not through ``logger.info``) to avoid
+    the feedback loop that would otherwise occur: any log handler bound to ``sys.stdout`` —
+    which is *this filter* while ``redirect_stdout`` is active — would re-enter ``write``
+    and ``flush`` on every record, either recursing without bound or double-logging the
+    same record into caplog/handlers. In Airflow tasks the captured stdout is the
+    ``StreamLogWriter`` wrapping the task log, so the line still surfaces there.
+
+    Memory footprint stays bounded: only the partial trailing line (no terminating newline
+    yet) is buffered; complete lines are emitted and discarded immediately. This is preferred
+    over ``io.StringIO()``, which would buffer every byte for the lifetime of the context
+    manager and grow proportionally to dbt's verbosity on large projects.
     """
 
     def __init__(self) -> None:
         self._buffer = ""
-        # Per-thread reentrancy guard. ``_emit`` forwards non-JSON lines via
-        # ``logger.info``; if any log handler is bound to ``sys.stdout`` — which is this
-        # filter while ``redirect_stdout`` is active — its ``emit`` calls ``stream.write``
-        # *and* ``stream.flush`` on every record, both of which re-enter this class.
-        # Without the guard the cycle (``_emit`` → ``logger.info`` → handler ``emit``
-        # → ``stream.flush`` → ``_emit``) recurses without bound. The guard makes
-        # reentrant ``write`` and ``flush`` calls no-ops, breaking the cycle; the log
-        # record is still delivered to non-stdout handlers (file, caplog).
-        self._tls = threading.local()
+        # Capture sys.stdout at construction time — this runs *before* ``redirect_stdout``
+        # swaps sys.stdout to this filter, so ``self._target`` points at whatever stdout
+        # the caller had set up (Airflow's StreamLogWriter in tasks, pytest's capture in
+        # tests, the real terminal stdout otherwise).
+        self._target = sys.stdout
 
     def write(self, s: str) -> int:
-        if getattr(self._tls, "emitting", False):
-            return len(s)
         self._buffer += s
         while "\n" in self._buffer:
             line, self._buffer = self._buffer.split("\n", 1)
@@ -159,8 +160,6 @@ class _StdoutFilter:
         return len(s)
 
     def flush(self) -> None:
-        if getattr(self._tls, "emitting", False):
-            return
         if self._buffer:
             self._emit(self._buffer)
             self._buffer = ""
@@ -171,11 +170,7 @@ class _StdoutFilter:
         try:
             json.loads(line)
         except (json.JSONDecodeError, ValueError):
-            self._tls.emitting = True
-            try:
-                logger.info(line)
-            finally:
-                self._tls.emitting = False
+            self._target.write(line + "\n")
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import logging
 from datetime import datetime, timedelta
@@ -2647,74 +2648,82 @@ class TestStdoutFilter:
     Regression coverage for issue #2649: non-JSON stdout written by third-party libraries
     (e.g. the Snowflake connector's externalbrowser auth URL) must surface to the task log
     instead of being silently discarded.
+
+    The filter forwards non-JSON lines to the pre-redirect ``sys.stdout`` (captured at
+    construction). These tests substitute a ``StringIO`` for that target and assert what
+    lands there.
     """
 
-    LOGGER_NAME = "cosmos.operators.watcher"
-
-    def test_json_line_is_dropped(self, caplog):
+    @staticmethod
+    def _make_filter() -> tuple[_StdoutFilter, io.StringIO]:
+        target = io.StringIO()
         f = _StdoutFilter()
-        with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME):
-            f.write('{"info": {"msg": "raw dbt json"}}\n')
-        assert "raw dbt json" not in caplog.text
+        f._target = target  # type: ignore[attr-defined]
+        return f, target
 
-    def test_non_json_line_is_forwarded_at_info(self, caplog):
-        f = _StdoutFilter()
+    def test_json_line_is_dropped(self):
+        f, target = self._make_filter()
+        f.write('{"info": {"msg": "raw dbt json"}}\n')
+        assert target.getvalue() == ""
+
+    def test_non_json_line_is_forwarded_to_target(self):
+        f, target = self._make_filter()
         snowflake_prompt = "Going to open: https://login.snowflakecomputing.com/oauth/authorize?... to authenticate..."
-        with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME):
-            f.write(snowflake_prompt + "\n")
-        assert snowflake_prompt in caplog.text
+        f.write(snowflake_prompt + "\n")
+        assert snowflake_prompt in target.getvalue()
 
-    def test_partial_writes_buffer_until_newline(self, caplog):
-        f = _StdoutFilter()
-        with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME):
-            f.write("hello ")
-            assert "hello" not in caplog.text
-            f.write("world\n")
-        assert "hello world" in caplog.text
+    def test_partial_writes_buffer_until_newline(self):
+        f, target = self._make_filter()
+        f.write("hello ")
+        assert target.getvalue() == ""
+        f.write("world\n")
+        assert "hello world" in target.getvalue()
 
-    def test_flush_emits_trailing_partial_line(self, caplog):
-        f = _StdoutFilter()
-        with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME):
-            f.write("trailing line without newline")
-            assert "trailing" not in caplog.text
-            f.flush()
-        assert "trailing line without newline" in caplog.text
+    def test_flush_emits_trailing_partial_line(self):
+        f, target = self._make_filter()
+        f.write("trailing line without newline")
+        assert target.getvalue() == ""
+        f.flush()
+        assert "trailing line without newline" in target.getvalue()
 
-    def test_mixed_json_and_plain_lines(self, caplog):
-        f = _StdoutFilter()
-        with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME):
-            f.write('{"info": {"msg": "json line"}}\n')
-            f.write("plain text from third-party lib\n")
-            f.write('{"info": {"msg": "another json"}}\n')
-        assert "plain text from third-party lib" in caplog.text
-        assert "json line" not in caplog.text
-        assert "another json" not in caplog.text
+    def test_mixed_json_and_plain_lines(self):
+        f, target = self._make_filter()
+        f.write('{"info": {"msg": "json line"}}\n')
+        f.write("plain text from third-party lib\n")
+        f.write('{"info": {"msg": "another json"}}\n')
+        out = target.getvalue()
+        assert "plain text from third-party lib" in out
+        assert "json line" not in out
+        assert "another json" not in out
 
     def test_no_recursion_when_log_handler_writes_back_to_filter(self, caplog):
-        """Regression: if any log handler is bound to ``sys.stdout`` while the filter is
-        active, its ``stream.write`` and ``stream.flush`` re-enter the filter. Without
-        the reentrancy guard this recurses without bound — production hit the flush
-        path because cosmos.dbt.runner logs a multi-line message ("Trying to run
-        dbtRunner with:\\n %s\\n in %s"), leaving partial-line content in the buffer
-        that a nested ``StreamHandler.emit``'s flush would re-emit.
+        """Regression: if a log handler is bound to ``sys.stdout`` while the filter is
+        active, the handler writes formatted log records back into the filter. The filter
+        must not re-enter the logging framework (which would deadlock/recurse on
+        ``StreamHandler.emit`` → ``stream.flush`` → ``_emit`` → ``logger.info``) and must
+        not double-deliver the record to other handlers (which broke
+        ``test_dbt_dag_with_watcher``'s ``message_count == 1`` assertion).
         """
         import contextlib
 
-        f = _StdoutFilter()
-        watcher_logger = logging.getLogger(self.LOGGER_NAME)
+        f, target = self._make_filter()
+        watcher_logger = logging.getLogger("cosmos.operators.watcher")
         handler = logging.StreamHandler(stream=f)
         handler.setLevel(logging.INFO)
         handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
         watcher_logger.addHandler(handler)
         try:
-            with caplog.at_level(logging.INFO, logger=self.LOGGER_NAME), contextlib.redirect_stdout(f):
-                # Mirror cosmos.dbt.runner.run_command's log call: embedded newlines force
-                # the buffer to hold a partial line across the _emit boundary, which is
-                # what triggers the flush-recursion path.
+            with caplog.at_level(logging.INFO, logger="cosmos.operators.watcher"), contextlib.redirect_stdout(f):
+                # Mirror cosmos.dbt.runner.run_command's log call: the embedded newlines
+                # force the buffer to hold a partial line across the _emit boundary, which
+                # is what triggered the flush-recursion path in production.
                 watcher_logger.info("Trying to run dbtRunner with:\n %s\n in %s", ["build"], "/tmp/x")
         finally:
             watcher_logger.removeHandler(handler)
-        assert "Trying to run dbtRunner" in caplog.text
+        # Original record reaches caplog exactly once — _emit forwards the handler's
+        # write to the captured target, not back through the logger.
+        assert caplog.text.count("Trying to run dbtRunner with:") == 1
+        assert "Trying to run dbtRunner with:" in target.getvalue()
 
 
 class TestStoreDbtResourceStatusFromLogNonJson:

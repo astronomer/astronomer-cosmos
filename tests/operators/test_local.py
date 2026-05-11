@@ -616,7 +616,8 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
-    from airflow.models.dataset import DatasetAlias, DatasetAliasModel
+    from airflow.dataset import Dataset, DatasetAlias
+    from airflow.models.dataset import DatasetAliasModel
     from sqlalchemy.orm.exc import FlushError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
@@ -630,6 +631,18 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
             install_deps=True,
             append_env=True,
         )
+
+        run_operator_dataset = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run_operator_alias",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            outlets=[Dataset(name="manual_outlet__run_dataset")],
+        )
+
         run_operator_alias = DbtRunLocalOperator(
             profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
@@ -640,6 +653,7 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
             append_env=True,
             outlets=[DatasetAlias(name="manual_outlet__run_alias")],
         )
+
         run_operator_alias_model = DbtRunLocalOperator(
             profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
@@ -650,6 +664,7 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
             append_env=True,
             outlets=[DatasetAliasModel(name="manual_outlet__run_alias_model")],
         )
+
         test_operator = DbtTestLocalOperator(
             profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
@@ -659,9 +674,17 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
             install_deps=True,
             append_env=True,
         )
-        seed_operator >> [run_operator_alias, run_operator_alias_model] >> test_operator
+        seed_operator >> [run_operator_dataset, run_operator_alias, run_operator_alias_model] >> test_operator
 
     assert seed_operator.outlets == []  # because emit_datasets=False,
+
+    # Handling Dataset
+    assert run_operator_dataset.outlets == [
+        DatasetAlias(name="manual_outlet__run_dataset"),
+        DatasetAlias(name="test_id_1__run_operator_dataset"),
+    ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_dataset.outlets)
 
     # Handling DatasetAlias
     assert run_operator_alias.outlets == [
@@ -669,11 +692,15 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
         DatasetAlias(name="test_id_1__run_operator_alias"),
     ]
 
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_alias.outlets)
+
     # Handling DatasetAliasModel passed by user and the DatasetAlias outlet by the Operator
     assert run_operator_alias_model.outlets == [
-        DatasetAliasModel(name="manual_outlet__run_alias_model"),
+        DatasetAlias(name="manual_outlet__run_alias_model"),
         DatasetAlias(name="test_id_1__run_operator_alias_model"),
     ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_alias_model.outlets)
 
     assert test_operator.outlets == [DatasetAlias(name="test_id_1__test")]
 

@@ -5,7 +5,7 @@ Scheduling
 
 Because Cosmos uses `Apache Airflow® <https://airflow.apache.org/>`_ to power scheduling, you can leverage Airflow's scheduling capabilities to schedule your dbt projects. This includes cron-based scheduling, timetables, and data-aware scheduling. For more info on Airflow's scheduling capabilities, check out the Airflow documentation or check out the `Astronomer documentation <https://docs.astronomer.io/learn/scheduling-in-airflow>`_.
 
-Time-Based Scheduling
+Time-based scheduling
 +++++++++++++++++++++
 
 To schedule a dbt project on a time-based schedule, you can use Airflow's scheduling options. For example, to run a dbt project every day starting on January 1, 2023, you can use the following DAG:
@@ -22,7 +22,7 @@ To schedule a dbt project on a time-based schedule, you can use Airflow's schedu
 
 .. _data-aware-scheduling:
 
-Data-Aware Scheduling
+Data-aware scheduling
 +++++++++++++++++++++
 
 `Apache Airflow® <https://airflow.apache.org/>`_ 2.4 introduced the concept of `scheduling based on Datasets <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/datasets.html>`_.
@@ -247,7 +247,7 @@ How Dataset Emission Differs by Execution Mode
    emitted URIs by enabling the ``enable_uri_xcom`` setting (see `Emitting Dataset URIs as XCom`_).
 
 
-Known Limitations
+Known limitations
 '''''''''''''''''
 
 Airflow 3.0 and beyond

@@ -22,16 +22,16 @@ and virtualenv execution methods (read `execution modes <../run_dbt/execution-mo
 
 Additionally, since Cosmos uses the open-source `openlineage-integration-common <https://github.com/OpenLineage/OpenLineage/tree/main/integration/common>`_, it relies on this library to support specific dbt adapters. As of 27 December 2024, the version 1.26.0 of this package supports:
 
-* Athena
-* BigQuery
-* Databricks
-* DuckDB
-* Dremio
-* Postgres
-* Redshift
-* Snowflake
-* Spark
-* SQLServer
+- Athena
+- BigQuery
+- Databricks
+- DuckDB
+- Dremio
+- Postgres
+- Redshift
+- Snowflake
+- Spark
+- SQLServer
 
 Contributions are also welcome in the `OpenLineage project <https://github.com/OpenLineage/OpenLineage/blob/main/integration/common/openlineage/common/provider/dbt/processor.py#L36C1-L47C22>`_ to support more adaptors.
 

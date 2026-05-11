@@ -171,7 +171,7 @@ Enable and trigger a run of the `jaffle_shop_k8s <https://github.com/astronomer/
 
 .. _kubernetes-known-limitations:
 
-Known Limitations
+Known limitations
 +++++++++++++++++
 
 The Kubernetes execution mode has the following limitations:

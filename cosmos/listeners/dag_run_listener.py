@@ -9,7 +9,10 @@ from typing import TYPE_CHECKING, Any
 from airflow.listeners import hookimpl
 
 if TYPE_CHECKING:
-    from airflow.models.dag import DAG
+    try:
+        from airflow.sdk import DAG
+    except ImportError:
+        from airflow.models.dag import DAG  # type: ignore[assignment]
     from airflow.models.dagrun import DagRun
 
 from cosmos import telemetry

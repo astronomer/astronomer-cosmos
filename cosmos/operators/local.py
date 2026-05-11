@@ -788,7 +788,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         with DatasetAlias:
         https://github.com/apache/airflow/issues/42495
         """
-        from airflow import DAG
+        try:
+            from airflow.sdk import DAG
+        except ImportError:
+            from airflow.models.dag import DAG  # type: ignore[assignment]
 
         if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
             logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")

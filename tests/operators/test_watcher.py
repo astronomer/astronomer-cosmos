@@ -2234,16 +2234,44 @@ class TestDbtTestWatcherOperator:
         xcom_keys_used = [call.kwargs.get("key") or call[1].get("key") for call in calls]
         assert self.TESTS_STATUS_XCOM_KEY in xcom_keys_used
 
-    def test_fallback_raises_on_retry(self):
-        """On retry (try_number > 1) with a terminated producer, the test sensor should raise since test re-execution is not yet supported."""
+    def test_fallback_runs_dbt_test_on_retry(self):
+        """On retry (try_number > 1) with a terminated producer, the test sensor should
+        fall back to running ``dbt test --select <model>`` locally for this model.
+        """
         sensor = self.make_sensor()
         sensor._get_producer_task_status.return_value = "success"
+        sensor.build_and_run_cmd = MagicMock()
         ti = MagicMock()
         ti.try_number = 2
         context = self.make_context(ti)
 
-        with pytest.raises(AirflowException, match="Test re-execution is not yet supported"):
-            sensor.poke(context)
+        result = sensor.poke(context)
+
+        assert result is True
+        sensor.build_and_run_cmd.assert_called_once()
+        _, kwargs = sensor.build_and_run_cmd.call_args
+        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".")[-1]]
+
+    def test_fallback_to_non_watcher_run_invokes_dbt_test(self):
+        """``_fallback_to_non_watcher_run`` should call ``build_and_run_cmd`` with only
+        a ``--select <model>`` selector and rely on ``base_cmd = ["test"]`` to issue dbt test.
+        Producer flags must not be forwarded since some (e.g. ``--full-refresh``) are
+        invalid for ``dbt test``.
+        """
+        sensor = self.make_sensor()
+        sensor.build_and_run_cmd = MagicMock()
+        ti = MagicMock()
+        # If producer flags were forwarded, this would leak into cmd_flags.
+        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--full-refresh"]
+        context = self.make_context(ti)
+
+        result = sensor._fallback_to_non_watcher_run(try_number=2, context=context)
+
+        assert result is True
+        _, kwargs = sensor.build_and_run_cmd.call_args
+        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".")[-1]]
+        assert "--full-refresh" not in kwargs["cmd_flags"]
+        assert sensor.base_cmd == ["test"]
 
     def test_retry_keeps_polling_when_producer_still_running(self):
         """On retry, if the producer is still running, the test sensor should keep polling instead of raising."""

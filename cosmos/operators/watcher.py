@@ -571,10 +571,45 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):  # type: ignore[misc]
 
     Deferral is fully supported: the ``WatcherTrigger`` receives
     ``is_test_sensor=True`` and polls the correct aggregated key.
+
+    On manual clear from the Airflow UI or Airflow-level retry, the sensor falls
+    back to running ``dbt test --select <model>`` locally for this specific model.
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields  # type: ignore[operator]
 
+    # Override DbtRunMixin.base_cmd so build_and_run_cmd issues `dbt test` in the
+    # fallback path. The normal sensor poll path does not shell out, so this is
+    # only consulted when _fallback_to_non_watcher_run runs.
+    base_cmd = ["test"]
+
     @property
     def is_test_sensor(self) -> bool:
+        return True
+
+    def _fallback_to_non_watcher_run(self, try_number: int, context: Context) -> bool:
+        """Run ``dbt test --select <model>`` locally to retry tests for this model.
+
+        Used when the test sensor is manually cleared from the Airflow UI or when
+        Airflow-level retries fire. Producer flags are intentionally not forwarded
+        because some of them (e.g. ``--full-refresh``) are not valid for ``dbt test``.
+        """
+        if try_number > 1:
+            logger.info(
+                "Retry attempt #%s – Running tests for model '%s' from project '%s'",
+                try_number - 1,
+                self.model_unique_id,
+                self.project_dir,
+            )
+        else:
+            logger.info(
+                "Falling back to running tests for model '%s' from project '%s'",
+                self.model_unique_id,
+                self.project_dir,
+            )
+
+        model_selector = self.model_unique_id.split(".")[-1]
+        cmd_flags = ["--select", model_selector]
+        self.build_and_run_cmd(context, cmd_flags=cmd_flags)
+        logger.info("dbt test completed successfully on retry for model '%s'", self.model_unique_id)
         return True

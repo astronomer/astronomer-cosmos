@@ -2273,6 +2273,22 @@ class TestDbtTestWatcherOperator:
         assert "--full-refresh" not in kwargs["cmd_flags"]
         assert sensor.base_cmd == ["test"]
 
+    def test_fallback_on_first_attempt_logs_fallback_message(self, caplog):
+        """When the fallback runs at ``try_number == 1`` (e.g. producer skipped/failed),
+        it should log the "Falling back" message rather than the "Retry attempt" one.
+        """
+        sensor = self.make_sensor()
+        sensor.build_and_run_cmd = MagicMock()
+        ti = MagicMock()
+        context = self.make_context(ti)
+
+        with caplog.at_level("INFO"):
+            result = sensor._fallback_to_non_watcher_run(try_number=1, context=context)
+
+        assert result is True
+        assert any("Falling back to running tests for model" in r.message for r in caplog.records)
+        assert not any("Retry attempt" in r.message for r in caplog.records)
+
     def test_fallback_selector_preserves_version_suffix(self):
         """Versioned dbt models (e.g. ``model.pkg.my_model.v1``) must select the full
         ``my_model.v1`` resource name, not just the trailing ``v1`` segment.

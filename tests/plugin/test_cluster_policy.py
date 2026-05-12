@@ -249,34 +249,10 @@ class TestTaskInstanceMutationHook:
 
 
 def test_cluster_policy_load_does_not_break_airflow_sentry_init(tmp_path):
-    """Regression test for issue #2620.
-
-    Reproduces the user-reported failure: when Airflow is configured with
-    ``[sentry] sentry_on = True`` and ``[sentry] before_send`` pointing at a
-    module that lives in the user's DAGs folder (i.e., not on ``sys.path``
-    yet when Airflow's ``settings.initialize()`` loads policy entry points),
-    the ``cosmos.plugin.cluster_policy`` entry point load triggers
-    ``AirflowConfigException: ... key "before_send" in "sentry" section.``
-    and the ``airflow`` CLI dies on startup.
-
-    The chain is::
-
-        airflow.settings.initialize()
-          -> load_policy_plugins("airflow.policy")
-            -> ep.load() -> cosmos.plugin.cluster_policy
-              -> from airflow.models.taskinstance import TaskInstance
-                -> from airflow.sentry import Sentry
-                  -> Sentry = ConfiguredSentry()
-                    -> conf.getimport("sentry", "before_send")
-                      -> importlib.import_module(<user-dags-module>) FAILS
-
-    The fix is to keep ``TaskInstance`` as a type-only import in
-    ``cosmos/plugin/cluster_policy.py`` (under ``if TYPE_CHECKING``) so the
-    above chain never runs at plugin-load time.
-
-    Runs in a fresh subprocess with the user's exact ``[sentry]`` config
-    supplied via env vars; expects ``import cosmos.plugin.cluster_policy``
-    to succeed.
+    """Regression for #2620: importing cosmos.plugin.cluster_policy must not
+    transitively load airflow.sentry. If it does, [sentry] before_send is
+    evaluated before the DAGs folder is on sys.path and Airflow startup
+    fails with AirflowConfigException.
     """
     code = "import cosmos.plugin.cluster_policy  # noqa: F401\n" "print('OK')\n"
     env = {

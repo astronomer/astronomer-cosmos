@@ -1,5 +1,8 @@
 .. _self:
 
+Astronomer Cosmos
+=================
+
 .. toctree::
    :hidden:
    :maxdepth: 0
@@ -37,14 +40,14 @@ time and effort. By automatically turning dbt workflows into Airflow DAGs, Cosmo
 high-quality data models without the hassle of managing complex integrations.
 
 What is Astronomer Cosmos?
-==========================
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Astronomer Cosmos is an open-source library that bridges Apache Airflow and dbt, allowing you to easily transform your
 dbt projects into Airflow Dags and manage everything seamlessly. With Cosmos, you can write your data transformations
 using dbt and then schedule and orchestrate them with Airflow, making the entire process smooth and straightforward.
 
 Why should you use Cosmos?
-==========================
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Integrating dbt and Airflow can be complex, but Cosmos simplifies it by seamlessly connecting these
 powerful tools—letting you focus on what matters most: delivering impactful data models and results without getting
@@ -60,7 +63,7 @@ Whether you're handling intricate data tasks or looking to streamline your proce
 with Airflow effortlessly, saving you time and letting you focus on what truly matters—creating impactful insights.
 
 Ready to get started?
-=====================
+~~~~~~~~~~~~~~~~~~~~~
 
 Check out the Cosmos Fundamentals, get started locally with the Quickstart Guides, or find instructions for how to bring your own dbt project to Cosmos in `Get started with Cosmos <https://astronomer.github.io/astronomer-cosmos/getting_started/index.html>`_.
 
@@ -68,7 +71,7 @@ You can also explore more examples in `/dev/dags <https://github.com/astronomer/
 or in the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
 
 Join the community
-==================
+~~~~~~~~~~~~~~~~~~
 
 Have questions, need help, or interested in contributing? We welcome all contributions and feedback!
 
@@ -81,7 +84,7 @@ Note that contributors and maintainers are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.
 
 License
-=======
+~~~~~~~
 
 `Apache License 2.0 <https://github.com/astronomer/astronomer-cosmos/blob/main/LICENSE>`_
 

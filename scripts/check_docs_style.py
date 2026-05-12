@@ -3,8 +3,9 @@
 
 Each rule is a small function registered in :data:`RULES`. ``check_file``
 walks every line of an ``.rst`` / ``.jinja2`` file, tracks whether the
-current line is inside a literal-block directive (code, include, or
-table) where structural markers must not be treated as prose, and
+current line is inside a literal-block directive (code blocks,
+literalinclude, or table directives) where structural markers must
+not be treated as prose, and
 dispatches every other line to each rule. Add a new rule by writing a
 function that takes a :class:`LineContext` and yields
 ``(lineno, message)`` pairs, then append it to ``RULES``.
@@ -55,9 +56,10 @@ Rule = Callable[[LineContext], Iterable[tuple[int, str]]]
 
 class LiteralBlockTracker:
     """Track whether the current line is inside an RST directive whose
-    content should not be treated as prose — code blocks, includes, and
-    table directives where the markers (``* -``) are structural, not
-    bullets.
+    content should not be treated as prose: code blocks, literalinclude,
+    and table directives where the markers (``* -``) are structural, not
+    bullets. Plain ``.. include::`` is excluded because its body is
+    re-parsed as RST rather than treated as a literal block.
 
     A directive like ``.. code-block:: python`` opens a region whose
     content lines are indented strictly further than the directive
@@ -152,7 +154,9 @@ RULES: list[Rule] = [
 # --- File walk ------------------------------------------------------------
 
 
-def check_file(path: Path, rules: list[Rule] = RULES) -> list[str]:
+def check_file(path: Path, rules: list[Rule] | None = None) -> list[str]:
+    if rules is None:
+        rules = RULES
     lines = path.read_text(encoding="utf-8").split("\n")
     tracker = LiteralBlockTracker()
     errors: list[str] = []

@@ -2234,16 +2234,78 @@ class TestDbtTestWatcherOperator:
         xcom_keys_used = [call.kwargs.get("key") or call[1].get("key") for call in calls]
         assert self.TESTS_STATUS_XCOM_KEY in xcom_keys_used
 
-    def test_fallback_raises_on_retry(self):
-        """On retry (try_number > 1) with a terminated producer, the test sensor should raise since test re-execution is not yet supported."""
+    def test_fallback_runs_dbt_test_on_retry(self):
+        """On retry (try_number > 1) with a terminated producer, ``poke`` should
+        invoke ``_fallback_to_non_watcher_run``, which runs ``dbt test --select <model>``
+        locally for this model.
+        """
         sensor = self.make_sensor()
         sensor._get_producer_task_status.return_value = "success"
+        sensor.build_and_run_cmd = MagicMock()
+        mock_fallback_to_non_watcher_run = MagicMock(side_effect=sensor._fallback_to_non_watcher_run)
+        sensor._fallback_to_non_watcher_run = mock_fallback_to_non_watcher_run
         ti = MagicMock()
         ti.try_number = 2
         context = self.make_context(ti)
 
-        with pytest.raises(AirflowException, match="Test re-execution is not yet supported"):
-            sensor.poke(context)
+        result = sensor.poke(context)
+
+        assert result is True
+        mock_fallback_to_non_watcher_run.assert_called_once()
+        sensor.build_and_run_cmd.assert_called_once()
+        _, kwargs = sensor.build_and_run_cmd.call_args
+        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".", 2)[2]]
+
+    def test_fallback_via_poke_does_not_forward_producer_flags(self):
+        """Driving through ``poke`` on retry, the fallback should issue ``dbt test`` with
+        a ``--select <model>`` selector only. Producer flags must not be forwarded since
+        some (e.g. ``--full-refresh``) are invalid for ``dbt test``.
+        """
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "success"
+        sensor.build_and_run_cmd = MagicMock()
+        mock_fallback_to_non_watcher_run = MagicMock(side_effect=sensor._fallback_to_non_watcher_run)
+        sensor._fallback_to_non_watcher_run = mock_fallback_to_non_watcher_run
+        ti = MagicMock()
+        ti.try_number = 2
+        # If producer flags were forwarded, this would leak into cmd_flags.
+        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--full-refresh"]
+        context = self.make_context(ti)
+
+        assert sensor.poke(context) is True
+
+        mock_fallback_to_non_watcher_run.assert_called_once()
+        _, kwargs = sensor.build_and_run_cmd.call_args
+        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".", 2)[2]]
+        assert "--full-refresh" not in kwargs["cmd_flags"]
+        assert sensor.base_cmd == ["test"]
+
+    def test_fallback_via_poke_preserves_version_suffix(self):
+        """Versioned dbt models (e.g. ``model.pkg.my_model.v1``) must select the full
+        ``my_model.v1`` resource name, not just the trailing ``v1`` segment.
+        """
+        versioned_uid = "model.jaffle_shop.stg_orders.v1"
+        extra_context = {"dbt_node_config": {"unique_id": versioned_uid}}
+        sensor = DbtTestWatcherOperator(
+            task_id="stg_orders_v1.test",
+            project_dir="/tmp/project",
+            profile_config=None,
+            deferrable=True,
+            extra_context=extra_context,
+        )
+        sensor._get_producer_task_status = MagicMock(return_value="success")
+        sensor.build_and_run_cmd = MagicMock()
+        mock_fallback_to_non_watcher_run = MagicMock(side_effect=sensor._fallback_to_non_watcher_run)
+        sensor._fallback_to_non_watcher_run = mock_fallback_to_non_watcher_run
+        ti = MagicMock()
+        ti.try_number = 2
+        context = self.make_context(ti)
+
+        assert sensor.poke(context) is True
+
+        mock_fallback_to_non_watcher_run.assert_called_once()
+        _, kwargs = sensor.build_and_run_cmd.call_args
+        assert kwargs["cmd_flags"] == ["--select", "stg_orders.v1"]
 
     def test_retry_keeps_polling_when_producer_still_running(self):
         """On retry, if the producer is still running, the test sensor should keep polling instead of raising."""

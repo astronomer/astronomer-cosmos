@@ -45,6 +45,33 @@ def test_dbt_run_airflow_async_bigquery_operator_init(profile_config_mock):
     assert operator.full_refresh is False  # Default value should be False
 
 
+def test_dbt_run_airflow_async_bigquery_operator_init_with_deferrable_false_warns(profile_config_mock, caplog):
+    """Passing deferrable=False must not raise TypeError, be overridden to True, and log a warning."""
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="cosmos.operators._asynchronous.bigquery"):
+        operator = DbtRunAirflowAsyncBigqueryOperator(
+            task_id="test_task",
+            project_dir="/path/to/project",
+            profile_config=profile_config_mock,
+            dbt_kwargs={"task_id": "test_task"},
+            deferrable=False,
+        )
+    assert operator.deferrable is True
+    assert "deferrable=True" in caplog.text
+
+
+def test_dbt_run_airflow_async_bigquery_operator_init_deferrable_defaults_true(profile_config_mock):
+    """deferrable defaults to True when not supplied."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+    assert operator.deferrable is True
+
+
 def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):
     """Test base_cmd property returns the correct dbt command."""
     operator = DbtRunAirflowAsyncBigqueryOperator(

@@ -1,7 +1,7 @@
 .. _optimize-rendering:
 
 Optimize DAG Parsing
---------------------
+====================
 
 Every time `Apache Airflow® <https://airflow.apache.org/>`_ parses a DAG file that contains a ``DbtDag`` or ``DbtTaskGroup``, Cosmos must load and process the
 dbt project to build the corresponding Airflow task graph. The time this takes directly affects how quickly your DAGs
@@ -19,7 +19,7 @@ appear and update in Airflow. This page covers the most impactful ways to reduce
 
 
 1. Choose the right LoadMode
-++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``LoadMode`` controls how Cosmos reads your dbt project. It is the single most impactful setting for parse-time
 performance.
@@ -76,7 +76,7 @@ Use ``LoadMode.DBT_LS`` with the following optimizations to minimize parse-time 
 
 
 2. Reduce DAG granularity
-+++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Fewer nodes in the Airflow DAG means faster parsing. There are two ways to reduce the number of nodes Cosmos generates.
 
@@ -112,7 +112,7 @@ increase the number of tasks in the DAG. Consider these alternatives:
 
 
 3. Skip stale sources
-+++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~
 
 If your DAG includes multiple data sources and some may not have fresh data, you can avoid running unnecessary
 branches by rendering source nodes with freshness checks. When a source is not fresh, the downstream branch can be

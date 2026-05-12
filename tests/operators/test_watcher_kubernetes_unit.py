@@ -452,15 +452,26 @@ def test_test_sensor_poke_status(xcom_return, expected):
     ti.xcom_pull.assert_any_call(sensor.producer_task_id, key=tests_xcom_key)
 
 
-def test_test_sensor_raises_on_retry():
-    """On retry (try_number > 1) with a terminated producer, poke should raise because test re-execution is not supported."""
+def test_test_sensor_runs_dbt_test_on_retry():
+    """On retry (try_number > 1) with a terminated producer, ``poke`` should
+    invoke ``_fallback_to_non_watcher_run``, which launches a pod running
+    ``dbt test --select <model>`` for this model.
+    """
     sensor = make_test_sensor()
     sensor._get_producer_task_status.return_value = "success"
+    sensor.build_and_run_cmd = MagicMock()
+    mock_fallback = MagicMock(side_effect=sensor._fallback_to_non_watcher_run)
+    sensor._fallback_to_non_watcher_run = mock_fallback
 
     ti = MagicMock()
     ti.try_number = 2
     ti.xcom_pull.return_value = None
     context = make_context(ti)
 
-    with pytest.raises(AirflowException, match="not yet supported"):
-        sensor.poke(context)
+    assert sensor.poke(context) is True
+
+    mock_fallback.assert_called_once()
+    sensor.build_and_run_cmd.assert_called_once()
+    _, kwargs = sensor.build_and_run_cmd.call_args
+    assert kwargs["cmd_flags"] == ["--select", "stg_orders"]
+    assert sensor.base_cmd == ["test"]

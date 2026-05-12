@@ -1,7 +1,7 @@
 .. _cosmos-config:
 
 Cosmos Config
--------------
+=============
 
 This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ configurations that affect Astronomer Cosmos behavior. They can be set in the ``airflow.cfg`` file or using environment variables.
 
@@ -14,7 +14,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 - [openlineage]
 
 [cosmos]
-++++++++
+~~~~~~~~
 
 .. _cache_dir:
 
@@ -378,7 +378,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE``
 
 [openlineage]
-+++++++++++++
+~~~~~~~~~~~~~
 
 .. _namespace:
 
@@ -392,7 +392,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     For more information, see `OpenLineage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_.
 
 Environment Variables
-+++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~
 
 .. _LINEAGE_NAMESPACE:
 

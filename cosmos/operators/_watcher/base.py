@@ -417,15 +417,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         Reconstructs the dbt command by cloning the project and re-running the model
         with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
 
-        For test sensors, re-execution is not supported in watcher mode; retries are skipped.
+        Subclasses may override to issue a different dbt subcommand (e.g. ``dbt test``
+        for test sensors or ``dbt source freshness`` for source sensors).
         """
-        if self.is_test_sensor:
-            raise AirflowException(
-                f"Test re-execution is not yet supported in watcher mode. "
-                f"{self._resource_label} '{self.model_unique_id}' cannot be retried. "
-                f"A future release will add fallback to local test execution."
-            )
-
         if try_number > 1:
             logger.info(
                 f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",

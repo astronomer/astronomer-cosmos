@@ -83,6 +83,7 @@ def get_automatic_profile_mapping(
 __all__ = [
     "AthenaAccessKeyProfileMapping",
     "BaseProfileMapping",
+    "ClickhouseUserPasswordProfileMapping",
     "GoogleCloudServiceAccountFileProfileMapping",
     "GoogleCloudServiceAccountDictProfileMapping",
     "GoogleCloudOauthProfileMapping",
@@ -98,6 +99,7 @@ __all__ = [
     "SnowflakePrivateKeyPemProfileMapping",
     "SnowflakePrivateKeyFilePemProfileMapping",
     "SnowflakeEncryptedPrivateKeyFilePemProfileMapping",
+    "SnowflakeEncryptedPrivateKeyPemProfileMapping",
     "StarrocksUserPasswordProfileMapping",
     "SparkThriftProfileMapping",
     "ExasolUserPasswordProfileMapping",

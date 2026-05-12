@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowSkipException
 from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
 from packaging.version import Version
 
@@ -52,34 +52,13 @@ def test_retries_not_forced_to_zero():
     assert op.retries == 5
 
 
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
-@patch("cosmos.operators._k8s_common._init_xcom_backup")
-@patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.execute")
-def test_first_attempt_calls_parent_execute(mock_execute, mock_init, mock_delete):
-    """On the first attempt (try_number=1), the producer delegates to the parent's execute and returns its value."""
-    op = DbtProducerWatcherGcpGkeOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-        **GKE_KWARGS,
-    )
-
-    ti = MagicMock()
-    ti.try_number = 1
-    context = {"ti": ti, "run_id": "test_run"}
-
-    mock_execute.return_value = "result"
-    result = op.execute(context=context)
-
-    mock_execute.assert_called_once()
-    assert result == "result"
-
-
 @patch("cosmos.operators._k8s_common._restore_xcom_from_variable")
 @patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.execute")
-def test_skips_retry_attempt(mock_execute, mock_restore, caplog):
-    """
-    Test that the operator skips execution when a retry is attempted (try_number > 1).
+def test_skips_retry_attempt(mock_execute, mock_restore):
+    """Smoke-test that the GCP GKE producer delegates to ``execute_watcher_producer``.
+
+    Full coverage of the producer's retry / XCom backup behaviour lives in
+    ``test_k8s_common.py``; this just guards against a missing delegation.
     """
     op = DbtProducerWatcherGcpGkeOperator(
         project_dir=".",
@@ -97,25 +76,6 @@ def test_skips_retry_attempt(mock_execute, mock_restore, caplog):
 
     mock_restore.assert_called_once_with(context)
     mock_execute.assert_not_called()
-
-
-def test_raises_exception_when_task_instance_missing():
-    """
-    Test that the operator raises an AirflowException when task instance is missing from context.
-    """
-    op = DbtProducerWatcherGcpGkeOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-        **GKE_KWARGS,
-    )
-
-    context = {"ti": None}
-
-    with pytest.raises(AirflowException) as excinfo:
-        op.execute(context=context)
-
-    assert "expects a task instance" in str(excinfo.value)
 
 
 def test_dbt_build_watcher_gcp_gke_operator_raises_not_implemented_error():

@@ -447,9 +447,6 @@ def execute_watcher_producer(
 
     _init_xcom_backup(context)
 
-    # This global variable is used to make the task context available to the K8s callback.
-    # While the callback is set during the operator initialization, the context is only created
-    # during the operator's execution.
     global _producer_task_context
     _producer_task_context = context
 

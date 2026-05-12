@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowSkipException
 from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
 from airflow.providers.cncf.kubernetes.secret import Secret
 from packaging.version import Version
@@ -76,33 +76,13 @@ project_config = ProjectConfig(
 render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=TestBehavior.NONE)
 
 
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
-@patch("cosmos.operators._k8s_common._init_xcom_backup")
-@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_first_attempt_calls_parent_execute(mock_execute, mock_init, mock_delete):
-    """On the first attempt (try_number=1), the producer delegates to the parent's execute and returns its value."""
-    op = DbtProducerWatcherKubernetesOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-    )
-
-    ti = MagicMock()
-    ti.try_number = 1
-    context = {"ti": ti, "run_id": "test_run"}
-
-    mock_execute.return_value = "result"
-    result = op.execute(context=context)
-
-    mock_execute.assert_called_once()
-    assert result == "result"
-
-
 @patch("cosmos.operators._k8s_common._restore_xcom_from_variable")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_skips_retry_attempt(mock_execute, mock_restore, caplog):
-    """
-    Test that the operator skips execution when a retry is attempted (try_number > 1).
+def test_skips_retry_attempt(mock_execute, mock_restore):
+    """Smoke-test that the K8s producer delegates to ``execute_watcher_producer``.
+
+    Full coverage of the producer's retry / XCom backup behaviour lives in
+    ``test_k8s_common.py``; this just guards against a missing delegation.
     """
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
@@ -119,72 +99,6 @@ def test_skips_retry_attempt(mock_execute, mock_restore, caplog):
 
     mock_restore.assert_called_once_with(context)
     mock_execute.assert_not_called()
-
-
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
-@patch("cosmos.operators._k8s_common._init_xcom_backup")
-@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_deletes_backup_on_success(mock_execute, mock_init, mock_delete):
-    """Test that the XCom backup Variable is deleted after a successful execution."""
-    op = DbtProducerWatcherKubernetesOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-    )
-
-    ti = MagicMock()
-    ti.try_number = 1
-    context = {"ti": ti}
-
-    op.execute(context=context)
-
-    mock_init.assert_called_once_with(context)
-    mock_delete.assert_called_once_with(context)
-    mock_execute.assert_called_once()
-
-
-@patch("cosmos.operators._k8s_common._backup_xcom_to_variable")
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
-@patch("cosmos.operators._k8s_common._init_xcom_backup")
-@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_keeps_backup_on_failure(mock_execute, mock_init, mock_delete, mock_backup):
-    """Test that the XCom backup Variable is persisted (not deleted) when execution fails."""
-    op = DbtProducerWatcherKubernetesOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-    )
-
-    ti = MagicMock()
-    ti.try_number = 1
-    context = {"ti": ti}
-
-    mock_execute.side_effect = RuntimeError("dbt build failed")
-
-    with pytest.raises(RuntimeError):
-        op.execute(context=context)
-
-    mock_init.assert_called_once_with(context)
-    mock_backup.assert_called_once_with(context)
-    mock_delete.assert_not_called()
-
-
-def test_raises_exception_when_task_instance_missing():
-    """
-    Test that the operator raises an AirflowException when task instance is missing from context.
-    """
-    op = DbtProducerWatcherKubernetesOperator(
-        project_dir=".",
-        profile_config=None,
-        image="dbt-image:latest",
-    )
-
-    context = {"ti": None}
-
-    with pytest.raises(AirflowException) as excinfo:
-        op.execute(context=context)
-
-    assert "expects a task instance" in str(excinfo.value)
 
 
 def test_dbt_build_watcher_kubernetes_operator_raises_not_implemented_error():

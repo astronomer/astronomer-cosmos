@@ -167,6 +167,7 @@ dependencies = [
     "types-python-dateutil",
     "Werkzeug<3.0.0",
     "pytest-asyncio",
+    "orjson",
     # Needed by the regression test for issue #2620: the test exercises
     # airflow.sentry's module-level ConfiguredSentry() path, which only
     # runs when sentry_sdk is importable.

@@ -145,9 +145,27 @@ Yes. Although Airflow does not render templated fields during DAG parsing,
 Cosmos resolves them **at task execution time**. To opt in, pass the
 templated values via ``operator_args``.
 
-Templatable fields include ``vars``, ``freshness``, and — when passed via
-``DbtDag(operator_args=...)`` (or directly to a standalone operator
-instance) — ``select``, ``selector``, and ``exclude``.
+The fields that support Airflow templating via
+``DbtDag(operator_args=...)`` or ``DbtTaskGroup(operator_args=...)`` are
+``env``, ``vars``, ``full_refresh``, and ``dbt_cmd_flags``. ``select``,
+``selector``, and ``exclude`` are also templatable when passed via
+``operator_args`` (or directly to a standalone operator instance), with
+the caveat below.
+
+.. note::
+
+   Templating ``select``, ``selector``, or ``exclude`` via
+   ``operator_args`` affects only the **dbt command each task runs at
+   execution time** — it does not change which Airflow tasks Cosmos
+   creates. The task graph is built during DAG parsing from
+   ``RenderConfig``, whose own ``select`` / ``selector`` / ``exclude``
+   fields are **not** templatable for the same reason: node selection
+   must complete before Airflow renders templates. In practice, every
+   dbt node still becomes an Airflow task; the templated selector simply
+   narrows what each task tells dbt to process at run time.
+
+For the full list of template fields and caveats, see
+:doc:`guides/run_dbt/operators/operator-args`.
 
 Example: passing Airflow date-aware Jinja templates as dbt ``vars`` via
 ``DbtDag`` and ``operator_args``:
@@ -183,9 +201,7 @@ corresponding execution window.
    Templated ``vars`` and ``env`` are not used when Cosmos parses the DAG
    with ``LoadMode.DBT_LS``. If the values need to influence DAG rendering
    (for example, to drive node selection), set them on
-   ``ProjectConfig.dbt_vars`` instead. See
-   :doc:`guides/run_dbt/operators/operator-args` for the full list of
-   template fields and caveats.
+   ``ProjectConfig.dbt_vars`` instead.
 
 .. note::
 

@@ -280,7 +280,7 @@ the producer-to-consumer dependency differently (``producer >> consumers`` with
    The ``dbt_producer_watcher_done`` task is visible in the Airflow UI. Click on it to see a
    description of its purpose in the "Doc" tab.
 
-For a detailed history of how retry behaviour has evolved across Cosmos releases, see
+For a detailed history of how retry behavior has evolved across Cosmos releases, see
 :ref:`watcher-retry-history`.
 
 Watcher dbt Execution Queue

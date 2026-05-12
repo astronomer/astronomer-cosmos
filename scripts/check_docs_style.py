@@ -67,7 +67,7 @@ class LiteralBlockTracker:
 
     def __init__(self) -> None:
         self._directive_indent: int | None = None
-        self._content_indent: int | None = None
+        self._in_body: bool = False
 
     def feed(self, line: str) -> bool:
         """Advance state with one line; return True if the line is inside
@@ -78,25 +78,25 @@ class LiteralBlockTracker:
         m = LITERAL_DIRECTIVE_RE.match(line)
         if m:
             self._directive_indent = len(m.group("indent"))
-            self._content_indent = None
+            self._in_body = False
             return False
 
         if self._directive_indent is None:
             return False
 
         if stripped == "":
-            return self._content_indent is not None
+            return self._in_body
 
-        if self._content_indent is None:
+        if not self._in_body:
             if line_indent > self._directive_indent:
-                self._content_indent = line_indent
+                self._in_body = True
                 return True
             self._directive_indent = None
             return False
 
-        if line_indent < self._content_indent:
+        if line_indent <= self._directive_indent:
             self._directive_indent = None
-            self._content_indent = None
+            self._in_body = False
             return False
 
         return True
@@ -153,7 +153,7 @@ RULES: list[Rule] = [
 
 
 def check_file(path: Path, rules: list[Rule] = RULES) -> list[str]:
-    lines = path.read_text().split("\n")
+    lines = path.read_text(encoding="utf-8").split("\n")
     tracker = LiteralBlockTracker()
     errors: list[str] = []
 

@@ -233,8 +233,6 @@ To use this mode, install the Google Cloud provider:
 
     pip install "astronomer-cosmos[google]"
 
--------------------------------------------------------------------------------
-
 Summary
 ~~~~~~~
 

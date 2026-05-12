@@ -578,8 +578,13 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):  # type: ignore[misc]
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields  # type: ignore[operator]
 
-    # Override DbtRunMixin.base_cmd so build_and_run_cmd issues `dbt test` in the
-    # fallback path. The normal sensor poll path does not shell out, so this is
+    # Hardcode base_cmd = ["test"] (overriding DbtRunMixin inherited via
+    # DbtConsumerWatcherSensor) rather than inheriting from DbtTestMixin: due
+    # to the multiple class inheritance and incompatible arguments,
+    # DbtTestMixin.__init__ forwards select/exclude/selector kwargs to super(),
+    # which the sensor side of our MRO (BaseSensorOperator) rejects. Setting
+    # the attribute here is simpler than overriding __init__ to bypass the
+    # mixin's chain. The normal sensor poll path does not shell out; this is
     # only consulted when _fallback_to_non_watcher_run runs.
     base_cmd = ["test"]
 
@@ -594,19 +599,12 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):  # type: ignore[misc]
         Airflow-level retries fire. Producer flags are intentionally not forwarded
         because some of them (e.g. ``--full-refresh``) are not valid for ``dbt test``.
         """
-        if try_number > 1:
-            logger.info(
-                "Retry attempt #%s – Running tests for model '%s' from project '%s'",
-                try_number - 1,
-                self.model_unique_id,
-                self.project_dir,
-            )
-        else:
-            logger.info(
-                "Falling back to running tests for model '%s' from project '%s'",
-                self.model_unique_id,
-                self.project_dir,
-            )
+        logger.info(
+            "Running tests for model '%s' from project '%s' (try %s)",
+            self.model_unique_id,
+            self.project_dir,
+            try_number,
+        )
 
         model_selector = self.model_unique_id.split(".", 2)[2]
         cmd_flags = ["--select", model_selector]

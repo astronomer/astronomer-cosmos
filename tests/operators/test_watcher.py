@@ -2235,12 +2235,15 @@ class TestDbtTestWatcherOperator:
         assert self.TESTS_STATUS_XCOM_KEY in xcom_keys_used
 
     def test_fallback_runs_dbt_test_on_retry(self):
-        """On retry (try_number > 1) with a terminated producer, the test sensor should
-        fall back to running ``dbt test --select <model>`` locally for this model.
+        """On retry (try_number > 1) with a terminated producer, ``poke`` should
+        invoke ``_fallback_to_non_watcher_run``, which runs ``dbt test --select <model>``
+        locally for this model.
         """
         sensor = self.make_sensor()
         sensor._get_producer_task_status.return_value = "success"
         sensor.build_and_run_cmd = MagicMock()
+        mock_fallback_to_non_watcher_run = MagicMock(side_effect=sensor._fallback_to_non_watcher_run)
+        sensor._fallback_to_non_watcher_run = mock_fallback_to_non_watcher_run
         ti = MagicMock()
         ti.try_number = 2
         context = self.make_context(ti)
@@ -2248,48 +2251,36 @@ class TestDbtTestWatcherOperator:
         result = sensor.poke(context)
 
         assert result is True
+        mock_fallback_to_non_watcher_run.assert_called_once()
         sensor.build_and_run_cmd.assert_called_once()
         _, kwargs = sensor.build_and_run_cmd.call_args
         assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".", 2)[2]]
 
-    def test_fallback_to_non_watcher_run_invokes_dbt_test(self):
-        """``_fallback_to_non_watcher_run`` should call ``build_and_run_cmd`` with only
-        a ``--select <model>`` selector and rely on ``base_cmd = ["test"]`` to issue dbt test.
-        Producer flags must not be forwarded since some (e.g. ``--full-refresh``) are
-        invalid for ``dbt test``.
+    def test_fallback_via_poke_does_not_forward_producer_flags(self):
+        """Driving through ``poke`` on retry, the fallback should issue ``dbt test`` with
+        a ``--select <model>`` selector only. Producer flags must not be forwarded since
+        some (e.g. ``--full-refresh``) are invalid for ``dbt test``.
         """
         sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "success"
         sensor.build_and_run_cmd = MagicMock()
+        mock_fallback_to_non_watcher_run = MagicMock(side_effect=sensor._fallback_to_non_watcher_run)
+        sensor._fallback_to_non_watcher_run = mock_fallback_to_non_watcher_run
         ti = MagicMock()
+        ti.try_number = 2
         # If producer flags were forwarded, this would leak into cmd_flags.
         ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--full-refresh"]
         context = self.make_context(ti)
 
-        result = sensor._fallback_to_non_watcher_run(try_number=2, context=context)
+        assert sensor.poke(context) is True
 
-        assert result is True
+        mock_fallback_to_non_watcher_run.assert_called_once()
         _, kwargs = sensor.build_and_run_cmd.call_args
         assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".", 2)[2]]
         assert "--full-refresh" not in kwargs["cmd_flags"]
         assert sensor.base_cmd == ["test"]
 
-    def test_fallback_on_first_attempt_logs_fallback_message(self, caplog):
-        """When the fallback runs at ``try_number == 1`` (e.g. producer skipped/failed),
-        it should log the "Falling back" message rather than the "Retry attempt" one.
-        """
-        sensor = self.make_sensor()
-        sensor.build_and_run_cmd = MagicMock()
-        ti = MagicMock()
-        context = self.make_context(ti)
-
-        with caplog.at_level("INFO"):
-            result = sensor._fallback_to_non_watcher_run(try_number=1, context=context)
-
-        assert result is True
-        assert any("Falling back to running tests for model" in r.message for r in caplog.records)
-        assert not any("Retry attempt" in r.message for r in caplog.records)
-
-    def test_fallback_selector_preserves_version_suffix(self):
+    def test_fallback_via_poke_preserves_version_suffix(self):
         """Versioned dbt models (e.g. ``model.pkg.my_model.v1``) must select the full
         ``my_model.v1`` resource name, not just the trailing ``v1`` segment.
         """
@@ -2302,13 +2293,17 @@ class TestDbtTestWatcherOperator:
             deferrable=True,
             extra_context=extra_context,
         )
+        sensor._get_producer_task_status = MagicMock(return_value="success")
         sensor.build_and_run_cmd = MagicMock()
+        mock_fallback_to_non_watcher_run = MagicMock(side_effect=sensor._fallback_to_non_watcher_run)
+        sensor._fallback_to_non_watcher_run = mock_fallback_to_non_watcher_run
         ti = MagicMock()
+        ti.try_number = 2
         context = self.make_context(ti)
 
-        result = sensor._fallback_to_non_watcher_run(try_number=2, context=context)
+        assert sensor.poke(context) is True
 
-        assert result is True
+        mock_fallback_to_non_watcher_run.assert_called_once()
         _, kwargs = sensor.build_and_run_cmd.call_args
         assert kwargs["cmd_flags"] == ["--select", "stg_orders.v1"]
 

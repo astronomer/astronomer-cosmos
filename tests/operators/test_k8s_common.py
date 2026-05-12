@@ -351,26 +351,59 @@ def test_progress_callback_uses_global_context_when_not_in_kwargs():
 
 
 @pytest.mark.parametrize(
-    ("try_number", "extra_kwargs", "expect_call", "expected_result"),
+    ("extra_kwargs",),
     (
-        pytest.param(1, {}, True, "result", id="first_attempt"),
-        pytest.param(1, {"extra_arg": "value"}, True, "result", id="forwards_kwargs"),
-        pytest.param(2, {}, False, None, id="skips_retry"),
+        pytest.param({}, id="first_attempt"),
+        pytest.param({"extra_arg": "value"}, id="forwards_kwargs"),
     ),
 )
-def test_execute_watcher_producer(try_number: int, extra_kwargs: dict, expect_call: bool, expected_result: Any):
+@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._init_xcom_backup")
+def test_execute_watcher_producer(mock_init, mock_delete, extra_kwargs: dict):
     ti = MagicMock()
-    ti.try_number = try_number
-    context = {"ti": ti}
+    ti.try_number = 1
+    context = {"ti": ti, "run_id": "test_run"}
     parent_execute = MagicMock(return_value="result")
 
     result = execute_watcher_producer(MagicMock(), context, parent_execute, **extra_kwargs)
 
-    assert result == expected_result
-    if expect_call:
-        parent_execute.assert_called_once_with(context, **extra_kwargs)
-    else:
-        parent_execute.assert_not_called()
+    assert result == "result"
+    parent_execute.assert_called_once_with(context, **extra_kwargs)
+    mock_init.assert_called_once_with(context)
+    mock_delete.assert_called_once_with(context)
+
+
+@patch("cosmos.operators._k8s_common._restore_xcom_from_variable")
+def test_execute_watcher_producer_skips_retry(mock_restore):
+    from airflow.exceptions import AirflowSkipException
+
+    ti = MagicMock()
+    ti.try_number = 2
+    context = {"ti": ti, "run_id": "test_run"}
+    parent_execute = MagicMock()
+
+    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+        execute_watcher_producer(MagicMock(), context, parent_execute)
+
+    mock_restore.assert_called_once_with(context)
+    parent_execute.assert_not_called()
+
+
+@patch("cosmos.operators._k8s_common._backup_xcom_to_variable")
+@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._init_xcom_backup")
+def test_execute_watcher_producer_backs_up_on_failure(mock_init, mock_delete, mock_backup):
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti, "run_id": "test_run"}
+    parent_execute = MagicMock(side_effect=RuntimeError("boom"))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        execute_watcher_producer(MagicMock(), context, parent_execute)
+
+    mock_init.assert_called_once_with(context)
+    mock_backup.assert_called_once_with(context)
+    mock_delete.assert_not_called()
 
 
 def test_execute_watcher_producer_raises_when_ti_missing():
@@ -380,12 +413,14 @@ def test_execute_watcher_producer_raises_when_ti_missing():
         execute_watcher_producer(MagicMock(), {"ti": None}, MagicMock())
 
 
-def test_execute_watcher_producer_sets_global_context():
+@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._init_xcom_backup")
+def test_execute_watcher_producer_sets_global_context(mock_init, mock_delete):
     import cosmos.operators._k8s_common as mod
 
     ti = MagicMock()
     ti.try_number = 1
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
     captured: dict[str, Any] = {}
 
     def capture_context(ctx, **kwargs):

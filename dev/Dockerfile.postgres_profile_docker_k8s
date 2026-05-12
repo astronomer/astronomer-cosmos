@@ -2,6 +2,7 @@ FROM python:3.12
 
 RUN pip install --force-reinstall 'dbt-postgres>=1.8'
 RUN pip install --force-reinstall dbt-adapters
+RUN pip install --force-reinstall awscli
 
 ENV POSTGRES_DATABASE=postgres
 ENV POSTGRES_DB=postgres

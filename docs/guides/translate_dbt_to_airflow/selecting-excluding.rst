@@ -1,17 +1,17 @@
 .. _selecting-excluding:
 
 Selecting & Excluding
----------------------
+=====================
 
 Cosmos allows you to filter to a subset of your dbt project in each ``DbtDag`` / ``DbtTaskGroup`` using the ``select`` and ``exclude`` parameters in the ``RenderConfig`` class.
 
-    Since Cosmos 1.3, the ``selector`` parameter is available in ``RenderConfig`` when using the ``LoadMode.DBT_LS`` to parse the dbt project into Airflow.
+    Since Cosmos 1.3, the ``selector`` parameter is available in ``RenderConfig`` when using the ``LoadMode.DBT_LS`` to parse the dbt project into `Apache Airflow® <https://airflow.apache.org/>`_.
 
     Since Cosmos 1.13, the ``selector`` parameter is available in ``RenderConfig`` when using the ``LoadMode.DBT_MANIFEST`` to parse the dbt project into Airflow.
 
 
 Using ``select`` and ``exclude``
-++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``select`` and ``exclude`` parameters are lists, with values like the following:
 
@@ -146,7 +146,7 @@ Examples:
     )
 
 Using ``selector``
-++++++++++++++++++
+~~~~~~~~~~~~~~~~~~
 .. note::
     Only currently supported using the ``LoadMode.DBT_LS`` (since Cosmos 1.3) or ``LoadMode.DBT_MANIFEST`` (since Cosmos 1.13).
     If  ``select`` and/or ``exclude`` are used with ``selector``, dbt will ignore the ``select`` and ``exclude`` parameters.
@@ -193,7 +193,7 @@ Examples:
     )
 
 Using ``selector`` with ``LoadMode.DBT_MANIFEST``
-'''''''''''''''''''''''''''''''''''''''''''''''''
++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Since Cosmos 1.13, the ``selector`` parameter is also supported when using the ``LoadMode.DBT_MANIFEST`` parsing method.
 
@@ -221,6 +221,8 @@ Cosmos distinguishes between two types of errors when parsing YAML selectors:
   - Missing required ``definition`` key
 
   These errors indicate malformed YAML structure and will raise a ``CosmosValueError`` immediately when calling ``YamlSelectors.parse()``.
+  You can modify this behavior to log instead of raising an exception by setting ``AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING=1``.
+  This allows DAGs referencing a manifest with one or more malformed selectors to render as long as the ``selector`` argument is valid.
 
 - **Selector Definition Errors** - These are isolated and surfaced when accessing the selector:
 

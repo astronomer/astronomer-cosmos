@@ -9,7 +9,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
-from airflow.utils.context import context_merge
+
+try:
+    from airflow.sdk.definitions.context import context_merge  # type: ignore[attr-defined]
+except ImportError:
+    from airflow.utils.context import context_merge
 
 if TYPE_CHECKING:  # pragma: no cover
     try:

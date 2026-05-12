@@ -15,14 +15,24 @@ from os import PathLike
 from typing import TYPE_CHECKING, Any, Protocol
 
 import kubernetes.client as k8s
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import convert_env_vars
 from airflow.providers.cncf.kubernetes.callbacks import client_type
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-from airflow.utils.context import context_merge
+
+try:
+    from airflow.sdk.definitions.context import context_merge  # type: ignore[attr-defined]
+except ImportError:
+    from airflow.utils.context import context_merge
 
 from cosmos.config import ProfileConfig
 from cosmos.log import get_logger
+from cosmos.operators._watcher.xcom import (
+    _backup_xcom_to_variable,
+    _delete_xcom_backup_variable,
+    _init_xcom_backup,
+    _restore_xcom_from_variable,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from pendulum import DateTime
@@ -417,8 +427,10 @@ def execute_watcher_producer(
 ) -> Any:
     """Shared ``execute`` logic for K8s watcher producer operators.
 
-    Handles retry skipping and sets the module-level context global so that
-    ``WatcherK8sCallback.progress_callback`` can access the task instance.
+    On retry, restores any XCom backup and raises ``AirflowSkipException`` (the
+    producer does not support Airflow retries). On the first attempt, initialises
+    an XCom backup, runs the parent execute, deletes the backup on success, and
+    backs up XComs on failure so the next try can restore them.
     """
     task_instance = context.get("ti")
     if task_instance is None:
@@ -427,17 +439,24 @@ def execute_watcher_producer(
     try_number = getattr(task_instance, "try_number", 1)
 
     if try_number > 1:
-        operator.log.info(
-            "%s does not support Airflow retries. "
-            "Detected attempt #%s; skipping execution to avoid running a second dbt build.",
-            type(operator).__name__,
-            try_number,
+        _restore_xcom_from_variable(context)
+        raise AirflowSkipException(
+            f"{type(operator).__name__} does not support Airflow retries. "
+            f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
         )
-        return None
+
+    _init_xcom_backup(context)
 
     # This global variable is used to make the task context available to the K8s callback.
     # While the callback is set during the operator initialization, the context is only created
     # during the operator's execution.
     global _producer_task_context
     _producer_task_context = context
-    return parent_execute(context, **kwargs)
+
+    try:
+        return_value = parent_execute(context, **kwargs)
+        _delete_xcom_backup_variable(context)
+        return return_value
+    except Exception:
+        _backup_xcom_to_variable(context)
+        raise

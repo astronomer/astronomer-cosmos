@@ -1349,7 +1349,7 @@ class YamlSelectors:
         return (select, exclude, errors)
 
     @classmethod
-    def parse(cls, selectors: dict[str, dict[str, Any]]) -> YamlSelectors:
+    def parse(cls, selectors: dict[str, dict[str, Any]], lax_parsing_enabled: bool) -> YamlSelectors:
         """
         Parse selector definitions from a dbt manifest into a YamlSelectors instance.
 
@@ -1357,6 +1357,7 @@ class YamlSelectors:
         selector definitions from the manifest and converts them to Cosmos format.
 
         :param selectors: dict[str, dict[str, Any]] - Dictionary of selector definitions from the manifest, keyed by selector name
+        :param lax_parsing_enabled: bool - Flag to determine whether parser exceptions should be logged instead of raised
         :return: YamlSelectors - A YamlSelectors instance containing both raw and parsed selector definitions
 
         Example Input:
@@ -1386,12 +1387,24 @@ class YamlSelectors:
 
         for name, definition in selectors.items():
             if not isinstance(definition, dict):
-                raise CosmosValueError(
+                error_message = (
                     f"Invalid selector definition for '{name}'. Expected a dict, got {type(definition)}: {definition}"
                 )
+                if lax_parsing_enabled:
+                    logger.warning(error_message)
+                    continue
+                else:
+                    raise CosmosValueError(error_message)
 
             if not definition.get("name") or not definition.get("definition"):
-                raise CosmosValueError(f"Selector definition for '{name}' must contain 'name' and 'definition' keys.")
+                error_message = f"Selector definition for '{name}' must contain 'name' and 'definition' keys."
+                if lax_parsing_enabled:
+                    logger.warning(error_message)
+                    continue
+                else:
+                    raise CosmosValueError(
+                        f"Selector definition for '{name}' must contain 'name' and 'definition' keys."
+                    )
 
             selector_name = definition["name"]
             selector_definition = definition["definition"]

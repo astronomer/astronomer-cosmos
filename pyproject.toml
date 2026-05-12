@@ -149,7 +149,7 @@ packages = ["/cosmos"]
 [tool.hatch.envs.tests]
 dependencies = [
     # do not install Airflow dependencies here!
-    # we need to use constrantis and we're doing this in the `pre-install-commands`
+    # we need to use constraints and we're doing this in the `pre-install-commands`
     "packaging>=22.0",
     "pytest>=6.0",
     "pytest-split",
@@ -167,12 +167,17 @@ dependencies = [
     "types-python-dateutil",
     "Werkzeug<3.0.0",
     "pytest-asyncio",
+    "orjson",
+    # Needed by the regression test for issue #2620: the test exercises
+    # airflow.sentry's module-level ConfiguredSentry() path, which only
+    # runs when sentry_sdk is importable.
+    "sentry-sdk",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 
 [[tool.hatch.envs.tests.matrix]]
 python = ["3.10", "3.11", "3.12", "3.13"]
-airflow = ["2.9", "2.10", "2.11", "3.0", "3.1"]
+airflow = ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
 dbt = ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "2.0"]
 
 [tool.hatch.envs.tests.overrides]
@@ -224,7 +229,7 @@ dependencies = [
 ]
 
 [tool.hatch.envs.docs.scripts]
-build = "sphinx-build -b html docs docs/_build"
+build = "sphinx-build -b html docs docs/_build --fail-on-warning"
 serve = "sphinx-autobuild docs docs/_build"
 # Serve without auto-reload: build once, then serve static files on port 8000
 serve-no-reload = "sphinx-build -b html docs docs/_build && python -m http.server 8000 --bind 127.0.0.1 --directory docs/_build"

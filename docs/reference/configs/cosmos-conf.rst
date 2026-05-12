@@ -1,9 +1,9 @@
 .. _cosmos-config:
 
 Cosmos Config
--------------
+=============
 
-This page lists all available Airflow configurations that affect ``astronomer-cosmos`` Astronomer Cosmos behavior. They can be set in the ``airflow.cfg file`` or using environment variables.
+This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ configurations that affect Astronomer Cosmos behavior. They can be set in the ``airflow.cfg`` file or using environment variables.
 
 .. note::
     For more information, see `Setting Configuration Options <https://airflow.apache.org/docs/apache-airflow/stable/howto/set-config.html>`_.
@@ -14,7 +14,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 - [openlineage]
 
 [cosmos]
-++++++++
+~~~~~~~~
 
 .. _cache_dir:
 
@@ -59,6 +59,15 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS``
+
+.. _enable_lax_selector_parsing:
+
+`enable_lax_selector_parsing`_:
+    Enable or disable lax parsing of YAML selectors when using ``LoadMode.DBT_MANIFEST`` with ``RenderConfig.selector``.
+    Lax parsing instructs the parser to log errors for selectors with malformed YAML structure instead of raising an exception.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING``
 
 .. _enable_cache_partial_parse:
 
@@ -295,18 +304,22 @@ This page lists all available Airflow configurations that affect ``astronomer-co
 .. _enable_memory_optimised_imports:
 
 `enable_memory_optimised_imports`_:
-    (Introduced in Cosmos 1.10.1): Eager imports in cosmos/__init__.py expose all Cosmos classes at the top level,
-    which can significantly increase memory usage—even when Cosmos is just installed but not actively used. This option allows
-    disabling those eager imports to reduce memory footprint. When enabled, users must access Cosmos classes via their full
-    module paths, avoiding the overhead of importing unused modules and classes.
+    (Introduced in Cosmos 1.10.1): On Cosmos versions earlier than 1.14.0, eager imports in ``cosmos/__init__.py``
+    exposed all Cosmos classes at the top level, which could significantly increase memory usage—even when Cosmos was
+    just installed but not actively used. This option allowed disabling those eager imports to reduce memory footprint.
+    When enabled, users had to access Cosmos classes via their full module paths, avoiding the overhead of importing
+    unused modules and classes.
 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_MEMORY_OPTIMISED_IMPORTS``
 
     .. note::
-        This option will become the default behavior in Cosmos 2.0.0, where all eager imports will be removed from ``cosmos/__init__.py``.
+        Since Cosmos 1.14.0, all imports in ``cosmos/__init__.py`` are lazy by default — modules are only loaded on
+        first access. This provides the same memory optimization automatically, without requiring users to change their
+        import paths. On 1.14.0 and newer, this setting is accepted but has no effect. The guidance below is relevant
+        only for users on Cosmos versions earlier than 1.14.0.
 
-    As an example, when this option is enabled, the following is an example of specifying the imports with full module paths:
+    When enabled, import Cosmos classes via their full module paths:
 
     .. literalinclude:: ../../../dev/dags/basic_cosmos_dag_full_module_path_imports.py
         :language: python
@@ -350,6 +363,23 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Default: ``0.5``
     - Environment Variable: ``AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS``
 
+.. _enable_orjson_parser:
+
+`enable_orjson_parser`_:
+    (Experimental, introduced in Cosmos 1.15.0) When enabled, Cosmos uses `orjson <https://github.com/ijl/orjson>`_ to parse
+    ``manifest.json`` files instead of the standard library ``json`` module. orjson is a fast, Rust-based JSON
+    library that can significantly reduce DAG parsing time for large dbt projects with big manifests.
+
+    Benchmarks show up to 40% faster parsing compared to the standard ``json`` module, with the improvement
+    scaling with manifest file size.
+
+    Requires the optional ``orjson`` dependency: ``pip install orjson``.
+    If this setting is ``True`` but ``orjson`` is not installed, Cosmos raises a
+    ``CosmosLoadDbtException`` at parse time with an actionable error message.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_ORJSON_PARSER``
+
 .. _watcher_dbt_execution_queue:
 
 `watcher_dbt_execution_queue`_:
@@ -365,7 +395,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE``
 
 [openlineage]
-+++++++++++++
+~~~~~~~~~~~~~
 
 .. _namespace:
 
@@ -379,7 +409,7 @@ This page lists all available Airflow configurations that affect ``astronomer-co
     For more information, see `OpenLineage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_.
 
 Environment Variables
-+++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~
 
 .. _LINEAGE_NAMESPACE:
 

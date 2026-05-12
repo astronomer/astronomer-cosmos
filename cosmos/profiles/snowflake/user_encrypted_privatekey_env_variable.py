@@ -44,6 +44,7 @@ class SnowflakeEncryptedPrivateKeyPemProfileMapping(SnowflakeBaseProfileMapping)
         "role": "extra.role",
         "private_key": "extra.private_key_content",
         "private_key_passphrase": "password",
+        "query_tag": "extra.query_tag",
     }
 
     def can_claim_connection(self) -> bool:

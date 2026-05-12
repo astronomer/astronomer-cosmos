@@ -3,18 +3,25 @@ from unittest.mock import MagicMock, Mock, patch
 
 import kubernetes.client as k8s
 import pytest
-from airflow import __version__ as airflow_version
-from airflow.models import DAG, TaskInstance
-from airflow.utils.context import Context
-from packaging import version
+from airflow.models import DAG
+from airflow.models.connection import Connection
+
+try:
+    from airflow.sdk.definitions.context import Context
+except ImportError:
+    from airflow.utils.context import Context
+
 from pendulum import datetime
 
 from cosmos import ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig
 from cosmos.airflow.task_group import DbtTaskGroup
+from cosmos.constants import InvocationMode
 from cosmos.operators._k8s_common import DbtTestWarningHandler
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
     DbtCloneKubernetesOperator,
+    DbtDocsKubernetesOperator,
+    DbtDocsS3KubernetesOperator,
     DbtKubernetesBaseOperator,
     DbtLSKubernetesOperator,
     DbtRunKubernetesOperator,
@@ -24,6 +31,13 @@ from cosmos.operators.kubernetes import (
     DbtTestKubernetesOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.conftest import base_operator_get_connection_path, make_task_instance
+
+profile_config = ProfileConfig(
+    profile_name="default",
+    target_name="dev",
+    profile_mapping=MagicMock(),
+)
 
 
 @pytest.fixture()
@@ -503,10 +517,7 @@ def test_dbt_kubernetes_operator_handle_warnings(
     mock_warning_callback = Mock()
     test_operator = DbtTestKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
 
-    if version.parse(airflow_version) >= version.Version("3.1"):
-        task_instance = TaskInstance(test_operator, dag_version_id=None)
-    else:
-        task_instance = TaskInstance(test_operator)
+    task_instance = make_task_instance(test_operator)
 
     task_instance.task.pod_manager = FakePodManager(log_string)
     task_instance.task.pod = task_instance.task.remote_pod = "pod"
@@ -528,10 +539,7 @@ def test_dbt_kubernetes_operator_handle_warnings_noop(
 ):
     mock_warning_callback = Mock()
     run_operator = DbtRunKubernetesOperator(on_warning_callback=mock_warning_callback, **base_kwargs)
-    if version.parse(airflow_version) >= version.Version("3.1"):
-        task_instance = TaskInstance(run_operator, dag_version_id=None)
-    else:
-        task_instance = TaskInstance(run_operator)
+    task_instance = make_task_instance(run_operator)
     context = Context(task_instance=task_instance)
 
     warning_handler_no_context = DbtTestWarningHandler(
@@ -664,6 +672,46 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_args):
     assert container["args"] == expected_args
 
 
+@pytest.mark.parametrize(
+    "operator_class",
+    (
+        DbtDocsKubernetesOperator,
+        DbtDocsS3KubernetesOperator,
+    ),
+)
+def test_operator_execute_without_flags(operator_class):
+    operator_class_kwargs = {
+        DbtDocsS3KubernetesOperator: {"connection_id": "aws_s3_conn", "bucket_name": "fake-bucket"},
+    }
+    task = operator_class(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        invocation_mode=InvocationMode.DBT_RUNNER,
+        **operator_class_kwargs.get(operator_class, {}),
+    )
+
+    with (
+        patch(
+            "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.hook",
+            is_in_cluster=False,
+        ),
+        patch("airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.cleanup"),
+        patch(
+            "airflow.providers.cncf.kubernetes.operators.pod.KubernetesPodOperator.get_or_create_pod",
+            side_effect=ValueError("Mock"),
+        ) as get_or_create_pod,
+        patch.object(operator_class, "build_and_run_cmd") as mock_build_and_run_cmd,
+    ):
+        try:
+            task.execute(context={})
+        except ValueError as e:
+            if e != get_or_create_pod.side_effect:
+                raise
+
+    mock_build_and_run_cmd.assert_called_once_with(context={}, cmd_flags=[])
+
+
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
 
@@ -766,3 +814,56 @@ def test_kubernetes_pod_container_resources():
         project_dir=DBT_ROOT_PATH / "jaffle_shop",
     )
     assert c_operator.container_resources is None
+
+
+def test_dbt_docs_kubernetes_operator_with_static_flags():
+    operator = DbtDocsKubernetesOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        dbt_cmd_flags=["--static"],
+    )
+    assert operator.required_files == ["static_index.html"]
+
+
+def test_dbt_docs_kubernetes_operator_ignores_graph_gpickle():
+    class CustomDbtDocsLocalOperator(DbtDocsKubernetesOperator):
+        required_files = ["index.html", "manifest.json", "graph.gpickle", "catalog.json"]
+
+    operator = CustomDbtDocsLocalOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        dbt_cmd_global_flags=["--no-write-json"],
+    )
+    assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
+
+
+@patch(
+    "cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_cmd", return_value=(["dbt", "docs", "generate"], {})
+)
+def test_dbt_docs_s3_kubernetes_operator_uses_connection_id(mock_build_cmd, mock_kubernetes_execute):
+    conn = Connection(
+        conn_id="aws_s3_conn",
+        conn_type="aws",
+        login="l",
+        password="p",
+        extra='{"region_name": "us-east-1", "aws_session_token": "t"}',
+    )
+    operator = DbtDocsS3KubernetesOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        image="fake-image",
+        profile_config=profile_config,
+        connection_id="aws_s3_conn",
+        bucket_name="fake-bucket",
+    )
+
+    with patch(base_operator_get_connection_path, return_value=conn):
+        operator.build_and_run_cmd(context={})
+
+    env_vars = {env_var.name: env_var.value for env_var in operator.env_vars}
+    assert env_vars["AWS_ACCESS_KEY_ID"] == "l"
+    assert env_vars["AWS_SECRET_ACCESS_KEY"] == "p"
+    assert env_vars["AWS_SESSION_TOKEN"] == "t"
+    assert env_vars["AWS_DEFAULT_REGION"] == "us-east-1"

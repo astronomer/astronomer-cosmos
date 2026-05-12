@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import logging
 
-from cosmos.settings import rich_logging
-
 
 class CosmosRichLogger(logging.Logger):
     """Custom Logger that prepends ``(astronomer-cosmos)`` to each log message in the scheduler."""
 
     def handle(self, record: logging.LogRecord) -> None:
-        record.msg = "\x1b[35m(astronomer-cosmos)\x1b[0m " + record.msg
+        if record.msg is not None:
+            record.msg = "\x1b[35m(astronomer-cosmos)\x1b[0m " + str(record.msg)
         return super().handle(record)
 
 
@@ -24,7 +23,14 @@ def get_logger(name: str) -> logging.Logger:
     as long as the ``rich_logging`` setting is True:
     [2023-08-09T14:20:55.532+0100] {subprocess.py:94} INFO - (astronomer-cosmos) - 13:20:55  Completed successfully
     """
-    if rich_logging:
+    # Import cosmos.settings at call time (not module level) to avoid circular imports
+    # during Airflow plugin discovery. getattr tolerates the module being partially
+    # initialized (rich_logging not yet defined) by falling back to False.
+    import cosmos.settings as _settings
+
+    _rich = getattr(_settings, "rich_logging", False)
+
+    if _rich:
         cls = logging.getLoggerClass()
         try:
             logging.setLoggerClass(CosmosRichLogger)

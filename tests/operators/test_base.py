@@ -5,7 +5,11 @@ from unittest.mock import patch
 
 import pytest
 from airflow.models import BaseOperator
-from airflow.utils.context import Context
+
+try:
+    from airflow.sdk.definitions.context import Context
+except ImportError:
+    from airflow.utils.context import Context
 
 from cosmos.operators.base import (
     AbstractDbtBase,

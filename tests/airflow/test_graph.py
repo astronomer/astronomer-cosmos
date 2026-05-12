@@ -253,6 +253,90 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
     assert list(output.children.keys()) == [f"dbt_node.{task_suffix}", "dbt_node.test"]
 
 
+def test_generate_task_or_group_with_dynamic_node_type_and_converter():
+    """A node whose resource_type is not in dbt_resource_to_class should be rendered via a user-supplied converter."""
+
+    def _convert_dynamic(dag: DAG, task_group: TaskGroup, node: DbtNode, task_id: str, **kwargs):
+        return EmptyOperator(dag=dag, task_group=task_group, task_id=task_id)
+
+    with DAG("test-dynamic-converter", start_date=datetime(2022, 1, 1)) as dag:
+        node = DbtNode(
+            unique_id="exposure.dbt-proj.my_exposure",
+            resource_type=DbtResourceType("exposure"),
+            depends_on=[],
+            path_base=Path("."),
+            original_file_path=Path("."),
+        )
+
+    output = generate_task_or_group(
+        dag=dag,
+        task_group=None,
+        node=node,
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={
+            "project_dir": SAMPLE_PROJ_PATH,
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        },
+        dbt_project_name="astro_shop",
+        node_converters={DbtResourceType("exposure"): _convert_dynamic},
+        render_config=RenderConfig(
+            test_behavior=TestBehavior.NONE,
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+        ),
+        on_warning_callback=None,
+    )
+    assert isinstance(output, EmptyOperator)
+
+
+def test_generate_task_or_group_with_dynamic_node_type_no_converter_returns_none():
+    """A node whose resource_type is not in dbt_resource_to_class and has no converter should be skipped."""
+    with DAG("test-dynamic-no-converter", start_date=datetime(2022, 1, 1)) as dag:
+        node = DbtNode(
+            unique_id="exposure.dbt-proj.my_exposure",
+            resource_type=DbtResourceType("exposure"),
+            depends_on=[],
+            path_base=Path("."),
+            original_file_path=Path("."),
+        )
+
+    output = generate_task_or_group(
+        dag=dag,
+        task_group=None,
+        node=node,
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={
+            "project_dir": SAMPLE_PROJ_PATH,
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        },
+        dbt_project_name="astro_shop",
+        node_converters={},
+        render_config=RenderConfig(
+            test_behavior=TestBehavior.NONE,
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+        ),
+        on_warning_callback=None,
+    )
+
+    # No converter is supplied
+    assert output is None
+
+
 @pytest.mark.integration
 def test_build_airflow_graph_with_after_all():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -2127,3 +2211,20 @@ def test_add_watcher_producer_task_sets_check_source_freshness_flag(source_rende
             assert task_metadata.arguments["_check_source_freshness"] is True
         else:
             assert "_check_source_freshness" not in task_metadata.arguments
+
+
+def test_add_watcher_producer_task_passes_freshness_callback_via_setup_operator_args():
+    """freshness_callback supplied via setup_operator_args (merged into task_args before the call) is forwarded to the producer."""
+    my_callback = MagicMock()
+    render_config = RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL)
+    # setup_operator_args is merged into task_args by the caller (generate_task_or_task_group)
+    task_args = {"project_dir": "/tmp/sample_project", "profile_config": None, "freshness_callback": my_callback}
+
+    with patch("cosmos.airflow.graph.create_airflow_task") as mock_create_task:
+        mock_create_task.return_value = MagicMock()
+        _add_watcher_producer_task(
+            dag=MagicMock(), task_group=None, tasks_map={}, render_config=render_config, task_args=task_args
+        )
+
+    task_metadata = mock_create_task.call_args[0][0]
+    assert task_metadata.arguments["freshness_callback"] is my_callback

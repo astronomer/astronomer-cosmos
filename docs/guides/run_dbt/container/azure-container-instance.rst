@@ -2,20 +2,20 @@
 
 
 Azure Container Instance execution mode
----------------------------------------
+=======================================
 .. versionadded:: 1.4
 
 Using ``Azure Container Instances`` as the execution mode provides an isolated way of running ``dbt``, since the ``dbt`` run itself occurs within a container running in an Azure Container Instance.
 
 Performance and maintenance considerations
-++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This execution mode requires you to have an Azure environment that can be used to run Azure Container Groups. Similar to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available that contains up-to-date ``dbt`` pipelines and profiles.
 
 Each task creates a new container on Azure, giving full isolation. This, however, comes at the cost of speed, as this separation of tasks introduces some overhead.
 
 Setup
-+++++
+~~~~~
 
 This tutorial guides you through the steps required to use Azure Container Instance as the execution mode for your dbt code with Astronomer Cosmos. Schematically, the guide demonstrates how to build the following architecture:
 
@@ -23,10 +23,10 @@ This tutorial guides you through the steps required to use Azure Container Insta
     :width: 800
 
 Prerequisites
-+++++++++++++
+~~~~~~~~~~~~~
 
 1. Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
-2. Airflow
+2. `Apache Airflow® <https://airflow.apache.org/>`_
 3. Azure CLI (install guide here: `Azure CLI <https://docs.microsoft.com/en-us/cli/azure/install-azure-cli>`_)
 4. Astronomer-cosmos package containing the dbt Azure Container Instance operators
 5. Azure account with:
@@ -42,7 +42,7 @@ More information on how to achieve 2-6 is detailed below.
 Note that the steps below will walk you through an example, for which the code can be found HERE
 
 Step-by-step guide
-++++++++++++++++++
+~~~~~~~~~~~~~~~~~~
 
 **Install Airflow and Cosmos**
 
@@ -74,7 +74,7 @@ In order to run a container in Azure Container Instance, it needs access to the 
 
 **Build the dbt Docker image**
 
-For the Docker operators to work, you need to create a docker image that will be supplied as image parameter to the dbt docker operators used in the DAG.
+For the Docker operators to work, you need to create a Docker image that will be supplied as image parameter to the dbt Docker operators used in the DAG.
 
 Clone the `cosmos-example <https://github.com/astronomer/cosmos-example.git>`_ repo
 
@@ -83,7 +83,7 @@ Clone the `cosmos-example <https://github.com/astronomer/cosmos-example.git>`_ r
     git clone https://github.com/astronomer/cosmos-example.git
     cd cosmos-example
 
-Create a docker image containing the dbt project files and dbt profile by using the `Dockerfile <https://github.com/astronomer/cosmos-example/blob/main/Dockerfile.azure_container_instance>`_, which will be supplied to the Docker operators.
+Create a Docker image containing the dbt project files and dbt profile by using the `Dockerfile <https://github.com/astronomer/cosmos-example/blob/main/Dockerfile.azure_container_instance>`_, which will be supplied to the Docker operators.
 
 .. code-block:: bash
 
@@ -96,14 +96,14 @@ After this, the image needs to be pushed to the registry of your choice. Note th
 
 .. note::
 
-    You may need to ensure docker knows to use the right credentials. If using Azure Container Registry, this can be done by running the following command:
+    You may need to ensure Docker knows to use the right credentials. If using Azure Container Registry, this can be done by running the following command:
     .. code-block:: bash
 
         az acr login
 
 .. note::
 
-    If running on M1, you may need to set the following envvars for running the docker build command in case it fails
+    If running on M1, you may need to set the following envvars for running the ``docker build`` command in case it fails
 
     .. code-block:: bash
 
@@ -142,7 +142,7 @@ Run Airflow
 
 .. note::
 
-    You might need to run airflow standalone with ``sudo`` if your Airflow user is not able to access the docker socket URL or pull the images in the Kind cluster.
+    You might need to run airflow standalone with ``sudo`` if your Airflow user is not able to access the Docker socket URL or pull the images in the Kind cluster.
 
 Log in to Airflow through a web browser ``http://localhost:8080/``, using the user ``airflow`` and the password described in the ``standalone_admin_password.txt`` file.
 

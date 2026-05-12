@@ -12,7 +12,11 @@ from unittest.mock import patch
 from urllib.parse import urlsplit
 
 import airflow
-from airflow.configuration import conf
+
+try:
+    from airflow.providers.common.compat.sdk import conf
+except ImportError:
+    from airflow.configuration import conf
 from airflow.plugins_manager import AirflowPlugin
 from airflow.sdk import ObjectStoragePath
 from fastapi import FastAPI
@@ -138,7 +142,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             cfg_local = projects.get(slug_alias, {})
             if not cfg_local.get("dir"):
                 return "<div>dbt Docs are not configured.</div>"
-            iframe_src = f"/cosmos/{slug_alias}/dbt_docs_index.html"
+            iframe_src = f"{API_BASE_PATH}/cosmos/{slug_alias}/dbt_docs_index.html"
             safe_iframe_src = html.escape(iframe_src, quote=True)
             return (
                 '<div style="height:100%;display:flex;flex-direction:column;">'

@@ -1,11 +1,10 @@
-import logging
 import os
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
 from packaging.version import Version
 
@@ -53,9 +52,11 @@ def test_retries_not_forced_to_zero():
     assert op.retries == 5
 
 
+@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._init_xcom_backup")
 @patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.execute")
-def test_first_attempt_calls_parent_execute(mock_execute):
-    """On the first attempt (try_number=1), the producer delegates to the parent's execute."""
+def test_first_attempt_calls_parent_execute(mock_execute, mock_init, mock_delete):
+    """On the first attempt (try_number=1), the producer delegates to the parent's execute and returns its value."""
     op = DbtProducerWatcherGcpGkeOperator(
         project_dir=".",
         profile_config=None,
@@ -65,7 +66,7 @@ def test_first_attempt_calls_parent_execute(mock_execute):
 
     ti = MagicMock()
     ti.try_number = 1
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
     mock_execute.return_value = "result"
     result = op.execute(context=context)
@@ -74,8 +75,9 @@ def test_first_attempt_calls_parent_execute(mock_execute):
     assert result == "result"
 
 
+@patch("cosmos.operators._k8s_common._restore_xcom_from_variable")
 @patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.execute")
-def test_skips_retry_attempt(mock_execute, caplog):
+def test_skips_retry_attempt(mock_execute, mock_restore, caplog):
     """
     Test that the operator skips execution when a retry is attempted (try_number > 1).
     """
@@ -88,15 +90,13 @@ def test_skips_retry_attempt(mock_execute, caplog):
 
     ti = MagicMock()
     ti.try_number = 2
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
-    with caplog.at_level(logging.INFO):
-        result = op.execute(context=context)
+    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+        op.execute(context=context)
 
+    mock_restore.assert_called_once_with(context)
     mock_execute.assert_not_called()
-    assert result is None
-    assert any("does not support Airflow retries" in message for message in caplog.messages)
-    assert any("skipping execution" in message for message in caplog.messages)
 
 
 def test_raises_exception_when_task_instance_missing():
@@ -162,7 +162,7 @@ def test_first_execution_behaves_as_base_consumer_sensor(mock_startup_events):
 
     ti = MagicMock()
     ti.try_number = 1
-    ti.xcom_pull.return_value = "success"
+    ti.xcom_pull.return_value = {"status": "success", "outlet_uris": []}
     context = make_context(ti)
 
     result = sensor.poke(context)
@@ -174,10 +174,11 @@ def test_first_execution_behaves_as_base_consumer_sensor(mock_startup_events):
 @patch("cosmos.operators.gcp_gke.DbtGcpGkeBaseOperator.build_and_run_cmd")
 def test_retry_executes_as_dbt_run_gcp_gke_operator(mock_build_and_run_cmd):
     """
-    On retry (try_number > 1), the sensor should fall back to executing
-    as DbtRunGcpGkeOperator by calling build_and_run_cmd.
+    On retry (try_number > 1) with a terminated producer, the sensor should
+    fall back to executing as DbtRunGcpGkeOperator by calling build_and_run_cmd.
     """
     sensor = make_sensor()
+    sensor._get_producer_task_status.return_value = "success"
 
     ti = MagicMock()
     ti.try_number = 2

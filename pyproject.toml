@@ -167,6 +167,10 @@ dependencies = [
     "types-python-dateutil",
     "Werkzeug<3.0.0",
     "pytest-asyncio",
+    # Needed by the regression test for issue #2620: the test exercises
+    # airflow.sentry's module-level ConfiguredSentry() path, which only
+    # runs when sentry_sdk is importable.
+    "sentry-sdk",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

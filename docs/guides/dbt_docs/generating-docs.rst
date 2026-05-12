@@ -5,7 +5,7 @@ Generating Docs
 
 dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official dbt documentation <https://docs.getdbt.com/docs/building-a-dbt-project/documentation>`_. For an example of what the docs look like with the ``jaffle_shop`` project, check out `this site <http://cosmos-demo-dbt-docs.s3-website.eu-north-1.amazonaws.com/>`_.
 
-After generating the dbt docs, you can host them natively within Airflow via the Cosmos Airflow plugin; see `Hosting Docs <hosting-docs.html>`__ for more information.
+After generating the dbt docs, you can host them natively within `Apache Airflow® <https://airflow.apache.org/>`_ via the Cosmos Airflow plugin; see `Hosting Docs <hosting-docs.html>`__ for more information.
 
 Alternatively, many users choose to serve these docs on a separate static website. This is a great way to share your data models with a broad array of stakeholders.
 
@@ -121,7 +121,7 @@ Choosing a folder
 All the DbtDocsOperators support specification of a custom folder (prefix) to place documentation in on the target cloud storage. This can be done by
 adding a ``folder_dir`` parameter to the operator definition.
 
-Static Flag
+Static flag
 '''''''''''
 
 All of the DbtDocsOperator accept the ``--static`` flag. To learn more about the static flag, check out the `original PR on dbt-core <https://github.com/dbt-labs/dbt-docs/pull/465>`_.
@@ -149,7 +149,7 @@ The following code snippet shows how to provide this flag with the default jaffl
         dbt_cmd_flags=["--static"],
     )
 
-Custom Callback
+Custom callback
 '''''''''''''''
 
 If you want to run custom code after the docs are generated, you can use the :class:`~cosmos.operators.DbtDocsOperator`. The following code snippet shows how to do this with the default jaffle_shop project:

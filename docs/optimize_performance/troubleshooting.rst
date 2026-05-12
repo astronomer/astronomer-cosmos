@@ -1,15 +1,15 @@
 .. _perf-troubleshooting:
 
 Troubleshooting Performance
----------------------------
+===========================
 
 This page helps you diagnose common performance issues when running Cosmos.
 
 
 Measuring DAG parse time
-+++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Cosmos logs the time it takes to parse each dbt project at the ``INFO`` level. Search your Airflow scheduler or
+Cosmos logs the time it takes to parse each dbt project at the ``INFO`` level. Search your `Apache Airflow® <https://airflow.apache.org/>`_ scheduler or
 DAG processor logs for messages like:
 
 .. code-block:: text
@@ -26,8 +26,8 @@ This tells you:
 If the parse time is high, see :ref:`optimize-rendering` for strategies to reduce it.
 
 
-Airflow DAG processor configuration
-++++++++++++++++++++++++++++++++++++
+Apache Airflow® DAG processor configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Airflow DAG processor controls how often and how quickly DAG files are parsed. Understanding these settings helps
 you diagnose issues where DAGs are slow to appear or update.
@@ -69,7 +69,7 @@ you diagnose issues where DAGs are slow to appear or update.
 
 
 DAGs not appearing
-++++++++++++++++++
+~~~~~~~~~~~~~~~~~~
 
 If your ``DbtDag`` or ``DbtTaskGroup`` does not appear in Airflow, the most likely cause is that DAG parsing exceeds
 the ``dagbag_import_timeout``.
@@ -98,7 +98,7 @@ the ``dagbag_import_timeout``.
 
 
 OOM errors during task execution
-++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If tasks are being killed by the OS or reaching a zombie state, they are likely running out of memory.
 

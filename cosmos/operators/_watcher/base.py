@@ -42,7 +42,10 @@ except ImportError:  # pragma: no cover
     from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 if TYPE_CHECKING:
-    from airflow.models.dag import DAG
+    try:
+        from airflow.sdk import DAG
+    except ImportError:
+        from airflow.models.dag import DAG  # type: ignore[assignment]
     from airflow.operators.empty import EmptyOperator
 
     try:

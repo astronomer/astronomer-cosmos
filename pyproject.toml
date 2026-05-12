@@ -167,6 +167,10 @@ dependencies = [
     "types-python-dateutil",
     "Werkzeug<3.0.0",
     "pytest-asyncio",
+    # Needed by the regression test for issue #2620: the test exercises
+    # airflow.sentry's module-level ConfiguredSentry() path, which only
+    # runs when sentry_sdk is importable.
+    "sentry-sdk",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 
@@ -224,7 +228,7 @@ dependencies = [
 ]
 
 [tool.hatch.envs.docs.scripts]
-build = "sphinx-build -b html docs docs/_build"
+build = "sphinx-build -b html docs docs/_build --fail-on-warning"
 serve = "sphinx-autobuild docs docs/_build"
 # Serve without auto-reload: build once, then serve static files on port 8000
 serve-no-reload = "sphinx-build -b html docs docs/_build && python -m http.server 8000 --bind 127.0.0.1 --directory docs/_build"

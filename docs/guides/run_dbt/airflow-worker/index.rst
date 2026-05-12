@@ -1,9 +1,9 @@
-Run dbt in an Airflow worker
-----------------------------
+Run dbt in an Apache Airflow® worker
+-------------------------------------
 
 .. toctree::
    :maxdepth: 1
-   :caption: Run dbt in an Airflow worker
+   :caption: Run dbt in an Apache Airflow® worker
 
    local-execution-mode
    watcher-execution-mode

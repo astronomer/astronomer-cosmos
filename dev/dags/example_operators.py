@@ -10,7 +10,15 @@ try:
 except ImportError:
     from airflow.operators.python import PythonOperator
 
-from cosmos import DbtCloneLocalOperator, DbtRunLocalOperator, DbtSeedLocalOperator, ProfileConfig
+from cosmos import (
+    DbtBuildLocalOperator,
+    DbtCloneLocalOperator,
+    DbtRunLocalOperator,
+    DbtSeedLocalOperator,
+    DbtSnapshotLocalOperator,
+    DbtTestLocalOperator,
+    ProfileConfig,
+)
 from cosmos.io import upload_to_aws_s3
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -71,21 +79,54 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
         },
     )
 
+    # [START run_local_example]
     run_operator = DbtRunLocalOperator(
         profile_config=profile_config,
         project_dir=DBT_PROJ_DIR,
         task_id="run",
-        dbt_cmd_flags=["--models", "stg_customers"],
+        dbt_cmd_flags=["--select", "stg_customers"],
         install_deps=True,
         append_env=True,
     )
+    # [END run_local_example]
+
+    # [START test_local_example]
+    test_operator = DbtTestLocalOperator(
+        profile_config=profile_config,
+        project_dir=DBT_PROJ_DIR,
+        task_id="test",
+        dbt_cmd_flags=["--select", "stg_customers"],
+        install_deps=True,
+        append_env=True,
+    )
+    # [END test_local_example]
+
+    # [START snapshot_local_example]
+    snapshot_operator = DbtSnapshotLocalOperator(
+        profile_config=profile_config,
+        project_dir=DBT_PROJ_DIR,
+        task_id="snapshot",
+        install_deps=True,
+        append_env=True,
+    )
+    # [END snapshot_local_example]
+
+    # [START build_local_example]
+    build_operator = DbtBuildLocalOperator(
+        profile_config=profile_config,
+        project_dir=DBT_PROJ_DIR,
+        task_id="build",
+        install_deps=True,
+        append_env=True,
+    )
+    # [END build_local_example]
 
     # [START clone_example]
     clone_operator = DbtCloneLocalOperator(
         profile_config=profile_config,
         project_dir=DBT_PROJ_DIR,
         task_id="clone",
-        dbt_cmd_flags=["--models", "stg_customers", "--state", DBT_ARTIFACT],
+        dbt_cmd_flags=["--select", "stg_customers", "--state", DBT_ARTIFACT],
         install_deps=True,
         append_env=True,
     )
@@ -101,5 +142,13 @@ with DAG("example_operators", start_date=datetime(2024, 1, 1), catchup=False) as
     )
     # [END seed_local_example]
 
-    [seed_operator, seed_raw_orders] >> run_operator >> clone_operator
-    [seed_operator, seed_raw_orders] >> check_file_uploaded_task
+    (
+        seed_operator
+        >> seed_raw_orders
+        >> run_operator
+        >> test_operator
+        >> snapshot_operator
+        >> build_operator
+        >> clone_operator
+    )
+    seed_raw_orders >> check_file_uploaded_task

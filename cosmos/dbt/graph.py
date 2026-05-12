@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import datetime
 import functools
 import itertools
@@ -62,6 +63,21 @@ from cosmos.dbt.selector import YamlSelectors, select_nodes
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
+
+
+@functools.lru_cache(maxsize=8)
+def _load_manifest_cached(path: str, mtime: float) -> dict[str, Any]:
+    """
+    Load and cache a parsed dbt manifest.json file.
+
+    When multiple DbtDag/DbtTaskGroup instances share the same manifest file,
+    this avoids re-parsing the JSON for each one during a single DagBag import cycle.
+
+    The cache is keyed on (path, mtime) so it auto-invalidates when the file changes.
+    maxsize=8 bounds memory for projects with multiple distinct manifests.
+    """
+    with open(path) as fp:
+        return json.load(fp) or {}
 
 
 def _normalize_path(path: str | None) -> str:
@@ -1273,8 +1289,14 @@ class DbtGraph:
         if TYPE_CHECKING:
             assert self.project.manifest_path is not None  # pragma: no cover
 
-        with self.project.manifest_path.open() as fp:
-            manifest = json.load(fp) or {}
+        manifest_path = self.project.manifest_path
+        manifest_path_str = str(manifest_path)
+        is_local = not ("://" in manifest_path_str and not manifest_path_str.startswith("file://"))
+        if is_local:
+            manifest = copy.deepcopy(_load_manifest_cached(manifest_path_str, manifest_path.stat().st_mtime))
+        else:
+            with manifest_path.open() as fp:
+                manifest = json.load(fp)
 
         project_path = self.execution_config.project_path
         nodes = self._load_nodes_from_manifest_data(manifest, project_path)

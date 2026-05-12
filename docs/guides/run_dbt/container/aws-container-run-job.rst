@@ -1,21 +1,21 @@
 .. _aws-container-run-job:
 
 AWS ECS execution mode
-----------------------
+======================
 
 .. versionadded:: 1.9.0
 
 Astronomer Cosmos provides a unified way to run containerized workloads across multiple cloud providers. Using ``AWS Elastic Container Service (ECS)`` as the execution mode provides an isolated and scalable way to run ``dbt`` tasks within an AWS ECS service. This execution mode ensures that each ``dbt`` run is performed inside a dedicated container running in an ECS task.
 
 Performance and maintenance considerations
-++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This execution mode requires you to have an AWS environment configured to run ECS tasks (see :ref:``aws-ecs`` for more details on the exact requirements). Similar to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
+This execution mode requires you to have an AWS environment configured to run ECS tasks (see `AWS ECS <https://aws.amazon.com/ecs/>`_ for more details on the exact requirements). Similar to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
 
 Each task creates a new ECS task execution, providing full isolation. However, this separation introduces some overhead in execution time due to container startup and provisioning. If you require faster execution times, configuring appropriate ECS task definitions and cluster optimizations can help mitigate these delays.
 
 Setup
-+++++
+~~~~~
 
 In this guide, you’ll learn how to deploy and run a Cosmos job on AWS Elastic Container Service (ECS) using Fargate.
 
@@ -25,7 +25,7 @@ Schematically, the guide will walk you through the steps required to build the f
     :width: 800
 
 Prerequisites
-+++++++++++++
+~~~~~~~~~~~~~
 
 Before you begin, ensure you have the following:
 
@@ -39,7 +39,7 @@ Before you begin, ensure you have the following:
 
 
 Step-by-step guide
-++++++++++++++++++
+~~~~~~~~~~~~~~~~~~
 
 **Install** `Apache Airflow® <https://airflow.apache.org/>`_ **and Cosmos**
 

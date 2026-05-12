@@ -10,7 +10,7 @@ Astronomer Cosmos provides a unified way to run containerized workloads across m
 Performance and maintenance considerations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This execution mode requires you to have an AWS environment configured to run ECS tasks (see :ref:``aws-ecs`` for more details on the exact requirements). Similar to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
+This execution mode requires you to have an AWS environment configured to run ECS tasks (see `AWS ECS <https://aws.amazon.com/ecs/>`_ for more details on the exact requirements). Similar to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
 
 Each task creates a new ECS task execution, providing full isolation. However, this separation introduces some overhead in execution time due to container startup and provisioning. If you require faster execution times, configuring appropriate ECS task definitions and cluster optimizations can help mitigate these delays.
 

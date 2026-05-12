@@ -3,7 +3,7 @@
 Choose an execution mode
 ========================
 
-The ```ExecutionConfig`` class defines your execution mode, which determines where and how Cosmos runs dbt commands.
+The ``ExecutionConfig`` class defines your execution mode, which determines where and how Cosmos runs dbt commands.
 
 There are two categories of execution modes:
 

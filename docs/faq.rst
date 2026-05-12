@@ -5,8 +5,8 @@ Frequently asked questions
 
 This page collects common questions about using Astronomer Cosmos.
 
-Can I run a combination of dbt Core and dbt Cloud in the same Airflow deployment?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Can I run a combination of dbt Core and dbt Cloud in the same Apache Airflow® deployment?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Yes. dbt Core (via Cosmos) and dbt Cloud (now dbt Platform) can run side by
 side in the same `Apache Airflow® <https://airflow.apache.org/>`_ deployment

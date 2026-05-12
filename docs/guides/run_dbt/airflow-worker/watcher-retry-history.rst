@@ -2,22 +2,22 @@
 
 .. _watcher-retry-history:
 
-Watcher Retry Behaviour History
--------------------------------
+Watcher retry behavior history
+------------------------------
 
-This page documents the evolution of retry behaviour in ``ExecutionMode.WATCHER`` across Cosmos releases.
+This page documents the evolution of retry behavior in ``ExecutionMode.WATCHER`` across Cosmos releases.
 
 Goals
 +++++
 
-* The Airflow DAG status should match the dbt pipeline status, whether successful or failed
-* Users should be able to retry individual tasks via Airflow retry
-* Users should be able to retry the whole DAG via Airflow automatic retry — so humans do not need to intervene when the DAG fails
-* Users should be able to retry the whole DAG via Airflow clear
-* Avoid duplicate or concurrent runs of the same dbt transformation in the same DAG run
+- The Airflow ``DbtDag`` / ``DbtTaskGroup`` state should match the dbt pipeline status, whether successful or failed
+- Users should be able to retry individual tasks via Airflow retry
+- Users should be able to retry the whole DAG via Airflow automatic retry — so humans do not need to intervene when the DAG fails
+- Users should be able to retry the whole DAG via Airflow clear
+- Avoid duplicate or concurrent runs of the same dbt transformation in the same DAG run
 
-Does the DAG status match dbt's?
-++++++++++++++++++++++++++++++++
+Does the Airflow state match dbt's?
++++++++++++++++++++++++++++++++++++
 
 .. list-table::
    :header-rows: 1
@@ -50,14 +50,14 @@ Does the DAG status match dbt's?
      - **Yes**.
 
 Task-level retry — consumer
-+++++++++++++++++++++++++++
++++++++++++++++++++++++++++++
 
 .. list-table::
    :header-rows: 1
    :widths: 15 85
 
    * - Version
-     - Behaviour
+     - Behavior
    * - **1.11.0**
      - Fallback to ``ExecutionMode.LOCAL`` behavior (``dbt run --select <model>``).
    * - **1.11.1**
@@ -88,14 +88,14 @@ Task-level retry — consumer
        XCom backup mechanism — see *Task-level retry — producer*.
 
 Task-level retry — producer
-+++++++++++++++++++++++++++
++++++++++++++++++++++++++++++
 
 .. list-table::
    :header-rows: 1
    :widths: 15 85
 
    * - Version
-     - Behaviour
+     - Behavior
    * - **1.11.0**
      - Relaunches the entire ``dbt build`` — dangerous duplicate/concurrent run.
    * - **1.11.1**
@@ -129,11 +129,11 @@ Task-level retry — producer
 
        **Known issues with the XCom backup mechanism:**
 
-       * `#2619 <https://github.com/astronomer/astronomer-cosmos/issues/2619>`_ — backup Variable
+       - `#2619 <https://github.com/astronomer/astronomer-cosmos/issues/2619>`_ — backup Variable
          key is not sanitized for ``:`` and ``+`` in Airflow 3 default ``run_id`` formats; strict-naming
-         secrets backends (e.g. GCP / AWS Secret Manager) reject the name, breaking every
+         secrets backends (e.g. GCP Secret Manager / AWS Secrets Manager) reject the name, breaking every
          ``Variable.get`` / ``Variable.set`` from the producer.
-       * `#2625 <https://github.com/astronomer/astronomer-cosmos/issues/2625>`_ — on Airflow 2,
+       - `#2625 <https://github.com/astronomer/astronomer-cosmos/issues/2625>`_ — on Airflow 2,
          ``_get_task_group_id()`` returns ``None``, so multiple ``DbtTaskGroup`` producers in the
          same DAG run share one backup key and log ``UniqueViolation`` on every model completion.
 
@@ -145,7 +145,7 @@ Automatic retries
    :widths: 15 85
 
    * - Version
-     - Behaviour
+     - Behavior
    * - **1.11.0**
      - No safeguard; producer auto-retries would relaunch ``dbt build``, while consumer tasks may
        be running their own retries.
@@ -183,7 +183,7 @@ Full DAG / TaskGroup clear
    :widths: 15 85
 
    * - Version
-     - Behaviour
+     - Behavior
    * - **1.11.0**
      - Relaunches the entire ``dbt build`` — dangerous duplicate/concurrent run.
    * - **1.11.1**
@@ -224,11 +224,11 @@ Avoid duplicate or concurrent runs of the same dbt transformation in the same DA
    :widths: 15 85
 
    * - Version
-     - Behaviour
+     - Behavior
    * - **1.11.0**
      - **Not met.** Producer auto-retry, manual clear, or full DAG/TaskGroup clear relaunches
        ``dbt build`` and re-runs all transformations — potentially in parallel with consumer
-       Fallback to ``ExecutionMode.LOCAL`` behavior runs of the same models.
+       fallback runs (``ExecutionMode.LOCAL`` behavior) of the same models.
    * - **1.11.1**
      - Same as 1.11.0.
    * - **1.11.2**

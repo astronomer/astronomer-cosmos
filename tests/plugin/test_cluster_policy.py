@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -243,3 +246,59 @@ class TestTaskInstanceMutationHook:
         task_instance_mutation_hook(task_instance)
 
         assert task_instance.queue == "retry_queue"
+
+
+def test_cluster_policy_load_does_not_break_airflow_sentry_init(tmp_path):
+    """Regression test for issue #2620.
+
+    Reproduces the user-reported failure: when Airflow is configured with
+    ``[sentry] sentry_on = True`` and ``[sentry] before_send`` pointing at a
+    module that lives in the user's DAGs folder (i.e., not on ``sys.path``
+    yet when Airflow's ``settings.initialize()`` loads policy entry points),
+    the ``cosmos.plugin.cluster_policy`` entry point load triggers
+    ``AirflowConfigException: ... key "before_send" in "sentry" section.``
+    and the ``airflow`` CLI dies on startup.
+
+    The chain is::
+
+        airflow.settings.initialize()
+          -> load_policy_plugins("airflow.policy")
+            -> ep.load() -> cosmos.plugin.cluster_policy
+              -> from airflow.models.taskinstance import TaskInstance
+                -> from airflow.sentry import Sentry
+                  -> Sentry = ConfiguredSentry()
+                    -> conf.getimport("sentry", "before_send")
+                      -> importlib.import_module(<user-dags-module>) FAILS
+
+    The fix is to keep ``TaskInstance`` as a type-only import in
+    ``cosmos/plugin/cluster_policy.py`` (under ``if TYPE_CHECKING``) so the
+    above chain never runs at plugin-load time.
+
+    Runs in a fresh subprocess with the user's exact ``[sentry]`` config
+    supplied via env vars; expects ``import cosmos.plugin.cluster_policy``
+    to succeed.
+    """
+    code = "import cosmos.plugin.cluster_policy  # noqa: F401\n" "print('OK')\n"
+    env = {
+        **os.environ,
+        "AIRFLOW_HOME": str(tmp_path),
+        # User's scenario: sentry is on and before_send points at a module
+        # that is not importable at plugin-load time.
+        "AIRFLOW__SENTRY__SENTRY_ON": "True",
+        "AIRFLOW__SENTRY__BEFORE_SEND": "cosmos_2620_dags_folder_module.before_send",
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode == 0 and "OK" in result.stdout, (
+        "Issue #2620 reproduced: importing cosmos.plugin.cluster_policy with "
+        "[sentry] before_send pointing at a not-yet-importable module "
+        "transitively loaded airflow.sentry and raised AirflowConfigException "
+        "at plugin-load time.\n"
+        f"returncode: {result.returncode}\n"
+        f"stdout: {result.stdout}\n"
+        f"stderr: {result.stderr}"
+    )

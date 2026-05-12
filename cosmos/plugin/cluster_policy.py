@@ -1,10 +1,15 @@
-from logging import getLogger
+from __future__ import annotations
 
-from airflow.models.taskinstance import TaskInstance
+from logging import getLogger
+from typing import TYPE_CHECKING
+
 from airflow.policies import hookimpl
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION
+
+if TYPE_CHECKING:
+    from airflow.models.taskinstance import TaskInstance
 
 log = getLogger(__name__)
 

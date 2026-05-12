@@ -5,7 +5,12 @@
 Watcher retry behavior history
 ------------------------------
 
-This page documents the evolution of retry behavior in ``ExecutionMode.WATCHER`` across Cosmos releases.
+While ``ExecutionMode.WATCHER`` can significantly improve DAG run times, it is based on
+non-idempotent `Apache Airflow® <https://airflow.apache.org/>`_ tasks and relies on a complex retry
+mechanism in which one task's status can affect another task's status. This is the reason
+``ExecutionMode.WATCHER`` has remained marked as experimental for several months — until we can get
+this right. This document aims to present how each aspect of retries has evolved within the Cosmos
+watcher implementation across Cosmos releases.
 
 Goals
 +++++
@@ -28,20 +33,20 @@ Does the Airflow state match dbt's?
    * - **1.11.0**
      - **Yes**.
    * - **1.11.1**
-     - Same as 1.11.0.
+     - **Yes**. Same as 1.11.0.
    * - **1.11.2**
-     - Same as 1.11.0.
+     - **Yes**. Same as 1.11.0.
    * - **1.11.3**
-     - Same as 1.11.0.
+     - **Yes**. Same as 1.11.0.
    * - **1.12.0**
-     - Same as 1.11.0.
+     - **Yes**. Same as 1.11.0.
    * - **1.12.1**
-     - Same as 1.11.0.
+     - **Yes**. Same as 1.11.0.
    * - **1.13.0**
      - **Maybe**. Yes if successful in the first run. No if retries happen, unless users manually
        clear the producer task.
    * - **1.13.1**
-     - Same as 1.13.0.
+     - **Maybe**. Same as 1.13.0.
    * - **1.14.0**
      - **No** — on producer retry, dbt model failures from the first attempt are silently dropped.
        The consumer tasks for those models are marked successful instead of running their fallback
@@ -79,12 +84,12 @@ Task-level retry — consumer
    * - **1.13.1**
      - Same as 1.12.0.
    * - **1.14.0**
-     - Similar to 1.11.0. Affected by an Airflow limitation
+     - Similar to 1.12.0. Affected by an Airflow limitation
        (`#2554 <https://github.com/astronomer/astronomer-cosmos/issues/2554>`_): because the producer
        returns success on retry and Airflow does not preserve XCom across retries, consumers lose
        the model statuses from the first attempt and may silently mark failed models as successful.
    * - **1.14.1**
-     - Similar to 1.11.0. Consumers always read correct model statuses thanks to the producer's
+     - Similar to 1.12.0. Consumers always read correct model statuses thanks to the producer's
        XCom backup mechanism — see *Task-level retry — producer*.
 
 Task-level retry — producer
@@ -108,7 +113,7 @@ Task-level retry — producer
    * - **1.12.0**
      - Same as 1.11.2.
    * - **1.12.1**
-     - Same as 1.12.0.
+     - Same as 1.11.2.
    * - **1.13.0**
      - Producer returns success on ``try_number > 1``
        (`#2283 <https://github.com/astronomer/astronomer-cosmos/pull/2283>`_) — logs an informational
@@ -147,33 +152,34 @@ Automatic retries
    * - Version
      - Behavior
    * - **1.11.0**
-     - No safeguard; producer auto-retries would relaunch ``dbt build``, while consumer tasks may
-       be running their own retries.
+     - **Unsafe.** No safeguard; producer auto-retries would relaunch ``dbt build``, while consumer
+       tasks may be running their own retries.
    * - **1.11.1**
-     - Same as 1.11.0.
+     - **Unsafe.** Same as 1.11.0.
    * - **1.11.2**
-     - Producer ``retries`` forced to ``0`` by Cosmos — no auto-retry possible on the producer.
+     - **Failure.** Producer ``retries`` forced to ``0`` by Cosmos — no auto-retry possible on the
+       producer.
    * - **1.11.3**
-     - Same as 1.11.2.
+     - **Failure.** Same as 1.11.2.
    * - **1.12.0**
-     - Same as 1.11.2.
+     - **Failure.** Same as 1.11.2.
    * - **1.12.1**
-     - Same as 1.11.2.
+     - **Failure.** Same as 1.11.2.
    * - **1.13.0**
-     - Same as 1.11.2.
+     - **Failure.** Same as 1.11.2.
    * - **1.13.1**
-     - Same as 1.11.2.
+     - **Failure.** Same as 1.11.2.
    * - **1.14.0**
-     - Forced ``retries=0`` on the producer is removed
+     - **Incorrect status.** Forced ``retries=0`` on the producer is removed
        (`#2479 <https://github.com/astronomer/astronomer-cosmos/pull/2479>`_), fixing
        `#2429 <https://github.com/astronomer/astronomer-cosmos/issues/2429>`_. Producer auto-retries
        return success without re-running ``dbt build``, but Airflow does not preserve XCom across
        retries (`#2554 <https://github.com/astronomer/astronomer-cosmos/issues/2554>`_), so failed
        dbt models can be silently marked successful.
    * - **1.14.1**
-     - Producer auto-retries raise ``AirflowSkipException``; XCom is restored from the Variable
-       backup so consumers read correct model statuses. Subject to the XCom backup known issues
-       — see *Task-level retry — producer*.
+     - **Works.** Producer auto-retries raise ``AirflowSkipException``; XCom is restored from the
+       Variable backup so consumers read correct model statuses. Subject to the XCom backup known
+       issues — see *Task-level retry — producer*.
 
 Full DAG / TaskGroup clear
 ++++++++++++++++++++++++++
@@ -185,31 +191,31 @@ Full DAG / TaskGroup clear
    * - Version
      - Behavior
    * - **1.11.0**
-     - Relaunches the entire ``dbt build`` — dangerous duplicate/concurrent run.
+     - **Unsafe.** Relaunches the entire ``dbt build`` — dangerous duplicate/concurrent run.
    * - **1.11.1**
-     - Same as 1.11.0.
+     - **Unsafe.** Same as 1.11.0.
    * - **1.11.2**
-     - Same as 1.11.0.
+     - **Unsafe.** Same as 1.11.0.
    * - **1.11.3**
-     - Same as 1.11.0.
+     - **Unsafe.** Same as 1.11.0.
    * - **1.12.0**
-     - Same as 1.11.0.
+     - **Unsafe.** Same as 1.11.0.
    * - **1.12.1**
-     - Same as 1.11.0.
+     - **Unsafe.** Same as 1.11.0.
    * - **1.13.0**
-     - Producer returns success on retry without re-running ``dbt build``; consumers run using
-       ``ExecutionMode.LOCAL``. Works correctly on a manual full clear.
+     - **Works.** Producer returns success on retry without re-running ``dbt build``; consumers run
+       using ``ExecutionMode.LOCAL``. Works correctly on a manual full clear.
    * - **1.13.1**
-     - Same as 1.13.0.
+     - **Works.** Same as 1.13.0.
    * - **1.14.0**
-     - Same as 1.13.0, but Airflow does not preserve XCom across retries
+     - **Incorrect status.** Same as 1.13.0, but Airflow does not preserve XCom across retries
        (`#2554 <https://github.com/astronomer/astronomer-cosmos/issues/2554>`_), so failed dbt
        models can be silently marked successful.
    * - **1.14.1**
-     - Producer raises ``AirflowSkipException`` (skipped, not successful); XCom is restored from
-       the Variable backup so consumers read correct model statuses (subject to the XCom backup
-       known issues — see *Task-level retry — producer*). For ``DbtTaskGroup``, a gateway task
-       ``dbt_producer_watcher_done``
+     - **Works.** Producer raises ``AirflowSkipException`` (skipped, not successful); XCom is
+       restored from the Variable backup so consumers read correct model statuses (subject to the
+       XCom backup known issues — see *Task-level retry — producer*). For ``DbtTaskGroup``, a
+       gateway task ``dbt_producer_watcher_done``
        (`#2597 <https://github.com/astronomer/astronomer-cosmos/pull/2597>`_) with
        ``trigger_rule="none_failed"`` is added downstream of the producer to absorb its skip state
        so it does not propagate to tasks downstream of the group
@@ -230,17 +236,17 @@ Avoid duplicate or concurrent runs of the same dbt transformation in the same DA
        ``dbt build`` and re-runs all transformations — potentially in parallel with consumer
        fallback runs (``ExecutionMode.LOCAL`` behavior) of the same models.
    * - **1.11.1**
-     - Same as 1.11.0.
+     - **Not met.** Same as 1.11.0.
    * - **1.11.2**
      - **Not met.** Producer ``retries`` forced to ``0`` — auto-re-run is impossible. Manual
        producer clear or full DAG/TaskGroup clear still relaunches ``dbt build`` and may run
        concurrently with consumer fallbacks.
    * - **1.11.3**
-     - Same as 1.11.2.
+     - **Not met.** Same as 1.11.2.
    * - **1.12.0**
-     - Same as 1.11.2.
+     - **Not met.** Same as 1.11.2.
    * - **1.12.1**
-     - Same as 1.11.2.
+     - **Not met.** Same as 1.11.2.
    * - **1.13.0**
      - **Not met.** Producer returns success on retry without re-running ``dbt build``, so retries
        and full clears no longer relaunch the entire build. However, when a consumer sensor times
@@ -249,10 +255,10 @@ Avoid duplicate or concurrent runs of the same dbt transformation in the same DA
        concurrent runs of the same transformation. Fixed in 1.14.1 by
        `#2592 <https://github.com/astronomer/astronomer-cosmos/pull/2592>`_.
    * - **1.13.1**
-     - Same as 1.13.0.
+     - **Not met.** Same as 1.13.0.
    * - **1.14.0**
-     - Same as 1.13.0 — forced ``retries=0`` is lifted, but the consumer-sensor-retry concurrent
-       run risk persists. Fixed in 1.14.1 by
+     - **Not met.** Same as 1.13.0 — forced ``retries=0`` is lifted, but the consumer-sensor-retry
+       concurrent run risk persists. Fixed in 1.14.1 by
        `#2592 <https://github.com/astronomer/astronomer-cosmos/pull/2592>`_.
    * - **1.14.1**
      - **Met.** Producer raises ``AirflowSkipException`` on retry — no ``dbt build`` re-run. On

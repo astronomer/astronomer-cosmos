@@ -219,7 +219,14 @@ If a branch of the DAG fails, users can clear the status of a failed consumer ta
 
 **Producer retry behavior**
 
+.. versionchanged:: 1.13.0
+   Producer no longer re-runs ``dbt build`` on retry: it returns success without re-executing
+   (`#2283 <https://github.com/astronomer/astronomer-cosmos/pull/2283>`_).
+
 .. versionchanged:: 1.14.1
+   Producer raises ``AirflowSkipException`` instead of returning success, and backs up XCom values
+   to an Airflow Variable so consumer sensors can read model statuses from the first attempt
+   (`#2559 <https://github.com/astronomer/astronomer-cosmos/pull/2559>`_).
 
 When the ``DbtProducerWatcherOperator`` is triggered for a retry (``try_number > 1``), it raises
 ``AirflowSkipException`` instead of re-running the ``dbt build`` command. Before skipping, it restores

@@ -2,7 +2,7 @@
 
 
 Watcher Kubernetes execution mode (experimental)
-------------------------------------------------
+================================================
 
 .. versionadded:: 1.13.0
 
@@ -16,7 +16,7 @@ This execution mode is ideal for users who:
 
 
 Background
-++++++++++
+~~~~~~~~~~
 
 The :ref:`watcher-execution-mode` introduced in Cosmos 1.11.0 significantly reduces dbt pipeline run times by running dbt as a single command while maintaining model-level observability in Airflow.
 
@@ -26,7 +26,7 @@ For more details on the watcher concept and how it works, please refer to the :r
 
 
 How to use
-++++++++++
+~~~~~~~~~~
 
 Users previously using ``ExecutionMode.KUBERNETES`` can simply replace the ``execution_mode`` to use ``ExecutionMode.WATCHER_KUBERNETES``.
 
@@ -62,7 +62,7 @@ For the complete setup including Kubernetes secrets, Docker image configuration,
 
 
 Performance gains
-+++++++++++++++++
+~~~~~~~~~~~~~~~~~
 
 Early benchmarks using the ``jaffle_shop_watcher_kubernetes`` DAG show significant improvements:
 
@@ -84,10 +84,10 @@ The performance improvement comes from:
 
 
 Known limitations
-+++++++++++++++++
+~~~~~~~~~~~~~~~~~
 
 Kubernetes provider version compatibility
-'''''''''''''''''''''''''''''''''''''''''
++++++++++++++++++++++++++++++++++++++++++
 
 ``ExecutionMode.WATCHER_KUBERNETES`` does not work with older versions of the ``apache-airflow-providers-cncf-kubernetes`` provider (<=10.7.0).
 
@@ -100,7 +100,7 @@ Please ensure you have a compatible version installed:
 We successfully tested against the most recent release of the provider (`10.12.2 <https://pypi.org/project/apache-airflow-providers-cncf-kubernetes/10.12.2/>`_).
 
 Support for KPO deferrable mode
-'''''''''''''''''''''''''''''''
++++++++++++++++++++++++++++++++
 
 The producer node created by the ``ExecutionMode.WATCHER_KUBERNETES`` producer task can be set to deferrable mode as long as:
 
@@ -133,7 +133,7 @@ The producer node created by the ``ExecutionMode.WATCHER_KUBERNETES`` producer t
 Conversely, the consumer tasks that subclass ``DbtConsumerWatcherKubernetesSensor`` run in deferrable mode by default when operating as a sensor. They can also operate in deferrable mode if they are running dbt themselves upon retry.
 
 Mandatory ``operator_args``
-'''''''''''''''''''''''''''
++++++++++++++++++++++++++++
 
 The  ``operator_args`` must define ``get_logs`` and ``log_events_on_failure``:
 
@@ -155,7 +155,7 @@ The  ``operator_args`` must define ``get_logs`` and ``log_events_on_failure``:
 
 
 Other inherited limitations
-'''''''''''''''''''''''''''
++++++++++++++++++++++++++++
 
 The following limitations from ``ExecutionMode.WATCHER`` also apply to ``ExecutionMode.WATCHER_KUBERNETES``:
 
@@ -171,7 +171,7 @@ Additionally, the limitations from ``ExecutionMode.KUBERNETES`` also apply to ``
 
 
 Example DAG
-+++++++++++
+~~~~~~~~~~~
 
 Below is a complete example of a DAG using ``ExecutionMode.WATCHER_KUBERNETES``:
 
@@ -180,7 +180,7 @@ Below is a complete example of a DAG using ``ExecutionMode.WATCHER_KUBERNETES``:
 
 
 Prerequisites
-+++++++++++++
+~~~~~~~~~~~~~
 
 Before using ``ExecutionMode.WATCHER_KUBERNETES``, ensure you have:
 
@@ -192,7 +192,7 @@ For detailed setup instructions, refer to the :ref:`kubernetes` documentation.
 
 
 Summary
-+++++++
+~~~~~~~
 
 ``ExecutionMode.WATCHER_KUBERNETES`` provides:
 

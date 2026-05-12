@@ -1,7 +1,7 @@
 .. _cosmos-config:
 
 Cosmos Config
--------------
+=============
 
 This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ configurations that affect Astronomer Cosmos behavior. They can be set in the ``airflow.cfg`` file or using environment variables.
 
@@ -14,7 +14,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 - [openlineage]
 
 [cosmos]
-++++++++
+~~~~~~~~
 
 .. _cache_dir:
 
@@ -363,6 +363,23 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Default: ``0.5``
     - Environment Variable: ``AIRFLOW__COSMOS__DEBUG_MEMORY_POLL_INTERVAL_SECONDS``
 
+.. _enable_orjson_parser:
+
+`enable_orjson_parser`_:
+    (Experimental, introduced in Cosmos 1.15.0) When enabled, Cosmos uses `orjson <https://github.com/ijl/orjson>`_ to parse
+    ``manifest.json`` files instead of the standard library ``json`` module. orjson is a fast, Rust-based JSON
+    library that can significantly reduce DAG parsing time for large dbt projects with big manifests.
+
+    Benchmarks show up to 40% faster parsing compared to the standard ``json`` module, with the improvement
+    scaling with manifest file size.
+
+    Requires the optional ``orjson`` dependency: ``pip install orjson``.
+    If this setting is ``True`` but ``orjson`` is not installed, Cosmos raises a
+    ``CosmosLoadDbtException`` at parse time with an actionable error message.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_ORJSON_PARSER``
+
 .. _watcher_dbt_execution_queue:
 
 `watcher_dbt_execution_queue`_:
@@ -378,7 +395,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE``
 
 [openlineage]
-+++++++++++++
+~~~~~~~~~~~~~
 
 .. _namespace:
 
@@ -392,7 +409,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     For more information, see `OpenLineage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_.
 
 Environment Variables
-+++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~
 
 .. _LINEAGE_NAMESPACE:
 

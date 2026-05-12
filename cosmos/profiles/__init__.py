@@ -22,6 +22,7 @@ from .snowflake.user_encrypted_privatekey_env_variable import SnowflakeEncrypted
 from .snowflake.user_encrypted_privatekey_file import SnowflakeEncryptedPrivateKeyFilePemProfileMapping
 from .snowflake.user_pass import SnowflakeUserPasswordProfileMapping
 from .snowflake.user_privatekey import SnowflakePrivateKeyPemProfileMapping
+from .snowflake.user_privatekey_file import SnowflakePrivateKeyFilePemProfileMapping
 from .spark.thrift import SparkThriftProfileMapping
 from .sqlserver.standard_sqlserver_auth import StandardSQLServerAuth
 from .starrocks import StarrocksUserPasswordProfileMapping
@@ -48,6 +49,7 @@ profile_mappings: list[type[BaseProfileMapping]] = [
     SnowflakeEncryptedPrivateKeyFilePemProfileMapping,
     SnowflakeEncryptedPrivateKeyPemProfileMapping,
     SnowflakePrivateKeyPemProfileMapping,
+    SnowflakePrivateKeyFilePemProfileMapping,
     StarrocksUserPasswordProfileMapping,
     SparkThriftProfileMapping,
     ExasolUserPasswordProfileMapping,
@@ -81,6 +83,7 @@ def get_automatic_profile_mapping(
 __all__ = [
     "AthenaAccessKeyProfileMapping",
     "BaseProfileMapping",
+    "ClickhouseUserPasswordProfileMapping",
     "GoogleCloudServiceAccountFileProfileMapping",
     "GoogleCloudServiceAccountDictProfileMapping",
     "GoogleCloudOauthProfileMapping",
@@ -94,7 +97,9 @@ __all__ = [
     "RedshiftUserPasswordProfileMapping",
     "SnowflakeUserPasswordProfileMapping",
     "SnowflakePrivateKeyPemProfileMapping",
+    "SnowflakePrivateKeyFilePemProfileMapping",
     "SnowflakeEncryptedPrivateKeyFilePemProfileMapping",
+    "SnowflakeEncryptedPrivateKeyPemProfileMapping",
     "StarrocksUserPasswordProfileMapping",
     "SparkThriftProfileMapping",
     "ExasolUserPasswordProfileMapping",

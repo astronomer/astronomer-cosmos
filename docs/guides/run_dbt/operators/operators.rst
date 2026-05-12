@@ -1,7 +1,7 @@
 .. _operators:
 
 dbt command operators
----------------------
+=====================
 
 Cosmos exposes individual operators that correspond to specific dbt commands, which can be used just like traditional
 `Apache Airflow® <https://airflow.apache.org/>`_ operators. Cosmos names these operators using the format ``Dbt<dbt-command><execution-mode>Operator``.
@@ -9,7 +9,7 @@ Cosmos exposes individual operators that correspond to specific dbt commands, wh
 You can see the full example DAG in the `dev/dags directory <https://github.com/astronomer/astronomer-cosmos/blob/main/dev/dags/example_operators.py>`_.
 
 Run
-+++
+~~~
 
 Requires Cosmos >= 0.6.0.
 
@@ -22,7 +22,7 @@ The ``DbtRunLocalOperator`` implements the `dbt run <https://docs.getdbt.com/ref
 
 
 Test
-++++
+~~~~
 
 Requires Cosmos >= 0.6.0.
 
@@ -35,7 +35,7 @@ The ``DbtTestLocalOperator`` implements the `dbt test <https://docs.getdbt.com/r
 
 
 Snapshot
-++++++++
+~~~~~~~~
 
 Requires Cosmos >= 0.6.0.
 
@@ -48,7 +48,7 @@ The ``DbtSnapshotLocalOperator`` implements the `dbt snapshot <https://docs.getd
 
 
 Build
-+++++
+~~~~~
 
 Requires Cosmos >= 1.4.0.
 
@@ -61,7 +61,7 @@ The ``DbtBuildLocalOperator`` implements the `dbt build <https://docs.getdbt.com
 
 
 Seed
-++++
+~~~~
 
 Requires Cosmos >= 0.6.0.
 
@@ -74,7 +74,7 @@ The ``DbtSeedLocalOperator`` implements the `dbt seed <https://docs.getdbt.com/r
 
 
 Clone
-+++++
+~~~~~
 
 Requires Cosmos >= 1.8.0.
 

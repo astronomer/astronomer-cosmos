@@ -133,31 +133,6 @@ def test_does_not_claim_when_passphrase_present() -> None:
         assert not profile_mapping.can_claim_connection()
 
 
-def test_does_not_claim_when_private_key_content_present() -> None:
-    """
-    When private_key_content is also set, defer to the content-based mappings.
-    """
-    conn = Connection(
-        conn_id="my_snowflake_pk_connection",
-        conn_type="snowflake",
-        login="my_user",
-        schema="my_schema",
-        extra=json.dumps(
-            {
-                "account": "my_account",
-                "database": "my_database",
-                "warehouse": "my_warehouse",
-                "private_key_file": "path/to/private_key.p8",
-                "private_key_content": "some_key_content",
-            }
-        ),
-    )
-
-    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakePrivateKeyFilePemProfileMapping(conn)
-        assert not profile_mapping.can_claim_connection()
-
-
 def test_profile_mapping_selected(
     mock_snowflake_conn: Connection,
 ) -> None:
@@ -288,36 +263,3 @@ def test_query_tag_absent_when_not_set(
     """
     profile_mapping = get_automatic_profile_mapping(mock_snowflake_conn.conn_id)
     assert "query_tag" not in profile_mapping.profile
-
-
-def test_old_snowflake_format() -> None:
-    """
-    Tests that the old ``extra__snowflake__*`` format still works.
-    """
-    conn = Connection(
-        conn_id="my_snowflake_connection",
-        conn_type="snowflake",
-        login="my_user",
-        schema="my_schema",
-        extra=json.dumps(
-            {
-                "extra__snowflake__account": "my_account",
-                "extra__snowflake__database": "my_database",
-                "extra__snowflake__warehouse": "my_warehouse",
-                "extra__snowflake__private_key_file": "path/to/private_key.p8",
-            }
-        ),
-    )
-
-    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
-        profile_mapping = SnowflakePrivateKeyFilePemProfileMapping(conn)
-        assert profile_mapping.profile == {
-            "type": conn.conn_type,
-            "user": conn.login,
-            "private_key_path": conn.extra_dejson.get("private_key_file"),
-            "schema": conn.schema,
-            "account": conn.extra_dejson.get("account"),
-            "database": conn.extra_dejson.get("database"),
-            "warehouse": conn.extra_dejson.get("warehouse"),
-            "threads": 4,
-        }

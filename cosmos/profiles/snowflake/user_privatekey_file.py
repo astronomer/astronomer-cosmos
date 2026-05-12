@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import json
-from typing import TYPE_CHECKING, Any
+import logging
+from typing import Any
 
 from cosmos.profiles.snowflake.base import SnowflakeBaseProfileMapping
 
-if TYPE_CHECKING:
-    from airflow.models import Connection
+logger = logging.getLogger(__name__)
 
 
 class SnowflakePrivateKeyFilePemProfileMapping(SnowflakeBaseProfileMapping):
@@ -20,7 +19,7 @@ class SnowflakePrivateKeyFilePemProfileMapping(SnowflakeBaseProfileMapping):
 
     airflow_connection_type: str = "snowflake"
     dbt_profile_type: str = "snowflake"
-    is_community: bool = True
+    is_community: bool = False
 
     required_fields = [
         "account",
@@ -45,32 +44,19 @@ class SnowflakePrivateKeyFilePemProfileMapping(SnowflakeBaseProfileMapping):
         result = super().can_claim_connection()
         if not result:
             return False
-        # Defer to the encrypted-file mapping when a passphrase is supplied.
+        # A passphrase is set: the connection is for an encrypted key. This mapping does not
+        # forward the passphrase to dbt, so claiming would yield a profile that fails at runtime.
+        # Refuse to claim and surface a warning so the user can switch to
+        # SnowflakeEncryptedPrivateKeyFilePemProfileMapping.
         if self.conn.password:
-            return False
-        # Defer to the content mappings when private_key_content is supplied.
-        if self.conn.extra_dejson.get("private_key_content") is not None:
+            logger.warning(
+                "%s will not claim connection %s: a passphrase is set on the Airflow connection. "
+                "Use SnowflakeEncryptedPrivateKeyFilePemProfileMapping for passphrase-protected keys.",
+                self.__class__.__name__,
+                self.conn_id,
+            )
             return False
         return True
-
-    @property
-    def conn(self) -> Connection:
-        """
-        Snowflake can be odd because the fields used to be stored with keys in the format
-        'extra__snowflake__account', but now are stored as 'account'.
-
-        This standardizes the keys to be 'account', 'database', etc.
-        """
-        conn = super().conn
-
-        conn_dejson = conn.extra_dejson
-
-        if conn_dejson.get("extra__snowflake__account"):
-            conn_dejson = {key.replace("extra__snowflake__", ""): value for key, value in conn_dejson.items()}
-
-        conn.extra = json.dumps(conn_dejson)
-
-        return conn
 
     @property
     def profile(self) -> dict[str, Any | None]:

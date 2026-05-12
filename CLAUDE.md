@@ -44,6 +44,19 @@ hatch run docs:serve-no-reload    # static build served on http://127.0.0.1:8000
 
 Always run `hatch run docs:build` before committing any change that touches `docs/`, and verify the build succeeds without warnings or errors.
 
+### Documentation Style
+
+When writing or editing files under `docs/`, follow the Cosmos lightweight style guide (proposed in #2460):
+
+- **Heading underlines** use this canonical hierarchy per file: page title `=`, H1 `~`, H2 `+`, H3 `^`. The remap is positional per file (first level encountered becomes `=`, second `~`, etc.). Underline length must match the title's character length (UTF-8 byte length matters for non-ASCII titles).
+- **Headings** use sentence case (e.g., "Choose an execution mode"), not Title Case.
+- **Bullet points** use `-`, not `*` or `+`.
+- **Decorative separator lines** (e.g., `-----` or `=====` not attached to a heading) should not be added.
+- **Apache Airflow trademark**: linked full form on the first prominent prose mention per page (`` `Apache Airflow® <https://airflow.apache.org/>`_ ``); plain `Apache Airflow®` in headings; subsequent prose mentions are bare "Airflow".
+- **DAG identifier** stays uppercase in code identifiers (`DAG` class, `DAG_FOLDER`, `AIRFLOW__DAG_*`) and in log-line samples that must match the code output (e.g., `cosmos/converter.py:334` emits "for DAG using ...").
+- A subset of these rules is enforced by `scripts/check_docs_style.py` in pre-commit.
+- Per-profile pages under `docs/reference/profiles/` are auto-generated from `docs/reference/templates/profile_mapping.rst.jinja2` by `docs/generate_mappings.py` at Sphinx build time. The generated `.rst` files are gitignored. Edit the template, not the generated files.
+
 ### Linting and Formatting
 
 Pre-commit runs the configured linters/formatters (e.g., Black (formatter), Ruff (linter), mypy, codespell). See `.pre-commit-config.yaml` for the full list:

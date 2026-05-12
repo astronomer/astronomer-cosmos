@@ -53,7 +53,7 @@ When writing or editing files under `docs/`, follow the Cosmos lightweight style
 - **Bullet points** use `-`, not `*` or `+`.
 - **Decorative separator lines** (e.g., `-----` or `=====` not attached to a heading) should not be added.
 - **Apache Airflow trademark**: linked full form on the first prominent prose mention per page (`` `Apache Airflow® <https://airflow.apache.org/>`_ ``); plain `Apache Airflow®` in headings; subsequent prose mentions are bare "Airflow".
-- **DAG identifier** stays uppercase in code identifiers (`DAG` class, `DAG_FOLDER`, `AIRFLOW__DAG_*`) and in log-line samples that must match the code output (e.g., `cosmos/converter.py:334` emits "for DAG using ...").
+- **DAG identifier** stays uppercase in code identifiers (`DAG` class, `DAG_FOLDER`, `AIRFLOW__DAG_*`) and in log-line samples that must match the code output (e.g., the `cosmos/converter.py` log message "for DAG using ...").
 - A subset of these rules is enforced by `scripts/check_docs_style.py` in pre-commit.
 - Per-profile pages under `docs/reference/profiles/` are auto-generated from `docs/reference/templates/profile_mapping.rst.jinja2` by `docs/generate_mappings.py` at Sphinx build time. The generated `.rst` files are gitignored. Edit the template, not the generated files.
 

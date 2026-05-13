@@ -13,6 +13,7 @@ from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
+    PRODUCER_FINAL_STATES,
     _log_dbt_event,
     build_producer_state_fetcher,
     is_dbt_node_status_failed,
@@ -202,7 +203,7 @@ class WatcherTrigger(BaseTrigger):
             # logging the full list. Also ensures we exit if producer finishes before
             # ever pushing _DBT_STARTUP_EVENTS_XCOM_KEY.
             producer_task_state = await self._get_producer_task_status()
-            if producer_task_state in ("failed", "success", "skipped"):
+            if producer_task_state in PRODUCER_FINAL_STATES:
                 return
 
             # Return if dbt node is in terminal state

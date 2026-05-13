@@ -21,6 +21,7 @@ from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
+    DATASET_EMITTING_RESOURCE_TYPES,
     _iso_to_string,
     _log_dbt_event,
     build_producer_state_fetcher,
@@ -320,7 +321,7 @@ def store_dbt_resource_status_from_log(
                 # Lazily populate per-model outlet URIs from the manifest, but only for
                 # resource types that can emit datasets (models/seeds/snapshots).
                 outlet_uris: list[str] = []
-                if dbt_node_resource_type in {"model", "seed", "snapshot"}:
+                if dbt_node_resource_type in DATASET_EMITTING_RESOURCE_TYPES:
                     project_dir = extra_kwargs.get("project_dir")
                     _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
                     outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []

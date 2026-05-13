@@ -28,7 +28,7 @@ from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
     store_dbt_resource_status_from_log,
 )
-from cosmos.operators._watcher.state import DBT_SUCCESS_STATUSES
+from cosmos.operators._watcher.state import DBT_SOURCE_FRESHNESS_STALE_STATUSES, DBT_SUCCESS_STATUSES
 from cosmos.operators._watcher.xcom import (
     _backup_xcom_to_variable,
     _delete_xcom_backup_variable,
@@ -83,7 +83,11 @@ def _default_freshness_callback(
     if not nodes or not sources_json:
         return []
 
-    stale_source_ids = {r["unique_id"] for r in sources_json.get("results", []) if r.get("status") in ("error", "warn")}
+    stale_source_ids = {
+        r["unique_id"]
+        for r in sources_json.get("results", [])
+        if r.get("status") in DBT_SOURCE_FRESHNESS_STALE_STATUSES
+    }
     if not stale_source_ids:
         return []
 

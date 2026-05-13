@@ -25,9 +25,19 @@ DBT_SUCCESS_STATUSES = frozenset({"success", "pass", "warn"})
 DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error", "runtime error"})
 DBT_SKIPPED_STATUSES = frozenset({"skipped"})
 
+# dbt source freshness statuses that mark a source as stale and propagate skips downstream.
+DBT_SOURCE_FRESHNESS_STALE_STATUSES = frozenset({"error", "warn"})
+
+# dbt resource types whose nodes can emit datasets (i.e. produce outputs with outlet URIs).
+DATASET_EMITTING_RESOURCE_TYPES = frozenset({"model", "seed", "snapshot"})
+
 # Airflow task states that indicate the producer has finished and will not deliver any more XCom updates.
 # Used to decide whether a sensor retry should fall back to a non-watcher run or keep polling.
 PRODUCER_TERMINAL_STATES = frozenset({"success", "failed", "skipped", "upstream_failed", "removed"})
+
+# Airflow task states checked by the watcher trigger to know the producer task has reached its
+# final outcome and the trigger can exit early. Subset of PRODUCER_TERMINAL_STATES.
+PRODUCER_FINAL_STATES = frozenset({"failed", "success", "skipped"})
 
 
 class DbtTestStatus(str, Enum):

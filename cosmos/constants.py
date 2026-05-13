@@ -178,6 +178,8 @@ SUPPORTED_BUILD_RESOURCES = [
 # https://docs.getdbt.com/reference/commands/test
 TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED}
 
+_DATASET_EMITTING_RESOURCE_TYPES = frozenset({"model", "seed", "snapshot"})
+
 DBT_SETUP_ASYNC_TASK_ID = "dbt_setup_async"
 DBT_TEARDOWN_ASYNC_TASK_ID = "dbt_teardown_async"
 

@@ -338,7 +338,7 @@ class DbtToAirflowConverter:
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
         logger.info(
-            "Cosmos performance (%s) -  [%s|%s]: It took %.3gs to parse the dbt project for DAG using %s",
+            "Cosmos performance (%s) - [%s|%s]: It took %.3gs to parse the dbt project for DAG using %s",
             cache_identifier,
             platform.node(),
             os.getpid(),

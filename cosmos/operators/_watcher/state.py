@@ -71,6 +71,18 @@ def is_producer_task_terminated(state: str | None) -> bool:
     return state in PRODUCER_TERMINAL_STATES
 
 
+def get_status_xcom_key(unique_id: str) -> str:
+    return f"{unique_id.replace('.', '__')}_status"
+
+
+def get_dbt_event_xcom_key(unique_id: str) -> str:
+    return f"{unique_id.replace('.', '__')}_dbt_event"
+
+
+def get_compiled_sql_xcom_key(unique_id: str) -> str:
+    return f"{unique_id.replace('.', '__')}_compiled_sql"
+
+
 xcom_set_lock = Lock()
 
 

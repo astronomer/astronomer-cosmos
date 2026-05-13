@@ -499,7 +499,7 @@ def generate_or_convert_task(
     conversion_function = node_converters.get(resource_type, None)
     if conversion_function is not None:
         task_id = task_meta.id
-        logger.debug(f"Converting node <{node.unique_id}> task <{task_id}> using <{conversion_function.__name__}>")
+        logger.debug("Converting node <%s> task <%s> using <%s>", node.unique_id, task_id, conversion_function.__name__)
         # In Cosmos 2.0 we should review this implementation and use render_config or another simpler interface:
         task = conversion_function(  # type: ignore
             dag=dag,
@@ -520,7 +520,7 @@ def generate_or_convert_task(
             detached_from_parent=detached_from_parent,
         )
         if task is not None:
-            logger.debug(f"Conversion of node <{node.unique_id}> task <{task_id}> was successful!")
+            logger.debug("Conversion of node <%s> task <%s> was successful!", node.unique_id, task_id)
     else:
         task = create_airflow_task(task_meta, dag, task_group)
     return task

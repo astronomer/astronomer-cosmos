@@ -425,16 +425,18 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         """
         if try_number > 1:
             logger.info(
-                f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
+                "Retry attempt #%s – Running model '%s' from project '%s' using %s",
                 try_number - 1,
                 self.model_unique_id,
                 self.project_dir,
+                self.__class__.__name__,
             )
         else:
             logger.info(
-                f"Falling back to running model '%s' from project '%s' using {self.__class__.__name__}",
+                "Falling back to running model '%s' from project '%s' using %s",
                 self.model_unique_id,
                 self.project_dir,
+                self.__class__.__name__,
             )
 
         upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)

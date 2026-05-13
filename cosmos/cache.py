@@ -440,7 +440,7 @@ def delete_unused_dbt_cache(
                 deleted_cosmos_variables += 1
 
     logger.info(
-        "Deleted %s/%s Airflow Variables used to store  Cosmos cache. ",
+        "Deleted %s/%s Airflow Variables used to store Cosmos cache.",
         deleted_cosmos_variables,
         total_cosmos_variables,
     )

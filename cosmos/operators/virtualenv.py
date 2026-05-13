@@ -210,13 +210,13 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             os.mkdir(str(self.virtualenv_dir))
 
         with open(self._lock_file, "w") as lf:
-            logger.info("Acquiring lock at %s with pid %s", self._lock_file, self._pid)
+            self.log.info("Acquiring lock at %s with pid %s", self._lock_file, self._pid)
             lf.write(str(self._pid))
 
     @depends_on_virtualenv_dir
     def _release_venv_lock(self) -> None:
         if not self._lock_file.is_file():
-            logger.warning("Lockfile %s not found, perhaps deleted by other concurrent operator?", self._lock_file)
+            self.log.warning("Lockfile %s not found, perhaps deleted by other concurrent operator?", self._lock_file)
             return
 
         with open(self._lock_file) as lf:
@@ -225,7 +225,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             if lock_file_pid == self._pid:
                 return self._lock_file.unlink()
 
-            logger.warning("Lockfile owned by process of pid %s, while operator has pid %s", lock_file_pid, self._pid)
+            self.log.warning("Lockfile owned by process of pid %s, while operator has pid %s", lock_file_pid, self._pid)
 
 
 class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):  # type: ignore[misc]

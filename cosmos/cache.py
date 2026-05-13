@@ -466,7 +466,7 @@ def delete_unused_dbt_remote_cache_files(  # pragma: no cover
     if session is None:
         return 0
 
-    logger.info("Delete the Cosmos cache stored remotely that hasn't been used for  %s", max_age_last_usage)
+    logger.info("Delete the Cosmos cache stored remotely that hasn't been used for %s", max_age_last_usage)
     cosmos_dags_ids_remote_cache_files = defaultdict(list)
 
     configured_remote_cache_dir = _configure_remote_cache_dir()

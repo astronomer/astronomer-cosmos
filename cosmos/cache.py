@@ -410,7 +410,7 @@ def delete_unused_dbt_cache(
     if session is None:
         return 0
 
-    logger.info("Delete the Cosmos cache stored in Airflow Variables that hasn't been used for  %s", max_age_last_usage)
+    logger.info("Delete the Cosmos cache stored in Airflow Variables that hasn't been used for %s", max_age_last_usage)
     cosmos_dags_ids = defaultdict(list)
     all_variables = session.scalars(select(Variable)).all()
     total_cosmos_variables = 0

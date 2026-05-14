@@ -48,7 +48,7 @@ Always run `hatch run docs:build` before committing any change that touches `doc
 
 When writing or editing files under `docs/`, follow the Cosmos lightweight style rules in this section:
 
-- **Heading underlines** use this canonical hierarchy per file: page title `=`, H1 `~`, H2 `+`, H3 `^`. The remap is positional per file (first level encountered becomes `=`, second `~`, etc.). Underline length must match the title's character length (UTF-8 byte length matters for non-ASCII titles).
+- **Heading underlines** use this canonical hierarchy per file: page title `=`, H1 `~`, H2 `+`, H3 `^`. The remap is positional per file (first level encountered becomes `=`, second `~`, etc.). Underline length must be at least the title's UTF-8 byte length.
 - **Headings** use sentence case (e.g., "Choose an execution mode"), not Title Case.
 - **Bullet points** use `-`, not `*` or `+`.
 - **Decorative separator lines** (e.g., `-----` or `=====` not attached to a heading) should not be added.

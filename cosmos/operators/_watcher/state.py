@@ -71,6 +71,21 @@ def is_producer_task_terminated(state: str | None) -> bool:
     return state in PRODUCER_TERMINAL_STATES
 
 
+def get_status_xcom_key(unique_id: str) -> str:
+    """Build the XCom key used to publish a dbt node's status, sanitising dots in ``unique_id`` to ``__``."""
+    return f"{unique_id.replace('.', '__')}_status"
+
+
+def get_dbt_event_xcom_key(unique_id: str) -> str:
+    """Build the XCom key used to publish a dbt node's structured event, sanitising dots in ``unique_id`` to ``__``."""
+    return f"{unique_id.replace('.', '__')}_dbt_event"
+
+
+def get_compiled_sql_xcom_key(unique_id: str) -> str:
+    """Build the XCom key used to publish a dbt node's compiled SQL, sanitising dots in ``unique_id`` to ``__``."""
+    return f"{unique_id.replace('.', '__')}_compiled_sql"
+
+
 xcom_set_lock = Lock()
 
 

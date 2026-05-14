@@ -11,6 +11,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from cosmos import settings
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
+    _DATASET_EMITTING_RESOURCE_TYPES,
     _DBT_STARTUP_EVENTS_XCOM_KEY,
     AIRFLOW_VERSION,
     CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
@@ -24,6 +25,9 @@ from cosmos.operators._watcher.state import (
     _iso_to_string,
     _log_dbt_event,
     build_producer_state_fetcher,
+    get_compiled_sql_xcom_key,
+    get_dbt_event_xcom_key,
+    get_status_xcom_key,
     get_xcom_val,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
@@ -117,8 +121,7 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
             "msg": msg,
         }
 
-        xcom_key = f"{unique_id.replace('.', '__')}_dbt_event"
-        safe_xcom_push(task_instance=task_instance, key=xcom_key, value=dbt_event)
+        safe_xcom_push(task_instance=task_instance, key=get_dbt_event_xcom_key(unique_id), value=dbt_event)
 
 
 def _extract_compiled_sql(
@@ -154,7 +157,7 @@ def _push_compiled_sql_for_model(task_instance: Any, unique_id: str, compiled_sq
     """
     safe_xcom_push(
         task_instance=task_instance,
-        key=f"{unique_id.replace('.', '__')}_compiled_sql",
+        key=get_compiled_sql_xcom_key(unique_id),
         value=compiled_sql,
     )
 
@@ -320,7 +323,7 @@ def store_dbt_resource_status_from_log(
                 # Lazily populate per-model outlet URIs from the manifest, but only for
                 # resource types that can emit datasets (models/seeds/snapshots).
                 outlet_uris: list[str] = []
-                if dbt_node_resource_type in {"model", "seed", "snapshot"}:
+                if dbt_node_resource_type in _DATASET_EMITTING_RESOURCE_TYPES:
                     project_dir = extra_kwargs.get("project_dir")
                     _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
                     outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
@@ -331,7 +334,7 @@ def store_dbt_resource_status_from_log(
                 }
                 safe_xcom_push(
                     task_instance=context["ti"],
-                    key=f"{unique_id.replace('.', '__')}_status",
+                    key=get_status_xcom_key(unique_id),
                     value=status_value,
                 )
 
@@ -422,16 +425,18 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         """
         if try_number > 1:
             logger.info(
-                f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
+                "Retry attempt #%s – Running model '%s' from project '%s' using %s",
                 try_number - 1,
                 self.model_unique_id,
                 self.project_dir,
+                self.__class__.__name__,
             )
         else:
             logger.info(
-                f"Falling back to running model '%s' from project '%s' using {self.__class__.__name__}",
+                "Falling back to running model '%s' from project '%s' using %s",
                 self.model_unique_id,
                 self.project_dir,
+                self.__class__.__name__,
             )
 
         upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)
@@ -476,10 +481,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if not self.deferrable:
             super().execute(context)
         elif not self.poke(context):
-            if self.is_test_sensor:
-                xcom_key = get_tests_status_xcom_key(self.model_unique_id)
-            else:
-                xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
+            xcom_key = (
+                get_tests_status_xcom_key(self.model_unique_id)
+                if self.is_test_sensor
+                else get_status_xcom_key(self.model_unique_id)
+            )
             logger.info(
                 "Deferring %s '%s'. The trigger will poll XCom key '%s' from producer task '%s'.",
                 self._resource_label.lower(),
@@ -544,7 +550,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         dbt_events = get_xcom_val(
             task_instance=context["ti"],
-            key=f"{self.model_unique_id.replace('.', '__')}_dbt_event",
+            key=get_dbt_event_xcom_key(self.model_unique_id),
             task_ids=self.producer_task_id,
         )
         _log_dbt_event(dbt_events)
@@ -589,9 +595,8 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         dataset emission.
         """
         if self.is_test_sensor:
-            xcom_key = get_tests_status_xcom_key(self.model_unique_id)
-            return get_xcom_val(ti, self.producer_task_id, xcom_key)
-        xcom_val = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+            return get_xcom_val(ti, self.producer_task_id, get_tests_status_xcom_key(self.model_unique_id))
+        xcom_val = get_xcom_val(ti, self.producer_task_id, get_status_xcom_key(self.model_unique_id))
         if xcom_val is None:
             return None
         self._outlet_uris = xcom_val.get("outlet_uris", [])
@@ -599,9 +604,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
     def _cache_compiled_sql(self, ti: Any, context: Context) -> None:
         """Pull compiled_sql from XCom and cache it on the sensor instance."""
-        compiled_sql = get_xcom_val(
-            ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
-        )
+        compiled_sql = get_xcom_val(ti, self.producer_task_id, get_compiled_sql_xcom_key(self.model_unique_id))
         if compiled_sql:
             self.compiled_sql = compiled_sql
             if hasattr(self, "_override_rtif"):
@@ -654,10 +657,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         ti = context["ti"]
         try_number = ti.try_number
 
-        if self.is_test_sensor:
-            xcom_key = get_tests_status_xcom_key(self.model_unique_id)
-        else:
-            xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
+        xcom_key = (
+            get_tests_status_xcom_key(self.model_unique_id)
+            if self.is_test_sensor
+            else get_status_xcom_key(self.model_unique_id)
+        )
         logger.info(
             "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' via XCom key '%s' for %s '%s'",
             try_number,
@@ -685,7 +689,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         dbt_events = get_xcom_val(
             task_instance=context["ti"],
-            key=f"{self.model_unique_id.replace('.', '__')}_dbt_event",
+            key=get_dbt_event_xcom_key(self.model_unique_id),
             task_ids=self.producer_task_id,
         )
         _log_dbt_event(dbt_events)

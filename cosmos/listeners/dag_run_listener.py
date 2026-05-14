@@ -80,7 +80,7 @@ def get_cosmos_telemetry_metadata(dag: DAG) -> dict[str, Any]:
     try:
         return _decompress_telemetry_metadata(compressed_metadata)
     except (binascii.Error, zlib.error, json.JSONDecodeError, UnicodeDecodeError) as e:
-        logger.warning(f"Failed to decompress telemetry metadata: {type(e).__name__}: {e}")
+        logger.warning("Failed to decompress telemetry metadata: %s: %s", type(e).__name__, e)
         return {}
 
 

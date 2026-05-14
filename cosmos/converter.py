@@ -338,7 +338,12 @@ class DbtToAirflowConverter:
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
         logger.info(
-            f"Cosmos performance ({cache_identifier}) -  [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to parse the dbt project for DAG using {self.dbt_graph.load_method}"
+            "Cosmos performance (%s) - [%s|%s]: It took %.3gs to parse the dbt project for DAG using %s",
+            cache_identifier,
+            platform.node(),
+            os.getpid(),
+            elapsed_time,
+            self.dbt_graph.load_method,
         )
         previous_time = current_time
 
@@ -385,7 +390,11 @@ class DbtToAirflowConverter:
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
         logger.info(
-            f"Cosmos performance ({cache_identifier}) - [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to build the Airflow DAG."
+            "Cosmos performance (%s) - [%s|%s]: It took %.3gs to build the Airflow DAG.",
+            cache_identifier,
+            platform.node(),
+            os.getpid(),
+            elapsed_time,
         )
         logger.info("::endgroup::Cosmos DAG parsing logs")
 
@@ -414,9 +423,9 @@ class DbtToAirflowConverter:
             else:
                 dag.doc_md = f"**dbt project hash:** `{dbt_project_hash}`"
 
-            logger.debug(f"Appended dbt project hash {dbt_project_hash} to DAG {dag.dag_id} documentation")
+            logger.debug("Appended dbt project hash %s to DAG %s documentation", dbt_project_hash, dag.dag_id)
         except Exception as e:
-            logger.warning(f"Failed to append dbt project hash to DAG documentation: {e}")
+            logger.warning("Failed to append dbt project hash to DAG documentation: %s", e)
 
     def _store_cosmos_telemetry_metadata_on_dag(  # noqa: C901
         self,
@@ -480,9 +489,12 @@ class DbtToAirflowConverter:
             )
             stored_metadata = True
         except ParamValidationError as e:
-            logger.warning(f"Failed to store compressed Cosmos telemetry metadata in DAG {dag.dag_id} params: {e}")
+            logger.warning("Failed to store compressed Cosmos telemetry metadata in DAG %s params: %s", dag.dag_id, e)
 
         if stored_metadata:
             logger.debug(
-                f"Stored compressed Cosmos telemetry metadata in DAG {dag.dag_id} params (original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
+                "Stored compressed Cosmos telemetry metadata in DAG %s params (original size: %s bytes, compressed: %s bytes)",
+                dag.dag_id,
+                len(str(metadata)),
+                len(compressed_metadata),
             )

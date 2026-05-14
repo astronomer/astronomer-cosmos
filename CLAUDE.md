@@ -44,6 +44,18 @@ hatch run docs:serve-no-reload    # static build served on http://127.0.0.1:8000
 
 Always run `hatch run docs:build` before committing any change that touches `docs/`, and verify the build succeeds without warnings or errors.
 
+### Documentation Style
+
+When writing or editing files under `docs/`, follow the Cosmos lightweight style rules in this section:
+
+- **Heading underlines** use this canonical hierarchy per file: page title `=`, H1 `~`, H2 `+`, H3 `^`. The remap is positional per file (first level encountered becomes `=`, second `~`, etc.). Underline length must be at least the title's UTF-8 byte length.
+- **Headings** use sentence case (e.g., "Choose an execution mode"), not Title Case.
+- **Bullet points** use `-`, not `*` or `+`.
+- **Decorative separator lines** (e.g., `-----` or `=====` not attached to a heading) should not be added.
+- **DAG identifier** stays uppercase in code identifiers (`DAG` class, `DAG_FOLDER`, `AIRFLOW__DAG_*`) and in log-line samples that must match the code output (e.g., the `cosmos/converter.py` log message "for DAG using ...").
+- A subset of these rules is enforced by `scripts/check_docs_style.py` in pre-commit.
+- Per-profile pages under `docs/reference/profiles/` are auto-generated from `docs/reference/templates/profile_mapping.rst.jinja2` by `docs/generate_mappings.py` at Sphinx build time. The generated `.rst` files are gitignored. Edit the template, not the generated files.
+
 ### Linting and Formatting
 
 Pre-commit runs the configured linters/formatters (e.g., Black (formatter), Ruff (linter), mypy, codespell). See `.pre-commit-config.yaml` for the full list:
@@ -87,6 +99,41 @@ Follow the [seven rules of a great Git commit message](https://cbea.ms/git-commi
 7. Use the body to explain *what* and *why*, not *how*
 
 Do not use Conventional Commits type prefixes (`feat:`, `fix:`, `chore:`, etc.).
+
+## Python Coding Standards
+
+### Logging
+
+Get loggers via `cosmos.log.get_logger`, not the stdlib `logging` module. This adds the `(astronomer-cosmos)` prefix when `rich_logging` is enabled and respects scoped log-level configuration.
+
+Yes:
+```python
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
+```
+
+No:
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+logging.error(...)  # never call the root logger directly either
+```
+
+Use **lazy logging**: pass the format string and arguments separately. Do not embed f-strings, `.format()`, or `%` interpolation in log messages — the logger formats them only when the record passes the level filter.
+
+Yes:
+```python
+logger.info("Parsed %s nodes in %.3gs", node_count, elapsed)
+```
+
+No:
+```python
+logger.info(f"Parsed {node_count} nodes in {elapsed:.3g}s")
+```
+
+Applies to every `logger.{debug,info,warning,error,exception}` call. f-strings are fine everywhere else (exception messages, return values, etc.).
 
 ## Architecture
 

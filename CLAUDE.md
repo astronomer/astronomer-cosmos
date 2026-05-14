@@ -100,6 +100,24 @@ Follow the [seven rules of a great Git commit message](https://cbea.ms/git-commi
 
 Do not use Conventional Commits type prefixes (`feat:`, `fix:`, `chore:`, etc.).
 
+## Python Coding Standards
+
+### Logging
+
+Use **lazy logging**: pass the format string and arguments separately. Do not embed f-strings, `.format()`, or `%` interpolation in log messages — the logger formats them only when the record passes the level filter.
+
+Yes:
+```python
+logger.info("Parsed %s nodes in %.3gs", node_count, elapsed)
+```
+
+No:
+```python
+logger.info(f"Parsed {node_count} nodes in {elapsed:.3g}s")
+```
+
+Applies to every `logger.{debug,info,warning,error,exception}` call. f-strings are fine everywhere else (exception messages, return values, etc.).
+
 ## Architecture
 
 ### Core Flow

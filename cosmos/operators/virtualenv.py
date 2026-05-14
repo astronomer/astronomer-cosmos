@@ -19,7 +19,6 @@ from cosmos import settings
 from cosmos.constants import InvocationMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-from cosmos.log import get_logger
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
     DbtCloneLocalOperator,
@@ -43,7 +42,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 PY_INTERPRETER = "python3"
 LOCK_FILENAME = "cosmos_virtualenv.lock"
-logger = get_logger(__name__)
 
 
 def depends_on_virtualenv_dir(method: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -130,7 +128,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         try:
             self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
             while not self._is_lock_available() and self.max_retries_lock:
-                logger.info("Waiting for virtualenv lock to be released")
+                self.log.info("Waiting for virtualenv lock to be released")
                 time.sleep(1)
                 self.max_retries_lock -= 1
 

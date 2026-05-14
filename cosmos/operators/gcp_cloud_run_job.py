@@ -11,7 +11,6 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos.config import ProfileConfig
-from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBase,
     DbtBuildMixin,
@@ -24,8 +23,6 @@ from cosmos.operators.base import (
     DbtSourceMixin,
     DbtTestMixin,
 )
-
-logger = get_logger(__name__)
 
 DEFAULT_ENVIRONMENT_VARIABLES: dict[str, str] = {}
 
@@ -129,7 +126,7 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
         self.build_command(context, cmd_flags)
         self.log.info(f"Running command: {self.command}")
         result = CloudRunExecuteJobOperator.execute(self, context)
-        logger.info(result)
+        self.log.info("%s", result)
 
     def build_command(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         # For the first round, we're going to assume that the command is dbt

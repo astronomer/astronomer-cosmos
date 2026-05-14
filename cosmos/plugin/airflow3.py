@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import html
 import json
-import logging
 import os
 import os.path as op
 from collections.abc import Generator
@@ -26,8 +25,11 @@ from packaging.version import Version
 from cosmos import telemetry
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
 from cosmos.listeners import dag_run_listener, task_instance_listener
+from cosmos.log import get_logger
 from cosmos.plugin.snippets import IFRAME_SCRIPT
 from cosmos.plugin.storage import get_storage_type_from_path
+
+logger = get_logger(__name__)
 
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
 # Note: We compute AIRFLOW_VERSION locally here (not from constants) so that tests can patch airflow.__version__ and reload this module
@@ -111,7 +113,7 @@ def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
         try:
             parsed = json.loads(projects_raw)
         except json.JSONDecodeError:
-            logging.exception("Invalid JSON in [cosmos] dbt_docs_projects: %s", projects_raw)
+            logger.exception("Invalid JSON in [cosmos] dbt_docs_projects: %s", projects_raw)
             raise
 
         if isinstance(parsed, dict):
@@ -193,7 +195,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     status_code=404,
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError):
-                logging.exception(
+                logger.exception(
                     f"Cosmos dbt docs error: index read failed for slug={slug_alias}, path={op.join(docs_dir_local, index_local)}, conn_id={conn_id_local}"
                 )
                 return HTMLResponse(
@@ -226,7 +228,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     status_code=404,
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError) as e:
-                logging.exception(
+                logger.exception(
                     f"Error reading manifest for slug '{slug_alias}', path '{op.join(docs_dir_local, 'manifest.json')}', conn_id '{conn_id_local}': {e}"
                 )
                 return JSONResponse(
@@ -260,7 +262,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     status_code=404,
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError) as e:
-                logging.exception(
+                logger.exception(
                     f"Error reading catalog for slug '{slug_alias}', path '{op.join(docs_dir_local, 'catalog.json')}', conn_id '{conn_id_local}': {e}"
                 )
                 return JSONResponse(

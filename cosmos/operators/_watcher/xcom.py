@@ -53,9 +53,27 @@ def _sanitize_key_component(value: str) -> str:
 
 
 def _get_task_group_id(ti: Any) -> str | None:
-    """Extract the task_group_id from a task instance, if available."""
+    """Extract the enclosing task group's id from a task instance, if available.
+
+    Airflow operators expose the parent group via ``task.task_group``, and
+    ``TaskGroup.group_id`` is the canonical identifier on both Airflow 2 and
+    Airflow 3. Direct attribute access is intentional: a previous version of
+    this helper read ``task.task_group_id`` (an attribute that does not exist
+    on operators) via ``getattr`` with a ``None`` default, silently dropping
+    the task-group segment from the XCom backup Variable key and causing every
+    watcher producer in the same DAG run to share one key. See
+    https://github.com/astronomer/astronomer-cosmos/issues/2625.
+    """
     task = getattr(ti, "task", None)
-    return getattr(task, "task_group_id", None) if task else None
+    if task is None:
+        return None
+    # ``task.task_group`` is part of every Airflow operator's contract (it is
+    # ``None`` for root-level tasks, a ``TaskGroup`` otherwise). Using direct
+    # attribute access here means a future rename or typo raises
+    # ``AttributeError`` at first invocation rather than silently degrading to
+    # the colliding-key behaviour we just fixed.
+    task_group = task.task_group
+    return task_group.group_id if task_group is not None else None
 
 
 def _init_xcom_backup(context: Any) -> None:

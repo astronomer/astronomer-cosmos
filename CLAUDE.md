@@ -104,6 +104,23 @@ Do not use Conventional Commits type prefixes (`feat:`, `fix:`, `chore:`, etc.).
 
 ### Logging
 
+Get loggers via `cosmos.log.get_logger`, not the stdlib `logging` module. This adds the `(astronomer-cosmos)` prefix when `rich_logging` is enabled and respects scoped log-level configuration.
+
+Yes:
+```python
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
+```
+
+No:
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+logging.error(...)  # never call the root logger directly either
+```
+
 Use **lazy logging**: pass the format string and arguments separately. Do not embed f-strings, `.format()`, or `%` interpolation in log messages — the logger formats them only when the record passes the level filter.
 
 Yes:

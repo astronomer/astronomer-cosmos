@@ -2181,6 +2181,38 @@ class TestSelectExcludeAsStringsInOperators:
         assert metadata.arguments["exclude"] is None
         assert metadata.arguments["selector"] is None
 
+    def test_create_test_task_metadata_after_all_adds_store_failures(self):
+        """AFTER_ALL test tasks should pass --store-failures to dbt test."""
+        render_config = RenderConfig(
+            test_behavior=TestBehavior.AFTER_ALL,
+        )
+        metadata = create_test_task_metadata(
+            test_task_name="test_all",
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={"project_dir": SAMPLE_PROJ_PATH},
+            render_config=render_config,
+        )
+
+        assert metadata.arguments["dbt_cmd_flags"] == ["--store-failures"]
+
+    def test_create_test_task_metadata_after_all_preserves_existing_dbt_cmd_flags(self):
+        """AFTER_ALL should append --store-failures without dropping caller-supplied dbt flags."""
+        render_config = RenderConfig(
+            test_behavior=TestBehavior.AFTER_ALL,
+        )
+        existing_flags = ["--full-refresh"]
+        metadata = create_test_task_metadata(
+            test_task_name="test_all",
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={"project_dir": SAMPLE_PROJ_PATH, "dbt_cmd_flags": existing_flags},
+            render_config=render_config,
+        )
+
+        assert metadata.arguments["dbt_cmd_flags"] == ["--full-refresh", "--store-failures"]
+        assert existing_flags == ["--full-refresh"]
+
 
 @pytest.mark.parametrize(
     "source_rendering_behavior, expected_flag",

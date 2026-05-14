@@ -217,6 +217,11 @@ def create_test_task_metadata(
         task_args["selector"] = render_config.selector
         task_args["exclude"] = _convert_list_to_str(render_config.exclude)
 
+        dbt_cmd_flags = list(task_args.get("dbt_cmd_flags") or [])
+        if render_config.test_behavior == TestBehavior.AFTER_ALL and "--store-failures" not in dbt_cmd_flags:
+            dbt_cmd_flags.append("--store-failures")
+            task_args["dbt_cmd_flags"] = dbt_cmd_flags
+
     if node:
         exclude_detached_tests_if_needed(node, task_args, detached_from_parent)
         _override_profile_if_needed(task_args, node.profile_config_to_override)

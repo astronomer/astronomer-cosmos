@@ -11,6 +11,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from cosmos import settings
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
+    _DATASET_EMITTING_RESOURCE_TYPES,
     _DBT_STARTUP_EVENTS_XCOM_KEY,
     AIRFLOW_VERSION,
     CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
@@ -320,7 +321,7 @@ def store_dbt_resource_status_from_log(
                 # Lazily populate per-model outlet URIs from the manifest, but only for
                 # resource types that can emit datasets (models/seeds/snapshots).
                 outlet_uris: list[str] = []
-                if dbt_node_resource_type in {"model", "seed", "snapshot"}:
+                if dbt_node_resource_type in _DATASET_EMITTING_RESOURCE_TYPES:
                     project_dir = extra_kwargs.get("project_dir")
                     _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
                     outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []

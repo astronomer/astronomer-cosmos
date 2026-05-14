@@ -168,7 +168,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.clean_dir_if_temporary()
 
     def _prepare_virtualenv(self) -> Any:
-        self.log.info("Creating or updating the virtualenv at `%s", self.virtualenv_dir)
+        self.log.info("Creating or updating the virtualenv at `%s`", self.virtualenv_dir)
         py_bin = prepare_virtualenv(
             venv_directory=str(self.virtualenv_dir),
             python_bin=PY_INTERPRETER,

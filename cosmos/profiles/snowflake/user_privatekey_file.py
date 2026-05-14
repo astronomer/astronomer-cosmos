@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
+from cosmos.log import get_logger
 from cosmos.profiles.snowflake.base import SnowflakeBaseProfileMapping
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SnowflakePrivateKeyFilePemProfileMapping(SnowflakeBaseProfileMapping):

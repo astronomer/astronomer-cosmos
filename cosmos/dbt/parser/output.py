@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import re
 from typing import TYPE_CHECKING
 
@@ -11,6 +10,9 @@ if TYPE_CHECKING:
 
 from cosmos import __version__ as cosmos_version  # type: ignore[attr-defined]
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
@@ -37,7 +39,7 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
         try:
             num = int(output.split(f"{DBT_WARN_MSG}=")[1].split()[0])
         except ValueError:
-            logging.error(
+            logger.error(
                 f"Could not parse number of {DBT_WARN_MSG}s. Check your dbt/airflow version or if --quiet is not being used"
             )
     return num

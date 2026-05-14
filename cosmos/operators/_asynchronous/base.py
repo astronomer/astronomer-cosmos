@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from cosmos._utils.importer import load_method_from_module
@@ -8,8 +7,6 @@ from cosmos.airflow.graph import _snake_case_to_camelcase
 from cosmos.config import ProfileConfig
 from cosmos.constants import ExecutionMode
 from cosmos.operators.local import DbtRunLocalOperator
-
-log = logging.getLogger(__name__)
 
 
 def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:

@@ -12,6 +12,9 @@ import pytest
 
 from cosmos.operators._watcher.state import (
     _log_dbt_event,
+    get_compiled_sql_xcom_key,
+    get_dbt_event_xcom_key,
+    get_status_xcom_key,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
@@ -63,6 +66,32 @@ class TestNodeStatusHelpers:
     @pytest.mark.parametrize("status", ["running", None, ""])
     def test_is_dbt_node_status_terminal_false(self, status: str | None):
         assert is_dbt_node_status_terminal(status) is False
+
+
+class TestXcomKeyHelpers:
+    """Tests for the watcher XCom-key builder helpers."""
+
+    @pytest.mark.parametrize(
+        "helper,suffix",
+        [
+            (get_status_xcom_key, "_status"),
+            (get_dbt_event_xcom_key, "_dbt_event"),
+            (get_compiled_sql_xcom_key, "_compiled_sql"),
+        ],
+    )
+    def test_replaces_dots_and_appends_suffix(self, helper, suffix):
+        assert helper("model.my_project.my_model") == f"model__my_project__my_model{suffix}"
+
+    @pytest.mark.parametrize(
+        "helper,suffix",
+        [
+            (get_status_xcom_key, "_status"),
+            (get_dbt_event_xcom_key, "_dbt_event"),
+            (get_compiled_sql_xcom_key, "_compiled_sql"),
+        ],
+    )
+    def test_unique_id_without_dots(self, helper, suffix):
+        assert helper("plain_id") == f"plain_id{suffix}"
 
 
 class TestProducerTaskTerminated:

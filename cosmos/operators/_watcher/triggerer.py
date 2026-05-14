@@ -15,6 +15,9 @@ from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
     _log_dbt_event,
     build_producer_state_fetcher,
+    get_compiled_sql_xcom_key,
+    get_dbt_event_xcom_key,
+    get_status_xcom_key,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
@@ -124,8 +127,7 @@ class WatcherTrigger(BaseTrigger):
         The XCom value is always a dict with ``status`` and ``outlet_uris`` keys.
         Stores outlet URIs on ``self._outlet_uris`` for later dataset emission.
         """
-        status_key = f"{self.model_unique_id.replace('.', '__')}_status"
-        xcom_val = await self.get_xcom_val(status_key)
+        xcom_val = await self.get_xcom_val(get_status_xcom_key(self.model_unique_id))
         if xcom_val is None:
             return None
         self._outlet_uris = xcom_val.get("outlet_uris", [])
@@ -148,14 +150,13 @@ class WatcherTrigger(BaseTrigger):
         if self.is_test_sensor:
             from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key
 
-            status_key = get_tests_status_xcom_key(self.model_unique_id)
-            status = await self.get_xcom_val(status_key)
+            status = await self.get_xcom_val(get_tests_status_xcom_key(self.model_unique_id))
             return status, None
 
-        compiled_sql_key = f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
-
         status = await self._get_node_status()
-        compiled_sql = await self.get_xcom_val(compiled_sql_key) if status is not None else None
+        compiled_sql = (
+            await self.get_xcom_val(get_compiled_sql_xcom_key(self.model_unique_id)) if status is not None else None
+        )
         return status, compiled_sql
 
     async def _get_producer_task_status(self) -> str | None:
@@ -228,7 +229,7 @@ class WatcherTrigger(BaseTrigger):
 
         while True:
             producer_task_state = await self._get_producer_task_status()
-            dbt_log_event = await self.get_xcom_val(f"{self.model_unique_id.replace('.', '__')}_dbt_event")
+            dbt_log_event = await self.get_xcom_val(get_dbt_event_xcom_key(self.model_unique_id))
             _log_dbt_event(dbt_log_event)
             dbt_node_status, compiled_sql = await self._parse_dbt_node_status_and_compiled_sql()
             if is_dbt_node_status_success(dbt_node_status):

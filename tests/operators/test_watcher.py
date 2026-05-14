@@ -48,6 +48,9 @@ ALTERED_JAFFLE_SHOP_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/a
 DBT_WATCHER_DOWNSTREAM_NOT_SKIPPED_PATH = (
     Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_downstream_not_skipped"
 )
+DBT_WATCHER_UPSTREAM_FAILURE_RECOVERY_PATH = (
+    Path(__file__).parent.parent.parent / "dev/dags/dbt/watcher_upstream_failure_recovery"
+)
 
 DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess/bin/dbt"
 DBT_PROJECT_WITH_EMPTY_MODEL_PATH = Path(__file__).parent.parent / "sample/dbt_project_with_empty_model"
@@ -81,6 +84,38 @@ class _MockTI:
 
 class _MockContext(dict):
     pass
+
+
+@pytest.fixture
+def reset_fail_once_sequence():
+    """Drop a fail-once Postgres sequence on ``example_conn`` so a watcher
+    retry-recovery integration test starts from a clean state.
+
+    The watcher integration tests use a per-project Postgres sequence
+    (created in the dbt project's ``on-run-start``) plus a model ``pre_hook``
+    that ``nextval``s into it and raises if the value is <= 1. That makes the
+    first run of the flaky model fail and any subsequent run succeed -- the
+    minimal recipe for exercising the consumer-fallback retry path. Each test
+    drops its sequence before running so re-runs and CI parallelism don't
+    leak sequence state.
+    """
+    import psycopg2
+    from airflow.hooks.base import BaseHook
+
+    def _drop(sequence_name: str) -> None:
+        airflow_conn = BaseHook.get_connection("example_conn")
+        with psycopg2.connect(
+            host=airflow_conn.host,
+            port=airflow_conn.port or 5432,
+            dbname=airflow_conn.schema or "postgres",
+            user=airflow_conn.login,
+            password=airflow_conn.password,
+        ) as conn:
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                cur.execute(f"DROP SEQUENCE IF EXISTS public.{sequence_name}")
+
+    return _drop
 
 
 def test_dbt_producer_watcher_operator_priority_weight_default():
@@ -2074,14 +2109,12 @@ def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
     ),
 )
 @pytest.mark.integration
-def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog):
+def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, reset_fail_once_sequence):
     """
     Verify that the dbt_producer_watcher_done gateway task prevents the producer's skip
     from propagating to tasks downstream of the DbtTaskGroup.
     """
-    import psycopg2
     from airflow import DAG
-    from airflow.hooks.base import BaseHook
 
     from cosmos import DbtTaskGroup
 
@@ -2090,18 +2123,7 @@ def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog):
     except ImportError:
         from airflow.operators.empty import EmptyOperator
 
-    # Reset the fail_once sequence using credentials from the same Airflow connection
-    airflow_conn = BaseHook.get_connection("example_conn")
-    with psycopg2.connect(
-        host=airflow_conn.host,
-        port=airflow_conn.port or 5432,
-        dbname=airflow_conn.schema or "postgres",
-        user=airflow_conn.login,
-        password=airflow_conn.password,
-    ) as conn:
-        conn.autocommit = True
-        with conn.cursor() as cur:
-            cur.execute("DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq")
+    reset_fail_once_sequence("_cosmos_fail_once_seq")
 
     caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
 
@@ -2140,6 +2162,110 @@ def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog):
     # The gateway task absorbs the producer skip — post_dbt runs successfully
     assert tis["post_dbt"].state == "success"
     assert tis["watcher_downstream_not_skipped.dbt_producer_watcher_done"].state == "success"
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    reason=(
+        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
+        "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
+        "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
+        "the watcher sensor cannot detect producer termination on retry. "
+        "Airflow 3.1.x crashes during task finalization (SetRenderedFields) when retrying "
+        "tasks inside a DbtTaskGroup via dag.test()."
+    ),
+)
+@pytest.mark.integration
+def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_fail_once_sequence):
+    """Regression for BOSS-401 / Linear customer issue.
+
+    When a dbt model fails on the producer's first attempt, dbt emits
+    ``SkippingDetails`` (and/or ``LogSkipBecauseError`` for ephemeral upstreams)
+    plus a later ``NodeFinished`` event with ``node_status="skipped"`` for each
+    downstream node. Before the fix that "skipped" status went straight to XCom,
+    the consumer sensor raised ``AirflowSkipException``, and the task ended
+    SKIPPED. Airflow does not retry SKIPPED tasks, so even after the failing
+    upstream recovered on its own consumer retry, the downstream model was never
+    re-run -- the DAG ended in a "false green" outcome with un-materialized
+    downstream tables.
+
+    The fix (``store_dbt_resource_status_from_log`` in
+    ``cosmos/operators/_watcher/base.py``) tracks unique_ids that dbt skipped
+    due to upstream-node failure (the only path that fires
+    ``SkippingDetails``/``LogSkipBecauseError``, since both come from
+    ``on_skip()`` which is only reached via ``do_skip(cause=...)``). Subsequent
+    "skipped" terminal events for those unique_ids are rewritten to "failed" so
+    the consumer fails on attempt 1, Airflow retries it, and the existing
+    ``_fallback_to_non_watcher_run`` path runs the model locally once its
+    upstream has recovered.
+    """
+    from airflow import DAG
+
+    from cosmos import DbtTaskGroup
+
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator
+
+    reset_fail_once_sequence("_cosmos_recovery_fail_once_seq")
+
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
+
+    with DAG(
+        dag_id="watcher_upstream_failure_recovery_test",
+        start_date=datetime(2023, 1, 1),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        dagrun_timeout=timedelta(seconds=180),
+    ) as dag:
+        dbt_group = DbtTaskGroup(
+            group_id="watcher_upstream_failure_recovery",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_UPSTREAM_FAILURE_RECOVERY_PATH),
+            profile_config=profile_config,
+            render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=180)},
+        )
+
+        # Force gateway >> root consumers so dag.test() respects execution order
+        # (see test_dbt_task_group_watcher_gateway_prevents_downstream_skip for the
+        # apache/airflow#56723 context).
+        gateway = dag.task_dict["watcher_upstream_failure_recovery.dbt_producer_watcher_done"]
+        for root_task in dbt_group.get_roots():
+            if root_task.task_id.endswith("_done") or root_task.task_id.endswith("dbt_producer_watcher"):
+                continue
+            gateway >> root_task
+
+        post_dbt = EmptyOperator(task_id="post_dbt")
+        dbt_group >> post_dbt
+
+    outcome = new_test_dag(dag, expected_dag_state=DagRunState.SUCCESS)
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+
+    # Core BOSS-401 assertion: model_downstream must end SUCCESS, not SKIPPED.
+    downstream_ti = tis["watcher_upstream_failure_recovery.model_downstream_run"]
+    assert downstream_ti.state == "success", (
+        f"model_downstream_run ended in '{downstream_ti.state}' -- expected 'success'. "
+        "Before the BOSS-401 fix, dbt's 'skipped' status for upstream-failure skips "
+        "was pushed to XCom unchanged, the consumer sensor raised AirflowSkipException, "
+        "and Airflow did not retry the SKIPPED task even after the upstream model "
+        "recovered on its own consumer retry."
+    )
+    # Proves the consumer fallback retry actually fired -- guards against a future
+    # refactor that happens to leave the task in 'success' for a different reason.
+    assert downstream_ti.try_number > 1, (
+        f"model_downstream_run succeeded on its first try (try_number={downstream_ti.try_number}); "
+        "the test setup is no longer exercising the retry-after-failure path."
+    )
+
+    # The flaky upstream itself also recovers via the consumer-retry fallback.
+    assert tis["watcher_upstream_failure_recovery.model_flaky_run"].state == "success"
+    assert tis["watcher_upstream_failure_recovery.model_a_run"].state == "success"
+
+    # Producer/gateway/post_dbt sanity (matches the gateway-prevents-skip test).
+    assert tis["watcher_upstream_failure_recovery.dbt_producer_watcher_done"].state == "success"
+    assert tis["post_dbt"].state == "success"
 
 
 def test_dbt_source_watcher_operator_template_fields():

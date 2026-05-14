@@ -306,7 +306,9 @@ def _calculate_yaml_selectors_cache_current_version(
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
-        f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
+        "Cosmos performance: time to calculate cache identifier %s for current version: %s",
+        cache_identifier,
+        elapsed_time,
     )
     return f"{dbt_project_hash},{yaml_selector_hash},{cache_key_hash}"
 
@@ -331,7 +333,9 @@ def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: 
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
-        f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
+        "Cosmos performance: time to calculate cache identifier %s for current version: %s",
+        cache_identifier,
+        elapsed_time,
     )
     return f"{dbt_project_hash},{hash_args}"
 
@@ -406,7 +410,7 @@ def delete_unused_dbt_cache(
     if session is None:
         return 0
 
-    logger.info(f"Delete the Cosmos cache stored in Airflow Variables that hasn't been used for  {max_age_last_usage}")
+    logger.info("Delete the Cosmos cache stored in Airflow Variables that hasn't been used for %s", max_age_last_usage)
     cosmos_dags_ids = defaultdict(list)
     all_variables = session.scalars(select(Variable)).all()
     total_cosmos_variables = 0
@@ -431,12 +435,14 @@ def delete_unused_dbt_cache(
         )
         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
             for var_key in vars_keys:
-                logger.info(f"Removing the {cache_type} cache {var_key}")
+                logger.info("Removing the %s cache %s", cache_type, var_key)
                 Variable.delete(var_key)
                 deleted_cosmos_variables += 1
 
     logger.info(
-        f"Deleted {deleted_cosmos_variables}/{total_cosmos_variables} Airflow Variables used to store  Cosmos cache. "
+        "Deleted %s/%s Airflow Variables used to store Cosmos cache.",
+        deleted_cosmos_variables,
+        total_cosmos_variables,
     )
     return deleted_cosmos_variables
 
@@ -460,13 +466,14 @@ def delete_unused_dbt_remote_cache_files(  # pragma: no cover
     if session is None:
         return 0
 
-    logger.info(f"Delete the Cosmos cache stored remotely that hasn't been used for  {max_age_last_usage}")
+    logger.info("Delete the Cosmos cache stored remotely that hasn't been used for %s", max_age_last_usage)
     cosmos_dags_ids_remote_cache_files = defaultdict(list)
 
     configured_remote_cache_dir = _configure_remote_cache_dir()
     if not configured_remote_cache_dir:
         logger.info(
-            f"No remote cache directory configured. Skipping the deletion of the {cache_type} cache files in remote storage."
+            "No remote cache directory configured. Skipping the deletion of the %s cache files in remote storage.",
+            cache_type,
         )
         return 0
 
@@ -495,7 +502,7 @@ def delete_unused_dbt_remote_cache_files(  # pragma: no cover
         )
         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
             for file in files:
-                logger.info(f"Removing the {cache_type} cache remote file {file}")
+                logger.info("Removing the %s cache remote file %s", cache_type, file)
                 file.unlink()
                 deleted_cosmos_remote_cache_files += 1
     logger.info(

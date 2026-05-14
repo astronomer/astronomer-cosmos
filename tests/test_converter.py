@@ -1162,9 +1162,9 @@ def test_dag_versioning_hash_error_handling(mock_load_dbt_graph, mock_hash_func,
 
     # Error should be logged as warning
     mock_logger.warning.assert_called_once()
-    warning_call = mock_logger.warning.call_args[0][0]
-    assert "Failed to append dbt project hash to DAG documentation" in warning_call
-    assert "File system error" in warning_call
+    warning_args = mock_logger.warning.call_args[0]
+    assert "Failed to append dbt project hash to DAG documentation" in warning_args[0]
+    assert "File system error" in str(warning_args[1])
 
 
 @skipif_airflow_lt_3_dag_doc_hash
@@ -1220,7 +1220,7 @@ def test_dag_versioning_successful_logging(mock_load_dbt_graph, mock_hash_func, 
     )
 
     # Check that the hash logging call was made (there are multiple debug calls now)
-    debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
+    debug_calls = [call.args[0] % call.args[1:] for call in mock_logger.debug.call_args_list if call.args]
     assert any(
         "Appended dbt project hash test_hash_123 to DAG test_dag_logging documentation" in call for call in debug_calls
     )

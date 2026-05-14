@@ -187,7 +187,9 @@ class TestTaskInstanceMutationHook:
         task_instance_mutation_hook(task_instance)
 
         mock_log.info.assert_called_once_with(
-            "Setting task my_test_task to use watcher dbt execution queue: custom_retry_queue",
+            "Setting task %s to use watcher dbt execution queue: %s",
+            "my_test_task",
+            "custom_retry_queue",
         )
 
     @patch("cosmos.settings.watcher_dbt_execution_queue", "custom_retry_queue")

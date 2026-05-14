@@ -37,7 +37,7 @@ def has_non_empty_dependencies_file(project_path: Path) -> bool:
         if filepath.exists() and filepath.stat().st_size > 0:
             return True
 
-    logger.info(f"Project {project_path} does not have {DBT_DEPENDENCIES_FILE_NAMES}")
+    logger.info("Project %s does not have %s", project_path, DBT_DEPENDENCIES_FILE_NAMES)
     return False
 
 
@@ -83,7 +83,7 @@ def get_dbt_packages_subpath(source_folder: Path) -> str:
             try:
                 dbt_project_file_content = yaml.safe_load(fp)
             except yaml.YAMLError:
-                logger.info(f"Unable to read the {DBT_PROJECT_FILENAME} file")
+                logger.info("Unable to read the %s file", DBT_PROJECT_FILENAME)
             else:
                 if isinstance(dbt_project_file_content, dict):
                     subpath = dbt_project_file_content.get("packages-install-path", DBT_DEFAULT_PACKAGES_FOLDER)
@@ -126,7 +126,7 @@ def copy_manifest_file_if_exists(source_manifest: str | Path, dbt_project_folder
     dbt_project_folder = Path(dbt_project_folder)
     source_manifest = str(source_manifest)
     if source_manifest and Path(source_manifest).exists():
-        logger.info(f"Copying the manifest from {source_manifest}...")
+        logger.info("Copying the manifest from %s...", source_manifest)
         target_folder_path = dbt_project_folder / DBT_TARGET_DIR_NAME
         tmp_manifest_filepath = target_folder_path / DBT_MANIFEST_FILE_NAME
         Path(target_folder_path).mkdir(parents=True, exist_ok=True)

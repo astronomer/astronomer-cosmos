@@ -574,7 +574,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         if settings.enable_uri_xcom and (uris := [outlet.uri for outlet in outlets]):
             context["ti"].xcom_push(key="uri", value=uris)
-            logger.info(f"Pushed outlet URI(s) to XCom: {uris}")
+            logger.info("Pushed outlet URI(s) to XCom: %s", uris)
 
     def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:

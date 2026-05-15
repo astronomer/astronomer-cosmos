@@ -659,7 +659,7 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
             try_number,
         )
 
-        model_selector = self.model_unique_id.split(".", 2)[2]
+        model_selector = get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = ["--select", model_selector]
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
         logger.info("dbt test completed successfully for model '%s'", self.model_unique_id)

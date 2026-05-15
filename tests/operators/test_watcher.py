@@ -2590,7 +2590,7 @@ class TestDbtTestWatcherOperator:
         mock_fallback_to_non_watcher_run.assert_called_once()
         sensor.build_and_run_cmd.assert_called_once()
         _, kwargs = sensor.build_and_run_cmd.call_args
-        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".", 2)[2]]
+        assert kwargs["cmd_flags"] == ["--select", get_resource_name_from_unique_id(self.MODEL_UID)]
 
     def test_fallback_via_poke_does_not_forward_producer_flags(self):
         """Driving through ``poke`` on retry, the fallback should issue ``dbt test`` with
@@ -2612,7 +2612,7 @@ class TestDbtTestWatcherOperator:
 
         mock_fallback_to_non_watcher_run.assert_called_once()
         _, kwargs = sensor.build_and_run_cmd.call_args
-        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".", 2)[2]]
+        assert kwargs["cmd_flags"] == ["--select", get_resource_name_from_unique_id(self.MODEL_UID)]
         assert "--full-refresh" not in kwargs["cmd_flags"]
         assert sensor.base_cmd == ["test"]
 

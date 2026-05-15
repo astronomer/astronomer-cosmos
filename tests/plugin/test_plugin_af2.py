@@ -170,6 +170,22 @@ def test_dbt_docs_artifact_missing(app, artifact):
     assert response.status_code == 404
 
 
+@pytest.mark.integration
+@patch.object(cosmos.plugin.airflow2, "open_file")
+def test_dbt_docs_index_404_breaks_out_of_iframe(mock_open_file, monkeypatch, app):
+    # Regression test for https://github.com/astronomer/astronomer-cosmos/issues/1828:
+    # the dbt_docs_index 404 is rendered inside the dbt_docs iframe, so its
+    # "Return to the main page" link must use target="_top" to break out.
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", "path/to/docs/dir")
+    mock_open_file.side_effect = FileNotFoundError
+
+    response = app.get("/cosmos/dbt_docs_index.html")
+
+    assert response.status_code == 404
+    assert 'target="_top"' in response.text
+    assert "Return to the main page" in response.text
+
+
 @pytest.mark.parametrize(
     "path,open_file_callback",
     [

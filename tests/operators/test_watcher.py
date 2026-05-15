@@ -1118,7 +1118,21 @@ class TestDbtConsumerWatcherSensor:
         sensor.build_and_run_cmd.assert_called_once()
         args, kwargs = sensor.build_and_run_cmd.call_args
         assert "--select" in kwargs["cmd_flags"]
-        assert MODEL_UNIQUE_ID.split(".")[-1] in kwargs["cmd_flags"]
+        assert MODEL_UNIQUE_ID.split(".", 2)[2] in kwargs["cmd_flags"]
+
+    def test_fallback_selector_preserves_version_suffix(self):
+        """For versioned dbt models (e.g. ``model.pkg.my_model.v1``) the selector must keep the version suffix."""
+        sensor = self.make_sensor()
+        sensor.model_unique_id = "model.jaffle_shop.stg_orders.v1"
+        ti = MagicMock()
+        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = []
+        context = self.make_context(ti)
+        sensor.build_and_run_cmd = MagicMock()
+
+        sensor._fallback_to_non_watcher_run(2, context)
+
+        kwargs = sensor.build_and_run_cmd.call_args.kwargs
+        assert kwargs["cmd_flags"] == ["--select", "stg_orders.v1"]
 
     def test_filter_flags(self):
         flags = ["--select", "model", "--exclude", "other", "--threads", "2"]

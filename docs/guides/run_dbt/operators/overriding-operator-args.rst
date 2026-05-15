@@ -23,7 +23,7 @@ Users could either use ``operator_args`` or ``default args`` for defining the de
 
 While configuring in the ``dbt_project.yml`` a different behaviour for the model "expensive", that should use the "expensive-pool":
 
-.. code-block::
+.. code-block:: yaml
 
     version: 2
         models:

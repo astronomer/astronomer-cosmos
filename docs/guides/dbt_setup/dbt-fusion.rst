@@ -40,7 +40,7 @@ How to use
 
 1. Install Cosmos 1.11.0a1 alpha
 
-.. code-block::
+.. code-block:: bash
 
     pip install astronomer-cosmos --pre
 
@@ -48,7 +48,7 @@ How to use
 
 End-users should install the dbt Fusion package themselves. An example of how to do this in Astro would be to add the following lines in your ``Dockerfile``:
 
-.. code-block::
+.. code-block:: dockerfile
 
     USER root
     RUN apt install -y curl
@@ -58,13 +58,11 @@ End-users should install the dbt Fusion package themselves. An example of how to
 
 Example:
 
-.. code-block::
+.. code-block:: python
 
     DbtDag(
         ...,
-        execution_config=ExecutionConfig(
-            dbt_executable_path="/home/astro/.local/bin/dbt"
-        )
+        execution_config=ExecutionConfig(dbt_executable_path="/home/astro/.local/bin/dbt"),
     )
 
 

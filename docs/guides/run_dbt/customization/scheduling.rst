@@ -282,7 +282,7 @@ If using cosmos with an Airflow 2.9 or below, users will experience the followin
 
 Example of scheduler logs:
 
-.. code-block::
+.. code-block:: text
 
     scheduler | [2023-09-08T10:18:34.252+0100] {scheduler_job_runner.py:1742} INFO - Orphaning unreferenced dataset 'postgres://0.0.0.0:5432/postgres.public.stg_customers'
     scheduler | [2023-09-08T10:18:34.252+0100] {scheduler_job_runner.py:1742} INFO - Orphaning unreferenced dataset 'postgres://0.0.0.0:5432/postgres.public.stg_payments'
@@ -311,7 +311,7 @@ For users to overcome this limitation in local tests, until the Airflow communit
 ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS``, that is ``True`` by default. If users want to run ``dags test`` and not see ``sqlalchemy.orm.exc.FlushError``,
 they can set this configuration to ``False``. It can also be set in the ``airflow.cfg`` file:
 
-.. code-block::
+.. code-block:: ini
 
     [cosmos]
     enable_dataset_alias = False
@@ -336,7 +336,7 @@ To enable this feature, set the environment variable:
 
 Or in your ``airflow.cfg``:
 
-.. code-block::
+.. code-block:: ini
 
     [cosmos]
     enable_uri_xcom = True

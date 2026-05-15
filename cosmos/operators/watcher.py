@@ -24,6 +24,7 @@ from cosmos.constants import (
 )
 from cosmos.dataset import get_dataset_namespace
 from cosmos.dbt.graph import DbtNode
+from cosmos.dbt.resource import get_resource_name_from_unique_id
 from cosmos.log import get_logger
 from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.base import (
@@ -379,12 +380,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # "error") that a custom freshness_callback may return.  Without exclusion,
         # dbt would run the model anyway and either overwrite the pre-set XCom status
         # or trigger a race condition with the consumer sensor.
-        # Use the same parsing as DbtNode.resource_name: unique_id.split(".", 2)[2]
-        # This preserves version suffixes (e.g. model.pkg.my_model.v1 -> my_model.v1)
         excluded_ids = [uid for uid, state in node_state_pairs if state not in DBT_SUCCESS_STATUSES]
         if not excluded_ids:
             return
-        model_names = sorted({uid.split(".", 2)[2] for uid in excluded_ids if len(uid.split(".", 2)) == 3})
+        model_names = sorted(
+            {get_resource_name_from_unique_id(uid) for uid in excluded_ids if len(uid.split(".", 2)) == 3}
+        )
         exclude_str = " ".join(model_names)
         if exclude_str:
             current_exclude = getattr(self, "exclude", None)
@@ -591,7 +592,7 @@ class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):
             self.model_unique_id,
             self.project_dir,
         )
-        resource_name = self.model_unique_id.split(".", 2)[2]
+        resource_name = get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = ["--select", f"source:{resource_name}"]
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
         logger.info("dbt source freshness completed successfully on retry for source '%s'", self.model_unique_id)

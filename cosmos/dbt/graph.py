@@ -64,6 +64,7 @@ from cosmos.dbt.project import (
     get_partial_parse_path,
     has_non_empty_dependencies_file,
 )
+from cosmos.dbt.resource import get_resource_name_from_unique_id
 from cosmos.dbt.selector import YamlSelectors, select_nodes
 from cosmos.log import get_logger
 
@@ -169,10 +170,10 @@ class DbtNode:
     def resource_name(self) -> str:
         """
         Use this property to retrieve the resource name for command generation, for instance: ["dbt", "run", "--models", f"{resource_name}"].
-        The unique_id format is defined as [<resource_type>.<package>.<resource_name>](https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details).
-        For a special case like a versioned model, the unique_id follows this pattern: [model.<package>.<resource_name>.<version>](https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31)
+        Delegates to :func:`cosmos.dbt.resource.get_resource_name_from_unique_id`, which documents the dbt ``unique_id`` format
+        (including the versioned-model variant ``model.<package>.<resource_name>.<version>``).
         """
-        return self.unique_id.split(".", 2)[2]
+        return get_resource_name_from_unique_id(self.unique_id)
 
     @property
     def name(self) -> str:

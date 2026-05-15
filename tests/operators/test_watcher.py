@@ -26,6 +26,7 @@ from cosmos.constants import (
     ExecutionMode,
     SourceRenderingBehavior,
 )
+from cosmos.dbt.resource import get_resource_name_from_unique_id
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
@@ -1227,7 +1228,7 @@ class TestDbtConsumerWatcherSensor:
         sensor.build_and_run_cmd.assert_called_once()
         args, kwargs = sensor.build_and_run_cmd.call_args
         assert "--select" in kwargs["cmd_flags"]
-        assert MODEL_UNIQUE_ID.split(".", 2)[2] in kwargs["cmd_flags"]
+        assert get_resource_name_from_unique_id(MODEL_UNIQUE_ID) in kwargs["cmd_flags"]
 
     def test_fallback_strips_producer_log_format_by_default(self):
         """Producer's ``--log-format json`` (internal, used for event-stream parsing) must not leak into

@@ -163,4 +163,4 @@ Since Airflow resolves template fields during Airflow DAG execution and not DAG 
 
 Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
 This is provided for telemetry on task execution, and is not an operator arg.
-For more information about this, see the `Compiled SQL <../../cosmos_devex/compiled-sql.html>`_ docs.
+For more information about this, see the :doc:`Compiled SQL </guides/cosmos_devex/compiled-sql>` docs.

@@ -40,30 +40,30 @@ How to use
 
 1. Install Cosmos 1.11.0a1 alpha
 
-.. code-block:: bash
+   .. code-block:: bash
 
-    pip install astronomer-cosmos --pre
+       pip install astronomer-cosmos --pre
 
 2. Install dbt Fusion in your Airflow deployment
 
-End-users should install the dbt Fusion package themselves. An example of how to do this in Astro would be to add the following lines in your ``Dockerfile``:
+   End-users should install the dbt Fusion package themselves. An example of how to do this in Astro would be to add the following lines in your ``Dockerfile``:
 
-.. code-block:: dockerfile
+   .. code-block:: dockerfile
 
-    USER root
-    RUN apt install -y curl
-    RUN curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update
+       USER root
+       RUN apt install -y curl
+       RUN curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update
 
 3. Update your ``DbtDag`` or ``DbtTaskGroup`` to use the dbt Fusion binary
 
-Example:
+   Example:
 
-.. code-block:: python
+   .. code-block:: python
 
-    DbtDag(
-        ...,
-        execution_config=ExecutionConfig(dbt_executable_path="/home/astro/.local/bin/dbt"),
-    )
+       DbtDag(
+           ...,
+           execution_config=ExecutionConfig(dbt_executable_path="/home/astro/.local/bin/dbt"),
+       )
 
 
 Limitations

@@ -405,6 +405,20 @@ class TestConsumerEmitDatasets:
 class TestStoreDbtStatusFromLog:
     """Tests for store_dbt_resource_status_from_log and _process_log_line_callable."""
 
+    @staticmethod
+    def _node_log_line(unique_id: str, node_status: str, event_name: str = "NodeFinished") -> str:
+        return json.dumps(
+            {
+                "info": {"name": event_name},
+                "data": {
+                    "node_info": {
+                        "node_status": node_status,
+                        "unique_id": unique_id,
+                    }
+                },
+            }
+        )
+
     def test_store_dbt_resource_status_from_log_success(self):
         """Test that success status is correctly parsed and stored in XCom."""
         ti = _MockTI()
@@ -426,6 +440,64 @@ class TestStoreDbtStatusFromLog:
         store_dbt_resource_status_from_log(log_line, {"context": ctx}, tests_per_model={}, test_results_per_model={})
 
         assert ti.store.get("model__pkg__failed_model_status") == {"status": "failed", "outlet_uris": []}
+
+    @pytest.mark.parametrize(
+        "first_event_name, second_event_name",
+        [
+            ("SkippingDetails", "NodeFinished"),
+            ("NodeFinished", "SkippingDetails"),
+            ("LogSkipBecauseError", "NodeFinished"),
+            ("NodeFinished", "LogSkipBecauseError"),
+        ],
+    )
+    def test_store_dbt_resource_status_from_log_rewrites_upstream_failure_skips(
+        self, first_event_name, second_event_name
+    ):
+        """Upstream-failure skip events are stored as failed so Airflow can retry the consumer."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        upstream_failure_skipped_ids: set[str] = set()
+
+        store_dbt_resource_status_from_log(
+            self._node_log_line("model.pkg.downstream_model", "skipped", first_event_name),
+            {"context": ctx},
+            tests_per_model={},
+            test_results_per_model={},
+            upstream_failure_skipped_ids=upstream_failure_skipped_ids,
+        )
+        store_dbt_resource_status_from_log(
+            self._node_log_line("model.pkg.downstream_model", "skipped", second_event_name),
+            {"context": ctx},
+            tests_per_model={},
+            test_results_per_model={},
+            upstream_failure_skipped_ids=upstream_failure_skipped_ids,
+        )
+
+        assert upstream_failure_skipped_ids == {"model.pkg.downstream_model"}
+        assert ti.store.get("model__pkg__downstream_model_status") == {"status": "failed", "outlet_uris": []}
+
+    def test_store_dbt_resource_status_from_log_keeps_plain_skips_as_skipped(self):
+        """Plain skips are unchanged, including when no rewrite accumulator is passed."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        upstream_failure_skipped_ids: set[str] = set()
+
+        store_dbt_resource_status_from_log(
+            self._node_log_line("model.pkg.with_accumulator", "skipped"),
+            {"context": ctx},
+            tests_per_model={},
+            test_results_per_model={},
+            upstream_failure_skipped_ids=upstream_failure_skipped_ids,
+        )
+        store_dbt_resource_status_from_log(
+            self._node_log_line("model.pkg.without_accumulator", "skipped", "SkippingDetails"),
+            {"context": ctx},
+            tests_per_model={},
+            test_results_per_model={},
+        )
+
+        assert ti.store.get("model__pkg__with_accumulator_status") == {"status": "skipped", "outlet_uris": []}
+        assert ti.store.get("model__pkg__without_accumulator_status") == {"status": "skipped", "outlet_uris": []}
 
     def test_store_dbt_resource_status_from_log_ignores_other_statuses(self):
         """Test that statuses other than success/failed are ignored."""
@@ -2177,7 +2249,7 @@ def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, reset_f
 )
 @pytest.mark.integration
 def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_fail_once_sequence):
-    """Regression for BOSS-401 / Linear customer issue.
+    """Regression for upstream-failure skips that previously left downstream models skipped (#2698).
 
     When a dbt model fails on the producer's first attempt, dbt emits
     ``SkippingDetails`` (and/or ``LogSkipBecauseError`` for ephemeral upstreams)
@@ -2243,11 +2315,11 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
 
     tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
 
-    # Core BOSS-401 assertion: model_downstream must end SUCCESS, not SKIPPED.
+    # Core #2698 assertion: model_downstream must end SUCCESS, not SKIPPED.
     downstream_ti = tis["watcher_upstream_failure_recovery.model_downstream_run"]
     assert downstream_ti.state == "success", (
         f"model_downstream_run ended in '{downstream_ti.state}' -- expected 'success'. "
-        "Before the BOSS-401 fix, dbt's 'skipped' status for upstream-failure skips "
+        "Before the #2698 fix, dbt's 'skipped' status for upstream-failure skips "
         "was pushed to XCom unchanged, the consumer sensor raised AirflowSkipException, "
         "and Airflow did not retry the SKIPPED task even after the upstream model "
         "recovered on its own consumer retry."

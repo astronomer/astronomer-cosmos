@@ -270,7 +270,7 @@ def _rewrite_upstream_failure_skip_status(
     on upstream-node failure); the second would otherwise overwrite the
     rewritten XCom with the original ``"skipped"``. Tracking affected
     ``unique_id``\\ s in a per-execution set lets the parser rewrite both. See
-    Linear BOSS-401.
+    #2698.
     """
     if not unique_id or upstream_failure_skipped_ids is None:
         return dbt_node_status
@@ -315,7 +315,7 @@ def store_dbt_resource_status_from_log(
         function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event; later
         ``NodeFinished`` events with ``node_status="skipped"`` for these unique_ids
         are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
-        retry it) rather than going SKIPPED. See BOSS-401.
+        retry it) rather than going SKIPPED. See #2698.
     """
     try:
         log_line = json.loads(line)
@@ -337,7 +337,7 @@ def store_dbt_resource_status_from_log(
         unique_id = node_info.get("unique_id")
 
         # Rewrite "skipped" to "failed" when dbt skipped the node because an
-        # upstream node failed (BOSS-401). See _rewrite_upstream_failure_skip_status.
+        # upstream node failed (#2698). See _rewrite_upstream_failure_skip_status.
         dbt_node_status = _rewrite_upstream_failure_skip_status(
             log_line, unique_id, dbt_node_status, upstream_failure_skipped_ids
         )

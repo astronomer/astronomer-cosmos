@@ -201,7 +201,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
         # for those unique_ids are rewritten to "failed" so the consumer sensor
         # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
-        # See BOSS-401.
+        # See #2698.
         self._upstream_failure_skipped_ids: set[str] = set()
 
     def _handle_datasets(self, context: Context) -> None:

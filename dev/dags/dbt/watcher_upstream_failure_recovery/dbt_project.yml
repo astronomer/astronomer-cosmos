@@ -19,7 +19,7 @@ clean-targets:
 require-dbt-version: [">=1.0.0", "<2.0.0"]
 
 # Sequence used by model_flaky.sql to fail on first run and succeed on subsequent
-# runs (see BOSS-401 regression test). Using a project-specific sequence name
+# runs (see #2698 regression test). Using a project-specific sequence name
 # avoids state leaking from / into watcher_downstream_not_skipped, which uses
 # the same fail-once recipe but tests a different invariant.
 on-run-start:

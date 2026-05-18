@@ -1,6 +1,6 @@
 """
 Demonstrate watcher-mode recovery of a downstream model that dbt skipped
-because its upstream failed on the producer's first attempt (BOSS-401).
+because its upstream failed on the producer's first attempt (#2698).
 
 Without the fix in ``cosmos/operators/_watcher/base.py``:
 - A dbt model fails on the first producer attempt.

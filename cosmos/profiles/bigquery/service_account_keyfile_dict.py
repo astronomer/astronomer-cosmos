@@ -13,7 +13,7 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
     """
     Maps Airflow GCP connections to dbt BigQuery profiles if they use a service account keyfile dict/json.
 
-    https://docs.getdbt.com/reference/warehouse-setups/bigquery-setup#service-account-file
+    https://docs.getdbt.com/docs/local/connect-data-platform/bigquery-setup
     https://airflow.apache.org/docs/apache-airflow-providers-google/stable/connections/gcp.html
     """
 

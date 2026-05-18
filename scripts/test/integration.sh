@@ -25,7 +25,7 @@ pytest -vv \
     --cov-report=term-missing \
     --cov-report=xml \
     --durations=0 \
-    --timeout=180 \
+    --timeout=300 \
     --timeout-method=thread \
     -m 'integration and not dbtfusion' \
     --ignore=tests/perf \

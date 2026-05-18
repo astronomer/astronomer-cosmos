@@ -980,9 +980,9 @@ def _add_test_tasks(
     elif render_config.test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH):
         # Handle detached test nodes
         for node_id, node in detached_nodes.items():
-            datached_node_name = calculate_detached_node_name(node)
+            detached_node_name = calculate_detached_node_name(node)
             test_meta = create_test_task_metadata(
-                datached_node_name,
+                detached_node_name,
                 execution_mode,
                 test_indirect_selection,
                 task_args=task_args,

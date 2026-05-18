@@ -212,7 +212,7 @@ Related documentation
   – Release notes and version removal notices
 - `Python Release Schedule <https://devguide.python.org/versions/>`_
   – Python version EOL dates
-- `Apache Airflow EOL Policy <https://airflow.apache.org/docs/apache-airflow/stable/security/end-of-life.html>`_
+- `Apache Airflow EOL Policy <https://airflow.apache.org/docs/apache-airflow/stable/installation/supported-versions.html>`_
   – Airflow version EOL dates
 - `dbt Core Versions <https://docs.getdbt.com/docs/dbt-versions/core>`_
   – dbt Core version support policy

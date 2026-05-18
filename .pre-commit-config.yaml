@@ -106,7 +106,7 @@ repos:
     hooks:
       - id: blacken-docs
         alias: black
-        additional_dependencies: [black>=26.3.1]
+        additional_dependencies: [black>=26.5.0]
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: fc0f09a29bb495f4a91f00266155d6282d52485d  # v1.20.2
     hooks:

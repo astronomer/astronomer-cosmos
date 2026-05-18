@@ -191,8 +191,8 @@ jobs:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
-    # Diagnostic: cap the job at 30 min so a hanging test surfaces a pytest failure with the test
-    # name and traceback in the log instead of being killed silently by GitHub's 6h default.
+    # Diagnostic: cap the job at 30 min so a hang does not run until GitHub's 6h default
+    # timeout. This is a job-level backstop and does not itself produce a pytest traceback.
     timeout-minutes: 30
     permissions:
       contents: read

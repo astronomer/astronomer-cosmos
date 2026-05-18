@@ -303,8 +303,6 @@ def store_dbt_resource_status_from_log(
 
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
-        # Handle terminal statuses for both models (success/failed) and tests (pass/fail)
-        # TODO: handle all possible statuses including skipped, warn, etc.
         if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
             if context is None:

@@ -229,6 +229,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # Mutable dict populated lazily from the manifest; shared with the log parser.
         self._dataset_namespace: str | None = None
         self._model_outlet_uris: dict[str, list[str]] = {}
+        # Mutable set populated by the log parser when dbt emits SkippingDetails
+        # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
+        # for those unique_ids are rewritten to "failed" so the consumer sensor
+        # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+        # See #2698.
+        self._upstream_failure_skipped_ids: set[str] = set()
 
     def _handle_datasets(self, context: Context) -> None:
         """No-op override: consumer tasks handle their own dataset emission in WATCHER mode."""
@@ -241,6 +247,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             test_results_per_model=self.test_results_per_model,
             model_outlet_uris=self._model_outlet_uris,
             dataset_namespace=self._dataset_namespace,
+            upstream_failure_skipped_ids=self._upstream_failure_skipped_ids,
         )
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> Any:
@@ -421,6 +428,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # Pre-compute the dataset namespace for per-model outlet URI generation.
         self._dataset_namespace = get_dataset_namespace(self.profile_config)
         self._model_outlet_uris.clear()
+        self._upstream_failure_skipped_ids.clear()
 
         task_instance = context.get("ti")
         if task_instance is None:

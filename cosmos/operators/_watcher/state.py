@@ -25,6 +25,15 @@ DBT_SUCCESS_STATUSES = frozenset({"success", "pass", "warn"})
 DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error", "runtime error"})
 DBT_SKIPPED_STATUSES = frozenset({"skipped"})
 
+# dbt event names that signal a node was skipped because an upstream node failed.
+# dbt fires SkippingDetails (non-ephemeral upstream) or LogSkipBecauseError
+# (ephemeral upstream) only from on_skip(), which is reached only when
+# do_skip(cause=...) was called -- i.e. exclusively on upstream node failure.
+DBT_UPSTREAM_FAILURE_SKIP_EVENT_NAMES = frozenset({"SkippingDetails", "LogSkipBecauseError"})
+
+# dbt source freshness statuses that mark a source as stale and propagate skips downstream.
+DBT_SOURCE_FRESHNESS_STALE_STATUSES = frozenset({"error", "warn"})
+
 # Airflow task states that indicate the producer has finished and will not deliver any more XCom updates.
 # Used to decide whether a sensor retry should fall back to a non-watcher run or keep polling.
 PRODUCER_TERMINAL_STATES = frozenset({"success", "failed", "skipped", "upstream_failed", "removed"})
@@ -57,6 +66,11 @@ def is_dbt_node_status_skipped(status: str | None) -> bool:
 def is_dbt_node_status_terminal(status: str | None) -> bool:
     """Check if the dbt node status is terminal (success, failed, or skipped)."""
     return is_dbt_node_status_success(status) or is_dbt_node_status_failed(status) or is_dbt_node_status_skipped(status)
+
+
+def is_dbt_upstream_failure_skip_event(event_name: str | None) -> bool:
+    """Check if the dbt event name indicates a node was skipped because an upstream node failed."""
+    return event_name in DBT_UPSTREAM_FAILURE_SKIP_EVENT_NAMES
 
 
 def is_producer_task_terminated(state: str | None) -> bool:

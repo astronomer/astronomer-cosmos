@@ -28,6 +28,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_dbt_upstream_failure_skip_event,
     is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
@@ -250,6 +251,33 @@ def _ensure_subprocess_model_outlet_uris(
         model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []  # type: ignore[assignment]
 
 
+def _rewrite_upstream_failure_skip_status(
+    log_line: dict[str, Any],
+    unique_id: str | None,
+    dbt_node_status: Any,
+    upstream_failure_skipped_ids: set[str] | None,
+) -> Any:
+    """Track upstream-failure-skipped nodes and rewrite their status from "skipped" to "failed".
+
+    dbt emits two events for a node that it skipped because of an upstream
+    failure: ``SkippingDetails``/``LogSkipBecauseError`` during ``on_skip()``,
+    and a later ``NodeFinished`` from the runnable ``finally``-block -- both
+    carry ``node_status="skipped"``. The first identifies the upstream-failure
+    cause (those events are reached only via ``do_skip(cause=...)``, exclusively
+    on upstream-node failure); the second would otherwise overwrite the
+    rewritten XCom with the original ``"skipped"``. Tracking affected
+    ``unique_id``\\ s in a per-execution set lets the parser rewrite both. See
+    #2698.
+    """
+    if not unique_id or upstream_failure_skipped_ids is None:
+        return dbt_node_status
+    if is_dbt_upstream_failure_skip_event(log_line.get("info", {}).get("name")):
+        upstream_failure_skipped_ids.add(unique_id)
+    if dbt_node_status == "skipped" and unique_id in upstream_failure_skipped_ids:
+        return "failed"
+    return dbt_node_status
+
+
 def _surface_non_json_stdout(line: str) -> None:
     """Forward non-JSON stdout (e.g. Snowflake connector's "Going to open: <URL>" prompt
     during externalbrowser auth) to the task log instead of silently dropping it.
@@ -266,6 +294,7 @@ def store_dbt_resource_status_from_log(
     test_results_per_model: dict[str, list[str]] | None = None,
     model_outlet_uris: dict[str, list[str]] | None = None,
     dataset_namespace: str | None = None,
+    upstream_failure_skipped_ids: set[str] | None = None,
 ) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
@@ -286,6 +315,12 @@ def store_dbt_resource_status_from_log(
     :param model_outlet_uris: Mutable dict mapping unique_id to outlet URIs.
         Populated lazily from the manifest on first terminal status detection.
     :param dataset_namespace: The OL-compatible dataset namespace for URI construction.
+    :param upstream_failure_skipped_ids: Mutable accumulator set of node unique_ids
+        that dbt skipped because of an upstream-node failure. Populated when this
+        function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event; later
+        ``NodeFinished`` events with ``node_status="skipped"`` for these unique_ids
+        are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
+        retry it) rather than going SKIPPED. See #2698.
     """
     try:
         log_line = json.loads(line)
@@ -305,6 +340,12 @@ def store_dbt_resource_status_from_log(
         dbt_node_status = node_info.get("node_status")
         dbt_node_resource_type = node_info.get("resource_type")
         unique_id = node_info.get("unique_id")
+
+        # Rewrite "skipped" to "failed" when dbt skipped the node because an
+        # upstream node failed (#2698). See _rewrite_upstream_failure_skip_status.
+        dbt_node_status = _rewrite_upstream_failure_skip_status(
+            log_line, unique_id, dbt_node_status, upstream_failure_skipped_ids
+        )
 
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 

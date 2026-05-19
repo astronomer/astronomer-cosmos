@@ -751,6 +751,7 @@ def _add_watcher_producer_task(
             task_id=PRODUCER_WATCHER_DONE_TASK_ID,
         )
         producer_airflow_task >> producer_done_task
+        tasks_map[PRODUCER_WATCHER_DONE_TASK_ID] = producer_done_task
 
     return producer_airflow_task
 
@@ -766,7 +767,15 @@ def _add_watcher_dependencies(
     Iterate through the watcher consumer tasks and:
     - set the producer task ID in all of them
     - make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
+    - if the producer task has depends_on_past=True, set wait_for_downstream=True in the producer and all its
+        watcher tasks, and put them upstream of the producer_watcher_done task so the entire task group
+        behaves as a single unit that needs to succeed for the next run to start.
     """
+    producer_watcher_done_task = tasks_map.get(PRODUCER_WATCHER_DONE_TASK_ID)
+    needs_wait_for_downstream = producer_watcher_done_task is not None and producer_airflow_task.depends_on_past
+    if needs_wait_for_downstream:
+        producer_airflow_task.wait_for_downstream = True
+
     for node_id, task_or_taskgroup in tasks_map.items():
         # We do not want to set a dependency between the producer task (or its gate) and itself
         if node_id in (PRODUCER_WATCHER_TASK_ID, PRODUCER_WATCHER_DONE_TASK_ID):
@@ -778,26 +787,40 @@ def _add_watcher_dependencies(
             else [task_or_taskgroup]
         )
         for task in node_tasks:
-            task.producer_task_id = producer_airflow_task.task_id  # type: ignore[union-attr]
+            if hasattr(task, "producer_task_id"):
+                task.producer_task_id = producer_airflow_task.task_id  # type: ignore[union-attr]
+            if needs_wait_for_downstream:
+                task.wait_for_downstream = True  # type: ignore[union-attr]
+
+        if needs_wait_for_downstream and not task_or_taskgroup.downstream_task_ids:
+            task_or_taskgroup >> producer_watcher_done_task
 
         # Make the producer task to be the parent of the root dbt nodes, without blocking them from sensing XCom
         # We only managed to do this in the case of DbtDag.
         # The way it is implemented is by setting the trigger_rule to "always" for the consumer tasks, and by having the producer task with a high priority_weight.
-        if "DbtDag" in dag.__class__.__name__:
+
+        if (
+            "DbtDag" in dag.__class__.__name__
+            and nodes
+            and node_id in nodes
+            and not set(nodes[node_id].depends_on).intersection(nodes)
+        ):
             # Is this dbt node a root of the (subset of the) dbt project?
             # Note: this may happen in one scenarios:
             # - the dbt node not having any `depends_on` within the user-selected `nodes`
-            if nodes and node_id in nodes and not set(nodes[node_id].depends_on).intersection(nodes):
-                producer_airflow_task >> task_or_taskgroup
-                if isinstance(task_or_taskgroup, TaskGroup):
-                    taskgroup = task_or_taskgroup
-                    always_run_tasks = [
-                        task for task in node_tasks if not set(task.upstream_task_ids).intersection(taskgroup.children)
-                    ]
-                else:
-                    always_run_tasks = [task_or_taskgroup]
-                for task in always_run_tasks:
-                    task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[union-attr]
+            producer_airflow_task >> task_or_taskgroup
+            always_run_tasks = (
+                [
+                    task
+                    for task in node_tasks
+                    if not set(task.upstream_task_ids).intersection(task_or_taskgroup.children)
+                ]
+                if isinstance(task_or_taskgroup, TaskGroup)
+                else [task_or_taskgroup]
+            )
+
+            for task in always_run_tasks:
+                task.trigger_rule = task_args.get("trigger_rule", "always")  # type: ignore[union-attr]
 
 
 def should_create_detached_nodes(render_config: RenderConfig) -> bool:
@@ -1029,6 +1052,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
+        tasks_map[f"{dbt_project_name}_test"] = test_task
     elif render_config.test_behavior in (TestBehavior.BUILD, TestBehavior.AFTER_EACH):
         # Handle detached test nodes
         for node_id, node in detached_nodes.items():

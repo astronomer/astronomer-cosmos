@@ -250,6 +250,14 @@ def _ensure_subprocess_model_outlet_uris(
         model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []  # type: ignore[assignment]
 
 
+def _surface_non_json_stdout(line: str) -> None:
+    """Forward non-JSON stdout (e.g. Snowflake connector's "Going to open: <URL>" prompt
+    during externalbrowser auth) to the task log instead of silently dropping it.
+    """
+    if line:
+        logger.info("%s", line)
+
+
 def store_dbt_resource_status_from_log(
     line: str,
     extra_kwargs: Any,
@@ -287,7 +295,7 @@ def store_dbt_resource_status_from_log(
         if ti:
             _process_dbt_log_event(ti, log_line)
     except json.JSONDecodeError:
-        logger.debug("Failed to parse log: %s", line)
+        _surface_non_json_stdout(line)
         log_line = {}
     else:
         context = extra_kwargs.get("context")

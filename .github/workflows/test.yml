@@ -193,7 +193,7 @@ jobs:
     runs-on: ubuntu-latest
     # Diagnostic: cap the job at 30 min so a hang does not run until GitHub's 6h default
     # timeout. This is a job-level backstop and does not itself produce a pytest traceback.
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
     strategy:

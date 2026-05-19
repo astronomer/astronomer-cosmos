@@ -91,7 +91,7 @@ Validation in progress
 ++++++++++++++++++++++
 
 We are actively validating the combined support for `Assets <https://airflow.apache.org/docs/apache-airflow/3.0.0/authoring-and-scheduling/assets.html>`_
-and `OpenLineage <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_ with Airflow 3.
+and `OpenLineage <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/structure.html>`_ with Airflow 3.
 This may be **unstable** in Cosmos 1.10.0. Bug reports are very welcome.
 We encourage users to try it out and provide feedback, but note that certain edge cases may still be under
 investigation.

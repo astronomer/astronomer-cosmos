@@ -155,6 +155,7 @@ dependencies = [
     "pytest-split",
     "pytest-dotenv",
     "pytest-rerunfailures",
+    "pytest-timeout",
     "requests-mock",
     "pytest-cov",
     "pytest-describe",

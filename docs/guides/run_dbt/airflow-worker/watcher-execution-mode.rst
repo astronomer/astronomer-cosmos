@@ -354,6 +354,30 @@ which increases overall task throughput. By default, the sensor now runs in defe
 Known limitations
 ~~~~~~~~~~~~~~~~~
 
+Minimum supported dbt version
++++++++++++++++++++++++++++++
+
+``ExecutionMode.WATCHER`` requires **dbt-core 1.8 or newer**. On earlier dbt
+versions the watcher producer and the consumer-fallback path fail at the dbt
+CLI layer with ``No such option '--log-format'`` before any of the watcher
+event-handling code runs.
+
+Note that previous versions of dbt have all reached end of life and are no
+longer supported by dbt Labs; see the
+`dbt Core versions <https://docs.getdbt.com/docs/dbt-versions/core>`_ page
+for current dbt-Labs-supported releases.
+
+The watcher needs ``--log-format json`` so the producer and the consumer
+fallback receive structured per-model events from dbt. Cosmos passes the
+flag after the dbt subcommand (e.g. ``dbt build --log-format json …``).
+dbt 1.5 / 1.6 / 1.7 expose ``--log-format`` as a **global** flag only — it
+must appear *before* the subcommand on those versions — so the dbt CLI
+parser rejects the command. dbt 1.8 was the release that added
+``--log-format`` as a per-subcommand flag, making the current command
+shape work.
+
+If you must use dbt < 1.8 with Cosmos, use ``ExecutionMode.LOCAL`` instead.
+
 Producer task implementation
 ++++++++++++++++++++++++++++
 

@@ -2248,7 +2248,17 @@ def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, reset_f
     ),
 )
 @pytest.mark.integration
-def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_fail_once_sequence):
+@pytest.mark.parametrize(
+    "downstream_task_id",
+    [
+        # Level-1 downstream of the flaky model.
+        "watcher_upstream_failure_recovery.model_downstream_run",
+        # Level-2 downstream -- confirms the fix handles arbitrary chain depth,
+        # since dbt emits SkippingDetails for each transitively-skipped node.
+        "watcher_upstream_failure_recovery.model_downstream_2_run",
+    ],
+)
+def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_fail_once_sequence, downstream_task_id):
     """Regression for upstream-failure skips that previously left downstream models skipped (#2698).
 
     When a dbt model fails on the producer's first attempt, dbt emits
@@ -2315,21 +2325,12 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
 
     tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
 
-    # Core #2698 assertion: model_downstream must end SUCCESS, not SKIPPED.
-    downstream_ti = tis["watcher_upstream_failure_recovery.model_downstream_run"]
-    assert downstream_ti.state == "success", (
-        f"model_downstream_run ended in '{downstream_ti.state}' -- expected 'success'. "
-        "Before the #2698 fix, dbt's 'skipped' status for upstream-failure skips "
-        "was pushed to XCom unchanged, the consumer sensor raised AirflowSkipException, "
-        "and Airflow did not retry the SKIPPED task even after the upstream model "
-        "recovered on its own consumer retry."
-    )
-    # Proves the consumer fallback retry actually fired -- guards against a future
-    # refactor that happens to leave the task in 'success' for a different reason.
-    assert downstream_ti.try_number > 1, (
-        f"model_downstream_run succeeded on its first try (try_number={downstream_ti.try_number}); "
-        "the test setup is no longer exercising the retry-after-failure path."
-    )
+    # Core #2698 assertion: the parametrized downstream model must end SUCCESS,
+    # not SKIPPED, and must have actually been retried (try_number > 1 proves
+    # the consumer-fallback path fired rather than the task happening to succeed
+    # on the first attempt).
+    assert tis[downstream_task_id].state == "success"
+    assert tis[downstream_task_id].try_number > 1
 
     # The flaky upstream itself also recovers via the consumer-retry fallback.
     assert tis["watcher_upstream_failure_recovery.model_flaky_run"].state == "success"

@@ -406,7 +406,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Environment Variable: ``AIRFLOW__OPENLINEAGE__NAMESPACE``
 
 .. note::
-    For more information, see `OpenLineage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_.
+    For more information, see `OpenLineage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/structure.html>`_.
 
 Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~

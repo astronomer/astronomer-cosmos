@@ -83,7 +83,7 @@ following conditions are met:
 
 - **Airflow EOL**: The Apache Airflow version has reached End of Life according
   to the
-  `Apache Airflow release policy <https://airflow.apache.org/docs/apache-airflow/stable/security/end-of-life.html>`_
+  `Apache Airflow release policy <https://airflow.apache.org/docs/apache-airflow/stable/installation/supported-versions.html>`_
 - **Astronomer Runtime EOL**: The Astronomer Runtime version has reached End of
   Basic Support according to the
   `Astronomer Runtime lifecycle policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_
@@ -212,7 +212,7 @@ Related documentation
   – Release notes and version removal notices
 - `Python Release Schedule <https://devguide.python.org/versions/>`_
   – Python version EOL dates
-- `Apache Airflow EOL Policy <https://airflow.apache.org/docs/apache-airflow/stable/security/end-of-life.html>`_
+- `Apache Airflow EOL Policy <https://airflow.apache.org/docs/apache-airflow/stable/installation/supported-versions.html>`_
   – Airflow version EOL dates
 - `dbt Core Versions <https://docs.getdbt.com/docs/dbt-versions/core>`_
   – dbt Core version support policy

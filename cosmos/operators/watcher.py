@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import json
+import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -124,20 +126,55 @@ def _default_freshness_callback(
     return [(uid, "skipped") for uid in excludable]
 
 
-class _NullWriter:
-    """Write-only sink that discards all data; used to suppress dbt stdout in DBT_RUNNER mode.
+class _StdoutFilter:
+    """Write-only sink used as ``sys.stdout`` proxy during DBT_RUNNER execution.
 
-    Preferred over ``io.StringIO()`` because StringIO buffers every byte written to it for the
-    lifetime of the context manager. On large projects dbt emits megabytes of JSON log lines,
-    so StringIO would grow unbounded and increase worker memory usage proportionally to project
-    size and verbosity. _NullWriter discards each write immediately with no allocation.
+    Discards lines that parse as JSON (those are dbt's ``--log-format json`` output and are
+    already handled by the registered ``EventMsg`` callback). Forwards every other line to
+    the pre-redirect ``sys.stdout`` so output written to stdout by third-party libraries —
+    e.g. the Snowflake connector's ``Going to open: <URL>`` externalbrowser auth prompt —
+    remains visible in the Airflow task log.
+
+    Forwarding goes directly to the captured stdout (not through ``logger.info``) to avoid
+    the feedback loop that would otherwise occur: any log handler bound to ``sys.stdout`` —
+    which is *this filter* while ``redirect_stdout`` is active — would re-enter ``write``
+    and ``flush`` on every record, either recursing without bound or double-logging the
+    same record into caplog/handlers. In Airflow tasks the captured stdout is the
+    ``StreamLogWriter`` wrapping the task log, so the line still surfaces there.
+
+    Memory footprint stays bounded: only the partial trailing line (no terminating newline
+    yet) is buffered; complete lines are emitted and discarded immediately. This is preferred
+    over ``io.StringIO()``, which would buffer every byte for the lifetime of the context
+    manager and grow proportionally to dbt's verbosity on large projects.
     """
 
+    def __init__(self) -> None:
+        self._buffer = ""
+        # Capture sys.stdout at construction time — this runs *before* ``redirect_stdout``
+        # swaps sys.stdout to this filter, so ``self._target`` points at whatever stdout
+        # the caller had set up (Airflow's StreamLogWriter in tasks, pytest's capture in
+        # tests, the real terminal stdout otherwise).
+        self._target = sys.stdout
+
     def write(self, s: str) -> int:
+        self._buffer += s
+        while "\n" in self._buffer:
+            line, self._buffer = self._buffer.split("\n", 1)
+            self._emit(line)
         return len(s)
 
     def flush(self) -> None:
-        pass
+        if self._buffer:
+            self._emit(self._buffer)
+            self._buffer = ""
+
+    def _emit(self, line: str) -> None:
+        if not line:
+            return
+        try:
+            json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            self._target.write(line + "\n")
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
@@ -242,9 +279,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         backend to push to, so registering a callback would cause it to raise and dbt would emit
         ``GenericExceptionOnRun`` for every node.
 
-        When a callback is registered, dbt's stdout is redirected to a null buffer so that the
+        When a callback is registered, dbt's stdout is wrapped by ``_StdoutFilter`` so that the
         raw ``--log-format json`` lines do not appear in Airflow task logs alongside the
-        human-readable messages already emitted by ``_log_dbt_msg`` inside the callback.
+        human-readable messages already emitted by ``_log_dbt_msg`` inside the callback. The
+        filter forwards any non-JSON line to the task logger so output from third-party
+        libraries written to stdout (e.g. the Snowflake connector's externalbrowser auth URL)
+        remains visible.
 
         The callback is intentionally **not** registered during the source freshness pre-check
         (``context["_check_source_freshness"] is True``).  Registering it there would leave a
@@ -257,7 +297,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             # During the source freshness pre-check suppress raw JSON stdout, but do not register
             # the XCom-pushing callback so it cannot accumulate and duplicate build logs later.
             if context.get("_check_source_freshness"):
-                with contextlib.redirect_stdout(_NullWriter()):
+                with contextlib.redirect_stdout(_StdoutFilter()):
                     return super().run_dbt_runner(command, env, cwd, **kwargs)
 
             extra_kwargs: dict[str, Any] = {"project_dir": cwd, "context": context}
@@ -282,7 +322,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                         callback_error.append(e)
 
             self._dbt_runner_callbacks = [*(self._dbt_runner_callbacks or []), _event_callback]
-            with contextlib.redirect_stdout(_NullWriter()):
+            with contextlib.redirect_stdout(_StdoutFilter()):
                 result = super().run_dbt_runner(command, env, cwd, **kwargs)
             if callback_error:
                 raise callback_error[0]

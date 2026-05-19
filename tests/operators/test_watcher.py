@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import logging
 from datetime import datetime, timedelta
@@ -35,6 +36,7 @@ from cosmos.operators.watcher import (
     DbtSeedWatcherOperator,
     DbtTestWatcherOperator,
     _default_freshness_callback,
+    _StdoutFilter,
     store_dbt_resource_status_from_log,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
@@ -1225,7 +1227,21 @@ class TestDbtConsumerWatcherSensor:
         sensor.build_and_run_cmd.assert_called_once()
         args, kwargs = sensor.build_and_run_cmd.call_args
         assert "--select" in kwargs["cmd_flags"]
-        assert MODEL_UNIQUE_ID.split(".")[-1] in kwargs["cmd_flags"]
+        assert MODEL_UNIQUE_ID.split(".", 2)[2] in kwargs["cmd_flags"]
+
+    def test_fallback_selector_preserves_version_suffix(self):
+        """For versioned dbt models (e.g. ``model.pkg.my_model.v1``) the selector must keep the version suffix."""
+        sensor = self.make_sensor()
+        sensor.model_unique_id = "model.jaffle_shop.stg_orders.v1"
+        ti = MagicMock()
+        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = []
+        context = self.make_context(ti)
+        sensor.build_and_run_cmd = MagicMock()
+
+        sensor._fallback_to_non_watcher_run(2, context)
+
+        kwargs = sensor.build_and_run_cmd.call_args.kwargs
+        assert kwargs["cmd_flags"] == ["--select", "stg_orders.v1"]
 
     def test_filter_flags(self):
         flags = ["--select", "model", "--exclude", "other", "--threads", "2"]
@@ -2899,3 +2915,115 @@ class TestProducerSourceFreshness:
         # The callback list must remain untouched — no watcher callback appended
         assert producer._dbt_runner_callbacks is None
         mock_super.assert_called_once()
+
+
+class TestStdoutFilter:
+    """Tests for ``_StdoutFilter``, the stdout proxy used during DBT_RUNNER execution.
+
+    Regression coverage for issue #2649: non-JSON stdout written by third-party libraries
+    (e.g. the Snowflake connector's externalbrowser auth URL) must surface to the task log
+    instead of being silently discarded.
+
+    The filter forwards non-JSON lines to the pre-redirect ``sys.stdout`` (captured at
+    construction). These tests substitute a ``StringIO`` for that target and assert what
+    lands there.
+    """
+
+    @staticmethod
+    def _make_filter() -> tuple[_StdoutFilter, io.StringIO]:
+        target = io.StringIO()
+        f = _StdoutFilter()
+        f._target = target  # type: ignore[attr-defined]
+        return f, target
+
+    def test_json_line_is_dropped(self):
+        f, target = self._make_filter()
+        f.write('{"info": {"msg": "raw dbt json"}}\n')
+        assert target.getvalue() == ""
+
+    def test_non_json_line_is_forwarded_to_target(self):
+        f, target = self._make_filter()
+        snowflake_prompt = "Going to open: https://login.snowflakecomputing.com/oauth/authorize?... to authenticate..."
+        f.write(snowflake_prompt + "\n")
+        assert snowflake_prompt in target.getvalue()
+
+    def test_partial_writes_buffer_until_newline(self):
+        f, target = self._make_filter()
+        f.write("hello ")
+        assert target.getvalue() == ""
+        f.write("world\n")
+        assert "hello world" in target.getvalue()
+
+    def test_flush_emits_trailing_partial_line(self):
+        f, target = self._make_filter()
+        f.write("trailing line without newline")
+        assert target.getvalue() == ""
+        f.flush()
+        assert "trailing line without newline" in target.getvalue()
+
+    def test_mixed_json_and_plain_lines(self):
+        f, target = self._make_filter()
+        f.write('{"info": {"msg": "json line"}}\n')
+        f.write("plain text from third-party lib\n")
+        f.write('{"info": {"msg": "another json"}}\n')
+        out = target.getvalue()
+        assert "plain text from third-party lib" in out
+        assert "json line" not in out
+        assert "another json" not in out
+
+    def test_no_recursion_when_log_handler_writes_back_to_filter(self, caplog):
+        """Regression: if a log handler is bound to ``sys.stdout`` while the filter is
+        active, the handler writes formatted log records back into the filter. The filter
+        must not re-enter the logging framework (which would deadlock/recurse on
+        ``StreamHandler.emit`` → ``stream.flush`` → ``_emit`` → ``logger.info``) and must
+        not double-deliver the record to other handlers (which broke
+        ``test_dbt_dag_with_watcher``'s ``message_count == 1`` assertion).
+        """
+        import contextlib
+
+        f, target = self._make_filter()
+        watcher_logger = logging.getLogger("cosmos.operators.watcher")
+        handler = logging.StreamHandler(stream=f)
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        watcher_logger.addHandler(handler)
+        try:
+            with caplog.at_level(logging.INFO, logger="cosmos.operators.watcher"), contextlib.redirect_stdout(f):
+                # Mirror cosmos.dbt.runner.run_command's log call: the embedded newlines
+                # force the buffer to hold a partial line across the _emit boundary, which
+                # is what triggered the flush-recursion path in production.
+                watcher_logger.info("Trying to run dbtRunner with:\n %s\n in %s", ["build"], "/tmp/x")
+        finally:
+            watcher_logger.removeHandler(handler)
+        # Original record reaches caplog exactly once — _emit forwards the handler's
+        # write to the captured target, not back through the logger.
+        assert caplog.text.count("Trying to run dbtRunner with:") == 1
+        assert "Trying to run dbtRunner with:" in target.getvalue()
+
+
+class TestStoreDbtResourceStatusFromLogNonJson:
+    """Regression coverage for issue #2649: in SUBPROCESS mode, non-JSON stdout lines
+    (e.g. Snowflake externalbrowser auth URL) must surface to the task log instead of
+    being silently demoted to DEBUG.
+    """
+
+    def test_non_json_line_is_logged_at_info(self, caplog):
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        snowflake_prompt = "Going to open: https://login.snowflakecomputing.com/oauth/authorize?... to authenticate..."
+        with caplog.at_level(logging.INFO, logger="cosmos.operators._watcher.base"):
+            store_dbt_resource_status_from_log(
+                snowflake_prompt,
+                {"context": ctx},
+                tests_per_model={},
+                test_results_per_model={},
+            )
+        assert snowflake_prompt in caplog.text
+        assert len(ti.store) == 0  # parser must not push XCom for non-JSON lines
+
+    def test_empty_line_is_not_logged(self, caplog):
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        with caplog.at_level(logging.INFO, logger="cosmos.operators._watcher.base"):
+            store_dbt_resource_status_from_log("", {"context": ctx}, tests_per_model={}, test_results_per_model={})
+        assert caplog.text == ""

@@ -281,6 +281,14 @@ def _rewrite_upstream_failure_skip_status(
     return dbt_node_status
 
 
+def _surface_non_json_stdout(line: str) -> None:
+    """Forward non-JSON stdout (e.g. Snowflake connector's "Going to open: <URL>" prompt
+    during externalbrowser auth) to the task log instead of silently dropping it.
+    """
+    if line:
+        logger.info("%s", line)
+
+
 def store_dbt_resource_status_from_log(
     line: str,
     extra_kwargs: Any,
@@ -325,7 +333,7 @@ def store_dbt_resource_status_from_log(
         if ti:
             _process_dbt_log_event(ti, log_line)
     except json.JSONDecodeError:
-        logger.debug("Failed to parse log: %s", line)
+        _surface_non_json_stdout(line)
         log_line = {}
     else:
         context = extra_kwargs.get("context")
@@ -344,8 +352,6 @@ def store_dbt_resource_status_from_log(
 
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
-        # Handle terminal statuses for both models (success/failed) and tests (pass/fail)
-        # TODO: handle all possible statuses including skipped, warn, etc.
         if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
             if context is None:
@@ -487,7 +493,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             raw_flags = upstream_task.add_cmd_flags()
             extra_flags = self._filter_flags(raw_flags)
 
-        model_selector = self.model_unique_id.split(".")[-1]
+        model_selector = self.model_unique_id.split(".", 2)[2]
         cmd_flags = extra_flags + ["--select", model_selector]
 
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]

@@ -8,6 +8,8 @@ Starting in the 1.4 version, Cosmos tries to leverage dbt's partial parsing (``p
 This feature is bound to `dbt partial parsing limitations <https://docs.getdbt.com/reference/parsing#known-limitations>`_.
 As an example, ``dbt`` requires the same ``--vars``, ``--target``, ``--profile``, and ``profile.yml`` environment variables (as called by the ``env_var()`` macro) while running dbt commands, otherwise it will reparse the project from scratch.
 
+.. _partial-parsing-profile-configuration:
+
 Profile configuration
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -63,7 +65,7 @@ Or environment variable:
     AIRFLOW__COSMOS__CACHE_DIR="path/to/docs/here"  # to override default caching directory (by default, uses the system temporary directory)
     AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE="False"  # to disable caching (enabled by default)
 
-Learn more about `caching <./caching.html>`_ and `Cosmos Airflow configurations <./cosmos-conf.html>`_.
+Learn more about :doc:`caching </optimize_performance/caching>` and :doc:`Cosmos Airflow configurations </reference/configs/cosmos-conf>`.
 
 Disabling
 ~~~~~~~~~

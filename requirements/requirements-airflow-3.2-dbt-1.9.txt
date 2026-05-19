@@ -37,7 +37,6 @@ argcomplete==3.6.3
 asgiref==3.11.1
 asn1crypto==1.5.1
 ast_serialize==0.5.0
--e git+ssh://git@github.com/astronomer/astronomer-cosmos.git@339c6bc0854eb1e7274f46a84a911de270745aa8#egg=astronomer_cosmos
 async-timeout==5.0.1
 attrs==26.1.0
 Authlib==1.6.9

@@ -63,12 +63,15 @@ When writing or editing files under `docs/`, follow the Cosmos lightweight style
 
 ### Linting and Formatting
 
-Pre-commit runs the configured linters/formatters (e.g., Black (formatter), Ruff (linter), mypy, codespell). See `.pre-commit-config.yaml` for the full list:
+**Always run the full pre-commit suite locally and ensure it passes before committing or pushing.** This includes the formatters, linters, type checks, and style checks (`scripts/check_docs_style.py` for `docs/`, configured via `.pre-commit-config.yaml`). The same hooks run in CI; catching failures locally avoids a wasted CI round-trip and a noisy PR history.
+
 ```bash
 pre-commit run --all-files
 ```
 
-Individual tools:
+Pre-commit's configured tools (Black, Ruff, mypy, codespell, check_docs_style, etc.) are listed in `.pre-commit-config.yaml`.
+
+Individual tools, if you need to iterate on a single one:
 ```bash
 black --line-length 120 cosmos/
 ruff check cosmos/

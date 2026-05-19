@@ -29,7 +29,12 @@ hatch run tests.py3.11-2.10-1.9:test-integration
 
 Type checking:
 ```bash
-hatch run tests.py3.10-2.10-1.9:type-check
+hatch run tests.py3.10-3.1-1.9:type-check
+```
+
+**Always run the type-check before committing or opening a PR** — mypy is enforced in CI and skipping it locally wastes a CI round-trip. The `type-check` script is an alias for `pre-commit run mypy --files cosmos/**/*`, so if the hatch env's `pre-install-airflow.sh` fails to bootstrap on your machine, fall back to:
+```bash
+pre-commit run mypy --all-files
 ```
 
 Other available matrix versions: Python `3.10`, `3.11`, `3.12`, `3.13` × Airflow `2.9`, `2.10`, `2.11`, `3.0`, `3.1` × dbt `1.5`–`2.0`.

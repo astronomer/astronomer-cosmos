@@ -1785,6 +1785,84 @@ def test_dbt_task_group_with_watcher():
 
 
 @pytest.mark.integration
+def test_dbt_task_groups_with_watcher_produce_distinct_xcom_backup_keys():
+    """
+    Two DbtTaskGroups using ExecutionMode.WATCHER in the same DAG must compute
+    distinct XCom backup Variable keys for their producer tasks.
+
+    Regression for https://github.com/astronomer/astronomer-cosmos/issues/2625.
+    Before the fix, ``_get_task_group_id`` in ``cosmos/operators/_watcher/xcom.py``
+    read ``task.task_group_id`` -- an attribute that does not exist on Airflow
+    operators in either Airflow 2 or 3. The helper returned None, the task-group
+    segment was dropped from the key, and both producers shared
+    ``cosmos_xcom_backup__{dag_id}__{run_id}``. On Airflow 2 the second producer
+    raised ``UniqueViolation`` on ``variable_key_uq``; on Airflow 3 ``Variable.set``
+    is an upsert so the backup row was silently overwritten by whichever
+    producer wrote last.
+    """
+    from airflow import DAG
+
+    from cosmos import DbtTaskGroup, ExecutionConfig
+    from cosmos.config import RenderConfig
+    from cosmos.constants import ExecutionMode, TestBehavior
+    from cosmos.operators._watcher.xcom import _init_xcom_backup
+
+    operator_args = {
+        "install_deps": True,
+        "execution_timeout": timedelta(seconds=120),
+    }
+
+    with DAG(
+        dag_id="watcher_xcom_collision_dag",
+        start_date=datetime(2025, 1, 1),
+    ) as dag:
+        DbtTaskGroup(
+            group_id="group_a",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=RenderConfig(select=["+customers"], test_behavior=TestBehavior.NONE),
+            operator_args=operator_args,
+        )
+        DbtTaskGroup(
+            group_id="group_b",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=RenderConfig(select=["+orders"], test_behavior=TestBehavior.NONE),
+            operator_args=operator_args,
+        )
+
+    # As in ``test_dbt_task_group_with_watcher`` above, we do not invoke
+    # ``new_test_dag`` here because ``dag.test()`` does not respect the producer's
+    # priority weight (apache/airflow#56723) and would schedule the consumer
+    # tasks before the producers. The structural assertion below is what guards
+    # against the #2625 regression -- it goes through the real
+    # ``_get_task_group_id`` helper that the bug lived in.
+    producer_a = dag.task_dict["group_a.dbt_producer_watcher"]
+    producer_b = dag.task_dict["group_b.dbt_producer_watcher"]
+
+    run_id = "manual__2026-01-01T00:00:00+00:00"
+
+    def _compute_backup_key(producer):
+        ti = _MockTI()
+        ti.dag_id = dag.dag_id
+        ti.task = producer
+        _init_xcom_backup({"ti": ti, "run_id": run_id})
+        return ti._cosmos_xcom_backup_var_key
+
+    key_a = _compute_backup_key(producer_a)
+    key_b = _compute_backup_key(producer_b)
+
+    assert key_a != key_b, (
+        "Watcher producers in different task groups share the same XCom backup "
+        f"Variable key {key_a!r}. See https://github.com/astronomer/astronomer-cosmos/issues/2625."
+    )
+    assert "group_a" in key_a
+    assert "group_b" in key_b
+
+
+@pytest.mark.integration
 def test_dbt_task_group_with_watcher_has_correct_dbt_cmd():
     """
     Create an Airflow DAG that uses a DbtTaskGroup with `ExecutionMode.WATCHER`.

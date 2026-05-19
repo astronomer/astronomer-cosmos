@@ -108,7 +108,7 @@ repos:
         alias: black
         additional_dependencies: [black>=26.3.1]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: fc0f09a29bb495f4a91f00266155d6282d52485d  # v1.20.2
+    rev: d2823d321df3af8f878f7ee3414dc94d037145b9  # v2.1.0
     hooks:
       - id: mypy
         name: mypy-python

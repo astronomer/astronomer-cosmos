@@ -67,13 +67,10 @@ def _get_task_group_id(ti: Any) -> str | None:
     task = getattr(ti, "task", None)
     if task is None:
         return None
-    # ``task.task_group`` is part of every Airflow operator's contract (it is
-    # ``None`` for root-level tasks, a ``TaskGroup`` otherwise). Using direct
-    # attribute access here means a future rename or typo raises
-    # ``AttributeError`` at first invocation rather than silently degrading to
-    # the colliding-key behaviour we just fixed.
-    task_group = task.task_group
-    return task_group.group_id if task_group is not None else None
+    # On a bound operator ``task.task_group`` is always a ``TaskGroup``: the
+    # implicit root group (whose ``group_id`` is ``None``) for top-level tasks,
+    # or the enclosing user-defined group otherwise.
+    return task.task_group.group_id
 
 
 def _init_xcom_backup(context: Any) -> None:

@@ -36,6 +36,11 @@ autoapi_ignore = ["*/tests/*"]
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/tests/*"]
 
+# URLs / patterns to skip during `sphinx-build -b linkcheck`. Add patterns here
+# for destinations that reliably reject automated requests (login walls, bot
+# blockers) or are otherwise flaky in CI.
+linkcheck_ignore: list[str] = []
+
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

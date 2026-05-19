@@ -70,7 +70,8 @@ def _get_task_group_id(ti: Any) -> str | None:
     # On a bound operator ``task.task_group`` is always a ``TaskGroup``: the
     # implicit root group (whose ``group_id`` is ``None``) for top-level tasks,
     # or the enclosing user-defined group otherwise.
-    return task.task_group.group_id
+    group_id: str | None = task.task_group.group_id
+    return group_id
 
 
 def _init_xcom_backup(context: Any) -> None:

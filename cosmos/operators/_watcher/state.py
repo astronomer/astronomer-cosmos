@@ -36,6 +36,25 @@ PRODUCER_TERMINAL_STATES = frozenset({"success", "failed", "skipped", "upstream_
 # final outcome and the trigger can exit early. Subset of PRODUCER_TERMINAL_STATES.
 PRODUCER_FINAL_STATES = frozenset({"failed", "success", "skipped"})
 
+# Substring of the dbt CLI error raised when the watcher's
+# ``dbt <subcommand> --log-format json …`` command is rejected because dbt < 1.8
+# only accepts ``--log-format`` as a global flag (before the subcommand).
+# See cosmos/issues/2698 and PR #2700 for full context.
+DBT_LOG_FORMAT_OPTION_ERROR_SUBSTR = "No such option '--log-format'"
+
+# User-facing hint that replaces the raw dbt CLI error message when the watcher
+# detects the dbt < 1.8 incompatibility, so users have a clear path to a fix
+# instead of an opaque ``No such option`` error.
+WATCHER_MIN_DBT_VERSION_HINT = (
+    "ExecutionMode.WATCHER requires dbt-core 1.8 or newer. The watcher passes "
+    "``--log-format json`` after the dbt subcommand (e.g. ``dbt build --log-format "
+    "json ...``), and dbt < 1.8 only accepts ``--log-format`` as a global flag "
+    "(before the subcommand), so the dbt CLI rejects the command before any "
+    "watcher logic runs. Either upgrade dbt-core to 1.8+ (recommended; dbt < 1.8 "
+    "is end-of-life per https://docs.getdbt.com/docs/dbt-versions/core) or switch "
+    "to ExecutionMode.LOCAL."
+)
+
 
 class DbtTestStatus(str, Enum):
     """Aggregated status of all tests for a given model."""
@@ -69,6 +88,16 @@ def is_dbt_node_status_terminal(status: str | None) -> bool:
 def is_producer_task_terminated(state: str | None) -> bool:
     """Return True when the producer task is in a terminal state."""
     return state in PRODUCER_TERMINAL_STATES
+
+
+def is_dbt_log_format_option_error(exc: BaseException) -> bool:
+    """Return True when ``exc`` is the dbt CLI's ``No such option '--log-format'`` error.
+
+    Surfaces on dbt < 1.8, where ``--log-format`` is a global flag only and
+    cannot appear after the subcommand. The watcher producer and the consumer
+    fallback both construct ``dbt <subcommand> --log-format json …`` commands.
+    """
+    return DBT_LOG_FORMAT_OPTION_ERROR_SUBSTR in str(exc)
 
 
 def get_status_xcom_key(unique_id: str) -> str:

@@ -15,6 +15,7 @@ from cosmos.operators._watcher.state import (
     get_compiled_sql_xcom_key,
     get_dbt_event_xcom_key,
     get_status_xcom_key,
+    is_dbt_log_format_option_error,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
@@ -104,6 +105,27 @@ class TestProducerTaskTerminated:
     @pytest.mark.parametrize("state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule", None, ""])
     def test_non_terminal_states(self, state: str | None):
         assert is_producer_task_terminated(state) is False
+
+
+class TestIsDbtLogFormatOptionError:
+    """Tests for is_dbt_log_format_option_error helper (watcher requires dbt 1.8+)."""
+
+    def test_returns_true_for_log_format_option_error(self):
+        exc = RuntimeError("dbt invocation did not complete with unhandled error: No such option '--log-format'.")
+        assert is_dbt_log_format_option_error(exc) is True
+
+    def test_returns_true_when_substring_is_anywhere_in_message(self):
+        exc = ValueError("wrapped: <Click No such option '--log-format'> while running build")
+        assert is_dbt_log_format_option_error(exc) is True
+
+    def test_returns_false_for_unrelated_error(self):
+        exc = RuntimeError("dbt invocation completed with errors: model_a failed")
+        assert is_dbt_log_format_option_error(exc) is False
+
+    def test_returns_false_for_other_log_option_error(self):
+        # A different "No such option" error should not be mistaken for the --log-format one.
+        exc = RuntimeError("No such option '--log-level'.")
+        assert is_dbt_log_format_option_error(exc) is False
 
 
 @pytest.mark.parametrize(

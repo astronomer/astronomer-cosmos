@@ -24,13 +24,19 @@ from cosmos.constants import (
 )
 from cosmos.dataset import get_dataset_namespace
 from cosmos.dbt.graph import DbtNode
+from cosmos.exceptions import CosmosDbtRunError
 from cosmos.log import get_logger
 from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
     store_dbt_resource_status_from_log,
 )
-from cosmos.operators._watcher.state import DBT_SOURCE_FRESHNESS_STALE_STATUSES, DBT_SUCCESS_STATUSES
+from cosmos.operators._watcher.state import (
+    DBT_SOURCE_FRESHNESS_STALE_STATUSES,
+    DBT_SUCCESS_STATUSES,
+    WATCHER_MIN_DBT_VERSION_HINT,
+    is_dbt_log_format_option_error,
+)
 from cosmos.operators._watcher.xcom import (
     _backup_xcom_to_variable,
     _delete_xcom_backup_variable,
@@ -464,9 +470,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             _delete_xcom_backup_variable(context)
             return return_value
 
-        except Exception:
+        except Exception as exc:
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             _backup_xcom_to_variable(context)
+            if is_dbt_log_format_option_error(exc):
+                raise CosmosDbtRunError(f"{WATCHER_MIN_DBT_VERSION_HINT} Original error: {exc}") from exc
             raise
 
 

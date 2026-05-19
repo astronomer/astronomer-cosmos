@@ -18,10 +18,12 @@ from cosmos.constants import (
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
 )
+from cosmos.exceptions import CosmosDbtRunError
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
+    WATCHER_MIN_DBT_VERSION_HINT,
     _iso_to_string,
     _log_dbt_event,
     build_producer_state_fetcher,
@@ -29,6 +31,7 @@ from cosmos.operators._watcher.state import (
     get_dbt_event_xcom_key,
     get_status_xcom_key,
     get_xcom_val,
+    is_dbt_log_format_option_error,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
@@ -455,7 +458,12 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         model_selector = self.model_unique_id.split(".", 2)[2]
         cmd_flags = extra_flags + ["--select", model_selector]
 
-        self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]
+        try:
+            self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]
+        except Exception as exc:
+            if is_dbt_log_format_option_error(exc):
+                raise CosmosDbtRunError(f"{WATCHER_MIN_DBT_VERSION_HINT} Original error: {exc}") from exc
+            raise
 
         logger.info("dbt run completed successfully on retry for model '%s'", self.model_unique_id)
         return True

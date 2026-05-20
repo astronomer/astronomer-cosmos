@@ -107,8 +107,6 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             except ImportError:
                 from airflow.datasets import DatasetAlias  # type: ignore
 
-            # ignoring the type because older versions of Airflow raise the follow error in mypy
-            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
             dag_id = kwargs.get("dag")
             task_group_id = kwargs.get("task_group")
             kwargs["outlets"] = [DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))]

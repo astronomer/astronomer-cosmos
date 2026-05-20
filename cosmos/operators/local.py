@@ -945,8 +945,6 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
             ):
                 from airflow.datasets import DatasetAlias
 
-                # ignoring the type because older versions of Airflow raise the follow error in mypy
-                # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
                 dag_id = kwargs.get("dag")
                 task_group_id = kwargs.get("task_group")
                 operator_kwargs["outlets"] = [

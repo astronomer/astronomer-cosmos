@@ -299,7 +299,7 @@ In watcher execution mode there are three different "types" of tasks that are ex
 
 - Producer tasks: execute a ``dbt build`` for the dbt project being rendered and orchestrated with watcher execution mode
 - Watcher tasks: lightweight sensors that wait for the producer task to complete
-- Retries: executes a dbt command for a specific node, **only when there is failure for that node**
+- Consumer tasks: (retries) executes a dbt command for a specific node, **only when there is failure for that node**
 
 Producer tasks typically require a high-memory worker to execute the ``dbt build`` command. On their first attempt, the consumer sensors require minimal CPU and memory resources. However, if these tasks retry, they execute the dbt command for the node, which may require significantly more resources. To ensure that the producer tasks and retry attempts have the appropriate resources for execution, the ``watcher_dbt_execution_queue`` configuration can be set.
 

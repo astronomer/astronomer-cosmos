@@ -7,14 +7,14 @@ Changelog
 Bug Fixes
 
 * Sanitize disallowed characters from XCom backup variable key by @MichaelRBlack in #2629
+* Prevent watcher producers from colliding on one XCom-backup key by @tatiana in #2683
+* Retry watcher downstream models on upstream-failure recovery by @tatiana in #2684
+* Fix ``ExecutionMode.WATCHER`` interaction with ``depends_on_past`` by @johnhoran in #2615
 * Fix duplicate ``deferrable`` kwarg in ``DbtRunAirflowAsyncBigqueryOperator`` by @pankajastro in #2616
 * Fix dbt docs iframe ``src`` missing deployment path prefix by @pankajastro in #2640
 * Defer ``TaskInstance`` import in cluster policy to fix Sentry init crash by @pankajastro in #2662
 * Restore type hints broken by lazy imports in ``cosmos/__init__.py`` by @pankajastro in #2647
 * Fix ``ExecutionMode.WATCHER`` non-dbt stdout being suppressed from logs by @pankajastro in #2654
-* Prevent watcher producers from colliding on one XCom-backup key by @tatiana in #2683
-* Retry watcher downstream models on upstream-failure recovery by @tatiana in #2684
-* Fix ``ExecutionMode.WATCHER`` interaction with ``depends_on_past`` by @johnhoran in #2615
 
 Docs
 

@@ -470,31 +470,6 @@ The consumer sensor recognises three state families: ``"skipped"`` raises ``Airf
 ``"skipped"`` for stale dependents — a node is skipped only when **all** of its upstream dependencies
 are stale or already skipped.
 
-.. literalinclude:: ../../../../dev/dags/watcher_with_freshness_check.py
-    :language: python
-    :start-after: [START example_watcher_with_freshness]
-    :end-before: [END example_watcher_with_freshness]
-
-To override the default logic, pass a ``freshness_callback`` via ``setup_operator_args``
-(custom callback support added in Cosmos 1.15.0):
-
-.. code-block:: python
-
-    def my_freshness_callback(
-        context: Context,
-        dag: Any,
-        task_group: TaskGroup | None,
-        nodes: dict[str, DbtNode] | None,  # full DbtGraph.nodes for dependency traversal
-        sources_json: dict[str, Any] | None,  # parsed target/sources.json
-    ) -> list[tuple[str, str]]:  # (unique_id, state) pairs
-        ...
-
-
-    execution_config = ExecutionConfig(
-        execution_mode=ExecutionMode.WATCHER,
-        setup_operator_args={"freshness_callback": my_freshness_callback},
-    )
-
 **Known limitations:**
 
 - Incompatible with ``selector`` in ``RenderConfig`` — ``--exclude`` is ignored by dbt when a YAML selector is active.

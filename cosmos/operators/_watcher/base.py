@@ -447,7 +447,15 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
-        """Filters out dbt flags that are incompatible with retry (e.g., --select, --exclude)."""
+        """Filters out dbt flags that should not propagate from the producer to the consumer's retry:
+
+        - ``--select`` / ``--exclude``: the consumer targets a single model and re-applies its own selector.
+        - ``--log-format``: the producer always sets ``--log-format json`` so it can parse dbt's structured
+          event stream; the consumer's retry is a user-facing dbt run and should default to text. Users who
+          want JSON on the retry can opt in via
+          ``operator_args={"dbt_cmd_flags": ["--log-format", "json"]}``, which is appended by ``build_cmd``
+          outside of this flag pipeline.
+        """
         filtered = []
         skip_next = False
         for token in flags:
@@ -456,7 +464,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     skip_next = False
                 else:
                     continue  # skip value of previous flag
-            if token in ("--select", "--exclude"):
+            if token in ("--select", "--exclude", "--log-format"):
                 skip_next = True
                 continue
             filtered.append(token)
@@ -466,7 +474,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         """
         Handles logic for retrying a failed dbt model execution.
         Reconstructs the dbt command by cloning the project and re-running the model
-        with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
+        with appropriate flags, while ensuring flags like ``--select``, ``--exclude``,
+        and ``--log-format`` (the producer-only JSON event stream) are excluded.
+
+        Users who want JSON-formatted dbt output on retry can opt in by passing
+        ``operator_args={"dbt_cmd_flags": ["--log-format", "json"]}`` to their
+        ``DbtDag`` / ``DbtTaskGroup``; ``dbt_cmd_flags`` is appended automatically
+        by ``build_cmd`` and is not filtered here.
 
         Subclasses may override to issue a different dbt subcommand (e.g. ``dbt test``
         for test sensors or ``dbt source freshness`` for source sensors).

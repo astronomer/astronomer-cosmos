@@ -146,7 +146,7 @@ def exclude_detached_tests_if_needed(
         exclude_items = current_exclude.split() if current_exclude else []
     else:
         exclude_items = []
-    tests_detached_from_this_node: list[DbtNode] = detached_from_parent.get(node.unique_id, [])  # type: ignore
+    tests_detached_from_this_node: list[DbtNode] = detached_from_parent.get(node.unique_id, [])
     for test_node in tests_detached_from_this_node:
         exclude_items.append(test_node.resource_name.split(".")[0])
     if exclude_items:
@@ -501,7 +501,7 @@ def generate_or_convert_task(
         task_id = task_meta.id
         logger.debug("Converting node <%s> task <%s> using <%s>", node.unique_id, task_id, conversion_function.__name__)
         # In Cosmos 2.0 we should review this implementation and use render_config or another simpler interface:
-        task = conversion_function(  # type: ignore
+        task = conversion_function(
             dag=dag,
             task_group=task_group,
             dbt_project_name=dbt_project_name,
@@ -626,7 +626,7 @@ def generate_task_or_group(
                     **generate_or_convert_task_args,
                     "task_group": model_task_group,
                     "task_meta": test_meta,
-                    "resource_type": DbtResourceType.TEST,  # type: ignore
+                    "resource_type": DbtResourceType.TEST,
                 }
                 test_task = generate_or_convert_task(**test_task_generate_or_convert_task_args)  # type: ignore[arg-type]
                 task >> test_task
@@ -1044,7 +1044,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         test_task_args = {
             **task_or_group_args,
             "task_meta": test_meta,
-            "resource_type": DbtResourceType.TEST,  # type: ignore
+            "resource_type": DbtResourceType.TEST,
         }
         # AFTER_ALL test is a single DAG-level task: place it at root so task_id stays e.g. "astro_shop_test"
         test_task_args["task_group"] = parent_task_group
@@ -1070,7 +1070,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             test_task_args = {
                 **task_or_group_args,
                 "task_meta": test_meta,
-                "resource_type": node.resource_type,  # type: ignore
+                "resource_type": node.resource_type,
             }
             test_task = generate_or_convert_task(**test_task_args)  # type: ignore[arg-type]
             tasks_map[node_id] = test_task

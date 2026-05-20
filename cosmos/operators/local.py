@@ -951,7 +951,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[
                 task_group_id = kwargs.get("task_group")
                 operator_kwargs["outlets"] = [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
-                ]  # type: ignore
+                ]
 
         if "task_id" in operator_kwargs:
             operator_kwargs.pop("task_id")
@@ -1127,7 +1127,7 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
     def execute(self, context: Context, **kwargs: Any) -> None:
         result = self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags())
         self._set_test_result_parsing_methods()
-        number_of_warnings = self.parse_number_of_warnings(result)  # type: ignore
+        number_of_warnings = self.parse_number_of_warnings(result)
         if self.on_warning_callback and number_of_warnings > 0:
             self._handle_warnings(result, context)
 

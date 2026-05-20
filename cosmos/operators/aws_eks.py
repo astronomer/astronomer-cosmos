@@ -71,7 +71,7 @@ class DbtAwsEksBaseOperator(DbtKubernetesBaseOperator):
         if self.config_file:
             raise AirflowException("The config_file is not an allowed parameter for the EksPodOperator.")
 
-    def execute(self, context: Context) -> Any | None:  # type: ignore
+    def execute(self, context: Context) -> Any | None:  # type: ignore[override]
         eks_hook = EksHook(
             aws_conn_id=self.aws_conn_id,
             region_name=self.region,

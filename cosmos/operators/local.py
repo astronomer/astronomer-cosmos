@@ -70,7 +70,7 @@ except ImportError:
 try:  # Airflow 3
     from airflow.sdk.definitions.asset import Asset
 except (ModuleNotFoundError, ImportError):  # Airflow 2
-    from airflow.datasets import Dataset as Asset  # type: ignore
+    from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
 
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -157,7 +157,7 @@ except (ImportError, ModuleNotFoundError):
         )
 
         @define
-        class OperatorLineage:  # type: ignore
+        class OperatorLineage:  # type: ignore[no-redef]
             inputs: list[str] = list()
             outputs: list[str] = list()
             run_facets: dict[str, str] = dict()
@@ -852,8 +852,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         if openlineage_events_completes is not None:
             for completed in openlineage_events_completes:
-                [inputs.append(input_) for input_ in completed.inputs if input_ not in inputs]  # type: ignore
-                [outputs.append(output) for output in completed.outputs if output not in outputs]  # type: ignore
+                [inputs.append(input_) for input_ in completed.inputs if input_ not in inputs]  # type: ignore[func-returns-value, union-attr]
+                [outputs.append(output) for output in completed.outputs if output not in outputs]  # type: ignore[func-returns-value, union-attr]
                 run_facets = {**run_facets, **completed.run.facets}
                 job_facets = {**job_facets, **completed.job.facets}
         else:

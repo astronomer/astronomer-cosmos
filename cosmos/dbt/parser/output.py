@@ -57,7 +57,7 @@ def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
     from invoking dbt build, compile, run, seed, snapshot, test, or run-operation.
     """
     num = 0
-    for run_result in result.result.results:  # type: ignore
+    for run_result in result.result.results:  # type: ignore[union-attr]
         if run_result.status == "warn":
             num += 1
     return num
@@ -143,7 +143,7 @@ def extract_dbt_runner_issues(
     node_names = []
     node_results = []
 
-    for node_result in result.result.results:  # type: ignore
+    for node_result in result.result.results:  # type: ignore[union-attr]
         if node_result.status in status_levels:
             node_names.append(str(node_result.node.name))
             node_results.append(str(node_result.message))

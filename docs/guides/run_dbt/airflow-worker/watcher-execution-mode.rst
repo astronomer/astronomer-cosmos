@@ -60,101 +60,17 @@ We used a dbt project developed by Google, the `google/fhir-dbt-analytics <https
 - 52 sources
 - 185 models
 
-Initial benchmarks, using  illustrate significant improvements:
+We benchmarked ``ExecutionMode.LOCAL`` against ``ExecutionMode.WATCHER`` on the project above using an Apache Airflow Helm chart deployment in May 2026. The headline results:
 
-+-----------------------------------------------+-----------+--------------------+
-| Environment                                   | Threads   | Wall time (minutes)|
-+===============================================+===========+====================+
-| dbt build (dbt CLI)                           | 4         | 6–7                |
-+-----------------------------------------------+-----------+--------------------+
-| dbt run per model (dbt CLI)                   | —         | 30                 |
-| similar to the Cosmos ``ExecutionMode.LOCAL`` |           |                    |
-+-----------------------------------------------+-----------+--------------------+
-| Cosmos ``ExecutionMode.LOCAL`` (Astro CLI)    | —         | 10–15              |
-+-----------------------------------------------+-----------+--------------------+
-| Cosmos ``ExecutionMode.WATCHER`` (Astro CLI)  | 1         | 26                 |
-|                                               | 2         | 14                 |
-|                                               | 4         | 7                  |
-|                                               | 8         | 4                  |
-|                                               | 16        | 2                  |
-+-----------------------------------------------+-----------+--------------------+
-| Cosmos ``ExecutionMode.WATCHER`` (Astro Cloud | 8         | ≈5                 |
-| Standard Deployment with A10 workers          |           |                    |
-+-----------------------------------------------+-----------+--------------------+
+- **Runtime**: ``WATCHER`` ran the DAG about 41% faster than ``LOCAL`` at ``threads=8`` (roughly 5.2 versus 8.9 minutes). Even at dbt's default ``threads=4``, ``WATCHER`` was about 15% faster.
+- **Memory**: Consumer pool peak memory dropped roughly 15% under ``WATCHER`` (10.0 GiB to about 8.5 GiB), because only the dedicated producer pod runs ``dbt build`` instead of one dbt process per concurrent consumer slot.
+- **CPU**: ``WATCHER`` drives the consumer pool to roughly 90% of its available CPU via lightweight sensor work, whereas ``LOCAL`` plateaus at about 48% because each dbt task spends most of its time waiting on the warehouse. Producer CPU rises sub-linearly with threads (0.28 to 0.83 cores from ``threads=4`` to ``threads=16``).
+- **Thread scaling**: ``threads=8`` is a strong default. Past 8 threads the producer ``dbt build`` keeps speeding up, but consumer sensors take proportionally longer to wake up (tracked in `astronomer/astronomer-cosmos#2657 <https://github.com/astronomer/astronomer-cosmos/issues/2657>`_), so total wall time plateaus.
 
-The last line represents the performance improvement in a real-world Airflow deployment, using `Astro Cloud <https://www.astronomer.io/>`_.
-
-Depending on the dbt workflow topology, if your dbt DAG previously took 5 minutes with ``ExecutionMode.LOCAL``, you can expect it to complete in roughly **1 minute** with ``ExecutionMode.WATCHER``.
-
-We plan to repeat these benchmarks and share the code with the community in the future.
-
+For the full cluster setup, per-configuration tables, and methodology, see :ref:`watcher-benchmark`. The benchmark code and reproducible sweep recipe live in the `cosmos-benchmark project <https://github.com/astronomer/cosmos-benchmark>`_.
 
 .. note::
    ``ExecutionMode.WATCHER`` relies on the ``threads`` value defined in your dbt profile. Start with a conservative value that matches the CPU capacity of your Airflow workers, then gradually increase it to find the sweet spot between faster runs and acceptable memory/CPU usage.
-
-When we ran the `astronomer/cosmos-benchmark <https://github.com/astronomer/cosmos-benchmark>`_ project with ``ExecutionMode.WATCHER`` (using Astro CLI setup locally, not the Apache Airflow Helm chart setup used for the newer benchmarks below), that same ``threads`` setting directly affected runtime: moving from 1 to 8 threads reduced the end-to-end ``dbt build`` duration from roughly 26 minutes to about 4 minutes (see table above), while 16 threads squeezed it to around 2 minutes at the cost of higher CPU usage. Use those numbers as a reference point when evaluating how thread counts scale in your own environment.
-
-Benchmarks on the Apache Airflow Helm chart (dated 2026-05-15)
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-The numbers above came from local (individual laptop) Astro CLI setup. To validate the gains on a more representative Airflow cluster, we re-ran the same comparison with the `astronomer/cosmos-benchmark <https://github.com/astronomer/cosmos-benchmark>`_ project on the official `Apache Airflow Helm chart <https://airflow.apache.org/docs/helm-chart/stable/index.html>`_, with a dedicated worker pool for the heavy producer ``dbt build`` step and a separate pool for the per-model sensor tasks.
-
-The full setup script, raw per-rep data, and a reproducible sweep recipe are published in the `cosmos-benchmark readme <https://github.com/astronomer/cosmos-benchmark/blob/main/benchmark/readme.md#results-local-vs-watcher-2026-05-15>`_. Cluster shape for the runs reported below:
-
-- Apache Airflow Helm chart ``1.21.0`` (Airflow ``3.2.0``)
-- ``astronomer-cosmos==1.14.1``, ``dbt-bigquery==1.9``
-- dbt project: ``google/fhir-dbt-analytics`` (2 seeds, 52 sources, 185 models)
-- Producer pool: 1 replica, ``cpu=1`` / ``memory=2Gi``
-- Consumer pool: 9 replicas, ``cpu=1`` / ``memory=2Gi`` with ``worker_concurrency=2`` (18 task slots total)
-- Airflow ``parallelism=16``
-- Cosmos ``watcher_dbt_execution_queue=producer`` routing so the producer ``dbt build`` always lands on the dedicated pool
-- 5 repetitions per configuration; wall time below is ``mean ± sample-stdev (n=5)``
-
-**Timing and CPU**
-
-+---------+---------+-----------+----------------+-----------+-----------+
-| Mode    | Threads | Wall time | Producer       | Producer  | Consumer  |
-|         |         | (minutes) | time (minutes) | max CPU   | max CPU   |
-+=========+=========+===========+================+===========+===========+
-| LOCAL   | N/A     | 8.9 ± 0.2 | N/A            | N/A       | 4.30      |
-+---------+---------+-----------+----------------+-----------+-----------+
-| WATCHER | 4       | 7.5 ± 0.2 | 7.3            | 0.28      | 7.96      |
-+---------+---------+-----------+----------------+-----------+-----------+
-| WATCHER | 8       | 5.2 ± 0.2 | 4.2            | 0.54      | 8.05      |
-+---------+---------+-----------+----------------+-----------+-----------+
-| WATCHER | 12      | 5.6 ± 1.2 | 4.3            | 0.70      | 8.15      |
-+---------+---------+-----------+----------------+-----------+-----------+
-| WATCHER | 16      | 5.2 ± 0.3 | 3.1            | 0.83      | 8.30      |
-+---------+---------+-----------+----------------+-----------+-----------+
-
-``Producer max CPU`` and ``Consumer max CPU`` are peak cores observed during the run. The producer pool's capacity is 1 core; the consumer pool's is 9 cores (9 replicas × 1 core).
-
-**Peak memory by pool**
-
-+---------+---------+---------------+---------------+
-| Mode    | Threads | Producer peak | Consumer peak |
-|         |         | memory (GiB)  | memory (GiB)  |
-+=========+=========+===============+===============+
-| LOCAL   | N/A     | N/A           | 10.0          |
-+---------+---------+---------------+---------------+
-| WATCHER | 4       | 0.8           | 8.1           |
-+---------+---------+---------------+---------------+
-| WATCHER | 8       | 0.8           | 8.5           |
-+---------+---------+---------------+---------------+
-| WATCHER | 12      | 0.8           | 8.7           |
-+---------+---------+---------------+---------------+
-| WATCHER | 16      | 0.8           | 8.6           |
-+---------+---------+---------------+---------------+
-
-**What this means for you**
-
-- ``WATCHER`` beat ``LOCAL`` at every thread count we tested. Even at dbt's default of 4 threads, ``WATCHER`` cut wall-clock runtime by about 15% (7.5 vs 8.9 minutes). With 8 threads or more, ``WATCHER`` ran the DAG roughly 41% faster than ``LOCAL``.
-- ``threads=8`` is a strong default. Past 8 threads the producer ``dbt build`` itself kept getting faster (4.2 minutes at ``threads=8`` versus 3.1 minutes at ``threads=16``), but the consumer sensor tasks took correspondingly longer to wake up and finalise, so total wall time plateaued (we are tracking the investigation of this consumer-side behaviour in `astronomer/astronomer-cosmos#2657 <https://github.com/astronomer/astronomer-cosmos/issues/2657>`_ and will update the findings as they become available). Start at 8 and only push higher if your producer task is the bottleneck.
-- Producer CPU rises with ``threads``, but sub-linearly. Going from 4 to 16 threads pushed producer peak CPU from 0.28 to 0.83 cores. dbt threads spend most of their time waiting on the warehouse, so most extra threads do not consume an extra core. Sizing the producer pod for roughly 1 core covers ``threads=16`` comfortably.
-- ``LOCAL`` is bound by your data warehouse, not Airflow. Under ``LOCAL`` the consumer pool peaked at 4.30 of 9 available cores (about 48%), because each dbt task spent most of its time waiting on BigQuery. Adding more Airflow workers will not move that ceiling. ``WATCHER`` instead saturates the consumer pool to roughly 8 cores via lightweight sensor work, and runs the heavy ``dbt build`` on the dedicated producer pod.
-- ``WATCHER`` cuts consumer memory pressure. Consumer peak memory drops from 10.0 GiB under ``LOCAL`` to roughly 8.5 GiB under ``WATCHER``, because the heavy ``dbt build`` runs in the 0.8 GiB producer pod rather than across the consumer pool's 18 concurrent dbt processes.
-
-These numbers reflect one specific dbt project, warehouse, and worker shape. Treat them as a directional baseline and re-run the benchmark against your own pipeline before settling on a thread count.
 
 To increase the number of threads, edit your dbt ``profiles.yml`` (or Helm values if you manage the profile there) and update the ``threads`` key for the target you use with Cosmos:
 

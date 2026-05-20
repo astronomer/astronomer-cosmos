@@ -868,8 +868,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         if openlineage_events_completes is not None:
             for completed in openlineage_events_completes:
-                [inputs.append(input_) for input_ in completed.inputs if input_ not in inputs]  # type: ignore[func-returns-value, union-attr]
-                [outputs.append(output) for output in completed.outputs if output not in outputs]  # type: ignore[func-returns-value, union-attr]
+                for input_ in completed.inputs:  # type: ignore[union-attr]
+                    if input_ not in inputs:
+                        inputs.append(input_)
+                for output in completed.outputs:  # type: ignore[union-attr]
+                    if output not in outputs:
+                        outputs.append(output)
                 run_facets = {**run_facets, **completed.run.facets}
                 job_facets = {**job_facets, **completed.job.facets}
         else:

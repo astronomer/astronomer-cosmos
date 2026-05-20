@@ -28,12 +28,21 @@ Docs
 * Normalize heading underlines in ``docs/guides/`` and ``docs/index.rst`` by @pankajkoti in #2664
 * Fix broken cross-directory doc links by @pankajastro in #2694
 * Fix broken external links in hand-written docs by @pankajastro in #2696
+* Document support for Airflow 3.2 in the compatibility policy by @pankajastro in #2652
+* Refresh the dbt/Airflow conflicts table to match the compatibility policy by @pankajastro in #2653
 
 Others
 
 * Import ``ParamValidationError`` from ``airflow.sdk`` to silence deprecation warning by @pankajastro in #2645
 * Import ``DAG`` from ``airflow.sdk`` to silence deprecation warning by @pankajastro in #2644
 * Enforce docs style guide via pre-commit hook by @pankajkoti and @tatiana in #2633
+* Add Airflow 3.2 to the test matrix in ``CLAUDE.md`` by @pankajastro in #2646
+* Document the lazy-logging standard in ``CLAUDE.md`` by @pankajastro in #2679
+* Extract watcher XCom-key helpers and inline single-use bindings by @pankajastro in #2673
+* Remove leftover ``scripts/airflow3`` directory by @pankajastro in #2661
+* Fix ``altered_jaffle_shop`` seed-dep CTE references by @pankajastro in #2690
+* Skip Airflow 3.0 integration test stuck on ``example_watcher_with_freshness`` by @pankajastro in #2692
+* Fix typo "constrantis" → "constraints" in tests env comment by @pankajastro in #2669
 
 1.14.1 (2026-04-23)
 -------------------

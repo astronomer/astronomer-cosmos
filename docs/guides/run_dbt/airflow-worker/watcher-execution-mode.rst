@@ -305,7 +305,7 @@ Producer tasks typically require a high-memory worker to execute the ``dbt build
 
 The ``watcher_dbt_execution_queue`` configuration allows you to specify the worker queue that the producer tasks and retry attempts use. This enables you to:
 
-- **Optimize resource allocation** — Use high-resource workers for producer tasks, lightweight workers for initial sensor execution, and high-resource workers for retries
+- **Optimize resource allocation** — Use high-resource workers for producer tasks and sensor retries, and lightweight workers for initial sensor execution.
 - **Improve scheduling efficiency** — Prevent resource contention between producer/retry executions and initial sensor tasks
 - **Scale independently** — Scale "execution" queues (producer and retry) separately from sensor tasks
 

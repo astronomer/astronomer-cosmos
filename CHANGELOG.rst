@@ -1,6 +1,40 @@
 Changelog
 =========
 
+1.14.2 (2026-05-20)
+-------------------
+
+Bug Fixes
+
+* Sanitize disallowed characters from XCom backup variable key by @MichaelRBlack in #2629
+* Fix duplicate ``deferrable`` kwarg in ``DbtRunAirflowAsyncBigqueryOperator`` by @pankajastro in #2616
+* Fix dbt docs iframe ``src`` missing deployment path prefix by @pankajastro in #2640
+* Defer ``TaskInstance`` import in cluster policy to fix Sentry init crash by @pankajastro in #2662
+* Restore type hints broken by lazy imports in ``cosmos/__init__.py`` by @pankajastro in #2647
+* Fix ``ExecutionMode.WATCHER`` non-dbt stdout being suppressed from logs by @pankajastro in #2654
+* Prevent watcher producers from colliding on one XCom-backup key by @tatiana in #2683
+* Retry watcher downstream models on upstream-failure recovery by @tatiana in #2684
+* Fix ``ExecutionMode.WATCHER`` interaction with ``depends_on_past`` by @johnhoran in #2615
+
+Docs
+
+* Document source freshness aware execution for ``ExecutionMode.WATCHER`` by @pankajastro in #2617
+* Add reference docs for ``DbtRunLocalOperator``, ``DbtTestLocalOperator``, ``DbtSnapshotLocalOperator`` and ``DbtBuildLocalOperator`` by @pankajastro in #2643
+* Add watcher retry behaviour history documentation by @tatiana in #2600
+* Add Apache Airflow® trademark on first prominent mention by @pankajkoti in #2624
+* Sentence-case section headings by @pankajkoti in #2630
+* Use ``-`` for bullet points by @pankajkoti in #2631
+* Drop decorative separator lines by @pankajkoti in #2632
+* Normalize heading underlines in ``docs/guides/`` and ``docs/index.rst`` by @pankajkoti in #2664
+* Fix broken cross-directory doc links by @pankajastro in #2694
+* Fix broken external links in hand-written docs by @pankajastro in #2696
+
+Others
+
+* Import ``ParamValidationError`` from ``airflow.sdk`` to silence deprecation warning by @pankajastro in #2645
+* Import ``DAG`` from ``airflow.sdk`` to silence deprecation warning by @pankajastro in #2644
+* Enforce docs style guide via pre-commit hook by @pankajkoti and @tatiana in #2633
+
 1.14.1 (2026-04-23)
 -------------------
 

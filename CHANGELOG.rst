@@ -15,6 +15,8 @@ Bug Fixes
 * Defer ``TaskInstance`` import in cluster policy to fix Sentry init crash by @pankajastro in #2662
 * Restore type hints broken by lazy imports in ``cosmos/__init__.py`` by @pankajastro in #2647
 * Fix ``ExecutionMode.WATCHER`` non-dbt stdout being suppressed from logs by @pankajastro in #2654
+* Fix test sensor retry behaviour in ``ExecutionMode.WATCHER`` by @pankajkoti in #2658
+* Fix watcher fallback selector for versioned dbt models by @pankajkoti in #2659
 
 Docs
 

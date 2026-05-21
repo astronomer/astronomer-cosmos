@@ -18,6 +18,7 @@ Bug Fixes
 * Fix ``ExecutionMode.WATCHER`` non-dbt stdout being suppressed from logs by @pankajastro in #2654
 * Fix test sensor retry behaviour in ``ExecutionMode.WATCHER`` by @pankajkoti in #2658
 * Fix watcher fallback selector for versioned dbt models by @pankajkoti in #2659
+* Break out of iframe from Airflow 2 dbt Docs 404 link by @pankajastro in #2685
 
 Docs
 
@@ -33,6 +34,7 @@ Docs
 * Fix broken external links in hand-written docs by @pankajastro in #2696
 * Document support for Airflow 3.2 in the compatibility policy by @pankajastro in #2652
 * Refresh the dbt/Airflow conflicts table to match the compatibility policy by @pankajastro in #2653
+* Document incremental model limitation for ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajastro in #2642
 
 Others
 

@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.14.2 (2026-05-20)
+1.14.2 (2026-05-21)
 -------------------
 
 Bug Fixes
@@ -10,6 +10,7 @@ Bug Fixes
 * Prevent watcher producers from colliding on one XCom-backup key by @tatiana in #2683
 * Retry watcher downstream models on upstream-failure recovery by @tatiana in #2684
 * Fix ``ExecutionMode.WATCHER`` interaction with ``depends_on_past`` by @johnhoran in #2615
+* Strip ``--log-format`` from producer flags on watcher consumer retry by @tatiana in #2713
 * Fix duplicate ``deferrable`` kwarg in ``DbtRunAirflowAsyncBigqueryOperator`` by @pankajastro in #2616
 * Fix dbt docs iframe ``src`` missing deployment path prefix by @pankajastro in #2640
 * Defer ``TaskInstance`` import in cluster policy to fix Sentry init crash by @pankajastro in #2662

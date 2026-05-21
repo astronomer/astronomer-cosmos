@@ -161,6 +161,19 @@ The following template fields are only selectable when using the operators in a 
 
 Since Airflow resolves template fields during Airflow DAG execution and not DAG parsing, the args above cannot be templated via ``DbtDag`` and ``DbtTaskGroup`` because both need to select dbt nodes during DAG parsing.
 
-Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
-This is provided for telemetry on task execution, and is not an operator arg.
-For more information about this, see the :doc:`Compiled SQL </guides/cosmos_devex/compiled-sql>` docs.
+Output-only template fields
++++++++++++++++++++++++++++
+
+A small number of template fields on the local execution mode operators are
+*output-only*: Cosmos populates them as the task runs so the values appear in the
+Airflow UI, but any value passed in via ``operator_args`` is silently
+overwritten and has no effect.
+
+- ``compiled_sql`` — the SQL Cosmos compiled for a model. See the
+  :doc:`Compiled SQL </guides/cosmos_devex/compiled-sql>` docs for how it
+  is populated and how to disable it via ``should_store_compiled_sql``.
+- ``freshness`` — the JSON Cosmos captures from ``dbt source freshness`` when
+  source nodes run, reset on every task instance.
+
+If you need to set one of these values through ``operator_args`` for an
+upstream task to consume, use a separate, regular template field instead.

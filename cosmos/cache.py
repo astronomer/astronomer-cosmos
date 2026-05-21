@@ -3,9 +3,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
-import os
 import shutil
-import tempfile
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -25,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cosmos import settings
+from cosmos.fs import safe_copy
 
 if TYPE_CHECKING:
     try:
@@ -664,35 +663,11 @@ def _get_latest_cached_package_lockfile(project_dir: Path) -> Path | None:
             return cached_package_lockfile
     cached_lockfile_dir = cache_dir / cache_identifier
     cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
-    _safe_copy(package_lockfile, cached_package_lockfile)
+    safe_copy(package_lockfile, cached_package_lockfile)
     return cached_package_lockfile
 
 
 def _copy_cached_package_lockfile_to_project(cached_package_lockfile: Path, project_dir: Path) -> None:
     """Copy the cached package-lock.yml to tmp project dir"""
     package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
-    _safe_copy(cached_package_lockfile, package_lockfile)
-
-
-# TODO: Move this function to a different location
-def _safe_copy(src: Path, dst: Path) -> None:
-    """
-    Safely copies a file from a source path to a destination path.
-
-    This function ensures that the copy operation is atomic by first
-    copying the file to a temporary file in the same directory as the
-    destination and then renaming the temporary file to the destination
-    file. This approach minimizes the risk of file corruption or partial
-    writes in case of a failure or interruption during the copy process.
-
-    See the blog for atomic file operations:
-    https://alexwlchan.net/2019/atomic-cross-filesystem-moves-in-python/
-    """
-    # Create a temporary file in the same directory as the destination
-    dir_name, base_name = os.path.split(dst)
-    temp_fd, temp_path = tempfile.mkstemp(dir=dir_name)
-
-    shutil.copyfile(src, temp_path)
-
-    # Rename the temporary file to the destination file
-    os.rename(temp_path, dst)
+    safe_copy(cached_package_lockfile, package_lockfile)

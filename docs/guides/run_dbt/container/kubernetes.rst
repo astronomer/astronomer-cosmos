@@ -2,20 +2,20 @@
 
 
 Kubernetes execution mode
--------------------------
+=========================
 
 The ``kubernetes`` execution mode provides a very isolated method to run ``dbt`` from within a Kubernetes Pod, usually in a separate host.
 
 Performance and maintenance considerations
-++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This execution mode assumes you have a Kubernetes cluster. It also expects you to ensure the Docker container has up-to-date ``dbt`` pipelines and profiles, potentially leading you to declare secrets in two places; Airflow and Docker container.
+This execution mode assumes you have a Kubernetes cluster. It also expects you to ensure the Docker container has up-to-date ``dbt`` pipelines and profiles, potentially leading you to declare secrets in two places; `Apache Airflow® <https://airflow.apache.org/>`_ and Docker container.
 
 The ``Kubernetes`` deployment might be slower than ``Docker`` and ``Virtualenv``, assuming that the container image is built (which is slower than creating a Python ``virtualenv`` and installing ``dbt-core``) and the Airflow task needs to spin up a new ``Pod`` in Kubernetes.
 
 
 Set up Kubernetes execution mode
-++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The following tutorial illustrates how to run the Cosmos dbt Kubernetes Operator using a local Kubernetes (K8s) cluster. It assumes the following:
 
@@ -23,7 +23,7 @@ The following tutorial illustrates how to run the Cosmos dbt Kubernetes Operator
 - Airflow is run locally, and it triggers a K8s Pod which runs dbt
 
 Requirements
-++++++++++++
+~~~~~~~~~~~~
 
 To test the DbtKubernetesOperators locally, we encourage you to install the following:
 
@@ -48,7 +48,7 @@ For instance,
    :end-before: [END kubernetes_tg_example]
 
 Step-by-step instructions
-+++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Using installed `Kind <https://kind.sigs.k8s.io/>`_, you can setup a local kubernetes cluster
 
@@ -166,8 +166,8 @@ Enable and trigger a run of the `jaffle_shop_k8s <https://github.com/astronomer/
 
 .. _kubernetes-known-limitations:
 
-Known Limitations
-+++++++++++++++++
+Known limitations
+~~~~~~~~~~~~~~~~~
 
 The Kubernetes execution mode has the following limitations:
 

@@ -149,12 +149,13 @@ packages = ["/cosmos"]
 [tool.hatch.envs.tests]
 dependencies = [
     # do not install Airflow dependencies here!
-    # we need to use constrantis and we're doing this in the `pre-install-commands`
+    # we need to use constraints and we're doing this in the `pre-install-commands`
     "packaging>=22.0",
     "pytest>=6.0",
     "pytest-split",
     "pytest-dotenv",
     "pytest-rerunfailures",
+    "pytest-timeout",
     "requests-mock",
     "pytest-cov",
     "pytest-describe",
@@ -167,6 +168,10 @@ dependencies = [
     "types-python-dateutil",
     "Werkzeug<3.0.0",
     "pytest-asyncio",
+    # Needed by the regression test for issue #2620: the test exercises
+    # airflow.sentry's module-level ConfiguredSentry() path, which only
+    # runs when sentry_sdk is importable.
+    "sentry-sdk",
 ]
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python}"]
 

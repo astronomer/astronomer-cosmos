@@ -63,6 +63,17 @@ def get_dag_bag() -> DagBag:  # noqa: C901
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.writelines("example_cosmos_cleanup_dag.py\n")
 
+        if Version("3.0.0") <= AIRFLOW_VERSION < Version("3.1.0"):
+            # `dag.test()` on Airflow 3.0 runs the WatcherTrigger inline. The trigger calls
+            # `airflow.sdk.execution_time.xcom.XCom.get_one`, which imports `SUPERVISOR_COMMS`
+            # from `airflow.sdk.execution_time.task_runner`. That symbol does not exist until
+            # Airflow 3.1, so the import fails, `dag.test()` re-queues the deferred task
+            # forever, and the integration job hangs until GH Actions kills it. The watcher
+            # path works on AF 3.0 in a real triggerer process; this skip only excludes the
+            # `dag.test()` exerciser. Drop once we either depend on AF >= 3.1 or rework the
+            # trigger's XCom fetch to not need `SUPERVISOR_COMMS`.
+            file.writelines("watcher_with_freshness_check.py\n")
+
         if AIRFLOW_VERSION == Version("2.9.0"):
             # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9
             file.writelines("cosmos_example_manifest_dag.py\n")

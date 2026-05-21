@@ -1,11 +1,11 @@
 .. _async-execution-mode:
 
-Airflow async execution mode
-----------------------------
+Apache Airflow® async execution mode
+=====================================
 
 This execution mode can reduce the runtime by 35% in comparison to Cosmos ``LOCAL`` execution mode, but is currently only available for BigQuery. While this mode was introduced in Cosmos 1.9, we strongly encourage users to use the latest version of Cosmos, which has significant performance improvements.
 
-The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using Apache Airflow's
+The ``airflow_async`` execution mode is a way to run the dbt resources from your dbt project using the `Apache Airflow® <https://airflow.apache.org/>`_
 `Deferrable operators <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`__.
 This execution mode is well-suited for when you have long-running resources and you want to run them asynchronously by
 leveraging Airflow's deferrable operators. With deferrable operators, you can potentially observe higher throughput of tasks
@@ -17,7 +17,7 @@ All the pipeline dbt model transformations run using ``DbtRunAirflowAsyncOperato
 You can also use other existing ``BigQueryInsertJobOperator`` features, such as the UI controls to link to the job in the BigQuery UI.
 
 Advantages of Airflow Async Mode
-++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **Improved Task Throughput:** Async tasks free up Airflow workers by leveraging the Airflow Trigger framework. While long-running SQL transformations are executing in the data warehouse, the worker is released and can handle other tasks, increasing overall task throughput.
 - **Better Resource Utilization:** By minimizing idle time on Airflow workers, async tasks allow more efficient use of compute resources. Workers aren't blocked waiting for external systems and can be reused for other work while waiting on async operations.
@@ -36,19 +36,19 @@ We have `observed <https://github.com/astronomer/astronomer-cosmos/pull/1934>`_ 
 +----------------------------------------------+--------------------------+
 
 
-Getting Started with Airflow Async Mode
-+++++++++++++++++++++++++++++++++++++++
+Getting started with Airflow async mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This guide walks you through setting up an Astro CLI project and running a Cosmos-based DAG with a deferrable operator, enabling asynchronous task execution in Apache Airflow.
 
 Prerequisites
-'''''''''''''
++++++++++++++
 
 - `Astro CLI <https://www.astronomer.io/docs/astro/cli/install-cli>`_
 - Airflow>=2.9
 
-1. Create Astro-CLI Project
-'''''''''''''''''''''''''''
+1. Create Astro-CLI project
++++++++++++++++++++++++++++
 
 Run the following command in your terminal:
 
@@ -73,7 +73,7 @@ This will create an Astro project with the following structure:
 
 
 2. Update Dockerfile
-''''''''''''''''''''
+++++++++++++++++++++
 
 Edit your Dockerfile to ensure all necessary requirements are included.
 
@@ -82,8 +82,8 @@ Edit your Dockerfile to ensure all necessary requirements are included.
     FROM astrocrpublic.azurecr.io/runtime:3.0-2
 
 
-3. Add astronomer-cosmos Dependency
-'''''''''''''''''''''''''''''''''''
+3. Add astronomer-cosmos dependency
++++++++++++++++++++++++++++++++++++
 
 In your ``requirements.txt``, add:
 
@@ -93,7 +93,7 @@ In your ``requirements.txt``, add:
 
 
 4. Create Airflow DAG
-'''''''''''''''''''''
++++++++++++++++++++++
 
 1. Create a new DAG file: ``dags/cosmos_async_dag.py``
 
@@ -156,7 +156,7 @@ In your ``requirements.txt``, add:
 
 
 5. Start the project
-''''''''''''''''''''
+++++++++++++++++++++
 
 Launch the Airflow project locally:
 
@@ -170,7 +170,7 @@ This will:
 - Expose Airflow UI at http://localhost:8080
 
 6. Create Airflow connection
-''''''''''''''''''''''''''''
+++++++++++++++++++++++++++++
 
 Create an Airflow connection with following configurations
 
@@ -199,7 +199,7 @@ Create an Airflow connection with following configurations
 
 
 7. Execute the DAG
-''''''''''''''''''
+++++++++++++++++++
 
 1. Visit the Airflow UI at ``http://localhost:8080``
 2. Enable the DAG: ``cosmos_async_dag``
@@ -213,7 +213,7 @@ The ``run`` tasks will run asynchronously via the deferrable operator, freeing u
 
 
 Control where to upload the SQL files
-+++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For optimal performance we encourage to keep Cosmos standard behaviour (introduced in 1.11), which is to upload the SQL files to XCom, instead of a remote object location.
 
@@ -228,7 +228,7 @@ However, if you want to upload the SQL files to a remote object location instead
 
 
 Limitations
-+++++++++++
+~~~~~~~~~~~
 
 
 1. **Limited to dbt models**: Only dbt resource type models are run asynchronously using Airflow deferrable operators. Other resource types are executed synchronously, similar to the local execution mode.
@@ -246,5 +246,7 @@ Limitations
 7. **Performance degradation when uploading to remote object location**: Even though it is possible to upload the SQL files to a remote object location by setting environment variables, it is slow. We observed that this introduces a significant overhead in the execution time (500s for 129 models).
 
 8. **TeardownAsyncOperator limitation**: When using a remote object location, in addition to the ``SetupAsyncOperator``, a ``TeardownAsyncOperator`` is also added to the DAG. This task will delete the SQL files from the remote location by the end of the DAG Run. This is can lead to a limitation from a retry perspective, as described in the issue `#2066 <https://github.com/astronomer/astronomer-cosmos/issues/2066>`_. This can be avoided by setting the ``enable_teardown_async_task`` configuration to ``False``, as described in the :ref:`enable_teardown_async_task` section.
+
+9. **Incremental models not supported**: Incremental models using the ``merge`` or ``insert_overwrite`` strategy are not supported. Use ``ExecutionMode.LOCAL`` for incremental models.
 
 For a comparison between different Cosmos execution modes, please, check the :ref:`execution-modes-comparison` section.

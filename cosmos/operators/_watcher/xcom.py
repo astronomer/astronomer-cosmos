@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import zlib
 from typing import Any
 
@@ -20,20 +21,57 @@ logger = get_logger(__name__)
 
 XCOM_BACKUP_VARIABLE_PREFIX = "cosmos_xcom_backup"
 
+# Characters that secrets backends commonly reject in Variable keys. AWS
+# Secrets Manager allows alphanumerics + ``-/_+=.@!``; GCP Secret Manager is
+# stricter at ``[A-Za-z0-9_-]``. Run IDs routinely contain ``:`` and ``+``
+# (timestamps and timezone offsets, e.g. ``scheduled__2026-05-04T10:15:00+00:00``)
+# and dag/task-group IDs can contain ``.``. Sanitize all components down to
+# ``[A-Za-z0-9_-]`` so the resulting key is portable across backends and does
+# not log a ``ValidationException`` on every ``Variable.set`` call when an
+# external secrets backend is configured (Airflow walks the backend chain on
+# set as well as get).
+_DISALLOWED_VARIABLE_KEY_CHAR_RE = re.compile(r"[^A-Za-z0-9_-]")
+
 
 def _xcom_backup_variable_key(dag_id: str, task_group_id: str | None, run_id: str) -> str:
-    """Build a unique Airflow Variable key for the XCom backup of a watcher producer run."""
-    parts = [XCOM_BACKUP_VARIABLE_PREFIX, dag_id.replace(".", "___")]
+    """Build a unique Airflow Variable key for the XCom backup of a watcher producer run.
+
+    The component-specific period-replacement counts (3 underscores for dag_id,
+    2 for task_group_id, 1 for run_id) are preserved so keys remain visually
+    parseable, then any remaining disallowed character is normalized to ``_``.
+    """
+    parts = [XCOM_BACKUP_VARIABLE_PREFIX, _sanitize_key_component(dag_id.replace(".", "___"))]
     if task_group_id:
-        parts.append(task_group_id.replace(".", "__"))
-    parts.append(run_id.replace(".", "_"))
+        parts.append(_sanitize_key_component(task_group_id.replace(".", "__")))
+    parts.append(_sanitize_key_component(run_id.replace(".", "_")))
     return "__".join(parts)
 
 
+def _sanitize_key_component(value: str) -> str:
+    """Replace characters that secrets backends reject in Variable keys with ``_``."""
+    return _DISALLOWED_VARIABLE_KEY_CHAR_RE.sub("_", value)
+
+
 def _get_task_group_id(ti: Any) -> str | None:
-    """Extract the task_group_id from a task instance, if available."""
+    """Extract the enclosing task group's id from a task instance, if available.
+
+    Airflow operators expose the parent group via ``task.task_group``, and
+    ``TaskGroup.group_id`` is the canonical identifier on both Airflow 2 and
+    Airflow 3. Direct attribute access is intentional: a previous version of
+    this helper read ``task.task_group_id`` (an attribute that does not exist
+    on operators) via ``getattr`` with a ``None`` default, silently dropping
+    the task-group segment from the XCom backup Variable key and causing every
+    watcher producer in the same DAG run to share one key. See
+    https://github.com/astronomer/astronomer-cosmos/issues/2625.
+    """
     task = getattr(ti, "task", None)
-    return getattr(task, "task_group_id", None) if task else None
+    if task is None:
+        return None
+    # On a bound operator ``task.task_group`` is always a ``TaskGroup``: the
+    # implicit root group (whose ``group_id`` is ``None``) for top-level tasks,
+    # or the enclosing user-defined group otherwise.
+    group_id: str | None = task.task_group.group_id
+    return group_id
 
 
 def _init_xcom_backup(context: Any) -> None:

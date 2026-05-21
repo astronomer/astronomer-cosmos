@@ -1,13 +1,13 @@
 .. _gcp-cloud-run-job:
 
 GCP Cloud Run Job execution mode
---------------------------------
+================================
 .. versionadded:: 1.7
 
 The ``gcp_cloud_run_job`` execution mode is particularly useful if you prefer to run their ``dbt`` commands on Google Cloud infrastructure, taking advantage of Cloud Run's scalability, isolation, and managed service capabilities.
 
 Performance and maintenance considerations
-++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For the ``gcp_cloud_run_job`` execution mode to work, a Cloud Run Job instance must first be created using a previously built Docker container. This container should include the latest ``dbt`` pipelines and profiles. You can find more details in the `Cloud Run Job creation guide <https://cloud.google.com/run/docs/create-jobs>`__ .
 
@@ -17,7 +17,7 @@ Each task will create a new Cloud Run Job execution, giving full isolation. The 
 
 
 Setup
-+++++
+~~~~~
 
 This tutorial will guide you through the steps required to use Cloud Run Job instance as the Execution Mode for your dbt code with Astronomer Cosmos. This guide will walk you through the steps required to build the following architecture:
 
@@ -25,21 +25,21 @@ This tutorial will guide you through the steps required to use Cloud Run Job ins
     :width: 600
 
 Prerequisites
-+++++++++++++
+~~~~~~~~~~~~~
 1. Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
-2. Airflow
+2. `Apache Airflow® <https://airflow.apache.org/>`_
 3. Google Cloud SDK (`install guide <https://cloud.google.com/sdk/docs/install>`_)
 4. Astronomer-cosmos package containing the dbt Cloud Run Job operators
 5. GCP account with:
     1. A GCP project (`setup guide <https://cloud.google.com/resource-manager/docs/creating-managing-projects#console>`_)
     2. IAM roles:
-        * Basic Role: `Owner <https://cloud.google.com/iam/docs/understanding-roles#owner>`_ (control over whole project) or
-        * Predefined Roles: `Artifact Registry Administrator <https://cloud.google.com/iam/docs/understanding-roles#artifactregistry.admin>`_, `Cloud Run Developer <https://cloud.google.com/iam/docs/understanding-roles#run.developer>`_ (control over specific services)
+        - Basic Role: `Owner <https://cloud.google.com/iam/docs/understanding-roles>`_ (control over whole project) or
+        - Predefined Roles: `Artifact Registry Administrator <https://cloud.google.com/iam/docs/roles-permissions/artifactregistry>`_, `Cloud Run Developer <https://cloud.google.com/iam/docs/roles-permissions/run>`_ (control over specific services)
     3. Enabled service APIs:
-        * Artifact Registry API
-        * Cloud Run Admin API
-        * BigQuery API
-    4. A service account with BigQuery roles: `JobUser <https://cloud.google.com/iam/docs/understanding-roles#bigquery.jobUser>`_ and `DataEditor <https://cloud.google.com/iam/docs/understanding-roles#bigquery.dataEditor>`_
+        - Artifact Registry API
+        - Cloud Run Admin API
+        - BigQuery API
+    4. A service account with BigQuery roles: `JobUser <https://cloud.google.com/iam/docs/roles-permissions/bigquery>`_ and `DataEditor <https://cloud.google.com/iam/docs/roles-permissions/bigquery>`_
 6. Docker image built with required dbt project and dbt DAG
 7. dbt DAG with Cloud Run Job operators in the Airflow DAGs directory to run in Airflow
 
@@ -51,7 +51,7 @@ More information on how to achieve 2-6 is detailed below.
 
 
 Step-by-step guide
-++++++++++++++++++
+~~~~~~~~~~~~~~~~~~
 
 **Install Airflow and Cosmos**
 

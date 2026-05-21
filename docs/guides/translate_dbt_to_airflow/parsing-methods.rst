@@ -2,7 +2,7 @@
 
 
 Parsing Methods
----------------
+===============
 
 Cosmos offers several options to parse your dbt project:
 
@@ -25,7 +25,7 @@ If you're using the ``docker`` or ``kubernetes`` modes, you should use either ``
 
 
 ``automatic``
-+++++++++++++
+~~~~~~~~~~~~~
 
 When you don't supply an argument to the ``load_mode`` parameter (or you supply the value ``"automatic"``), Cosmos will attempt the other methods in order:
 
@@ -36,8 +36,10 @@ When you don't supply an argument to the ``load_mode`` parameter (or you supply 
 To use this method, you don't need to supply any additional config. This is the default.
 
 
+.. _parsing-methods-dbt-manifest:
+
 ``dbt_manifest``
-++++++++++++++++
+~~~~~~~~~~~~~~~~
 
 If you already have a ``manifest.json`` file created by dbt, Cosmos will parse the manifest to generate your DAG.
 
@@ -97,8 +99,10 @@ from your project directory. If the manifest was built before a package was adde
 appear in the DAG until you regenerate the manifest.
 
 
+.. _parsing-methods-dbt-ls:
+
 ``dbt_ls``
-++++++++++
+~~~~~~~~~~
 
 .. note::
 
@@ -120,7 +124,7 @@ To use this:
     )
 
 Starting in Cosmos 1.5, Cosmos will cache the output of the ``dbt ls`` command, to improve the performance of this
-parsing method. Learn more `here <./caching.html>`_.
+parsing method. Learn more :doc:`here </optimize_performance/caching>`.
 
 Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__. This mode requires dbt version 1.5.0 or higher.
 This mode,  named ``InvocationMode.DBT_RUNNER``, also depends on dbt being installed in the same Python virtual environment as Airflow.
@@ -142,7 +146,7 @@ For more information, check the `RenderConfig docs <./render-config.html>`_.
 
 
 ``dbt_ls_file``
-+++++++++++++++
+~~~~~~~~~~~~~~~
 
 .. note::
    New in Cosmos 1.3.
@@ -163,7 +167,7 @@ To use this:
     )
 
 ``custom``
-++++++++++
+~~~~~~~~~~
 
 If the above methods fail, Cosmos will default to using its own dbt parser. This parser is not as robust as dbt's, so it's recommended that you use one of the above methods if possible.
 

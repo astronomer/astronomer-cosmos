@@ -29,10 +29,15 @@ hatch run tests.py3.11-2.10-1.9:test-integration
 
 Type checking:
 ```bash
-hatch run tests.py3.10-2.10-1.9:type-check
+hatch run tests.py3.10-3.1-1.9:type-check
 ```
 
-Other available matrix versions: Python `3.10`, `3.11`, `3.12`, `3.13` × Airflow `2.9`, `2.10`, `2.11`, `3.0`, `3.1` × dbt `1.5`–`2.0`.
+**Always run the type-check before committing or opening a PR** — mypy is enforced in CI and skipping it locally wastes a CI round-trip. The `type-check` script is an alias for `pre-commit run mypy --files cosmos/**/*`, so if the hatch env's `pre-install-airflow.sh` fails to bootstrap on your machine, fall back to:
+```bash
+pre-commit run mypy --all-files
+```
+
+Other available matrix versions: Python `3.10`, `3.11`, `3.12`, `3.13` × Airflow `2.9`, `2.10`, `2.11`, `3.0`, `3.1`, `3.2` × dbt `1.5`–`2.0`.
 
 ### Linting and Formatting
 
@@ -77,6 +82,41 @@ Follow the [seven rules of a great Git commit message](https://cbea.ms/git-commi
 7. Use the body to explain *what* and *why*, not *how*
 
 Do not use Conventional Commits type prefixes (`feat:`, `fix:`, `chore:`, etc.).
+
+## Python Coding Standards
+
+### Logging
+
+Get loggers via `cosmos.log.get_logger`, not the stdlib `logging` module. This adds the `(astronomer-cosmos)` prefix when `rich_logging` is enabled and respects scoped log-level configuration.
+
+Yes:
+```python
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
+```
+
+No:
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+logging.error(...)  # never call the root logger directly either
+```
+
+Use **lazy logging**: pass the format string and arguments separately. Do not embed f-strings, `.format()`, or `%` interpolation in log messages — the logger formats them only when the record passes the level filter.
+
+Yes:
+```python
+logger.info("Parsed %s nodes in %.3gs", node_count, elapsed)
+```
+
+No:
+```python
+logger.info(f"Parsed {node_count} nodes in {elapsed:.3g}s")
+```
+
+Applies to every `logger.{debug,info,warning,error,exception}` call. f-strings are fine everywhere else (exception messages, return values, etc.).
 
 ## Architecture
 

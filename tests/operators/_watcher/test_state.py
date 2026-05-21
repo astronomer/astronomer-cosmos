@@ -12,6 +12,9 @@ import pytest
 
 from cosmos.operators._watcher.state import (
     _log_dbt_event,
+    get_compiled_sql_xcom_key,
+    get_dbt_event_xcom_key,
+    get_status_xcom_key,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
@@ -25,6 +28,7 @@ from cosmos.operators._watcher.xcom import (
     _init_xcom_backup,
     _persist_backup,
     _restore_xcom_from_variable,
+    _xcom_backup_variable_key,
 )
 
 
@@ -62,6 +66,32 @@ class TestNodeStatusHelpers:
     @pytest.mark.parametrize("status", ["running", None, ""])
     def test_is_dbt_node_status_terminal_false(self, status: str | None):
         assert is_dbt_node_status_terminal(status) is False
+
+
+class TestXcomKeyHelpers:
+    """Tests for the watcher XCom-key builder helpers."""
+
+    @pytest.mark.parametrize(
+        "helper,suffix",
+        [
+            (get_status_xcom_key, "_status"),
+            (get_dbt_event_xcom_key, "_dbt_event"),
+            (get_compiled_sql_xcom_key, "_compiled_sql"),
+        ],
+    )
+    def test_replaces_dots_and_appends_suffix(self, helper, suffix):
+        assert helper("model.my_project.my_model") == f"model__my_project__my_model{suffix}"
+
+    @pytest.mark.parametrize(
+        "helper,suffix",
+        [
+            (get_status_xcom_key, "_status"),
+            (get_dbt_event_xcom_key, "_dbt_event"),
+            (get_compiled_sql_xcom_key, "_compiled_sql"),
+        ],
+    )
+    def test_unique_id_without_dots(self, helper, suffix):
+        assert helper("plain_id") == f"plain_id{suffix}"
 
 
 class TestProducerTaskTerminated:
@@ -124,6 +154,40 @@ class _MockTI:
         self.store[key] = value
 
 
+class TestXcomBackupVariableKey:
+    """Tests for ``_xcom_backup_variable_key`` covering secrets-backend
+    compatibility (AWS Secrets Manager and similar reject ``:``, ``+`` etc.)."""
+
+    AWS_ALLOWED = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+
+    def test_period_replacement_preserved(self):
+        key = _xcom_backup_variable_key("a.b", "g.h", "r.s")
+        assert key == "cosmos_xcom_backup__a___b__g__h__r_s"
+
+    def test_run_id_with_colon_and_plus_is_sanitized(self):
+        key = _xcom_backup_variable_key(
+            dag_id="dbt_daily",
+            task_group_id=None,
+            run_id="scheduled__2026-05-04T10:15:00+00:00",
+        )
+        assert key == "cosmos_xcom_backup__dbt_daily__scheduled__2026-05-04T10_15_00_00_00"
+        assert ":" not in key and "+" not in key
+
+    @pytest.mark.parametrize(
+        "dag_id,task_group_id,run_id",
+        [
+            ("dbt_daily", None, "scheduled__2026-05-04T10:15:00+00:00"),
+            ("dag.with.dots", "group.id", "manual__2026-01-01T00:00:00+00:00"),
+            ("dag with spaces", None, "manual__2026-01-01"),
+            ("dag(parens)", None, "run/with/slashes"),
+            ("dag*star", "group:colon", "run+plus"),
+        ],
+    )
+    def test_result_contains_only_safe_characters(self, dag_id, task_group_id, run_id):
+        key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
+        assert all(c in self.AWS_ALLOWED for c in key), key
+
+
 class TestInitXcomBackup:
     def test_sets_var_key_and_buffer_on_ti(self):
         ti = _MockTI()
@@ -137,12 +201,33 @@ class TestInitXcomBackup:
 
     def test_includes_task_group_id_when_present(self):
         ti = _MockTI()
-        ti.task = MagicMock(task_group_id="my_group")
+        # Airflow operators expose the enclosing group via task.task_group, and
+        # the canonical id is TaskGroup.group_id -- not task.task_group_id,
+        # which does not exist on operators. Regression for issue #2625.
+        ti.task = MagicMock(task_group=MagicMock(group_id="my_group"))
         context = {"ti": ti, "run_id": "manual__2026-01-01"}
 
         _init_xcom_backup(context)
 
         assert "my_group" in ti._cosmos_xcom_backup_var_key
+
+    def test_rejects_task_without_task_group_attribute(self):
+        # Regression for issue #2625: the previous implementation read
+        # ``task.task_group_id`` via ``getattr`` with a ``None`` default, an
+        # attribute that does not exist on real operators -- so it silently
+        # dropped the task-group discriminator and every concurrent watcher
+        # producer in the same DAG run collided on one Variable key. The
+        # fixed helper uses direct attribute access on ``task.task_group``,
+        # so a task that lacks the canonical attribute raises loudly rather
+        # than producing a colliding key.
+        ti = _MockTI()
+        task = MagicMock(spec=["task_group_id"])
+        task.task_group_id = "my_group"
+        ti.task = task
+        context = {"ti": ti, "run_id": "manual__2026-01-01"}
+
+        with pytest.raises(AttributeError, match="task_group"):
+            _init_xcom_backup(context)
 
 
 class TestPersistBackup:

@@ -1,7 +1,7 @@
 .. _operator-args:
 
 Operator arguments
-------------------
+==================
 
 It is possible to pass arguments to Cosmos operators in two ways. Either by passing them when directly instantiating Cosmos Operators
 or by defining the ``operator_args`` within a ``DbtDag`` or a ``DbtTaskGroup`` instance.
@@ -37,10 +37,10 @@ Example of setting a Cosmos-specific operator argument:
 
 
 Summary of Cosmos-specific arguments
-++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 dbt-related
-'''''''''''
++++++++++++
 
 - ``append_env``: Expose the operating system environment variables to the ``dbt`` command. For most execution modes, the default is ``False``, however, for execution modes ExecuteMode.LOCAL and ExecuteMode.VIRTUALENV, the default is True. This behavior is consistent with the LoadMode.DBT_LS command in forwarding the environment variables to the subprocess by default.
 - ``dbt_cmd_flags``: List of command flags to pass to ``dbt`` command, added after dbt subcommand
@@ -48,7 +48,7 @@ dbt-related
 - ``dbt_executable_path``: Path to dbt executable.
 - ``env``: (Deprecated since Cosmos 1.3 use ``ProjectConfig.env_vars`` instead) Declare, using a Python dictionary, values to be set as environment variables when running ``dbt`` commands.
 - ``fail_fast``: ``dbt`` exits immediately if ``dbt`` fails to process a resource.
-- ``interceptors``: (new in v1.14) Optional list of callables run before building the dbt command. Each callable receives ``(context, operator)`` and may modify ``operator.vars`` and ``operator.env``; the modified values are then used when building and running the dbt command. Supported for all execution modes. Useful for injecting runtime vars or env (e.g. from Airflow connections or XCom) per task run.
+- ``interceptors``: (new in v1.14) Optional list of callables run before building the dbt command. Each callable receives ``(context, operator)`` and may modify ``operator.vars`` and ``operator.env``; the modified values are then used when building and running the dbt command. Supported for all execution modes. Useful for injecting runtime vars or env (e.g. from `Apache Airflow® <https://airflow.apache.org/>`_ connections or XCom) per task run.
 - ``models``: Specifies which nodes to include.
 - ``no_version_check``: If set, skip ensuring ``dbt``'s version matches the one specified in the ``dbt_project.yml``.
 - ``quiet``: run ``dbt`` in silent mode, only displaying its error logs.
@@ -60,15 +60,15 @@ dbt-related
 - ``manifest_filepath`` (new in v1.10.1):  When using ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``, use the user-defined ``manifest.json`` file.
 
 
-Airflow-related
-'''''''''''''''
+Apache Airflow®-related
+++++++++++++++++++++++++
 
 - ``cancel_query_on_kill``: If true, cancel any running queries when the task's ``on_kill()`` is executed.
 - ``output_encoding``: Declare the character encoding to parse the ``dbt`` command output.
 - ``skip_exit_code``: If the task exits with this exit code, leave the task in ``skipped`` state (default: 99).
 
 Sample usage
-''''''''''''
+++++++++++++
 
 .. code-block:: python
 
@@ -113,7 +113,7 @@ Example: using ``interceptors`` to set vars and env at runtime (e.g. from Airflo
 
 
 Template fields
-+++++++++++++++
+~~~~~~~~~~~~~~~
 
 Some of the operator args are `template fields <https://airflow.apache.org/docs/apache-airflow/stable/howto/custom-operator.html#templating>`_ for your convenience.
 
@@ -163,4 +163,4 @@ Since Airflow resolves template fields during Airflow DAG execution and not DAG 
 
 Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
 This is provided for telemetry on task execution, and is not an operator arg.
-For more information about this, see the `Compiled SQL <../../cosmos_devex/compiled-sql.html>`_ docs.
+For more information about this, see the :doc:`Compiled SQL </guides/cosmos_devex/compiled-sql>` docs.

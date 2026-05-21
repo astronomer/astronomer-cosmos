@@ -6,8 +6,8 @@ Cosmos core concepts
 **Cosmos** is an open-source library that helps you to run dbt code in Apache Airflow. Because it operates at the interface between Airflow and dbt, becoming familiar with the commonly used terminology and foundational concepts can help you get started.
 
 
-Similar dbt and Airflow concepts
-++++++++++++++++++++++++++++++++
+Similar dbt and Apache Airflow® concepts
++++++++++++++++++++++++++++++++++++++++++
 
 dbt and Airflow each solve different kinds of data engineering problems. However, they do share some useful concepts. See :ref:`dbt-airflow-concepts`.
 
@@ -77,7 +77,7 @@ Parsing generally refers to the processes and configurations that Cosmos uses to
 Invocation Mode
 +++++++++++++++
 
-The method that Cosmos uses to parse the dbt object, whether its by using the Python ``subprocess`` module or with a ``dbt_runner``. See `Invocation modes <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/execution-modes.html#invocation-modes>`_.
+The method that Cosmos uses to parse the dbt object, whether its by using the Python ``subprocess`` module or with a ``dbt_runner``. See `Invocation modes <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
 
 Rendering
 +++++++++

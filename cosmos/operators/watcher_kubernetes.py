@@ -44,9 +44,13 @@ from cosmos.operators.kubernetes import (
 logger = get_logger(__name__)
 
 
-# This global variable is currently used to make the task context available to the K8s callback.
-# While the callback is set during the operator initialization, the context is only created during the operator's execution.
+# Module-level globals used to make per-execution state available to the static
+# K8s callback (see WatcherKubernetesCallback). They are set in
+# DbtProducerWatcherKubernetesOperator.execute, read in the callback, and
+# mirror the per-operator state DbtProducerWatcherOperator threads through its
+# functools.partial-wrapped parser.
 producer_task_context = None
+producer_upstream_failure_skipped_ids: set[str] | None = None
 
 
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
@@ -73,10 +77,12 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param pod: the pod from which the log line was read.
         """
         if "context" not in kwargs:
-            # This global variable is used to make the task context available to the K8s callback.
-            # While the callback is set during the operator initialization, the context is only created during the operator's execution.
             kwargs["context"] = producer_task_context
-        store_dbt_resource_status_from_log(line, kwargs)
+        store_dbt_resource_status_from_log(
+            line,
+            kwargs,
+            upstream_failure_skipped_ids=producer_upstream_failure_skipped_ids,
+        )
 
 
 class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
@@ -98,6 +104,12 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         kwargs["callbacks"] = normalized_callbacks
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
+        # Mutable set populated by the log parser when dbt emits SkippingDetails
+        # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
+        # for those unique_ids are rewritten to "failed" so the consumer sensor
+        # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+        # Mirrors DbtProducerWatcherOperator._upstream_failure_skipped_ids; see #2698.
+        self._upstream_failure_skipped_ids: set[str] = set()
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
@@ -121,10 +133,13 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
         _init_xcom_backup(context)
 
-        # This global variable is used to make the task context available to the K8s callback.
-        # While the callback is set during the operator initialization, the context is only created during the operator's execution.
-        global producer_task_context
+        self._upstream_failure_skipped_ids.clear()
+
+        # Make per-execution state available to the static K8s callback. See the
+        # module-level globals at the top of this file for details.
+        global producer_task_context, producer_upstream_failure_skipped_ids
         producer_task_context = context
+        producer_upstream_failure_skipped_ids = self._upstream_failure_skipped_ids
 
         try:
             return_value = super().execute(context, **kwargs)

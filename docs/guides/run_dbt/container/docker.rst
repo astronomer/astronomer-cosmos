@@ -1,16 +1,16 @@
 .. _docker:
 
 Docker execution mode
----------------------
+=====================
 
 The ``docker`` approach assumes you previously created Docker image, which contains all the ``dbt`` pipelines and a ``profiles.yml`` that you manage.
 
 Performance and maintenance considerations
-++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can have better environment isolation with ``docker`` than when using ``local`` or ``virtualenv`` modes, but this mode also requires more maintenance and has some performance tradeoffs, depending on your project configurations.
 
-Using ``docker`` requires that you ensure the Docker container you use has up-to-date files and you might potentially need to manage secrets in multiple places. Another challenge of working with ``docker`` occurs when the Airflow worker is already running in Docker, which can cause problems related to running `Docker in Docker <https://devops.stackexchange.com/questions/676/why-is-docker-in-docker-considered-bad>`__.
+Using ``docker`` requires that you ensure the Docker container you use has up-to-date files and you might potentially need to manage secrets in multiple places. Another challenge of working with ``docker`` occurs when the `Apache Airflow® <https://airflow.apache.org/>`_ worker is already running in Docker, which can cause problems related to running `Docker in Docker <https://devops.stackexchange.com/questions/676/why-is-docker-in-docker-considered-bad>`__.
 
 Also, the Docker execution mode approach can be significantly slower than ``virtualenv``, since it might require building the ``Docker`` container before executing dbt commands, which is slower than creating a Virtualenv with ``dbt-core``.
 
@@ -18,12 +18,12 @@ Finally, if you run Airflow in a container - such as in an Astro deployment - yo
 
 
 Set up Docker execution mode
-++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The following procedure illustrates how to run the Cosmos dbt Docker Operators and the required setup for them.
 
 Requirements
-''''''''''''
+++++++++++++
 
 - Docker with Docker Desktop (Docker Desktop on MacOS) or equivalent (such as `Orbstack <https://orbstack.dev/>`__). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
 
@@ -35,8 +35,8 @@ The following example setup steps include setting up the following:
 - Docker image built with required dbt project and dbt DAG
 - dbt DAG with dbt Docker operators in the Airflow DAGs directory to run in Airflow
 
-1. Install Airflow and Cosmos
-'''''''''''''''''''''''''''''
+1. Install Apache Airflow® and Cosmos
+++++++++++++++++++++++++++++++++++++++
 
 Create a python virtualenv, activate it, upgrade pip to the latest version, and install `Apache Airflow® <https://airflow.apache.org/>`_ & ``astronomer-postgres``:
 
@@ -49,7 +49,7 @@ Create a python virtualenv, activate it, upgrade pip to the latest version, and 
     pip install "astronomer-cosmos[dbt-postgres]"
 
 2. Set up Postgres database
-'''''''''''''''''''''''''''
++++++++++++++++++++++++++++
 
 You will need a PostgreSQL database running to use as the database for the dbt project. Run the following command to run and expose a postgres database:
 
@@ -58,7 +58,7 @@ You will need a PostgreSQL database running to use as the database for the dbt p
     docker run --name some-postgres -e POSTGRES_PASSWORD="<postgres_password>" -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -p5432:5432 -d postgres
 
 3. Build the dbt Docker image
-'''''''''''''''''''''''''''''
++++++++++++++++++++++++++++++
 
 For the Docker operators to work, you need to create a Docker image that will be supplied as image parameter to the dbt Docker operators used in the DAG.
 
@@ -92,8 +92,8 @@ Read the following example Dockerfiles to understand what it does so that you ca
 - The ``dbt_project.yml`` is replaced with `postgres_profile_dbt_project.yml <https://github.com/astronomer/cosmos-example/blob/main/postgres_profile_dbt_project.yml>`_, which contains the profile key pointing to ``postgres_profile`` because profile creation is not handled for K8s operators, like in local mode.
 
 
-4. Set up and trigger the Dag with Airflow
-''''''''''''''''''''''''''''''''''''''''''
+4. Set up and trigger the Dag with Apache Airflow®
++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 1. Copy the ``dags`` directory from the ``cosmos-example`` repo to your Airflow home
 
@@ -121,7 +121,7 @@ This directory contains a Docker-specific example Dag.
     :width: 800
 
 Specifying ProfileConfig
-++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Starting with Cosmos 1.8.0, you can use the ``profile_config`` argument in your Dbt DAG Docker operators to reference
 profiles for your dbt project defined in a profiles.yml file. To do so, provide the file’s path via the
@@ -132,6 +132,6 @@ approach. The ``profile_mapping`` method will not work because the required Airf
 within the Docker container to map them to the dbt profile.
 
 Troubleshooting
-+++++++++++++++
+~~~~~~~~~~~~~~~
 
 If dbt is unavailable in the Airflow scheduler, the default ``LoadMode.DBT_LS`` will not work. In this scenario, you must use a :ref:`parsing-methods` that does not rely on dbt, such as ``LoadMode.MANIFEST``.

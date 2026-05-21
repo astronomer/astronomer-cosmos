@@ -1229,6 +1229,42 @@ class TestDbtConsumerWatcherSensor:
         assert "--select" in kwargs["cmd_flags"]
         assert MODEL_UNIQUE_ID.split(".", 2)[2] in kwargs["cmd_flags"]
 
+    def test_fallback_strips_producer_log_format_by_default(self):
+        """Producer's ``--log-format json`` (internal, used for event-stream parsing) must not leak into
+        the consumer's user-facing retry dbt command when the user hasn't asked for JSON.
+        """
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--log-format", "json", "--threads", "2"]
+        context = self.make_context(ti)
+        sensor.build_and_run_cmd = MagicMock()
+
+        sensor._fallback_to_non_watcher_run(2, context)
+
+        cmd_flags = sensor.build_and_run_cmd.call_args.kwargs["cmd_flags"]
+        assert "--log-format" not in cmd_flags
+        assert "json" not in cmd_flags
+
+    def test_fallback_preserves_user_dbt_cmd_flags_opt_in_to_json(self):
+        """User opt-in path: ``operator_args={"dbt_cmd_flags": ["--log-format", "json"]}`` reaches the
+        consumer as ``self.dbt_cmd_flags``. ``build_cmd`` (inside ``build_and_run_cmd``) auto-appends
+        ``self.dbt_cmd_flags`` to whatever ``cmd_flags`` we pass, so this path keeps working through
+        normal extension — no special handling in ``_fallback_to_non_watcher_run`` needed. The fallback's
+        ``cmd_flags`` payload itself should remain free of ``--log-format`` because that's stripped from
+        the producer's flags; ``self.dbt_cmd_flags`` is preserved for ``build_cmd`` to pick up.
+        """
+        sensor = self.make_sensor(dbt_cmd_flags=["--log-format", "json"])
+        ti = MagicMock()
+        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--log-format", "json", "--threads", "2"]
+        context = self.make_context(ti)
+        sensor.build_and_run_cmd = MagicMock()
+
+        sensor._fallback_to_non_watcher_run(2, context)
+
+        cmd_flags = sensor.build_and_run_cmd.call_args.kwargs["cmd_flags"]
+        assert "--log-format" not in cmd_flags  # appended later by build_cmd from self.dbt_cmd_flags
+        assert sensor.dbt_cmd_flags == ["--log-format", "json"]
+
     def test_fallback_selector_preserves_version_suffix(self):
         """For versioned dbt models (e.g. ``model.pkg.my_model.v1``) the selector must keep the version suffix."""
         sensor = self.make_sensor()
@@ -1244,12 +1280,18 @@ class TestDbtConsumerWatcherSensor:
         assert kwargs["cmd_flags"] == ["--select", "stg_orders.v1"]
 
     def test_filter_flags(self):
-        flags = ["--select", "model", "--exclude", "other", "--threads", "2"]
+        flags = ["--select", "model", "--exclude", "other", "--log-format", "json", "--threads", "2"]
         expected = ["--threads", "2"]
 
         result = DbtConsumerWatcherSensor._filter_flags(flags)
 
         assert result == expected
+
+    def test_filter_flags_strips_log_format_when_first(self):
+        """--log-format at the start of the producer's flags is stripped along with its value."""
+        flags = ["--log-format", "json", "--threads", "2"]
+        result = DbtConsumerWatcherSensor._filter_flags(flags)
+        assert result == ["--threads", "2"]
 
     @patch("cosmos.operators._watcher.base.get_xcom_val")
     def test_producer_state_failed(self, mock_get_xcom_val):

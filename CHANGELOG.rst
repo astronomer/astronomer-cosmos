@@ -1,6 +1,82 @@
 Changelog
 =========
 
+1.14.2 (2026-05-21)
+-------------------
+
+Behaviour Changes
+
+These changes adjust observable behaviour of the ``ExecutionMode.WATCHER`` execution mode.
+None of them break the public Cosmos API, but users relying on undocumented internals
+(graph wiring assertions, XCom backup Variable names, retry-on-recovery semantics, or
+retry log format) should review before upgrading.
+
+* ``ExecutionMode.WATCHER`` + ``depends_on_past=True``: when the producer task has
+  ``depends_on_past=True`` (typically set via ``default_args``), the producer-done gateway
+  task inside ``DbtTaskGroup`` is now wired downstream of every consumer task, in addition
+  to the producer. This is required so that ``wait_for_downstream`` gating behaves
+  correctly across DAG runs and the task group acts as a single unit that must fully
+  succeed before the next run starts. Users with ``depends_on_past=False`` (the default)
+  see no topology change. See #2615.
+* ``ExecutionMode.WATCHER`` downstream retry on upstream recovery: dbt models that were
+  skipped after an upstream-failure event are now retried in the same DAG run when the
+  upstream task succeeds on retry. Previously these models remained skipped for the run.
+  See #2684.
+* ``ExecutionMode.WATCHER`` consumer-retry log format: the consumer's fallback ``dbt``
+  invocation no longer inherits the producer's internal ``--log-format json`` flag, so
+  retry task logs now default to dbt's normal text format. Users who relied on JSON output
+  in retry logs can opt in via ``operator_args={"dbt_cmd_flags": ["--log-format", "json"]}``.
+  See #2713.
+* ``ExecutionMode.WATCHER`` XCom-backup Variable key scheme: the per-model XCom backup
+  Variable key now includes the full task-group path and sanitises disallowed characters
+  (``+`` / ``:``) from ``run_id``. External monitoring or cleanup scripts that match the
+  old key pattern will need updating. See #2629 and #2683.
+
+Bug Fixes
+
+* Sanitize disallowed characters from XCom backup variable key by @MichaelRBlack in #2629
+* Prevent watcher producers from colliding on one XCom-backup key by @tatiana in #2683
+* Retry watcher downstream models on upstream-failure recovery by @tatiana in #2684
+* Fix ``ExecutionMode.WATCHER`` interaction with ``depends_on_past`` by @johnhoran in #2615
+* Strip ``--log-format`` from producer flags on watcher consumer retry by @tatiana in #2713
+* Fix duplicate ``deferrable`` kwarg in ``DbtRunAirflowAsyncBigqueryOperator`` by @pankajastro in #2616
+* Fix dbt docs iframe ``src`` missing deployment path prefix by @pankajastro in #2640
+* Defer ``TaskInstance`` import in cluster policy to fix Sentry init crash by @pankajastro in #2662
+* Restore type hints broken by lazy imports in ``cosmos/__init__.py`` by @pankajastro in #2647
+* Fix ``ExecutionMode.WATCHER`` non-dbt stdout being suppressed from logs by @pankajastro in #2654
+* Fix test sensor retry behaviour in ``ExecutionMode.WATCHER`` by @pankajkoti in #2658
+* Fix watcher fallback selector for versioned dbt models by @pankajkoti in #2659
+* Break out of iframe from Airflow 2 dbt Docs 404 link by @pankajastro in #2685
+
+Docs
+
+* Document source freshness aware execution for ``ExecutionMode.WATCHER`` by @pankajastro in #2617
+* Add reference docs for ``DbtRunLocalOperator``, ``DbtTestLocalOperator``, ``DbtSnapshotLocalOperator`` and ``DbtBuildLocalOperator`` by @pankajastro in #2643
+* Add watcher retry behaviour history documentation by @tatiana in #2600
+* Add Apache Airflow® trademark on first prominent mention by @pankajkoti in #2624
+* Sentence-case section headings by @pankajkoti in #2630
+* Use ``-`` for bullet points by @pankajkoti in #2631
+* Drop decorative separator lines by @pankajkoti in #2632
+* Normalize heading underlines in ``docs/guides/`` and ``docs/index.rst`` by @pankajkoti in #2664
+* Fix broken cross-directory doc links by @pankajastro in #2694
+* Fix broken external links in hand-written docs by @pankajastro in #2696
+* Document support for Airflow 3.2 in the compatibility policy by @pankajastro in #2652
+* Refresh the dbt/Airflow conflicts table to match the compatibility policy by @pankajastro in #2653
+* Document incremental model limitation for ``ExecutionMode.AIRFLOW_ASYNC`` by @pankajastro in #2642
+
+Others
+
+* Import ``ParamValidationError`` from ``airflow.sdk`` to silence deprecation warning by @pankajastro in #2645
+* Import ``DAG`` from ``airflow.sdk`` to silence deprecation warning by @pankajastro in #2644
+* Enforce docs style guide via pre-commit hook by @pankajkoti and @tatiana in #2633
+* Add Airflow 3.2 to the test matrix in ``CLAUDE.md`` by @pankajastro in #2646
+* Document the lazy-logging standard in ``CLAUDE.md`` by @pankajastro in #2679
+* Extract watcher XCom-key helpers and inline single-use bindings by @pankajastro in #2673
+* Remove leftover ``scripts/airflow3`` directory by @pankajastro in #2661
+* Fix ``altered_jaffle_shop`` seed-dep CTE references by @pankajastro in #2690
+* Skip Airflow 3.0 integration test stuck on ``example_watcher_with_freshness`` by @pankajastro in #2692
+* Fix typo "constrantis" → "constraints" in tests env comment by @pankajastro in #2669
+
 1.14.1 (2026-04-23)
 -------------------
 

@@ -14,7 +14,13 @@ For ``ExecutionMode.LOCAL`` execution mode, Cosmos supports two invocation modes
 
 .. note::
 
-   When ``InvocationMode.DBT_RUNNER`` is used with dbt 1.5.6 or later, Cosmos automatically appends ``--no-static-parser`` to every dbt command it invokes. Cosmos copies the dbt project into a temporary directory at both DAG parse time and task execution time, and the differing temp paths can interfere with dbt's static parser and cause task hangs. Disabling the static parser is a workaround for this interaction. If you rely on dbt's static parser, use ``InvocationMode.SUBPROCESS`` instead.
+   When ``InvocationMode.DBT_RUNNER`` is used with dbt-core 1.5.6 or later,
+   Cosmos automatically appends ``--no-static-parser`` to every dbt command
+   it invokes. Cosmos copies the dbt project into a temporary directory at
+   both DAG parse time and task execution time, and the differing temp paths
+   can interfere with dbt's static parser and cause task hangs. Disabling the
+   static parser is a workaround for this interaction. If you rely on dbt's
+   static parser, use ``InvocationMode.SUBPROCESS`` instead.
 
 The invocation mode can be set in the ``ExecutionConfig`` as shown below:
 

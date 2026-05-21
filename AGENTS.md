@@ -108,6 +108,18 @@ Follow the [seven rules of a great Git commit message](https://cbea.ms/git-commi
 
 Do not use Conventional Commits type prefixes (`feat:`, `fix:`, `chore:`, etc.).
 
+### AI agent attribution
+
+When a commit or PR description is drafted with the help of an AI coding agent (Claude Code, Cursor, Codex, Copilot, etc.), give the agent credit, but **do not add the agent as a `Co-Authored-By` trailer**. The Git `Co-Authored-By` trailer is reserved for human collaborators — it surfaces in GitHub's contributor graph and `git shortlog -sn` as if the agent were a person, which it isn't. Those signals are reserved for humans.
+
+Instead, mark the assistance with a plain line at the end of the commit body or PR description (separated from the rest by a blank line):
+
+```
+🤖 Generated with Claude Code (https://claude.com/claude-code)
+```
+
+Substitute the equivalent for whichever agent was used. The convention is "visible credit, no person-shaped artefact" — the marker keeps the assist discoverable in `git log` without polluting human contribution stats.
+
 ## Python Coding Standards
 
 ### Logging

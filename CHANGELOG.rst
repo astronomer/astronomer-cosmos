@@ -4,6 +4,34 @@ Changelog
 1.14.2 (2026-05-21)
 -------------------
 
+Behaviour Changes
+
+These changes adjust observable behaviour of the ``ExecutionMode.WATCHER`` execution mode.
+None of them break the public Cosmos API, but users relying on undocumented internals
+(graph wiring assertions, XCom backup Variable names, retry-on-recovery semantics, or
+retry log format) should review before upgrading.
+
+* ``ExecutionMode.WATCHER`` + ``depends_on_past=True``: when the producer task has
+  ``depends_on_past=True`` (typically set via ``default_args``), the producer-done gateway
+  task inside ``DbtTaskGroup`` is now wired downstream of every consumer task, in addition
+  to the producer. This is required so that ``wait_for_downstream`` gating behaves
+  correctly across DAG runs and the task group acts as a single unit that must fully
+  succeed before the next run starts. Users with ``depends_on_past=False`` (the default)
+  see no topology change. See #2615.
+* ``ExecutionMode.WATCHER`` downstream retry on upstream recovery: dbt models that were
+  skipped after an upstream-failure event are now retried in the same DAG run when the
+  upstream task succeeds on retry. Previously these models remained skipped for the run.
+  See #2684.
+* ``ExecutionMode.WATCHER`` consumer-retry log format: the consumer's fallback ``dbt``
+  invocation no longer inherits the producer's internal ``--log-format json`` flag, so
+  retry task logs now default to dbt's normal text format. Users who relied on JSON output
+  in retry logs can opt in via ``operator_args={"dbt_cmd_flags": ["--log-format", "json"]}``.
+  See #2713.
+* ``ExecutionMode.WATCHER`` XCom-backup Variable key scheme: the per-model XCom backup
+  Variable key now includes the full task-group path and sanitises disallowed characters
+  (``+`` / ``:``) from ``run_id``. External monitoring or cleanup scripts that match the
+  old key pattern will need updating. See #2629 and #2683.
+
 Bug Fixes
 
 * Sanitize disallowed characters from XCom backup variable key by @MichaelRBlack in #2629

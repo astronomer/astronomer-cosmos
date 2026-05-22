@@ -56,6 +56,7 @@ Performance gains
 ~~~~~~~~~~~~~~~~~
 
 We used a dbt project developed by Google, the `google/fhir-dbt-analytics <https://github.com/google/fhir-dbt-analytics>`_ project, that interfaces with BigQuery. It contains:
+
 - 2 seeds
 - 52 sources
 - 185 models

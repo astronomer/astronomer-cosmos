@@ -174,6 +174,3 @@ overwritten and has no effect.
   is populated and how to disable it via ``should_store_compiled_sql``.
 - ``freshness`` — the JSON Cosmos captures from ``dbt source freshness`` when
   source nodes run, reset on every task instance.
-
-If you need to set one of these values through ``operator_args`` for an
-upstream task to consume, use a separate, regular template field instead.

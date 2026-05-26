@@ -2494,6 +2494,31 @@ def test_dbt_source_watcher_operator_template_fields():
         assert field in DbtSourceWatcherOperator.template_fields
 
 
+def test_dbt_source_watcher_operator_fallback_runs_source_freshness():
+    """On retry the source sensor should run ``dbt source freshness --select source:<resource_name>``
+    locally for its specific source.
+    """
+    from cosmos.operators.watcher import DbtSourceWatcherOperator
+
+    source_uid = "source.jaffle_shop.raw.orders"
+    extra_context = {"dbt_node_config": {"unique_id": source_uid}}
+    sensor = DbtSourceWatcherOperator(
+        task_id="raw_orders.source",
+        project_dir="/tmp/project",
+        profile_config=None,
+        extra_context=extra_context,
+    )
+    sensor.build_and_run_cmd = MagicMock()
+    context = MagicMock()
+
+    result = sensor._fallback_to_non_watcher_run(2, context)
+
+    assert result is True
+    sensor.build_and_run_cmd.assert_called_once()
+    _, kwargs = sensor.build_and_run_cmd.call_args
+    assert kwargs["cmd_flags"] == ["--select", "source:raw.orders"]
+
+
 class TestDbtTestWatcherOperator:
     """Tests for DbtTestWatcherOperator — the sensor that watches aggregated test results."""
 

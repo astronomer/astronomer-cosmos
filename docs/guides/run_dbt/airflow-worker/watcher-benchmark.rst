@@ -26,40 +26,43 @@ Cluster setup
 Timing and CPU
 ~~~~~~~~~~~~~~
 
-+---------+---------+-----------+----------------+-----------+-----------+
-| Mode    | Threads | Wall time | Producer       | Producer  | Consumer  |
-|         |         | (minutes) | time (minutes) | max CPU   | max CPU   |
-+=========+=========+===========+================+===========+===========+
-| LOCAL   | N/A     | 8.9 ± 0.2 | N/A            | N/A       | 4.30      |
-+---------+---------+-----------+----------------+-----------+-----------+
-| WATCHER | 4       | 7.5 ± 0.2 | 7.3            | 0.28      | 7.96      |
-+---------+---------+-----------+----------------+-----------+-----------+
-| WATCHER | 8       | 5.2 ± 0.2 | 4.2            | 0.54      | 8.05      |
-+---------+---------+-----------+----------------+-----------+-----------+
-| WATCHER | 12      | 5.6 ± 1.2 | 4.3            | 0.70      | 8.15      |
-+---------+---------+-----------+----------------+-----------+-----------+
-| WATCHER | 16      | 5.2 ± 0.3 | 3.1            | 0.83      | 8.30      |
-+---------+---------+-----------+----------------+-----------+-----------+
++---------+---------+-----------+----------------+-----------+-----------------+
+| Mode    | Threads | Wall time | Producer       | Producer  | Total consumers |
+|         |         | (minutes) | time (minutes) | max CPU   | max CPU         |
++=========+=========+===========+================+===========+=================+
+| LOCAL   | N/A     | 8.9 ± 0.2 | N/A            | N/A       | 4.30            |
++---------+---------+-----------+----------------+-----------+-----------------+
+| WATCHER | 4       | 7.5 ± 0.2 | 7.3            | 0.28      | 7.96            |
++---------+---------+-----------+----------------+-----------+-----------------+
+| WATCHER | 8       | 5.2 ± 0.2 | 4.2            | 0.54      | 8.05            |
++---------+---------+-----------+----------------+-----------+-----------------+
+| WATCHER | 12      | 5.6 ± 1.2 | 4.3            | 0.70      | 8.15            |
++---------+---------+-----------+----------------+-----------+-----------------+
+| WATCHER | 16      | 5.2 ± 0.3 | 3.1            | 0.83      | 8.30            |
++---------+---------+-----------+----------------+-----------+-----------------+
 
-``Producer max CPU`` and ``Consumer max CPU`` are peak cores observed during the run. The producer pool's capacity is 1 core; the consumer pool's is 9 cores (9 replicas × 1 core).
+``Producer max CPU`` is peak cores observed for the single producer pod (capacity: 1 core). ``Total consumers max CPU`` is peak cores summed across the 9 consumer pods (combined capacity: 9 cores); each individual consumer pod is bounded by its 1-core limit.
 
 Peak memory by pool
 ~~~~~~~~~~~~~~~~~~~
 
-+---------+---------+---------------+---------------+
-| Mode    | Threads | Producer peak | Consumer peak |
-|         |         | memory (GiB)  | memory (GiB)  |
-+=========+=========+===============+===============+
-| LOCAL   | N/A     | N/A           | 10.0          |
-+---------+---------+---------------+---------------+
-| WATCHER | 4       | 0.8           | 8.1           |
-+---------+---------+---------------+---------------+
-| WATCHER | 8       | 0.8           | 8.5           |
-+---------+---------+---------------+---------------+
-| WATCHER | 12      | 0.8           | 8.7           |
-+---------+---------+---------------+---------------+
-| WATCHER | 16      | 0.8           | 8.6           |
-+---------+---------+---------------+---------------+
++---------+---------+---------------+-----------------+
+| Mode    | Threads | Producer peak | Total consumers |
+|         |         | memory (GiB)  | peak memory     |
+|         |         |               | (GiB)           |
++=========+=========+===============+=================+
+| LOCAL   | N/A     | N/A           | 10.0            |
++---------+---------+---------------+-----------------+
+| WATCHER | 4       | 0.8           | 8.1             |
++---------+---------+---------------+-----------------+
+| WATCHER | 8       | 0.8           | 8.5             |
++---------+---------+---------------+-----------------+
+| WATCHER | 12      | 0.8           | 8.7             |
++---------+---------+---------------+-----------------+
+| WATCHER | 16      | 0.8           | 8.6             |
++---------+---------+---------------+-----------------+
+
+``Producer peak memory`` is for the single producer pod (capacity: 2 GiB). ``Total consumers peak memory`` is summed across the 9 consumer pods (combined capacity: 18 GiB); each individual consumer pod is bounded by its 2 GiB limit.
 
 Analysis
 ~~~~~~~~
@@ -68,6 +71,6 @@ Analysis
 - ``threads=8`` is a strong default. Past 8 threads the producer ``dbt build`` itself kept getting faster (4.2 minutes at ``threads=8`` versus 3.1 minutes at ``threads=16``), but the consumer sensor tasks took correspondingly longer to wake up and finalise, so total wall time plateaued (we are tracking the investigation of this consumer-side behaviour in `astronomer/astronomer-cosmos#2657 <https://github.com/astronomer/astronomer-cosmos/issues/2657>`_ and will update the findings as they become available). Start at 8 and only push higher if your producer task is the bottleneck.
 - Producer CPU rises with ``threads``, but sub-linearly. Going from 4 to 16 threads pushed producer peak CPU from 0.28 to 0.83 cores. dbt threads spend most of their time waiting on the warehouse, so most extra threads do not consume an extra core. Sizing the producer pod for roughly 1 core covers ``threads=16`` comfortably.
 - ``LOCAL`` is bound by your data warehouse, not Airflow. Under ``LOCAL`` the consumer pool peaked at 4.30 of 9 available cores (about 48%), because each dbt task spent most of its time waiting on BigQuery. Adding more Airflow workers will not move that ceiling. ``WATCHER`` instead saturates the consumer pool to roughly 8 cores via lightweight sensor work, and runs the heavy ``dbt build`` on the dedicated producer pod.
-- ``WATCHER`` cuts consumer memory pressure. Consumer peak memory drops from 10.0 GiB under ``LOCAL`` to roughly 8.5 GiB under ``WATCHER``, because the heavy ``dbt build`` runs in the 0.8 GiB producer pod rather than across the consumer pool's 18 concurrent dbt processes.
+- ``WATCHER`` cuts consumer memory pressure. Total consumers peak memory drops from 10.0 GiB under ``LOCAL`` to roughly 8.5 GiB under ``WATCHER``, because the heavy ``dbt build`` runs in the 0.8 GiB producer pod rather than across the consumer pool's 18 concurrent dbt processes.
 
 These numbers reflect one specific dbt project, warehouse, and worker shape. Treat them as a directional baseline and re-run the benchmark against your own pipeline before settling on a thread count.

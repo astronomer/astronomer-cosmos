@@ -274,13 +274,19 @@ Watcher dbt Execution Queue
 
 .. versionadded:: 1.14.0
 
-In watcher execution mode, by default, consumer sensor tasks are lightweight sensors that wait for the producer task to complete. On their first attempt, they require minimal CPU and memory resources. However, when these tasks retry, they execute the dbt command for the node, which may require significantly more resources.
+In watcher execution mode there are three different "types" of tasks that are executed:
 
-The ``watcher_dbt_execution_queue`` configuration allows you to specify a different worker queue for retry attempts. This enables you to:
+- Producer tasks: execute a ``dbt build`` for the dbt project being rendered and orchestrated with watcher execution mode
+- Consumer tasks: (first try) lightweight sensors that wait for the producer task to complete
+- Consumer tasks: (retries) executes a dbt command for a specific node, **only when there is failure for that node**
 
-- **Optimize resource allocation** — Use lightweight workers for initial sensor execution and high-resource workers for retries
-- **Improve scheduling efficiency** — Prevent resource contention between initial sensor tasks and retry executions
-- **Scale independently** — Scale retry queues separately based on retry workload patterns
+Producer tasks typically require a high-memory worker to execute the ``dbt build`` command. On their first attempt, the consumer sensors require minimal CPU and memory resources. However, if these tasks retry, they execute the dbt command for the node, which may require significantly more resources. To ensure that the producer tasks and retry attempts have the appropriate resources for execution, the ``watcher_dbt_execution_queue`` configuration can be set.
+
+The ``watcher_dbt_execution_queue`` configuration allows you to specify the worker queue that the producer tasks and retry attempts use. This enables you to:
+
+- **Optimize resource allocation** — Use high-resource workers for producer tasks and sensor retries, and lightweight workers for initial sensor execution.
+- **Improve scheduling efficiency** — Prevent resource contention between producer/retry executions and initial sensor tasks
+- **Scale independently** — Scale "execution" queues (producer and retry) separately from sensor tasks
 
 **Configuration:**
 

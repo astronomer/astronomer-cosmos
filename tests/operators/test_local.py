@@ -117,6 +117,59 @@ def test_install_deps_in_empty_dir_becomes_false(tmpdir):
         profile_config=profile_config, task_id="my-task", project_dir=tmpdir, install_deps=True
     )
     assert not dbt_base_operator.install_deps
+    assert not dbt_base_operator._should_install_deps()
+
+
+def test_install_deps_is_a_template_field():
+    """``install_deps`` must be a template field so users can pass Jinja-templated values
+    (e.g. ``"{{ params.install_deps }}"``)."""
+    assert "install_deps" in DbtLocalBaseOperator.template_fields
+
+
+@pytest.mark.parametrize(
+    "rendered_value, expected",
+    [
+        (True, True),
+        (False, False),
+        ("True", True),
+        ("true", True),
+        ("1", True),
+        ("False", False),
+        ("false", False),
+        ("0", False),
+    ],
+)
+def test_should_install_deps_resolves_rendered_template_value(rendered_value, expected):
+    """After Airflow renders ``install_deps`` from a Jinja template, it can be either a real bool
+    (``render_template_as_native_obj=True``) or a bool-like string (default). ``_should_install_deps``
+    must normalize both to a real bool."""
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, install_deps=True
+    )
+    # Simulate Airflow having rendered the templated field on the operator instance.
+    dbt_base_operator.install_deps = rendered_value
+    assert dbt_base_operator._should_install_deps() is expected
+
+
+def test_should_install_deps_false_when_no_dependencies_file(tmpdir):
+    """If the project has no packages.yml / dependencies.yml, ``dbt deps`` is never run regardless of
+    the (possibly templated) ``install_deps`` value."""
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=tmpdir, install_deps="{{ params.install_deps }}"
+    )
+    # Even with a "truthy" string value at runtime, no deps file means we skip.
+    dbt_base_operator.install_deps = "True"
+    assert dbt_base_operator._should_install_deps() is False
+
+
+def test_install_deps_preserves_template_string_when_dependencies_file_exists():
+    """When a dependencies file is present, the operator must preserve the raw template string so
+    Airflow can render it at task execution time."""
+    template = "{{ params.install_deps }}"
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, install_deps=template
+    )
+    assert dbt_base_operator.install_deps == template
 
 
 def test_dbt_base_operator_add_global_flags() -> None:
@@ -1314,6 +1367,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
                 "dbt_cmd_flags",
                 "compiled_sql",
                 "freshness",
+                "install_deps",
                 "full_refresh",
             ),
         ),
@@ -1329,6 +1383,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
                 "dbt_cmd_flags",
                 "compiled_sql",
                 "freshness",
+                "install_deps",
                 "full_refresh",
             ),
         ),
@@ -1344,12 +1399,24 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
                 "dbt_cmd_flags",
                 "compiled_sql",
                 "freshness",
+                "install_deps",
                 "full_refresh",
             ),
         ),
         (
             DbtSourceLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "dbt_cmd_flags", "compiled_sql", "freshness"),
+            (
+                "env",
+                "select",
+                "exclude",
+                "selector",
+                "vars",
+                "models",
+                "dbt_cmd_flags",
+                "compiled_sql",
+                "freshness",
+                "install_deps",
+            ),
         ),
     ],
 )

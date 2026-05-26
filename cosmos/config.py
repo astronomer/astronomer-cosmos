@@ -173,7 +173,10 @@ class ProjectConfig:
     Class for setting project config.
 
     :param dbt_project_path: The path to the dbt project directory. Example: /path/to/dbt/project. Defaults to None
-    :param install_dbt_deps: Run dbt deps during DAG parsing and task execution. Defaults to True.
+    :param install_dbt_deps: Run dbt deps during DAG parsing and task execution. Defaults to True. Accepts a
+        boolean or an Airflow Jinja-templated string (e.g. ``"{{ params.install_deps }}"``) that renders to a
+        boolean or boolean-like string at task execution time. When a template string is provided, ``dbt deps``
+        is always run during DAG parsing (since templates are only rendered at task execution time).
     :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages (False by default).
     :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
     :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
@@ -193,7 +196,7 @@ class ProjectConfig:
     """
 
     dbt_project_path: Path | None = None
-    install_dbt_deps: bool = True
+    install_dbt_deps: bool | str = True
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
     manifest_path: Path | ObjectStoragePath | None = None
     models_path: Path | None = None
@@ -204,7 +207,7 @@ class ProjectConfig:
     def __init__(
         self,
         dbt_project_path: str | Path | None = None,
-        install_dbt_deps: bool = True,
+        install_dbt_deps: bool | str = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         models_relative_path: str | Path = "models",
         seeds_relative_path: str | Path = "seeds",

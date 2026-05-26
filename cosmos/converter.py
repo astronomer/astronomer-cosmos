@@ -135,13 +135,18 @@ def validate_arguments(
         has_non_empty_dependencies = execution_config.project_path and has_non_empty_dependencies_file(
             execution_config.project_path
         )
+        # When `install_dbt_deps` (or the deprecated `install_deps` operator_arg) is a Jinja-templated string,
+        # its actual value is only known at task execution time, so skip the parse-time consistency check.
+        install_deps_task_arg = task_args.get("install_deps", True)
+        is_templated_install_deps = isinstance(install_deps_task_arg, str) or isinstance(render_config.dbt_deps, str)
         if (
             has_non_empty_dependencies
             and (
                 render_config.load_method == LoadMode.DBT_LS
                 or (render_config.load_method == LoadMode.AUTOMATIC and not project_config.is_manifest_available())
             )
-            and (render_config.dbt_deps != task_args.get("install_deps", True))
+            and not is_templated_install_deps
+            and (render_config.dbt_deps != install_deps_task_arg)
         ):
             err_msg = f"When using `LoadMode.DBT_LS` and `{execution_config.execution_mode}`, the value of `dbt_deps` in `RenderConfig` should be the same as the `operator_args['install_deps']` value."
             raise CosmosValueError(err_msg)
@@ -454,8 +459,14 @@ class DbtToAirflowConverter:
 
         if render_config is not None:
             metadata["invocation_mode"] = str(render_config.invocation_mode.value)
+            # Telemetry captures the parse-time install-deps decision. When the value is a Jinja template
+            # string, the runtime value is not known until task execution, so we report the parse-time
+            # default (True, matching the behavior in DbtGraph).
+            effective_install_deps = (
+                render_config.dbt_deps if render_config.dbt_deps is not None else project_config.install_dbt_deps
+            )
             metadata["install_deps"] = (
-                bool(render_config.dbt_deps) if render_config.dbt_deps is not None else project_config.install_dbt_deps
+                bool(effective_install_deps) if isinstance(effective_install_deps, bool) else True
             )
             metadata["uses_node_converter"] = render_config.node_converters is not None
             metadata["test_behavior"] = str(render_config.test_behavior.value)

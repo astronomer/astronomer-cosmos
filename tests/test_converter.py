@@ -93,6 +93,30 @@ def test_validate_arguments_exception():
     assert err.value.args[0] == expected
 
 
+def test_validate_arguments_skips_install_deps_mismatch_check_for_templated_value():
+    """A Jinja-templated ``install_deps`` is only resolved at task execution time, so the parse-time
+    mismatch check against ``RenderConfig.dbt_deps`` must be skipped to avoid spurious failures."""
+    render_config = RenderConfig(load_method=LoadMode.DBT_LS, dbt_deps=False)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(
+        execution_mode=ExecutionMode.LOCAL, dbt_project_path=DBT_PROJECTS_PROJ_WITH_DEPS_DIR
+    )
+    project_config = ProjectConfig()
+
+    task_args = {"install_deps": "{{ params.install_deps }}"}
+    validate_arguments(
+        execution_config=execution_config,
+        profile_config=profile_config,
+        project_config=project_config,
+        render_config=render_config,
+        task_args=task_args,
+    )
+
+
 @pytest.mark.parametrize(
     "execution_mode",
     (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV),

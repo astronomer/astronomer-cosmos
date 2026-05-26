@@ -23,6 +23,11 @@ variables that should be used for rendering and execution. It takes the followin
 - ``env_vars``: (new in v1.3) A dictionary of environment variables used for rendering and execution. Rendering with
   env vars is only supported when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
 - ``install_dbt_deps``: (new in v1.9) Run dbt deps during DAG parsing and task execution if True (default).
+  Also accepts an `Airflow Jinja-templated <https://airflow.apache.org/docs/apache-airflow/stable/templates-ref.html#templates-reference>`_
+  string (e.g. ``"{{ params.install_deps }}"``) that resolves to a boolean at task execution time. This is
+  useful when you want to control ``dbt deps`` per DAG run (e.g. via an Airflow ``Param``). When a template
+  string is provided, ``dbt deps`` is always run during DAG parsing (since templates are only rendered at
+  task execution time).
 - ``copy_dbt_packages``: (new in v1.10) Copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
 - ``partial_parse``: (new in v1.4) If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
   for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``
@@ -48,3 +53,33 @@ Project config example
             "end_time": "{{ data_interval_end.strftime('%Y%m%d%H%M%S') }}",
         },
     )
+
+Controlling dbt deps per DAG run
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``install_dbt_deps`` can be templated, which is useful when you want to decide whether to run ``dbt deps``
+at task execution time — for example, only on the first run or when package dependencies change — driven
+by an Airflow ``Param``.
+
+.. code-block:: python
+
+    from airflow.models.param import Param
+    from cosmos import DbtDag, ProjectConfig
+
+    dag = DbtDag(
+        # ...
+        project_config=ProjectConfig(
+            dbt_project_path="/path/to/dbt/project",
+            install_dbt_deps="{{ params.install_deps }}",
+        ),
+        params={
+            "install_deps": Param(
+                False, type="boolean", description="Install dbt dependencies?"
+            ),
+        },
+        render_template_as_native_obj=True,
+    )
+
+Setting ``render_template_as_native_obj=True`` is recommended so the rendered value is a real boolean.
+Without it Airflow renders the template to a string (e.g. ``"False"``); Cosmos normalizes both forms to
+a boolean when deciding whether to run ``dbt deps``.

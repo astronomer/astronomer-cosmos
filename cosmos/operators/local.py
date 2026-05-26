@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 import jinja2
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
+from airflow.utils.strings import to_boolean
 from packaging.version import Version
 
 from cosmos.io import _construct_dest_file_path
@@ -171,7 +172,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param profile_args: Arguments to pass to the profile. See
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param profile_config: ProfileConfig Object
-    :param install_deps (deprecated): If true, install dependencies before running the command
+    :param install_deps (deprecated): If true, install dependencies before running the command. Accepts a
+        boolean, or an Airflow Jinja templated string (e.g. ``"{{ params.install_deps }}"``) that renders
+        to a boolean or boolean-like string.
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
@@ -185,7 +188,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         and does not inherit the current process environment.
     """
 
-    template_fields: Sequence[str] = AbstractDbtBase.template_fields + ("compiled_sql", "freshness")  # type: ignore[operator]
+    template_fields: Sequence[str] = AbstractDbtBase.template_fields + ("compiled_sql", "freshness", "install_deps")  # type: ignore[operator]
     template_fields_renderers = {
         "compiled_sql": "sql",
         "freshness": "json",
@@ -197,7 +200,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
-        install_deps: bool = True,
+        install_deps: bool | str = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
@@ -230,11 +233,30 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # as it can break existing DAGs.
         self.append_env = append_env
 
-        # We should not spend time trying to install deps if the project doesn't have any dependencies
-        self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
+        # We should not spend time trying to install deps if the project doesn't have any dependencies.
+        # The raw value is preserved (including Jinja templated strings) so Airflow can render the field
+        # at task execution time. The effective boolean used at runtime is computed by
+        # ``self._should_install_deps()``.
+        self._has_dependencies_file = has_non_empty_dependencies_file(Path(self.project_dir))
+        self.install_deps = install_deps if self._has_dependencies_file else False
         self.copy_dbt_packages = copy_dbt_packages
 
         self.manifest_filepath = manifest_filepath
+
+    def _should_install_deps(self) -> bool:
+        """Resolve the effective ``install_deps`` flag.
+
+        ``install_deps`` is an Airflow template field, so by execution time it may be a real ``bool`` or
+        a rendered string such as ``"True"`` / ``"False"`` (when ``render_template_as_native_obj`` is
+        ``False``). This helper normalizes both forms and ensures we never try to run ``dbt deps`` for
+        projects without a dependencies file.
+        """
+        if not self._has_dependencies_file:
+            return False
+        value = self.install_deps
+        if isinstance(value, str):
+            return bool(to_boolean(value))
+        return bool(value)
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -496,7 +518,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path,
             self.project_dir,
         )
-        should_not_create_dbt_deps_symbolic_link = self.install_deps or self.copy_dbt_packages
+        should_not_create_dbt_deps_symbolic_link = self._should_install_deps() or self.copy_dbt_packages
         create_symlinks(
             Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
         )
@@ -670,7 +692,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
-                if self.install_deps:
+                if self._should_install_deps():
                     self._install_dependencies(
                         tmp_dir_path, flags + self._process_global_flag("--vars", self.vars), env
                     )

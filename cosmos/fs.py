@@ -19,11 +19,15 @@ def safe_copy(src: Path, dst: Path) -> None:
     See the blog for atomic file operations:
     https://alexwlchan.net/2019/atomic-cross-filesystem-moves-in-python/
     """
-    # Create a temporary file in the same directory as the destination
-    dir_name, base_name = os.path.split(dst)
-    temp_fd, temp_path = tempfile.mkstemp(dir=dir_name)
+    # Create a temporary file in the same directory as the destination.
+    temp_fd, temp_path = tempfile.mkstemp(dir=dst.parent)
+    os.close(temp_fd)
 
-    shutil.copyfile(src, temp_path)
+    try:
+        shutil.copyfile(src, temp_path)
 
-    # Rename the temporary file to the destination file
-    os.rename(temp_path, dst)
+        # Replace the temporary file with the destination file atomically.
+        os.replace(temp_path, dst)
+    finally:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)

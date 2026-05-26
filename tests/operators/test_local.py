@@ -184,6 +184,38 @@ def test_install_deps_false_skips_dependencies_file_probe(mock_has_deps_file):
     assert dbt_base_operator._should_install_deps() is False
 
 
+@pytest.mark.parametrize("field", ["compiled_sql", "freshness"])
+def test_dbt_local_operator_rejects_output_only_template_fields(field):
+    """``compiled_sql`` and ``freshness`` are populated by Cosmos at runtime.
+
+    Passing them via ``operator_args`` (i.e. as kwargs to the operator) used to
+    be silently overwritten in ``__init__``; we now fail fast at instantiation
+    with a clear error so the misuse is caught immediately.
+    """
+    with pytest.raises(CosmosValueError, match=field):
+        ConcreteDbtLocalBaseOperator(
+            profile_config=profile_config,
+            task_id="my-task",
+            project_dir="my/dir",
+            **{field: "value-the-user-tried-to-set"},
+        )
+
+
+def test_dbt_local_operator_rejects_multiple_output_only_template_fields():
+    """When both forbidden fields are passed, the error names both of them."""
+    with pytest.raises(CosmosValueError) as excinfo:
+        ConcreteDbtLocalBaseOperator(
+            profile_config=profile_config,
+            task_id="my-task",
+            project_dir="my/dir",
+            compiled_sql="x",
+            freshness="y",
+        )
+    message = str(excinfo.value)
+    assert "compiled_sql" in message
+    assert "freshness" in message
+
+
 def test_dbt_base_operator_add_global_flags() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,

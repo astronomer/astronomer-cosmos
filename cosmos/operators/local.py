@@ -187,6 +187,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         "compiled_sql": "sql",
         "freshness": "json",
     }
+    # These template fields are populated by Cosmos at runtime; values supplied
+    # via ``operator_args`` (or directly to the operator) would be silently
+    # overwritten, so reject them at instantiation instead.
+    _OUTPUT_ONLY_TEMPLATE_FIELDS: tuple[str, ...] = ("compiled_sql", "freshness")
     _process_log_line_callable: Callable[[str, Any], None] | None = None
 
     def _warn_on_output_only_fields(self, kwargs: dict[str, Any]) -> None:
@@ -216,6 +220,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]
         **kwargs: Any,
     ) -> None:
+        forbidden = [f for f in self._OUTPUT_ONLY_TEMPLATE_FIELDS if f in kwargs]
+        if forbidden:
+            names = ", ".join(repr(f) for f in forbidden)
+            raise CosmosValueError(
+                f"{names} {'is' if len(forbidden) == 1 else 'are'} output-only "
+                "template field(s) populated by Cosmos at runtime; "
+                "remove them from operator_args."
+            )
         self.task_id = task_id
         self.profile_config = profile_config
         self.callback = callback

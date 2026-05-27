@@ -18,7 +18,13 @@ from cosmos.constants import (
     LoadMode,
     TestBehavior,
 )
-from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
+from cosmos.converter import (
+    DbtToAirflowConverter,
+    _is_jinja_template,
+    _normalize_install_deps,
+    validate_arguments,
+    validate_initial_user_config,
+)
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
@@ -114,6 +120,85 @@ def test_validate_arguments_skips_install_deps_mismatch_check_for_templated_valu
         project_config=project_config,
         render_config=render_config,
         task_args=task_args,
+    )
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (True, True),
+        (False, False),
+        ("True", True),
+        ("False", False),
+        ("true", True),
+        ("0", False),
+        ("{{ params.install_deps }}", "{{ params.install_deps }}"),
+        ("{% if x %}True{% endif %}", "{% if x %}True{% endif %}"),
+    ],
+)
+def test_normalize_install_deps(value, expected):
+    """Literal string forms are resolved to a real bool; Jinja templates and bools pass through."""
+    assert _normalize_install_deps(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (True, False),
+        ("True", False),
+        ("False", False),
+        ("{{ params.install_deps }}", True),
+        ("{% if x %}True{% endif %}", True),
+    ],
+)
+def test_is_jinja_template(value, expected):
+    """Only strings containing Jinja delimiters are considered templates."""
+    assert _is_jinja_template(value) is expected
+
+
+def test_validate_arguments_normalizes_literal_install_deps_string_and_raises_on_mismatch():
+    """A non-templated string like ``"False"`` must be normalized to a bool so the parse-time
+    consistency check between ``RenderConfig.dbt_deps`` and ``operator_args['install_deps']`` still runs."""
+    render_config = RenderConfig(load_method=LoadMode.DBT_LS, dbt_deps=True)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(
+        execution_mode=ExecutionMode.LOCAL, dbt_project_path=DBT_PROJECTS_PROJ_WITH_DEPS_DIR
+    )
+    project_config = ProjectConfig()
+
+    with pytest.raises(CosmosValueError):
+        validate_arguments(
+            execution_config=execution_config,
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=render_config,
+            task_args={"install_deps": "False"},
+        )
+
+
+def test_validate_arguments_passes_when_literal_install_deps_string_matches_render_config():
+    """Matching literal-string and bool forms must satisfy the consistency check after normalization."""
+    render_config = RenderConfig(load_method=LoadMode.DBT_LS, dbt_deps=False)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(
+        execution_mode=ExecutionMode.LOCAL, dbt_project_path=DBT_PROJECTS_PROJ_WITH_DEPS_DIR
+    )
+    project_config = ProjectConfig()
+
+    validate_arguments(
+        execution_config=execution_config,
+        profile_config=profile_config,
+        project_config=project_config,
+        render_config=render_config,
+        task_args={"install_deps": "False"},
     )
 
 

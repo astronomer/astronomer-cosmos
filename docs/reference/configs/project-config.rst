@@ -26,8 +26,9 @@ variables that should be used for rendering and execution. It takes the followin
   Also accepts an `Airflow Jinja-templated <https://airflow.apache.org/docs/apache-airflow/stable/templates-ref.html#templates-reference>`_
   string (e.g. ``"{{ params.install_deps }}"``) that resolves to a boolean at task execution time. This is
   useful when you want to control ``dbt deps`` per DAG run (e.g. via an Airflow ``Param``). When a template
-  string is provided, ``dbt deps`` is always run during DAG parsing (since templates are only rendered at
-  task execution time).
+  string is provided, ``dbt deps`` runs during DAG parsing whenever a non-empty ``packages.yml`` or
+  ``dependencies.yml`` is present (since templates are only rendered at task execution time); if no
+  dependencies file exists, ``dbt deps`` is skipped at both parse and execution time.
 - ``copy_dbt_packages``: (new in v1.10) Copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
 - ``partial_parse``: (new in v1.4) If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
   for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``

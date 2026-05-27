@@ -1,5 +1,3 @@
-Checking dependencies
-Syncing dependencies
 a2wsgi==1.10.10
 adal==1.2.7
 adlfs==2026.2.0

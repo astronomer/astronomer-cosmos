@@ -107,13 +107,9 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             except ImportError:
                 from airflow.datasets import DatasetAlias  # type: ignore
 
-            # ignoring the type because older versions of Airflow raise the follow error in mypy
-            # error: Incompatible types in assignment (expression has type "list[DatasetAlias]", target has type "str")
             dag_id = kwargs.get("dag")
             task_group_id = kwargs.get("task_group")
-            kwargs["outlets"] = [
-                DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
-            ]  # type: ignore
+            kwargs["outlets"] = [DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))]
 
         # This is a workaround for Airflow 3 compatibility. In Airflow 2, the super().__init__() call worked correctly,
         # but in Airflow 3, it attempts to re-initialize AbstractDbtLocalBase with filtered kwargs that only include
@@ -165,7 +161,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
         elapsed_time = time.time() - start_time
         self.log.info("SQL file download completed in %.2f seconds.", elapsed_time)
-        return sql_query  # type: ignore
+        return sql_query
 
     def get_remote_sql(self) -> str:
         start_time = time.time()
@@ -175,7 +171,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         except ImportError:
             from airflow.io.path import ObjectStoragePath
 
-        file_path = self.async_context["dbt_node_config"]["file_path"]  # type: ignore
+        file_path = self.async_context["dbt_node_config"]["file_path"]
         dbt_dag_task_group_identifier = self.async_context["dbt_dag_task_group_identifier"]
         run_id = self.async_context["run_id"]
 

@@ -99,7 +99,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
     ) -> FullOutputSubprocessResult:
         if self._py_bin is not None:
-            self.log.info(f"Using Python binary from virtualenv: {self._py_bin}")
+            self.log.info("Using Python binary from virtualenv: %s", self._py_bin)
             command[0] = str(Path(self._py_bin).parent / "dbt")
         return super().run_subprocess(command, env, cwd, **kwargs)
 
@@ -128,7 +128,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
                 )
 
         try:
-            self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
+            self.log.info("Checking if the virtualenv lock %s exists", self._lock_file)
             while not self._is_lock_available() and self.max_retries_lock:
                 logger.info("Waiting for virtualenv lock to be released")
                 time.sleep(1)
@@ -154,7 +154,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         Delete the virtualenv directory if it is temporary.
         """
         if self.is_virtualenv_dir_temporary and self.virtualenv_dir and self.virtualenv_dir.exists():
-            self.log.info(f"Deleting the Python virtualenv {self.virtualenv_dir}")
+            self.log.info("Deleting the Python virtualenv %s", self.virtualenv_dir)
             shutil.rmtree(str(self.virtualenv_dir), ignore_errors=True)
 
     def execute(self, context: Context, **kwargs: Any) -> None:
@@ -168,7 +168,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.clean_dir_if_temporary()
 
     def _prepare_virtualenv(self) -> Any:
-        self.log.info(f"Creating or updating the virtualenv at `{self.virtualenv_dir}")
+        self.log.info("Creating or updating the virtualenv at `%s`", self.virtualenv_dir)
         py_bin = prepare_virtualenv(
             venv_directory=str(self.virtualenv_dir),
             python_bin=PY_INTERPRETER,
@@ -193,12 +193,12 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         if self._lock_file.is_file():
             with open(self._lock_file) as lf:
                 pid = int(lf.read())
-                self.log.info(f"Checking for running process with PID {pid}")
+                self.log.info("Checking for running process with PID %s", pid)
                 try:
                     _process_running = psutil.Process(pid).is_running()
-                    self.log.info(f"Process {pid} running: {_process_running} and has the lock {self._lock_file}.")
+                    self.log.info("Process %s running: %s and has the lock %s.", pid, _process_running, self._lock_file)
                 except psutil.NoSuchProcess:
-                    self.log.info(f"Process {pid} is not running. Lock {self._lock_file} was outdated.")
+                    self.log.info("Process %s is not running. Lock %s was outdated.", pid, self._lock_file)
                     is_available = True
                 else:
                     is_available = not _process_running

@@ -235,7 +235,7 @@ def patch_partial_parse_content(partial_parse_filepath: Path, project_path: Path
             # it may be due a race condition of multiple processes trying to read/write this file
             data = msgpack.unpack(f)
     except ValueError as e:
-        logger.info("Unable to patch the partial_parse.msgpack file due to %s" % repr(e))
+        logger.info("Unable to patch the partial_parse.msgpack file due to %r", e)
     else:
         for node in data["nodes"].values():
             expected_filepath = node.get("root_path")

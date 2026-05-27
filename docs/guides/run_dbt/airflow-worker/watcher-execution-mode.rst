@@ -357,7 +357,7 @@ Known limitations
 Minimum supported dbt version
 +++++++++++++++++++++++++++++
 
-``ExecutionMode.WATCHER`` requires **dbt-core 1.8 or newer**. On earlier dbt
+``ExecutionMode.WATCHER`` requires **dbt-core 1.5 or newer**. On earlier dbt
 versions the watcher producer and the consumer-fallback path fail at the dbt
 CLI layer with ``No such option '--log-format'`` before any of the watcher
 event-handling code runs.

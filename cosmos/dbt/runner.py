@@ -3,6 +3,7 @@ from __future__ import annotations
 import gc
 import sys
 from collections.abc import Callable
+from functools import cache as functools_cache
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
@@ -15,11 +16,7 @@ if "pytest" in sys.modules:
     # running tests
     cache = lru_cache(maxsize=0)
 else:  # pragma: no cover
-    try:
-        # Available since Python 3.9
-        from functools import cache
-    except ImportError:
-        cache = lru_cache(maxsize=None)
+    cache = functools_cache
 
 
 logger = get_logger(__name__)

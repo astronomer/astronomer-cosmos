@@ -88,6 +88,7 @@ jobs:
               PRIVACY_NOTICE.rst) ;;
               CODEOWNERS) ;;
               CLAUDE.md) ;;
+              AGENTS.md) ;;
               docs/*) ;;
               # GitHub and CI config unrelated to tests
               .github/pull_request_template.md) ;;
@@ -191,6 +192,9 @@ jobs:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
+    # Diagnostic: cap the job at 60 min so a hang does not run until GitHub's 6h default
+    # timeout. This is a job-level backstop and does not itself produce a pytest traceback.
+    timeout-minutes: 60
     permissions:
       contents: read
     strategy:
@@ -852,7 +856,7 @@ jobs:
           coverage report
           coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2  # v6.0.0
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354  # v6.0.1
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}

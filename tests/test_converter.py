@@ -414,7 +414,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents_test_afterall():
         )
     tasks = converter.tasks_map
 
-    assert len(converter.tasks_map) == 3
+    assert len(converter.tasks_map) == 4
 
     assert tasks["model.my_dbt_project.combined_model"].task_id == "combined_model_run"
     assert tasks["model.my_dbt_project.model_a"].task_id == "model_a_run"

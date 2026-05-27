@@ -48,6 +48,8 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 
 `enable_cache_dbt_ls`_:
     Enable or disable caching of the dbt ls command in case using ``LoadMode.DBT_LS`` in an Airflow Variable.
+    Disabling this causes ``dbt ls`` to run on every DAG parse, which can significantly increase scheduler
+    DAG processing and task queueing times on deployments with many Cosmos DAGs.
 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS``
@@ -56,6 +58,8 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 
 `enable_cache_dbt_yaml_selectors`_:
     Enable or disable caching of the YAML selectors in case using ``LoadMode.DBT_MANIFEST`` with ``RenderConfig.selector`` in an Airflow Variable.
+    Disabling this causes the YAML selectors to be reparsed on every DAG parse, which can increase scheduler
+    DAG processing time on deployments with many Cosmos DAGs that use ``RenderConfig.selector``.
 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS``
@@ -209,6 +213,10 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 
     This is an experimental feature available since Cosmos 1.6 to gather user feedback and will be merged into the
     ``cache_dir`` setting in upcoming releases.
+
+    Using a remote cache moves the read off the Airflow metadata database but adds network latency on every DAG
+    parse (observed at roughly 2 to 4 seconds per parse on busy deployments). Prefer the default Variable-backed
+    cache unless you specifically need the cache to be shared across deployments.
 
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__REMOTE_CACHE_DIR``
@@ -406,7 +414,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Environment Variable: ``AIRFLOW__OPENLINEAGE__NAMESPACE``
 
 .. note::
-    For more information, see `OpenLineage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/user.html>`_.
+    For more information, see `OpenLineage Configuration Options <https://airflow.apache.org/docs/apache-airflow-providers-openlineage/stable/guides/structure.html>`_.
 
 Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~

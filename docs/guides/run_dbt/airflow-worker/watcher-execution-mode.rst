@@ -56,43 +56,22 @@ Performance gains
 ~~~~~~~~~~~~~~~~~
 
 We used a dbt project developed by Google, the `google/fhir-dbt-analytics <https://github.com/google/fhir-dbt-analytics>`_ project, that interfaces with BigQuery. It contains:
+
 - 2 seeds
 - 52 sources
 - 185 models
 
-Initial benchmarks, using  illustrate significant improvements:
+We benchmarked ``ExecutionMode.LOCAL`` against ``ExecutionMode.WATCHER`` on the project above using an Apache Airflow Helm chart deployment in May 2026. The headline results:
 
-+-----------------------------------------------+-----------+--------------------+
-| Environment                                   | Threads   | Execution Time (s) |
-+===============================================+===========+====================+
-| dbt build (dbt CLI)                           | 4         | 6–7                |
-+-----------------------------------------------+-----------+--------------------+
-| dbt run per model (dbt CLI)                   | —         | 30                 |
-| similar to the Cosmos ``ExecutionMode.LOCAL`` |           |                    |
-+-----------------------------------------------+-----------+--------------------+
-| Cosmos ``ExecutionMode.LOCAL`` (Astro CLI)    | —         | 10–15              |
-+-----------------------------------------------+-----------+--------------------+
-| Cosmos ``ExecutionMode.WATCHER`` (Astro CLI)  | 1         | 26                 |
-|                                               | 2         | 14                 |
-|                                               | 4         | 7                  |
-|                                               | 8         | 4                  |
-|                                               | 16        | 2                  |
-+-----------------------------------------------+-----------+--------------------+
-| Cosmos ``ExecutionMode.WATCHER`` (Astro Cloud | 8         | ≈5                 |
-| Standard Deployment with A10 workers          |           |                    |
-+-----------------------------------------------+-----------+--------------------+
+- **Runtime**: ``WATCHER`` ran the DAG about 41% faster than ``LOCAL`` at ``threads=8`` (roughly 5.2 versus 8.9 minutes). Even at dbt's default ``threads=4``, ``WATCHER`` was about 15% faster.
+- **Memory**: Consumer pool peak memory dropped roughly 15% under ``WATCHER`` (10.0 GiB to about 8.5 GiB), because only the dedicated producer pod runs ``dbt build`` instead of one dbt process per concurrent consumer slot.
+- **CPU**: ``WATCHER`` drives the consumer pool to roughly 90% of its available CPU via lightweight sensor work, whereas ``LOCAL`` plateaus at about 48% because each dbt task spends most of its time waiting on the warehouse. Producer CPU rises sub-linearly with threads (0.28 to 0.83 cores from ``threads=4`` to ``threads=16``).
+- **Thread scaling**: ``threads=8`` is a strong default. Past 8 threads the producer ``dbt build`` keeps speeding up, but consumer sensors take proportionally longer to wake up (tracked in `astronomer/astronomer-cosmos#2657 <https://github.com/astronomer/astronomer-cosmos/issues/2657>`_), so total wall time plateaus.
 
-The last line represents the performance improvement in a real-world Airflow deployment, using `Astro Cloud <https://www.astronomer.io/>`_.
-
-Depending on the dbt workflow topology, if your dbt DAG previously took 5 minutes with ``ExecutionMode.LOCAL``, you can expect it to complete in roughly **1 minute** with ``ExecutionMode.WATCHER``.
-
-We plan to repeat these benchmarks and share the code with the community in the future.
-
+For the full cluster setup, per-configuration tables, and methodology, see :ref:`watcher-benchmark`. The benchmark code and reproducible sweep recipe live in the `cosmos-benchmark project <https://github.com/astronomer/cosmos-benchmark>`_.
 
 .. note::
    ``ExecutionMode.WATCHER`` relies on the ``threads`` value defined in your dbt profile. Start with a conservative value that matches the CPU capacity of your Airflow workers, then gradually increase it to find the sweet spot between faster runs and acceptable memory/CPU usage.
-
-When we ran the `astronomer/cosmos-benchmark <https://github.com/astronomer/cosmos-benchmark>`_ project with ``ExecutionMode.WATCHER``, that same ``threads`` setting directly affected runtime: moving from 1 to 8 threads reduced the end-to-end ``dbt build`` duration from roughly 26 seconds to about 4 seconds (see table above), while 16 threads squeezed it to around 2 seconds at the cost of higher CPU usage. Use those numbers as a reference point when evaluating how thread counts scale in your own environment.
 
 To increase the number of threads, edit your dbt ``profiles.yml`` (or Helm values if you manage the profile there) and update the ``threads`` key for the target you use with Cosmos:
 
@@ -295,13 +274,19 @@ Watcher dbt Execution Queue
 
 .. versionadded:: 1.14.0
 
-In watcher execution mode, by default, consumer sensor tasks are lightweight sensors that wait for the producer task to complete. On their first attempt, they require minimal CPU and memory resources. However, when these tasks retry, they execute the dbt command for the node, which may require significantly more resources.
+In watcher execution mode there are three different "types" of tasks that are executed:
 
-The ``watcher_dbt_execution_queue`` configuration allows you to specify a different worker queue for retry attempts. This enables you to:
+- Producer tasks: execute a ``dbt build`` for the dbt project being rendered and orchestrated with watcher execution mode
+- Consumer tasks: (first try) lightweight sensors that wait for the producer task to complete
+- Consumer tasks: (retries) executes a dbt command for a specific node, **only when there is failure for that node**
 
-- **Optimize resource allocation** — Use lightweight workers for initial sensor execution and high-resource workers for retries
-- **Improve scheduling efficiency** — Prevent resource contention between initial sensor tasks and retry executions
-- **Scale independently** — Scale retry queues separately based on retry workload patterns
+Producer tasks typically require a high-memory worker to execute the ``dbt build`` command. On their first attempt, the consumer sensors require minimal CPU and memory resources. However, if these tasks retry, they execute the dbt command for the node, which may require significantly more resources. To ensure that the producer tasks and retry attempts have the appropriate resources for execution, the ``watcher_dbt_execution_queue`` configuration can be set.
+
+The ``watcher_dbt_execution_queue`` configuration allows you to specify the worker queue that the producer tasks and retry attempts use. This enables you to:
+
+- **Optimize resource allocation** — Use high-resource workers for producer tasks and sensor retries, and lightweight workers for initial sensor execution.
+- **Improve scheduling efficiency** — Prevent resource contention between producer/retry executions and initial sensor tasks
+- **Scale independently** — Scale "execution" queues (producer and retry) separately from sensor tasks
 
 **Configuration:**
 

@@ -196,7 +196,10 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError):
                 logger.exception(
-                    f"Cosmos dbt docs error: index read failed for slug={slug_alias}, path={op.join(docs_dir_local, index_local)}, conn_id={conn_id_local}"
+                    "Cosmos dbt docs error: index read failed for slug=%s, path=%s, conn_id=%s",
+                    slug_alias,
+                    op.join(docs_dir_local, index_local),
+                    conn_id_local,
                 )
                 return HTMLResponse(
                     content=(
@@ -229,7 +232,11 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError) as e:
                 logger.exception(
-                    f"Error reading manifest for slug '{slug_alias}', path '{op.join(docs_dir_local, 'manifest.json')}', conn_id '{conn_id_local}': {e}"
+                    "Error reading manifest for slug '%s', path '%s', conn_id '%s': %s",
+                    slug_alias,
+                    op.join(docs_dir_local, "manifest.json"),
+                    conn_id_local,
+                    e,
                 )
                 return JSONResponse(
                     content={
@@ -263,7 +270,11 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError) as e:
                 logger.exception(
-                    f"Error reading catalog for slug '{slug_alias}', path '{op.join(docs_dir_local, 'catalog.json')}', conn_id '{conn_id_local}': {e}"
+                    "Error reading catalog for slug '%s', path '%s', conn_id '%s': %s",
+                    slug_alias,
+                    op.join(docs_dir_local, "catalog.json"),
+                    conn_id_local,
+                    e,
                 )
                 return JSONResponse(
                     content={

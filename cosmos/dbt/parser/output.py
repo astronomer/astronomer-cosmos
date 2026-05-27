@@ -40,7 +40,8 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
             num = int(output.split(f"{DBT_WARN_MSG}=")[1].split()[0])
         except ValueError:
             logger.error(
-                f"Could not parse number of {DBT_WARN_MSG}s. Check your dbt/airflow version or if --quiet is not being used"
+                "Could not parse number of %ss. Check your dbt/airflow version or if --quiet is not being used",
+                DBT_WARN_MSG,
             )
     return num
 

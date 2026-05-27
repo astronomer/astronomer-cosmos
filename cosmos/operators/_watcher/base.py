@@ -32,6 +32,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_dbt_upstream_failure_skip_event,
     is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
@@ -253,6 +254,41 @@ def _ensure_subprocess_model_outlet_uris(
         model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []  # type: ignore[assignment]
 
 
+def _rewrite_upstream_failure_skip_status(
+    log_line: dict[str, Any],
+    unique_id: str | None,
+    dbt_node_status: Any,
+    upstream_failure_skipped_ids: set[str] | None,
+) -> Any:
+    """Track upstream-failure-skipped nodes and rewrite their status from "skipped" to "failed".
+
+    dbt emits two events for a node that it skipped because of an upstream
+    failure: ``SkippingDetails``/``LogSkipBecauseError`` during ``on_skip()``,
+    and a later ``NodeFinished`` from the runnable ``finally``-block -- both
+    carry ``node_status="skipped"``. The first identifies the upstream-failure
+    cause (those events are reached only via ``do_skip(cause=...)``, exclusively
+    on upstream-node failure); the second would otherwise overwrite the
+    rewritten XCom with the original ``"skipped"``. Tracking affected
+    ``unique_id``\\ s in a per-execution set lets the parser rewrite both. See
+    #2698.
+    """
+    if not unique_id or upstream_failure_skipped_ids is None:
+        return dbt_node_status
+    if is_dbt_upstream_failure_skip_event(log_line.get("info", {}).get("name")):
+        upstream_failure_skipped_ids.add(unique_id)
+    if dbt_node_status == "skipped" and unique_id in upstream_failure_skipped_ids:
+        return "failed"
+    return dbt_node_status
+
+
+def _surface_non_json_stdout(line: str) -> None:
+    """Forward non-JSON stdout (e.g. Snowflake connector's "Going to open: <URL>" prompt
+    during externalbrowser auth) to the task log instead of silently dropping it.
+    """
+    if line:
+        logger.info("%s", line)
+
+
 def store_dbt_resource_status_from_log(
     line: str,
     extra_kwargs: Any,
@@ -261,6 +297,7 @@ def store_dbt_resource_status_from_log(
     test_results_per_model: dict[str, list[str]] | None = None,
     model_outlet_uris: dict[str, list[str]] | None = None,
     dataset_namespace: str | None = None,
+    upstream_failure_skipped_ids: set[str] | None = None,
 ) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
@@ -281,6 +318,12 @@ def store_dbt_resource_status_from_log(
     :param model_outlet_uris: Mutable dict mapping unique_id to outlet URIs.
         Populated lazily from the manifest on first terminal status detection.
     :param dataset_namespace: The OL-compatible dataset namespace for URI construction.
+    :param upstream_failure_skipped_ids: Mutable accumulator set of node unique_ids
+        that dbt skipped because of an upstream-node failure. Populated when this
+        function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event; later
+        ``NodeFinished`` events with ``node_status="skipped"`` for these unique_ids
+        are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
+        retry it) rather than going SKIPPED. See #2698.
     """
     try:
         log_line = json.loads(line)
@@ -290,7 +333,7 @@ def store_dbt_resource_status_from_log(
         if ti:
             _process_dbt_log_event(ti, log_line)
     except json.JSONDecodeError:
-        logger.debug("Failed to parse log: %s", line)
+        _surface_non_json_stdout(line)
         log_line = {}
     else:
         context = extra_kwargs.get("context")
@@ -301,10 +344,14 @@ def store_dbt_resource_status_from_log(
         dbt_node_resource_type = node_info.get("resource_type")
         unique_id = node_info.get("unique_id")
 
+        # Rewrite "skipped" to "failed" when dbt skipped the node because an
+        # upstream node failed (#2698). See _rewrite_upstream_failure_skip_status.
+        dbt_node_status = _rewrite_upstream_failure_skip_status(
+            log_line, unique_id, dbt_node_status, upstream_failure_skipped_ids
+        )
+
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
-        # Handle terminal statuses for both models (success/failed) and tests (pass/fail)
-        # TODO: handle all possible statuses including skipped, warn, etc.
         if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
             if context is None:
@@ -348,6 +395,15 @@ def store_dbt_resource_status_from_log(
 
     # Additionally, log the message from dbt logs
     _log_dbt_msg(log_line)
+
+
+# dbt flags set by the producer that must not propagate into the consumer's
+# retry command. ``--select`` / ``--exclude`` are dropped because the consumer
+# targets a single model and re-applies its own selector; ``--log-format`` is
+# dropped because the consumer's retry is a user-facing dbt run and should
+# default to text. Each entry consumes the following token as its value (e.g.
+# ``--log-format json``).
+_PRODUCER_ONLY_FLAGS: tuple[str, ...] = ("--select", "--exclude", "--log-format")
 
 
 class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
@@ -399,7 +455,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
-        """Filters out dbt flags that are incompatible with retry (e.g., --select, --exclude)."""
+        """Filter out dbt flags that should not propagate from the producer to the consumer's retry.
+
+        The set of stripped flags is defined by ``_PRODUCER_ONLY_FLAGS`` at module
+        scope; see that constant's docstring for the rationale per flag.
+        """
         filtered = []
         skip_next = False
         for token in flags:
@@ -408,7 +468,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     skip_next = False
                 else:
                     continue  # skip value of previous flag
-            if token in ("--select", "--exclude"):
+            if token in _PRODUCER_ONLY_FLAGS:
                 skip_next = True
                 continue
             filtered.append(token)
@@ -418,7 +478,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         """
         Handles logic for retrying a failed dbt model execution.
         Reconstructs the dbt command by cloning the project and re-running the model
-        with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
+        with appropriate flags, while ensuring flags like ``--select``, ``--exclude``,
+        and ``--log-format`` (the producer-only JSON event stream) are excluded.
+
+        Users who want JSON-formatted dbt output on retry can opt in by passing
+        ``operator_args={"dbt_cmd_flags": ["--log-format", "json"]}`` to their
+        ``DbtDag`` / ``DbtTaskGroup``; ``dbt_cmd_flags`` is appended automatically
+        by ``build_cmd`` and is not filtered here.
 
         Subclasses may override to issue a different dbt subcommand (e.g. ``dbt test``
         for test sensors or ``dbt source freshness`` for source sensors).
@@ -446,7 +512,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             raw_flags = upstream_task.add_cmd_flags()
             extra_flags = self._filter_flags(raw_flags)
 
-        model_selector = self.model_unique_id.split(".")[-1]
+        model_selector = self.model_unique_id.split(".", 2)[2]
         cmd_flags = extra_flags + ["--select", model_selector]
 
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]

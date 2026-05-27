@@ -357,26 +357,22 @@ Known limitations
 Minimum supported dbt version
 +++++++++++++++++++++++++++++
 
-``ExecutionMode.WATCHER`` requires **dbt-core 1.5 or newer**. On earlier dbt
-versions the watcher producer and the consumer-fallback path fail at the dbt
-CLI layer with ``No such option '--log-format'`` before any of the watcher
-event-handling code runs.
+``ExecutionMode.WATCHER`` requires **dbt-core 1.5 or newer**. The watcher
+relies on ``--log-format json`` to consume structured per-model events from
+dbt, with the flag placed after the dbt subcommand (e.g.
+``dbt build --log-format json …``). dbt-core 1.5 introduced finer-grained
+log CLI parameters (see the
+`dbt-core 1.5.0 changelog <https://github.com/dbt-labs/dbt-core/blob/v1.5.0/CHANGELOG.md#dbt-core-150---april-27-2023>`_,
+"Implemented new log cli parameters for finer-grained control", tracked in
+`dbt-core#6639 <https://github.com/dbt-labs/dbt-core/issues/6639>`_) and
+accepts ``--log-format`` in that position; older dbt releases predate this
+change and are not validated by Cosmos's watcher tests.
 
-Note that previous versions of dbt have all reached end of life and are no
-longer supported by dbt Labs; see the
+dbt versions older than 1.5 have all reached end of life and are no longer
+supported by dbt Labs; see the
 `dbt Core versions <https://docs.getdbt.com/docs/dbt-versions/core>`_ page
-for current dbt-Labs-supported releases.
-
-The watcher needs ``--log-format json`` so the producer and the consumer
-fallback receive structured per-model events from dbt. Cosmos passes the
-flag after the dbt subcommand (e.g. ``dbt build --log-format json …``).
-dbt 1.5 / 1.6 / 1.7 expose ``--log-format`` as a **global** flag only — it
-must appear *before* the subcommand on those versions — so the dbt CLI
-parser rejects the command. dbt 1.8 was the release that added
-``--log-format`` as a per-subcommand flag, making the current command
-shape work.
-
-If you must use dbt < 1.8 with Cosmos, use ``ExecutionMode.LOCAL`` instead.
+for current dbt-Labs-supported releases. If you must run an older dbt
+release with Cosmos, use ``ExecutionMode.LOCAL`` instead.
 
 Producer task implementation
 ++++++++++++++++++++++++++++

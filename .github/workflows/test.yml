@@ -88,6 +88,7 @@ jobs:
               PRIVACY_NOTICE.rst) ;;
               CODEOWNERS) ;;
               CLAUDE.md) ;;
+              AGENTS.md) ;;
               docs/*) ;;
               # GitHub and CI config unrelated to tests
               .github/pull_request_template.md) ;;

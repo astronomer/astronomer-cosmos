@@ -140,7 +140,7 @@ By default, Cosmos will error:
 
 .. image:: ../../_static/test_with_multiple_parents_failure.png
 
-.. code-block:: pytb
+.. code-block:: text
 
     [2024-12-27T12:07:33.564+0000] {taskinstance.py:2905} ERROR - Task failed with exception
     Traceback (most recent call last):

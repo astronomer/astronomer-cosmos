@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides project-wide guidance for AI coding agents (Claude Code, Cursor, Codex, Copilot, etc.) working in this repository. Tool-specific overrides — Claude-only behaviour, IDE-only shortcuts, etc. — belong in a sibling file (e.g., [`CLAUDE.md`](CLAUDE.md)), which is expected to defer to this document for the common parts.
+This file provides project-wide guidance for AI coding agents (Claude Code, Cursor, Codex, Copilot, etc.) working in this repository. Tool-specific overrides — Claude-only behavior, IDE-only shortcuts, etc. — belong in a sibling file (e.g., [`CLAUDE.md`](CLAUDE.md)), which is expected to defer to this document for the common parts.
 
 ## What is Astronomer Cosmos
 

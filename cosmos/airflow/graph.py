@@ -1064,6 +1064,7 @@ def build_airflow_graph(
             tests_per_model=tests_per_model,
         )
 
+    task_or_group_args: dict[str, Any] = {}
     for node_id, node in nodes.items():
         task_group = (
             create_task_groups_based_on_folder(dag, node, parent_task_group, task_groups)

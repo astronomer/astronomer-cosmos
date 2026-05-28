@@ -235,6 +235,25 @@ def test_profile_args_insecure_mode(
     assert profile_mapping.profile["insecure_mode"] is True
 
 
+def test_profile_args_connect_args(
+    mock_snowflake_conn: Connection,
+) -> None:
+    """
+    Tests that a nested `connect_args` dict passed via profile_args lands in the rendered profile.
+
+    In newer `snowflake-connector-python` releases, `insecure_mode` is deprecated in favour of
+    `disable_ocsp_checks`, which dbt-snowflake expects under a `connect_args` block. This guards
+    against any regression that would flatten, drop, or otherwise mangle nested values from
+    `profile_args`.
+    """
+    profile_mapping = get_automatic_profile_mapping(
+        mock_snowflake_conn.conn_id,
+        profile_args={"connect_args": {"disable_ocsp_checks": True}},
+    )
+    assert profile_mapping.profile_args == {"connect_args": {"disable_ocsp_checks": True}}
+    assert profile_mapping.profile["connect_args"] == {"disable_ocsp_checks": True}
+
+
 def test_profile_env_vars(
     mock_snowflake_conn: Connection,
 ) -> None:

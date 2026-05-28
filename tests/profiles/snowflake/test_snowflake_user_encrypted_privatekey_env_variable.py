@@ -217,6 +217,24 @@ def test_profile_args_overrides(
     }
 
 
+def test_profile_args_insecure_mode(
+    mock_snowflake_conn: Connection,
+) -> None:
+    """
+    Tests that `insecure_mode: True` passed via profile_args lands in the rendered profile.
+
+    `insecure_mode` is not part of `airflow_param_mapping`, so it can only reach the profile
+    via `profile_args`. This guards against a regression where the merge order or null
+    filtering would drop it.
+    """
+    profile_mapping = get_automatic_profile_mapping(
+        mock_snowflake_conn.conn_id,
+        profile_args={"insecure_mode": True},
+    )
+    assert profile_mapping.profile_args == {"insecure_mode": True}
+    assert profile_mapping.profile["insecure_mode"] is True
+
+
 def test_profile_env_vars(
     mock_snowflake_conn: Connection,
 ) -> None:

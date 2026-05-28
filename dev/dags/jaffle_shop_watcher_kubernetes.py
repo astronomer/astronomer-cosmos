@@ -74,7 +74,7 @@ operator_args = {
 }
 
 profile_config = ProfileConfig(
-    profile_name="postgres_profile", target_name="dev", profiles_yml_filepath=KBS_DBT_PROFILES_YAML_FILEPATH
+    profile_name="default", target_name="dev", profiles_yml_filepath=KBS_DBT_PROFILES_YAML_FILEPATH
 )
 
 project_config = ProjectConfig(

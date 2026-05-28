@@ -77,6 +77,13 @@ repos:
       - id: remove-crlf
       - id: remove-tabs
         exclude: ^docs/make.bat$|^docs/Makefile$|^dev/dags/dbt/jaffle_shop/seeds/raw_orders.csv$
+  - repo: local
+    hooks:
+      - id: check-docs-style
+        name: Enforce Cosmos docs style guide
+        entry: python scripts/check_docs_style.py
+        language: python
+        files: ^docs/.*\.(rst|jinja2)$
   - repo: https://github.com/asottile/pyupgrade
     rev: 75992aaa40730136014f34227e0135f63fc951b4  # v3.21.2
     hooks:
@@ -90,7 +97,7 @@ repos:
       - id: ruff-check
         args: [ --fix ]
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: fa505ab9c3e0fedafe1709fd7ac2b5f8996c670d  # 26.3.1
+    rev: 4160603246a6b365d4a2af661c6d71b0a0f50478  # 26.5.1
     hooks:
       - id: black
         args: ["--config", "./pyproject.toml"]
@@ -99,9 +106,9 @@ repos:
     hooks:
       - id: blacken-docs
         alias: black
-        additional_dependencies: [black>=26.3.1]
+        additional_dependencies: [black==26.5.1]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: fc0f09a29bb495f4a91f00266155d6282d52485d  # v1.20.2
+    rev: d2823d321df3af8f878f7ee3414dc94d037145b9  # v2.1.0
     hooks:
       - id: mypy
         name: mypy-python

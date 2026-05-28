@@ -1,10 +1,15 @@
-from logging import getLogger
+from __future__ import annotations
 
-from airflow.models.taskinstance import TaskInstance
+from logging import getLogger
+from typing import TYPE_CHECKING
+
 from airflow.policies import hookimpl
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION
+
+if TYPE_CHECKING:
+    from airflow.models.taskinstance import TaskInstance
 
 log = getLogger(__name__)
 
@@ -40,6 +45,8 @@ def task_instance_mutation_hook(task_instance: TaskInstance) -> None:
     if watcher_dbt_execution_queue and task_instance.try_number and _is_watcher_sensor(task_instance):
         if task_instance.try_number >= retry_number:
             log.info(
-                f"Setting task {task_instance.task_id} to use watcher dbt execution queue: {watcher_dbt_execution_queue}",
+                "Setting task %s to use watcher dbt execution queue: %s",
+                task_instance.task_id,
+                watcher_dbt_execution_queue,
             )
             task_instance.queue = watcher_dbt_execution_queue

@@ -134,7 +134,7 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
     ) -> Any:
         self.invoke_interceptors(context)
         self.build_kube_args(context, cmd_flags)
-        self.log.info(f"Running command: {self.arguments}")
+        self.log.info("Running command: %s", self.arguments)
         result = KubernetesPodOperator.execute(self, context)
         self.log.info(result)
 

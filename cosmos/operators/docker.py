@@ -106,7 +106,7 @@ class DbtDockerBaseOperator(AbstractDbtBase, DockerOperator):  # type: ignore
     ) -> Any:
         self.invoke_interceptors(context)
         self.build_command(context, cmd_flags)
-        self.log.info(f"Running command: {self.command}")
+        self.log.info("Running command: %s", self.command)
         result = DockerOperator.execute(self, context)
         self.log.info(result)
 

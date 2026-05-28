@@ -3,9 +3,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
-import os
 import shutil
-import tempfile
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -25,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cosmos import settings
+from cosmos.fs import safe_copy
 
 if TYPE_CHECKING:
     try:
@@ -236,7 +235,7 @@ def patch_partial_parse_content(partial_parse_filepath: Path, project_path: Path
             # it may be due a race condition of multiple processes trying to read/write this file
             data = msgpack.unpack(f)
     except ValueError as e:
-        logger.info("Unable to patch the partial_parse.msgpack file due to %s" % repr(e))
+        logger.info("Unable to patch the partial_parse.msgpack file due to %r", e)
     else:
         for node in data["nodes"].values():
             expected_filepath = node.get("root_path")
@@ -306,7 +305,9 @@ def _calculate_yaml_selectors_cache_current_version(
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
-        f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
+        "Cosmos performance: time to calculate cache identifier %s for current version: %s",
+        cache_identifier,
+        elapsed_time,
     )
     return f"{dbt_project_hash},{yaml_selector_hash},{cache_key_hash}"
 
@@ -331,7 +332,9 @@ def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: 
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
-        f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
+        "Cosmos performance: time to calculate cache identifier %s for current version: %s",
+        cache_identifier,
+        elapsed_time,
     )
     return f"{dbt_project_hash},{hash_args}"
 
@@ -406,7 +409,7 @@ def delete_unused_dbt_cache(
     if session is None:
         return 0
 
-    logger.info(f"Delete the Cosmos cache stored in Airflow Variables that hasn't been used for  {max_age_last_usage}")
+    logger.info("Delete the Cosmos cache stored in Airflow Variables that hasn't been used for %s", max_age_last_usage)
     cosmos_dags_ids = defaultdict(list)
     all_variables = session.scalars(select(Variable)).all()
     total_cosmos_variables = 0
@@ -431,12 +434,14 @@ def delete_unused_dbt_cache(
         )
         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
             for var_key in vars_keys:
-                logger.info(f"Removing the {cache_type} cache {var_key}")
+                logger.info("Removing the %s cache %s", cache_type, var_key)
                 Variable.delete(var_key)
                 deleted_cosmos_variables += 1
 
     logger.info(
-        f"Deleted {deleted_cosmos_variables}/{total_cosmos_variables} Airflow Variables used to store  Cosmos cache. "
+        "Deleted %s/%s Airflow Variables used to store Cosmos cache.",
+        deleted_cosmos_variables,
+        total_cosmos_variables,
     )
     return deleted_cosmos_variables
 
@@ -460,13 +465,14 @@ def delete_unused_dbt_remote_cache_files(  # pragma: no cover
     if session is None:
         return 0
 
-    logger.info(f"Delete the Cosmos cache stored remotely that hasn't been used for  {max_age_last_usage}")
+    logger.info("Delete the Cosmos cache stored remotely that hasn't been used for %s", max_age_last_usage)
     cosmos_dags_ids_remote_cache_files = defaultdict(list)
 
     configured_remote_cache_dir = _configure_remote_cache_dir()
     if not configured_remote_cache_dir:
         logger.info(
-            f"No remote cache directory configured. Skipping the deletion of the {cache_type} cache files in remote storage."
+            "No remote cache directory configured. Skipping the deletion of the %s cache files in remote storage.",
+            cache_type,
         )
         return 0
 
@@ -495,7 +501,7 @@ def delete_unused_dbt_remote_cache_files(  # pragma: no cover
         )
         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
             for file in files:
-                logger.info(f"Removing the {cache_type} cache remote file {file}")
+                logger.info("Removing the %s cache remote file %s", cache_type, file)
                 file.unlink()
                 deleted_cosmos_remote_cache_files += 1
     logger.info(
@@ -657,35 +663,11 @@ def _get_latest_cached_package_lockfile(project_dir: Path) -> Path | None:
             return cached_package_lockfile
     cached_lockfile_dir = cache_dir / cache_identifier
     cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
-    _safe_copy(package_lockfile, cached_package_lockfile)
+    safe_copy(package_lockfile, cached_package_lockfile)
     return cached_package_lockfile
 
 
 def _copy_cached_package_lockfile_to_project(cached_package_lockfile: Path, project_dir: Path) -> None:
     """Copy the cached package-lock.yml to tmp project dir"""
     package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
-    _safe_copy(cached_package_lockfile, package_lockfile)
-
-
-# TODO: Move this function to a different location
-def _safe_copy(src: Path, dst: Path) -> None:
-    """
-    Safely copies a file from a source path to a destination path.
-
-    This function ensures that the copy operation is atomic by first
-    copying the file to a temporary file in the same directory as the
-    destination and then renaming the temporary file to the destination
-    file. This approach minimizes the risk of file corruption or partial
-    writes in case of a failure or interruption during the copy process.
-
-    See the blog for atomic file operations:
-    https://alexwlchan.net/2019/atomic-cross-filesystem-moves-in-python/
-    """
-    # Create a temporary file in the same directory as the destination
-    dir_name, base_name = os.path.split(dst)
-    temp_fd, temp_path = tempfile.mkstemp(dir=dir_name)
-
-    shutil.copyfile(src, temp_path)
-
-    # Rename the temporary file to the destination file
-    os.rename(temp_path, dst)
+    safe_copy(cached_package_lockfile, package_lockfile)

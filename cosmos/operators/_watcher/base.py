@@ -11,6 +11,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from cosmos import settings
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
+    _DATASET_EMITTING_RESOURCE_TYPES,
     _DBT_STARTUP_EVENTS_XCOM_KEY,
     AIRFLOW_VERSION,
     CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
@@ -24,10 +25,14 @@ from cosmos.operators._watcher.state import (
     _iso_to_string,
     _log_dbt_event,
     build_producer_state_fetcher,
+    get_compiled_sql_xcom_key,
+    get_dbt_event_xcom_key,
+    get_status_xcom_key,
     get_xcom_val,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_dbt_upstream_failure_skip_event,
     is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
@@ -117,8 +122,7 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
             "msg": msg,
         }
 
-        xcom_key = f"{unique_id.replace('.', '__')}_dbt_event"
-        safe_xcom_push(task_instance=task_instance, key=xcom_key, value=dbt_event)
+        safe_xcom_push(task_instance=task_instance, key=get_dbt_event_xcom_key(unique_id), value=dbt_event)
 
 
 def _extract_compiled_sql(
@@ -154,7 +158,7 @@ def _push_compiled_sql_for_model(task_instance: Any, unique_id: str, compiled_sq
     """
     safe_xcom_push(
         task_instance=task_instance,
-        key=f"{unique_id.replace('.', '__')}_compiled_sql",
+        key=get_compiled_sql_xcom_key(unique_id),
         value=compiled_sql,
     )
 
@@ -250,6 +254,41 @@ def _ensure_subprocess_model_outlet_uris(
         model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []  # type: ignore[assignment]
 
 
+def _rewrite_upstream_failure_skip_status(
+    log_line: dict[str, Any],
+    unique_id: str | None,
+    dbt_node_status: Any,
+    upstream_failure_skipped_ids: set[str] | None,
+) -> Any:
+    """Track upstream-failure-skipped nodes and rewrite their status from "skipped" to "failed".
+
+    dbt emits two events for a node that it skipped because of an upstream
+    failure: ``SkippingDetails``/``LogSkipBecauseError`` during ``on_skip()``,
+    and a later ``NodeFinished`` from the runnable ``finally``-block -- both
+    carry ``node_status="skipped"``. The first identifies the upstream-failure
+    cause (those events are reached only via ``do_skip(cause=...)``, exclusively
+    on upstream-node failure); the second would otherwise overwrite the
+    rewritten XCom with the original ``"skipped"``. Tracking affected
+    ``unique_id``\\ s in a per-execution set lets the parser rewrite both. See
+    #2698.
+    """
+    if not unique_id or upstream_failure_skipped_ids is None:
+        return dbt_node_status
+    if is_dbt_upstream_failure_skip_event(log_line.get("info", {}).get("name")):
+        upstream_failure_skipped_ids.add(unique_id)
+    if dbt_node_status == "skipped" and unique_id in upstream_failure_skipped_ids:
+        return "failed"
+    return dbt_node_status
+
+
+def _surface_non_json_stdout(line: str) -> None:
+    """Forward non-JSON stdout (e.g. Snowflake connector's "Going to open: <URL>" prompt
+    during externalbrowser auth) to the task log instead of silently dropping it.
+    """
+    if line:
+        logger.info("%s", line)
+
+
 def store_dbt_resource_status_from_log(
     line: str,
     extra_kwargs: Any,
@@ -258,6 +297,7 @@ def store_dbt_resource_status_from_log(
     test_results_per_model: dict[str, list[str]] | None = None,
     model_outlet_uris: dict[str, list[str]] | None = None,
     dataset_namespace: str | None = None,
+    upstream_failure_skipped_ids: set[str] | None = None,
 ) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
@@ -278,6 +318,12 @@ def store_dbt_resource_status_from_log(
     :param model_outlet_uris: Mutable dict mapping unique_id to outlet URIs.
         Populated lazily from the manifest on first terminal status detection.
     :param dataset_namespace: The OL-compatible dataset namespace for URI construction.
+    :param upstream_failure_skipped_ids: Mutable accumulator set of node unique_ids
+        that dbt skipped because of an upstream-node failure. Populated when this
+        function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event; later
+        ``NodeFinished`` events with ``node_status="skipped"`` for these unique_ids
+        are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
+        retry it) rather than going SKIPPED. See #2698.
     """
     try:
         log_line = json.loads(line)
@@ -287,7 +333,7 @@ def store_dbt_resource_status_from_log(
         if ti:
             _process_dbt_log_event(ti, log_line)
     except json.JSONDecodeError:
-        logger.debug("Failed to parse log: %s", line)
+        _surface_non_json_stdout(line)
         log_line = {}
     else:
         context = extra_kwargs.get("context")
@@ -298,10 +344,14 @@ def store_dbt_resource_status_from_log(
         dbt_node_resource_type = node_info.get("resource_type")
         unique_id = node_info.get("unique_id")
 
+        # Rewrite "skipped" to "failed" when dbt skipped the node because an
+        # upstream node failed (#2698). See _rewrite_upstream_failure_skip_status.
+        dbt_node_status = _rewrite_upstream_failure_skip_status(
+            log_line, unique_id, dbt_node_status, upstream_failure_skipped_ids
+        )
+
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
-        # Handle terminal statuses for both models (success/failed) and tests (pass/fail)
-        # TODO: handle all possible statuses including skipped, warn, etc.
         if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
             if context is None:
@@ -320,7 +370,7 @@ def store_dbt_resource_status_from_log(
                 # Lazily populate per-model outlet URIs from the manifest, but only for
                 # resource types that can emit datasets (models/seeds/snapshots).
                 outlet_uris: list[str] = []
-                if dbt_node_resource_type in {"model", "seed", "snapshot"}:
+                if dbt_node_resource_type in _DATASET_EMITTING_RESOURCE_TYPES:
                     project_dir = extra_kwargs.get("project_dir")
                     _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
                     outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
@@ -331,7 +381,7 @@ def store_dbt_resource_status_from_log(
                 }
                 safe_xcom_push(
                     task_instance=context["ti"],
-                    key=f"{unique_id.replace('.', '__')}_status",
+                    key=get_status_xcom_key(unique_id),
                     value=status_value,
                 )
 
@@ -345,6 +395,15 @@ def store_dbt_resource_status_from_log(
 
     # Additionally, log the message from dbt logs
     _log_dbt_msg(log_line)
+
+
+# dbt flags set by the producer that must not propagate into the consumer's
+# retry command. ``--select`` / ``--exclude`` are dropped because the consumer
+# targets a single model and re-applies its own selector; ``--log-format`` is
+# dropped because the consumer's retry is a user-facing dbt run and should
+# default to text. Each entry consumes the following token as its value (e.g.
+# ``--log-format json``).
+_PRODUCER_ONLY_FLAGS: tuple[str, ...] = ("--select", "--exclude", "--log-format")
 
 
 class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
@@ -396,7 +455,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
-        """Filters out dbt flags that are incompatible with retry (e.g., --select, --exclude)."""
+        """Filter out dbt flags that should not propagate from the producer to the consumer's retry.
+
+        The set of stripped flags is defined by ``_PRODUCER_ONLY_FLAGS`` at module
+        scope; see that constant's docstring for the rationale per flag.
+        """
         filtered = []
         skip_next = False
         for token in flags:
@@ -405,7 +468,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     skip_next = False
                 else:
                     continue  # skip value of previous flag
-            if token in ("--select", "--exclude"):
+            if token in _PRODUCER_ONLY_FLAGS:
                 skip_next = True
                 continue
             filtered.append(token)
@@ -415,29 +478,31 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         """
         Handles logic for retrying a failed dbt model execution.
         Reconstructs the dbt command by cloning the project and re-running the model
-        with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
+        with appropriate flags, while ensuring flags like ``--select``, ``--exclude``,
+        and ``--log-format`` (the producer-only JSON event stream) are excluded.
 
-        For test sensors, re-execution is not supported in watcher mode; retries are skipped.
+        Users who want JSON-formatted dbt output on retry can opt in by passing
+        ``operator_args={"dbt_cmd_flags": ["--log-format", "json"]}`` to their
+        ``DbtDag`` / ``DbtTaskGroup``; ``dbt_cmd_flags`` is appended automatically
+        by ``build_cmd`` and is not filtered here.
+
+        Subclasses may override to issue a different dbt subcommand (e.g. ``dbt test``
+        for test sensors or ``dbt source freshness`` for source sensors).
         """
-        if self.is_test_sensor:
-            raise AirflowException(
-                f"Test re-execution is not yet supported in watcher mode. "
-                f"{self._resource_label} '{self.model_unique_id}' cannot be retried. "
-                f"A future release will add fallback to local test execution."
-            )
-
         if try_number > 1:
             logger.info(
-                f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
+                "Retry attempt #%s – Running model '%s' from project '%s' using %s",
                 try_number - 1,
                 self.model_unique_id,
                 self.project_dir,
+                self.__class__.__name__,
             )
         else:
             logger.info(
-                f"Falling back to running model '%s' from project '%s' using {self.__class__.__name__}",
+                "Falling back to running model '%s' from project '%s' using %s",
                 self.model_unique_id,
                 self.project_dir,
+                self.__class__.__name__,
             )
 
         upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)
@@ -447,7 +512,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             raw_flags = upstream_task.add_cmd_flags()
             extra_flags = self._filter_flags(raw_flags)
 
-        model_selector = self.model_unique_id.split(".")[-1]
+        model_selector = self.model_unique_id.split(".", 2)[2]
         cmd_flags = extra_flags + ["--select", model_selector]
 
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]
@@ -482,10 +547,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if not self.deferrable:
             super().execute(context)
         elif not self.poke(context):
-            if self.is_test_sensor:
-                xcom_key = get_tests_status_xcom_key(self.model_unique_id)
-            else:
-                xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
+            xcom_key = (
+                get_tests_status_xcom_key(self.model_unique_id)
+                if self.is_test_sensor
+                else get_status_xcom_key(self.model_unique_id)
+            )
             logger.info(
                 "Deferring %s '%s'. The trigger will poll XCom key '%s' from producer task '%s'.",
                 self._resource_label.lower(),
@@ -550,7 +616,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         dbt_events = get_xcom_val(
             task_instance=context["ti"],
-            key=f"{self.model_unique_id.replace('.', '__')}_dbt_event",
+            key=get_dbt_event_xcom_key(self.model_unique_id),
             task_ids=self.producer_task_id,
         )
         _log_dbt_event(dbt_events)
@@ -595,9 +661,8 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         dataset emission.
         """
         if self.is_test_sensor:
-            xcom_key = get_tests_status_xcom_key(self.model_unique_id)
-            return get_xcom_val(ti, self.producer_task_id, xcom_key)
-        xcom_val = get_xcom_val(ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_status")
+            return get_xcom_val(ti, self.producer_task_id, get_tests_status_xcom_key(self.model_unique_id))
+        xcom_val = get_xcom_val(ti, self.producer_task_id, get_status_xcom_key(self.model_unique_id))
         if xcom_val is None:
             return None
         self._outlet_uris = xcom_val.get("outlet_uris", [])
@@ -605,9 +670,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
     def _cache_compiled_sql(self, ti: Any, context: Context) -> None:
         """Pull compiled_sql from XCom and cache it on the sensor instance."""
-        compiled_sql = get_xcom_val(
-            ti, self.producer_task_id, f"{self.model_unique_id.replace('.', '__')}_compiled_sql"
-        )
+        compiled_sql = get_xcom_val(ti, self.producer_task_id, get_compiled_sql_xcom_key(self.model_unique_id))
         if compiled_sql:
             self.compiled_sql = compiled_sql
             if hasattr(self, "_override_rtif"):
@@ -660,10 +723,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         ti = context["ti"]
         try_number = ti.try_number
 
-        if self.is_test_sensor:
-            xcom_key = get_tests_status_xcom_key(self.model_unique_id)
-        else:
-            xcom_key = f"{self.model_unique_id.replace('.', '__')}_status"
+        xcom_key = (
+            get_tests_status_xcom_key(self.model_unique_id)
+            if self.is_test_sensor
+            else get_status_xcom_key(self.model_unique_id)
+        )
         logger.info(
             "Try number #%s, poke attempt #%s: Pulling status from task_id '%s' via XCom key '%s' for %s '%s'",
             try_number,
@@ -691,7 +755,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
         dbt_events = get_xcom_val(
             task_instance=context["ti"],
-            key=f"{self.model_unique_id.replace('.', '__')}_dbt_event",
+            key=get_dbt_event_xcom_key(self.model_unique_id),
             task_ids=self.producer_task_id,
         )
         _log_dbt_event(dbt_events)

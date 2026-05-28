@@ -18,6 +18,11 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
 
+try:
+    import orjson
+except ImportError:  # pragma: no cover
+    orjson = None  # type: ignore[assignment]
+
 if TYPE_CHECKING:
     try:
         # Airflow 3 onwards
@@ -528,7 +533,7 @@ class DbtGraph:
                 airflow_vars = [var_name, Variable.get(var_name, "")]
                 cache_args.extend(airflow_vars)
 
-        logger.debug(f"Value of `dbt_ls_cache_key_args` for <{self.cache_key}>: {cache_args}")
+        logger.debug("Value of `dbt_ls_cache_key_args` for <%s>: %s", self.cache_key, cache_args)
         return cache_args
 
     @cached_property
@@ -550,7 +555,7 @@ class DbtGraph:
         will be reparsed and the new value will be stored.
         """
         cache_args = [impl_version] + self._yaml_selectors_airflow_vars
-        logger.debug(f"Value of `dbt_yaml_selectors_cache_key` for <{self.cache_key}>: {cache_args}")
+        logger.debug("Value of `dbt_yaml_selectors_cache_key` for <%s>: %s", self.cache_key, cache_args)
         return cache_args
 
     def _save_cache_to_variable(self, cache_dict: dict[str, Any], cache_name: str) -> None:
@@ -778,13 +783,13 @@ class DbtGraph:
 
     def load_via_dbt_ls_cache(self) -> bool:
         """(Try to) load dbt ls cache from an Airflow Variable"""
-        logger.info(f"Trying to parse the dbt project using dbt ls cache {self.cache_key}...")
+        logger.info("Trying to parse the dbt project using dbt ls cache %s...", self.cache_key)
         if self.should_use_dbt_ls_cache():
             project_path = self.project_path
 
             cache_dict = self.get_dbt_ls_cache()
             if not cache_dict:
-                logger.info(f"Cosmos performance: Cache miss for {self.cache_key}")
+                logger.info("Cosmos performance: Cache miss for %s", self.cache_key)
                 return False
 
             cache_version = cache_dict.get("version")
@@ -796,16 +801,20 @@ class DbtGraph:
 
             if dbt_ls_cache and not cache.was_project_modified(cache_version, current_version):
                 logger.info(
-                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_key} is {len(dbt_ls_cache)}"
+                    "Cosmos performance [%s|%s]: The cache size for %s is %s",
+                    platform.node(),
+                    os.getpid(),
+                    self.cache_key,
+                    len(dbt_ls_cache),
                 )
                 self.load_method = LoadMode.DBT_LS_CACHE
 
                 nodes = parse_dbt_ls_output(project_path=project_path, ls_stdout=dbt_ls_cache)
                 self.nodes = nodes
                 self.filtered_nodes = nodes
-                logger.info(f"Cosmos performance: Cache hit for {self.cache_key} - {current_version}")
+                logger.info("Cosmos performance: Cache hit for %s - %s", self.cache_key, current_version)
                 return True
-        logger.info(f"Cosmos performance: Cache miss for {self.cache_key} - skipped")
+        logger.info("Cosmos performance: Cache miss for %s - skipped", self.cache_key)
         return False
 
     def should_use_partial_parse_cache(self) -> bool:
@@ -888,13 +897,13 @@ class DbtGraph:
         dbt_cmd = self.render_config.dbt_executable_path
         dbt_cmd = dbt_cmd.as_posix() if isinstance(dbt_cmd, Path) else dbt_cmd
 
-        logger.info(f"Trying to parse the dbt project in `{self.render_config.project_path}` using dbt ls...")
+        logger.info("Trying to parse the dbt project in `%s` using dbt ls...", self.render_config.project_path)
         project_path = self.project_path
         if not self.profile_config:
             raise CosmosLoadDbtException("Unable to load project via dbt ls without a profile config.")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            logger.debug(f"Content of the dbt project dir {project_path}: `{os.listdir(project_path)}`")
+            logger.debug("Content of the dbt project dir %s: `%s`", project_path, os.listdir(project_path))
             tmpdir_path = Path(tmpdir)
 
             self._copy_or_create_symbolic_links(project_path, tmpdir_path)
@@ -1169,13 +1178,13 @@ class DbtGraph:
         Returns:
             YamlSelectors: A YamlSelectors instance
         """
-        logger.info(f"Trying to parse the dbt yaml selectors using {self.cache_key}...")
+        logger.info("Trying to parse the dbt yaml selectors using %s...", self.cache_key)
 
         if self.should_use_yaml_selectors_cache():
             cache_dict = self.get_yaml_selectors_cache()
 
             if not cache_dict:
-                logger.info(f"Cosmos performance: Cache miss for {self.cache_key}")
+                logger.info("Cosmos performance: Cache miss for %s", self.cache_key)
 
                 return self.parse_yaml_selectors(selector_definitions)
 
@@ -1191,13 +1200,17 @@ class DbtGraph:
 
             if cache_dict and not cache.were_yaml_selectors_modified(cache_version, current_version):
                 logger.info(
-                    f"Cosmos performance [{platform.node()}|{os.getpid()}]: The cache size for {self.cache_key} is {len(yaml_selectors.parsed)}"
+                    "Cosmos performance [%s|%s]: The cache size for %s is %s",
+                    platform.node(),
+                    os.getpid(),
+                    self.cache_key,
+                    len(yaml_selectors.parsed),
                 )
-                logger.info(f"Cosmos performance: Cache hit for {self.cache_key} - {current_version}")
+                logger.info("Cosmos performance: Cache hit for %s - %s", self.cache_key, current_version)
 
                 return yaml_selectors
 
-        logger.info(f"Cosmos performance: Cache miss for {self.cache_key} - skipped")
+        logger.info("Cosmos performance: Cache miss for %s - skipped", self.cache_key)
 
         return self.parse_yaml_selectors(selector_definitions)
 
@@ -1250,6 +1263,40 @@ class DbtGraph:
                 exclude=self.render_config.exclude,
             )
 
+    def _load_manifest_from_file(self, manifest_path: Path | ObjectStoragePath) -> dict[str, Any]:
+        """
+        Load and parse a dbt manifest JSON file.
+
+        Uses orjson for faster parsing if enabled and available, otherwise falls back to standard json.
+
+        Args:
+            manifest_path: Path to the manifest.json file
+
+        Returns:
+            Parsed manifest dictionary
+
+        Raises:
+            CosmosLoadDbtException: If orjson is enabled but not installed, or if the parsed manifest root is not a dictionary
+        """
+        if settings.enable_orjson_parser and orjson:
+            with manifest_path.open("rb") as fp:
+                manifest = orjson.loads(fp.read())
+        elif settings.enable_orjson_parser:
+            raise CosmosLoadDbtException("orjson is not installed. Install it with: pip install orjson")
+        else:
+            with manifest_path.open("r") as fp:
+                manifest = json.load(fp)
+
+        if manifest is None:
+            return {}
+
+        if not isinstance(manifest, dict):
+            raise CosmosLoadDbtException(
+                f"Invalid dbt manifest file `{manifest_path}`: expected top-level JSON object, got {type(manifest).__name__}"
+            )
+
+        return manifest
+
     def load_from_dbt_manifest(self) -> None:
         """
         This approach accurately loads `dbt` projects using the `manifest.json` dbt manifest artifact.
@@ -1273,8 +1320,7 @@ class DbtGraph:
         if TYPE_CHECKING:
             assert self.project.manifest_path is not None  # pragma: no cover
 
-        with self.project.manifest_path.open() as fp:
-            manifest = json.load(fp) or {}
+        manifest = self._load_manifest_from_file(self.project.manifest_path)
 
         project_path = self.execution_config.project_path
         nodes = self._load_nodes_from_manifest_data(manifest, project_path)

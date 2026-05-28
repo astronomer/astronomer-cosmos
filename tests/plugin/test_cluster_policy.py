@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -184,7 +187,9 @@ class TestTaskInstanceMutationHook:
         task_instance_mutation_hook(task_instance)
 
         mock_log.info.assert_called_once_with(
-            "Setting task my_test_task to use watcher dbt execution queue: custom_retry_queue",
+            "Setting task %s to use watcher dbt execution queue: %s",
+            "my_test_task",
+            "custom_retry_queue",
         )
 
     @patch("cosmos.settings.watcher_dbt_execution_queue", "custom_retry_queue")
@@ -243,3 +248,35 @@ class TestTaskInstanceMutationHook:
         task_instance_mutation_hook(task_instance)
 
         assert task_instance.queue == "retry_queue"
+
+
+def test_cluster_policy_load_does_not_break_airflow_sentry_init(tmp_path):
+    """Regression for #2620: importing cosmos.plugin.cluster_policy must not
+    transitively load airflow.sentry. If it does, [sentry] before_send is
+    evaluated before the DAGs folder is on sys.path and Airflow startup
+    fails with AirflowConfigException.
+    """
+    code = "import cosmos.plugin.cluster_policy  # noqa: F401\n" "print('OK')\n"
+    env = {
+        **os.environ,
+        "AIRFLOW_HOME": str(tmp_path),
+        # User's scenario: sentry is on and before_send points at a module
+        # that is not importable at plugin-load time.
+        "AIRFLOW__SENTRY__SENTRY_ON": "True",
+        "AIRFLOW__SENTRY__BEFORE_SEND": "cosmos_2620_dags_folder_module.before_send",
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode == 0 and "OK" in result.stdout, (
+        "Issue #2620 reproduced: importing cosmos.plugin.cluster_policy with "
+        "[sentry] before_send pointing at a not-yet-importable module "
+        "transitively loaded airflow.sentry and raised AirflowConfigException "
+        "at plugin-load time.\n"
+        f"returncode: {result.returncode}\n"
+        f"stdout: {result.stdout}\n"
+        f"stderr: {result.stderr}"
+    )

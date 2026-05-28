@@ -1,7 +1,7 @@
 .. _optimize-execution:
 
 Optimize Task Execution
------------------------
+=======================
 
 Once your DAG is parsed, performance depends on how quickly tasks execute. Each Cosmos task runs one or more dbt
 commands, and the overhead of those invocations adds up across a DAG run. This page covers the most impactful ways
@@ -9,7 +9,7 @@ to reduce DAG run time.
 
 
 1. Use an efficient execution mode
-+++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The execution mode determines how Cosmos runs dbt commands at task execution time. Choosing the right mode is the
 single most impactful change for DAG run performance.
@@ -63,7 +63,7 @@ the same Python environment; otherwise Cosmos falls back to ``InvocationMode.SUB
 
 
 2. Install dbt in the same Python environment as Airflow
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When dbt is installed alongside Airflow, Cosmos uses dbt's programmatic API (``dbtRunner``) instead of spawning
 subprocesses. This eliminates process creation overhead and reduces both CPU and memory usage during task execution
@@ -75,7 +75,7 @@ For more details, see :ref:`invocation-mode`.
 
 
 3. Pre-install dbt dependencies
-+++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 By default, Cosmos runs ``dbt deps`` during both DAG parsing and task execution to ensure packages are available.
 For large projects with many packages, this adds significant overhead to every task.
@@ -101,7 +101,7 @@ For large projects with many packages, this adds significant overhead to every t
 
 
 4. Use profiles.yml instead of profile mapping
-+++++++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Cosmos can generate dbt profiles at runtime from Airflow connections using profile mapping classes. While convenient,
 this adds overhead to each task invocation because Cosmos must read the Airflow connection and construct the profile.
@@ -114,7 +114,7 @@ For how to configure this, see
 
 
 5. Worker node sizing
-+++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~
 
 The adequate resources needed to run Cosmos tasks depend on your dbt project and the Cosmos configuration chosen.
 Airflow workers configured for IO-intensive workloads (the default on Astro, which uses a ratio of 5 concurrent
@@ -149,7 +149,7 @@ to route the producer task and sensor retries to a worker queue with more resour
 
 
 6. Profile memory usage with debug mode
-++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To right-size your workers, enable Cosmos debug mode to measure actual memory consumption per task:
 

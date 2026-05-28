@@ -1,7 +1,7 @@
 .. _watcher-execution-mode:
 
 Watcher execution mode (experimental)
--------------------------------------
+=====================================
 
 With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in `Apache Airflow® <https://airflow.apache.org/>`_.
 
@@ -13,7 +13,7 @@ Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime *
 
 
 Background: The problem with the local execution mode in Cosmos
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When running dbt via Cosmos using the default ``ExecutionMode.LOCAL``, each dbt model is executed as a separate Airflow task.
 
@@ -33,7 +33,7 @@ This difference motivated a rethinking of how Cosmos interacts with dbt.
 
 
 Concept: ``ExecutionMode.WATCHER``
-++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``ExecutionMode.WATCHER`` combines the **speed of a single dbt run** with the **observability and task management of Airflow**.
 
@@ -53,46 +53,25 @@ Together, these operators let you:
 
 
 Performance gains
-+++++++++++++++++
+~~~~~~~~~~~~~~~~~
 
 We used a dbt project developed by Google, the `google/fhir-dbt-analytics <https://github.com/google/fhir-dbt-analytics>`_ project, that interfaces with BigQuery. It contains:
+
 - 2 seeds
 - 52 sources
 - 185 models
 
-Initial benchmarks, using  illustrate significant improvements:
+We benchmarked ``ExecutionMode.LOCAL`` against ``ExecutionMode.WATCHER`` on the project above using an Apache Airflow Helm chart deployment in May 2026. The headline results:
 
-+-----------------------------------------------+-----------+--------------------+
-| Environment                                   | Threads   | Execution Time (s) |
-+===============================================+===========+====================+
-| dbt build (dbt CLI)                           | 4         | 6–7                |
-+-----------------------------------------------+-----------+--------------------+
-| dbt run per model (dbt CLI)                   | —         | 30                 |
-| similar to the Cosmos ``ExecutionMode.LOCAL`` |           |                    |
-+-----------------------------------------------+-----------+--------------------+
-| Cosmos ``ExecutionMode.LOCAL`` (Astro CLI)    | —         | 10–15              |
-+-----------------------------------------------+-----------+--------------------+
-| Cosmos ``ExecutionMode.WATCHER`` (Astro CLI)  | 1         | 26                 |
-|                                               | 2         | 14                 |
-|                                               | 4         | 7                  |
-|                                               | 8         | 4                  |
-|                                               | 16        | 2                  |
-+-----------------------------------------------+-----------+--------------------+
-| Cosmos ``ExecutionMode.WATCHER`` (Astro Cloud | 8         | ≈5                 |
-| Standard Deployment with A10 workers          |           |                    |
-+-----------------------------------------------+-----------+--------------------+
+- **Runtime**: ``WATCHER`` ran the DAG about 41% faster than ``LOCAL`` at ``threads=8`` (roughly 5.2 versus 8.9 minutes). Even at dbt's default ``threads=4``, ``WATCHER`` was about 15% faster.
+- **Memory**: Consumer pool peak memory dropped roughly 15% under ``WATCHER`` (10.0 GiB to about 8.5 GiB), because only the dedicated producer pod runs ``dbt build`` instead of one dbt process per concurrent consumer slot.
+- **CPU**: ``WATCHER`` drives the consumer pool to roughly 90% of its available CPU via lightweight sensor work, whereas ``LOCAL`` plateaus at about 48% because each dbt task spends most of its time waiting on the warehouse. Producer CPU rises sub-linearly with threads (0.28 to 0.83 cores from ``threads=4`` to ``threads=16``).
+- **Thread scaling**: ``threads=8`` is a strong default. Past 8 threads the producer ``dbt build`` keeps speeding up, but consumer sensors take proportionally longer to wake up (tracked in `astronomer/astronomer-cosmos#2657 <https://github.com/astronomer/astronomer-cosmos/issues/2657>`_), so total wall time plateaus.
 
-The last line represents the performance improvement in a real-world Airflow deployment, using `Astro Cloud <https://www.astronomer.io/>`_.
-
-Depending on the dbt workflow topology, if your dbt DAG previously took 5 minutes with ``ExecutionMode.LOCAL``, you can expect it to complete in roughly **1 minute** with ``ExecutionMode.WATCHER``.
-
-We plan to repeat these benchmarks and share the code with the community in the future.
-
+For the full cluster setup, per-configuration tables, and methodology, see :ref:`watcher-benchmark`. The benchmark code and reproducible sweep recipe live in the `cosmos-benchmark project <https://github.com/astronomer/cosmos-benchmark>`_.
 
 .. note::
    ``ExecutionMode.WATCHER`` relies on the ``threads`` value defined in your dbt profile. Start with a conservative value that matches the CPU capacity of your Airflow workers, then gradually increase it to find the sweet spot between faster runs and acceptable memory/CPU usage.
-
-When we ran the `astronomer/cosmos-benchmark <https://github.com/astronomer/cosmos-benchmark>`_ project with ``ExecutionMode.WATCHER``, that same ``threads`` setting directly affected runtime: moving from 1 to 8 threads reduced the end-to-end ``dbt build`` duration from roughly 26 seconds to about 4 seconds (see table above), while 16 threads squeezed it to around 2 seconds at the cost of higher CPU usage. Use those numbers as a reference point when evaluating how thread counts scale in your own environment.
 
 To increase the number of threads, edit your dbt ``profiles.yml`` (or Helm values if you manage the profile there) and update the ``threads`` key for the target you use with Cosmos:
 
@@ -129,12 +108,12 @@ If you prefer to manage threads through Cosmos profile mappings instead of editi
 
 
 Example usage of ``ExecutionMode.WATCHER``
-++++++++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There are two main ways to use the new execution mode in Cosmos — directly within a ``DbtDag``, or embedded as part of a ``DbtTaskGroup`` inside a larger DAG.
 
-Example 1 — Using ``DbtDag`` with ``ExecutionMode.WATCHER``
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Example 1: Using ``DbtDag`` with ``ExecutionMode.WATCHER``
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 You can enable WATCHER mode directly in your ``DbtDag`` configuration.
 This approach is best when your Airflow DAG is fully dedicated to a dbt project.
@@ -158,8 +137,8 @@ As it can be observed, the only difference with the default ``ExecutionMode.LOCA
     :alt: Cosmos DbtDag with `ExecutionMode.WATCHER`
     :align: center
 
-Example 2 — Using ``DbtTaskGroup`` with ``ExecutionMode.WATCHER``
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Example 2: Using ``DbtTaskGroup`` with ``ExecutionMode.WATCHER``
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 If your Airflow DAG includes multiple stages or integrations (e.g., data ingestion → dbt → reporting), use ``DbtTaskGroup`` to embed your dbt project into a larger DAG — still benefiting from WATCHER performance.
 
@@ -206,10 +185,10 @@ If your Airflow DAG includes multiple stages or integrations (e.g., data ingesti
 
 
 Additional details
-++++++++++++++++++
+~~~~~~~~~~~~~~~~~~
 
 How retries work
-''''''''''''''''
+++++++++++++++++
 
 When the ``dbt build`` command run by ``DbtProducerWatcherOperator`` fails, it will notify all the ``DbtConsumerWatcherSensor``.
 
@@ -219,7 +198,14 @@ If a branch of the DAG fails, users can clear the status of a failed consumer ta
 
 **Producer retry behavior**
 
+.. versionchanged:: 1.13.0
+   Producer no longer re-runs ``dbt build`` on retry: it returns success without re-executing
+   (`#2283 <https://github.com/astronomer/astronomer-cosmos/pull/2283>`_).
+
 .. versionchanged:: 1.14.1
+   Producer raises ``AirflowSkipException`` instead of returning success, and backs up XCom values
+   to an Airflow Variable so consumer sensors can read model statuses from the first attempt
+   (`#2559 <https://github.com/astronomer/astronomer-cosmos/pull/2559>`_).
 
 When the ``DbtProducerWatcherOperator`` is triggered for a retry (``try_number > 1``), it raises
 ``AirflowSkipException`` instead of re-running the ``dbt build`` command. Before skipping, it restores
@@ -253,7 +239,7 @@ accumulating over time.
 The overall retry behavior will be further improved once `#1978 <https://github.com/astronomer/astronomer-cosmos/issues/1978>`_ is implemented.
 
 Producer done gateway task (DbtTaskGroup only)
-...............................................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. versionadded:: 1.14.1
 
@@ -280,18 +266,27 @@ the producer-to-consumer dependency differently (``producer >> consumers`` with
    The ``dbt_producer_watcher_done`` task is visible in the Airflow UI. Click on it to see a
    description of its purpose in the "Doc" tab.
 
+For a detailed history of how retry behavior has evolved across Cosmos releases, see
+:ref:`watcher-retry-history`.
+
 Watcher dbt Execution Queue
-...........................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. versionadded:: 1.14.0
 
-In watcher execution mode, by default, consumer sensor tasks are lightweight sensors that wait for the producer task to complete. On their first attempt, they require minimal CPU and memory resources. However, when these tasks retry, they execute the dbt command for the node, which may require significantly more resources.
+In watcher execution mode there are three different "types" of tasks that are executed:
 
-The ``watcher_dbt_execution_queue`` configuration allows you to specify a different worker queue for retry attempts. This enables you to:
+- Producer tasks: execute a ``dbt build`` for the dbt project being rendered and orchestrated with watcher execution mode
+- Consumer tasks: (first try) lightweight sensors that wait for the producer task to complete
+- Consumer tasks: (retries) executes a dbt command for a specific node, **only when there is failure for that node**
 
-- **Optimize resource allocation** — Use lightweight workers for initial sensor execution and high-resource workers for retries
-- **Improve scheduling efficiency** — Prevent resource contention between initial sensor tasks and retry executions
-- **Scale independently** — Scale retry queues separately based on retry workload patterns
+Producer tasks typically require a high-memory worker to execute the ``dbt build`` command. On their first attempt, the consumer sensors require minimal CPU and memory resources. However, if these tasks retry, they execute the dbt command for the node, which may require significantly more resources. To ensure that the producer tasks and retry attempts have the appropriate resources for execution, the ``watcher_dbt_execution_queue`` configuration can be set.
+
+The ``watcher_dbt_execution_queue`` configuration allows you to specify the worker queue that the producer tasks and retry attempts use. This enables you to:
+
+- **Optimize resource allocation** — Use high-resource workers for producer tasks and sensor retries, and lightweight workers for initial sensor execution.
+- **Improve scheduling efficiency** — Prevent resource contention between producer/retry executions and initial sensor tasks
+- **Scale independently** — Scale "execution" queues (producer and retry) separately from sensor tasks
 
 **Configuration:**
 
@@ -323,7 +318,7 @@ Or via environment variable:
   ``watcher_dbt_execution_queue`` > explicit ``queue`` on the producer (from ``setup_operator_args``) > ``operator_args`` > your Airflow deployment’s default queue.
 
 Installation of Apache Airflow® and dbt
-''''''''''''''''''''''''''''''''''''''''
+++++++++++++++++++++++++++++++++++++++++
 
 Since Cosmos 1.12.0, ``ExecutionMode.WATCHER`` works well regardless of whether dbt and Airflow are installed in the same Python virtual environment.
 
@@ -332,7 +327,7 @@ When dbt and Airflow are installed in the same Python virtual environment, the `
 When dbt and Airflow are not installed in the same Python virtual environment, the ``ExecutionMode.WATCHER`` consumes the dbt `structured logging <https://docs.getdbt.com/reference/events-logging#structured-logging>`_ to update the consumer tasks.
 
 Synchronous versus Asynchronous sensor execution
-''''''''''''''''''''''''''''''''''''''''''''''''
+++++++++++++++++++++++++++++++++++++++++++++++++
 
 In Cosmos 1.11.0, the ``DbtConsumerWatcherSensor`` operator is implemented as a synchronous XCom sensor, which continuously occupies the worker slot - even if they're just sleeping and checking periodically.
 
@@ -342,17 +337,37 @@ which increases overall task throughput. By default, the sensor now runs in defe
 
 
 Known limitations
-+++++++++++++++++
+~~~~~~~~~~~~~~~~~
+
+Minimum supported dbt version
++++++++++++++++++++++++++++++
+
+``ExecutionMode.WATCHER`` requires **dbt-core 1.5 or newer**. The watcher
+relies on ``--log-format json`` to consume structured per-model events from
+dbt, with the flag placed after the dbt subcommand (e.g.
+``dbt build --log-format json …``). dbt-core 1.5 introduced finer-grained
+log CLI parameters (see the
+`dbt-core 1.5.0 changelog <https://github.com/dbt-labs/dbt-core/blob/v1.5.0/CHANGELOG.md#dbt-core-150---april-27-2023>`_,
+"Implemented new log cli parameters for finer-grained control", tracked in
+`dbt-core#6639 <https://github.com/dbt-labs/dbt-core/issues/6639>`_) and
+accepts ``--log-format`` in that position; older dbt releases predate this
+change and are not validated by Cosmos's watcher tests.
+
+dbt versions older than 1.5 have all reached end of life and are no longer
+supported by dbt Labs; see the
+`dbt Core versions <https://docs.getdbt.com/docs/dbt-versions/core>`_ page
+for current dbt-Labs-supported releases. If you must run an older dbt
+release with Cosmos, use ``ExecutionMode.LOCAL`` instead.
 
 Producer task implementation
-''''''''''''''''''''''''''''
+++++++++++++++++++++++++++++
 
 The producer task is implemented as a ``DbtProducerWatcherOperator`` and currently relies on dbt being installed alongside the Airflow deployment, as in the ``ExecutionMode.LOCAL`` implementation.
 
 The alternative to this implementation is to use ``ExecutionMode.WATCHER_KUBERNETES``, which is built on top of ``ExecutionMode.KUBERNETES``. Check :ref:`watcher-kubernetes-execution-mode` for more information.
 
 Individual dbt Operators
-''''''''''''''''''''''''
+++++++++++++++++++++++++
 
 The ``ExecutionMode.WATCHER`` efficiently implements the following operators:
 - ``DbtSeedWatcherOperator``
@@ -375,7 +390,7 @@ Finally, the following features are not implemented as operators under ``Executi
 You can still invoke these operators using the default ``ExecutionMode.LOCAL`` mode.
 
 Test behavior
-'''''''''''''
++++++++++++++
 
 By default, the watcher mode runs tests alongside models via the ``dbt build`` command being executed by the producer ``DbtProducerWatcherOperator`` operator.
 
@@ -395,7 +410,7 @@ The ``TestBehavior.BUILD`` behavior is embedded in the producer ``DbtProducerWat
 The ``TestBehavior.NONE`` and ``TestBehavior.AFTER_ALL`` behave similarly to ``ExecutionMode.LOCAL``.
 
 Apache Airflow® Datasets and Assets
-''''''''''''''''''''''''''''''''''''
+++++++++++++++++++++++++++++++++++++
 
 .. versionchanged:: 1.14.0
 
@@ -407,7 +422,7 @@ For details on URI patterns and how dataset emission differs between execution m
 :ref:`data-aware-scheduling`.
 
 Source freshness nodes
-''''''''''''''''''''''
+++++++++++++++++++++++
 
 Since Cosmos 1.6, it `supports the rendering of source nodes <https://www.astronomer.io/blog/native-support-for-source-node-rendering-in-cosmos/>`_.
 
@@ -417,7 +432,7 @@ before ``dbt build``, and the freshness callback determines which dependent node
 stale sources. See :ref:`watcher-source-freshness` for details.
 
 Concurrent DAG runs with ``depends_on_past``
-''''''''''''''''''''''''''''''''''''''''''''
+++++++++++++++++++++++++++++++++++++++++++++
 
 When ``depends_on_past=True`` is used together with concurrent DAG runs, a race can occur between consecutive runs where the next run's producer starts while the previous run's consumer fallback is still executing, causing two dbt processes to write to the same models concurrently.
 
@@ -427,10 +442,10 @@ For details, see `#2596 <https://github.com/astronomer/astronomer-cosmos/issues/
 
 
 Advanced config
-+++++++++++++++
+~~~~~~~~~~~~~~~
 
 Callback support
-''''''''''''''''
+++++++++++++++++
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` will use the user-defined callback function similar to ``ExecutionMode.LOCAL`` mode.
 
@@ -439,7 +454,7 @@ You can define different ``callback`` behaviors for producer and consumer nodes 
 .. _watcher-source-freshness:
 
 Source freshness aware execution (Experimental)
-''''''''''''''''''''''''''''''''''''''''''''''''
+++++++++++++++++++++++++++++++++++++++++++++++++
 
 .. versionadded:: 1.14.0
 
@@ -493,12 +508,12 @@ To override the default logic, pass a ``freshness_callback`` via ``setup_operato
 
 
 Overriding ``operator_args``
-''''''''''''''''''''''''''''
+++++++++++++++++++++++++++++
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` operators handle ``operator_args``  similar to the ``ExecutionMode.LOCAL`` mode.
 
 Using Custom Args for the Producer and Watcher
-''''''''''''''''''''''''''''''''''''''''''''''
+++++++++++++++++++++++++++++++++++++++++++++++
 .. versionadded:: 1.12.0
 
 If you need to override ``operator_args`` for the ``DbtProducerWatcherOperator``, you can do so using ``setup_operator_args``.
@@ -535,7 +550,7 @@ If configuring queues, we suggest using the previously mentioned ``watcher_dbt_e
 
 
 Sensor slot allocation and polling
-''''''''''''''''''''''''''''''''''
+++++++++++++++++++++++++++++++++++
 
 Each ``DbtDag`` or ``DbtTaskGroup`` root node will startup during DAG runs  at - potentially - the same time as the DAG Run. This may not happen, since it is dependent on the
 concurrency settings and available task slots in the Airflow deployment.
@@ -546,7 +561,7 @@ We plan to review this behaviour and alternative approaches in the future.
 
 
 Asynchronous sensor execution
-'''''''''''''''''''''''''''''
++++++++++++++++++++++++++++++
 
 - Deferrable execution is currently supported only for dbt models, seeds and snapshots.
 - Deferrable execution applies only to the first task attempt (try number 1). For subsequent retries, the sensor falls back to synchronous execution.
@@ -560,7 +575,7 @@ To disable asynchronous execution, set the ``deferrable`` flag to ``False`` in t
 
 
 Troubleshooting
-+++++++++++++++
+~~~~~~~~~~~~~~~
 
 Problem: "I changed from ``ExecutionMode.LOCAL`` to ``ExecutionMode.WATCHER``, but my DAG is running slower."
 Answer: Please, check the number of threads that are being used by searching the producer task logs for a message similar to ``Concurrency: 1 threads (target='DEV')``. To leverage the Watcher mode, you should have a high number of threads, at least dbt's default of 4. Check the `dbt threading docs <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ for more information on how to set the number of threads.
@@ -593,7 +608,7 @@ Or add the equivalent to your ``airflow.cfg``:
 
 
 Summary
-+++++++
+~~~~~~~
 
 ``ExecutionMode.WATCHER`` represents a significant leap forward for running dbt in Airflow via Cosmos:
 

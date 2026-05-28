@@ -334,7 +334,7 @@ class GraphSelector:
                 root_id = node_by_name[node_name_patched]
                 root_nodes.add(root_id)
             else:
-                logger.warning(f"Selector {self.node_name} not found.")
+                logger.warning("Selector %s not found.", self.node_name)
                 return selected_nodes
 
         selected_nodes.update(root_nodes)

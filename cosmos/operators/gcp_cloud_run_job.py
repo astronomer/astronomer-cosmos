@@ -127,7 +127,7 @@ class DbtGcpCloudRunJobBaseOperator(AbstractDbtBase, CloudRunExecuteJobOperator)
     ) -> Any:
         self.invoke_interceptors(context)
         self.build_command(context, cmd_flags)
-        self.log.info(f"Running command: {self.command}")
+        self.log.info("Running command: %s", self.command)
         result = CloudRunExecuteJobOperator.execute(self, context)
         logger.info(result)
 

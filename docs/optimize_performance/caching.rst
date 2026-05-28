@@ -1,14 +1,14 @@
 .. _caching:
 
 Caching
--------
+=======
 
 This page explains the caching strategies in ``astronomer-cosmos`` Astronomer Cosmos behavior.
 
 All Cosmos caching mechanisms can be enabled or turned off in the ``airflow.cfg`` file or using environment variables.
 
 .. note::
-    For more information, see `configuring a Cosmos project <./project-config.html>`_.
+    For more information, see :doc:`configuring a Cosmos project </reference/configs/project-config>`.
 
 Depending on the Cosmos version, it creates a cache for three types of data:
 
@@ -20,11 +20,11 @@ It is possible to turn off any cache in Cosmos by exporting the environment vari
 Disabling individual types of cache in Cosmos is also possible, as explained below.
 
 Caching the dbt ls output
-+++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (Introduced in Cosmos 1.5)
 
-While parsing a dbt project using `LoadMode.DBT_LS <./parsing-methods.html#dbt-ls>`_, Cosmos uses subprocess to run ``dbt ls``.
+While parsing a dbt project using :ref:`LoadMode.DBT_LS <parsing-methods-dbt-ls>`, Cosmos uses subprocess to run ``dbt ls``.
 This operation can be very costly; it can increase the DAG parsing times and affect not only the scheduler DAG processing but
 also the tasks queueing time.
 
@@ -41,6 +41,18 @@ Variables. To do so, you need to configure a remote cache directory. See :ref:`r
 :ref:`remote_cache_dir_conn_id` for more information. This is an experimental feature introduced in 1.6.0 to gather
 user feedback. The ``remote_cache_dir`` will eventually be merged into the :ref:`cache_dir` setting in upcoming
 releases.
+
+**Choosing between Variable cache and remote cache**
+
+By default, Cosmos stores this cache in an Airflow Variable, which is read directly from the Airflow metadata database
+and is typically the fastest option. The remote cache directory stores the cache in object storage (S3, GCS, Azure Blob)
+and trades that for portability across environments; in exchange, every DAG parse fetches the cache over the network.
+On busy deployments, this has been observed to add roughly 2 to 4 seconds of latency per parse. If parse time matters
+more than cross-environment portability for your workload, prefer the default Variable cache.
+
+Disabling this cache entirely (``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS=0``) is also supported, but means ``dbt ls`` runs
+on every DAG parse cycle, which can significantly increase scheduler DAG processing time and task queueing time on
+deployments with many Cosmos DAGs.
 
 **How the cache is refreshed**
 
@@ -111,11 +123,11 @@ The cache values contain a few properties:
 - ``cosmos_type`` is either ``DbtDag`` or ``DbtTaskGroup``
 
 Caching the YAML selectors
-++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (Introduced in Cosmos 1.13)
 
-While parsing a dbt project using `LoadMode.DBT_MANIFEST <./parsing-methods.html#dbt-manifest>`_, if a ``selector`` argument is provided to the `RenderConfig <./render-config.html>`_ instance passed to the ``DbtDag`` or ``DbtTaskGroup``,
+While parsing a dbt project using :ref:`LoadMode.DBT_MANIFEST <parsing-methods-dbt-manifest>`, if a ``selector`` argument is provided to the :doc:`RenderConfig </guides/translate_dbt_to_airflow/render-config>` instance passed to the ``DbtDag`` or ``DbtTaskGroup``,
 Cosmos will parse the preprocessed YAML selectors found in the manifest. The YAML selectors will be parsed into selection criteria that Cosmos will use to filter the dbt nodes to include in the Airflow DAG. The parsed selectors will be cached to improve performance during DAG parsing.
 
 This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS=0``.
@@ -125,6 +137,18 @@ Variables. To do so, you need to configure a remote cache directory. See :ref:`r
 :ref:`remote_cache_dir_conn_id` for more information. This is an experimental feature introduced in 1.6.0 to gather
 user feedback. The ``remote_cache_dir`` will eventually be merged into the :ref:`cache_dir` setting in upcoming
 releases.
+
+**Choosing between Variable cache and remote cache**
+
+By default, Cosmos stores this cache in an Airflow Variable, which is read directly from the Airflow metadata database
+and is typically the fastest option. The remote cache directory stores the cache in object storage (S3, GCS, Azure Blob)
+and trades that for portability across environments; in exchange, every DAG parse fetches the cache over the network.
+On busy deployments, this has been observed to add roughly 2 to 4 seconds of latency per parse. If parse time matters
+more than cross-environment portability for your workload, prefer the default Variable cache.
+
+Disabling this cache entirely (``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS=0``) is also supported, but means
+the YAML selectors are reparsed on every DAG parse cycle, which can increase scheduler DAG processing time on
+deployments with many Cosmos DAGs that use ``RenderConfig.selector``.
 
 **How the cache is refreshed**
 
@@ -198,7 +222,7 @@ When using Airflow variables as the backend to store cached cosmos artifacts, bo
 to have both artifacts occupy the cache at the same time due to their distinct `RenderConfig.load_mode <./render-config.html>`_ and switching from using one cache to the other will invalidate the cache on the next version check.
 
 Caching the partial parse file
-++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (Introduced in Cosmos 1.4)
 
@@ -217,7 +241,7 @@ For more information, read the `Cosmos partial parsing documentation <./partial-
 
 
 Caching the profiles
-++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~
 
 (Introduced in Cosmos 1.5)
 

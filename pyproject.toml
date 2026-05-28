@@ -259,10 +259,61 @@ no_warn_unused_ignores = true
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint]
-select = ["C901", "D300", "I", "F"]
+select = ["C901", "D300", "I", "F", "TID253"]
 ignore = ["F541"]
 [tool.ruff.lint.mccabe]
 max-complexity = 10
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Block module-level imports of optional / heavy / provider-specific
+# dependencies so they don't become hard runtime requirements for every
+# Cosmos user. These should be imported lazily (inside functions/methods)
+# or guarded by `if TYPE_CHECKING:` / `try: ... except ImportError:`.
+# See PR #1109 / #1132 for the history of why this matters.
+banned-module-level-imports = [
+    # Airflow provider packages — each is an optional pip install
+    "airflow.providers.amazon",
+    "airflow.providers.cncf.kubernetes",
+    "airflow.providers.databricks",
+    "airflow.providers.docker",
+    "airflow.providers.google",
+    "airflow.providers.microsoft.azure",
+    "airflow.providers.snowflake",
+    # Cloud / orchestration SDKs
+    "azure",
+    "boto3",
+    "botocore",
+    "databricks.sql",
+    "docker",
+    "google.auth",
+    "google.cloud",
+    "kubernetes",
+    "snowflake.connector",
+    # Cloud filesystems
+    "adlfs",
+    "gcsfs",
+    "s3fs",
+    # Other heavy optional deps
+    "mlflow",
+    "sentry_sdk",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Opt-in leaf modules — only loaded via cosmos/__init__.py's _LAZY_IMPORTS
+# when the user explicitly imports the matching operator class. Eager
+# provider imports here are appropriate.
+"cosmos/operators/kubernetes.py" = ["TID253"]
+"cosmos/operators/aws_eks.py" = ["TID253"]
+"cosmos/operators/aws_ecs.py" = ["TID253"]
+"cosmos/operators/azure_container_instance.py" = ["TID253"]
+"cosmos/operators/gcp_cloud_run_job.py" = ["TID253"]
+"cosmos/operators/docker.py" = ["TID253"]
+"cosmos/operators/watcher_kubernetes.py" = ["TID253"]
+"cosmos/airflow/_override.py" = ["TID253"]
+# Tests, dev DAGs, and CI scripts aren't shipped to users.
+"tests/**/*.py" = ["TID253"]
+"dev/**/*.py" = ["TID253"]
+"scripts/**/*.py" = ["TID253"]
 
 [tool.distutils.bdist_wheel]
 universal = true

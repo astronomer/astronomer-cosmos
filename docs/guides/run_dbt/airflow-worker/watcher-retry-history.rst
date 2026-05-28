@@ -52,7 +52,9 @@ Does the Airflow state match dbt's?
        The consumer tasks for those models are marked successful instead of running their fallback
        retry, so the DAG appears successful even though dbt failed.
    * - **1.14.1**
-     - **Yes**.
+     - **Mostly**, except upstream-failure-skipped downstream nodes could produce a "false
+       green" — fixed in 1.14.2 by
+       `#2684 <https://github.com/astronomer/astronomer-cosmos/pull/2684>`_.
    * - **1.14.2**
      - **Yes**. Same as 1.14.1, plus a previously unreported "false green" gap is closed:
        when a model fails on its first attempt and dbt skips downstream nodes via the
@@ -315,8 +317,8 @@ Avoid duplicate or concurrent runs of the same dbt transformation in the same DA
        cross-run risk where the next DAG run's producer could start before the previous run's
        consumers had completed
        (`#2596 <https://github.com/astronomer/astronomer-cosmos/issues/2596>`_) is now mitigated:
-       the producer-done gateway is wired downstream of every consumer task and the task-group
-       leaves carry ``wait_for_downstream=True``
+       leaf consumer tasks are wired upstream of the producer-done gateway, and the producer
+       plus watcher tasks carry ``wait_for_downstream=True``
        (`#2615 <https://github.com/astronomer/astronomer-cosmos/pull/2615>`_), so the task group
        behaves as a single atomic unit across runs. Topology is unchanged for the default
        ``depends_on_past=False``.

@@ -339,6 +339,26 @@ which increases overall task throughput. By default, the sensor now runs in defe
 Known limitations
 ~~~~~~~~~~~~~~~~~
 
+Minimum supported dbt version
++++++++++++++++++++++++++++++
+
+``ExecutionMode.WATCHER`` requires **dbt-core 1.5 or newer**. The watcher
+relies on ``--log-format json`` to consume structured per-model events from
+dbt, with the flag placed after the dbt subcommand (e.g.
+``dbt build --log-format json …``). dbt-core 1.5 introduced finer-grained
+log CLI parameters (see the
+`dbt-core 1.5.0 changelog <https://github.com/dbt-labs/dbt-core/blob/v1.5.0/CHANGELOG.md#dbt-core-150---april-27-2023>`_,
+"Implemented new log cli parameters for finer-grained control", tracked in
+`dbt-core#6639 <https://github.com/dbt-labs/dbt-core/issues/6639>`_) and
+accepts ``--log-format`` in that position; older dbt releases predate this
+change and are not validated by Cosmos's watcher tests.
+
+dbt versions older than 1.5 have all reached end of life and are no longer
+supported by dbt Labs; see the
+`dbt Core versions <https://docs.getdbt.com/docs/dbt-versions/core>`_ page
+for current dbt-Labs-supported releases. If you must run an older dbt
+release with Cosmos, use ``ExecutionMode.LOCAL`` instead.
+
 Producer task implementation
 ++++++++++++++++++++++++++++
 

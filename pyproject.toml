@@ -267,8 +267,14 @@ max-complexity = 10
 [tool.ruff.lint.flake8-tidy-imports]
 # Block module-level imports of optional / heavy / provider-specific
 # dependencies so they don't become hard runtime requirements for every
-# Cosmos user. These should be imported lazily (inside functions/methods)
-# or guarded by `if TYPE_CHECKING:` / `try: ... except ImportError:`.
+# Cosmos user. Preferred patterns, in order of preference:
+#   1. import inside the function/method that uses the dependency;
+#   2. `if TYPE_CHECKING:` block for type-only imports.
+# Module-scope `try: ... except ImportError:` blocks (used today by the
+# Airflow 2/3 BaseHook split in `cosmos/profiles/base.py` and by the
+# BigQuery async operator) are not flagged by TID253 at the time of
+# writing, but the rule's handling of conditional imports may tighten
+# in future ruff versions — prefer function-level imports when possible.
 # See PR #1109 / #1132 for the history of why this matters.
 banned-module-level-imports = [
     # Airflow provider packages — each is an optional pip install
@@ -309,6 +315,7 @@ banned-module-level-imports = [
 "cosmos/operators/gcp_cloud_run_job.py" = ["TID253"]
 "cosmos/operators/docker.py" = ["TID253"]
 "cosmos/operators/watcher_kubernetes.py" = ["TID253"]
+"cosmos/operators/_asynchronous/bigquery.py" = ["TID253"]
 "cosmos/airflow/_override.py" = ["TID253"]
 # Tests, dev DAGs, and CI scripts aren't shipped to users.
 "tests/**/*.py" = ["TID253"]

@@ -317,3 +317,43 @@ def test_old_snowflake_format() -> None:
             "warehouse": conn.extra_dejson.get("warehouse"),
             "threads": 4,
         }
+
+
+def test_insecure_mode_from_connection_extra() -> None:
+    """
+    Tests that `insecure_mode` set on the Airflow connection's Extra is forwarded to the profile.
+
+    `insecure_mode` is a first-class field of the Airflow Snowflake connection form. It must reach
+    the rendered dbt profile via `airflow_param_mapping` (not only via `profile_args`), otherwise
+    users behind PrivateLink who rely on it to bypass OCSP checks silently lose the setting.
+    """
+    conn = Connection(
+        conn_id="my_snowflake_pk_connection_insecure",
+        conn_type="snowflake",
+        login="my_user",
+        schema="my_schema",
+        extra=json.dumps(
+            {
+                "account": "my_account",
+                "database": "my_database",
+                "warehouse": "my_warehouse",
+                "private_key_content": "my_private_key",
+                "private_key_passphrase": "my_passphrase",
+                "insecure_mode": True,
+            }
+        ),
+    )
+
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        assert profile_mapping.profile["insecure_mode"] is True
+
+
+def test_insecure_mode_absent_when_not_set(
+    mock_snowflake_conn: Connection,
+) -> None:
+    """Tests that `insecure_mode` is omitted from the profile when it is not set on the connection."""
+    profile_mapping = get_automatic_profile_mapping(
+        mock_snowflake_conn.conn_id,
+    )
+    assert "insecure_mode" not in profile_mapping.profile

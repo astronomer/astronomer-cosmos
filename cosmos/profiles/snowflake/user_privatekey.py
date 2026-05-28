@@ -42,6 +42,7 @@ class SnowflakePrivateKeyPemProfileMapping(SnowflakeBaseProfileMapping):
         "role": "extra.role",
         "private_key": "extra.private_key_content",
         "query_tag": "extra.query_tag",
+        "insecure_mode": "extra.insecure_mode",
     }
 
     @property

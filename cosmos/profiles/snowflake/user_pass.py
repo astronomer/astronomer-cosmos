@@ -43,6 +43,7 @@ class SnowflakeUserPasswordProfileMapping(SnowflakeBaseProfileMapping):
         "host": "extra.host",
         "port": "extra.port",
         "query_tag": "extra.query_tag",
+        "insecure_mode": "extra.insecure_mode",
     }
 
     def can_claim_connection(self) -> bool:

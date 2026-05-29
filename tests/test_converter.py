@@ -945,6 +945,36 @@ def test_execution_config_install_dbt_deps_overrides_project_config(
     assert kwargs["task_args"].get("install_deps", None) == expected
 
 
+@patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.validate_initial_user_config")
+@patch("cosmos.converter.DbtGraph")
+@patch("cosmos.converter.build_airflow_graph")
+def test_execution_config_install_dbt_deps_takes_precedence_over_operator_args(
+    mock_build_airflow_graph,
+    mock_user_config,
+    mock_dbt_graph,
+    mock_validate_project,
+):
+    """ExecutionConfig.install_dbt_deps must win over a deprecated ``operator_args['install_deps']`` so the
+    skipped parse-time consistency check cannot mask a silent mismatch."""
+    project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL, install_dbt_deps=False)
+    render_config = MagicMock()
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        DbtToAirflowConverter(
+            dag=dag,
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=sample_profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+            operator_args={"install_deps": True},
+        )
+    _, kwargs = mock_build_airflow_graph.call_args
+
+    assert kwargs["task_args"].get("install_deps", None) is False
+
+
 @pytest.mark.parametrize("invocation_mode", [None, InvocationMode.SUBPROCESS, InvocationMode.DBT_RUNNER])
 @patch("cosmos.config.ProjectConfig.validate_project")
 @patch("cosmos.converter.validate_initial_user_config")

@@ -233,7 +233,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         # Preserve the raw value (including Jinja templated strings) so Airflow can render the template
         # field at execution time; the effective boolean is resolved by ``self._should_install_deps()``.
-        self._has_dependencies_file = has_non_empty_dependencies_file(Path(self.project_dir))
+        # Skip the filesystem probe when deps are explicitly disabled to avoid extra per-task I/O at parse time.
+        self._has_dependencies_file = install_deps is not False and has_non_empty_dependencies_file(
+            Path(self.project_dir)
+        )
         self.install_deps = install_deps if self._has_dependencies_file else False
         self.copy_dbt_packages = copy_dbt_packages
 

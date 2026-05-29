@@ -172,6 +172,17 @@ def test_install_deps_preserves_template_string_when_dependencies_file_exists():
     assert dbt_base_operator.install_deps == template
 
 
+@patch("cosmos.operators.local.has_non_empty_dependencies_file")
+def test_install_deps_false_skips_dependencies_file_probe(mock_has_deps_file):
+    """When ``install_deps`` is explicitly False, the dependencies-file probe must be skipped to avoid
+    extra per-task filesystem I/O during DAG parsing."""
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, install_deps=False
+    )
+    mock_has_deps_file.assert_not_called()
+    assert dbt_base_operator._should_install_deps() is False
+
+
 def test_dbt_base_operator_add_global_flags() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,

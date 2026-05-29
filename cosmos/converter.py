@@ -259,13 +259,12 @@ def override_configuration(
         operator_args["invocation_mode"] = execution_config.invocation_mode
 
     if execution_config.execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV, ExecutionMode.WATCHER):
-        if "install_deps" not in operator_args:
-            # ExecutionConfig.install_dbt_deps overrides ProjectConfig.install_dbt_deps for execution only.
-            operator_args["install_deps"] = (
-                execution_config.install_dbt_deps
-                if execution_config.install_dbt_deps is not None
-                else project_config.install_dbt_deps
-            )
+        # ExecutionConfig.install_dbt_deps overrides ProjectConfig.install_dbt_deps and the deprecated
+        # operator_args value for execution only; otherwise fall back to those existing values.
+        if execution_config.install_dbt_deps is not None:
+            operator_args["install_deps"] = execution_config.install_dbt_deps
+        elif "install_deps" not in operator_args:
+            operator_args["install_deps"] = project_config.install_dbt_deps
         if "copy_dbt_packages" not in operator_args:
             operator_args["copy_dbt_packages"] = project_config.copy_dbt_packages
 

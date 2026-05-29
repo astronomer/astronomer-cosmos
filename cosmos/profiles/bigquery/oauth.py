@@ -25,9 +25,10 @@ class GoogleCloudOauthProfileMapping(BaseProfileMapping):
         "dataset",
     ]
 
+    # Providing parity with other profile types for BigQuery
     airflow_param_mapping = {
-        "project": "extra.project",
-        "dataset": "extra.dataset",
+        "project": ["extra.project", "extra__google_cloud_platform__project"],
+        "dataset": ["extra.dataset", "extra__google_cloud_platform__dataset"],
     }
 
     @property

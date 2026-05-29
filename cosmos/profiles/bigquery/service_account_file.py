@@ -25,10 +25,11 @@ class GoogleCloudServiceAccountFileProfileMapping(BaseProfileMapping):
         "keyfile",
     ]
 
+    # Providing parity with other profile types for BigQuery
     airflow_param_mapping = {
-        "project": "extra.project",
-        "dataset": "extra.dataset",
-        "keyfile": "extra.key_path",
+        "project": ["extra.project", "extra__google_cloud_platform__project"],
+        "dataset": ["extra.dataset", "extra__google_cloud_platform__dataset"],
+        "keyfile": ["extra.key_path", "extra__google_cloud_platform__key_path"],
     }
 
     @property

@@ -19,6 +19,7 @@ def mock_bigquery_conn():  # type: ignore
     """
     extra = {
         "project": "my_project",
+        "dataset": "my_dataset",
         "key_path": "my_key_path.json",
     }
     conn = Connection(
@@ -27,6 +28,28 @@ def mock_bigquery_conn():  # type: ignore
         extra=json.dumps(extra),
     )
 
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        yield conn
+
+
+@pytest.fixture()
+def mock_bigquery_conn_extra_gcp():  # type: ignore
+    """
+    Mocks and returns an Airflow BigQuery connection with:
+        - extra__google_cloud_platform__dataset
+        - extra__google_cloud_platform__project
+        - extra__google_cloud_platform__key_path
+    """
+    extra = {
+        "extra__google_cloud_platform__project": "my_project",
+        "extra__google_cloud_platform__dataset": "my_dataset",
+        "extra__google_cloud_platform__key_path": "my_key_path.json",
+    }
+    conn = Connection(
+        conn_id="my_bigquery_connection",
+        conn_type="google_cloud_platform",
+        extra=json.dumps(extra),
+    )
     with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         yield conn
 
@@ -176,3 +199,22 @@ def test_profile_env_vars(
         profile_args={"dataset": "my_dataset"},
     )
     assert profile_mapping.env_vars == {}
+
+
+def test_extra_gcp_fields(mock_bigquery_conn_extra_gcp: Connection) -> None:
+    """
+    Validate that using extra__google_cloud_platform__project/dataset/key_path properly sets the fields below:
+        - project
+        - dataset
+        - keyfile
+    """
+    profile_mapping = GoogleCloudServiceAccountFileProfileMapping(mock_bigquery_conn_extra_gcp, {})
+    expected = {
+        "type": "bigquery",
+        "method": "service-account",
+        "project": "my_project",
+        "dataset": "my_dataset",
+        "keyfile": "my_key_path.json",
+        "threads": 1,
+    }
+    assert profile_mapping.profile == expected

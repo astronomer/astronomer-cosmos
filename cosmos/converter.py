@@ -12,8 +12,6 @@ from collections.abc import Callable
 from typing import Any
 from warnings import warn
 
-from airflow.utils.strings import to_boolean
-
 try:
     from airflow.sdk.exceptions import ParamValidationError
 except ImportError:
@@ -60,21 +58,6 @@ from cosmos.telemetry import _compress_telemetry_metadata, should_emit
 from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
-
-
-def _is_jinja_template(value: Any) -> bool:
-    """Return True only for strings containing Jinja delimiters (``{{`` or ``{%``)."""
-    return isinstance(value, str) and ("{{" in value or "{%" in value)
-
-
-def _normalize_install_deps(value: Any) -> Any:
-    """Resolve non-templated string forms of ``install_deps`` (e.g. ``"False"``) to a real bool.
-
-    Real bools and Jinja-templated strings are returned unchanged.
-    """
-    if isinstance(value, str) and not _is_jinja_template(value):
-        return bool(to_boolean(value))
-    return value
 
 
 def migrate_to_new_interface(
@@ -152,20 +135,16 @@ def validate_arguments(
         has_non_empty_dependencies = execution_config.project_path and has_non_empty_dependencies_file(
             execution_config.project_path
         )
-        # When `install_dbt_deps` (or the deprecated `install_deps` operator_arg) is a Jinja-templated string,
-        # its actual value is only known at task execution time, so skip the parse-time consistency check.
-        # Literal strings like "True"/"False" are normalized to a bool so the check still runs.
-        install_deps_task_arg = _normalize_install_deps(task_args.get("install_deps", True))
-        normalized_dbt_deps = _normalize_install_deps(render_config.dbt_deps)
-        is_templated_install_deps = _is_jinja_template(install_deps_task_arg) or _is_jinja_template(normalized_dbt_deps)
         if (
             has_non_empty_dependencies
             and (
                 render_config.load_method == LoadMode.DBT_LS
                 or (render_config.load_method == LoadMode.AUTOMATIC and not project_config.is_manifest_available())
             )
-            and not is_templated_install_deps
-            and (normalized_dbt_deps != install_deps_task_arg)
+            # ExecutionConfig.install_dbt_deps intentionally overrides the parse-time value for execution only,
+            # so the parse-time consistency check does not apply when it is set.
+            and execution_config.install_dbt_deps is None
+            and (render_config.dbt_deps != task_args.get("install_deps", True))
         ):
             err_msg = f"When using `LoadMode.DBT_LS` and `{execution_config.execution_mode}`, the value of `dbt_deps` in `RenderConfig` should be the same as the `operator_args['install_deps']` value."
             raise CosmosValueError(err_msg)
@@ -281,7 +260,12 @@ def override_configuration(
 
     if execution_config.execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV, ExecutionMode.WATCHER):
         if "install_deps" not in operator_args:
-            operator_args["install_deps"] = project_config.install_dbt_deps
+            # ExecutionConfig.install_dbt_deps overrides ProjectConfig.install_dbt_deps for execution only.
+            operator_args["install_deps"] = (
+                execution_config.install_dbt_deps
+                if execution_config.install_dbt_deps is not None
+                else project_config.install_dbt_deps
+            )
         if "copy_dbt_packages" not in operator_args:
             operator_args["copy_dbt_packages"] = project_config.copy_dbt_packages
 
@@ -478,14 +462,8 @@ class DbtToAirflowConverter:
 
         if render_config is not None:
             metadata["invocation_mode"] = str(render_config.invocation_mode.value)
-            # Telemetry captures the parse-time install-deps decision. Real bools and literal string
-            # forms (e.g. "False") are recorded as their resolved bool. Jinja-templated values resolve
-            # at task execution time, so we fall back to True (matching the parse-time default in DbtGraph).
-            effective_install_deps = _normalize_install_deps(
-                render_config.dbt_deps if render_config.dbt_deps is not None else project_config.install_dbt_deps
-            )
             metadata["install_deps"] = (
-                bool(effective_install_deps) if isinstance(effective_install_deps, bool) else True
+                bool(render_config.dbt_deps) if render_config.dbt_deps is not None else project_config.install_dbt_deps
             )
             metadata["uses_node_converter"] = render_config.node_converters is not None
             metadata["test_behavior"] = str(render_config.test_behavior.value)

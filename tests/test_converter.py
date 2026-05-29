@@ -18,13 +18,7 @@ from cosmos.constants import (
     LoadMode,
     TestBehavior,
 )
-from cosmos.converter import (
-    DbtToAirflowConverter,
-    _is_jinja_template,
-    _normalize_install_deps,
-    validate_arguments,
-    validate_initial_user_config,
-)
+from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
@@ -99,66 +93,9 @@ def test_validate_arguments_exception():
     assert err.value.args[0] == expected
 
 
-def test_validate_arguments_skips_install_deps_mismatch_check_for_templated_value():
-    """A Jinja-templated ``install_deps`` is only resolved at task execution time, so the parse-time
-    mismatch check against ``RenderConfig.dbt_deps`` must be skipped to avoid spurious failures."""
-    render_config = RenderConfig(load_method=LoadMode.DBT_LS, dbt_deps=False)
-    profile_config = ProfileConfig(
-        profile_name="test",
-        target_name="test",
-        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
-    )
-    execution_config = ExecutionConfig(
-        execution_mode=ExecutionMode.LOCAL, dbt_project_path=DBT_PROJECTS_PROJ_WITH_DEPS_DIR
-    )
-    project_config = ProjectConfig()
-
-    task_args = {"install_deps": "{{ params.install_deps }}"}
-    validate_arguments(
-        execution_config=execution_config,
-        profile_config=profile_config,
-        project_config=project_config,
-        render_config=render_config,
-        task_args=task_args,
-    )
-
-
-@pytest.mark.parametrize(
-    "value, expected",
-    [
-        (True, True),
-        (False, False),
-        ("True", True),
-        ("False", False),
-        ("true", True),
-        ("0", False),
-        ("{{ params.install_deps }}", "{{ params.install_deps }}"),
-        ("{% if x %}True{% endif %}", "{% if x %}True{% endif %}"),
-    ],
-)
-def test_normalize_install_deps(value, expected):
-    """Literal string forms are resolved to a real bool; Jinja templates and bools pass through."""
-    assert _normalize_install_deps(value) == expected
-
-
-@pytest.mark.parametrize(
-    "value, expected",
-    [
-        (True, False),
-        ("True", False),
-        ("False", False),
-        ("{{ params.install_deps }}", True),
-        ("{% if x %}True{% endif %}", True),
-    ],
-)
-def test_is_jinja_template(value, expected):
-    """Only strings containing Jinja delimiters are considered templates."""
-    assert _is_jinja_template(value) is expected
-
-
-def test_validate_arguments_normalizes_literal_install_deps_string_and_raises_on_mismatch():
-    """A non-templated string like ``"False"`` must be normalized to a bool so the parse-time
-    consistency check between ``RenderConfig.dbt_deps`` and ``operator_args['install_deps']`` still runs."""
+def test_validate_arguments_skips_install_deps_mismatch_check_when_execution_config_overrides():
+    """When ExecutionConfig.install_dbt_deps is set, it intentionally overrides the parse-time value for
+    execution only, so the parse-time consistency check against RenderConfig.dbt_deps must be skipped."""
     render_config = RenderConfig(load_method=LoadMode.DBT_LS, dbt_deps=True)
     profile_config = ProfileConfig(
         profile_name="test",
@@ -166,30 +103,9 @@ def test_validate_arguments_normalizes_literal_install_deps_string_and_raises_on
         profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
     )
     execution_config = ExecutionConfig(
-        execution_mode=ExecutionMode.LOCAL, dbt_project_path=DBT_PROJECTS_PROJ_WITH_DEPS_DIR
-    )
-    project_config = ProjectConfig()
-
-    with pytest.raises(CosmosValueError):
-        validate_arguments(
-            execution_config=execution_config,
-            profile_config=profile_config,
-            project_config=project_config,
-            render_config=render_config,
-            task_args={"install_deps": "False"},
-        )
-
-
-def test_validate_arguments_passes_when_literal_install_deps_string_matches_render_config():
-    """Matching literal-string and bool forms must satisfy the consistency check after normalization."""
-    render_config = RenderConfig(load_method=LoadMode.DBT_LS, dbt_deps=False)
-    profile_config = ProfileConfig(
-        profile_name="test",
-        target_name="test",
-        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
-    )
-    execution_config = ExecutionConfig(
-        execution_mode=ExecutionMode.LOCAL, dbt_project_path=DBT_PROJECTS_PROJ_WITH_DEPS_DIR
+        execution_mode=ExecutionMode.LOCAL,
+        dbt_project_path=DBT_PROJECTS_PROJ_WITH_DEPS_DIR,
+        install_dbt_deps="{{ params.install_deps }}",
     )
     project_config = ProjectConfig()
 
@@ -198,7 +114,7 @@ def test_validate_arguments_passes_when_literal_install_deps_string_matches_rend
         profile_config=profile_config,
         project_config=project_config,
         render_config=render_config,
-        task_args={"install_deps": "False"},
+        task_args={"install_deps": "{{ params.install_deps }}"},
     )
 
 
@@ -977,6 +893,52 @@ def test_project_config_install_dbt_deps_overrides_operator_args(
             execution_config=execution_config,
             render_config=render_config,
             operator_args=operator_args,
+        )
+    _, kwargs = mock_build_airflow_graph.call_args
+
+    assert kwargs["task_args"].get("install_deps", None) == expected
+
+
+@pytest.mark.parametrize(
+    "execution_install_dbt_deps,project_install_dbt_deps,expected",
+    [
+        # When set, ExecutionConfig.install_dbt_deps overrides ProjectConfig.install_dbt_deps for execution.
+        (False, True, False),
+        (True, False, True),
+        ("{{ params.install_deps }}", True, "{{ params.install_deps }}"),
+        # When None (default), it falls back to ProjectConfig.install_dbt_deps.
+        (None, False, False),
+        (None, True, True),
+    ],
+)
+@patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.validate_initial_user_config")
+@patch("cosmos.converter.DbtGraph")
+@patch("cosmos.converter.build_airflow_graph")
+def test_execution_config_install_dbt_deps_overrides_project_config(
+    mock_build_airflow_graph,
+    mock_user_config,
+    mock_dbt_graph,
+    mock_validate_project,
+    execution_install_dbt_deps,
+    project_install_dbt_deps,
+    expected,
+):
+    """ExecutionConfig.install_dbt_deps (which may be an Airflow template) overrides
+    ProjectConfig.install_dbt_deps for task execution; when None it falls back to the project value."""
+    project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
+    project_config.install_dbt_deps = project_install_dbt_deps
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL, install_dbt_deps=execution_install_dbt_deps)
+    render_config = MagicMock()
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        DbtToAirflowConverter(
+            dag=dag,
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=sample_profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+            operator_args={},
         )
     _, kwargs = mock_build_airflow_graph.call_args
 

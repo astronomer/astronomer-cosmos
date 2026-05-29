@@ -173,12 +173,9 @@ class ProjectConfig:
     Class for setting project config.
 
     :param dbt_project_path: The path to the dbt project directory. Example: /path/to/dbt/project. Defaults to None
-    :param install_dbt_deps: Run dbt deps during DAG parsing and task execution. Defaults to True. Accepts a
-        boolean or an Airflow Jinja-templated string (e.g. ``"{{ params.install_deps }}"``) that renders to a
-        boolean or boolean-like string at task execution time. When a template string is provided, ``dbt deps``
-        runs during DAG parsing only when a non-empty ``packages.yml``/``dependencies.yml`` is present (since
-        templates are only rendered at task execution time); if no dependencies file exists, ``dbt deps`` is
-        skipped at both parse and execution time.
+    :param install_dbt_deps: Run dbt deps during DAG parsing and task execution. Defaults to True. To control
+        ``dbt deps`` per DAG run via an Airflow template (e.g. ``"{{ params.install_deps }}"``), set
+        ``ExecutionConfig.install_dbt_deps`` instead, which overrides this value at task execution time only.
     :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages (False by default).
     :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
     :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
@@ -198,7 +195,7 @@ class ProjectConfig:
     """
 
     dbt_project_path: Path | None = None
-    install_dbt_deps: bool | str = True
+    install_dbt_deps: bool = True
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
     manifest_path: Path | ObjectStoragePath | None = None
     models_path: Path | None = None
@@ -209,7 +206,7 @@ class ProjectConfig:
     def __init__(
         self,
         dbt_project_path: str | Path | None = None,
-        install_dbt_deps: bool | str = True,
+        install_dbt_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         models_relative_path: str | Path = "models",
         seeds_relative_path: str | Path = "seeds",
@@ -426,6 +423,11 @@ class ExecutionConfig:
     :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
     :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
     :param dbt_project_path: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
+    :param install_dbt_deps: Whether to run ``dbt deps`` at task execution time. When set, overrides
+        ``ProjectConfig.install_dbt_deps`` for execution only (it does not affect DAG parsing). Accepts a
+        boolean or an Airflow Jinja-templated string (e.g. ``"{{ params.install_deps }}"``) that renders to a
+        boolean or boolean-like string, so ``dbt deps`` can be controlled per DAG run. Defaults to None
+        (fall back to ``ProjectConfig.install_dbt_deps``).
     :param virtualenv_dir: Directory path to locate the (cached) virtual env that
     should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
     :param async_py_requirements:  A list of Python packages to install when `ExecutionMode.AIRFLOW_ASYNC` is used. This parameter is required only if both `enable_setup_async_task` and `enable_teardown_async_task` are set to `True`.
@@ -440,6 +442,7 @@ class ExecutionConfig:
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
     dbt_executable_path: str | Path = field(default_factory=get_system_dbt)
 
+    install_dbt_deps: bool | str | None = None
     dbt_project_path: InitVar[str | Path | None] = None
     virtualenv_dir: str | Path | None = None
 

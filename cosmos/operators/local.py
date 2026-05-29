@@ -172,9 +172,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param profile_args: Arguments to pass to the profile. See
         :py:class:`cosmos.providers.dbt.core.profiles.BaseProfileMapping`.
     :param profile_config: ProfileConfig Object
-    :param install_deps (deprecated): If true, install dependencies before running the command. Accepts a
-        boolean, or an Airflow Jinja templated string (e.g. ``"{{ params.install_deps }}"``) that renders
-        to a boolean or boolean-like string.
+    :param install_deps (deprecated): If true, install dependencies before running the command
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
     :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
     :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
@@ -233,10 +231,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # as it can break existing DAGs.
         self.append_env = append_env
 
-        # We should not spend time trying to install deps if the project doesn't have any dependencies.
-        # The raw value is preserved (including Jinja templated strings) so Airflow can render the field
-        # at task execution time. The effective boolean used at runtime is computed by
-        # ``self._should_install_deps()``.
+        # Preserve the raw value (including Jinja templated strings) so Airflow can render the template
+        # field at execution time; the effective boolean is resolved by ``self._should_install_deps()``.
         self._has_dependencies_file = has_non_empty_dependencies_file(Path(self.project_dir))
         self.install_deps = install_deps if self._has_dependencies_file else False
         self.copy_dbt_packages = copy_dbt_packages
@@ -244,18 +240,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.manifest_filepath = manifest_filepath
 
     def _should_install_deps(self) -> bool:
-        """Resolve the effective ``install_deps`` flag.
-
-        ``install_deps`` is an Airflow template field, so by execution time it may be a real ``bool`` or
-        a rendered string such as ``"True"`` / ``"False"`` (when ``render_template_as_native_obj`` is
-        ``False``). This helper normalizes both forms and ensures we never try to run ``dbt deps`` for
-        projects without a dependencies file.
-        """
+        """Resolve the effective ``install_deps`` flag, normalizing a rendered template string to a bool."""
         if not self._has_dependencies_file:
             return False
         value = self.install_deps
         if isinstance(value, str):
-            return bool(to_boolean(value))
+            # ``to_boolean`` does not strip whitespace, so a rendered " true " would otherwise be False.
+            return bool(to_boolean(value.strip()))
         return bool(value)
 
     @cached_property

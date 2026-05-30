@@ -366,15 +366,18 @@ class ProfileConfig:
                 profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
             )
             profile_path = create_cache_profile(current_profile_version, profile_contents)
-            profile_data = yaml.safe_load(profile_contents)
-            for field in self.profile_mapping.secret_fields:
-                profile_data[self.profile_name]["outputs"][self.target_name][field] = "***"
-            redacted_contents = yaml.dump(profile_data, indent=4)
-            logger.info(
-                "Profile not found in cache, storing and using profile: %s with the following contents:\n%s",
-                profile_path,
-                redacted_contents,
-            )
+            if isinstance(profile_contents, str):
+                profile_data = yaml.safe_load(profile_contents)
+                for field in self.profile_mapping.secret_fields:
+                    profile_data[self.profile_name]["outputs"][self.target_name][field] = "***"
+                redacted_contents = yaml.dump(profile_data, indent=4)
+                logger.info(
+                    "Profile not found in cache, storing and using profile: %s with the following contents:\n%s",
+                    profile_path,
+                    redacted_contents,
+                )
+            else:
+                logger.info("Profile not found in cache storing and using profile: %s.", profile_path)
             return profile_path
 
     @contextlib.contextmanager

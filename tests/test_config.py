@@ -237,7 +237,9 @@ def test_profile_config_logs_redacted_contents_on_cache_miss(
 
     with patch("cosmos.profiles.base.BaseProfileMapping.conn", new_callable=PropertyMock, return_value=conn):
         profile_mapping = PostgresUserPasswordProfileMapping(conn_id="test", profile_args={})
-        profile_config = ProfileConfig(profile_name="test", target_name="cosmos_target", profile_mapping=profile_mapping)
+        profile_config = ProfileConfig(
+            profile_name="test", target_name="cosmos_target", profile_mapping=profile_mapping
+        )
 
         mock_create_cache_profile.return_value = Path("/tmp/cosmos/profile/abc/profiles.yml")
 

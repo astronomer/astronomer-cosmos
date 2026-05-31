@@ -400,3 +400,83 @@ def test_insecure_mode_absent_when_not_set(mapping_class, password, extra_fields
     with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = mapping_class(conn)
         assert "insecure_mode" not in profile_mapping.profile
+
+
+def test_authenticator() -> None:
+    """
+    Tests that authenticator from connection extras is forwarded to the dbt profile.
+    """
+    conn = Connection(
+        conn_id="my_snowflake_connection",
+        conn_type="snowflake",
+        login="my_user",
+        schema="my_schema",
+        password="secret",
+        extra=json.dumps(
+            {
+                "account": "my_account",
+                "database": "my_database",
+                "warehouse": "my_warehouse",
+                "private_key_content": "my_private_key",
+                "authenticator": "externalbrowser",
+            }
+        ),
+    )
+
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        assert profile_mapping.profile["authenticator"] == "externalbrowser"
+
+
+def test_client_session_keep_alive() -> None:
+    """
+    Tests that client_session_keep_alive from connection extras is forwarded to the dbt profile.
+    """
+    conn = Connection(
+        conn_id="my_snowflake_connection",
+        conn_type="snowflake",
+        login="my_user",
+        schema="my_schema",
+        password="secret",
+        extra=json.dumps(
+            {
+                "account": "my_account",
+                "database": "my_database",
+                "warehouse": "my_warehouse",
+                "private_key_content": "my_private_key",
+                "client_session_keep_alive": True,
+            }
+        ),
+    )
+
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        assert profile_mapping.profile["client_session_keep_alive"] is True
+
+
+def test_host_and_port() -> None:
+    """
+    Tests that host and port from connection extras are forwarded to the dbt profile.
+    """
+    conn = Connection(
+        conn_id="my_snowflake_connection",
+        conn_type="snowflake",
+        login="my_user",
+        schema="my_schema",
+        password="secret",
+        extra=json.dumps(
+            {
+                "account": "my_account",
+                "database": "my_database",
+                "warehouse": "my_warehouse",
+                "private_key_content": "my_private_key",
+                "host": "my_host.snowflakecomputing.com",
+                "port": 443,
+            }
+        ),
+    )
+
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = SnowflakeEncryptedPrivateKeyPemProfileMapping(conn)
+        assert profile_mapping.profile["host"] == "my_host.snowflakecomputing.com"
+        assert profile_mapping.profile["port"] == 443

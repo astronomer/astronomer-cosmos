@@ -78,6 +78,7 @@ with DAG(
             "POSTGRES_DB": "postgres",
             "POSTGRES_SCHEMA": "public",
             "POSTGRES_USER": "postgres",
+            "POSTGRES_PORT": "5432",
         },
     )
     # [END kubernetes_seed_example]
@@ -95,6 +96,7 @@ with DAG(
             "POSTGRES_DB": "postgres",
             "POSTGRES_SCHEMA": "public",
             "POSTGRES_USER": "postgres",
+            "POSTGRES_PORT": "5432",
         },
         bucket_name="cosmos-ci-docs",
         install_deps=True,
@@ -130,6 +132,7 @@ with DAG(
                 "POSTGRES_DB": "postgres",
                 "POSTGRES_SCHEMA": "public",
                 "POSTGRES_USER": "postgres",
+                "POSTGRES_PORT": "5432",
             },
         },
     )

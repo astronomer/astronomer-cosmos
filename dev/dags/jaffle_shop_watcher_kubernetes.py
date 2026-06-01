@@ -69,6 +69,7 @@ operator_args = {
         "POSTGRES_DB": "postgres",
         "POSTGRES_SCHEMA": "public",
         "POSTGRES_USER": "postgres",
+        "POSTGRES_PORT": "5432",
     },
     "retry": 0,
 }

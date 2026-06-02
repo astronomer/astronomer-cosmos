@@ -10,8 +10,8 @@ from ..base import BaseProfileMapping
 class SparkThriftProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Spark connections to dbt profiles if they use a thrift connection.
-    https://docs.getdbt.com/reference/warehouse-setups/spark-setup#thrift
-    https://airflow.apache.org/docs/apache-airflow-providers-apache-spark/stable/connections/spark.html
+    https://docs.getdbt.com/docs/local/connect-data-platform/spark-setup
+    https://airflow.apache.org/docs/apache-airflow-providers-apache-spark/stable/connections/index.html
     """
 
     airflow_connection_type: str = "spark"

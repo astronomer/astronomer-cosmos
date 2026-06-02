@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 class SnowflakePrivateKeyFilePemProfileMapping(SnowflakeBaseProfileMapping):
     """
     Maps Airflow Snowflake connections to dbt profiles if they use a user/private key path without a passphrase.
-    https://docs.getdbt.com/docs/core/connect-data-platform/snowflake-setup#key-pair-authentication
+    https://docs.getdbt.com/docs/local/connect-data-platform/snowflake-setup
     https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
     """
 

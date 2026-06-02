@@ -24,7 +24,7 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
     Information about the dbt Athena profile that is generated can be found here:
 
     https://github.com/dbt-athena/dbt-athena?tab=readme-ov-file#configuring-your-profile
-    https://docs.getdbt.com/docs/core/connect-data-platform/athena-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/athena-setup
     """
 
     airflow_connection_type: str = "aws"

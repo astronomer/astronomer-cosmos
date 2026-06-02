@@ -10,7 +10,7 @@ from ..base import BaseProfileMapping
 class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Redshift connections to dbt Redshift profiles if they use a username and password.
-    https://docs.getdbt.com/reference/warehouse-setups/redshift-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/redshift-setup
     https://airflow.apache.org/docs/apache-airflow-providers-amazon/stable/connections/redshift.html
     """
 

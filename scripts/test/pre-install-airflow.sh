@@ -86,9 +86,9 @@ else
 fi
 
 # Installation of dbt in a separate Python virtual environment:
-# Pin dbt-core to the matrix version. Previously dbt-loom (installed here) held
-# dbt-core below 2.0; with dbt-loom moved to the dedicated loom job, the pin is
+# Cap dbt-core below 2.0. Previously dbt-loom (installed here) held dbt-core in
+# the 1.x range; with dbt-loom moved to the dedicated loom job, the bound is
 # explicit so `pip install -U` doesn't pull dbt-core 2.0 (Fusion), which lacks
 # the postgres adapter the subprocess tests rely on.
 python -m venv venv-subprocess
-venv-subprocess/bin/pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres
+venv-subprocess/bin/pip install -U "dbt-core<2.0" dbt-postgres

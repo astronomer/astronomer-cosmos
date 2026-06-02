@@ -8,12 +8,14 @@ on:
       - "docs/**"
       - "cosmos/**"
       - ".github/workflows/docs-build.yml"
+      - "lychee.toml"
   pull_request:
     branches: [main, 'release-*']
     paths:
       - "docs/**"
       - "cosmos/**"
       - ".github/workflows/docs-build.yml"
+      - "lychee.toml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}

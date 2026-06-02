@@ -47,7 +47,7 @@ In some cases, Cosmos may continue to support older Airflow versions, depending 
 dbt Core
 ++++++++
 
-- **Supported versions**: 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 2.0 (dbt Fusion)
+- **Supported versions**: 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 2.0 (dbt Fusion)
 
 .. note::
 

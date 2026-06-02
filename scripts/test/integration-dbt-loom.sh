@@ -46,7 +46,12 @@ else
     airflow db init
 fi
 
-# Run only the cross-project example DAG that exercises dbt-loom
+# Run only the cross-project example DAG that exercises dbt-loom.
+# TEST_SINGLE_DAG makes test_example_dags.py build a DagBag containing only this
+# DAG (see get_dag_bag_single_dag). Without it, collection loads every example
+# DAG and asserts no import errors, which fails here because other DAGs need
+# secrets this job doesn't provide (e.g. DATABRICKS_CLUSTER_ID, S3 access).
+export TEST_SINGLE_DAG="cross_project_manifest_dag.py"
 pytest -vv \
     --cov=cosmos \
     --cov-report=term-missing \

@@ -36,35 +36,6 @@ autoapi_ignore = ["*/tests/*"]
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/tests/*"]
 
-# URLs / patterns to skip during `sphinx-build -b linkcheck`. Add patterns here
-# only for destinations that cannot be reliably verified by an automated
-# checker: login walls / bot blockers, hosts that are flaky or rate-limit CI,
-# and example URLs that are never reachable. Genuinely broken links should be
-# fixed, not ignored.
-linkcheck_ignore: list[str] = [
-    # Auth wall — Slack invite links return 403 to unauthenticated requests.
-    r"https://join\.slack\.com/.*",
-    # Flaky in CI — intermittently fails the TLS handshake / rate-limits.
-    r"https://ossrank\.com/.*",
-    # Flaky in CI — Astronomer's docs site throttles automated requests from
-    # CI runners and intermittently exceeds the read timeout.
-    r"https://www\.astronomer\.io/.*",
-    # Example/local URLs used in docs that are never reachable from CI.
-    r"http://localhost(:\d+)?/?.*",
-]
-
-# GitHub renders page anchors client-side, so linkcheck cannot see fragments
-# like #L72 or #issuecomment-... and reports them as broken. Still verify the
-# page itself returns 200, but skip the anchor check for GitHub URLs.
-linkcheck_anchors_ignore_for_url = [
-    r"https://github\.com/.*",
-]
-
-# Give slow / occasionally throttling hosts a chance before failing the build,
-# so transient network hiccups don't make this blocking check flaky.
-linkcheck_timeout = 60
-linkcheck_retries = 3
-
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

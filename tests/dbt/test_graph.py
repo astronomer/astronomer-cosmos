@@ -233,6 +233,7 @@ def test_dbt_profile_config_to_override():
                 "has_non_detached_test": False,
                 "resource_name": "customers",
                 "name": "customers",
+                "checksum": None,
             },
         ),
         (
@@ -249,6 +250,7 @@ def test_dbt_profile_config_to_override():
                 "has_non_detached_test": False,
                 "resource_name": "customers.v1",
                 "name": "customers_v1",
+                "checksum": None,
             },
         ),
     ],

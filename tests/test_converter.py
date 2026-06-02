@@ -1,5 +1,6 @@
 import logging
 import tempfile
+from contextlib import nullcontext as does_not_raise
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -16,6 +17,7 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
+    SeedRenderingBehavior,
     TestBehavior,
 )
 from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
@@ -1519,3 +1521,34 @@ def test_telemetry_metadata_not_stored_when_disabled(mock_should_emit, mock_load
 
     # Verify metadata is NOT stored when telemetry is disabled
     assert "__cosmos_telemetry_metadata__" not in dag.params
+
+
+@pytest.mark.parametrize(
+    "execution_mode, expectation",
+    [
+        (ExecutionMode.LOCAL, does_not_raise()),
+        (ExecutionMode.VIRTUALENV, does_not_raise()),
+        (ExecutionMode.AIRFLOW_ASYNC, does_not_raise()),
+        (ExecutionMode.DOCKER, pytest.raises(CosmosValueError)),
+        (ExecutionMode.KUBERNETES, pytest.raises(CosmosValueError)),
+        (ExecutionMode.WATCHER, pytest.raises(CosmosValueError)),
+    ],
+)
+def test_validate_arguments_seed_when_seed_changes_execution_mode(execution_mode, expectation):
+    """WHEN_SEED_CHANGES is only allowed for worker-filesystem execution modes."""
+    project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST, project_name="xubiru")
+    render_config = RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.WHEN_SEED_CHANGES)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=execution_mode)
+    with expectation:
+        validate_arguments(
+            execution_config=execution_config,
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=render_config,
+            task_args={},
+        )

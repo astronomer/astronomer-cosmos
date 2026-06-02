@@ -106,6 +106,9 @@ class DbtNode:
     has_non_detached_test: bool = False
     downstream: list[str] = field(default_factory=lambda: [])
     fqn: list[str] | None = None
+    # dbt records a content checksum per node in the manifest (e.g. sha256 of a seed's CSV). Used by
+    # SeedRenderingBehavior.WHEN_SEED_CHANGES to detect seed changes. None when loading via dbt ls.
+    checksum: str | None = None
 
     @property
     def file_path(self) -> Path:
@@ -200,6 +203,7 @@ class DbtNode:
             "has_non_detached_test": self.has_non_detached_test,
             "resource_name": self.resource_name,
             "name": self.name,
+            "checksum": self.checksum,
         }
 
 
@@ -363,6 +367,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                         else False
                     ),
                     fqn=node_dict.get("fqn"),
+                    checksum=(node_dict.get("checksum") or {}).get("checksum"),
                 )
             except (KeyError, TypeError):
                 logger.info("Could not parse following the dbt ls line even though it was a valid JSON `%s`", line)
@@ -412,6 +417,7 @@ def _build_dbt_node_from_manifest_resource(
             is_freshness_effective(node_dict.get("freshness")) if resource_type == DbtResourceType.SOURCE else False
         ),
         fqn=node_dict.get("fqn"),
+        checksum=(node_dict.get("checksum") or {}).get("checksum"),
     )
 
 

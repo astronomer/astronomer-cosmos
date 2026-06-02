@@ -57,6 +57,7 @@ from cosmos.dbt.project import (
     get_partial_parse_path,
     has_non_empty_dependencies_file,
 )
+from cosmos.dbt.seed import _evaluate_seed_change, _persist_seed_checksum
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
     remote_target_path,
@@ -1031,6 +1032,40 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+
+    def execute(self, context: Context, **kwargs: Any) -> None:
+        # When SeedRenderingBehavior.WHEN_SEED_CHANGES is active (flagged at render time in
+        # create_task_metadata), skip running `dbt seed` if the seed's content is unchanged since the
+        # last successful run. We delegate the actual run to the base execute() so extra_context
+        # merging, debug-mode memory tracking and **kwargs forwarding are preserved. A `--full-refresh`
+        # request always runs the seed, bypassing change detection.
+        extra_context = self.extra_context or {}
+        if extra_context.get("uses_seed_change_detection") and not self._is_full_refresh():
+            node_config = extra_context.get("dbt_node_config") or {}
+            should_run, checksum, variable_key = _evaluate_seed_change(
+                extra_context.get("dbt_dag_task_group_identifier"),
+                node_config.get("unique_id"),
+                node_config.get("checksum"),
+                node_config.get("file_path"),
+            )
+            if not should_run:
+                # Return successfully (do NOT raise AirflowSkipException) so downstream models that
+                # depend on the seed are not skip-propagated by the default trigger rule.
+                self.log.info(
+                    "Seed `%s` is unchanged since its last successful run; skipping `dbt seed`.",
+                    node_config.get("unique_id"),
+                )
+                return
+            super().execute(context, **kwargs)
+            _persist_seed_checksum(variable_key, checksum)
+            return
+        super().execute(context, **kwargs)
+
+    def _is_full_refresh(self) -> bool:
+        """Return whether --full-refresh is requested, mirroring DbtSeedMixin.add_cmd_flags handling."""
+        if isinstance(self.full_refresh, str):
+            return to_boolean(self.full_refresh)
+        return bool(self.full_refresh)
 
 
 class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):

@@ -27,6 +27,7 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
+    SeedRenderingBehavior,
     SourceRenderingBehavior,
     TestBehavior,
     TestIndirectSelection,
@@ -73,6 +74,7 @@ class RenderConfig:
     :param group_nodes_by_folder: When enabled, groups nodes by folder structure, creating a ``TaskGroup`` per resource type and folder. Disabled by default.
     :param source_rendering_behavior: Determines how source nodes are rendered when using cosmos default source node rendering (ALL, NONE, WITH_TESTS_OR_FRESHNESS). Defaults to "NONE" (since Cosmos 1.6).
     :param source_pruning: Determines if source nodes without a corresponding downstream task should be removed or not. Default is False
+    :param seed_rendering_behavior: Determines how seed nodes are rendered and run (ALWAYS, WHEN_SEED_CHANGES, RENDER_ONLY, NONE). Defaults to "ALWAYS", preserving the original Cosmos behaviour of always rendering and running seeds. WHEN_SEED_CHANGES is only supported for ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV and ExecutionMode.AIRFLOW_ASYNC, and is incompatible with TestBehavior.BUILD. Under ExecutionMode.WATCHER, only ALWAYS is meaningful: a single dbt build runs seeds regardless of this setting.
     :param airflow_vars_to_purge_dbt_ls_cache: Specify Airflow variables that will affect the LoadMode.DBT_LS cache.
     :param airflow_vars_to_purge_dbt_yaml_selectors_cache: Specify Airflow variables that will affect the parsed manifest YamlSelectors cache.
     :param normalize_task_id: A callable that takes a dbt node as input and returns the task ID. This allows users to assign a custom node ID separate from the display name.
@@ -100,6 +102,7 @@ class RenderConfig:
     group_nodes_by_folder: bool = False
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE
     source_pruning: bool = False
+    seed_rendering_behavior: SeedRenderingBehavior = SeedRenderingBehavior.ALWAYS
     airflow_vars_to_purge_dbt_ls_cache: list[str] = field(default_factory=list)
     airflow_vars_to_purge_dbt_yaml_selectors_cache: list[str] = field(default_factory=list)
     normalize_task_id: Callable[..., Any] | None = None
@@ -126,6 +129,16 @@ class RenderConfig:
                 UserWarning,
             )
             self.source_rendering_behavior = SourceRenderingBehavior.NONE
+        if (
+            self.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES
+            and self.test_behavior == TestBehavior.BUILD
+        ):
+            raise CosmosValueError(
+                "SeedRenderingBehavior.WHEN_SEED_CHANGES is incompatible with TestBehavior.BUILD: under "
+                "TestBehavior.BUILD seeds run via `dbt build` as a single task and cannot be selectively "
+                "skipped based on CSV changes. Use TestBehavior.AFTER_EACH/AFTER_ALL/NONE, or "
+                "SeedRenderingBehavior.ALWAYS."
+            )
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
         # allows us to initiate this attribute from Path objects and str
         self.dbt_ls_path = Path(self.dbt_ls_path) if self.dbt_ls_path else None

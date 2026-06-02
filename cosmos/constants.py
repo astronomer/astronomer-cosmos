@@ -9,6 +9,14 @@ from packaging.version import Version
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
+# The EmptyOperator import path changed in Airflow 3: it moved to the standard provider. The legacy
+# ``airflow.operators.empty`` path still works in Airflow 3 but emits a DeprecatedImportWarning.
+EMPTY_OPERATOR_CLASS = (
+    "airflow.operators.empty.EmptyOperator"
+    if AIRFLOW_VERSION < Version("3.0")
+    else "airflow.providers.standard.operators.empty.EmptyOperator"
+)
+
 BIGQUERY_PROFILE_TYPE = "bigquery"
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DBT_PROJECT_FILENAME = "dbt_project.yml"
@@ -143,6 +151,25 @@ class SourceRenderingBehavior(Enum):
     NONE = "none"
     ALL = "all"
     WITH_TESTS_OR_FRESHNESS = "with_tests_or_freshness"
+
+
+class SeedRenderingBehavior(Enum):
+    """
+    Modes to configure how dbt seed nodes are rendered and run.
+
+    ALWAYS: Render the seed and run ``dbt seed`` on every execution (default, original Cosmos behaviour).
+    WHEN_SEED_CHANGES: Render the seed, but only run ``dbt seed`` when the seed's CSV content has changed
+        since the last successful run. Supported only for execution modes where the Airflow worker can
+        access the seed files directly (LOCAL, VIRTUALENV, AIRFLOW_ASYNC).
+    RENDER_ONLY: Render the seed as a no-op ``EmptyOperator`` placeholder so it remains visible in the
+        DAG topology/lineage, but never run ``dbt seed``.
+    NONE: Do not render the seed in the DAG/TaskGroup at all.
+    """
+
+    ALWAYS = "always"
+    WHEN_SEED_CHANGES = "when_seed_changes"
+    RENDER_ONLY = "render_only"
+    NONE = "none"
 
 
 class DbtResourceType(aenum.Enum):  # type: ignore

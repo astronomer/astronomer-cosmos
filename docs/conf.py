@@ -46,6 +46,9 @@ linkcheck_ignore: list[str] = [
     r"https://join\.slack\.com/.*",
     # Flaky in CI — intermittently fails the TLS handshake / rate-limits.
     r"https://ossrank\.com/.*",
+    # Flaky in CI — Astronomer's docs site throttles automated requests from
+    # CI runners and intermittently exceeds the read timeout.
+    r"https://www\.astronomer\.io/.*",
     # Example/local URLs used in docs that are never reachable from CI.
     r"http://localhost(:\d+)?/?.*",
 ]
@@ -56,6 +59,11 @@ linkcheck_ignore: list[str] = [
 linkcheck_anchors_ignore_for_url = [
     r"https://github\.com/.*",
 ]
+
+# Give slow / occasionally throttling hosts a chance before failing the build,
+# so transient network hiccups don't make this blocking check flaky.
+linkcheck_timeout = 60
+linkcheck_retries = 3
 
 
 # -- Options for HTML output -------------------------------------------------

@@ -206,7 +206,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     @depends_on_virtualenv_dir
     def _acquire_venv_lock(self) -> None:
-        if not self.virtualenv_dir.is_dir():  # type: ignore
+        if not self.virtualenv_dir.is_dir():  # type: ignore[union-attr]
             os.mkdir(str(self.virtualenv_dir))
 
         with open(self._lock_file, "w") as lf:

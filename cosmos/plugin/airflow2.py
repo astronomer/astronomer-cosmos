@@ -123,7 +123,7 @@ def open_file(path: str, conn_id: str | None = None) -> str:
         return content  # type: ignore[no-any-return]
 
 
-class DbtDocsView(AirflowBaseView):  # type: ignore
+class DbtDocsView(AirflowBaseView):  # type: ignore[misc]
     default_view = "dbt_docs"
     route_base = "/cosmos"
     template_folder = op.join(op.dirname(__file__), "templates")

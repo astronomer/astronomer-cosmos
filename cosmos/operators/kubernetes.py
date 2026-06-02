@@ -63,7 +63,7 @@ except ImportError:  # Since Airflow 3.1, BaseHook is in the airflow.sdk.bases.h
     from airflow.hooks.base import BaseHook
 
 
-class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type: ignore
+class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type: ignore[misc]
     """
     Executes a dbt core cli command in a Kubernetes Pod.
 

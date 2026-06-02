@@ -44,7 +44,7 @@ except ImportError:  # pragma: no cover
     )  # pragma: no cover
 
 
-class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignore
+class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignore[misc]
     """
     Executes a dbt core cli command in an ECS Task instance with dbt installed in it.
 

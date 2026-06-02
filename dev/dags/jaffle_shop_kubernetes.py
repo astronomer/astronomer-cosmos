@@ -72,12 +72,13 @@ with DAG(
         is_delete_operator_pod=False,
         secrets=[postgres_password_secret, postgres_host_secret],
         profile_config=ProfileConfig(
-            profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="postgres_profile", target_name="dev"
+            profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="default", target_name="dev"
         ),
         env_vars={
             "POSTGRES_DB": "postgres",
             "POSTGRES_SCHEMA": "public",
             "POSTGRES_USER": "postgres",
+            "POSTGRES_PORT": "5432",
         },
     )
     # [END kubernetes_seed_example]
@@ -89,12 +90,13 @@ with DAG(
         connection_id="aws_s3_conn",
         secrets=[postgres_host_secret, postgres_password_secret],
         profile_config=ProfileConfig(
-            profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="postgres_profile", target_name="dev"
+            profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="default", target_name="dev"
         ),
         env_vars={
             "POSTGRES_DB": "postgres",
             "POSTGRES_SCHEMA": "public",
             "POSTGRES_USER": "postgres",
+            "POSTGRES_PORT": "5432",
         },
         bucket_name="cosmos-ci-docs",
         install_deps=True,
@@ -108,7 +110,7 @@ with DAG(
     run_models = DbtTaskGroup(
         project_config=ProjectConfig(),
         profile_config=ProfileConfig(
-            profile_name="postgres_profile",
+            profile_name="default",
             target_name="dev",
             # The following profile mapping works for the DAG parsing
             # However, it is not exposed during the K8s pod operators execution
@@ -130,6 +132,7 @@ with DAG(
                 "POSTGRES_DB": "postgres",
                 "POSTGRES_SCHEMA": "public",
                 "POSTGRES_USER": "postgres",
+                "POSTGRES_PORT": "5432",
             },
         },
     )

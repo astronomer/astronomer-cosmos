@@ -34,6 +34,7 @@ from cosmos.airflow.graph import (
 )
 from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
+    EMPTY_OPERATOR_CLASS,
     SUPPORTED_BUILD_RESOURCES,
     DbtResourceType,
     ExecutionMode,
@@ -691,7 +692,7 @@ def test_create_task_metadata_model_use_task_group(caplog):
             False,
             SOURCE_RENDERING_BEHAVIOR,
             "my_source_source",
-            "airflow.operators.empty.EmptyOperator",
+            EMPTY_OPERATOR_CLASS,
         ),
         (
             f"{DbtResourceType.SOURCE.value}.my_folder.my_source",

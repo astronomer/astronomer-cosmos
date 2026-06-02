@@ -29,6 +29,7 @@ from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
+    EMPTY_OPERATOR_CLASS,
     PRODUCER_WATCHER_DONE_TASK_ID,
     PRODUCER_WATCHER_TASK_ID,
     SUPPORTED_BUILD_RESOURCES,
@@ -417,7 +418,7 @@ def create_task_metadata(  # noqa: C901
                     args = {"task_display_name": args["task_display_name"]}
                 else:
                     args = {}
-                return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
+                return TaskMetadata(id=task_id, operator_class=EMPTY_OPERATOR_CLASS, arguments=args)
         else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"

@@ -58,7 +58,7 @@ jobs:
         # Uses the lychee link checker. Behaviour (which hosts to skip, retries,
         # accepted status codes for throttling hosts) is configured in the
         # repo-root lychee.toml. Fails the job on genuinely broken links.
-          args: "--no-progress --config lychee.toml 'docs/**/*.rst'"
+        uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2.8.0
         with:
-          args: "--no-progress --config lychee.toml docs/**/*.rst"
+          args: "--no-progress --config lychee.toml 'docs/**/*.rst'"
           fail: true

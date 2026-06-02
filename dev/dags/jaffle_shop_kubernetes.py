@@ -90,7 +90,7 @@ with DAG(
         connection_id="aws_s3_conn",
         secrets=[postgres_host_secret, postgres_password_secret],
         profile_config=ProfileConfig(
-            profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="postgres_profile", target_name="dev"
+            profiles_yml_filepath="/root/.dbt/profiles.yml", profile_name="default", target_name="dev"
         ),
         env_vars={
             "POSTGRES_DB": "postgres",

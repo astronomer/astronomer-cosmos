@@ -11,7 +11,6 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos.config import ProfileConfig
-from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBase,
     DbtBuildMixin,
@@ -23,8 +22,6 @@ from cosmos.operators.base import (
     DbtSourceMixin,
     DbtTestMixin,
 )
-
-logger = get_logger(__name__)
 
 DEFAULT_CONN_ID = "aws_default"
 DEFAULT_CONTAINER_NAME = "dbt"
@@ -129,7 +126,7 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
 
         result = EcsRunTaskOperator.execute(self, context)
 
-        logger.info(result)
+        self.log.info("%s", result)
 
     def build_command(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         # For the first round, we're going to assume that the command is dbt

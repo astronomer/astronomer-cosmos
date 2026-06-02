@@ -434,6 +434,15 @@ def create_task_metadata(  # noqa: C901
                 execution_mode=execution_mode,
             )
 
+            if node.has_ephemeral_materialization and render_config.ephemeral_models_as_empty_operator:
+                # Ephemeral models are inlined as CTEs into downstream models and never written to the
+                # warehouse, so running them via a dbt operator is a no-op. Render them as empty operators
+                # to avoid wasted dbt invocations while keeping the node in the graph so that the dependency
+                # chain passing through it is preserved. EmptyOperator does not accept custom parameters
+                # (e.g. profile_args), so recreate the args keeping only the display name when present.
+                args = {"task_display_name": args["task_display_name"]} if "task_display_name" in args else {}
+                return TaskMetadata(id=task_id, operator_class=EMPTY_OPERATOR_CLASS, arguments=args)
+
         _override_profile_if_needed(args, node.profile_config_to_override)
 
         task_owner = node.owner

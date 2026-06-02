@@ -163,7 +163,7 @@ class DbtBuildWatcherKubernetesOperator:
         )
 
 
-class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerWatcherKubernetesSensor):  # type: ignore[misc]
+class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerWatcherKubernetesSensor):
     """
     Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
     """
@@ -174,7 +174,7 @@ class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerWatcherKubernete
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotWatcherKubernetesOperator(DbtSnapshotMixin, DbtConsumerWatcherKubernetesSensor):  # type: ignore[misc]
+class DbtSnapshotWatcherKubernetesOperator(DbtSnapshotMixin, DbtConsumerWatcherKubernetesSensor):
     """
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """
@@ -187,7 +187,7 @@ class DbtSourceWatcherKubernetesOperator(DbtSourceKubernetesOperator):
     Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
     """
 
-    template_fields: tuple[str, ...] = tuple(DbtSourceKubernetesOperator.template_fields)  # type: ignore[arg-type]
+    template_fields: tuple[str, ...] = tuple(DbtSourceKubernetesOperator.template_fields)
 
 
 class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
@@ -210,4 +210,4 @@ class DbtTestWatcherKubernetesOperator(EmptyOperator):
     def __init__(self, *args: Any, **kwargs: Any):
         desired_keys = ("dag", "task_group", "task_id")
         new_kwargs = {key: value for key, value in kwargs.items() if key in desired_keys}
-        super().__init__(**new_kwargs)  # type: ignore[no-untyped-call]
+        super().__init__(**new_kwargs)

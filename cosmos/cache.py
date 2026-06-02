@@ -70,7 +70,7 @@ def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
     remote_cache_conn_id = remote_cache_dir_conn_id
     if not remote_cache_conn_id:
         cache_dir_schema = cache_dir_str.split("://")[0]
-        remote_cache_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(cache_dir_schema, None)  # type: ignore[assignment]
+        remote_cache_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(cache_dir_schema, None)
     if remote_cache_conn_id is None:
         return _configured_cache_dir
 
@@ -81,7 +81,7 @@ def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
 
     _configured_cache_dir = ObjectStoragePath(cache_dir_str, conn_id=remote_cache_conn_id)
 
-    if not _configured_cache_dir.exists():  # type: ignore[no-untyped-call]
+    if not _configured_cache_dir.exists():
         # TODO: Check if we should raise an error instead in case the provided path does not exist.
         _configured_cache_dir.mkdir(parents=True, exist_ok=True)
 

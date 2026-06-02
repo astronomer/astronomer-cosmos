@@ -60,7 +60,8 @@ else
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
   uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0" apache-airflow==$AIRFLOW_VERSION
-  uv pip install dbt-loom
+  # dbt-loom is installed by the dedicated Run-Integration-Tests-DBT-Loom job
+  # (scripts/test/integration-dbt-loom.sh), not by the common pre-install path.
 
   # Delete the no longer needed constraint file
   rm /tmp/constraint.txt
@@ -87,5 +88,7 @@ else
 fi
 
 # Installation of dbt in a separate Python virtual environment:
+# dbt-loom is added to this venv by the dedicated Run-Integration-Tests-DBT-Loom
+# job (scripts/test/integration-dbt-loom.sh), not by the common pre-install path.
 python -m venv venv-subprocess
-venv-subprocess/bin/pip install -U dbt-postgres dbt-loom
+venv-subprocess/bin/pip install -U dbt-postgres

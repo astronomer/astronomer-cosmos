@@ -46,9 +46,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    # Informational only — does not block PRs. Flip to required once known
-    # broken external links are resolved and linkcheck_ignore is populated.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:

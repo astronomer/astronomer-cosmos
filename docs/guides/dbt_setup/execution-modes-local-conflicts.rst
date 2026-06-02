@@ -8,8 +8,8 @@ When using the :ref:`local-execution` without defining a custom ``ExecutionConfi
 
 If you find errors, we recommend users isolating the installation of dbt from the Airflow installation.
 With the ``local`` execution mode, this can be accomplished by installing dbt in a separate
-Python virtualenv and setting the `ExecutionConfig.dbt_executable_path <../../reference/configs/execution-config.html>`_  and
-`RenderConfig.dbt_executable_path <../../guides/translate_dbt_to_airflow/render-config.html>`_ parameters.
+Python virtualenv and setting the :doc:`ExecutionConfig.dbt_executable_path </reference/configs/execution-config>`  and
+:doc:`RenderConfig.dbt_executable_path </guides/translate_dbt_to_airflow/render-config>` parameters.
 
 The page, :ref:`execution-modes` describes many other methods that support isolating dbt from Airflow.
 

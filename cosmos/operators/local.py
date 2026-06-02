@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 import jinja2
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
+from airflow.utils.strings import to_boolean
 from packaging.version import Version
 
 from cosmos.io import _construct_dest_file_path
@@ -185,7 +186,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         and does not inherit the current process environment.
     """
 
-    template_fields: Sequence[str] = AbstractDbtBase.template_fields + ("compiled_sql", "freshness")  # type: ignore[operator]
+    template_fields: Sequence[str] = AbstractDbtBase.template_fields + ("compiled_sql", "freshness", "install_deps")  # type: ignore[operator]
     template_fields_renderers = {
         "compiled_sql": "sql",
         "freshness": "json",
@@ -197,7 +198,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
-        install_deps: bool = True,
+        install_deps: bool | str = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
@@ -230,11 +231,26 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # as it can break existing DAGs.
         self.append_env = append_env
 
-        # We should not spend time trying to install deps if the project doesn't have any dependencies
-        self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
+        # Preserve the raw value (including Jinja templated strings) so Airflow can render the template
+        # field at execution time; the effective boolean is resolved by ``self._should_install_deps()``.
+        # Skip the filesystem probe when deps are explicitly disabled to avoid extra per-task I/O at parse time.
+        self._has_dependencies_file = install_deps is not False and has_non_empty_dependencies_file(
+            Path(self.project_dir)
+        )
+        self.install_deps = install_deps if self._has_dependencies_file else False
         self.copy_dbt_packages = copy_dbt_packages
 
         self.manifest_filepath = manifest_filepath
+
+    def _should_install_deps(self) -> bool:
+        """Resolve the effective ``install_deps`` flag, normalizing a rendered template string to a bool."""
+        if not self._has_dependencies_file:
+            return False
+        value = self.install_deps
+        if isinstance(value, str):
+            # ``to_boolean`` does not strip whitespace, so a rendered " true " would otherwise be False.
+            return bool(to_boolean(value.strip()))
+        return bool(value)
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -496,7 +512,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path,
             self.project_dir,
         )
-        should_not_create_dbt_deps_symbolic_link = self.install_deps or self.copy_dbt_packages
+        should_not_create_dbt_deps_symbolic_link = self._should_install_deps() or self.copy_dbt_packages
         create_symlinks(
             Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
         )
@@ -670,7 +686,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
-                if self.install_deps:
+                if self._should_install_deps():
                     self._install_dependencies(
                         tmp_dir_path, flags + self._process_global_flag("--vars", self.vars), env
                     )

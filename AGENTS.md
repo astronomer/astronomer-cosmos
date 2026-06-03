@@ -124,15 +124,13 @@ Substitute the equivalent for whichever agent was used. The convention is "visib
 
 ### Logging
 
-In library / module-level code, get loggers via `cosmos.log.get_logger`, not the stdlib `logging` module. This adds the `(astronomer-cosmos)` prefix when `rich_logging` is enabled and respects scoped log-level configuration. Inside operators and hooks (anything with `LoggingMixin`), log via `self.log` instead, so messages land in the per-task-instance log shown in the Airflow UI.
+In library / module-level code, get loggers via `cosmos.log.get_logger`, not the stdlib `logging` module. This adds the `(astronomer-cosmos)` prefix when `rich_logging` is enabled and respects scoped log-level configuration.
 
 Yes:
 ```python
 from cosmos.log import get_logger
 
-logger = get_logger(__name__)  # library / module-level code
-
-self.log.info("Running command: %s", self.command)  # inside an operator/hook
+logger = get_logger(__name__)
 ```
 
 No:
@@ -141,8 +139,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 logging.error(...)  # never call the root logger directly either
+```
 
-logger = get_logger(__name__)  # inside an operator/hook — use self.log instead
+Inside operators, log via `self.log` (provided by Airflow's `LoggingMixin`) rather than a module-level logger, so messages land in the per-task-instance log shown in the Airflow UI:
+```python
+def execute(self, context):
+    self.log.info("Running command: %s", self.command)
 ```
 
 Use **lazy logging**: pass the format string and arguments separately. Do not embed f-strings, `.format()`, or `%` interpolation in log messages — the logger formats them only when the record passes the level filter.

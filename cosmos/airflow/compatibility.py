@@ -11,9 +11,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING
 
-from packaging.version import Version
-
-from cosmos.constants import AIRFLOW_VERSION
+from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION
 
 if TYPE_CHECKING:
     # Resolved for type checkers / IDEs only; no import happens at runtime here. The standard
@@ -27,8 +25,11 @@ if TYPE_CHECKING:
 # Single source of truth for where ``EmptyOperator`` lives. The operator moved to the standard
 # provider in Airflow 3; the legacy ``airflow.operators.empty`` path still resolves there but
 # emits a ``DeprecatedImportWarning``, so on Airflow 3 we select the standard provider path.
+# Compare on the major version so Airflow 3 pre-releases (e.g. 3.0.0rc1) are treated as Airflow 3.
 _EMPTY_OPERATOR_MODULE = (
-    "airflow.operators.empty" if AIRFLOW_VERSION < Version("3.0") else "airflow.providers.standard.operators.empty"
+    "airflow.operators.empty"
+    if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION
+    else "airflow.providers.standard.operators.empty"
 )
 
 # Maps the exported name to the module it should be imported from for this Airflow version.
@@ -41,7 +42,11 @@ def __getattr__(name: str) -> object:
     module_path = _LAZY_IMPORTS.get(name)
     if module_path is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    return getattr(importlib.import_module(module_path), name)
+    # Cache the resolved symbol in the module namespace so subsequent attribute access skips
+    # __getattr__ entirely (PEP 562 only invokes it for names missing from globals()).
+    resolved = getattr(importlib.import_module(module_path), name)
+    globals()[name] = resolved
+    return resolved
 
 
 def get_version_aware_operator_class_path(operator: type) -> str:

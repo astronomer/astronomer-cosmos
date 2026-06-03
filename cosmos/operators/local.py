@@ -1176,6 +1176,9 @@ class DbtRunOperationLocalOperator(DbtRunOperationMixin, DbtLocalBaseOperator):
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtDocsLocalOperator(DbtLocalBaseOperator):
     """

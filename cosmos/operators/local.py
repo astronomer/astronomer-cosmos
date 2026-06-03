@@ -319,7 +319,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 relative_path = str(compiled_sql_path.relative_to(tmp_project_dir))
                 parts.append(f"-- {relative_path}\n{compiled_sql}")
 
-        self.compiled_sql = "\n\n".join(parts)
+        # Trailing .strip() preserves the previous behavior: if a compiled .sql file is empty,
+        # its chunk ends with a trailing newline, which would otherwise leak to the last entry.
+        self.compiled_sql = "\n\n".join(parts).strip()
 
     @staticmethod
     def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tuple[None, None]:

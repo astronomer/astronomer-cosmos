@@ -1082,7 +1082,8 @@ def _assert_compiled_sql_aggregated(operator: AbstractDbtLocalBase) -> None:
     assert "SELECT 1" in operator.compiled_sql
     assert "SELECT 2" in operator.compiled_sql
     assert "manifest.json" not in operator.compiled_sql
-    # Chunks separated by a blank line; no trailing whitespace from the previous `+= ...\n\n` pattern.
+    # Invariant: chunks are separated by a blank line and the aggregated string has no
+    # leading or trailing whitespace.
     assert "\n\n" in operator.compiled_sql
     assert operator.compiled_sql == operator.compiled_sql.strip()
 

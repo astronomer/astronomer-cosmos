@@ -44,6 +44,84 @@ You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upl
         bucket_name="test_bucket",
     )
 
+Before this Task can be executed, there are a handful of additional steps that need to be completed. These include:
+
+- Creating an S3 bucket
+- Creating (or updating) an AWS IAM role that has access to write docs
+- Allowing that AWS IAM role to be "assumed"
+- Creating an Airflow Connection pointing towards the new role
+
+Creating the S3 bucket should be quite straightforward. This can be done manually in the AWS Console, using the AWS CLI, or programmatically with a tool like Terraform. Once this is complete, a new (or existing IAM role) should be created/updated with permission to write to that S3 bucket.
+
+Creating/Updating an IAM Role
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+These steps below assume that a bucket named ``dbt-docs-bucket`` already exists.
+
+1. In the AWS Console, create a new IAM Policy. This can be named whatever you'd like, but for this example, we'll use ``generate-dbt-docs-policy``.
+2. Add the permissions below to that policy.
+3. Once the Policy has been created, create a new IAM role with the name ``generate-dbt-docs-role``.
+4. Attach the ``generate-dbt-docs-policy`` to the ``generate-dbt-docs-role``.
+
+.. code-block:: javascript
+
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "AllowS3Write",
+                "Effect": "Allow",
+                "Action": [
+                    "s3:PutObject",
+                    "s3:GetObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:ListObjectsV2"
+                ],
+                "Resource": [
+                    "arn:aws:s3:::dbt-docs-bucket",
+                    "arn:aws:s3:::dbt-docs-bucket/*"
+                ]
+            }
+        ]
+    }
+
+Allowing the IAM Role to be Assumed
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Once the IAM role has been created, it can only be used if it allows another role/user to "assume" it. For example, if your Airflow environment has a workload identity ``arn:aws:iam::123456789:role/airflow-production-environment``, your new ``generate-dbt-docs-role`` needs to allow itself to be "assumed" by that workload identity.
+
+This can be done by adding the below JSON to the trust policy for ``generate-dbt-docs-role``.
+
+.. code-block:: javascript
+
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": {
+            "AWS": ["arn:aws:iam::123456789:role/airflow-production-environment"]
+          },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }
+
+Creating the Airflow Connection
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The final step is to create an Airflow Connection that points to the newly created ``generate-dbt-docs-role``. To do that, follow the list of steps below.
+
+1. Find the ARN for the ``generate-dbt-docs-role``. This should be something like: ``arn:aws:iam::123456789:role/generate-dbt-docs-role``.
+2. Create an AWS "Assume Role" Connection.
+3. Name the connection something like ``test_aws`` (to match the example above).
+4. Copy-and-paste the ``arn:aws:iam::123456789:role/generate-dbt-docs-role`` into the "IAM Role ARN" section.
+5. Save the Connection.
+
+Now, your ``DbtDocsS3Operator`` should point to the ``test_aws`` Connection and have the proper permissions to upload generated docs to your S3 bucket.
+
+
 Upload to S3 from Kubernetes
 ++++++++++++++++++++++++++++
 

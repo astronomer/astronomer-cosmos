@@ -820,7 +820,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         try:
             from airflow.sdk import DAG
         except ImportError:
-            from airflow.models.dag import DAG  # type: ignore[assignment]
+            from airflow.models.dag import DAG
 
         if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
             logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")
@@ -881,14 +881,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         if openlineage_events_completes is not None:
             for completed in openlineage_events_completes:
-                for input_ in completed.inputs:
+                for input_ in completed.inputs or []:
                     if input_ not in inputs:
                         inputs.append(input_)
-                for output in completed.outputs:
+                for output in completed.outputs or []:
                     if output not in outputs:
                         outputs.append(output)
-                run_facets = {**run_facets, **completed.run.facets}
-                job_facets = {**job_facets, **completed.job.facets}
+                run_facets = {**run_facets, **(completed.run.facets or {})}
+                job_facets = {**job_facets, **(completed.job.facets or {})}
         else:
             logger.info("Unable to emit OpenLineage events due to lack of dependencies or data.")
 
@@ -935,8 +935,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self.subprocess_hook.send_sigterm()
 
 
-class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[misc]
-    template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields  # type: ignore[operator]
+class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
+    template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
@@ -1420,7 +1420,7 @@ class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
     Executes a dbt core clone command.
     """
 
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

@@ -2577,7 +2577,25 @@ class TestReadTargetSourcesJson:
         target = tmp_path / "target"
         target.mkdir()
         sources_file = target / "sources.json"
-        sources_file.write_text("not valid json {{{")
+        sources_file.write_text("not valid json {{{{")
 
         result = _read_target_sources_json(tmp_path)
         assert result is None
+
+
+def test_dbt_local_operator_warns_on_output_only_template_fields(caplog):
+    """Test that passing compiled_sql or freshness to local operators emits a warning."""
+    from cosmos.operators.local import DbtRunLocalOperator
+
+    with caplog.at_level("WARNING", logger="cosmos.operators.local"):
+        DbtRunLocalOperator(
+            task_id="fake-task",
+            profile_config=profile_config,
+            project_dir="fake-dir",
+            compiled_sql="SELECT 1",
+            freshness="test",
+        )
+
+    assert "compiled_sql" in caplog.text
+    assert "freshness" in caplog.text
+    assert "output-only template field" in caplog.text

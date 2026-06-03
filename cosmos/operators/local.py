@@ -118,6 +118,8 @@ from cosmos.operators.base import (
 
 logger = get_logger(__name__)
 
+_OUTPUT_ONLY_TEMPLATE_FIELDS: tuple[str, ...] = ("compiled_sql", "freshness")
+
 
 def _read_target_sources_json(project_root: Path) -> dict[str, Any] | None:
     """Parse ``target/sources.json`` under ``project_root`` if the file exists."""
@@ -192,6 +194,17 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         "freshness": "json",
     }
     _process_log_line_callable: Callable[[str, Any], None] | None = None
+
+    def _warn_on_output_only_fields(self, kwargs: dict[str, Any]) -> None:
+        """Warn when output-only template fields are passed directly to local operators."""
+        for field in _OUTPUT_ONLY_TEMPLATE_FIELDS:
+            if field in kwargs:
+                logger.warning(
+                    "The '%s' argument passed to %s will be overwritten at runtime; "
+                    "it is an output-only template field.",
+                    field,
+                    self.__class__.__name__,
+                )
 
     def __init__(
         self,
@@ -938,6 +951,16 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
 
         default_args = kwargs.get("default_args", {})
 
+        # Warn when output-only template fields are passed directly to local operators
+        for field in _OUTPUT_ONLY_TEMPLATE_FIELDS:
+            if field in kwargs:
+                logger.warning(
+                    "The '%s' argument passed to %s will be overwritten at runtime; "
+                    "it is an output-only template field.",
+                    field,
+                    self.__class__.__name__,
+                )
+
         for arg in operator_args:
             try:
                 operator_kwargs[arg] = kwargs[arg]
@@ -1160,9 +1183,6 @@ class DbtRunOperationLocalOperator(DbtRunOperationMixin, DbtLocalBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtRunOperationMixin.template_fields  # type: ignore[operator]
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
 
 
 class DbtDocsLocalOperator(DbtLocalBaseOperator):
@@ -1405,7 +1425,7 @@ class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
     Executes a dbt core clone command.
     """
 
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

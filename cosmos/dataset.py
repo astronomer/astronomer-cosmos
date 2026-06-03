@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from cosmos.config import ProfileConfig
 
     try:
-        from airflow.sdk import DAG  # type: ignore[assignment]
+        from airflow.sdk import DAG
 
         # Airflow 3.1 onwards
         from airflow.utils.task_group import TaskGroup

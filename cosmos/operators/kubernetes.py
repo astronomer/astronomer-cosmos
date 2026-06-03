@@ -217,7 +217,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         self.operator = operator
         self.context = context
 
-    def on_pod_completion(  # type: ignore[override]
+    def on_pod_completion(
         self,
         *,
         pod: k8s.V1Pod,
@@ -362,9 +362,9 @@ class DbtWarningKubernetesOperator(DbtKubernetesBaseOperator, ABC):
             self.warning_handler = DbtTestWarningHandler(on_warning_callback, operator=self)
             # Support for handling multiple operator callbacks via self.callbacks was added in provider version 10.2.0
             if isinstance(self.callbacks, list):  # type: ignore[has-type]
-                self.callbacks.append(self.warning_handler)  # type: ignore[has-type,arg-type]
+                self.callbacks.append(self.warning_handler)  # type: ignore[has-type]
             else:
-                self.callbacks = self.warning_handler  # type: ignore[assignment]
+                self.callbacks = self.warning_handler
 
     def build_and_run_cmd(
         self,
@@ -434,7 +434,7 @@ class DbtDocsKubernetesOperator(DbtKubernetesBaseOperator):
     Use the `callback` parameter to specify a callback function to run after the command completes.
     """
 
-    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields
 
     ui_color = "#8194E0"
     required_files = ["index.html", "manifest.json", "catalog.json"]
@@ -460,13 +460,13 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
     the generated documentation to cloud storage *also inside the Pod*.
     """
 
-    template_fields: Sequence[str] = DbtDocsKubernetesOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtDocsKubernetesOperator.template_fields
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
         # In Kubernetes mode, we do NOT use callback-based upload on the Airflow worker.
-        self.callback = None  # type: ignore[assignment]
+        self.callback = None
 
     @abstractmethod
     def build_upload_shell_command(self, docs_target: str) -> str:

@@ -85,8 +85,8 @@ def _init_xcom_backup(context: Any) -> None:
     dag_id = ti.dag_id
     run_id = context["run_id"]
     task_group_id = _get_task_group_id(ti)
-    ti._cosmos_xcom_backup_var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)  # type: ignore[attr-defined]
-    ti._cosmos_xcom_backup_buffer = {}  # type: ignore[attr-defined]
+    ti._cosmos_xcom_backup_var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
+    ti._cosmos_xcom_backup_buffer = {}
 
 
 def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:

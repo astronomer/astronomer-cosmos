@@ -226,7 +226,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             self.log.warning("Lockfile owned by process of pid %s, while operator has pid %s", lock_file_pid, self._pid)
 
 
-class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):  # type: ignore[misc]
+class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):
     """
     Executes a dbt core build command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
@@ -242,13 +242,13 @@ class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):
     and deleted just after.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
 
-class DbtSeedVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSeedLocalOperator):  # type: ignore[misc]
+class DbtSeedVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSeedLocalOperator):
     """
     Executes a dbt core seed command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
@@ -264,7 +264,7 @@ class DbtSnapshotVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSnapshotLocalO
     command and deleted just after.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -276,13 +276,13 @@ class DbtSourceVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSourceLocalOpera
     command and deleted just after.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
 
-class DbtRunVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunLocalOperator):  # type: ignore[misc]
+class DbtRunVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunLocalOperator):
     """
     Executes a dbt core run command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
@@ -298,13 +298,13 @@ class DbtTestVirtualenvOperator(DbtVirtualenvBaseOperator, DbtTestLocalOperator)
     and deleted just after.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
 
-class DbtRunOperationVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunOperationLocalOperator):  # type: ignore[misc]
+class DbtRunOperationVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunOperationLocalOperator):
     """
     Executes a dbt core run-operation command within a Python Virtual Environment, that is created before running the
     dbt command and deleted just after.
@@ -320,7 +320,7 @@ class DbtDocsVirtualenvOperator(DbtVirtualenvBaseOperator, DbtDocsLocalOperator)
     command and deleted just after.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -331,7 +331,7 @@ class DbtCloneVirtualenvOperator(DbtVirtualenvBaseOperator, DbtCloneLocalOperato
     Executes a dbt core clone command.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

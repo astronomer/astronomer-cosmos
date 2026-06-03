@@ -24,12 +24,12 @@ except ImportError:
     from airflow.utils.task_group import TaskGroup
 
 from cosmos import settings
+from cosmos.airflow.compatibility import EmptyOperator, get_version_aware_operator_class_path
 from cosmos.config import ExecutionConfig, RenderConfig
 from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
-    EMPTY_OPERATOR_CLASS,
     PRODUCER_WATCHER_DONE_TASK_ID,
     PRODUCER_WATCHER_TASK_ID,
     SUPPORTED_BUILD_RESOURCES,
@@ -418,7 +418,11 @@ def create_task_metadata(  # noqa: C901
                     args = {"task_display_name": args["task_display_name"]}
                 else:
                     args = {}
-                return TaskMetadata(id=task_id, operator_class=EMPTY_OPERATOR_CLASS, arguments=args)
+                return TaskMetadata(
+                    id=task_id,
+                    operator_class=get_version_aware_operator_class_path(EmptyOperator),
+                    arguments=args,
+                )
         else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"

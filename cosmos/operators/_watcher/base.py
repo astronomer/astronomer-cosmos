@@ -51,7 +51,7 @@ if TYPE_CHECKING:
         from airflow.sdk import DAG
     except ImportError:
         from airflow.models.dag import DAG  # type: ignore[assignment]
-    from airflow.operators.empty import EmptyOperator
+    from cosmos.airflow.compatibility import EmptyOperator
 
     try:
         from airflow.sdk import TaskGroup
@@ -779,10 +779,7 @@ def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> 
     is skipped on retry, this task still succeeds (trigger_rule=NONE_FAILED), preventing
     the skip from propagating to tasks downstream of the group.
     """
-    try:
-        from airflow.providers.standard.operators.empty import EmptyOperator
-    except ImportError:
-        from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+    from cosmos.airflow.compatibility import EmptyOperator
 
     try:
         from airflow.task.trigger_rule import TriggerRule

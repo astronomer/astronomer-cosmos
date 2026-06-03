@@ -820,7 +820,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         try:
             from airflow.sdk import DAG
         except ImportError:
-            from airflow.models.dag import DAG
+            from airflow.models.dag import DAG  # type: ignore[assignment]
 
         if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
             logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")
@@ -881,14 +881,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         if openlineage_events_completes is not None:
             for completed in openlineage_events_completes:
-                for input_ in completed.inputs or []:
+                for input_ in completed.inputs:
                     if input_ not in inputs:
                         inputs.append(input_)
-                for output in completed.outputs or []:
+                for output in completed.outputs:
                     if output not in outputs:
                         outputs.append(output)
-                run_facets = {**run_facets, **(completed.run.facets or {})}
-                job_facets = {**job_facets, **(completed.job.facets or {})}
+                run_facets = {**run_facets, **completed.run.facets}
+                job_facets = {**job_facets, **completed.job.facets}
         else:
             logger.info("Unable to emit OpenLineage events due to lack of dependencies or data.")
 

@@ -1178,6 +1178,9 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
 
 
 class DbtRunOperationLocalOperator(DbtRunOperationMixin, DbtLocalBaseOperator):
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
     """
     Executes a dbt core run-operation command.
 
@@ -1425,6 +1428,9 @@ class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
 
 
 class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
     """
     Executes a dbt core clone command.
     """

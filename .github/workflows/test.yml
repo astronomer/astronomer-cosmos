@@ -906,7 +906,7 @@ jobs:
       - Authorize
       - Run-Unit-Tests
       - Run-Integration-Tests
-      - Run-Integration-Tests-DBT-Loom
+      - Run-Integration-Tests-dbt-Loom
       - Run-Integration-Tests-Expensive
       - Run-Kubernetes-Tests
       - Run-Telemetry-Tests

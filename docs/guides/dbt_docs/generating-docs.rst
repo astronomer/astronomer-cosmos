@@ -63,25 +63,28 @@ These steps below assume that a bucket named ``dbt-docs-bucket`` already exists.
 3. Once the Policy has been created, create a new IAM role with the name ``generate-dbt-docs-role``.
 4. Attach the ``generate-dbt-docs-policy`` to the ``generate-dbt-docs-role``.
 
-.. code-block:: javascript
+.. code-block:: json
 
     {
         "Version": "2012-10-17",
         "Statement": [
             {
-                "Sid": "AllowS3Write",
+                "Sid": "AllowS3ListBucket",
+                "Effect": "Allow",
+                "Action": [
+                    "s3:ListBucket"
+                ],
+                "Resource": "arn:aws:s3:::dbt-docs-bucket"
+            },
+            {
+                "Sid": "AllowS3ObjectRW",
                 "Effect": "Allow",
                 "Action": [
                     "s3:PutObject",
                     "s3:GetObject",
-                    "s3:DeleteObject",
-                    "s3:ListBucket",
-                    "s3:ListObjectsV2"
+                    "s3:DeleteObject"
                 ],
-                "Resource": [
-                    "arn:aws:s3:::dbt-docs-bucket",
-                    "arn:aws:s3:::dbt-docs-bucket/*"
-                ]
+                "Resource": "arn:aws:s3:::dbt-docs-bucket/*"
             }
         ]
     }
@@ -89,11 +92,11 @@ These steps below assume that a bucket named ``dbt-docs-bucket`` already exists.
 Allowing the IAM Role to be Assumed
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Once the IAM role has been created, it can only be used if it allows another role/user to "assume" it. For example, if your Airflow environment has a workload identity ``arn:aws:iam::123456789:role/airflow-production-environment``, your new ``generate-dbt-docs-role`` needs to allow itself to be "assumed" by that workload identity.
+Once the IAM role has been created, it can only be used if it allows another role/user to "assume" it. For example, if your Airflow environment has a workload identity ``arn:aws:iam::123456789:role/airflow-production-environment``, your new ``generate-dbt-docs-role`` needs to allow it to be assumed by that workload identity.
 
 This can be done by adding the below JSON to the trust policy for ``generate-dbt-docs-role``.
 
-.. code-block:: javascript
+.. code-block:: json
 
     {
       "Version": "2012-10-17",

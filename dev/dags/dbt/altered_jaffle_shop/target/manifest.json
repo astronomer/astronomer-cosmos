@@ -15296,7 +15296,7 @@
       "raw_code": "",
       "relation_name": "\"p\".\"public\".\"raw_orders\"",
       "resource_type": "seed",
-      "root_path": "/Users/pankajkoti/astronomer/cosmos/boss-290-ephemeral-empty/dev/dags/dbt/altered_jaffle_shop",
+      "root_path": "dev/dags/dbt/altered_jaffle_shop",
       "schema": "public",
       "tags": [],
       "unique_id": "seed.altered_jaffle_shop.raw_orders",

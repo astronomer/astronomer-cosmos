@@ -10,6 +10,7 @@ from airflow.models import DAG
 from packaging.version import Version
 
 from cosmos import DbtDag
+from cosmos.airflow.compatibility import EmptyOperator
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     AIRFLOW_VERSION,
@@ -25,12 +26,6 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import DbtRunLocalOperator
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
 from cosmos.telemetry import _decompress_telemetry_metadata
-
-try:
-    # Airflow 3.1 onwards
-    from airflow.providers.standard.operators.empty import EmptyOperator
-except ImportError:
-    from airflow.operators.empty import EmptyOperator
 
 SAMPLE_PROFILE_YML = Path(__file__).parent / "sample/profiles.yml"
 SAMPLE_DBT_PROJECT = Path(__file__).parent / "sample/"

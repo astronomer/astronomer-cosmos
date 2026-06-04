@@ -9,6 +9,9 @@ from packaging.version import Version
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
+# dbt materialization for models that are inlined as a CTE into downstream models and never written to the warehouse.
+DBT_EPHEMERAL_MATERIALIZATION = "ephemeral"
+
 BIGQUERY_PROFILE_TYPE = "bigquery"
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DBT_PROJECT_FILENAME = "dbt_project.yml"

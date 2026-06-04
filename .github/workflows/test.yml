@@ -539,6 +539,85 @@ jobs:
       POSTGRES_SCHEMA: public
       POSTGRES_PORT: 5432
 
+  Run-Integration-Tests-dbt-Loom:
+    # Dedicated job for cross_project_manifest_dag.py, which exercises dbt-loom.
+    # Carved out of Run-Integration-Tests so the loom job's dbt + loom versions
+    # can move independently of the main matrix.
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11"]
+        airflow-version: ["3.2"]
+        dbt-version: ["1.11"]
+    services:
+      postgres:
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: integration-dbt-loom-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install uv
+          uv pip install --system "hatch>=1.14.2"
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
+
+      - name: Test cross_project_manifest_dag with dbt-loom installed
+        run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-loom
+
+      - name: Upload coverage to Github
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-integration-dbt-loom-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
+          path: .coverage
+          include-hidden-files: true
+
+    env:
+      AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
+      PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
+      AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
+      AIRFLOW__COSMOS__ENABLE_CACHE: 0
+      DBT_ADAPTER_VERSION: ${{ matrix.dbt-version }}
+
+      # cross_project_manifest_dag's profiles.yml references these
+      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
+      POSTGRES_HOST: localhost
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_SCHEMA: public
+      POSTGRES_PORT: 5432
+
   Run-Integration-dbt-fusion-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
@@ -827,6 +906,7 @@ jobs:
       - Authorize
       - Run-Unit-Tests
       - Run-Integration-Tests
+      - Run-Integration-Tests-dbt-Loom
       - Run-Integration-Tests-Expensive
       - Run-Kubernetes-Tests
       - Run-Telemetry-Tests

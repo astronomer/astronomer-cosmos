@@ -44,6 +44,7 @@ from cosmos.cache import (
 )
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
+    DBT_EPHEMERAL_MATERIALIZATION,
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
     DBT_LOG_PATH_ENVVAR,
@@ -141,6 +142,11 @@ class DbtNode:
         if self.resource_type != DbtResourceType.SEED:
             return None
         return _calculate_file_checksum(self.file_path)
+
+    @property
+    def has_ephemeral_materialization(self) -> bool:
+        """Whether the node is materialized as ephemeral (inlined as a CTE, never written to the warehouse)."""
+        return str(self.config.get("materialized") or "").lower() == DBT_EPHEMERAL_MATERIALIZATION
 
     @property
     def meta(self) -> dict[str, Any]:

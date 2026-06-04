@@ -1063,32 +1063,60 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     assert "Unable to emit OpenLineage events due to lack of dependencies or data." in caplog.text
 
 
+def _write_target_sql_fixture(tmp_path: Path) -> None:
+    """Create a fake dbt ``target/`` tree with two .sql files and one non-SQL artefact."""
+    compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
+    run_dir = tmp_path / "target" / "run" / "pkg" / "models"
+    compiled_dir.mkdir(parents=True)
+    run_dir.mkdir(parents=True)
+    (compiled_dir / "a.sql").write_text("SELECT 1\n")
+    (run_dir / "b.sql").write_text("SELECT 2\n")
+    # Non-SQL artefact under target/ must be ignored.
+    (tmp_path / "target" / "manifest.json").write_text("{}")
+
+
+def _assert_compiled_sql_aggregated(operator: AbstractDbtLocalBase) -> None:
+    """Verify aggregated ``compiled_sql`` contains both fixture files, excludes non-SQL, and has no trailing blank line."""
+    assert "-- target/compiled/pkg/models/a.sql" in operator.compiled_sql
+    assert "-- target/run/pkg/models/b.sql" in operator.compiled_sql
+    assert "SELECT 1" in operator.compiled_sql
+    assert "SELECT 2" in operator.compiled_sql
+    assert "manifest.json" not in operator.compiled_sql
+    # Invariant: chunks are separated by a blank line and the aggregated string has no
+    # leading or trailing whitespace.
+    assert "\n\n" in operator.compiled_sql
+    assert operator.compiled_sql == operator.compiled_sql.strip()
+
+
 @pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test only applies to Airflow 2")
-def test_store_compiled_sql_airflow2() -> None:
+def test_store_compiled_sql_airflow2(tmp_path: Path) -> None:
+    # should_store_compiled_sql=False is a no-op even when target/ has files.
+    _write_target_sql_fixture(tmp_path)
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=False,
     )
-    # here we just need to call the method to make sure it doesn't raise an exception
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
+    assert dbt_base_operator.compiled_sql == ""
 
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=True,
     )
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
-    # here we call the method and see if it tries to access the context["ti"]
-    # it should, and it should raise a KeyError because we didn't pass in a ti
+    _assert_compiled_sql_aggregated(dbt_base_operator)
+
+    # _override_rtif tries to access context["ti"]; it should raise KeyError when ti is absent.
     with pytest.raises(KeyError):
         dbt_base_operator._override_rtif(
             context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
@@ -1096,30 +1124,34 @@ def test_store_compiled_sql_airflow2() -> None:
 
 
 @pytest.mark.skipif(version.parse(airflow_version).major == 2, reason="Test only applies to Airflow 3")
-def test_store_compiled_sql_airflow3() -> None:
+def test_store_compiled_sql_airflow3(tmp_path: Path) -> None:
+    # should_store_compiled_sql=False is a no-op even when target/ has files.
+    _write_target_sql_fixture(tmp_path)
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=False,
     )
-    # here we just need to call the method to make sure it doesn't raise an exception
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
+    assert dbt_base_operator.compiled_sql == ""
 
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=True,
     )
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
-    # Test Airflow 3 behavior - should set flag
+    _assert_compiled_sql_aggregated(dbt_base_operator)
+
+    # Airflow 3 only flips a flag; Airflow itself re-renders templates post-execute.
     dbt_base_operator._override_rtif(
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )

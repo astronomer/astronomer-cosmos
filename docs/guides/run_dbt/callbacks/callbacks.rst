@@ -6,6 +6,9 @@ Callbacks
 .. note::
     Feature available when using ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``.
 
+.. note::
+    Since Cosmos v1.15.0, ephemeral dbt models are rendered as ``EmptyOperator`` tasks by default (``RenderConfig.ephemeral_models_as_empty_operator=True``). Because no dbt command runs for these tasks, callbacks are not invoked for ephemeral models. Set ``ephemeral_models_as_empty_operator=False`` to render them as regular dbt run tasks if you rely on callbacks for them.
+
 Most dbt commands output `one or more artifacts <https://docs.getdbt.com/reference/artifacts/dbt-artifacts>`_
 such as ``semantic_manifest.json``, ``manifest.json``, ``catalog.json``, ``run_results.json``, and ``sources.json`` in the target folder, which by default resides in the dbt project's root folder.
 However, since Cosmos creates temporary folders to run each dbt command, this folder vanishes by the end of the Cosmos task execution,

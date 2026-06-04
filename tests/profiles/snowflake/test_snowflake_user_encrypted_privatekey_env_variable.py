@@ -446,9 +446,7 @@ def test_client_session_keep_alive_absent_when_not_set(mapping_class, password, 
 @pytest.mark.parametrize("mapping_class, password, extra_fields", SNOWFLAKE_PROFILE_MAPPINGS)
 def test_host_and_port_from_connection_extra(mapping_class, password, extra_fields) -> None:
     """host and port set on the Airflow connection Extra are forwarded to every profile mapping."""
-    conn = _build_snowflake_conn(
-        password, extra_fields, host="my_host.snowflakecomputing.com", port=443
-    )
+    conn = _build_snowflake_conn(password, extra_fields, host="my_host.snowflakecomputing.com", port=443)
     with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = mapping_class(conn)
         assert profile_mapping.profile["host"] == "my_host.snowflakecomputing.com"

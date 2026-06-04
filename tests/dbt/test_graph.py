@@ -955,9 +955,11 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
     dbt_graph.load_via_dbt_ls()
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     # This test is dependent upon dbt >= 1.5.4
-    assert len(dbt_graph.nodes) == 9
+    assert len(dbt_graph.nodes) == 11
     expected_keys = [
         "model.altered_jaffle_shop.customers",
+        "model.altered_jaffle_shop.ephemeral_customers",
+        "model.altered_jaffle_shop.ephemeral_customers_downstream",
         "model.altered_jaffle_shop.stg_customers",
         "seed.altered_jaffle_shop.raw_customers",
         "test.altered_jaffle_shop.not_null_customers_customer_id.5c9bf9911d",

@@ -33,6 +33,10 @@ By default, if using a version between Airflow 2.4 or higher, Cosmos emits `Airf
 
    This feature is only available for ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV``, ``ExecutionMode.WATCHER`` and ``ExecutionMode.AIRFLOW_ASYNC``.
 
+.. note::
+
+   Since Cosmos v1.15.0, ephemeral dbt models are rendered as ``EmptyOperator`` tasks by default (``RenderConfig.ephemeral_models_as_empty_operator=True``). These tasks do not run dbt and therefore do not emit datasets, so a DAG scheduled on an ephemeral model's dataset will not be triggered by it. Set ``ephemeral_models_as_empty_operator=False`` to render ephemeral models as regular dbt run tasks and keep emitting their datasets.
+
 Cosmos calculates these URIs during the task execution, by using the library `OpenLineage Integration Common <https://pypi.org/project/openlineage-integration-common/>`_.
 
 This block illustrates a Cosmos-generated dataset for Postgres:

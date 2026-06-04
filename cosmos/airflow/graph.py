@@ -30,7 +30,6 @@ from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
-    EMPTY_OPERATOR_CLASS,
     PRODUCER_WATCHER_DONE_TASK_ID,
     PRODUCER_WATCHER_TASK_ID,
     SUPPORTED_BUILD_RESOURCES,
@@ -388,7 +387,7 @@ def create_task_metadata(  # noqa: C901
                 )
                 # EmptyOperator does not accept custom dbt parameters (e.g. profile_args); recreate the args.
                 args = {"task_display_name": args["task_display_name"]} if "task_display_name" in args else {}
-                return TaskMetadata(id=task_id, operator_class=EMPTY_OPERATOR_CLASS, arguments=args)
+                return TaskMetadata(id=task_id, operator_class=EMPTY_OPERATOR_CLASS_PATH, arguments=args)
             if render_config.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES:
                 # Render the seed as usual, but flag the task so the operator skips running
                 # `dbt seed` when the CSV content is unchanged since the last successful run.

@@ -9,14 +9,6 @@ from packaging.version import Version
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
-# The EmptyOperator import path changed in Airflow 3: it moved to the standard provider. The legacy
-# ``airflow.operators.empty`` path still works in Airflow 3 but emits a DeprecatedImportWarning.
-EMPTY_OPERATOR_CLASS = (
-    "airflow.operators.empty.EmptyOperator"
-    if AIRFLOW_VERSION < Version("3.0")
-    else "airflow.providers.standard.operators.empty.EmptyOperator"
-)
-
 BIGQUERY_PROFILE_TYPE = "bigquery"
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DBT_PROJECT_FILENAME = "dbt_project.yml"

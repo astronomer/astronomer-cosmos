@@ -35,7 +35,6 @@ from cosmos.airflow.graph import (
 )
 from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
-    EMPTY_OPERATOR_CLASS,
     SUPPORTED_BUILD_RESOURCES,
     DbtResourceType,
     ExecutionMode,
@@ -2348,7 +2347,7 @@ def test_create_task_metadata_seed_rendering_render_only(test_behavior):
         ),
     )
     assert metadata.id == "my_seed_seed"
-    assert metadata.operator_class == EMPTY_OPERATOR_CLASS
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
 
 
 def test_create_task_metadata_seed_rendering_when_seed_changes_sets_flag():

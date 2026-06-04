@@ -190,7 +190,7 @@ def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
 
     err_msg = str(exc_info.value)
     expected1 = "dbt invocation did not complete with unhandled error: Compilation Error"
-    expected2 = "dbt found 1 package(s) specified in packages.yml, but only 0 package(s) installed"
+    expected2 = "dbt expects 1 package(s) based on packages specified in packages.yml, but found only 0 package(s) installed in dbt_packages"
     assert expected1 in err_msg
     assert expected2 in err_msg
 

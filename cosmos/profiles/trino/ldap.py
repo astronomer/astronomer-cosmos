@@ -11,7 +11,7 @@ class TrinoLDAPProfileMapping(TrinoBaseProfileMapping):
     """
     Maps Airflow Trino connections to LDAP Trino dbt profiles.
 
-    https://docs.getdbt.com/reference/warehouse-setups/trino-setup#ldap
+    https://docs.getdbt.com/docs/local/connect-data-platform/trino-setup#example-profilesyml-for-ldap
     https://airflow.apache.org/docs/apache-airflow-providers-trino/stable/connections.html
     """
 

@@ -21,7 +21,7 @@ from airflow.models import Variable
 try:
     import orjson
 except ImportError:  # pragma: no cover
-    orjson = None  # type: ignore[assignment]
+    orjson = None
 
 if TYPE_CHECKING:
     try:

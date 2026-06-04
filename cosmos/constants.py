@@ -172,7 +172,7 @@ class SeedRenderingBehavior(Enum):
     NONE = "none"
 
 
-class DbtResourceType(aenum.Enum):  # type: ignore
+class DbtResourceType(aenum.Enum):  # type: ignore[misc]
     """
     Type of dbt node.
     """
@@ -185,7 +185,7 @@ class DbtResourceType(aenum.Enum):  # type: ignore
     EXPOSURE = "exposure"
 
     @classmethod
-    def _missing_value_(cls, value):  # type: ignore
+    def _missing_value_(cls, value):  # type: ignore[no-untyped-def]
         aenum.extend_enum(cls, value.upper(), value.lower())
         return getattr(DbtResourceType, value.upper())
 

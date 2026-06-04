@@ -197,13 +197,13 @@ def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tu
     remote_conn_id = settings.remote_target_path_conn_id
     if not remote_conn_id:
         target_path_schema = urlparse(target_path_str).scheme
-        remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]
+        remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)
     if remote_conn_id is None:
         return None, None
 
     _configured_target_path = ObjectStoragePath(target_path_str, conn_id=remote_conn_id)
 
-    if not _configured_target_path.exists():  # type: ignore[no-untyped-call]
+    if not _configured_target_path.exists():
         _configured_target_path.mkdir(parents=True, exist_ok=True)
 
     return _configured_target_path, remote_conn_id

@@ -38,7 +38,7 @@ except ImportError:
     )
 
 
-class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInstancesOperator):  # type: ignore
+class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInstancesOperator):  # type: ignore[misc]
     """
     Executes a dbt core cli command in an Azure Container Instance
     """
@@ -129,7 +129,7 @@ class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInsta
         self.command: list[str] = dbt_cmd
 
 
-class DbtBuildAzureContainerInstanceOperator(DbtBuildMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtBuildAzureContainerInstanceOperator(DbtBuildMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core build command.
     """
@@ -140,7 +140,7 @@ class DbtBuildAzureContainerInstanceOperator(DbtBuildMixin, DbtAzureContainerIns
         super().__init__(*args, **kwargs)
 
 
-class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core ls command.
     """
@@ -149,7 +149,7 @@ class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceB
         super().__init__(*args, **kwargs)
 
 
-class DbtSeedAzureContainerInstanceOperator(DbtSeedMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtSeedAzureContainerInstanceOperator(DbtSeedMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core seed command.
 
@@ -162,7 +162,7 @@ class DbtSeedAzureContainerInstanceOperator(DbtSeedMixin, DbtAzureContainerInsta
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotAzureContainerInstanceOperator(DbtSnapshotMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtSnapshotAzureContainerInstanceOperator(DbtSnapshotMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core snapshot command.
 
@@ -181,7 +181,7 @@ class DbtSourceAzureContainerInstanceOperator(DbtSourceMixin, DbtAzureContainerI
         super().__init__(*args, **kwargs)
 
 
-class DbtRunAzureContainerInstanceOperator(DbtRunMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtRunAzureContainerInstanceOperator(DbtRunMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core run command.
     """
@@ -192,7 +192,7 @@ class DbtRunAzureContainerInstanceOperator(DbtRunMixin, DbtAzureContainerInstanc
         super().__init__(*args, **kwargs)
 
 
-class DbtTestAzureContainerInstanceOperator(DbtTestMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtTestAzureContainerInstanceOperator(DbtTestMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core test command.
     """

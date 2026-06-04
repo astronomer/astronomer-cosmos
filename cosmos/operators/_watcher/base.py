@@ -51,7 +51,7 @@ if TYPE_CHECKING:
         from airflow.sdk import DAG
     except ImportError:
         from airflow.models.dag import DAG  # type: ignore[assignment]
-    from airflow.operators.empty import EmptyOperator
+    from cosmos.airflow.compatibility import EmptyOperator
 
     try:
         from airflow.sdk import TaskGroup
@@ -251,7 +251,7 @@ def _ensure_subprocess_model_outlet_uris(
         manifest_path = Path(project_dir) / "target" / "manifest.json"
         if manifest_path.exists():
             model_outlet_uris.update(compute_model_outlet_uris(manifest_path, dataset_namespace))
-        model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []  # type: ignore[assignment]
+        model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []
 
 
 def _rewrite_upstream_failure_skip_status(
@@ -406,8 +406,8 @@ def store_dbt_resource_status_from_log(
 _PRODUCER_ONLY_FLAGS: tuple[str, ...] = ("--select", "--exclude", "--log-format")
 
 
-class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
-    template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
+class BaseConsumerSensor(BaseSensorOperator):
+    template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")
     poke_retry_number: int = 0
 
     def __init__(
@@ -779,17 +779,14 @@ def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> 
     is skipped on retry, this task still succeeds (trigger_rule=NONE_FAILED), preventing
     the skip from propagating to tasks downstream of the group.
     """
-    try:
-        from airflow.providers.standard.operators.empty import EmptyOperator
-    except ImportError:
-        from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+    from cosmos.airflow.compatibility import EmptyOperator
 
     try:
         from airflow.task.trigger_rule import TriggerRule
     except ImportError:
-        from airflow.utils.trigger_rule import TriggerRule  # type: ignore[no-redef]
+        from airflow.utils.trigger_rule import TriggerRule
 
-    return EmptyOperator(  # type: ignore[no-untyped-call]
+    return EmptyOperator(
         task_id=task_id,
         dag=dag,
         task_group=task_group,

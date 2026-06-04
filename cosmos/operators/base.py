@@ -24,7 +24,7 @@ if TYPE_CHECKING:  # pragma: no cover
 try:
     from airflow.utils.operator_helpers import context_to_airflow_vars  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover
-    from airflow.sdk.execution_time.context import context_to_airflow_vars  # type: ignore
+    from airflow.sdk.execution_time.context import context_to_airflow_vars
 
 from airflow.utils.strings import to_boolean
 
@@ -170,7 +170,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
 
     # The following is necessary so that dynamic mapped classes work since Cosmos 1.9.0 subclass changes
     # Bug report: https://github.com/astronomer/astronomer-cosmos/issues/1546
-    __init__._BaseOperatorMeta__param_names = {  # type: ignore
+    __init__._BaseOperatorMeta__param_names = {  # type: ignore[attr-defined]
         name
         for (name, param) in inspect.signature(__init__).parameters.items()
         if param.name != "self" and param.kind not in (param.VAR_POSITIONAL, param.VAR_KEYWORD)
@@ -182,7 +182,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         # Since this class is subclassed by all Cosmos operators, to do this here allows to avoid to have this
         # logic explicitly in all subclasses
         # Bug report: https://github.com/astronomer/astronomer-cosmos/issues/1546
-        cls.__init__._BaseOperatorMeta__param_names = {  # type: ignore
+        cls.__init__._BaseOperatorMeta__param_names = {  # type: ignore[attr-defined]
             name
             for (name, param) in inspect.signature(cls.__init__).parameters.items()
             if param.name != "self" and param.kind not in (param.VAR_POSITIONAL, param.VAR_KEYWORD)
@@ -328,7 +328,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
     ) -> Any:
         """Override this method for the operator to execute the dbt command"""
 
-    def execute(self, context: Context, **kwargs) -> Any | None:  # type: ignore
+    def execute(self, context: Context, **kwargs) -> Any | None:  # type: ignore[no-untyped-def, return]
         if self.extra_context:
             context_merge(context, self.extra_context)
 
@@ -487,7 +487,7 @@ class DbtTestMixin:
         self.select = select
         self.exclude = exclude
         self.selector = selector
-        super().__init__(exclude=exclude, select=select, selector=selector, **kwargs)  # type: ignore
+        super().__init__(exclude=exclude, select=select, selector=selector, **kwargs)  # type: ignore[call-arg]
 
 
 class DbtRunOperationMixin:

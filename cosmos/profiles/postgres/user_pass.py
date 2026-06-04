@@ -10,7 +10,7 @@ from ..base import BaseProfileMapping
 class PostgresUserPasswordProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Postgres connections using user + password authentication to dbt profiles.
-    https://docs.getdbt.com/reference/warehouse-setups/postgres-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/postgres-setup
     https://airflow.apache.org/docs/apache-airflow-providers-postgres/stable/connections/postgres.html
     """
 

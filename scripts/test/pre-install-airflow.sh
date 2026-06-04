@@ -6,6 +6,9 @@ set -e
 
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"
+# dbt minor passed by Hatch via {matrix:dbt}. Defaults to the pinned baseline
+# when the script is invoked with only two args (e.g. local/manual runs).
+DBT_VERSION="${3:-1.11}"
 
 # Use this to set the appropriate Python environment in Github Actions,
 # while also not assuming --system when running locally.
@@ -24,20 +27,23 @@ rm -f $AIRFLOW_HOME/airflow.db
 pip install uv
 uv pip install pip --upgrade
 
-if [ "$AIRFLOW_VERSION" = "2.9" ] ; then
-  uv pip install -r requirements/requirements-airflow-2.9-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "2.10" ] ; then
-  uv pip install -r requirements/requirements-airflow-2.10-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "2.11" ] ; then
-  uv pip install -r requirements/requirements-airflow-2.11-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.0" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.0-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.1-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.2-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.3-dbt-1.11.txt
+# Tracks the dbt minor we can assert on after install. Set when a pinned
+# lockfile actually pins the requested dbt minor, or by the dynamic path below.
+EFFECTIVE_DBT_VERSION=""
+
+if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRFLOW_VERSION" = "2.11" ] || [ "$AIRFLOW_VERSION" = "3.0" ] || [ "$AIRFLOW_VERSION" = "3.1" ] || [ "$AIRFLOW_VERSION" = "3.2" ] || [ "$AIRFLOW_VERSION" = "3.3" ] ; then
+  # Install from the pinned lockfile matching this (airflow, dbt) pair. When no
+  # lockfile exists for the requested dbt minor, fall back to the dbt-1.11
+  # baseline; jobs that need a different dbt minor re-pin it in their own setup.
+  REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-${DBT_VERSION}.txt"
+  if [ -f "$REQUIREMENTS_FILE" ]; then
+    EFFECTIVE_DBT_VERSION="$DBT_VERSION"
+  else
+    REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"
+    EFFECTIVE_DBT_VERSION="1.11"
+  fi
+  echo "Installing pinned requirements from $REQUIREMENTS_FILE"
+  uv pip install -r "$REQUIREMENTS_FILE"
 else
   # Download Airflow constraints according to the version being used
   if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
@@ -62,6 +68,7 @@ else
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
   uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0" apache-airflow==$AIRFLOW_VERSION
+  EFFECTIVE_DBT_VERSION="$DBT_VERSION"
 
   # Delete the no longer needed constraint file
   rm /tmp/constraint.txt
@@ -77,14 +84,17 @@ else
     exit 1
 fi
 
-actual_dbt_version=$(dbt --version 2>/dev/null | awk '/Core:/{print $2}' | cut -d. -f1,2)
-desired_dbt_version=$(echo "$DBT_VERSION" | cut -d. -f1,2)
-
-if [ "$actual_dbt_version" = "$desired_dbt_version" ]; then
-    echo "Version is as expected: $desired_dbt_version"
-else
-    echo "Version does not match. Expected: $desired_dbt_version, but got: $actual_dbt_version"
-    exit 1
+# Assert the installed dbt minor only when we know which one to expect: a lockfile
+# pinned it, or the dynamic path installed it. Jobs that fell back to the dbt-1.11
+# baseline assert against 1.11; jobs that re-pin dbt later verify it themselves.
+if [ -n "$EFFECTIVE_DBT_VERSION" ]; then
+    actual_dbt_version=$(dbt --version 2>/dev/null | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
+    if [ "$actual_dbt_version" = "$EFFECTIVE_DBT_VERSION" ]; then
+        echo "dbt version is as expected: $EFFECTIVE_DBT_VERSION"
+    else
+        echo "dbt version does not match. Expected: $EFFECTIVE_DBT_VERSION, but got: $actual_dbt_version"
+        exit 1
+    fi
 fi
 
 # Installation of dbt in a separate Python virtual environment:

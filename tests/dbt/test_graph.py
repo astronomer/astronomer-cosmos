@@ -955,9 +955,11 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
     dbt_graph.load_via_dbt_ls()
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     # This test is dependent upon dbt >= 1.5.4
-    assert len(dbt_graph.nodes) == 9
+    assert len(dbt_graph.nodes) == 11
     expected_keys = [
         "model.altered_jaffle_shop.customers",
+        "model.altered_jaffle_shop.ephemeral_customers",
+        "model.altered_jaffle_shop.ephemeral_customers_downstream",
         "model.altered_jaffle_shop.stg_customers",
         "seed.altered_jaffle_shop.raw_customers",
         "test.altered_jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
@@ -984,7 +986,7 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "project_dir,node_count",
-    [(DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME, 39), (DBT_PROJECTS_ROOT_DIR / "jaffle_shop_python", 28)],
+    [(DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME, 41), (DBT_PROJECTS_ROOT_DIR / "jaffle_shop_python", 28)],
 )
 def test_load_via_dbt_ls_without_exclude(project_dir, node_count, postgres_profile_config):
     project_config = ProjectConfig(dbt_project_path=project_dir)
@@ -1345,7 +1347,7 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate, po
     mock_popen_communicate.assert_called_once()
 
 
-@pytest.mark.parametrize("project_name,nodes_count", [("altered_jaffle_shop", 28), ("jaffle_shop_python", 28)])
+@pytest.mark.parametrize("project_name,nodes_count", [("altered_jaffle_shop", 30), ("jaffle_shop_python", 28)])
 def test_load_via_load_via_custom_parser(project_name, nodes_count):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)

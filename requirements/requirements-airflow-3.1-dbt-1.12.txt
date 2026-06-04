@@ -312,7 +312,6 @@ pathspec==0.12.1
 pdbr==0.9.7
 pendulum==3.1.0
 pexpect==4.9.0
-pip==23.0.1
 platformdirs==4.5.1
 pluggy==1.6.0
 ply==3.11
@@ -475,7 +474,6 @@ wcwidth==0.5.3
 websocket-client==1.8.0
 websockets==15.0.1
 werkzeug==2.3.8
-wheel==0.45.1
 wirerope==1.0.0
 wrapt==1.17.3
 yarl==1.20.1

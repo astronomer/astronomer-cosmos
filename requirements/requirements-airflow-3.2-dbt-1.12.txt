@@ -287,7 +287,6 @@ parsedatetime==2.6
 pathlib-abc==0.5.2
 pathspec==0.12.1
 pendulum==3.2.0
-pip==23.0.1
 platformdirs==4.9.4
 pluggy==1.6.0
 prometheus-client==0.24.1
@@ -398,7 +397,6 @@ watchfiles==1.1.1
 watchtower==3.4.0
 websocket-client==1.9.0
 websockets==16.0
-wheel==0.45.1
 wirerope==1.0.0
 wrapt==1.17.3
 yarl==1.23.0

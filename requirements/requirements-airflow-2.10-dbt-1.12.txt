@@ -291,7 +291,6 @@ paradime-io==4.17.0
 parsedatetime==2.6
 pathspec==0.12.1
 pendulum==3.0.0
-pip==23.0.1
 platformdirs==4.5.1
 pluggy==1.5.0
 ply==3.11
@@ -399,7 +398,6 @@ watchtower==3.2.0
 websocket-client==1.8.0
 websockets==14.2
 werkzeug==2.2.3
-wheel==0.45.1
 wirerope==0.4.7
 wrapt==1.16.0
 wtforms==3.1.2

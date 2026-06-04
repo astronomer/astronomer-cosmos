@@ -92,7 +92,7 @@ These steps below assume that a bucket named ``dbt-docs-bucket`` already exists.
 Allowing the IAM Role to be Assumed
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Once the IAM role has been created, it can only be used if it allows another role/user to "assume" it. For example, if your Airflow environment has a workload identity ``arn:aws:iam::123456789:role/airflow-production-environment``, your new ``generate-dbt-docs-role`` needs to allow it to be assumed by that workload identity.
+Once the IAM role has been created, it can only be used if it allows another role/user to "assume" it. This is only required if the IAM role that is being created/updated is not the IAM role being used as the workload identity for your Airflow instance. For example, if your Airflow environment has a workload identity ``arn:aws:iam::123456789:role/airflow-production-environment``, your new ``generate-dbt-docs-role`` needs to allow it to be assumed by that workload identity.
 
 This can be done by adding the below JSON to the trust policy for ``generate-dbt-docs-role``.
 

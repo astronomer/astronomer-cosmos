@@ -711,6 +711,34 @@ def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_run():
     assert metadata.arguments == {"select": "my_ephemeral"}
 
 
+def test_create_task_metadata_ephemeral_model_as_empty_operator_in_build_mode():
+    """Ephemeral models render as EmptyOperator even under TestBehavior.BUILD, where they would
+    otherwise be rendered as dbt build tasks."""
+    metadata = create_task_metadata(
+        _ephemeral_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
+    )
+    assert metadata.id == "my_ephemeral_model_build"
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
+    assert metadata.arguments == {}
+
+
+def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_build_in_build_mode():
+    """With the flag disabled under TestBehavior.BUILD, ephemeral models render as dbt build tasks."""
+    metadata = create_task_metadata(
+        _ephemeral_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD, ephemeral_models_as_empty_operator=False),
+    )
+    assert metadata.id == "my_ephemeral_model_build"
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+
+
 @pytest.mark.parametrize(
     "unique_id, resource_type, has_freshness, source_rendering_behavior, expected_id, expected_operator_class",
     [

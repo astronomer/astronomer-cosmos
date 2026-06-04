@@ -675,7 +675,10 @@ def test_create_task_metadata_model_use_task_group(caplog):
     assert metadata.id == "run"
 
 
-def _ephemeral_node():
+def _ephemeral_node(owner=None):
+    config = {"materialized": "ephemeral"}
+    if owner is not None:
+        config["meta"] = {"owner": owner}
     return DbtNode(
         unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_ephemeral",
         resource_type=DbtResourceType.MODEL,
@@ -683,7 +686,7 @@ def _ephemeral_node():
         path_base=Path("."),
         original_file_path=Path("."),
         tags=[],
-        config={"materialized": "ephemeral"},
+        config=config,
     )
 
 
@@ -737,6 +740,18 @@ def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_build_in_buil
     )
     assert metadata.id == "my_ephemeral_model_build"
     assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+
+
+def test_create_task_metadata_ephemeral_empty_operator_inherits_owner():
+    """The ephemeral EmptyOperator inherits the dbt model owner when owner inheritance is enabled (default)."""
+    metadata = create_task_metadata(
+        _ephemeral_node(owner="dbt-owner"),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
+    assert metadata.owner == "dbt-owner"
 
 
 @pytest.mark.parametrize(

@@ -387,7 +387,12 @@ def create_task_metadata(  # noqa: C901
             )
             # EmptyOperator does not accept custom dbt parameters (e.g. profile_args); keep only the display name.
             args = {"task_display_name": args["task_display_name"]} if "task_display_name" in args else {}
-            return TaskMetadata(id=task_id, operator_class=EMPTY_OPERATOR_CLASS_PATH, arguments=args)
+            return TaskMetadata(
+                id=task_id,
+                owner=node.owner if render_config.enable_owner_inheritance else "",
+                operator_class=EMPTY_OPERATOR_CLASS_PATH,
+                arguments=args,
+            )
 
         if render_config.test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
             if node.fqn and len(node.fqn) > 0:

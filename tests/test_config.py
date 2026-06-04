@@ -278,6 +278,11 @@ def test_render_config_source_rendering_behavior_none_warns_and_normalizes():
     assert config.source_rendering_behavior == SourceRenderingBehavior.NONE
 
 
+def test_render_config_ephemeral_models_as_empty_operator_defaults_to_true():
+    """Ephemeral models are rendered as EmptyOperator by default."""
+    assert RenderConfig().ephemeral_models_as_empty_operator is True
+
+
 @pytest.mark.parametrize(
     "execution_mode, invocation_mode, expectation",
     [

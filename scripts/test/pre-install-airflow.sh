@@ -60,7 +60,6 @@ else
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
   uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0" apache-airflow==$AIRFLOW_VERSION
-  uv pip install dbt-loom
 
   # Delete the no longer needed constraint file
   rm /tmp/constraint.txt
@@ -87,5 +86,9 @@ else
 fi
 
 # Installation of dbt in a separate Python virtual environment:
+# Cap dbt-core below 2.0. Previously dbt-loom (installed here) held dbt-core in
+# the 1.x range; with dbt-loom moved to the dedicated loom job, the bound is
+# explicit so `pip install -U` doesn't pull dbt-core 2.0 (Fusion), which lacks
+# the postgres adapter the subprocess tests rely on.
 python -m venv venv-subprocess
-venv-subprocess/bin/pip install -U dbt-postgres dbt-loom
+venv-subprocess/bin/pip install -U "dbt-core<2.0" dbt-postgres

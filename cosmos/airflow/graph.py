@@ -366,6 +366,34 @@ def create_task_metadata(  # noqa: C901
         # `AIRFLOW__COSMOS__PRE_DBT_FUSION=1`.
         models_select_key = "models" if settings.pre_dbt_fusion else "select"
 
+        if node.has_ephemeral_materialization and render_config.ephemeral_models_as_empty_operator:
+            # Ephemeral models are inlined as CTEs into downstream models and never written to the
+            # warehouse, so running them via a dbt operator (whether `dbt run` or `dbt build`) is a
+            # no-op. Render them as empty operators while keeping the node in the graph so the
+            # dependency chain passing through it is preserved. This check sits before the
+            # TestBehavior.BUILD branch so it is honored regardless of the test behavior.
+            is_build = (
+                render_config.test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES
+            )
+            task_id, args = _get_task_id_and_args(
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=render_config.normalize_task_id,
+                normalize_task_display_name=render_config.normalize_task_display_name,
+                resource_suffix=resource_suffix,
+                include_resource_type=is_build,
+                execution_mode=execution_mode,
+            )
+            # EmptyOperator does not accept custom dbt parameters (e.g. profile_args); keep only the display name.
+            args = {"task_display_name": args["task_display_name"]} if "task_display_name" in args else {}
+            return TaskMetadata(
+                id=task_id,
+                owner=node.owner if render_config.enable_owner_inheritance else "",
+                operator_class=EMPTY_OPERATOR_CLASS_PATH,
+                arguments=args,
+            )
+
         if render_config.test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"

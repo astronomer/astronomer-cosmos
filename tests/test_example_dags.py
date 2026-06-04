@@ -31,7 +31,7 @@ IGNORED_DAG_FILES = [
 ]
 
 # cross_project_manifest_dag.py runs dbt subprocesses that need dbt-loom.
-# When dbt-loom isn't installed, the dedicated Run-Integration-Tests-DBT-Loom
+# When dbt-loom isn't installed, the dedicated Run-Integration-Tests-dbt-Loom
 # CI job covers this DAG instead.
 if importlib.util.find_spec("dbt_loom") is None:
     IGNORED_DAG_FILES.append("cross_project_manifest_dag.py")

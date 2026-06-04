@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from airflow.models.dag import DAG  # type: ignore[assignment]
+from airflow.models.dag import DAG
 
 from cosmos.converter import DbtToAirflowConverter, airflow_kwargs, specific_kwargs
 

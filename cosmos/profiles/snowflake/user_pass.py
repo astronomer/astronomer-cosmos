@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class SnowflakeUserPasswordProfileMapping(SnowflakeBaseProfileMapping):
     """
     Maps Airflow Snowflake connections to dbt profiles if they use a user/password.
-    https://docs.getdbt.com/reference/warehouse-setups/snowflake-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/snowflake-setup
     https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
     """
 
@@ -43,6 +43,7 @@ class SnowflakeUserPasswordProfileMapping(SnowflakeBaseProfileMapping):
         "host": "extra.host",
         "port": "extra.port",
         "query_tag": "extra.query_tag",
+        "insecure_mode": "extra.insecure_mode",
     }
 
     def can_claim_connection(self) -> bool:

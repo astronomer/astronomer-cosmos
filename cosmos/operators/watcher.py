@@ -352,7 +352,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try:
             self.base_cmd = ["source", "freshness"]
             self.indirect_selection = None  # ``dbt source freshness`` does not support --indirect-selection
-            self.full_refresh = False  # type: ignore[assignment]  # ``dbt source freshness`` does not support --full-refresh
+            self.full_refresh = False
             self.dbt_cmd_flags = []  # clear build-specific flags (e.g. --resource-type)
             full_cmd, env = self.build_cmd(context=context, cmd_flags=self.add_cmd_flags())
             context["_check_source_freshness"] = True  # type: ignore[typeddict-unknown-key]
@@ -478,7 +478,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             raise
 
 
-class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type: ignore[misc]
+class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunLocalOperator.template_fields  # type: ignore[operator]
 
     def __init__(
@@ -525,7 +525,7 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         if settings.enable_uri_xcom:
             context["ti"].xcom_push(key="uri", value=outlet_uris)
 
-    def execute(self, context: Context, **kwargs: Any) -> None:  # type: ignore[override]
+    def execute(self, context: Context, **kwargs: Any) -> None:
         super().execute(context, **kwargs)
         # If we reach here without deferring, the model succeeded — emit datasets
         self._emit_datasets(context)
@@ -547,7 +547,7 @@ class DbtBuildWatcherOperator:
         )
 
 
-class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):  # type: ignore[misc]
+class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):
     """
     Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
     """
@@ -558,7 +558,7 @@ class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):  # type: i
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  # type: ignore[misc]
+class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):
     """
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """
@@ -566,7 +566,7 @@ class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  #
     template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
 
 
-class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):  # type: ignore[misc]
+class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):
     """Watches for source freshness results from the producer task.
 
     When the producer has ``_check_source_freshness`` enabled it runs
@@ -593,7 +593,7 @@ class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):  # t
         )
         resource_name = self.model_unique_id.split(".", 2)[2]
         cmd_flags = ["--select", f"source:{resource_name}"]
-        self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]
+        self.build_and_run_cmd(context, cmd_flags=cmd_flags)
         logger.info("dbt source freshness completed successfully on retry for source '%s'", self.model_unique_id)
         return True
 
@@ -609,7 +609,7 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
         super().__init__(*args, **kwargs)
 
 
-class DbtTestWatcherOperator(DbtConsumerWatcherSensor):  # type: ignore[misc]
+class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
     """Sensor that watches the aggregated test status for a dbt model in watcher execution mode.
 
     The producer task (``DbtProducerWatcherOperator``) collects individual test
@@ -628,7 +628,7 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):  # type: ignore[misc]
     back to running ``dbt test --select <model>`` locally for this specific model.
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
 
     # Hardcode base_cmd = ["test"] (overriding DbtRunMixin inherited via
     # DbtConsumerWatcherSensor) rather than inheriting from DbtTestMixin: due

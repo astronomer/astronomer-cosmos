@@ -24,12 +24,12 @@ except ImportError:
     from airflow.utils.task_group import TaskGroup
 
 from cosmos import settings
+from cosmos.airflow.compatibility import EMPTY_OPERATOR_CLASS_PATH
 from cosmos.config import ExecutionConfig, RenderConfig
 from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
-    EMPTY_OPERATOR_CLASS,
     PRODUCER_WATCHER_DONE_TASK_ID,
     PRODUCER_WATCHER_TASK_ID,
     SUPPORTED_BUILD_RESOURCES,
@@ -418,7 +418,11 @@ def create_task_metadata(  # noqa: C901
                     args = {"task_display_name": args["task_display_name"]}
                 else:
                     args = {}
-                return TaskMetadata(id=task_id, operator_class=EMPTY_OPERATOR_CLASS, arguments=args)
+                return TaskMetadata(
+                    id=task_id,
+                    operator_class=EMPTY_OPERATOR_CLASS_PATH,
+                    arguments=args,
+                )
         else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"
@@ -441,7 +445,7 @@ def create_task_metadata(  # noqa: C901
                 # chain passing through it is preserved. EmptyOperator does not accept custom parameters
                 # (e.g. profile_args), so recreate the args keeping only the display name when present.
                 args = {"task_display_name": args["task_display_name"]} if "task_display_name" in args else {}
-                return TaskMetadata(id=task_id, operator_class=EMPTY_OPERATOR_CLASS, arguments=args)
+                return TaskMetadata(id=task_id, operator_class=EMPTY_OPERATOR_CLASS_PATH, arguments=args)
 
         _override_profile_if_needed(args, node.profile_config_to_override)
 
@@ -798,7 +802,7 @@ def _add_watcher_dependencies(
         )
         for task in node_tasks:
             if hasattr(task, "producer_task_id"):
-                task.producer_task_id = producer_airflow_task.task_id  # type: ignore[union-attr]
+                task.producer_task_id = producer_airflow_task.task_id
             if needs_wait_for_downstream:
                 task.wait_for_downstream = True  # type: ignore[union-attr]
 

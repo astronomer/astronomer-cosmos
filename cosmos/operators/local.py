@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 import jinja2
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.taskinstance import TaskInstance
+from airflow.utils.strings import to_boolean
 from packaging.version import Version
 
 from cosmos.io import _construct_dest_file_path
@@ -70,7 +71,7 @@ except ImportError:
 try:  # Airflow 3
     from airflow.sdk.definitions.asset import Asset
 except (ModuleNotFoundError, ImportError):  # Airflow 2
-    from airflow.datasets import Dataset as Asset  # type: ignore
+    from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
 
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -157,7 +158,7 @@ except (ImportError, ModuleNotFoundError):
         )
 
         @define
-        class OperatorLineage:  # type: ignore
+        class OperatorLineage:  # type: ignore[no-redef]
             inputs: list[str] = list()
             outputs: list[str] = list()
             run_facets: dict[str, str] = dict()
@@ -185,7 +186,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         and does not inherit the current process environment.
     """
 
-    template_fields: Sequence[str] = AbstractDbtBase.template_fields + ("compiled_sql", "freshness")  # type: ignore[operator]
+    template_fields: Sequence[str] = AbstractDbtBase.template_fields + ("compiled_sql", "freshness", "install_deps")  # type: ignore[operator]
     template_fields_renderers = {
         "compiled_sql": "sql",
         "freshness": "json",
@@ -197,7 +198,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         task_id: str,
         profile_config: ProfileConfig,
         invocation_mode: InvocationMode | None = None,
-        install_deps: bool = True,
+        install_deps: bool | str = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
@@ -230,11 +231,26 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # as it can break existing DAGs.
         self.append_env = append_env
 
-        # We should not spend time trying to install deps if the project doesn't have any dependencies
-        self.install_deps = install_deps and has_non_empty_dependencies_file(Path(self.project_dir))
+        # Preserve the raw value (including Jinja templated strings) so Airflow can render the template
+        # field at execution time; the effective boolean is resolved by ``self._should_install_deps()``.
+        # Skip the filesystem probe when deps are explicitly disabled to avoid extra per-task I/O at parse time.
+        self._has_dependencies_file = install_deps is not False and has_non_empty_dependencies_file(
+            Path(self.project_dir)
+        )
+        self.install_deps = install_deps if self._has_dependencies_file else False
         self.copy_dbt_packages = copy_dbt_packages
 
         self.manifest_filepath = manifest_filepath
+
+    def _should_install_deps(self) -> bool:
+        """Resolve the effective ``install_deps`` flag, normalizing a rendered template string to a bool."""
+        if not self._has_dependencies_file:
+            return False
+        value = self.install_deps
+        if isinstance(value, str):
+            # ``to_boolean`` does not strip whitespace, so a rendered " true " would otherwise be False.
+            return bool(to_boolean(value.strip()))
+        return bool(value)
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -321,7 +337,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         remote_conn_id = remote_target_path_conn_id
         if not remote_conn_id:
             target_path_schema = urlparse(target_path_str).scheme
-            remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]
+            remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)
         if remote_conn_id is None:
             logger.info(
                 "Remote target connection not set. Please, configure [cosmos][remote_target_path_conn_id] or set the environment variable AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID"
@@ -330,7 +346,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         _configured_target_path = ObjectStoragePath(target_path_str, conn_id=remote_conn_id)
 
-        if not _configured_target_path.exists():  # type: ignore[no-untyped-call]
+        if not _configured_target_path.exists():
             _configured_target_path.mkdir(parents=True, exist_ok=True)
 
         return _configured_target_path, remote_conn_id
@@ -496,7 +512,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path,
             self.project_dir,
         )
-        should_not_create_dbt_deps_symbolic_link = self.install_deps or self.copy_dbt_packages
+        should_not_create_dbt_deps_symbolic_link = self._should_install_deps() or self.copy_dbt_packages
         create_symlinks(
             Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
         )
@@ -670,7 +686,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
-                if self.install_deps:
+                if self._should_install_deps():
                     self._install_dependencies(
                         tmp_dir_path, flags + self._process_global_flag("--vars", self.vars), env
                     )
@@ -809,7 +825,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     if task.task_id == self.task_id:
                         task.outlets.extend(new_outlets)
                         task.inlets.extend(new_inlets)
-                DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined, call-arg, arg-type]
+                DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined]
                 session.commit()
         else:
             dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
@@ -824,7 +840,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 from airflow.sdk.definitions.asset import AssetAlias
 
                 # This line was necessary in Airflow 3.0.0, but this may become automatic in newer versions
-                self.outlets.append(AssetAlias(dataset_alias_name))  # type: ignore[attr-defined, call-arg, arg-type]
+                self.outlets.append(AssetAlias(dataset_alias_name))  # type: ignore[attr-defined]
                 for outlet in new_outlets:
                     context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)
 
@@ -852,8 +868,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         if openlineage_events_completes is not None:
             for completed in openlineage_events_completes:
-                [inputs.append(input_) for input_ in completed.inputs if input_ not in inputs]  # type: ignore
-                [outputs.append(output) for output in completed.outputs if output not in outputs]  # type: ignore
+                for input_ in completed.inputs:
+                    if input_ not in inputs:
+                        inputs.append(input_)
+                for output in completed.outputs:
+                    if output not in outputs:
+                        outputs.append(output)
                 run_facets = {**run_facets, **completed.run.facets}
                 job_facets = {**job_facets, **completed.job.facets}
         else:
@@ -902,8 +922,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self.subprocess_hook.send_sigterm()
 
 
-class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):  # type: ignore[misc]
-    template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields  # type: ignore[operator]
+class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
+    template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
@@ -1000,7 +1020,7 @@ class DbtLSLocalOperator(DbtLSMixin, DbtLocalBaseOperator):
     Executes a dbt core ls command.
     """
 
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -1022,7 +1042,7 @@ class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
     Executes a dbt core snapshot command.
     """
 
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -1033,7 +1053,7 @@ class DbtSourceLocalOperator(DbtSourceMixin, DbtLocalBaseOperator):
     Executes a dbt source freshness command.
     """
 
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields
 
     def __init__(self, *args: Any, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -1085,7 +1105,7 @@ class DbtTestLocalOperator(DbtTestMixin, DbtLocalBaseOperator):
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
     """
 
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields
 
     def __init__(
         self,
@@ -1151,7 +1171,7 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
     Use the `callback` parameter to specify a callback function to run after the command completes.
     """
 
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields
 
     ui_color = "#8194E0"
     required_files = ["index.html", "manifest.json", "catalog.json"]
@@ -1176,7 +1196,7 @@ class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
     Abstract class for operators that upload the generated documentation to cloud storage.
     """
 
-    template_fields: Sequence[str] = DbtDocsLocalOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtDocsLocalOperator.template_fields
 
     def __init__(
         self,
@@ -1373,7 +1393,7 @@ class DbtDepsLocalOperator(DbtLocalBaseOperator):
 
 
 class DbtCompileLocalOperator(DbtCompileMixin, DbtLocalBaseOperator):
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs["should_upload_compiled_sql"] = True
@@ -1385,7 +1405,7 @@ class DbtCloneLocalOperator(DbtCloneMixin, DbtLocalBaseOperator):
     Executes a dbt core clone command.
     """
 
-    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

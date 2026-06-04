@@ -9,14 +9,6 @@ from packaging.version import Version
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
-# The EmptyOperator import path changed in Airflow 3: it moved to the standard provider. The legacy
-# ``airflow.operators.empty`` path still works in Airflow 3 but emits a DeprecatedImportWarning.
-EMPTY_OPERATOR_CLASS = (
-    "airflow.operators.empty.EmptyOperator"
-    if AIRFLOW_VERSION < Version("3.0")
-    else "airflow.providers.standard.operators.empty.EmptyOperator"
-)
-
 # dbt materialization for models that are inlined as a CTE into downstream models and never written to the warehouse.
 DBT_EPHEMERAL_MATERIALIZATION = "ephemeral"
 
@@ -156,7 +148,7 @@ class SourceRenderingBehavior(Enum):
     WITH_TESTS_OR_FRESHNESS = "with_tests_or_freshness"
 
 
-class DbtResourceType(aenum.Enum):  # type: ignore
+class DbtResourceType(aenum.Enum):  # type: ignore[misc]
     """
     Type of dbt node.
     """
@@ -169,7 +161,7 @@ class DbtResourceType(aenum.Enum):  # type: ignore
     EXPOSURE = "exposure"
 
     @classmethod
-    def _missing_value_(cls, value):  # type: ignore
+    def _missing_value_(cls, value):  # type: ignore[no-untyped-def]
         aenum.extend_enum(cls, value.upper(), value.lower())
         return getattr(DbtResourceType, value.upper())
 

@@ -18,6 +18,7 @@ except ImportError:
     from airflow.operators.empty import EmptyOperator
     from airflow.utils.task_group import TaskGroup
 
+from cosmos.airflow.compatibility import EMPTY_OPERATOR_CLASS_PATH
 from cosmos.airflow.graph import (
     _add_teardown_task,
     _add_watcher_producer_task,
@@ -34,7 +35,6 @@ from cosmos.airflow.graph import (
 )
 from cosmos.config import ProfileConfig, RenderConfig
 from cosmos.constants import (
-    EMPTY_OPERATOR_CLASS,
     SUPPORTED_BUILD_RESOURCES,
     DbtResourceType,
     ExecutionMode,
@@ -693,7 +693,7 @@ def test_create_task_metadata_ephemeral_model_as_empty_operator_by_default():
         _ephemeral_node(), execution_mode=ExecutionMode.LOCAL, args={}, dbt_dag_task_group_identifier=""
     )
     assert metadata.id == "my_ephemeral_run"
-    assert metadata.operator_class == EMPTY_OPERATOR_CLASS
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
     assert metadata.arguments == {}
 
 
@@ -728,7 +728,7 @@ def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_run():
             False,
             SOURCE_RENDERING_BEHAVIOR,
             "my_source_source",
-            EMPTY_OPERATOR_CLASS,
+            EMPTY_OPERATOR_CLASS_PATH,
         ),
         (
             f"{DbtResourceType.SOURCE.value}.my_folder.my_source",

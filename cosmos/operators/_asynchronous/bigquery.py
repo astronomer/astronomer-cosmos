@@ -20,12 +20,12 @@ except ImportError:
 try:  # Airflow 3
     from airflow.sdk.definitions.asset import Asset
 except (ModuleNotFoundError, ImportError):  # Airflow 2
-    from airflow.datasets import Dataset as Asset  # type: ignore
+    from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
 
 try:
     from airflow.sdk.definitions.context import Context  # type: ignore[attr-defined]
 except ImportError:
-    from airflow.utils.context import Context  # type: ignore
+    from airflow.utils.context import Context  # type: ignore[attr-defined]
 from packaging.version import Version
 
 from cosmos import settings
@@ -91,7 +91,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
     ):
         self.project_dir = project_dir
         self.profile_config = profile_config
-        self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore
+        self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore[union-attr]
         self.extra_context = extra_context or {}
         self.configuration: dict[str, Any] = {}
         self.dbt_kwargs = dbt_kwargs or {}
@@ -105,7 +105,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             try:
                 from airflow.sdk.definitions.asset import AssetAlias as DatasetAlias
             except ImportError:
-                from airflow.datasets import DatasetAlias  # type: ignore
+                from airflow.datasets import DatasetAlias  # type: ignore[no-redef]
 
             dag_id = kwargs.get("dag")
             task_group_id = kwargs.get("task_group")
@@ -187,11 +187,11 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         )
 
         object_storage_path = ObjectStoragePath(remote_model_path, conn_id=remote_target_path_conn_id)
-        with object_storage_path.open() as fp:  # type: ignore
+        with object_storage_path.open() as fp:  # type: ignore[no-untyped-call]
             sql = fp.read()
             elapsed_time = time.time() - start_time
             self.log.info("SQL file download completed in %.2f seconds.", elapsed_time)
-            return sql  # type: ignore
+            return sql  # type: ignore[no-any-return]
 
     def execute(self, context: Context, **kwargs: Any) -> None:
         if self.async_context.get("run_id") is None:

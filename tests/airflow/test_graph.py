@@ -18,7 +18,7 @@ except ImportError:
     from airflow.operators.empty import EmptyOperator
     from airflow.utils.task_group import TaskGroup
 
-from cosmos.airflow.compatibility import get_version_aware_operator_class_path
+from cosmos.airflow.compatibility import EMPTY_OPERATOR_CLASS_PATH
 from cosmos.airflow.graph import (
     _add_teardown_task,
     _add_watcher_producer_task,
@@ -692,7 +692,7 @@ def test_create_task_metadata_model_use_task_group(caplog):
             False,
             SOURCE_RENDERING_BEHAVIOR,
             "my_source_source",
-            get_version_aware_operator_class_path(EmptyOperator),
+            EMPTY_OPERATOR_CLASS_PATH,
         ),
         (
             f"{DbtResourceType.SOURCE.value}.my_folder.my_source",

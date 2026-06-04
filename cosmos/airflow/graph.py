@@ -24,7 +24,7 @@ except ImportError:
     from airflow.utils.task_group import TaskGroup
 
 from cosmos import settings
-from cosmos.airflow.compatibility import EmptyOperator, get_version_aware_operator_class_path
+from cosmos.airflow.compatibility import EMPTY_OPERATOR_CLASS_PATH
 from cosmos.config import ExecutionConfig, RenderConfig
 from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
@@ -420,7 +420,7 @@ def create_task_metadata(  # noqa: C901
                     args = {}
                 return TaskMetadata(
                     id=task_id,
-                    operator_class=get_version_aware_operator_class_path(EmptyOperator),
+                    operator_class=EMPTY_OPERATOR_CLASS_PATH,
                     arguments=args,
                 )
         else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT

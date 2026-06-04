@@ -16,12 +16,8 @@ import kubernetes.client as k8s
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
 
-try:
-    from airflow.providers.standard.operators.empty import EmptyOperator
-except ImportError:  # pragma: no cover
-    from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
-
 from cosmos.airflow._override import CosmosKubernetesPodManager
+from cosmos.airflow.compatibility import EmptyOperator
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators._watcher.xcom import (

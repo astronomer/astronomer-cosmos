@@ -13992,7 +13992,7 @@
     },
     "run_started_at": "2026-06-02T11:39:56.177084+00:00",
     "send_anonymous_usage_stats": true,
-    "user_id": "ac50c74f-580d-41e5-8857-d2516fafe985"
+    "user_id": null
   },
   "metrics": {},
   "nodes": {

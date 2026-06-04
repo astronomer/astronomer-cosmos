@@ -2360,7 +2360,7 @@ def test_create_task_metadata_seed_rendering_when_seed_changes_sets_flag():
         render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.WHEN_SEED_CHANGES),
     )
     assert metadata.operator_class == "cosmos.operators.local.DbtSeedLocalOperator"
-    assert metadata.extra_context["uses_seed_change_detection"] is True
+    assert metadata.extra_context["should_run_if_seed_changed"] is True
 
 
 def test_create_task_metadata_seed_rendering_always_no_flag():
@@ -2373,4 +2373,4 @@ def test_create_task_metadata_seed_rendering_always_no_flag():
         render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.ALWAYS),
     )
     assert metadata.operator_class == "cosmos.operators.local.DbtSeedLocalOperator"
-    assert "uses_seed_change_detection" not in metadata.extra_context
+    assert "should_run_if_seed_changed" not in metadata.extra_context

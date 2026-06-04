@@ -138,6 +138,44 @@ def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
     assert node.resource_name == expected_select
 
 
+def test_dbt_node_checksum_computes_sha256_of_seed_file(tmp_path):
+    import hashlib
+
+    content = b"id,name\n1,alice\n"
+    (tmp_path / "my_seed.csv").write_bytes(content)
+    node = DbtNode(
+        unique_id="seed.my_project.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        path_base=tmp_path,
+        original_file_path=Path("my_seed.csv"),
+    )
+    assert node.checksum == hashlib.sha256(content).hexdigest()
+
+
+def test_dbt_node_checksum_is_none_for_non_seed_nodes(tmp_path):
+    (tmp_path / "model.sql").write_text("select 1")
+    node = DbtNode(
+        unique_id="model.my_project.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=tmp_path,
+        original_file_path=Path("model.sql"),
+    )
+    assert node.checksum is None
+
+
+def test_dbt_node_checksum_is_none_when_seed_file_missing(tmp_path):
+    node = DbtNode(
+        unique_id="seed.my_project.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        path_base=tmp_path,
+        original_file_path=Path("does_not_exist.csv"),
+    )
+    assert node.checksum is None
+
+
 def test_dbt_node_meta():
     valid_node = DbtNode(
         unique_id="some-id",

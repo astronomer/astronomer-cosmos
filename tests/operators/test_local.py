@@ -36,7 +36,6 @@ from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMod
 from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
 )
-from cosmos.dbt.seed import _compute_csv_checksum
 from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 from cosmos.operators.local import (
@@ -2584,30 +2583,27 @@ class TestReadTargetSourcesJson:
         assert result is None
 
 
-def _seed_change_extra_context(seed_file, *, manifest_checksum=None):
+def _seed_change_extra_context(*, checksum="current-checksum"):
     return {
-        "uses_seed_change_detection": True,
+        "should_run_if_seed_changed": True,
         "dbt_dag_task_group_identifier": "my_dag",
         "dbt_node_config": {
             "unique_id": "seed.pkg.my_seed",
-            "checksum": manifest_checksum,
-            "file_path": str(seed_file),
+            "checksum": checksum,
         },
     }
 
 
-@patch("cosmos.dbt.seed.Variable")
+@patch("cosmos.cache.Variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
-def test_dbt_seed_local_operator_skips_when_unchanged(mock_build_and_run_cmd, mock_variable, tmp_path, caplog):
-    """When the seed CSV is unchanged, execute() must not run `dbt seed` and must not raise (success)."""
-    seed_file = tmp_path / "my_seed.csv"
-    seed_file.write_text("id,name\n1,alice\n")
-    mock_variable.get.return_value = _compute_csv_checksum(seed_file)  # stored == current
+def test_dbt_seed_local_operator_skips_when_unchanged(mock_build_and_run_cmd, mock_variable, caplog):
+    """When the seed checksum is unchanged, execute() must not run `dbt seed` and must not raise (success)."""
+    mock_variable.get.return_value = "current-checksum"  # stored == current
     operator = DbtSeedLocalOperator(
         profile_config=profile_config,
         task_id="my_seed",
         project_dir="my/dir",
-        extra_context=_seed_change_extra_context(seed_file),
+        extra_context=_seed_change_extra_context(),
     )
     caplog.set_level(logging.INFO)
     operator.execute(context={})
@@ -2616,49 +2612,78 @@ def test_dbt_seed_local_operator_skips_when_unchanged(mock_build_and_run_cmd, mo
     assert "unchanged" in caplog.text
 
 
-@patch("cosmos.dbt.seed.Variable")
+@patch("cosmos.cache.Variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
-def test_dbt_seed_local_operator_runs_and_persists_when_changed(mock_build_and_run_cmd, mock_variable, tmp_path):
-    """When the seed CSV changed, execute() runs `dbt seed` and persists the new checksum."""
-    seed_file = tmp_path / "my_seed.csv"
-    seed_file.write_text("id,name\n1,alice\n")
+def test_dbt_seed_local_operator_runs_and_persists_when_changed(mock_build_and_run_cmd, mock_variable):
+    """When the seed checksum changed, execute() runs `dbt seed` and persists the new checksum."""
     mock_variable.get.return_value = "stale-checksum"  # differs from current
     operator = DbtSeedLocalOperator(
         profile_config=profile_config,
         task_id="my_seed",
         project_dir="my/dir",
-        extra_context=_seed_change_extra_context(seed_file),
+        extra_context=_seed_change_extra_context(),
     )
     operator.execute(context={})
     mock_build_and_run_cmd.assert_called_once()
     mock_variable.set.assert_called_once()
 
 
-@patch("cosmos.dbt.seed.Variable")
+@patch("cosmos.cache.Variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
-def test_dbt_seed_local_operator_full_refresh_bypasses_detection(mock_build_and_run_cmd, mock_variable, tmp_path):
-    """--full-refresh always runs the seed, even when the CSV is unchanged."""
-    seed_file = tmp_path / "my_seed.csv"
-    seed_file.write_text("id,name\n1,alice\n")
-    mock_variable.get.return_value = _compute_csv_checksum(seed_file)  # unchanged
+def test_dbt_seed_local_operator_runs_when_checksum_unresolved(mock_build_and_run_cmd, mock_variable):
+    """When the current checksum could not be resolved, execute() runs the seed without touching Variables."""
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config,
+        task_id="my_seed",
+        project_dir="my/dir",
+        extra_context=_seed_change_extra_context(checksum=None),
+    )
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    mock_variable.get.assert_not_called()
+    mock_variable.set.assert_not_called()
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_full_refresh_bypasses_detection(mock_build_and_run_cmd, mock_variable):
+    """--full-refresh always runs the seed, even when the checksum is unchanged."""
+    mock_variable.get.return_value = "current-checksum"  # unchanged
     operator = DbtSeedLocalOperator(
         profile_config=profile_config,
         task_id="my_seed",
         project_dir="my/dir",
         full_refresh=True,
-        extra_context=_seed_change_extra_context(seed_file),
+        extra_context=_seed_change_extra_context(),
     )
     operator.execute(context={})
     mock_build_and_run_cmd.assert_called_once()
+    mock_variable.get.assert_not_called()
 
 
-@patch("cosmos.dbt.seed.Variable")
+@patch("cosmos.cache.Variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
-def test_dbt_seed_local_operator_runs_normally_without_change_detection(
-    mock_build_and_run_cmd, mock_variable, tmp_path
-):
+def test_dbt_seed_local_operator_runs_normally_without_change_detection(mock_build_and_run_cmd, mock_variable):
     """Without the change-detection flag (ALWAYS), execute() runs `dbt seed` and never touches Variables."""
     operator = DbtSeedLocalOperator(profile_config=profile_config, task_id="my_seed", project_dir="my/dir")
     operator.execute(context={})
     mock_build_and_run_cmd.assert_called_once()
     mock_variable.get.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "full_refresh,expected",
+    [
+        (True, True),
+        (False, False),
+        ("true", True),
+        (" true ", True),  # rendered templates may carry surrounding whitespace
+        ("false", False),
+        ("", False),
+    ],
+)
+def test_dbt_seed_local_operator_is_full_refresh(full_refresh, expected):
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config, task_id="my_seed", project_dir="my/dir", full_refresh=full_refresh
+    )
+    assert operator._is_full_refresh() is expected

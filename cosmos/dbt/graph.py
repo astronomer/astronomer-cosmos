@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import datetime
 import functools
+import hashlib
 import itertools
 import json
 import os
@@ -68,6 +69,23 @@ from cosmos.log import get_logger
 
 logger = get_logger(__name__)
 
+# Read the seed file in fixed-size chunks when checksumming so a large CSV does not have to be loaded
+# into memory all at once.
+_CHECKSUM_READ_CHUNK_SIZE = 1024 * 1024
+
+
+def _calculate_file_checksum(file_path: Path) -> str | None:
+    """Return the SHA256 checksum of a file, streaming it in chunks, or ``None`` if it cannot be read."""
+    digest = hashlib.sha256()
+    try:
+        with open(file_path, "rb") as file:
+            for chunk in iter(lambda: file.read(_CHECKSUM_READ_CHUNK_SIZE), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        logger.warning("Unable to read file `%s` to compute its checksum: %s", file_path, exc)
+        return None
+    return digest.hexdigest()
+
 
 def _normalize_path(path: str | None) -> str:
     """
@@ -106,14 +124,23 @@ class DbtNode:
     has_non_detached_test: bool = False
     downstream: list[str] = field(default_factory=lambda: [])
     fqn: list[str] | None = None
-    # dbt records a content checksum per node in the manifest (e.g. sha256 of a seed's CSV). Used by
-    # SeedRenderingBehavior.WHEN_SEED_CHANGES to detect seed changes. None when loading via dbt ls.
-    checksum: str | None = None
 
     @property
     def file_path(self) -> Path:
         """Combined path to the node's file (path_base / original_file_path)."""
         return self.path_base / self.original_file_path
+
+    @property
+    def checksum(self) -> str | None:
+        """SHA256 checksum of a seed's CSV content, used by ``SeedRenderingBehavior.WHEN_SEED_CHANGES``.
+
+        Although ``manifest.json`` records a checksum per node, we always recompute it from the seed file
+        here so the value is consistent regardless of whether the project was loaded via ``LoadMode.MANIFEST``
+        or ``LoadMode.DBT_LS``. Returns ``None`` for non-seed nodes or when the file cannot be read.
+        """
+        if self.resource_type != DbtResourceType.SEED:
+            return None
+        return _calculate_file_checksum(self.file_path)
 
     @property
     def meta(self) -> dict[str, Any]:
@@ -367,7 +394,6 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                         else False
                     ),
                     fqn=node_dict.get("fqn"),
-                    checksum=(node_dict.get("checksum") or {}).get("checksum"),
                 )
             except (KeyError, TypeError):
                 logger.info("Could not parse following the dbt ls line even though it was a valid JSON `%s`", line)
@@ -417,7 +443,6 @@ def _build_dbt_node_from_manifest_resource(
             is_freshness_effective(node_dict.get("freshness")) if resource_type == DbtResourceType.SOURCE else False
         ),
         fqn=node_dict.get("fqn"),
-        checksum=(node_dict.get("checksum") or {}).get("checksum"),
     )
 
 

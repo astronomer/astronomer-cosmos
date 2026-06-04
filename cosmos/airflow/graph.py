@@ -391,7 +391,7 @@ def create_task_metadata(  # noqa: C901
             if render_config.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES:
                 # Render the seed as usual, but flag the task so the operator skips running
                 # `dbt seed` when the CSV content is unchanged since the last successful run.
-                extra_context["uses_seed_change_detection"] = True
+                extra_context["should_run_if_seed_changed"] = True
 
         if render_config.test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
             if node.fqn and len(node.fqn) > 0:

@@ -13,7 +13,7 @@ from cosmos.constants import _AIRFLOW3_MAJOR_VERSION, AIRFLOW_VERSION
 if AIRFLOW_VERSION.major >= _AIRFLOW3_MAJOR_VERSION:
     try:
         from airflow.providers.standard.operators.empty import EmptyOperator as EmptyOperator
-    except ImportError as exc:
+    except ImportError as exc:  # pragma: no cover
         raise ImportError(
             "Cosmos on Airflow 3 requires `apache-airflow-providers-standard` to import `EmptyOperator`."
         ) from exc

@@ -183,11 +183,21 @@ class DbtNode:
         Splitting with ``maxsplit=2`` preserves that suffix:
         ``model.pkg.my_model.v1`` -> ``my_model.v1``.
 
-        :raises IndexError: if ``unique_id`` does not contain at least two
-            dots. Malformed inputs are surfaced loudly rather than silently
-            mis-parsed.
+        :raises ValueError: if ``unique_id`` does not have the expected
+            ``<resource_type>.<package>.<resource_name>`` shape, i.e. fewer
+            than two dots or any empty segment (e.g. ``model..name``, ``..``,
+            ``model.pkg.``). Malformed inputs are surfaced loudly rather than
+            silently mis-parsed.
         """
-        return unique_id.split(".", 2)[2]
+        # ``maxsplit=2`` caps the result at 3 elements, so a well-formed
+        # unique_id always yields exactly 3 non-empty parts (the versioned/source
+        # suffixes stay attached to the third part).
+        parts = unique_id.split(".", 2)
+        if len(parts) != 3 or not all(parts):
+            raise ValueError(
+                f"Malformed dbt unique_id, expected '<resource_type>.<package>.<resource_name>': {unique_id!r}"
+            )
+        return parts[2]
 
     @property
     def resource_name(self) -> str:

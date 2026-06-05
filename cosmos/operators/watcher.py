@@ -386,7 +386,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         for uid in excluded_ids:
             try:
                 resource_names.add(DbtNode.get_resource_name_from_unique_id(uid))
-            except IndexError:
+            except ValueError:
                 logger.warning("Skipping malformed dbt unique_id while building source-freshness exclude list: %s", uid)
         model_names = sorted(resource_names)
         exclude_str = " ".join(model_names)

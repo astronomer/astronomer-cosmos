@@ -379,12 +379,16 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # "error") that a custom freshness_callback may return.  Without exclusion,
         # dbt would run the model anyway and either overwrite the pre-set XCom status
         # or trigger a race condition with the consumer sensor.
-        # Use the same parsing as DbtNode.resource_name: unique_id.split(".", 2)[2]
-        # This preserves version suffixes (e.g. model.pkg.my_model.v1 -> my_model.v1)
         excluded_ids = [uid for uid, state in node_state_pairs if state not in DBT_SUCCESS_STATUSES]
         if not excluded_ids:
             return
-        model_names = sorted({uid.split(".", 2)[2] for uid in excluded_ids if len(uid.split(".", 2)) == 3})
+        resource_names = set()
+        for uid in excluded_ids:
+            try:
+                resource_names.add(DbtNode.get_resource_name_from_unique_id(uid))
+            except ValueError:
+                logger.warning("Skipping malformed dbt unique_id while building source-freshness exclude list: %s", uid)
+        model_names = sorted(resource_names)
         exclude_str = " ".join(model_names)
         if exclude_str:
             current_exclude = getattr(self, "exclude", None)
@@ -591,7 +595,7 @@ class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):
             self.model_unique_id,
             self.project_dir,
         )
-        resource_name = self.model_unique_id.split(".", 2)[2]
+        resource_name = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = ["--select", f"source:{resource_name}"]
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
         logger.info("dbt source freshness completed successfully on retry for source '%s'", self.model_unique_id)
@@ -658,7 +662,7 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
             try_number,
         )
 
-        model_selector = self.model_unique_id.split(".", 2)[2]
+        model_selector = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = ["--select", model_selector]
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
         logger.info("dbt test completed successfully for model '%s'", self.model_unique_id)

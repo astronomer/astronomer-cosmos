@@ -138,6 +138,22 @@ def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
     assert node.resource_name == expected_select
 
 
+class TestGetResourceNameFromUniqueId:
+    def test_plain_model(self):
+        assert DbtNode.get_resource_name_from_unique_id("model.my_pkg.my_model") == "my_model"
+
+    def test_versioned_model_preserves_version_suffix(self):
+        assert DbtNode.get_resource_name_from_unique_id("model.my_pkg.my_model.v1") == "my_model.v1"
+
+    @pytest.mark.parametrize(
+        "malformed",
+        ["", "foo", "foo.bar", "model..name", "..", "model.pkg.", ".pkg.name"],
+    )
+    def test_malformed_unique_id_raises(self, malformed):
+        with pytest.raises(ValueError):
+            DbtNode.get_resource_name_from_unique_id(malformed)
+
+
 def test_dbt_node_meta():
     valid_node = DbtNode(
         unique_id="some-id",

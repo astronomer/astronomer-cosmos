@@ -640,7 +640,7 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,
             append_env=True,
-            outlets=[Dataset(name="manual_outlet__run_dataset")],
+            outlets=[Dataset(uri="manual_outlet__run_dataset")],
         )
 
         run_operator_alias = DbtRunLocalOperator(

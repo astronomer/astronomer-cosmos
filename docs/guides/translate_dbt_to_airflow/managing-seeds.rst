@@ -7,12 +7,11 @@ Managing seeds
     ``SeedRenderingBehavior`` is available for cosmos >= 1.15.0.
 
 By default, Cosmos renders every dbt seed and runs ``dbt seed`` on each DAG run. In many production pipelines,
-seeds change rarely, so re-running them on every execution is unnecessary. You can control this behaviour using the
+seeds change rarely, so re-running them on every execution is unnecessary. You can control this behavior using the
 ``seed_rendering_behavior`` field in the ``RenderConfig`` object. This is how it works:
 
 - **always** (default): Cosmos renders the seed and runs ``dbt seed`` on every execution. This preserves the
-  original Cosmos behaviour.
-
+  original Cosmos behavior.
 - **when_seed_changes**: Cosmos renders the seed, but only runs ``dbt seed`` when the seed's CSV content has changed
   since the last successful run. When the content is unchanged, the task succeeds without running ``dbt seed``.
 

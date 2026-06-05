@@ -41,9 +41,9 @@ Detecting seed changes
 When ``seed_rendering_behavior`` is set to ``when_seed_changes``, Cosmos computes the seed's content checksum and
 compares it against the checksum recorded after the last successful run:
 
-- The checksum is the SHA256 of the seed's CSV content, always computed from the seed file. Computing it from the
+- The checksum is the SHA256 of the seed's CSV content, computed from the seed file when available. Computing it from the
   file (rather than reading dbt's per-node manifest checksum) keeps change detection consistent whether the project
-  is loaded via ``LoadMode.MANIFEST`` or ``LoadMode.DBT_LS``.
+  is loaded via ``LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
 - The last-seen checksum is persisted as an Airflow Variable, scoped per ``DbtDag``/``DbtTaskGroup`` and seed, so the
   same seed rendered in different DAGs tracks its state independently and one DAG never causes another to skip a seed.
 - Passing ``full_refresh=True`` always runs the seed, bypassing change detection.

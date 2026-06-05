@@ -174,6 +174,22 @@ def test_dbt_node_checksum_is_none_when_seed_file_missing(tmp_path):
         original_file_path=Path("does_not_exist.csv"),
     )
     assert node.checksum is None
+    
+
+class TestGetResourceNameFromUniqueId:
+    def test_plain_model(self):
+        assert DbtNode.get_resource_name_from_unique_id("model.my_pkg.my_model") == "my_model"
+
+    def test_versioned_model_preserves_version_suffix(self):
+        assert DbtNode.get_resource_name_from_unique_id("model.my_pkg.my_model.v1") == "my_model.v1"
+
+    @pytest.mark.parametrize(
+        "malformed",
+        ["", "foo", "foo.bar", "model..name", "..", "model.pkg.", ".pkg.name"],
+    )
+    def test_malformed_unique_id_raises(self, malformed):
+        with pytest.raises(ValueError):
+            DbtNode.get_resource_name_from_unique_id(malformed)
 
 
 def test_dbt_node_meta():

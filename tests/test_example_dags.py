@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 from functools import cache
 from pathlib import Path
@@ -28,6 +29,12 @@ IGNORED_DAG_FILES = [
     "jaffle_shop_watcher_kubernetes.py",
     "cross_project_dbt_ls_dag.py",
 ]
+
+# cross_project_manifest_dag.py runs dbt subprocesses that need dbt-loom.
+# When dbt-loom isn't installed, the dedicated Run-Integration-Tests-dbt-Loom
+# CI job covers this DAG instead.
+if importlib.util.find_spec("dbt_loom") is None:
+    IGNORED_DAG_FILES.append("cross_project_manifest_dag.py")
 
 
 @provide_session

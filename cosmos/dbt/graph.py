@@ -43,6 +43,7 @@ from cosmos.cache import (
 )
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
+    DBT_EPHEMERAL_MATERIALIZATION,
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
     DBT_LOG_PATH_ENVVAR,
@@ -111,6 +112,11 @@ class DbtNode:
     def file_path(self) -> Path:
         """Combined path to the node's file (path_base / original_file_path)."""
         return self.path_base / self.original_file_path
+
+    @property
+    def has_ephemeral_materialization(self) -> bool:
+        """Whether the node is materialized as ephemeral (inlined as a CTE, never written to the warehouse)."""
+        return str(self.config.get("materialized") or "").lower() == DBT_EPHEMERAL_MATERIALIZATION
 
     @property
     def meta(self) -> dict[str, Any]:

@@ -118,6 +118,8 @@ from cosmos.operators.base import (
 
 logger = get_logger(__name__)
 
+_OUTPUT_ONLY_TEMPLATE_FIELDS: tuple[str, ...] = ("compiled_sql", "freshness")
+
 
 def _read_target_sources_json(project_root: Path) -> dict[str, Any] | None:
     """Parse ``target/sources.json`` under ``project_root`` if the file exists."""
@@ -192,6 +194,17 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         "freshness": "json",
     }
     _process_log_line_callable: Callable[[str, Any], None] | None = None
+
+    def _warn_on_output_only_fields(self, kwargs: dict[str, Any]) -> None:
+        """Warn when output-only template fields are passed directly to local operators."""
+        for field in _OUTPUT_ONLY_TEMPLATE_FIELDS:
+            if field in kwargs:
+                logger.warning(
+                    "The '%s' argument passed to %s will be overwritten at runtime; "
+                    "it is an output-only template field.",
+                    field,
+                    self.__class__.__name__,
+                )
 
     def __init__(
         self,
@@ -306,23 +319,22 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if not self.should_store_compiled_sql:
             return
 
-        compiled_queries = {}
-        # dbt compiles sql files and stores them in the target directory
+        # Build a list of chunks and join once at the end. The previous implementation accumulated with `+=`,
+        # which is O(n^2) in the total compiled output and was the largest per-task allocation for wide projects.
+        parts: list[str] = []
         for folder_path, _, file_paths in os.walk(os.path.join(tmp_project_dir, "target")):
             for file_path in file_paths:
                 if not file_path.endswith(".sql"):
                     continue
 
                 compiled_sql_path = Path(os.path.join(folder_path, file_path))
-                compiled_sql = compiled_sql_path.read_text(encoding="utf-8")
-
+                compiled_sql = compiled_sql_path.read_text(encoding="utf-8").strip()
                 relative_path = str(compiled_sql_path.relative_to(tmp_project_dir))
-                compiled_queries[relative_path] = compiled_sql.strip()
+                parts.append(f"-- {relative_path}\n{compiled_sql}")
 
-        for name, query in compiled_queries.items():
-            self.compiled_sql += f"-- {name}\n{query}\n\n"
-
-        self.compiled_sql = self.compiled_sql.strip()
+        # Trailing .strip() preserves the previous behavior: if a compiled .sql file is empty,
+        # its chunk ends with a trailing newline, which would otherwise leak to the last entry.
+        self.compiled_sql = "\n\n".join(parts).strip()
 
     @staticmethod
     def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tuple[None, None]:
@@ -937,6 +949,8 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
         operator_args = {*inspect.signature(BaseOperator.__init__).parameters.keys()}
 
         default_args = kwargs.get("default_args", {})
+
+        self._warn_on_output_only_fields(kwargs)
 
         for arg in operator_args:
             try:

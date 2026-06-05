@@ -323,10 +323,16 @@ def test_old_snowflake_format() -> None:
         }
 
 
-# Each entry pairs a Snowflake profile mapping with the connection password and Extra
-# fields required to satisfy that mapping's ``required_fields``. ``insecure_mode`` lives in
-# every mapping's ``airflow_param_mapping``, so the tests below run against all of them to
-# guard against a regression slipping into any single mapping.
+# ---------------------------------------------------------------------------
+# Cross-mapping parametrized tests
+#
+# Each entry pairs a profile mapping class with the connection password and
+# extra fields required to satisfy that mapping's ``required_fields``.
+# Running the same assertions across all five mappings guards against a
+# regression slipping into any single class undetected.
+# ---------------------------------------------------------------------------
+
+
 SNOWFLAKE_PROFILE_MAPPINGS = [
     pytest.param(SnowflakeUserPasswordProfileMapping, "my_password", {}, id="user_password"),
     pytest.param(
@@ -356,18 +362,17 @@ SNOWFLAKE_PROFILE_MAPPINGS = [
 ]
 
 
-def _build_snowflake_conn(password: str | None, extra_fields: dict, insecure_mode: bool | None = None) -> Connection:
-    """Builds a Snowflake connection valid for any of the profile mappings under test."""
+def _build_snowflake_conn(password: str | None, extra_fields: dict, **kwargs) -> Connection:
+    """Build a Snowflake connection valid for any of the profile mappings under test."""
     extra = {
         "account": "my_account",
         "database": "my_database",
         "warehouse": "my_warehouse",
         **extra_fields,
+        **kwargs,
     }
-    if insecure_mode is not None:
-        extra["insecure_mode"] = insecure_mode
     return Connection(
-        conn_id="my_snowflake_insecure_conn",
+        conn_id="my_snowflake_conn",
         conn_type="snowflake",
         login="my_user",
         schema="my_schema",
@@ -400,3 +405,49 @@ def test_insecure_mode_absent_when_not_set(mapping_class, password, extra_fields
     with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
         profile_mapping = mapping_class(conn)
         assert "insecure_mode" not in profile_mapping.profile
+
+
+@pytest.mark.parametrize("mapping_class, password, extra_fields", SNOWFLAKE_PROFILE_MAPPINGS)
+def test_authenticator_from_connection_extra(mapping_class, password, extra_fields) -> None:
+    """authenticator set on the Airflow connection Extra is forwarded to every profile mapping."""
+    conn = _build_snowflake_conn(password, extra_fields, authenticator="externalbrowser")
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = mapping_class(conn)
+        assert profile_mapping.profile["authenticator"] == "externalbrowser"
+
+
+@pytest.mark.parametrize("mapping_class, password, extra_fields", SNOWFLAKE_PROFILE_MAPPINGS)
+def test_authenticator_absent_when_not_set(mapping_class, password, extra_fields) -> None:
+    """authenticator is absent from the profile when not set on the connection."""
+    conn = _build_snowflake_conn(password, extra_fields)
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = mapping_class(conn)
+        assert "authenticator" not in profile_mapping.profile
+
+
+@pytest.mark.parametrize("mapping_class, password, extra_fields", SNOWFLAKE_PROFILE_MAPPINGS)
+def test_client_session_keep_alive_from_connection_extra(mapping_class, password, extra_fields) -> None:
+    """client_session_keep_alive set on the Airflow connection Extra is forwarded to every profile mapping."""
+    conn = _build_snowflake_conn(password, extra_fields, client_session_keep_alive=True)
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = mapping_class(conn)
+        assert profile_mapping.profile["client_session_keep_alive"] is True
+
+
+@pytest.mark.parametrize("mapping_class, password, extra_fields", SNOWFLAKE_PROFILE_MAPPINGS)
+def test_client_session_keep_alive_absent_when_not_set(mapping_class, password, extra_fields) -> None:
+    """client_session_keep_alive is absent from the profile when not set on the connection."""
+    conn = _build_snowflake_conn(password, extra_fields)
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = mapping_class(conn)
+        assert "client_session_keep_alive" not in profile_mapping.profile
+
+
+@pytest.mark.parametrize("mapping_class, password, extra_fields", SNOWFLAKE_PROFILE_MAPPINGS)
+def test_host_and_port_from_connection_extra(mapping_class, password, extra_fields) -> None:
+    """host and port set on the Airflow connection Extra are forwarded to every profile mapping."""
+    conn = _build_snowflake_conn(password, extra_fields, host="my_host.snowflakecomputing.com", port=443)
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = mapping_class(conn)
+        assert profile_mapping.profile["host"] == "my_host.snowflakecomputing.com"
+        assert profile_mapping.profile["port"] == 443

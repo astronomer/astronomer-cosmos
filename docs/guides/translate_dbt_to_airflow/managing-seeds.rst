@@ -38,7 +38,8 @@ Detecting seed changes
 ~~~~~~~~~~~~~~~~~~~~~~
 
 When ``seed_rendering_behavior`` is set to ``when_seed_changes``, Cosmos computes the seed's content checksum and
-compares it against the checksum recorded after the last successful run:
+compares it against the last checksum persisted after a successful run (best-effort: if Cosmos cannot compute or read
+either checksum, it falls back to running the seed):
 
 - The checksum is the SHA256 of the seed's CSV content, computed from the seed file when available. Computing it from the
   file (rather than reading dbt's per-node manifest checksum) keeps change detection consistent whether the project
@@ -46,7 +47,7 @@ compares it against the checksum recorded after the last successful run:
 - The last-seen checksum is persisted as an Airflow Variable, scoped per ``DbtDag``/``DbtTaskGroup`` and seed, so the
   same seed rendered in different DAGs tracks its state independently and one DAG never causes another to skip a seed.
 - Passing ``full_refresh=True`` always runs the seed, bypassing change detection. This path does not update the persisted
-  checksum, so the next non-full-refresh run may still execute once to record it.
+  checksum, so the next non-full-refresh run may run again to record/update it.
 - On a run where the seed is skipped because it is unchanged, the task does not emit its Airflow dataset, since no
   data was loaded.
 

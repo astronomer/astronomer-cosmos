@@ -9,6 +9,7 @@ try:  # Airflow 3
     from airflow.sdk.definitions.asset import AssetAlias as DatasetAlias
 except ImportError:  # Airflow 2
     from airflow.datasets import Dataset
+
     try:
         from airflow.datasets import DatasetAlias
     except ImportError:  # Airflow < 2.10

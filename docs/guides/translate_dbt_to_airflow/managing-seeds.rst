@@ -46,7 +46,8 @@ compares it against the checksum recorded after the last successful run:
   is loaded via ``LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``.
 - The last-seen checksum is persisted as an Airflow Variable, scoped per ``DbtDag``/``DbtTaskGroup`` and seed, so the
   same seed rendered in different DAGs tracks its state independently and one DAG never causes another to skip a seed.
-- Passing ``full_refresh=True`` always runs the seed, bypassing change detection.
+- Passing ``full_refresh=True`` always runs the seed, bypassing change detection. This path does not update the persisted
+  checksum, so the next non-full-refresh run may still execute once to record it.
 - On a run where the seed is skipped because it is unchanged, the task does not emit its Airflow dataset, since no
   data was loaded.
 

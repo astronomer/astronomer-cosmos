@@ -64,7 +64,6 @@ from cosmos.dbt.project import (
     get_partial_parse_path,
     has_non_empty_dependencies_file,
 )
-from cosmos.dbt.resource import get_resource_name_from_unique_id
 from cosmos.dbt.selector import YamlSelectors, select_nodes
 from cosmos.log import get_logger
 
@@ -166,14 +165,38 @@ class DbtNode:
             )
         return operator_kwargs
 
+    @staticmethod
+    def get_resource_name_from_unique_id(unique_id: str) -> str:
+        """
+        Return the ``resource_name`` segment of a dbt node ``unique_id``.
+
+        Per the `dbt manifest spec
+        <https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details>`_,
+        a node ``unique_id`` is ``<resource_type>.<package>.<resource_name>``.
+        Both ``resource_type`` and ``package`` are constrained identifiers that
+        cannot contain dots, so the first two dots are unambiguous separators
+        and everything after the second dot is the full resource name.
+
+        For versioned models, dbt appends a fourth segment:
+        ``model.<package>.<resource_name>.<version>`` (see
+        `node_args.py <https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31>`_).
+        Splitting with ``maxsplit=2`` preserves that suffix:
+        ``model.pkg.my_model.v1`` -> ``my_model.v1``.
+
+        :raises IndexError: if ``unique_id`` does not contain at least two
+            dots. Malformed inputs are surfaced loudly rather than silently
+            mis-parsed.
+        """
+        return unique_id.split(".", 2)[2]
+
     @property
     def resource_name(self) -> str:
         """
         Use this property to retrieve the resource name for command generation, for instance: ["dbt", "run", "--models", f"{resource_name}"].
-        Delegates to :func:`cosmos.dbt.resource.get_resource_name_from_unique_id`, which documents the dbt ``unique_id`` format
+        Delegates to :meth:`get_resource_name_from_unique_id`, which documents the dbt ``unique_id`` format
         (including the versioned-model variant ``model.<package>.<resource_name>.<version>``).
         """
-        return get_resource_name_from_unique_id(self.unique_id)
+        return self.get_resource_name_from_unique_id(self.unique_id)
 
     @property
     def name(self) -> str:

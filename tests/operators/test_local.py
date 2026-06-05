@@ -2719,7 +2719,7 @@ def test_dbt_seed_local_operator_is_full_refresh(full_refresh, expected):
         profile_config=profile_config, task_id="my_seed", project_dir="my/dir", full_refresh=full_refresh
     )
     assert operator._is_full_refresh() is expected
-    
+
 
 def test_dbt_local_operator_warns_on_output_only_template_fields(caplog):
     """Test that passing compiled_sql or freshness to local operators emits a warning."""

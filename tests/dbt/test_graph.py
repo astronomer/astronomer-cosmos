@@ -174,7 +174,7 @@ def test_dbt_node_checksum_is_none_when_seed_file_missing(tmp_path):
         original_file_path=Path("does_not_exist.csv"),
     )
     assert node.checksum is None
-    
+
 
 class TestGetResourceNameFromUniqueId:
     def test_plain_model(self):

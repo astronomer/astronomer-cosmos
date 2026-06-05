@@ -57,7 +57,7 @@ class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInsta
         profile_config: ProfileConfig | None = None,
         remove_on_error: bool = False,
         fail_if_exists: bool = False,
-        registry_conn_id: str | None = None,  # need to add a default for Airflow 2.3 support
+        registry_conn_id: str | None = None,
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config

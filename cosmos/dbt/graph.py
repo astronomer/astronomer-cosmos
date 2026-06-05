@@ -195,14 +195,48 @@ class DbtNode:
             )
         return operator_kwargs
 
+    @staticmethod
+    def get_resource_name_from_unique_id(unique_id: str) -> str:
+        """
+        Return the ``resource_name`` segment of a dbt node ``unique_id``.
+
+        Per the `dbt manifest spec
+        <https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details>`_,
+        a node ``unique_id`` is ``<resource_type>.<package>.<resource_name>``.
+        Both ``resource_type`` and ``package`` are constrained identifiers that
+        cannot contain dots, so the first two dots are unambiguous separators
+        and everything after the second dot is the full resource name.
+
+        For versioned models, dbt appends a fourth segment:
+        ``model.<package>.<resource_name>.<version>`` (see
+        `node_args.py <https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31>`_).
+        Splitting with ``maxsplit=2`` preserves that suffix:
+        ``model.pkg.my_model.v1`` -> ``my_model.v1``.
+
+        :raises ValueError: if ``unique_id`` does not have the expected
+            ``<resource_type>.<package>.<resource_name>`` shape, i.e. fewer
+            than two dots or any empty segment (e.g. ``model..name``, ``..``,
+            ``model.pkg.``). Malformed inputs are surfaced loudly rather than
+            silently mis-parsed.
+        """
+        # ``maxsplit=2`` caps the result at 3 elements, so a well-formed
+        # unique_id always yields exactly 3 non-empty parts (the versioned/source
+        # suffixes stay attached to the third part).
+        parts = unique_id.split(".", 2)
+        if len(parts) != 3 or not all(parts):
+            raise ValueError(
+                f"Malformed dbt unique_id, expected '<resource_type>.<package>.<resource_name>': {unique_id!r}"
+            )
+        return parts[2]
+
     @property
     def resource_name(self) -> str:
         """
         Use this property to retrieve the resource name for command generation, for instance: ["dbt", "run", "--models", f"{resource_name}"].
-        The unique_id format is defined as [<resource_type>.<package>.<resource_name>](https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details).
-        For a special case like a versioned model, the unique_id follows this pattern: [model.<package>.<resource_name>.<version>](https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31)
+        Delegates to :meth:`get_resource_name_from_unique_id`, which documents the dbt ``unique_id`` format
+        (including the versioned-model variant ``model.<package>.<resource_name>.<version>``).
         """
-        return self.unique_id.split(".", 2)[2]
+        return self.get_resource_name_from_unique_id(self.unique_id)
 
     @property
     def name(self) -> str:

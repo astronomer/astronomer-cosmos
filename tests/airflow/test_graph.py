@@ -38,6 +38,7 @@ from cosmos.constants import (
     SUPPORTED_BUILD_RESOURCES,
     DbtResourceType,
     ExecutionMode,
+    SeedRenderingBehavior,
     SourceRenderingBehavior,
     TestBehavior,
     TestIndirectSelection,
@@ -560,6 +561,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "has_test": False,
                     "resource_name": "my_model",
                     "name": "my_model",
+                    "checksum": None,
                 },
                 "package_name": None,
             },
@@ -605,6 +607,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "has_test": False,
                     "resource_name": "my_snapshot",
                     "name": "my_snapshot",
+                    "checksum": None,
                 },
                 "package_name": None,
             },
@@ -2383,3 +2386,70 @@ def test_watcher_dependency_wiring(test_behavior, depends_on_past):
             "tg.dbt_producer_watcher",
             "tg.astro_shop_test",
         }
+
+
+def _seed_node():
+    return DbtNode(
+        unique_id=f"{DbtResourceType.SEED.value}.my_folder.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.AFTER_EACH, TestBehavior.BUILD])
+def test_create_task_metadata_seed_rendering_none(test_behavior):
+    """SeedRenderingBehavior.NONE drops the seed regardless of test behavior (incl. BUILD)."""
+    metadata = create_task_metadata(
+        _seed_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.NONE, test_behavior=test_behavior),
+    )
+    assert metadata is None
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.AFTER_EACH, TestBehavior.BUILD])
+def test_create_task_metadata_seed_rendering_render_only(test_behavior):
+    """RENDER_ONLY renders the seed as an EmptyOperator placeholder, never a dbt seed/build task."""
+    metadata = create_task_metadata(
+        _seed_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(
+            seed_rendering_behavior=SeedRenderingBehavior.RENDER_ONLY, test_behavior=test_behavior
+        ),
+    )
+    assert metadata.id == "my_seed_seed"
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
+
+
+def test_create_task_metadata_seed_rendering_when_seed_changes_sets_flag():
+    """WHEN_SEED_CHANGES renders the normal seed operator and flags change detection in extra_context."""
+    metadata = create_task_metadata(
+        _seed_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.WHEN_SEED_CHANGES),
+    )
+    assert metadata.operator_class == "cosmos.operators.local.DbtSeedLocalOperator"
+    assert metadata.extra_context["should_run_if_seed_changed"] is True
+
+
+def test_create_task_metadata_seed_rendering_always_no_flag():
+    """ALWAYS (default) renders the normal seed operator without the change-detection flag."""
+    metadata = create_task_metadata(
+        _seed_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.ALWAYS),
+    )
+    assert metadata.operator_class == "cosmos.operators.local.DbtSeedLocalOperator"
+    assert "should_run_if_seed_changed" not in metadata.extra_context

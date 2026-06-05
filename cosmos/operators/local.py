@@ -41,7 +41,9 @@ from cosmos._utils.importer import load_method_from_module
 from cosmos.cache import (
     _copy_cached_package_lockfile_to_project,
     _get_latest_cached_package_lockfile,
+    get_seed_checksum,
     is_cache_package_lockfile_enabled,
+    store_seed_checksum,
 )
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
@@ -1049,6 +1051,46 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+
+    def execute(self, context: Context, **kwargs: Any) -> None:
+        # When SeedRenderingBehavior.WHEN_SEED_CHANGES is active (flagged at render time in
+        # create_task_metadata), skip running `dbt seed` if the seed's content is unchanged since the
+        # last successful run. We delegate the actual run to the base execute() so extra_context
+        # merging, debug-mode memory tracking and **kwargs forwarding are preserved. A `--full-refresh`
+        # request always runs the seed, bypassing change detection.
+        extra_context = self.extra_context or {}
+        if not extra_context.get("should_run_if_seed_changed") or self._is_full_refresh():
+            super().execute(context, **kwargs)
+            return
+
+        node_config = extra_context.get("dbt_node_config") or {}
+        dag_task_group_identifier = extra_context.get("dbt_dag_task_group_identifier")
+        unique_id = node_config.get("unique_id")
+        current_seed_checksum = node_config.get("checksum")
+
+        # Change detection needs the seed's current checksum and a scope (DAG/task-group + seed) to store it
+        # under. When both are available, skip the run if the checksum matches the last successful run;
+        # otherwise fall back to always running the seed (change detection is best-effort).
+        if current_seed_checksum and dag_task_group_identifier and unique_id:
+            last_run_seed_checksum = get_seed_checksum(dag_task_group_identifier, unique_id)
+            should_run = last_run_seed_checksum != current_seed_checksum
+            if not should_run:
+                # Return successfully (do NOT raise AirflowSkipException) so downstream models that depend
+                # on the seed are not skip-propagated by the default trigger rule.
+                self.log.info("Seed `%s` is unchanged since its last successful run; skipping `dbt seed`.", unique_id)
+                return
+            super().execute(context, **kwargs)
+            store_seed_checksum(dag_task_group_identifier, unique_id, current_seed_checksum)
+            return
+
+        super().execute(context, **kwargs)
+
+    def _is_full_refresh(self) -> bool:
+        """Return whether --full-refresh is requested, mirroring DbtSeedMixin.add_cmd_flags handling."""
+        if isinstance(self.full_refresh, str):
+            # `to_boolean` does not strip whitespace, so a rendered " true " would otherwise be False.
+            return bool(to_boolean(self.full_refresh.strip()))
+        return bool(self.full_refresh)
 
 
 class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):

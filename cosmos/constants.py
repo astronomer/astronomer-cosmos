@@ -148,6 +148,25 @@ class SourceRenderingBehavior(Enum):
     WITH_TESTS_OR_FRESHNESS = "with_tests_or_freshness"
 
 
+class SeedRenderingBehavior(Enum):
+    """
+    Modes to configure how dbt seed nodes are rendered and run.
+
+    ALWAYS: Render the seed and run ``dbt seed`` on every execution (default, original Cosmos behaviour).
+    WHEN_SEED_CHANGES: Render the seed, but only run ``dbt seed`` when the seed's CSV content has changed
+        since the last successful run. Supported only for execution modes where the Airflow worker can
+        access the seed files directly (LOCAL, VIRTUALENV, AIRFLOW_ASYNC).
+    RENDER_ONLY: Render the seed as a no-op ``EmptyOperator`` placeholder so it remains visible in the
+        DAG topology/lineage, but never run ``dbt seed``.
+    NONE: Do not render the seed in the DAG/TaskGroup at all.
+    """
+
+    ALWAYS = "always"
+    WHEN_SEED_CHANGES = "when_seed_changes"
+    RENDER_ONLY = "render_only"
+    NONE = "none"
+
+
 class DbtResourceType(aenum.Enum):  # type: ignore[misc]
     """
     Type of dbt node.

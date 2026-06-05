@@ -42,10 +42,14 @@ class SnowflakeEncryptedPrivateKeyPemProfileMapping(SnowflakeBaseProfileMapping)
         "warehouse": "extra.warehouse",
         "schema": "schema",
         "role": "extra.role",
+        "authenticator": "extra.authenticator",
+        "host": "extra.host",
+        "port": "extra.port",
         "private_key": "extra.private_key_content",
         "private_key_passphrase": "password",
         "query_tag": "extra.query_tag",
         "insecure_mode": "extra.insecure_mode",
+        "client_session_keep_alive": "extra.client_session_keep_alive",
     }
 
     def can_claim_connection(self) -> bool:

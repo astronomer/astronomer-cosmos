@@ -616,7 +616,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 )
 @pytest.mark.integration
 def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
-    from airflow.dataset import Dataset, DatasetAlias
+    from airflow.datasets import Dataset, DatasetAlias
     from airflow.models.dataset import DatasetAliasModel
     from sqlalchemy.orm.exc import FlushError
 
@@ -635,7 +635,7 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
         run_operator_dataset = DbtRunLocalOperator(
             profile_config=real_profile_config,
             project_dir=DBT_PROJ_DIR,
-            task_id="run_operator_alias",
+            task_id="run_operator_dataset",
             dag=dag,
             dbt_cmd_flags=["--models", "stg_customers"],
             install_deps=True,

@@ -3,7 +3,16 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow import DAG
-from airflow.models.dataset import Dataset, DatasetAlias
+
+try:  # Airflow 3
+    from airflow.sdk.definitions.asset import Asset as Dataset
+    from airflow.sdk.definitions.asset import AssetAlias as DatasetAlias
+except ImportError:  # Airflow 2
+    from airflow.datasets import Dataset
+    try:
+        from airflow.datasets import DatasetAlias
+    except ImportError:  # Airflow < 2.10
+        DatasetAlias = None  # type: ignore[assignment]
 
 from cosmos import (
     DbtRunLocalOperator,
@@ -53,15 +62,18 @@ with DAG("example_outlets", start_date=datetime(2024, 1, 1), catchup=False) as d
         outlets=[Dataset("stg_customers__dataset")],
     )
 
-    run_operator__dataset_alias = DbtRunLocalOperator(
-        profile_config=profile_config,
-        project_dir=DBT_PROJ_DIR,
-        task_id="run__dataset_alias",
-        dbt_cmd_flags=["--select", "stg_orders"],
-        install_deps=True,
-        append_env=True,
-        emit_datasets=True,
-        outlets=[DatasetAlias("stg_orders__dataset_alias")],
-    )
+    if DatasetAlias is not None:
+        run_operator__dataset_alias = DbtRunLocalOperator(
+            profile_config=profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run__dataset_alias",
+            dbt_cmd_flags=["--select", "stg_orders"],
+            install_deps=True,
+            append_env=True,
+            emit_datasets=True,
+            outlets=[DatasetAlias("stg_orders__dataset_alias")],
+        )
 
-    [seed_operator, seed_raw_orders] >> run_operator__dataset >> run_operator__dataset_alias
+        [seed_operator, seed_raw_orders] >> run_operator__dataset >> run_operator__dataset_alias
+    else:
+        [seed_operator, seed_raw_orders] >> run_operator__dataset

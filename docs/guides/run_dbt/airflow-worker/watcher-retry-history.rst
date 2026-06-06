@@ -52,15 +52,15 @@ Does the Airflow state match dbt's?
        The consumer tasks for those models are marked successful instead of running their fallback
        retry, so the DAG appears successful even though dbt failed.
    * - **1.14.1**
-     - **Mostly**, except upstream-failure-skipped downstream nodes could produce a "false
-       green" — fixed in 1.14.2 by
-       `#2684 <https://github.com/astronomer/astronomer-cosmos/pull/2684>`_.
+     - **Yes**.
    * - **1.14.2**
      - **Yes**. Same as 1.14.1, plus a previously unreported "false green" gap is closed:
        when a model fails on its first attempt and dbt skips downstream nodes via the
-       ``upstream_failure`` path, those downstream models are now re-run when their upstream
-       recovers via consumer fallback, instead of being silently marked SKIPPED while the DAG
-       completes ``success`` with the downstream tables un-materialized
+       ``upstream_failure`` path, those downstream nodes are now rewritten from SKIPPED to
+       **failed** instead of being silently marked successful. The DAG therefore fails rather
+       than completing ``success`` with the tables un-materialized, and Airflow's automatic
+       retries re-run the affected models via consumer fallback — so the whole DAG recovers on
+       retry without any manual intervention
        (`#2684 <https://github.com/astronomer/astronomer-cosmos/pull/2684>`_).
 
 Task-level retry — consumer
@@ -165,7 +165,7 @@ Task-level retry — producer
          same DAG run share one backup key and log ``UniqueViolation`` on every model completion.
    * - **1.14.2**
      - Same as 1.14.1, with both XCom-backup known issues from 1.14.1 fixed. The key generator now
-       sanitises every component to ``[A-Za-z0-9_-]`` — the safest subset across the secrets
+       sanitizes every component to ``[A-Za-z0-9_-]`` — the safest subset across the secrets
        backends Airflow ships with — so ``:`` / ``+`` from default Airflow 3 ``run_id`` formats no
        longer break strict-naming backends
        (`#2629 <https://github.com/astronomer/astronomer-cosmos/pull/2629>`_, closes

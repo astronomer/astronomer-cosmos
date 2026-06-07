@@ -224,17 +224,17 @@ def construct_dataset_uri(namespace: str, name: str) -> str:
         )
         return airflow_2_uri
 
-        if not settings.use_dataset_airflow3_uri_standard:
-            logger.warning(
-                "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs "
-                "(standard used by Cosmos) are no longer accepted. "
-                "Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <%s>. "
-                "Before, with Airflow 2.x, the URI used to be <%s>. "
-                "Please, change any DAGs that were scheduled using the old standard to the new one.",
-                airflow_3_uri,
-                airflow_2_uri,
-            )
-        return airflow_3_uri
+    if not settings.use_dataset_airflow3_uri_standard:
+        logger.warning(
+            "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs "
+            "(standard used by Cosmos) are no longer accepted. "
+            "Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <%s>. "
+            "Before, with Airflow 2.x, the URI used to be <%s>. "
+            "Please, change any DAGs that were scheduled using the old standard to the new one.",
+            airflow_3_uri,
+            airflow_2_uri,
+        )
+    return airflow_3_uri
 
 
 def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict[str, list[str]]:

@@ -1,0 +1,30 @@
+name: 'watcher_upstream_failure_recovery'
+
+config-version: 2
+version: '0.1'
+
+profile: 'default'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets:
+    - "target"
+    - "dbt_modules"
+    - "logs"
+
+require-dbt-version: [">=1.0.0", "<2.0.0"]
+
+# Sequence used by model_flaky.sql to fail on first run and succeed on subsequent
+# runs (see #2698 regression test). Using a project-specific sequence name
+# avoids state leaking from / into watcher_downstream_not_skipped, which uses
+# the same fail-once recipe but tests a different invariant.
+on-run-start:
+  - "CREATE SEQUENCE IF NOT EXISTS {{ target.schema }}._cosmos_recovery_fail_once_seq"
+
+models:
+  watcher_upstream_failure_recovery:
+      +materialized: table

@@ -117,6 +117,70 @@ def test_install_deps_in_empty_dir_becomes_false(tmpdir):
         profile_config=profile_config, task_id="my-task", project_dir=tmpdir, install_deps=True
     )
     assert not dbt_base_operator.install_deps
+    assert not dbt_base_operator._should_install_deps()
+
+
+def test_install_deps_is_a_template_field():
+    """``install_deps`` must be a template field so users can pass Jinja-templated values
+    (e.g. ``"{{ params.install_deps }}"``)."""
+    assert "install_deps" in DbtLocalBaseOperator.template_fields
+
+
+@pytest.mark.parametrize(
+    "rendered_value, expected",
+    [
+        (True, True),
+        (False, False),
+        ("True", True),
+        ("true", True),
+        ("1", True),
+        ("False", False),
+        ("false", False),
+        ("0", False),
+    ],
+)
+def test_should_install_deps_resolves_rendered_template_value(rendered_value, expected):
+    """After Airflow renders ``install_deps`` from a Jinja template, it can be either a real bool
+    (``render_template_as_native_obj=True``) or a bool-like string (default). ``_should_install_deps``
+    must normalize both to a real bool."""
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, install_deps=True
+    )
+    # Simulate Airflow having rendered the templated field on the operator instance.
+    dbt_base_operator.install_deps = rendered_value
+    assert dbt_base_operator._should_install_deps() is expected
+
+
+def test_should_install_deps_false_when_no_dependencies_file(tmpdir):
+    """If the project has no packages.yml / dependencies.yml, ``dbt deps`` is never run regardless of
+    the (possibly templated) ``install_deps`` value."""
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=tmpdir, install_deps="{{ params.install_deps }}"
+    )
+    # Even with a "truthy" string value at runtime, no deps file means we skip.
+    dbt_base_operator.install_deps = "True"
+    assert dbt_base_operator._should_install_deps() is False
+
+
+def test_install_deps_preserves_template_string_when_dependencies_file_exists():
+    """When a dependencies file is present, the operator must preserve the raw template string so
+    Airflow can render it at task execution time."""
+    template = "{{ params.install_deps }}"
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, install_deps=template
+    )
+    assert dbt_base_operator.install_deps == template
+
+
+@patch("cosmos.operators.local.has_non_empty_dependencies_file")
+def test_install_deps_false_skips_dependencies_file_probe(mock_has_deps_file):
+    """When ``install_deps`` is explicitly False, the dependencies-file probe must be skipped to avoid
+    extra per-task filesystem I/O during DAG parsing."""
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, install_deps=False
+    )
+    mock_has_deps_file.assert_not_called()
+    assert dbt_base_operator._should_install_deps() is False
 
 
 def test_dbt_base_operator_add_global_flags() -> None:
@@ -999,32 +1063,60 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     assert "Unable to emit OpenLineage events due to lack of dependencies or data." in caplog.text
 
 
+def _write_target_sql_fixture(tmp_path: Path) -> None:
+    """Create a fake dbt ``target/`` tree with two .sql files and one non-SQL artefact."""
+    compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
+    run_dir = tmp_path / "target" / "run" / "pkg" / "models"
+    compiled_dir.mkdir(parents=True)
+    run_dir.mkdir(parents=True)
+    (compiled_dir / "a.sql").write_text("SELECT 1\n")
+    (run_dir / "b.sql").write_text("SELECT 2\n")
+    # Non-SQL artefact under target/ must be ignored.
+    (tmp_path / "target" / "manifest.json").write_text("{}")
+
+
+def _assert_compiled_sql_aggregated(operator: AbstractDbtLocalBase) -> None:
+    """Verify aggregated ``compiled_sql`` contains both fixture files, excludes non-SQL, and has no trailing blank line."""
+    assert "-- target/compiled/pkg/models/a.sql" in operator.compiled_sql
+    assert "-- target/run/pkg/models/b.sql" in operator.compiled_sql
+    assert "SELECT 1" in operator.compiled_sql
+    assert "SELECT 2" in operator.compiled_sql
+    assert "manifest.json" not in operator.compiled_sql
+    # Invariant: chunks are separated by a blank line and the aggregated string has no
+    # leading or trailing whitespace.
+    assert "\n\n" in operator.compiled_sql
+    assert operator.compiled_sql == operator.compiled_sql.strip()
+
+
 @pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test only applies to Airflow 2")
-def test_store_compiled_sql_airflow2() -> None:
+def test_store_compiled_sql_airflow2(tmp_path: Path) -> None:
+    # should_store_compiled_sql=False is a no-op even when target/ has files.
+    _write_target_sql_fixture(tmp_path)
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=False,
     )
-    # here we just need to call the method to make sure it doesn't raise an exception
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
+    assert dbt_base_operator.compiled_sql == ""
 
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=True,
     )
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
-    # here we call the method and see if it tries to access the context["ti"]
-    # it should, and it should raise a KeyError because we didn't pass in a ti
+    _assert_compiled_sql_aggregated(dbt_base_operator)
+
+    # _override_rtif tries to access context["ti"]; it should raise KeyError when ti is absent.
     with pytest.raises(KeyError):
         dbt_base_operator._override_rtif(
             context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
@@ -1032,30 +1124,34 @@ def test_store_compiled_sql_airflow2() -> None:
 
 
 @pytest.mark.skipif(version.parse(airflow_version).major == 2, reason="Test only applies to Airflow 3")
-def test_store_compiled_sql_airflow3() -> None:
+def test_store_compiled_sql_airflow3(tmp_path: Path) -> None:
+    # should_store_compiled_sql=False is a no-op even when target/ has files.
+    _write_target_sql_fixture(tmp_path)
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=False,
     )
-    # here we just need to call the method to make sure it doesn't raise an exception
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
+    assert dbt_base_operator.compiled_sql == ""
 
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=True,
     )
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
-    # Test Airflow 3 behavior - should set flag
+    _assert_compiled_sql_aggregated(dbt_base_operator)
+
+    # Airflow 3 only flips a flag; Airflow itself re-renders templates post-execute.
     dbt_base_operator._override_rtif(
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
@@ -1314,6 +1410,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
                 "dbt_cmd_flags",
                 "compiled_sql",
                 "freshness",
+                "install_deps",
                 "full_refresh",
             ),
         ),
@@ -1329,6 +1426,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
                 "dbt_cmd_flags",
                 "compiled_sql",
                 "freshness",
+                "install_deps",
                 "full_refresh",
             ),
         ),
@@ -1344,12 +1442,24 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
                 "dbt_cmd_flags",
                 "compiled_sql",
                 "freshness",
+                "install_deps",
                 "full_refresh",
             ),
         ),
         (
             DbtSourceLocalOperator,
-            ("env", "select", "exclude", "selector", "vars", "models", "dbt_cmd_flags", "compiled_sql", "freshness"),
+            (
+                "env",
+                "select",
+                "exclude",
+                "selector",
+                "vars",
+                "models",
+                "dbt_cmd_flags",
+                "compiled_sql",
+                "freshness",
+                "install_deps",
+            ),
         ),
     ],
 )
@@ -2499,7 +2609,131 @@ class TestReadTargetSourcesJson:
         target = tmp_path / "target"
         target.mkdir()
         sources_file = target / "sources.json"
-        sources_file.write_text("not valid json {{{")
+        sources_file.write_text("not valid json {{{{")
 
         result = _read_target_sources_json(tmp_path)
         assert result is None
+
+
+def _seed_change_extra_context(*, checksum="current-checksum"):
+    return {
+        "should_run_if_seed_changed": True,
+        "dbt_dag_task_group_identifier": "my_dag",
+        "dbt_node_config": {
+            "unique_id": "seed.pkg.my_seed",
+            "checksum": checksum,
+        },
+    }
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_skips_when_unchanged(mock_build_and_run_cmd, mock_variable, caplog):
+    """When the seed checksum is unchanged, execute() must not run `dbt seed` and must not raise (success)."""
+    mock_variable.get.return_value = "current-checksum"  # stored == current
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config,
+        task_id="my_seed",
+        project_dir="my/dir",
+        extra_context=_seed_change_extra_context(),
+    )
+    caplog.set_level(logging.INFO)
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_not_called()
+    mock_variable.set.assert_not_called()
+    assert "unchanged" in caplog.text
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_runs_and_persists_when_changed(mock_build_and_run_cmd, mock_variable):
+    """When the seed checksum changed, execute() runs `dbt seed` and persists the new checksum."""
+    mock_variable.get.return_value = "stale-checksum"  # differs from current
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config,
+        task_id="my_seed",
+        project_dir="my/dir",
+        extra_context=_seed_change_extra_context(),
+    )
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    mock_variable.set.assert_called_once()
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_runs_when_checksum_unresolved(mock_build_and_run_cmd, mock_variable):
+    """When the current checksum could not be resolved, execute() runs the seed without touching Variables."""
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config,
+        task_id="my_seed",
+        project_dir="my/dir",
+        extra_context=_seed_change_extra_context(checksum=None),
+    )
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    mock_variable.get.assert_not_called()
+    mock_variable.set.assert_not_called()
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_full_refresh_bypasses_detection(mock_build_and_run_cmd, mock_variable):
+    """--full-refresh always runs the seed, even when the checksum is unchanged."""
+    mock_variable.get.return_value = "current-checksum"  # unchanged
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config,
+        task_id="my_seed",
+        project_dir="my/dir",
+        full_refresh=True,
+        extra_context=_seed_change_extra_context(),
+    )
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    mock_variable.get.assert_not_called()
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_runs_normally_without_change_detection(mock_build_and_run_cmd, mock_variable):
+    """Without the change-detection flag (ALWAYS), execute() runs `dbt seed` and never touches Variables."""
+    operator = DbtSeedLocalOperator(profile_config=profile_config, task_id="my_seed", project_dir="my/dir")
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    mock_variable.get.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "full_refresh,expected",
+    [
+        (True, True),
+        (False, False),
+        ("true", True),
+        (" true ", True),  # rendered templates may carry surrounding whitespace
+        ("false", False),
+        ("", False),
+    ],
+)
+def test_dbt_seed_local_operator_is_full_refresh(full_refresh, expected):
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config, task_id="my_seed", project_dir="my/dir", full_refresh=full_refresh
+    )
+    assert operator._is_full_refresh() is expected
+
+
+def test_dbt_local_operator_warns_on_output_only_template_fields(caplog):
+    """Test that passing compiled_sql or freshness to local operators emits a warning."""
+    from cosmos.operators.local import DbtRunLocalOperator
+
+    with caplog.at_level("WARNING", logger="cosmos.operators.local"):
+        DbtRunLocalOperator(
+            task_id="fake-task",
+            profile_config=profile_config,
+            project_dir="fake-dir",
+            compiled_sql="SELECT 1",
+            freshness="test",
+        )
+
+    assert "compiled_sql" in caplog.text
+    assert "freshness" in caplog.text
+    assert "output-only template field" in caplog.text

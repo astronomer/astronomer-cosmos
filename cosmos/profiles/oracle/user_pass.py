@@ -11,7 +11,7 @@ from ..base import BaseProfileMapping
 class OracleUserPasswordProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Oracle connections using user + password authentication to dbt profiles.
-    https://docs.getdbt.com/reference/warehouse-setups/oracle-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/oracle-setup
     https://airflow.apache.org/docs/apache-airflow-providers-oracle/stable/connections/oracle.html
     """
 

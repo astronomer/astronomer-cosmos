@@ -18,6 +18,7 @@ except ImportError:
     from airflow.operators.empty import EmptyOperator
     from airflow.utils.task_group import TaskGroup
 
+from cosmos.airflow.compatibility import EMPTY_OPERATOR_CLASS_PATH
 from cosmos.airflow.graph import (
     _add_teardown_task,
     _add_watcher_producer_task,
@@ -37,6 +38,7 @@ from cosmos.constants import (
     SUPPORTED_BUILD_RESOURCES,
     DbtResourceType,
     ExecutionMode,
+    SeedRenderingBehavior,
     SourceRenderingBehavior,
     TestBehavior,
     TestIndirectSelection,
@@ -559,6 +561,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "has_test": False,
                     "resource_name": "my_model",
                     "name": "my_model",
+                    "checksum": None,
                 },
                 "package_name": None,
             },
@@ -604,6 +607,7 @@ def test_create_task_metadata_unsupported(caplog):
                     "has_test": False,
                     "resource_name": "my_snapshot",
                     "name": "my_snapshot",
+                    "checksum": None,
                 },
                 "package_name": None,
             },
@@ -674,6 +678,85 @@ def test_create_task_metadata_model_use_task_group(caplog):
     assert metadata.id == "run"
 
 
+def _ephemeral_node(owner=None):
+    config = {"materialized": "ephemeral"}
+    if owner is not None:
+        config["meta"] = {"owner": owner}
+    return DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.my_ephemeral",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config=config,
+    )
+
+
+def test_create_task_metadata_ephemeral_model_as_empty_operator_by_default():
+    """Ephemeral models are rendered as EmptyOperator by default, keeping the task id of the run task."""
+    metadata = create_task_metadata(
+        _ephemeral_node(), execution_mode=ExecutionMode.LOCAL, args={}, dbt_dag_task_group_identifier=""
+    )
+    assert metadata.id == "my_ephemeral_run"
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
+    assert metadata.arguments == {}
+
+
+def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_run():
+    """With the flag disabled, ephemeral models render as regular dbt run tasks."""
+    metadata = create_task_metadata(
+        _ephemeral_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(ephemeral_models_as_empty_operator=False),
+    )
+    assert metadata.id == "my_ephemeral_run"
+    assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
+    assert metadata.arguments == {"select": "my_ephemeral"}
+
+
+def test_create_task_metadata_ephemeral_model_as_empty_operator_in_build_mode():
+    """Ephemeral models render as EmptyOperator even under TestBehavior.BUILD, where they would
+    otherwise be rendered as dbt build tasks."""
+    metadata = create_task_metadata(
+        _ephemeral_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
+    )
+    assert metadata.id == "my_ephemeral_model_build"
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
+    assert metadata.arguments == {}
+
+
+def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_build_in_build_mode():
+    """With the flag disabled under TestBehavior.BUILD, ephemeral models render as dbt build tasks."""
+    metadata = create_task_metadata(
+        _ephemeral_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD, ephemeral_models_as_empty_operator=False),
+    )
+    assert metadata.id == "my_ephemeral_model_build"
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+
+
+def test_create_task_metadata_ephemeral_empty_operator_inherits_owner():
+    """The ephemeral EmptyOperator inherits the dbt model owner when owner inheritance is enabled (default)."""
+    metadata = create_task_metadata(
+        _ephemeral_node(owner="dbt-owner"),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
+    assert metadata.owner == "dbt-owner"
+
+
 @pytest.mark.parametrize(
     "unique_id, resource_type, has_freshness, source_rendering_behavior, expected_id, expected_operator_class",
     [
@@ -691,7 +774,7 @@ def test_create_task_metadata_model_use_task_group(caplog):
             False,
             SOURCE_RENDERING_BEHAVIOR,
             "my_source_source",
-            "airflow.operators.empty.EmptyOperator",
+            EMPTY_OPERATOR_CLASS_PATH,
         ),
         (
             f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
@@ -2271,3 +2354,145 @@ def test_add_watcher_producer_task_passes_freshness_callback_via_setup_operator_
 
     task_metadata = mock_create_task.call_args[0][0]
     assert task_metadata.arguments["freshness_callback"] is my_callback
+
+
+@pytest.mark.parametrize("depends_on_past", [False, True])
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_EACH, TestBehavior.AFTER_ALL])
+def test_watcher_dependency_wiring(test_behavior, depends_on_past):
+    with DAG("test-id", start_date=datetime(2022, 1, 1), default_args={"depends_on_past": depends_on_past}) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    child_2b = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.child2.v2_b",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[parent_node.unique_id],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen3/models/child2_v2.sql"),
+        tags=["nightly"],
+        config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"pool": "custom_pool"}}}},
+        has_test=True,
+        has_non_detached_test=True,
+    )
+    child_2b_test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.child2.test_v2_b",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[child_2b.unique_id],
+        path_base=Path("."),
+        original_file_path=Path("."),
+    )
+
+    build_airflow_graph(
+        nodes={child_2b.unique_id: child_2b, child_2b_test.unique_id: child_2b_test, **sample_nodes},
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=RenderConfig(
+            test_behavior=test_behavior,
+        ),
+        dbt_project_name="astro_shop",
+        task_group=TaskGroup("tg", dag=dag),
+    )
+    if not depends_on_past:
+        assert dag.task_dict["tg.dbt_producer_watcher_done"].upstream_task_ids == {"tg.dbt_producer_watcher"}
+        assert all(task.wait_for_downstream is False for task in dag.tasks)
+        return
+
+    assert all(task.wait_for_downstream is True for task in dag.tasks if task.task_id != "tg.dbt_producer_watcher_done")
+    if test_behavior == TestBehavior.NONE:
+        assert dag.task_dict["tg.dbt_producer_watcher_done"].upstream_task_ids == {
+            "tg.child_run",
+            "tg.dbt_producer_watcher",
+            "tg.child2_v2_run",
+            "tg.child2_v2_b_run",
+        }
+    if test_behavior == TestBehavior.AFTER_EACH:
+        assert dag.task_dict["tg.dbt_producer_watcher_done"].upstream_task_ids == {
+            "tg.child_run",
+            "tg.dbt_producer_watcher",
+            "tg.child2_v2_run",
+            "tg.child2_v2_b.test",
+        }
+    if test_behavior == TestBehavior.AFTER_ALL:
+        assert dag.task_dict["tg.dbt_producer_watcher_done"].upstream_task_ids == {
+            "tg.dbt_producer_watcher",
+            "tg.astro_shop_test",
+        }
+
+
+def _seed_node():
+    return DbtNode(
+        unique_id=f"{DbtResourceType.SEED.value}.my_folder.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.AFTER_EACH, TestBehavior.BUILD])
+def test_create_task_metadata_seed_rendering_none(test_behavior):
+    """SeedRenderingBehavior.NONE drops the seed regardless of test behavior (incl. BUILD)."""
+    metadata = create_task_metadata(
+        _seed_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.NONE, test_behavior=test_behavior),
+    )
+    assert metadata is None
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.AFTER_EACH, TestBehavior.BUILD])
+def test_create_task_metadata_seed_rendering_render_only(test_behavior):
+    """RENDER_ONLY renders the seed as an EmptyOperator placeholder, never a dbt seed/build task."""
+    metadata = create_task_metadata(
+        _seed_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(
+            seed_rendering_behavior=SeedRenderingBehavior.RENDER_ONLY, test_behavior=test_behavior
+        ),
+    )
+    assert metadata.id == "my_seed_seed"
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
+
+
+def test_create_task_metadata_seed_rendering_when_seed_changes_sets_flag():
+    """WHEN_SEED_CHANGES renders the normal seed operator and flags change detection in extra_context."""
+    metadata = create_task_metadata(
+        _seed_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.WHEN_SEED_CHANGES),
+    )
+    assert metadata.operator_class == "cosmos.operators.local.DbtSeedLocalOperator"
+    assert metadata.extra_context["should_run_if_seed_changed"] is True
+
+
+def test_create_task_metadata_seed_rendering_always_no_flag():
+    """ALWAYS (default) renders the normal seed operator without the change-detection flag."""
+    metadata = create_task_metadata(
+        _seed_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.ALWAYS),
+    )
+    assert metadata.operator_class == "cosmos.operators.local.DbtSeedLocalOperator"
+    assert "should_run_if_seed_changed" not in metadata.extra_context

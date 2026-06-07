@@ -153,6 +153,15 @@ If testing for the same Airflow and Python version, next runs of the integration
 
     hatch run tests.py3.11-2.10-1.9:test-integration
 
+Any extra arguments passed after ``test-integration`` are forwarded to ``pytest``. This is convenient for iterating on a single test:
+
+.. code-block:: bash
+
+    hatch run tests.py3.11-2.10-1.9:test-integration -k test_name
+    hatch run tests.py3.11-2.10-1.9:test-integration tests/operators/test_watcher.py::test_name
+
+The same applies to other pytest flags (``-x``, ``-vv``, ``--lf``, ``--pdb``). Note: ``scripts/test/integration.sh`` passes its own ``-k`` exclusion list for k8s and python-models DAGs, so a ``-k`` passed here overrides that exclusion. Setting ``PYTEST_ADDOPTS="-k ..."`` does not work — pytest only honors the last ``-k`` it sees, and the script's ``-k`` wins.
+
 Writing Docs
 ^^^^^^^^^^^^
 

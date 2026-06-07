@@ -13,7 +13,7 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
     """
     Maps Airflow GCP connections to dbt BigQuery profiles if they use a service account keyfile dict/json.
 
-    https://docs.getdbt.com/reference/warehouse-setups/bigquery-setup#service-account-file
+    https://docs.getdbt.com/docs/local/connect-data-platform/bigquery-setup
     https://airflow.apache.org/docs/apache-airflow-providers-google/stable/connections/gcp.html
     """
 
@@ -32,9 +32,9 @@ class GoogleCloudServiceAccountDictProfileMapping(BaseProfileMapping):
     secret_fields = ["private_key_id", "private_key"]
 
     airflow_param_mapping = {
-        "project": "extra.project",
+        "project": ["extra.project", "extra__google_cloud_platform__project"],
         # multiple options for dataset because of older Airflow versions
-        "dataset": "extra.dataset",
+        "dataset": ["extra.dataset", "extra__google_cloud_platform__dataset"],
         # multiple options for keyfile_dict param name because of older Airflow versions
         "keyfile_json": ["extra.keyfile_dict", "keyfile_dict", "extra__google_cloud_platform__keyfile_dict"],
     }

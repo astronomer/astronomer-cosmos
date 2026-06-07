@@ -41,10 +41,10 @@ logger = get_logger(__name__)
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
     """Callback that parses dbt JSON logs from Kubernetes pod output.
 
-    ``tests_per_model``, ``test_results_per_model``, and ``context`` are
-    forwarded by ``CosmosKubernetesPodManager`` via its
-    ``callback_extra_kwargs``, which is spread into every
-    ``progress_callback`` invocation as ``**kwargs``.
+    ``tests_per_model``, ``test_results_per_model``, ``context``, and
+    ``upstream_failure_skipped_ids`` are forwarded by
+    ``CosmosKubernetesPodManager`` via its ``callback_extra_kwargs``, which is
+    spread into every ``progress_callback`` invocation as ``**kwargs``.
     """
 
     @staticmethod
@@ -73,6 +73,7 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
             kwargs,
             tests_per_model=kwargs.get("tests_per_model"),
             test_results_per_model=kwargs.get("test_results_per_model"),
+            upstream_failure_skipped_ids=kwargs.get("upstream_failure_skipped_ids"),
         )
 
 
@@ -95,6 +96,12 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         kwargs["callbacks"] = normalized_callbacks
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
+        # Mutable set populated by the log parser when dbt emits SkippingDetails
+        # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
+        # for those unique_ids are rewritten to "failed" so the consumer sensor
+        # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+        # Mirrors DbtProducerWatcherOperator._upstream_failure_skipped_ids; see #2698.
+        self._upstream_failure_skipped_ids: set[str] = set()
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
@@ -105,6 +112,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
                 "tests_per_model": self._tests_per_model,
                 "test_results_per_model": self._test_results_per_model,
                 "context": self._context,
+                "upstream_failure_skipped_ids": self._upstream_failure_skipped_ids,
             },
         )
 
@@ -126,6 +134,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
         _init_xcom_backup(context)
 
+        self._upstream_failure_skipped_ids.clear()
         self._context = context
 
         try:
@@ -150,7 +159,7 @@ class DbtBuildWatcherKubernetesOperator:
         )
 
 
-class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerWatcherKubernetesSensor):  # type: ignore[misc]
+class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerWatcherKubernetesSensor):
     """
     Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
     """
@@ -161,7 +170,7 @@ class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerWatcherKubernete
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotWatcherKubernetesOperator(DbtSnapshotMixin, DbtConsumerWatcherKubernetesSensor):  # type: ignore[misc]
+class DbtSnapshotWatcherKubernetesOperator(DbtSnapshotMixin, DbtConsumerWatcherKubernetesSensor):
     """
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """
@@ -174,7 +183,7 @@ class DbtSourceWatcherKubernetesOperator(DbtSourceKubernetesOperator):
     Executes a dbt source freshness command, synchronously, as ExecutionMode.LOCAL.
     """
 
-    template_fields: tuple[str, ...] = tuple(DbtSourceKubernetesOperator.template_fields)  # type: ignore[arg-type]
+    template_fields: tuple[str, ...] = tuple(DbtSourceKubernetesOperator.template_fields)
 
 
 class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):

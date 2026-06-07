@@ -203,7 +203,7 @@ class DbtModel:
                     and isinstance(node.args[0], jinja2.nodes.Const)
                     and node.node.name == "var"
                 ):
-                    value += self.dbt_vars[node.args[0].value]  # type: ignore
+                    value += self.dbt_vars[node.args[0].value]
         elif isinstance(first_arg, jinja2.nodes.Const):
             # and add it to the config
             value = first_arg.value

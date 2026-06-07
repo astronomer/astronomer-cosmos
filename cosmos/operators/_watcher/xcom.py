@@ -53,9 +53,25 @@ def _sanitize_key_component(value: str) -> str:
 
 
 def _get_task_group_id(ti: Any) -> str | None:
-    """Extract the task_group_id from a task instance, if available."""
+    """Extract the enclosing task group's id from a task instance, if available.
+
+    Airflow operators expose the parent group via ``task.task_group``, and
+    ``TaskGroup.group_id`` is the canonical identifier on both Airflow 2 and
+    Airflow 3. Direct attribute access is intentional: a previous version of
+    this helper read ``task.task_group_id`` (an attribute that does not exist
+    on operators) via ``getattr`` with a ``None`` default, silently dropping
+    the task-group segment from the XCom backup Variable key and causing every
+    watcher producer in the same DAG run to share one key. See
+    https://github.com/astronomer/astronomer-cosmos/issues/2625.
+    """
     task = getattr(ti, "task", None)
-    return getattr(task, "task_group_id", None) if task else None
+    if task is None:
+        return None
+    # On a bound operator ``task.task_group`` is always a ``TaskGroup``: the
+    # implicit root group (whose ``group_id`` is ``None``) for top-level tasks,
+    # or the enclosing user-defined group otherwise.
+    group_id: str | None = task.task_group.group_id
+    return group_id
 
 
 def _init_xcom_backup(context: Any) -> None:
@@ -69,8 +85,8 @@ def _init_xcom_backup(context: Any) -> None:
     dag_id = ti.dag_id
     run_id = context["run_id"]
     task_group_id = _get_task_group_id(ti)
-    ti._cosmos_xcom_backup_var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)  # type: ignore[attr-defined]
-    ti._cosmos_xcom_backup_buffer = {}  # type: ignore[attr-defined]
+    ti._cosmos_xcom_backup_var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
+    ti._cosmos_xcom_backup_buffer = {}
 
 
 def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:

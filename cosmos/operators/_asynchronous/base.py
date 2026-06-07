@@ -29,7 +29,7 @@ def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
         raise ImportError(f"Error in loading class: {class_path}. Unable to find the specified operator class.") from e
 
 
-class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):  # type: ignore[misc]
+class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):
 
     def __init__(
         self,

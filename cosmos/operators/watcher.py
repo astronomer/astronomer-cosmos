@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import json
+import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -124,20 +126,55 @@ def _default_freshness_callback(
     return [(uid, "skipped") for uid in excludable]
 
 
-class _NullWriter:
-    """Write-only sink that discards all data; used to suppress dbt stdout in DBT_RUNNER mode.
+class _StdoutFilter:
+    """Write-only sink used as ``sys.stdout`` proxy during DBT_RUNNER execution.
 
-    Preferred over ``io.StringIO()`` because StringIO buffers every byte written to it for the
-    lifetime of the context manager. On large projects dbt emits megabytes of JSON log lines,
-    so StringIO would grow unbounded and increase worker memory usage proportionally to project
-    size and verbosity. _NullWriter discards each write immediately with no allocation.
+    Discards lines that parse as JSON (those are dbt's ``--log-format json`` output and are
+    already handled by the registered ``EventMsg`` callback). Forwards every other line to
+    the pre-redirect ``sys.stdout`` so output written to stdout by third-party libraries —
+    e.g. the Snowflake connector's ``Going to open: <URL>`` externalbrowser auth prompt —
+    remains visible in the Airflow task log.
+
+    Forwarding goes directly to the captured stdout (not through ``logger.info``) to avoid
+    the feedback loop that would otherwise occur: any log handler bound to ``sys.stdout`` —
+    which is *this filter* while ``redirect_stdout`` is active — would re-enter ``write``
+    and ``flush`` on every record, either recursing without bound or double-logging the
+    same record into caplog/handlers. In Airflow tasks the captured stdout is the
+    ``StreamLogWriter`` wrapping the task log, so the line still surfaces there.
+
+    Memory footprint stays bounded: only the partial trailing line (no terminating newline
+    yet) is buffered; complete lines are emitted and discarded immediately. This is preferred
+    over ``io.StringIO()``, which would buffer every byte for the lifetime of the context
+    manager and grow proportionally to dbt's verbosity on large projects.
     """
 
+    def __init__(self) -> None:
+        self._buffer = ""
+        # Capture sys.stdout at construction time — this runs *before* ``redirect_stdout``
+        # swaps sys.stdout to this filter, so ``self._target`` points at whatever stdout
+        # the caller had set up (Airflow's StreamLogWriter in tasks, pytest's capture in
+        # tests, the real terminal stdout otherwise).
+        self._target = sys.stdout
+
     def write(self, s: str) -> int:
+        self._buffer += s
+        while "\n" in self._buffer:
+            line, self._buffer = self._buffer.split("\n", 1)
+            self._emit(line)
         return len(s)
 
     def flush(self) -> None:
-        pass
+        if self._buffer:
+            self._emit(self._buffer)
+            self._buffer = ""
+
+    def _emit(self, line: str) -> None:
+        if not line:
+            return
+        try:
+            json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            self._target.write(line + "\n")
 
 
 class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
@@ -197,6 +234,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # Mutable dict populated lazily from the manifest; shared with the log parser.
         self._dataset_namespace: str | None = None
         self._model_outlet_uris: dict[str, list[str]] = {}
+        # Mutable set populated by the log parser when dbt emits SkippingDetails
+        # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
+        # for those unique_ids are rewritten to "failed" so the consumer sensor
+        # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+        # See #2698.
+        self._upstream_failure_skipped_ids: set[str] = set()
 
     def _handle_datasets(self, context: Context) -> None:
         """No-op override: consumer tasks handle their own dataset emission in WATCHER mode."""
@@ -209,6 +252,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             test_results_per_model=self.test_results_per_model,
             model_outlet_uris=self._model_outlet_uris,
             dataset_namespace=self._dataset_namespace,
+            upstream_failure_skipped_ids=self._upstream_failure_skipped_ids,
         )
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> Any:
@@ -235,9 +279,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         backend to push to, so registering a callback would cause it to raise and dbt would emit
         ``GenericExceptionOnRun`` for every node.
 
-        When a callback is registered, dbt's stdout is redirected to a null buffer so that the
+        When a callback is registered, dbt's stdout is wrapped by ``_StdoutFilter`` so that the
         raw ``--log-format json`` lines do not appear in Airflow task logs alongside the
-        human-readable messages already emitted by ``_log_dbt_msg`` inside the callback.
+        human-readable messages already emitted by ``_log_dbt_msg`` inside the callback. The
+        filter forwards any non-JSON line to the task logger so output from third-party
+        libraries written to stdout (e.g. the Snowflake connector's externalbrowser auth URL)
+        remains visible.
 
         The callback is intentionally **not** registered during the source freshness pre-check
         (``context["_check_source_freshness"] is True``).  Registering it there would leave a
@@ -250,7 +297,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             # During the source freshness pre-check suppress raw JSON stdout, but do not register
             # the XCom-pushing callback so it cannot accumulate and duplicate build logs later.
             if context.get("_check_source_freshness"):
-                with contextlib.redirect_stdout(_NullWriter()):
+                with contextlib.redirect_stdout(_StdoutFilter()):
                     return super().run_dbt_runner(command, env, cwd, **kwargs)
 
             extra_kwargs: dict[str, Any] = {"project_dir": cwd, "context": context}
@@ -275,7 +322,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                         callback_error.append(e)
 
             self._dbt_runner_callbacks = [*(self._dbt_runner_callbacks or []), _event_callback]
-            with contextlib.redirect_stdout(_NullWriter()):
+            with contextlib.redirect_stdout(_StdoutFilter()):
                 result = super().run_dbt_runner(command, env, cwd, **kwargs)
             if callback_error:
                 raise callback_error[0]
@@ -305,7 +352,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try:
             self.base_cmd = ["source", "freshness"]
             self.indirect_selection = None  # ``dbt source freshness`` does not support --indirect-selection
-            self.full_refresh = False  # type: ignore[assignment]  # ``dbt source freshness`` does not support --full-refresh
+            self.full_refresh = False
             self.dbt_cmd_flags = []  # clear build-specific flags (e.g. --resource-type)
             full_cmd, env = self.build_cmd(context=context, cmd_flags=self.add_cmd_flags())
             context["_check_source_freshness"] = True  # type: ignore[typeddict-unknown-key]
@@ -332,12 +379,16 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # "error") that a custom freshness_callback may return.  Without exclusion,
         # dbt would run the model anyway and either overwrite the pre-set XCom status
         # or trigger a race condition with the consumer sensor.
-        # Use the same parsing as DbtNode.resource_name: unique_id.split(".", 2)[2]
-        # This preserves version suffixes (e.g. model.pkg.my_model.v1 -> my_model.v1)
         excluded_ids = [uid for uid, state in node_state_pairs if state not in DBT_SUCCESS_STATUSES]
         if not excluded_ids:
             return
-        model_names = sorted({uid.split(".", 2)[2] for uid in excluded_ids if len(uid.split(".", 2)) == 3})
+        resource_names = set()
+        for uid in excluded_ids:
+            try:
+                resource_names.add(DbtNode.get_resource_name_from_unique_id(uid))
+            except ValueError:
+                logger.warning("Skipping malformed dbt unique_id while building source-freshness exclude list: %s", uid)
+        model_names = sorted(resource_names)
         exclude_str = " ".join(model_names)
         if exclude_str:
             current_exclude = getattr(self, "exclude", None)
@@ -399,6 +450,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # Pre-compute the dataset namespace for per-model outlet URI generation.
         self._dataset_namespace = get_dataset_namespace(self.profile_config)
         self._model_outlet_uris.clear()
+        self._upstream_failure_skipped_ids.clear()
 
         task_instance = context.get("ti")
         if task_instance is None:
@@ -430,7 +482,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             raise
 
 
-class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type: ignore[misc]
+class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunLocalOperator.template_fields  # type: ignore[operator]
 
     def __init__(
@@ -477,7 +529,7 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):  # type
         if settings.enable_uri_xcom:
             context["ti"].xcom_push(key="uri", value=outlet_uris)
 
-    def execute(self, context: Context, **kwargs: Any) -> None:  # type: ignore[override]
+    def execute(self, context: Context, **kwargs: Any) -> None:
         super().execute(context, **kwargs)
         # If we reach here without deferring, the model succeeded — emit datasets
         self._emit_datasets(context)
@@ -499,7 +551,7 @@ class DbtBuildWatcherOperator:
         )
 
 
-class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):  # type: ignore[misc]
+class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):
     """
     Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
     """
@@ -510,7 +562,7 @@ class DbtSeedWatcherOperator(DbtSeedMixin, DbtConsumerWatcherSensor):  # type: i
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  # type: ignore[misc]
+class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):
     """
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """
@@ -518,7 +570,7 @@ class DbtSnapshotWatcherOperator(DbtSnapshotMixin, DbtConsumerWatcherSensor):  #
     template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
 
 
-class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):  # type: ignore[misc]
+class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):
     """Watches for source freshness results from the producer task.
 
     When the producer has ``_check_source_freshness`` enabled it runs
@@ -543,9 +595,9 @@ class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):  # t
             self.model_unique_id,
             self.project_dir,
         )
-        resource_name = self.model_unique_id.split(".", 2)[2]
+        resource_name = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = ["--select", f"source:{resource_name}"]
-        self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]
+        self.build_and_run_cmd(context, cmd_flags=cmd_flags)
         logger.info("dbt source freshness completed successfully on retry for source '%s'", self.model_unique_id)
         return True
 
@@ -561,7 +613,7 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
         super().__init__(*args, **kwargs)
 
 
-class DbtTestWatcherOperator(DbtConsumerWatcherSensor):  # type: ignore[misc]
+class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
     """Sensor that watches the aggregated test status for a dbt model in watcher execution mode.
 
     The producer task (``DbtProducerWatcherOperator``) collects individual test
@@ -580,7 +632,7 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):  # type: ignore[misc]
     back to running ``dbt test --select <model>`` locally for this specific model.
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields
 
     # Hardcode base_cmd = ["test"] (overriding DbtRunMixin inherited via
     # DbtConsumerWatcherSensor) rather than inheriting from DbtTestMixin: due
@@ -610,7 +662,7 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):  # type: ignore[misc]
             try_number,
         )
 
-        model_selector = self.model_unique_id.split(".", 2)[2]
+        model_selector = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = ["--select", model_selector]
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
         logger.info("dbt test completed successfully for model '%s'", self.model_unique_id)

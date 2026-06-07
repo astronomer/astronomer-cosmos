@@ -138,6 +138,60 @@ def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
     assert node.resource_name == expected_select
 
 
+def test_dbt_node_checksum_computes_sha256_of_seed_file(tmp_path):
+    import hashlib
+
+    content = b"id,name\n1,alice\n"
+    (tmp_path / "my_seed.csv").write_bytes(content)
+    node = DbtNode(
+        unique_id="seed.my_project.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        path_base=tmp_path,
+        original_file_path=Path("my_seed.csv"),
+    )
+    assert node.checksum == hashlib.sha256(content).hexdigest()
+
+
+def test_dbt_node_checksum_is_none_for_non_seed_nodes(tmp_path):
+    (tmp_path / "model.sql").write_text("select 1")
+    node = DbtNode(
+        unique_id="model.my_project.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=tmp_path,
+        original_file_path=Path("model.sql"),
+    )
+    assert node.checksum is None
+
+
+def test_dbt_node_checksum_is_none_when_seed_file_missing(tmp_path):
+    node = DbtNode(
+        unique_id="seed.my_project.my_seed",
+        resource_type=DbtResourceType.SEED,
+        depends_on=[],
+        path_base=tmp_path,
+        original_file_path=Path("does_not_exist.csv"),
+    )
+    assert node.checksum is None
+
+
+class TestGetResourceNameFromUniqueId:
+    def test_plain_model(self):
+        assert DbtNode.get_resource_name_from_unique_id("model.my_pkg.my_model") == "my_model"
+
+    def test_versioned_model_preserves_version_suffix(self):
+        assert DbtNode.get_resource_name_from_unique_id("model.my_pkg.my_model.v1") == "my_model.v1"
+
+    @pytest.mark.parametrize(
+        "malformed",
+        ["", "foo", "foo.bar", "model..name", "..", "model.pkg.", ".pkg.name"],
+    )
+    def test_malformed_unique_id_raises(self, malformed):
+        with pytest.raises(ValueError):
+            DbtNode.get_resource_name_from_unique_id(malformed)
+
+
 def test_dbt_node_meta():
     valid_node = DbtNode(
         unique_id="some-id",
@@ -233,6 +287,7 @@ def test_dbt_profile_config_to_override():
                 "has_non_detached_test": False,
                 "resource_name": "customers",
                 "name": "customers",
+                "checksum": None,
             },
         ),
         (
@@ -249,6 +304,7 @@ def test_dbt_profile_config_to_override():
                 "has_non_detached_test": False,
                 "resource_name": "customers.v1",
                 "name": "customers_v1",
+                "checksum": None,
             },
         ),
     ],
@@ -955,9 +1011,11 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
     dbt_graph.load_via_dbt_ls()
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     # This test is dependent upon dbt >= 1.5.4
-    assert len(dbt_graph.nodes) == 9
+    assert len(dbt_graph.nodes) == 11
     expected_keys = [
         "model.altered_jaffle_shop.customers",
+        "model.altered_jaffle_shop.ephemeral_customers",
+        "model.altered_jaffle_shop.ephemeral_customers_downstream",
         "model.altered_jaffle_shop.stg_customers",
         "seed.altered_jaffle_shop.raw_customers",
         "test.altered_jaffle_shop.not_null_customers_customer_id.5c9bf9911d",
@@ -984,7 +1042,7 @@ def test_load_via_dbt_ls_with_exclude(postgres_profile_config):
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "project_dir,node_count",
-    [(DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME, 39), (DBT_PROJECTS_ROOT_DIR / "jaffle_shop_python", 28)],
+    [(DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME, 41), (DBT_PROJECTS_ROOT_DIR / "jaffle_shop_python", 28)],
 )
 def test_load_via_dbt_ls_without_exclude(project_dir, node_count, postgres_profile_config):
     project_config = ProjectConfig(dbt_project_path=project_dir)
@@ -1345,7 +1403,7 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate, po
     mock_popen_communicate.assert_called_once()
 
 
-@pytest.mark.parametrize("project_name,nodes_count", [("altered_jaffle_shop", 28), ("jaffle_shop_python", 28)])
+@pytest.mark.parametrize("project_name,nodes_count", [("altered_jaffle_shop", 30), ("jaffle_shop_python", 28)])
 def test_load_via_load_via_custom_parser(project_name, nodes_count):
     project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
     execution_config = ExecutionConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name)
@@ -2365,9 +2423,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
         # Different macOS versions have produced different hashes for this directory. The first value below is a
         # historical macOS-specific hash, while the second matches the Linux hash asserted in the else-branch. We
         # allow both here so that the test is stable across macOS versions and when macOS hashing matches Linux.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "5c1aed937708e585054c874ff8f33fd1")
+        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "39a5f27ad840d837ca9f86515e605ed6")
     else:
-        assert hash_dir == "5c1aed937708e585054c874ff8f33fd1"
+        assert hash_dir == "39a5f27ad840d837ca9f86515e605ed6"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2407,9 +2465,9 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
         # Some macOS versions compute a different directory hash than Linux, while others match the Linux behavior.
         # The first value is the macOS-specific hash; the second value is the Linux hash, which certain macOS versions also produce.
         # We allow both here to keep the test stable across macOS releases, while non-macOS platforms assert only the Linux hash.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "5c1aed937708e585054c874ff8f33fd1")
+        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "39a5f27ad840d837ca9f86515e605ed6")
     else:
-        assert hash_dir == "5c1aed937708e585054c874ff8f33fd1"
+        assert hash_dir == "39a5f27ad840d837ca9f86515e605ed6"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")

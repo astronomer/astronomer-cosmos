@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import datetime
 import functools
+import hashlib
 import itertools
 import json
 import os
@@ -21,7 +22,7 @@ from airflow.models import Variable
 try:
     import orjson
 except ImportError:  # pragma: no cover
-    orjson = None  # type: ignore[assignment]
+    orjson = None
 
 if TYPE_CHECKING:
     try:
@@ -43,6 +44,7 @@ from cosmos.cache import (
 )
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
+    DBT_EPHEMERAL_MATERIALIZATION,
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
     DBT_LOG_PATH_ENVVAR,
@@ -67,6 +69,23 @@ from cosmos.dbt.selector import YamlSelectors, select_nodes
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
+
+# Read the seed file in fixed-size chunks when checksumming so a large CSV does not have to be loaded
+# into memory all at once.
+_CHECKSUM_READ_CHUNK_SIZE = 1024 * 1024
+
+
+def _calculate_file_checksum(file_path: Path) -> str | None:
+    """Return the SHA256 checksum of a file, streaming it in chunks, or ``None`` if it cannot be read."""
+    digest = hashlib.sha256()
+    try:
+        with open(file_path, "rb") as file:
+            for chunk in iter(lambda: file.read(_CHECKSUM_READ_CHUNK_SIZE), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        logger.warning("Unable to read file `%s` to compute its checksum: %s", file_path, exc)
+        return None
+    return digest.hexdigest()
 
 
 def _normalize_path(path: str | None) -> str:
@@ -111,6 +130,23 @@ class DbtNode:
     def file_path(self) -> Path:
         """Combined path to the node's file (path_base / original_file_path)."""
         return self.path_base / self.original_file_path
+
+    @property
+    def checksum(self) -> str | None:
+        """SHA256 checksum of a seed's CSV content, used by ``SeedRenderingBehavior.WHEN_SEED_CHANGES``.
+
+        Although ``manifest.json`` records a checksum per node, we always recompute it from the seed file
+        here so the value is consistent regardless of whether the project was loaded via ``LoadMode.MANIFEST``
+        or ``LoadMode.DBT_LS``. Returns ``None`` for non-seed nodes or when the file cannot be read.
+        """
+        if self.resource_type != DbtResourceType.SEED:
+            return None
+        return _calculate_file_checksum(self.file_path)
+
+    @property
+    def has_ephemeral_materialization(self) -> bool:
+        """Whether the node is materialized as ephemeral (inlined as a CTE, never written to the warehouse)."""
+        return str(self.config.get("materialized") or "").lower() == DBT_EPHEMERAL_MATERIALIZATION
 
     @property
     def meta(self) -> dict[str, Any]:
@@ -159,14 +195,48 @@ class DbtNode:
             )
         return operator_kwargs
 
+    @staticmethod
+    def get_resource_name_from_unique_id(unique_id: str) -> str:
+        """
+        Return the ``resource_name`` segment of a dbt node ``unique_id``.
+
+        Per the `dbt manifest spec
+        <https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details>`_,
+        a node ``unique_id`` is ``<resource_type>.<package>.<resource_name>``.
+        Both ``resource_type`` and ``package`` are constrained identifiers that
+        cannot contain dots, so the first two dots are unambiguous separators
+        and everything after the second dot is the full resource name.
+
+        For versioned models, dbt appends a fourth segment:
+        ``model.<package>.<resource_name>.<version>`` (see
+        `node_args.py <https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31>`_).
+        Splitting with ``maxsplit=2`` preserves that suffix:
+        ``model.pkg.my_model.v1`` -> ``my_model.v1``.
+
+        :raises ValueError: if ``unique_id`` does not have the expected
+            ``<resource_type>.<package>.<resource_name>`` shape, i.e. fewer
+            than two dots or any empty segment (e.g. ``model..name``, ``..``,
+            ``model.pkg.``). Malformed inputs are surfaced loudly rather than
+            silently mis-parsed.
+        """
+        # ``maxsplit=2`` caps the result at 3 elements, so a well-formed
+        # unique_id always yields exactly 3 non-empty parts (the versioned/source
+        # suffixes stay attached to the third part).
+        parts = unique_id.split(".", 2)
+        if len(parts) != 3 or not all(parts):
+            raise ValueError(
+                f"Malformed dbt unique_id, expected '<resource_type>.<package>.<resource_name>': {unique_id!r}"
+            )
+        return parts[2]
+
     @property
     def resource_name(self) -> str:
         """
         Use this property to retrieve the resource name for command generation, for instance: ["dbt", "run", "--models", f"{resource_name}"].
-        The unique_id format is defined as [<resource_type>.<package>.<resource_name>](https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details).
-        For a special case like a versioned model, the unique_id follows this pattern: [model.<package>.<resource_name>.<version>](https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31)
+        Delegates to :meth:`get_resource_name_from_unique_id`, which documents the dbt ``unique_id`` format
+        (including the versioned-model variant ``model.<package>.<resource_name>.<version>``).
         """
-        return self.unique_id.split(".", 2)[2]
+        return self.get_resource_name_from_unique_id(self.unique_id)
 
     @property
     def name(self) -> str:
@@ -200,6 +270,7 @@ class DbtNode:
             "has_non_detached_test": self.has_non_detached_test,
             "resource_name": self.resource_name,
             "name": self.name,
+            "checksum": self.checksum,
         }
 
 

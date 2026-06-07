@@ -75,12 +75,12 @@ def _read_content_via_object_storage(path: str, conn_id: str | None = None) -> A
         with connection_env(conn_id):
             p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
             with p.open("r") as f:  # type: ignore[no-untyped-call]
-                content = f.read()  # type: ignore[no-any-return]
+                content = f.read()
             return content
     else:
         p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
         with p.open("r") as f:  # type: ignore[no-untyped-call]
-            content = f.read()  # type: ignore[no-any-return]
+            content = f.read()
         return content
 
 
@@ -95,7 +95,7 @@ def open_file(path: str, conn_id: str | None = None) -> Any:
     else:
         with open(path) as f:
             content = f.read()
-        return content  # type: ignore[no-any-return]
+        return content
 
 
 def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
@@ -140,7 +140,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     for slug, cfg in projects.items():
         # Simple HTML wrapper to embed the dbt docs UI
         @app.get(f"/{slug}/dbt_docs", response_class=HTMLResponse)
-        def dbt_docs_view(slug_alias: str = slug) -> str:  # type: ignore[no-redef]
+        def dbt_docs_view(slug_alias: str = slug) -> str:
             cfg_local = projects.get(slug_alias, {})
             if not cfg_local.get("dir"):
                 return "<div>dbt Docs are not configured.</div>"
@@ -157,7 +157,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             f"/{slug}/dbt_docs_index.html",
             response_class=HTMLResponse,
         )
-        def dbt_docs_index(slug_alias: str = slug) -> Response:  # type: ignore[no-redef]
+        def dbt_docs_index(slug_alias: str = slug) -> Response:
             # Emit telemetry for dbt docs access
             cfg_local = projects.get(slug_alias, {})
             docs_dir_local = cfg_local.get("dir")
@@ -196,7 +196,10 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError):
                 logger.exception(
-                    f"Cosmos dbt docs error: index read failed for slug={slug_alias}, path={op.join(docs_dir_local, index_local)}, conn_id={conn_id_local}"
+                    "Cosmos dbt docs error: index read failed for slug=%s, path=%s, conn_id=%s",
+                    slug_alias,
+                    op.join(docs_dir_local, index_local),
+                    conn_id_local,
                 )
                 return HTMLResponse(
                     content=(
@@ -209,7 +212,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
 
         # JSON artifacts
         @app.get(f"/{slug}/manifest.json")
-        def manifest(slug_alias: str = slug) -> Response:  # type: ignore[no-redef]
+        def manifest(slug_alias: str = slug) -> Response:
             cfg_local = projects.get(slug_alias, {})
             docs_dir_local = cfg_local.get("dir")
             conn_id_local = cfg_local.get("conn_id")
@@ -229,7 +232,11 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError) as e:
                 logger.exception(
-                    f"Error reading manifest for slug '{slug_alias}', path '{op.join(docs_dir_local, 'manifest.json')}', conn_id '{conn_id_local}': {e}"
+                    "Error reading manifest for slug '%s', path '%s', conn_id '%s': %s",
+                    slug_alias,
+                    op.join(docs_dir_local, "manifest.json"),
+                    conn_id_local,
+                    e,
                 )
                 return JSONResponse(
                     content={
@@ -243,7 +250,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             return JSONResponse(content=json.loads(data))
 
         @app.get(f"/{slug}/catalog.json")
-        def catalog(slug_alias: str = slug) -> Response:  # type: ignore[no-redef]
+        def catalog(slug_alias: str = slug) -> Response:
             cfg_local = projects.get(slug_alias, {})
             docs_dir_local = cfg_local.get("dir")
             conn_id_local = cfg_local.get("conn_id")
@@ -263,7 +270,11 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError) as e:
                 logger.exception(
-                    f"Error reading catalog for slug '{slug_alias}', path '{op.join(docs_dir_local, 'catalog.json')}', conn_id '{conn_id_local}': {e}"
+                    "Error reading catalog for slug '%s', path '%s', conn_id '%s': %s",
+                    slug_alias,
+                    op.join(docs_dir_local, "catalog.json"),
+                    conn_id_local,
+                    e,
                 )
                 return JSONResponse(
                     content={

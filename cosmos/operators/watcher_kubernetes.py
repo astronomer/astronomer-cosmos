@@ -89,7 +89,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
         self._tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
-        self._test_results_per_model: dict[str, list[str]] = {}
+        self._test_results_per_model: dict[str, dict[str, str]] = {}
         # Set in execute() before super().execute() triggers pod_manager. Initialized
         # here so pod_manager never raises AttributeError if accessed before execute().
         self._context: Context | None = None

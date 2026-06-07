@@ -84,6 +84,9 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
         self._tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self._test_results_per_model: dict[str, list[str]] = {}
+        # Set in execute() before super().execute() triggers pod_manager. Initialized
+        # here so pod_manager never raises AttributeError if accessed before execute().
+        self._context: Context | None = None
 
         existing_callbacks = kwargs.get("callbacks")
         if existing_callbacks is None:

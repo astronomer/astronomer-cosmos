@@ -347,23 +347,30 @@ def test_producer_pod_manager_wires_callback_extra_kwargs(mock_manager_cls):
     assert extra["context"] is sentinel_context
 
 
-def test_pod_manager_spreads_callback_extra_kwargs_into_progress_callback():
-    """CosmosKubernetesPodManager forwards _callback_extra_kwargs as **kwargs to each progress_callback invocation."""
+def test_pod_manager_passes_extra_kwargs_only_to_marked_callbacks():
+    """callback_extra_kwargs reach WatcherKubernetesCallback but not unmarked user callbacks (#2543)."""
     from cosmos.airflow._override import CosmosKubernetesPodManager
 
-    callback = MagicMock()
-    callback.progress_callback = MagicMock()
     extra = {"tests_per_model": {"m": ["t"]}, "test_results_per_model": {}, "context": {"ti": MagicMock()}}
-
     manager = CosmosKubernetesPodManager(
         kube_client=MagicMock(),
-        callbacks=[callback],
+        callbacks=[WatcherKubernetesCallback],
         callback_extra_kwargs=extra,
     )
-
     assert manager._callback_extra_kwargs is extra
 
-    # Default when omitted is an empty dict so the spread is safe.
+    # WatcherKubernetesCallback opts in via the marker -> receives the kwargs (same object).
+    assert manager._extra_kwargs_for(WatcherKubernetesCallback) is extra
+
+    # A user-supplied callback without the marker receives nothing, so its progress_callback
+    # (which may not accept Cosmos-only kwargs) is never passed them and cannot raise TypeError.
+    class UserCallback:
+        @staticmethod
+        def progress_callback(*, line, client, mode, container_name, timestamp, pod): ...
+
+    assert manager._extra_kwargs_for(UserCallback) == {}
+
+    # Default when omitted is an empty dict so the spread is always safe.
     bare_manager = CosmosKubernetesPodManager(kube_client=MagicMock())
     assert bare_manager._callback_extra_kwargs == {}
 

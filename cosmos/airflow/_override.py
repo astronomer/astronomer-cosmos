@@ -33,6 +33,21 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
         super().__init__(kube_client=kube_client, callbacks=callbacks)
         self._callback_extra_kwargs = callback_extra_kwargs or {}
 
+    def _extra_kwargs_for(self, callback: Any) -> dict[str, Any]:
+        """Return ``callback_extra_kwargs`` only for callbacks that opt in via the marker.
+
+        Cosmos threads its internal state (``tests_per_model``, ``test_results_per_model``,
+        ``context``, ``upstream_failure_skipped_ids``) to ``WatcherKubernetesCallback``
+        through ``callback_extra_kwargs``. ``DbtProducerWatcherKubernetesOperator`` preserves
+        user-supplied callbacks, which must not receive these Cosmos-only kwargs, or their
+        ``progress_callback`` could raise ``TypeError`` while reading pod logs. Only callbacks
+        marked with ``receives_cosmos_callback_kwargs = True`` (i.e. ``WatcherKubernetesCallback``)
+        are given them.
+        """
+        if getattr(callback, "receives_cosmos_callback_kwargs", False):
+            return self._callback_extra_kwargs
+        return {}
+
     def fetch_container_logs(  # noqa: C901
         self,
         pod: V1Pod,
@@ -134,7 +149,7 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
                                         container_name=container_name,
                                         timestamp=message_timestamp,
                                         pod=pod,
-                                        **self._callback_extra_kwargs,
+                                        **self._extra_kwargs_for(callback),
                                     )
                                 self._log_message(
                                     message_to_log,
@@ -160,7 +175,7 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
                                 container_name=container_name,
                                 timestamp=message_timestamp,
                                 pod=pod,
-                                **self._callback_extra_kwargs,
+                                **self._extra_kwargs_for(callback),
                             )
                         self._log_message(
                             message_to_log, container_name, container_name_log_prefix_enabled, log_formatter

@@ -42,10 +42,16 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
     """Callback that parses dbt JSON logs from Kubernetes pod output.
 
     ``tests_per_model``, ``test_results_per_model``, ``context``, and
-    ``upstream_failure_skipped_ids`` are forwarded by
-    ``CosmosKubernetesPodManager`` via its ``callback_extra_kwargs``, which is
-    spread into every ``progress_callback`` invocation as ``**kwargs``.
+    ``upstream_failure_skipped_ids`` are forwarded by ``CosmosKubernetesPodManager``
+    via its ``callback_extra_kwargs`` and arrive in ``progress_callback`` as ``**kwargs``.
+    The ``receives_cosmos_callback_kwargs`` marker opts this callback in to receiving
+    them; user-supplied callbacks without the marker are not given these Cosmos-only
+    kwargs, so their ``progress_callback`` is not broken.
     """
+
+    # Opts this callback in to receiving callback_extra_kwargs; read by
+    # CosmosKubernetesPodManager._extra_kwargs_for (keep the attribute name in sync).
+    receives_cosmos_callback_kwargs = True
 
     @staticmethod
     def progress_callback(

@@ -83,6 +83,22 @@ The performance improvement comes from:
 - Eliminating repeated dbt initialization for each model
 
 
+Test behavior
+~~~~~~~~~~~~~
+
+By default, ``ExecutionMode.WATCHER_KUBERNETES`` runs tests alongside models via the ``dbt build`` command executed by the producer task (``DbtProducerWatcherKubernetesOperator``) in a single Kubernetes pod.
+
+``TestBehavior.AFTER_EACH`` (the default) renders each model's tests as a ``DbtTestWatcherKubernetesOperator`` — a ``DbtConsumerWatcherKubernetesSensor`` subclass that watches the aggregated test results the producer publishes via XCom, behaving as a real sensor rather than a no-op placeholder. If the sensor is manually cleared from the Airflow UI or retried, it falls back to launching a pod that runs ``dbt test --select <model>`` for that specific model.
+
+``TestBehavior.AFTER_ALL`` renders a single ``DbtTestKubernetesOperator`` that runs ``dbt test`` in a dedicated Kubernetes pod after all models complete.
+
+``TestBehavior.NONE`` disables test tasks.
+
+``TestBehavior.BUILD`` is not exposed by ``ExecutionMode.WATCHER_KUBERNETES``: the build command is already executed by the producer task, so no dedicated build operator is available.
+
+For more details on the watcher test behavior, refer to the :ref:`watcher-execution-mode` documentation.
+
+
 Known limitations
 ~~~~~~~~~~~~~~~~~
 
@@ -158,10 +174,6 @@ Other inherited limitations
 +++++++++++++++++++++++++++
 
 The following limitations from ``ExecutionMode.WATCHER`` also apply to ``ExecutionMode.WATCHER_KUBERNETES``:
-
-- **Individual dbt Operators**: ``DbtSeedWatcherKubernetesOperator``, ``DbtSnapshotWatcherKubernetesOperator``, ``DbtRunWatcherKubernetesOperator``, and ``DbtTestWatcherKubernetesOperator`` are implemented.
-
-- **Test behavior**: ``TestBehavior.AFTER_EACH`` (the default) creates a ``DbtTestWatcherKubernetesOperator`` sensor per model that polls the producer's aggregated test results via XCom. ``TestBehavior.AFTER_ALL`` creates a single ``DbtTestKubernetesOperator`` that runs ``dbt test`` in a dedicated Kubernetes pod after all models complete. ``TestBehavior.NONE`` disables test tasks.
 
 - **Source freshness nodes**: The ``dbt build`` command does not run source freshness checks.
 

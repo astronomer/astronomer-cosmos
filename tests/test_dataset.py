@@ -246,12 +246,20 @@ class TestConstructDatasetUri:
         mock_settings.use_dataset_airflow3_uri_standard = True
         uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
         assert uri == "postgres://host:5432/mydb/public/customers"
-
+  
     @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("3.0.0"))
-    def test_airflow3_uri(self):
+    @patch("cosmos.dataset.settings")
+    def test_airflow3_uri(self, mock_settings):
+        mock_settings.use_dataset_airflow3_uri_standard = False
         uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
         assert uri == "postgres://host:5432/mydb/public/customers"
 
+    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("cosmos.dataset.settings")
+    def test_airflow3_uri_no_warning_when_flag_set(self, mock_settings):
+        mock_settings.use_dataset_airflow3_uri_standard = True
+        uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
+        assert uri == "postgres://host:5432/mydb/public/customers"
 
 # --- Tests for compute_model_outlet_uris ---
 

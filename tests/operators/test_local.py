@@ -2141,6 +2141,18 @@ def test_handle_post_execution_with_mixed_callbacks(
     resolved_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
 
 
+def test_resolve_callback_rejects_path_without_module():
+    with pytest.raises(CosmosValueError, match="Invalid callback import path"):
+        ConcreteDbtLocalBaseOperator._resolve_callback("upload_to_aws_s3")
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+def test_resolve_callback_rejects_non_callable(mock_load_method):
+    mock_load_method.return_value = "not-a-callable"
+    with pytest.raises(CosmosValueError, match="did not resolve to a callable"):
+        ConcreteDbtLocalBaseOperator._resolve_callback("cosmos.io.SOME_CONSTANT")
+
+
 @pytest.mark.integration
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
 @patch("cosmos.operators.local.ObjectStoragePath")

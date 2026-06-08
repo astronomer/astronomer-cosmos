@@ -219,7 +219,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         install_deps: bool | str = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
-        callback: str | Callable[[str], None] | list[str | Callable[[str], None]] | None = None,
+        callback: str | Callable[..., Any] | list[str | Callable[..., Any]] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
@@ -650,10 +650,23 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.callback_args.update({"context": context})
             callbacks = self.callback if isinstance(self.callback, list) else [self.callback]
             for callback_fn in callbacks:
-                if isinstance(callback_fn, str):
-                    module_path, method_name = callback_fn.rsplit(".", 1)
-                    callback_fn = load_method_from_module(module_path, method_name)
-                callback_fn(tmp_project_dir, **self.callback_args)
+                self._resolve_callback(callback_fn)(tmp_project_dir, **self.callback_args)
+
+    @staticmethod
+    def _resolve_callback(callback: str | Callable[..., Any]) -> Callable[..., Any]:
+        """Resolve a callback given as a string import path into a callable. Callables are returned as-is."""
+        if not isinstance(callback, str):
+            return callback
+        if "." not in callback:
+            raise CosmosValueError(
+                f"Invalid callback import path {callback!r}. Use a full import path, "
+                f"for example 'cosmos.io.upload_to_aws_s3'."
+            )
+        module_path, method_name = callback.rsplit(".", 1)
+        resolved = load_method_from_module(module_path, method_name)
+        if not callable(resolved):
+            raise CosmosValueError(f"Callback {callback!r} did not resolve to a callable.")
+        return resolved
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if settings.enable_setup_async_task:

@@ -249,7 +249,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
 
         task = self.context["task_instance"].task
         if not (isinstance(task, self.test_operator_class) or isinstance(task, self.source_operator_class)):
-            self.operator.log.warning(f"Cannot handle dbt warnings for task of type {type(task)}.")
+            self.operator.log.warning("Cannot handle dbt warnings for task of type %s.", type(task))
             return
 
         # Get the logs from the pod
@@ -266,12 +266,12 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         if isinstance(task, self.test_operator_class):
             warn_count = self._detect_standard_warnings(logs_text)
             if warn_count:
-                self.operator.log.info(f"Detected {warn_count} warnings using standard pattern")
+                self.operator.log.info("Detected %s warnings using standard pattern", warn_count)
                 warning_detected = True
         elif isinstance(task, self.source_operator_class):
             source_freshness_warnings = self._detect_source_freshness_warnings(logs_text)
             if source_freshness_warnings:
-                self.operator.log.info(f"Detected {len(source_freshness_warnings)} source freshness warnings")
+                self.operator.log.info("Detected %s source freshness warnings", len(source_freshness_warnings))
                 warning_detected = True
 
         if not warning_detected:

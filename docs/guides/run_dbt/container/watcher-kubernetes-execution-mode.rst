@@ -199,6 +199,8 @@ For detailed setup instructions, refer to the :ref:`kubernetes` documentation.
 Watcher GCP GKE
 ++++++++++++++++
 
+.. versionadded:: 1.15.0
+
 ``ExecutionMode.WATCHER_GCP_GKE`` is the GCP GKE variant of ``ExecutionMode.WATCHER_KUBERNETES``.
 It uses ``GKEStartPodOperator`` instead of ``KubernetesPodOperator`` and requires the same
 additional parameters as :ref:`gcp-gke-execution-mode` (``project_id``, ``location``, ``cluster_name``).

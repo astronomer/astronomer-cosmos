@@ -575,7 +575,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _install_dependencies(
         self, tmp_dir_path: Path, flags: list[str], env: dict[str, str | bytes | os.PathLike[Any]]
     ) -> None:
-        self._cache_package_lockfile(tmp_dir_path)
         deps_command = [self.dbt_executable_path, "deps"] + flags
 
         for filename in DBT_DEPENDENCIES_FILE_NAMES:
@@ -717,6 +716,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
+                self._cache_package_lockfile(tmp_dir_path)
                 if self._should_install_deps():
                     self._install_dependencies(
                         tmp_dir_path, flags + self._process_global_flag("--vars", self.vars), env

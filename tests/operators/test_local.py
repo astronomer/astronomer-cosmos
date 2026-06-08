@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import zlib
@@ -1446,6 +1447,21 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
 
     assert instance.parse.called
     assert "Unable to parse OpenLineage events" in caplog.text
+
+
+def test_dbt_local_artifact_processor_imported_lazily():
+    """Regression: importing ``cosmos.operators.local`` must not eagerly import the openlineage
+    ``DbtLocalArtifactProcessor``; it is imported lazily on first use. Run in a subprocess for a clean import."""
+    code = (
+        "import sys;"
+        "import cosmos.operators.local as m;"
+        "assert m.DbtLocalArtifactProcessor is None, m.DbtLocalArtifactProcessor;"
+        "assert 'openlineage.common.provider.dbt.local' not in sys.modules, 'heavy openlineage module eagerly imported';"
+        "print('OK')"
+    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert "OK" in result.stdout
 
 
 @patch("cosmos.operators.local.DbtLocalBaseOperator._handle_post_execution")

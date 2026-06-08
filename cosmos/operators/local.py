@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import importlib.util
 import inspect
 import json
 import os
@@ -136,15 +137,14 @@ def _read_target_sources_json(project_root: Path) -> dict[str, Any] | None:
         return None
 
 
-# The following is related to the ability of Cosmos parsing dbt artifacts and generating OpenLineage URIs
-# It is used for emitting Airflow assets and not necessarily OpenLineage events
+# Used for parsing dbt artifacts to generate OpenLineage URIs / Airflow assets.
+# ``find_spec`` only checks availability without importing the heavy openlineage client; the actual
+# ``DbtLocalArtifactProcessor`` import is deferred to ``calculate_openlineage_events_completes``.
 try:
-    from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
-
-    is_openlineage_common_available = True
+    is_openlineage_common_available = importlib.util.find_spec("openlineage.common") is not None
 except ModuleNotFoundError:
     is_openlineage_common_available = False
-    DbtLocalArtifactProcessor = None
+DbtLocalArtifactProcessor = None
 
 
 # The following is related to the ability of Airflow to emit OpenLineage events
@@ -772,6 +772,19 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         Return a list of RunEvents
         """
+        # Imported lazily (not at module load) to avoid pulling the heavy openlineage client at DAG parse time.
+        # Cached on the module global so repeat calls and ``@patch``-based tests reuse it.
+        global DbtLocalArtifactProcessor
+        if DbtLocalArtifactProcessor is None:
+            try:
+                from openlineage.common.provider.dbt.local import (
+                    DbtLocalArtifactProcessor as _DbtLocalArtifactProcessor,
+                )
+            except ImportError:
+                logger.debug("openlineage-integration-common is unavailable; skipping OpenLineage event parsing.")
+                return
+            DbtLocalArtifactProcessor = _DbtLocalArtifactProcessor
+
         # Since openlineage-integration-common relies on the profiles definition, we need to make these newly introduced
         # environment variables to the library. As of 1.0.0, DbtLocalArtifactProcessor did not allow passing environment
         # variables as an argument, so we need to inject them to the system environment variables.

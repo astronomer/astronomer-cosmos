@@ -1451,12 +1451,13 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
 
 def test_dbt_local_artifact_processor_imported_lazily():
     """Regression: importing ``cosmos.operators.local`` must not eagerly import the openlineage
-    ``DbtLocalArtifactProcessor``; it is imported lazily on first use. Run in a subprocess for a clean import."""
+    ``DbtLocalArtifactProcessor``; it stays ``None`` until first used. Run in a subprocess for a clean import.
+
+    We assert on Cosmos' own module global rather than ``sys.modules``, since other packages (e.g. the legacy
+    ``openlineage-airflow``) may load ``openlineage.common.provider.dbt.local`` independently of Cosmos."""
     code = (
-        "import sys;"
         "import cosmos.operators.local as m;"
         "assert m.DbtLocalArtifactProcessor is None, m.DbtLocalArtifactProcessor;"
-        "assert 'openlineage.common.provider.dbt.local' not in sys.modules, 'heavy openlineage module eagerly imported';"
         "print('OK')"
     )
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)

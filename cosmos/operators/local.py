@@ -142,7 +142,9 @@ def _read_target_sources_json(project_root: Path) -> dict[str, Any] | None:
 # ``DbtLocalArtifactProcessor`` import is deferred to ``calculate_openlineage_events_completes``.
 try:
     is_openlineage_common_available = importlib.util.find_spec("openlineage.common") is not None
-except ModuleNotFoundError:
+except ImportError:
+    # ImportError (superclass of ModuleNotFoundError) also covers a present-but-broken package, e.g. one
+    # whose parent __init__ fails to import due to missing transitive deps.
     is_openlineage_common_available = False
 DbtLocalArtifactProcessor = None
 
@@ -770,7 +772,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         * {project_dir}/target/manifest.json
         * {project_dir}/target/run_results.json
 
-        Return a list of RunEvents
+        Stores the extracted RunEvents on ``self.openlineage_events_completes``.
         """
         # Imported lazily (not at module load) to avoid pulling the heavy openlineage client at DAG parse time.
         # Cached on the module global so repeat calls and ``@patch``-based tests reuse it.

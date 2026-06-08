@@ -19,7 +19,6 @@ from cosmos import settings
 from cosmos.constants import InvocationMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-from cosmos.log import get_logger
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
     DbtCloneLocalOperator,
@@ -43,7 +42,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 PY_INTERPRETER = "python3"
 LOCK_FILENAME = "cosmos_virtualenv.lock"
-logger = get_logger(__name__)
 
 
 def depends_on_virtualenv_dir(method: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -99,7 +97,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
     ) -> FullOutputSubprocessResult:
         if self._py_bin is not None:
-            self.log.info(f"Using Python binary from virtualenv: {self._py_bin}")
+            self.log.info("Using Python binary from virtualenv: %s", self._py_bin)
             command[0] = str(Path(self._py_bin).parent / "dbt")
         return super().run_subprocess(command, env, cwd, **kwargs)
 
@@ -128,9 +126,9 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
                 )
 
         try:
-            self.log.info(f"Checking if the virtualenv lock {str(self._lock_file)} exists")
+            self.log.info("Checking if the virtualenv lock %s exists", self._lock_file)
             while not self._is_lock_available() and self.max_retries_lock:
-                logger.info("Waiting for virtualenv lock to be released")
+                self.log.info("Waiting for virtualenv lock to be released")
                 time.sleep(1)
                 self.max_retries_lock -= 1
 
@@ -154,7 +152,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         Delete the virtualenv directory if it is temporary.
         """
         if self.is_virtualenv_dir_temporary and self.virtualenv_dir and self.virtualenv_dir.exists():
-            self.log.info(f"Deleting the Python virtualenv {self.virtualenv_dir}")
+            self.log.info("Deleting the Python virtualenv %s", self.virtualenv_dir)
             shutil.rmtree(str(self.virtualenv_dir), ignore_errors=True)
 
     def execute(self, context: Context, **kwargs: Any) -> None:
@@ -168,7 +166,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         self.clean_dir_if_temporary()
 
     def _prepare_virtualenv(self) -> Any:
-        self.log.info(f"Creating or updating the virtualenv at `{self.virtualenv_dir}")
+        self.log.info("Creating or updating the virtualenv at `%s`", self.virtualenv_dir)
         py_bin = prepare_virtualenv(
             venv_directory=str(self.virtualenv_dir),
             python_bin=PY_INTERPRETER,
@@ -193,12 +191,12 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
         if self._lock_file.is_file():
             with open(self._lock_file) as lf:
                 pid = int(lf.read())
-                self.log.info(f"Checking for running process with PID {pid}")
+                self.log.info("Checking for running process with PID %s", pid)
                 try:
                     _process_running = psutil.Process(pid).is_running()
-                    self.log.info(f"Process {pid} running: {_process_running} and has the lock {self._lock_file}.")
+                    self.log.info("Process %s running: %s and has the lock %s.", pid, _process_running, self._lock_file)
                 except psutil.NoSuchProcess:
-                    self.log.info(f"Process {pid} is not running. Lock {self._lock_file} was outdated.")
+                    self.log.info("Process %s is not running. Lock %s was outdated.", pid, self._lock_file)
                     is_available = True
                 else:
                     is_available = not _process_running
@@ -206,17 +204,17 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
 
     @depends_on_virtualenv_dir
     def _acquire_venv_lock(self) -> None:
-        if not self.virtualenv_dir.is_dir():  # type: ignore
+        if not self.virtualenv_dir.is_dir():  # type: ignore[union-attr]
             os.mkdir(str(self.virtualenv_dir))
 
         with open(self._lock_file, "w") as lf:
-            logger.info(f"Acquiring lock at {self._lock_file} with pid {str(self._pid)}")
+            self.log.info("Acquiring lock at %s with pid %s", self._lock_file, self._pid)
             lf.write(str(self._pid))
 
     @depends_on_virtualenv_dir
     def _release_venv_lock(self) -> None:
         if not self._lock_file.is_file():
-            logger.warning(f"Lockfile {self._lock_file} not found, perhaps deleted by other concurrent operator?")
+            self.log.warning("Lockfile %s not found, perhaps deleted by other concurrent operator?", self._lock_file)
             return
 
         with open(self._lock_file) as lf:
@@ -225,10 +223,10 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             if lock_file_pid == self._pid:
                 return self._lock_file.unlink()
 
-            logger.warning(f"Lockfile owned by process of pid {lock_file_pid}, while operator has pid {self._pid}")
+            self.log.warning("Lockfile owned by process of pid %s, while operator has pid %s", lock_file_pid, self._pid)
 
 
-class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):  # type: ignore[misc]
+class DbtBuildVirtualenvOperator(DbtVirtualenvBaseOperator, DbtBuildLocalOperator):
     """
     Executes a dbt core build command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
@@ -244,13 +242,13 @@ class DbtLSVirtualenvOperator(DbtVirtualenvBaseOperator, DbtLSLocalOperator):
     and deleted just after.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
 
-class DbtSeedVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSeedLocalOperator):  # type: ignore[misc]
+class DbtSeedVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSeedLocalOperator):
     """
     Executes a dbt core seed command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
@@ -266,7 +264,7 @@ class DbtSnapshotVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSnapshotLocalO
     command and deleted just after.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -278,13 +276,13 @@ class DbtSourceVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSourceLocalOpera
     command and deleted just after.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
 
-class DbtRunVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunLocalOperator):  # type: ignore[misc]
+class DbtRunVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunLocalOperator):
     """
     Executes a dbt core run command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
@@ -300,13 +298,13 @@ class DbtTestVirtualenvOperator(DbtVirtualenvBaseOperator, DbtTestLocalOperator)
     and deleted just after.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
 
-class DbtRunOperationVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunOperationLocalOperator):  # type: ignore[misc]
+class DbtRunOperationVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunOperationLocalOperator):
     """
     Executes a dbt core run-operation command within a Python Virtual Environment, that is created before running the
     dbt command and deleted just after.
@@ -322,7 +320,7 @@ class DbtDocsVirtualenvOperator(DbtVirtualenvBaseOperator, DbtDocsLocalOperator)
     command and deleted just after.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -333,7 +331,7 @@ class DbtCloneVirtualenvOperator(DbtVirtualenvBaseOperator, DbtCloneLocalOperato
     Executes a dbt core clone command.
     """
 
-    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtVirtualenvBaseOperator.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

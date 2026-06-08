@@ -34,7 +34,7 @@ except ImportError:  # Since Airflow 3.1, BaseHook is in the airflow.sdk.bases.h
     from airflow.hooks.base import BaseHook
 
 
-class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type: ignore
+class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type: ignore[misc]
     """
     Executes a dbt core cli command in a Kubernetes Pod.
     """
@@ -181,7 +181,7 @@ class DbtDocsKubernetesOperator(DbtKubernetesBaseOperator):
     Use the `callback` parameter to specify a callback function to run after the command completes.
     """
 
-    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields
 
     ui_color = "#8194E0"
     required_files = ["index.html", "manifest.json", "catalog.json"]
@@ -207,13 +207,13 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
     the generated documentation to cloud storage *also inside the Pod*.
     """
 
-    template_fields: Sequence[str] = DbtDocsKubernetesOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtDocsKubernetesOperator.template_fields
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
         # In Kubernetes mode, we do NOT use callback-based upload on the Airflow worker.
-        self.callback = None  # type: ignore[assignment]
+        self.callback = None
 
     @abstractmethod
     def build_upload_shell_command(self, docs_target: str) -> str:

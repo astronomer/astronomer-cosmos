@@ -9,7 +9,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING
 
-__version__ = "1.14.2a1"
+__version__ = "1.14.2"
 
 
 # Mapping of public names to their module paths for lazy loading via __getattr__.
@@ -27,6 +27,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "ExecutionMode": "cosmos.constants",
     "InvocationMode": "cosmos.constants",
     "LoadMode": "cosmos.constants",
+    "SeedRenderingBehavior": "cosmos.constants",
     "SourceRenderingBehavior": "cosmos.constants",
     "TestBehavior": "cosmos.constants",
     "TestIndirectSelection": "cosmos.constants",
@@ -123,6 +124,7 @@ if TYPE_CHECKING:
     from cosmos.constants import ExecutionMode as ExecutionMode
     from cosmos.constants import InvocationMode as InvocationMode
     from cosmos.constants import LoadMode as LoadMode
+    from cosmos.constants import SeedRenderingBehavior as SeedRenderingBehavior
     from cosmos.constants import SourceRenderingBehavior as SourceRenderingBehavior
     from cosmos.constants import TestBehavior as TestBehavior
     from cosmos.constants import TestIndirectSelection as TestIndirectSelection

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import html
 import json
-import logging
 import os
 import os.path as op
 from collections.abc import Generator
@@ -26,8 +25,11 @@ from packaging.version import Version
 from cosmos import telemetry
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
 from cosmos.listeners import dag_run_listener, task_instance_listener
+from cosmos.log import get_logger
 from cosmos.plugin.snippets import IFRAME_SCRIPT
 from cosmos.plugin.storage import get_storage_type_from_path
+
+logger = get_logger(__name__)
 
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
 # Note: We compute AIRFLOW_VERSION locally here (not from constants) so that tests can patch airflow.__version__ and reload this module
@@ -73,12 +75,12 @@ def _read_content_via_object_storage(path: str, conn_id: str | None = None) -> A
         with connection_env(conn_id):
             p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
             with p.open("r") as f:  # type: ignore[no-untyped-call]
-                content = f.read()  # type: ignore[no-any-return]
+                content = f.read()
             return content
     else:
         p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
         with p.open("r") as f:  # type: ignore[no-untyped-call]
-            content = f.read()  # type: ignore[no-any-return]
+            content = f.read()
         return content
 
 
@@ -93,7 +95,7 @@ def open_file(path: str, conn_id: str | None = None) -> Any:
     else:
         with open(path) as f:
             content = f.read()
-        return content  # type: ignore[no-any-return]
+        return content
 
 
 def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
@@ -111,7 +113,7 @@ def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
         try:
             parsed = json.loads(projects_raw)
         except json.JSONDecodeError:
-            logging.exception("Invalid JSON in [cosmos] dbt_docs_projects: %s", projects_raw)
+            logger.exception("Invalid JSON in [cosmos] dbt_docs_projects: %s", projects_raw)
             raise
 
         if isinstance(parsed, dict):
@@ -138,7 +140,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     for slug, cfg in projects.items():
         # Simple HTML wrapper to embed the dbt docs UI
         @app.get(f"/{slug}/dbt_docs", response_class=HTMLResponse)
-        def dbt_docs_view(slug_alias: str = slug) -> str:  # type: ignore[no-redef]
+        def dbt_docs_view(slug_alias: str = slug) -> str:
             cfg_local = projects.get(slug_alias, {})
             if not cfg_local.get("dir"):
                 return "<div>dbt Docs are not configured.</div>"
@@ -155,7 +157,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             f"/{slug}/dbt_docs_index.html",
             response_class=HTMLResponse,
         )
-        def dbt_docs_index(slug_alias: str = slug) -> Response:  # type: ignore[no-redef]
+        def dbt_docs_index(slug_alias: str = slug) -> Response:
             # Emit telemetry for dbt docs access
             cfg_local = projects.get(slug_alias, {})
             docs_dir_local = cfg_local.get("dir")
@@ -193,8 +195,11 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     status_code=404,
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError):
-                logging.exception(
-                    f"Cosmos dbt docs error: index read failed for slug={slug_alias}, path={op.join(docs_dir_local, index_local)}, conn_id={conn_id_local}"
+                logger.exception(
+                    "Cosmos dbt docs error: index read failed for slug=%s, path=%s, conn_id=%s",
+                    slug_alias,
+                    op.join(docs_dir_local, index_local),
+                    conn_id_local,
                 )
                 return HTMLResponse(
                     content=(
@@ -207,7 +212,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
 
         # JSON artifacts
         @app.get(f"/{slug}/manifest.json")
-        def manifest(slug_alias: str = slug) -> Response:  # type: ignore[no-redef]
+        def manifest(slug_alias: str = slug) -> Response:
             cfg_local = projects.get(slug_alias, {})
             docs_dir_local = cfg_local.get("dir")
             conn_id_local = cfg_local.get("conn_id")
@@ -226,8 +231,12 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     status_code=404,
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError) as e:
-                logging.exception(
-                    f"Error reading manifest for slug '{slug_alias}', path '{op.join(docs_dir_local, 'manifest.json')}', conn_id '{conn_id_local}': {e}"
+                logger.exception(
+                    "Error reading manifest for slug '%s', path '%s', conn_id '%s': %s",
+                    slug_alias,
+                    op.join(docs_dir_local, "manifest.json"),
+                    conn_id_local,
+                    e,
                 )
                 return JSONResponse(
                     content={
@@ -241,7 +250,7 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             return JSONResponse(content=json.loads(data))
 
         @app.get(f"/{slug}/catalog.json")
-        def catalog(slug_alias: str = slug) -> Response:  # type: ignore[no-redef]
+        def catalog(slug_alias: str = slug) -> Response:
             cfg_local = projects.get(slug_alias, {})
             docs_dir_local = cfg_local.get("dir")
             conn_id_local = cfg_local.get("conn_id")
@@ -260,8 +269,12 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     status_code=404,
                 )
             except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError) as e:
-                logging.exception(
-                    f"Error reading catalog for slug '{slug_alias}', path '{op.join(docs_dir_local, 'catalog.json')}', conn_id '{conn_id_local}': {e}"
+                logger.exception(
+                    "Error reading catalog for slug '%s', path '%s', conn_id '%s': %s",
+                    slug_alias,
+                    op.join(docs_dir_local, "catalog.json"),
+                    conn_id_local,
+                    e,
                 )
                 return JSONResponse(
                     content={

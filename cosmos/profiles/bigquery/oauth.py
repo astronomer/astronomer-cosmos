@@ -12,7 +12,7 @@ class GoogleCloudOauthProfileMapping(BaseProfileMapping):
     Maps Airflow GCP connections to dbt BigQuery profiles that uses oauth via gcloud,
     if they don't use key file or JSON.
 
-    https://docs.getdbt.com/docs/core/connect-data-platform/bigquery-setup#oauth-via-gcloud
+    https://docs.getdbt.com/docs/local/connect-data-platform/bigquery-setup
     https://airflow.apache.org/docs/apache-airflow-providers-google/stable/connections/gcp.html
     """
 
@@ -25,9 +25,10 @@ class GoogleCloudOauthProfileMapping(BaseProfileMapping):
         "dataset",
     ]
 
+    # Providing parity with other profile types for BigQuery
     airflow_param_mapping = {
-        "project": "extra.project",
-        "dataset": "extra.dataset",
+        "project": ["extra.project", "extra__google_cloud_platform__project"],
+        "dataset": ["extra.dataset", "extra__google_cloud_platform__dataset"],
     }
 
     @property

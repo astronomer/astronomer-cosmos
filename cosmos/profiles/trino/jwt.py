@@ -11,7 +11,7 @@ class TrinoJWTProfileMapping(TrinoBaseProfileMapping):
     """
     Maps Airflow Trino connections to JWT Trino dbt profiles.
 
-    https://docs.getdbt.com/reference/warehouse-setups/trino-setup#jwt
+    https://docs.getdbt.com/docs/local/connect-data-platform/trino-setup#example-profilesyml-for-jwt
     https://airflow.apache.org/docs/apache-airflow-providers-trino/stable/connections.html
     """
 

@@ -56,6 +56,7 @@ You can customize how Cosmos parses your dbt workflows into Airflow Dags. Choosi
    Selecting what to run <translate_dbt_to_airflow/selecting-excluding>
    Configure tests <translate_dbt_to_airflow/testing-behavior>
    translate_dbt_to_airflow/managing-sources
+   translate_dbt_to_airflow/managing-seeds
    translate_dbt_to_airflow/render-config
    Customize node conversion <translate_dbt_to_airflow/dag-customization>
 

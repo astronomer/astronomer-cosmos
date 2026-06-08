@@ -182,7 +182,7 @@ class DbtModel:
                     if base_node.node.name == "config":
                         config_selectors |= self._parse_jinja_config_node(base_node)
                 except KeyError as e:
-                    logger.warning(f"Could not add upstream model for config in {self.path}: {e}")
+                    logger.warning("Could not add upstream model for config in %s: %s", self.path, e)
 
         return upstream_models, config_selectors
 
@@ -203,7 +203,7 @@ class DbtModel:
                     and isinstance(node.args[0], jinja2.nodes.Const)
                     and node.node.name == "var"
                 ):
-                    value += self.dbt_vars[node.args[0].value]  # type: ignore
+                    value += self.dbt_vars[node.args[0].value]
         elif isinstance(first_arg, jinja2.nodes.Const):
             # and add it to the config
             value = first_arg.value
@@ -237,7 +237,7 @@ class DbtModel:
 
             except Exception as e:
                 # if we can't convert it to a constant, we can't do anything with it
-                logger.warning(f"Could not parse {config_name} from config in {self.path}: {e}")
+                logger.warning("Could not parse %s from config in %s: %s", config_name, self.path, e)
                 pass
 
     def __repr__(self) -> str:

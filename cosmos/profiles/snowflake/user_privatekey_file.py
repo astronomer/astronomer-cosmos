@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
+from cosmos.log import get_logger
 from cosmos.profiles.snowflake.base import SnowflakeBaseProfileMapping
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SnowflakePrivateKeyFilePemProfileMapping(SnowflakeBaseProfileMapping):
     """
     Maps Airflow Snowflake connections to dbt profiles if they use a user/private key path without a passphrase.
-    https://docs.getdbt.com/docs/core/connect-data-platform/snowflake-setup#key-pair-authentication
+    https://docs.getdbt.com/docs/local/connect-data-platform/snowflake-setup
     https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
     """
 
@@ -36,8 +36,13 @@ class SnowflakePrivateKeyFilePemProfileMapping(SnowflakeBaseProfileMapping):
         "warehouse": "extra.warehouse",
         "schema": "schema",
         "role": "extra.role",
+        "authenticator": "extra.authenticator",
+        "host": "extra.host",
+        "port": "extra.port",
         "private_key_path": "extra.private_key_file",
         "query_tag": "extra.query_tag",
+        "insecure_mode": "extra.insecure_mode",
+        "client_session_keep_alive": "extra.client_session_keep_alive",
     }
 
     def can_claim_connection(self) -> bool:

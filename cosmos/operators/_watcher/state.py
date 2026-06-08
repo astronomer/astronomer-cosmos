@@ -25,9 +25,22 @@ DBT_SUCCESS_STATUSES = frozenset({"success", "pass", "warn"})
 DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error", "runtime error"})
 DBT_SKIPPED_STATUSES = frozenset({"skipped"})
 
+# dbt event names that signal a node was skipped because an upstream node failed.
+# dbt fires SkippingDetails (non-ephemeral upstream) or LogSkipBecauseError
+# (ephemeral upstream) only from on_skip(), which is reached only when
+# do_skip(cause=...) was called -- i.e. exclusively on upstream node failure.
+DBT_UPSTREAM_FAILURE_SKIP_EVENT_NAMES = frozenset({"SkippingDetails", "LogSkipBecauseError"})
+
+# dbt source freshness statuses that mark a source as stale and propagate skips downstream.
+DBT_SOURCE_FRESHNESS_STALE_STATUSES = frozenset({"error", "warn"})
+
 # Airflow task states that indicate the producer has finished and will not deliver any more XCom updates.
 # Used to decide whether a sensor retry should fall back to a non-watcher run or keep polling.
 PRODUCER_TERMINAL_STATES = frozenset({"success", "failed", "skipped", "upstream_failed", "removed"})
+
+# Airflow task states checked by the watcher trigger to know the producer task has reached its
+# final outcome and the trigger can exit early. Subset of PRODUCER_TERMINAL_STATES.
+PRODUCER_FINAL_STATES = frozenset({"failed", "success", "skipped"})
 
 
 class DbtTestStatus(str, Enum):
@@ -59,9 +72,29 @@ def is_dbt_node_status_terminal(status: str | None) -> bool:
     return is_dbt_node_status_success(status) or is_dbt_node_status_failed(status) or is_dbt_node_status_skipped(status)
 
 
+def is_dbt_upstream_failure_skip_event(event_name: str | None) -> bool:
+    """Check if the dbt event name indicates a node was skipped because an upstream node failed."""
+    return event_name in DBT_UPSTREAM_FAILURE_SKIP_EVENT_NAMES
+
+
 def is_producer_task_terminated(state: str | None) -> bool:
     """Return True when the producer task is in a terminal state."""
     return state in PRODUCER_TERMINAL_STATES
+
+
+def get_status_xcom_key(unique_id: str) -> str:
+    """Build the XCom key used to publish a dbt node's status, sanitising dots in ``unique_id`` to ``__``."""
+    return f"{unique_id.replace('.', '__')}_status"
+
+
+def get_dbt_event_xcom_key(unique_id: str) -> str:
+    """Build the XCom key used to publish a dbt node's structured event, sanitising dots in ``unique_id`` to ``__``."""
+    return f"{unique_id.replace('.', '__')}_dbt_event"
+
+
+def get_compiled_sql_xcom_key(unique_id: str) -> str:
+    """Build the XCom key used to publish a dbt node's compiled SQL, sanitising dots in ``unique_id`` to ``__``."""
+    return f"{unique_id.replace('.', '__')}_compiled_sql"
 
 
 xcom_set_lock = Lock()

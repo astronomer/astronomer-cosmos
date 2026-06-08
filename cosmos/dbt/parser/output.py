@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import re
 from typing import TYPE_CHECKING
 
@@ -9,8 +8,11 @@ import deprecation
 if TYPE_CHECKING:
     from dbt.cli.main import dbtRunnerResult
 
-from cosmos import __version__ as cosmos_version  # type: ignore[attr-defined]
+from cosmos import __version__ as cosmos_version
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
+from cosmos.log import get_logger
+
+logger = get_logger(__name__)
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
@@ -37,8 +39,9 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
         try:
             num = int(output.split(f"{DBT_WARN_MSG}=")[1].split()[0])
         except ValueError:
-            logging.error(
-                f"Could not parse number of {DBT_WARN_MSG}s. Check your dbt/airflow version or if --quiet is not being used"
+            logger.error(
+                "Could not parse number of %ss. Check your dbt/airflow version or if --quiet is not being used",
+                DBT_WARN_MSG,
             )
     return num
 
@@ -55,7 +58,7 @@ def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
     from invoking dbt build, compile, run, seed, snapshot, test, or run-operation.
     """
     num = 0
-    for run_result in result.result.results:  # type: ignore
+    for run_result in result.result.results:
         if run_result.status == "warn":
             num += 1
     return num
@@ -124,7 +127,7 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
 )  # type: ignore[untyped-decorator]
 def extract_dbt_runner_issues(
     result: dbtRunnerResult, status_levels: list[str] | None = None
-) -> tuple[list[str], list[str]]:  # type: ignore[misc]
+) -> tuple[list[str], list[str]]:
     """
     Extracts messages from the dbt runner result and returns them as a formatted string.
 
@@ -141,7 +144,7 @@ def extract_dbt_runner_issues(
     node_names = []
     node_results = []
 
-    for node_result in result.result.results:  # type: ignore
+    for node_result in result.result.results:
         if node_result.status in status_levels:
             node_names.append(str(node_result.node.name))
             node_results.append(str(node_result.message))

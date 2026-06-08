@@ -321,12 +321,20 @@ _CALLBACK_KWARGS = dict(client=MagicMock(), mode="sync", container_name="base", 
 
 
 def test_progress_callback_calls_store_dbt_resource_status():
+    import cosmos.operators._k8s_common as mod
+
     context = {"ti": MagicMock()}
     line = _make_dbt_log_line()
 
     with patch("cosmos.operators._k8s_common.store_dbt_resource_status_from_log") as mock_store:
         WatcherK8sCallback.progress_callback(line=line, **_CALLBACK_KWARGS, context=context)
-        mock_store.assert_called_once_with(line, {"context": context})
+        # The callback forwards the producer's upstream-failure skip accumulator (see #2698);
+        # outside a producer execution this module global is None.
+        mock_store.assert_called_once_with(
+            line,
+            {"context": context},
+            upstream_failure_skipped_ids=mod._producer_upstream_failure_skipped_ids,
+        )
 
 
 def test_progress_callback_uses_global_context_when_not_in_kwargs():

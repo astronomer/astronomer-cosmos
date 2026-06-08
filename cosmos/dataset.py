@@ -9,14 +9,14 @@ import yaml
 from packaging.version import Version
 
 from cosmos import settings
-from cosmos.constants import AIRFLOW_VERSION
+from cosmos.constants import _DATASET_EMITTING_RESOURCE_TYPES, AIRFLOW_VERSION
 from cosmos.log import get_logger
 
 if TYPE_CHECKING:
     from cosmos.config import ProfileConfig
 
     try:
-        from airflow.sdk import DAG  # type: ignore[assignment]
+        from airflow.sdk import DAG
 
         # Airflow 3.1 onwards
         from airflow.utils.task_group import TaskGroup
@@ -244,8 +244,6 @@ def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict
     :param namespace: The OL-compatible dataset namespace (e.g. ``postgres://host:5432``).
     :returns: Mapping of ``{unique_id: [uri]}`` for model, seed, and snapshot nodes.
     """
-    _RESOURCE_TYPES_WITH_DATASETS = {"model", "seed", "snapshot"}
-
     # The manifest may not exist if dbt failed before completing compilation,
     # or if the temp project directory was cleaned up before this function ran.
     # In those cases we gracefully return an empty dict — consumers simply
@@ -264,7 +262,7 @@ def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict
     result: dict[str, list[str]] = {}
     for unique_id, node in manifest.get("nodes", {}).items():
         resource_type = node.get("resource_type", "")
-        if resource_type not in _RESOURCE_TYPES_WITH_DATASETS:
+        if resource_type not in _DATASET_EMITTING_RESOURCE_TYPES:
             continue
 
         database = node.get("database", "")

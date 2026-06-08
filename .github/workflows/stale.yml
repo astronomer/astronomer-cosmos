@@ -9,17 +9,16 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/stale@b5d41d4e1d5dceea10e7104786b73624c18a190f # v10.2.0
+      - uses: actions/stale@eb5cf3af3ac0a1aa4c9c45633dd1ae542a27a899 # v10.3.0
         with:
           days-before-issue-stale: 30
           days-before-issue-close: -1  # Never closes issues, more information in https://github.com/actions/stale/
           stale-issue-label: "stale"
           stale-issue-message: "This issue is stale because it has been open for 30 days with no activity."
           days-before-pr-stale: 30
-          days-before-pr-close: 10
+          days-before-pr-close: -1  # Never closes PRs, more information in https://github.com/actions/stale/
           stale-pr-label: "stale"
           exempt-issue-labels: "do-not-stale"
           exempt-pr-labels: "do-not-stale"
           stale-pr-message: "This PR is stale because it has been open for 30 days with no activity."
-          close-pr-message: "This PR was closed because it has been inactive for 10 days since being marked as stale."
           repo-token: ${{ secrets.GITHUB_TOKEN }}

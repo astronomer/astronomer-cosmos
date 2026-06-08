@@ -26,7 +26,6 @@ except ImportError:
     from airflow.utils.context import context_merge
 
 from cosmos.config import ProfileConfig
-from cosmos.log import get_logger
 from cosmos.operators._watcher.xcom import (
     _backup_xcom_to_variable,
     _delete_xcom_backup_variable,
@@ -61,8 +60,6 @@ try:
     from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
 except ImportError:
     from airflow.models import BaseOperator  # Airflow 2
-
-logger = get_logger(__name__)
 
 
 # The 2 classes below are an attempt at type hinting the operators. Not perfect but workable.
@@ -180,7 +177,7 @@ def build_and_run_cmd(
     operator.invoke_interceptors(context)
     operator.build_kube_args(context, cmd_flags)
     # Log the full command (executable + arguments) for accurate, debuggable output.
-    operator.log.info(f"Running command: {operator.cmds + operator.arguments}")
+    operator.log.info("Running command: %s", operator.cmds + operator.arguments)
     result = pod_operator_class.execute(operator, context)
     operator.log.info(result)
 
@@ -230,7 +227,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         self.test_operator_class = test_operator_class
         self.source_operator_class = source_operator_class
 
-    def on_pod_completion(  # type: ignore[override]
+    def on_pod_completion(
         self,
         *,
         pod: k8s.V1Pod,
@@ -363,17 +360,23 @@ def setup_warning_handler(
         source_operator_class=source_operator_class,
     )
     # Support for handling multiple operator callbacks via self.callbacks was added in provider version 10.2.0
-    if isinstance(operator.callbacks, list):  # type: ignore[has-type]
-        operator.callbacks.append(handler)  # type: ignore[has-type,arg-type]
+    if isinstance(operator.callbacks, list):
+        operator.callbacks.append(handler)
     else:
-        operator.callbacks = handler  # type: ignore[assignment]
+        operator.callbacks = handler
     return handler
 
 
-# This global variable is currently used to make the task context available to the K8s callback (set by the producer's execute()).
-# While the callback is set during the operator initialization, the context is only created during the operator's execution.
+# These module-level globals make per-execution producer state available to the static K8s
+# callback (set by the producer's execute()). While the callback is set during the operator
+# initialization, the context is only created during the operator's execution.
 # Safe because only one producer task runs per worker process at a time.
 _producer_task_context: Any | None = None
+# Mutable set the dbt JSON log parser populates with the unique_ids of nodes whose upstream
+# failure caused a skip; subsequent "skipped" terminal events for those ids are rewritten to
+# "failed" so the consumer sensor fails on attempt 1 (Airflow does not retry SKIPPED). Points
+# at the running producer's DbtProducer*WatcherOperator._upstream_failure_skipped_ids; see #2698.
+_producer_upstream_failure_skipped_ids: set[str] | None = None
 
 
 class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
@@ -406,7 +409,11 @@ class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
             # This global variable is used to make the task context available to the K8s callback.
             # While the callback is set during the operator initialization, the context is only created during the operator's execution.
             kwargs["context"] = _producer_task_context
-        store_dbt_resource_status_from_log(line, kwargs)
+        store_dbt_resource_status_from_log(
+            line,
+            kwargs,
+            upstream_failure_skipped_ids=_producer_upstream_failure_skipped_ids,
+        )
 
 
 def inject_watcher_callback(kwargs: dict[str, Any]) -> None:
@@ -447,8 +454,16 @@ def execute_watcher_producer(
 
     _init_xcom_backup(context)
 
-    global _producer_task_context
+    # Reset and expose the producer's upstream-failure skip accumulator for the static callback
+    # (see the module-level globals above). Producers create this set in __init__; guard with
+    # getattr so any non-producer caller of this helper keeps working.
+    skipped_ids = getattr(operator, "_upstream_failure_skipped_ids", None)
+    if skipped_ids is not None:
+        skipped_ids.clear()
+
+    global _producer_task_context, _producer_upstream_failure_skipped_ids
     _producer_task_context = context
+    _producer_upstream_failure_skipped_ids = skipped_ids
 
     try:
         return_value = parent_execute(context, **kwargs)

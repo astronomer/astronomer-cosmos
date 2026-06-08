@@ -27,6 +27,7 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
+    SeedRenderingBehavior,
     SourceRenderingBehavior,
     TestBehavior,
     TestIndirectSelection,
@@ -73,12 +74,14 @@ class RenderConfig:
     :param group_nodes_by_folder: When enabled, groups nodes by folder structure, creating a ``TaskGroup`` per resource type and folder. Disabled by default.
     :param source_rendering_behavior: Determines how source nodes are rendered when using cosmos default source node rendering (ALL, NONE, WITH_TESTS_OR_FRESHNESS). Defaults to "NONE" (since Cosmos 1.6).
     :param source_pruning: Determines if source nodes without a corresponding downstream task should be removed or not. Default is False
+    :param seed_rendering_behavior: Determines how seed nodes are rendered and run (ALWAYS, WHEN_SEED_CHANGES, RENDER_ONLY, NONE). Defaults to "ALWAYS", preserving the original Cosmos behaviour of always rendering and running seeds. WHEN_SEED_CHANGES is only supported for ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV and ExecutionMode.AIRFLOW_ASYNC, and is incompatible with TestBehavior.BUILD. Under ExecutionMode.WATCHER, only ALWAYS is meaningful: a single dbt build runs seeds regardless of this setting.
     :param airflow_vars_to_purge_dbt_ls_cache: Specify Airflow variables that will affect the LoadMode.DBT_LS cache.
     :param airflow_vars_to_purge_dbt_yaml_selectors_cache: Specify Airflow variables that will affect the parsed manifest YamlSelectors cache.
     :param normalize_task_id: A callable that takes a dbt node as input and returns the task ID. This allows users to assign a custom node ID separate from the display name.
     :param normalize_task_display_name: A callable that takes a dbt node as input and returns the task display name. This allows users to assign a custom task display name separate from the node ID.
     :param should_detach_multiple_parents_tests: A boolean that allows users to decide whether to run tests with multiple parent dependencies in separate tasks.
     :param enable_owner_inheritance: A boolean that allows users to enable the owner inheritance from dbt models to airflow tasks. Defaults to True.
+    :param ephemeral_models_as_empty_operator: A boolean that controls how ephemeral models are rendered. Ephemeral models are inlined as CTEs into downstream models and never written to the warehouse, so running them via a dbt operator is effectively a no-op. When True (default), they are rendered as ``EmptyOperator`` tasks, which preserves the dependency chain that passes through them while avoiding wasted dbt invocations and decluttering the DAG. Set to False to render them as regular dbt run tasks.
     """
 
     emit_datasets: bool = True
@@ -100,12 +103,14 @@ class RenderConfig:
     group_nodes_by_folder: bool = False
     source_rendering_behavior: SourceRenderingBehavior = SourceRenderingBehavior.NONE
     source_pruning: bool = False
+    seed_rendering_behavior: SeedRenderingBehavior = SeedRenderingBehavior.ALWAYS
     airflow_vars_to_purge_dbt_ls_cache: list[str] = field(default_factory=list)
     airflow_vars_to_purge_dbt_yaml_selectors_cache: list[str] = field(default_factory=list)
     normalize_task_id: Callable[..., Any] | None = None
     normalize_task_display_name: Callable[..., Any] | None = None
     should_detach_multiple_parents_tests: bool = False
     enable_owner_inheritance: bool | None = True
+    ephemeral_models_as_empty_operator: bool = True
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:
@@ -126,6 +131,16 @@ class RenderConfig:
                 UserWarning,
             )
             self.source_rendering_behavior = SourceRenderingBehavior.NONE
+        if (
+            self.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES
+            and self.test_behavior == TestBehavior.BUILD
+        ):
+            raise CosmosValueError(
+                "SeedRenderingBehavior.WHEN_SEED_CHANGES is incompatible with TestBehavior.BUILD: under "
+                "TestBehavior.BUILD seeds run via `dbt build` as a single task and cannot be selectively "
+                "skipped based on CSV changes. Use TestBehavior.AFTER_EACH/AFTER_ALL/NONE, or "
+                "SeedRenderingBehavior.ALWAYS."
+            )
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
         # allows us to initiate this attribute from Path objects and str
         self.dbt_ls_path = Path(self.dbt_ls_path) if self.dbt_ls_path else None
@@ -173,7 +188,9 @@ class ProjectConfig:
     Class for setting project config.
 
     :param dbt_project_path: The path to the dbt project directory. Example: /path/to/dbt/project. Defaults to None
-    :param install_dbt_deps: Run dbt deps during DAG parsing and task execution. Defaults to True.
+    :param install_dbt_deps: Run dbt deps during DAG parsing and task execution. Defaults to True. To control
+        ``dbt deps`` per DAG run via an Airflow template (e.g. ``"{{ params.install_deps }}"``), set
+        ``ExecutionConfig.install_dbt_deps`` instead, which overrides this value at task execution time only.
     :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages (False by default).
     :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
     :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
@@ -421,6 +438,11 @@ class ExecutionConfig:
     :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
     :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
     :param dbt_project_path: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
+    :param install_dbt_deps: Whether to run ``dbt deps`` at task execution time. When set, overrides
+        ``ProjectConfig.install_dbt_deps`` for execution only (it does not affect DAG parsing). Accepts a
+        boolean or an Airflow Jinja-templated string (e.g. ``"{{ params.install_deps }}"``) that renders to a
+        boolean or boolean-like string, so ``dbt deps`` can be controlled per DAG run. Defaults to None
+        (fall back to ``ProjectConfig.install_dbt_deps``).
     :param virtualenv_dir: Directory path to locate the (cached) virtual env that
     should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
     :param async_py_requirements:  A list of Python packages to install when `ExecutionMode.AIRFLOW_ASYNC` is used. This parameter is required only if both `enable_setup_async_task` and `enable_teardown_async_task` are set to `True`.
@@ -435,6 +457,7 @@ class ExecutionConfig:
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
     dbt_executable_path: str | Path = field(default_factory=get_system_dbt)
 
+    install_dbt_deps: bool | str | None = None
     dbt_project_path: InitVar[str | Path | None] = None
     virtualenv_dir: str | Path | None = None
 

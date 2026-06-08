@@ -34,7 +34,7 @@ from cosmos.operators.base import (
 )
 
 
-class DbtGcpGkeBaseOperator(AbstractDbtBase, GKEStartPodOperator):  # type: ignore
+class DbtGcpGkeBaseOperator(AbstractDbtBase, GKEStartPodOperator):  # type: ignore[misc]
     """
     Executes a dbt core cli command in a GKE Pod.
     """

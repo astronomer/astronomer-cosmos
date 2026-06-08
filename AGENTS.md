@@ -192,7 +192,7 @@ Each mode in `ExecutionMode` enum corresponds to an operator subclass:
 - `DOCKER` → `cosmos/operators/docker.py`
 - `KUBERNETES` → `cosmos/operators/kubernetes.py`
 - `WATCHER_KUBERNETES` → `cosmos/operators/watcher_kubernetes.py` - a combination of `WATCHER` and `KUBERNETES`
-- `AWS_EKS`, `AWS_ECS`, `AZURE_CONTAINER_INSTANCE`, `GCP_CLOUD_RUN_JOB` — cloud variants
+- `AWS_EKS`, `AWS_ECS`, `AZURE_CONTAINER_INSTANCE`, `GCP_CLOUD_RUN_JOB`, `GCP_GKE`, `WATCHER_GCP_GKE` — cloud variants
 
 Operators use lazy loading (`cosmos/operators/lazy_load.py`) so optional dependencies (Docker SDK, Kubernetes client) are only imported when the corresponding mode is used.
 

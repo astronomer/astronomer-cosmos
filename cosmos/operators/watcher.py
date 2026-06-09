@@ -243,8 +243,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._dataset_namespace: str | None = None
         self._model_outlet_uris: dict[str, list[str]] = {}
         # In-memory per-node event buffer shared with the log parser. dbt events accumulate here and
-        # are flushed to XCom once per node (at terminal), instead of one XCom write per event.
-        self._node_event_buffer: dict[str, dict[str, Any]] = {}
+        # are flushed to XCom at terminal (and may be re-flushed if a later error event carries the message),
+        # instead of one XCom write per event.
         # Mutable set populated by the log parser when dbt emits SkippingDetails
         # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
         # for those unique_ids are rewritten to "failed" so the consumer sensor

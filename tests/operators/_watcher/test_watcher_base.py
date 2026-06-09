@@ -9,6 +9,7 @@ from cosmos.operators._watcher.base import (
     _flush_dbt_event,
     _flush_dbt_event_on_error,
     _process_dbt_log_event,
+    store_dbt_resource_status_from_log,
 )
 from cosmos.operators.local import DbtRunLocalOperator
 
@@ -350,6 +351,13 @@ class TestNodeEventBuffer:
         buffer: dict = {}
         _accumulate_dbt_log_event(buffer, self._run_result_error(msg="err"))  # node_status == "None"
         assert buffer[self.UID]["status"] is None
+
+    @pytest.mark.parametrize("extra_kwargs", [None, {}])
+    def test_store_dbt_resource_status_from_log_tolerates_falsy_extra_kwargs(self, extra_kwargs):
+        """A falsy/None extra_kwargs must not raise during parsing (no context to push to)."""
+        line = '{"info": {"name": "NodeFinished"}, "data": {"node_info": {"unique_id": "model.p.m", "node_status": "success"}}}'
+        # Should be a no-op (no context/ti) rather than raising AttributeError.
+        store_dbt_resource_status_from_log(line, extra_kwargs, node_event_buffer={})
 
     def test_accumulate_ignores_non_allowlisted_and_missing_unique_id(self):
         buffer: dict = {}

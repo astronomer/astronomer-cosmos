@@ -469,6 +469,8 @@ def store_dbt_resource_status_from_log(
         terminal state and may be re-flushed if a later error event provides the message (e.g. subprocess mode).
         This replaces the previous per-event XCom push, which wrote on every event (lock contention) and let a trailing ``NodeFinished`` overwrite the captured error message.
     """
+    # extra_kwargs is typed Any and may be falsy/None; normalise so the .get() calls below are safe.
+    extra_kwargs = extra_kwargs or {}
     try:
         log_line = json.loads(line)
     except json.JSONDecodeError:

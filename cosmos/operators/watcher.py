@@ -317,7 +317,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                     json_str = MessageToJson(event, preserving_proto_field_name=True)
                     parse(json_str, extra_kwargs)
                 except Exception as e:
-                    logger.exception("Error in dbt event callback: %s", e)
+                    self.log.exception("Error in dbt event callback: %s", e)
                     if not callback_error:
                         callback_error.append(e)
 
@@ -371,7 +371,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         ti = context["ti"]
 
         for unique_id, state in node_state_pairs:
-            logger.info("Pre-setting resource '%s' state to %s from source-freshness callback", unique_id, state)
+            self.log.info("Pre-setting resource '%s' state to %s from source-freshness callback", unique_id, state)
             self._push_node_state_xcom(ti, unique_id, state)
 
         # Exclude any node whose pre-set state is non-success from the dbt build.
@@ -387,7 +387,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             try:
                 resource_names.add(DbtNode.get_resource_name_from_unique_id(uid))
             except ValueError:
-                logger.warning("Skipping malformed dbt unique_id while building source-freshness exclude list: %s", uid)
+                self.log.warning(
+                    "Skipping malformed dbt unique_id while building source-freshness exclude list: %s", uid
+                )
         model_names = sorted(resource_names)
         exclude_str = " ".join(model_names)
         if exclude_str:
@@ -420,7 +422,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             # sources.json was never written (e.g. connection error, bad project config).
             if self._sources_json is None:
                 raise
-            logger.warning(
+            self.log.warning(
                 "dbt source freshness completed with non-zero exit code: %s. " "Proceeding with freshness results.",
                 exc,
             )
@@ -589,7 +591,7 @@ class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):
 
     def _fallback_to_non_watcher_run(self, try_number: int, context: Context) -> bool:
         """Run ``dbt source freshness`` locally for this specific source on retry."""
-        logger.info(
+        self.log.info(
             "Retry attempt #%s – Running source freshness for '%s' from project '%s'",
             try_number - 1,
             self.model_unique_id,
@@ -598,7 +600,7 @@ class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):
         resource_name = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = ["--select", f"source:{resource_name}"]
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
-        logger.info("dbt source freshness completed successfully on retry for source '%s'", self.model_unique_id)
+        self.log.info("dbt source freshness completed successfully on retry for source '%s'", self.model_unique_id)
         return True
 
 
@@ -655,7 +657,7 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
         Airflow-level retries fire. Producer flags are intentionally not forwarded
         because some of them (e.g. ``--full-refresh``) are not valid for ``dbt test``.
         """
-        logger.info(
+        self.log.info(
             "Running tests for model '%s' from project '%s' (try %s)",
             self.model_unique_id,
             self.project_dir,
@@ -665,5 +667,5 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
         model_selector = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = ["--select", model_selector]
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
-        logger.info("dbt test completed successfully for model '%s'", self.model_unique_id)
+        self.log.info("dbt test completed successfully for model '%s'", self.model_unique_id)
         return True

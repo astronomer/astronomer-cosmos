@@ -1,0 +1,288 @@
+name: test-unprivileged
+
+on:
+  push: # Run on pushes to the default branch so coverage on main stays current.
+    branches: [main]
+  # Unprivileged test jobs that execute untrusted PR code but require no secrets. Running them
+  # under `pull_request` (not `pull_request_target`) means fork PRs get a read-only token and no
+  # access to repository secrets, so checking out and running the PR's code is not a privileged
+  # operation. This preserves fast feedback for forks without a manual approval gate, while
+  # avoiding the privileged-checkout and cache-poisoning patterns that `pull_request_target`
+  # would introduce. Jobs that need secrets (integration, kubernetes, coverage upload) stay in
+  # test.yml, gated behind the Authorize environment.
+  pull_request:
+    branches: [main, 'release-*']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  SCARF_NO_ANALYTICS: "true"
+
+jobs:
+  # Skip unit/telemetry/performance tests when only non-code files changed.
+  Check-changed-files:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code_changed: ${{ steps.check.outputs.code_changed }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.event_name }}" == "pull_request_target" ]; then
+            # Use GitHub API to list changed files — works reliably for fork PRs
+            # where git diff may fail because the fork's commits aren't in local history.
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            if ! FILES=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename' 2>/tmp/gh_api_err); then
+              echo "::warning::Failed to list PR changed files via GitHub API, falling back to running all tests. Error: $(cat /tmp/gh_api_err)"
+              echo "code_changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            # Handle cases where BASE is missing or all zeros (e.g., first push, force push)
+            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              echo "code_changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            # Compute changed files; if git diff fails, assume code changed to be safe
+            if ! FILES=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null); then
+              echo "code_changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          CODE_CHANGED=false
+          # If we can't determine changed files, run tests to be safe
+          if [ -z "$FILES" ]; then
+            CODE_CHANGED=true
+          fi
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              # Documentation and metadata
+              README.rst|README.md) ;;
+              CHANGELOG.rst) ;;
+              CODE_OF_CONDUCT.md) ;;
+              CONTRIBUTING.md) ;;
+              LICENSE) ;;
+              SECURITY.rst) ;;
+              PRIVACY_NOTICE.rst) ;;
+              CODEOWNERS) ;;
+              CLAUDE.md) ;;
+              AGENTS.md) ;;
+              docs/*) ;;
+              # GitHub and CI config unrelated to tests
+              .github/pull_request_template.md) ;;
+              .github/ISSUE_TEMPLATE/*) ;;
+              .github/dependabot.yml) ;;
+              .github/workflows/docs.yml) ;;
+              .github/workflows/docs-build.yml) ;;
+              .github/workflows/stale.yml) ;;
+              .github/workflows/actionlint.yml) ;;
+              .github/workflows/codeql.yml) ;;
+              .github/workflows/zizmor.yml) ;;
+              .github/workflows/deploy.yml) ;;
+              # Tooling config that does not affect test outcomes
+              .gitignore) ;;
+              .tiltignore) ;;
+              Tiltfile) ;;
+              .codespell-ignore-words) ;;
+              .pre-commit-config.yaml) ;;
+              .airflow-registry.yaml) ;;
+              *) CODE_CHANGED=true; break ;;
+            esac
+          done <<< "$FILES"
+          echo "code_changed=$CODE_CHANGED" >> "$GITHUB_OUTPUT"
+
+  Run-Unit-Tests:
+    needs: Check-changed-files
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
+        dbt-version: ["1.10"]
+        exclude:
+          # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
+          - python-version: "3.13"
+            airflow-version: "2.9"
+          - python-version: "3.13"
+            airflow-version: "2.10"
+          - python-version: "3.13"
+            airflow-version: "2.11"
+          - python-version: "3.13"
+            airflow-version: "3.0"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
+      - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: unit-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install uv
+          uv pip install --system "hatch>=1.14.2"
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
+
+      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
+        run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-cov
+
+      - name: Upload coverage to Github
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-unit-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
+          path: .coverage
+          include-hidden-files: true
+
+  Run-Telemetry-Tests:
+    needs: Check-changed-files
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11"]
+        airflow-version: ["2.10"]
+        dbt-version: ["1.9"]
+    env:
+      SCARF_NO_ANALYTICS: "false"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
+      - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: telemetry-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install uv
+          uv pip install --system "hatch>=1.14.2"
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
+
+      - name: Run telemetry tests
+        run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-telemetry
+
+      - name: Upload coverage to Github
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-telemetry-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
+          path: .coverage
+          include-hidden-files: true
+
+  Run-Performance-Tests:
+    needs: Check-changed-files
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11"]
+        airflow-version: ["2.10", "3.0"]
+        dbt-version: ["1.9"]
+        num-models: [1, 10, 50, 100, 500]
+    services:
+      postgres:
+        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
+      - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cache/pip
+            .local/share/hatch/
+          key: perf-test-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install uv
+          uv pip install --system "hatch>=1.14.2"
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
+
+      - name: Run performance tests against against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
+        id: run-performance-tests
+        run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-performance-setup
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-performance
+
+          # read the performance results and set them as an env var for the next step
+          # format: NUM_MODELS={num_models}\nTIME={end - start}\n
+          cat /tmp/performance_results.txt > "$GITHUB_STEP_SUMMARY"
+        env:
+          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
+          AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
+          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 180.0
+          PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_SCHEMA: public
+          POSTGRES_PORT: 5432
+          MODEL_COUNT: ${{ matrix.num-models }}
+    env:
+      AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
+      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
+      PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH

@@ -8,14 +8,14 @@ Watcher Kubernetes and GCP GKE execution modes (experimental)
 
 The ``ExecutionMode.WATCHER_KUBERNETES`` combines the **speed of the** :ref:`watcher-execution-mode` **with the isolation of** :ref:`kubernetes`.
 
-A GCP GKE variant is also available as ``ExecutionMode.WATCHER_GCP_GKE``, which uses
-``GKEStartPodOperator`` instead of ``KubernetesPodOperator``. See :ref:`watcher-gcp-gke` below.
-
 This execution mode is ideal for users who:
 
 - Want to leverage the performance benefits of the watcher execution mode
 - Need to run dbt in isolated Kubernetes pods
 - Prefer not to install dbt in their `Apache Airflow® <https://airflow.apache.org/>`_ deployment
+
+A GCP GKE variant is also available as ``ExecutionMode.WATCHER_GCP_GKE``, which uses
+``GKEStartPodOperator`` instead of ``KubernetesPodOperator``. See :ref:`watcher-gcp-gke-execution-mode` below.
 
 
 Background
@@ -194,10 +194,10 @@ Before using ``ExecutionMode.WATCHER_KUBERNETES``, ensure you have:
 For detailed setup instructions, refer to the :ref:`kubernetes` documentation.
 
 
-.. _watcher-gcp-gke:
+.. _watcher-gcp-gke-execution-mode:
 
-Watcher GCP GKE
-++++++++++++++++
+Watcher GCP GKE execution mode
+++++++++++++++++++++++++++++++
 
 .. versionadded:: 1.15.0
 

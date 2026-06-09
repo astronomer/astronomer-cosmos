@@ -4,7 +4,10 @@
 Kubernetes and GCP GKE execution modes
 ======================================
 
-The ``kubernetes`` and ``gcp_gke`` execution modes provide a very isolated method to run ``dbt`` from within a Kubernetes Pod, usually in a separate host. The ``gcp_gke`` variant uses GKE-specific authentication via ``GKEStartPodOperator``.
+The ``ExecutionMode.KUBERNETES`` provides a very isolated method to run ``dbt`` from within a Kubernetes Pod, usually in a separate host.
+
+
+A GCP GKE variant is also available as ``ExecutionMode.GCP_GKE``, which uses ``GKEStartPodOperator`` instead of ``KubernetesPodOperator``. See :ref:`gcp-gke-execution-mode` below.
 
 Performance and maintenance considerations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

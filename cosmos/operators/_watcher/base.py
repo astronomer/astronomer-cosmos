@@ -465,9 +465,9 @@ def store_dbt_resource_status_from_log(
         are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
         retry it) rather than going SKIPPED. See #2698.
     :param node_event_buffer: Mutable in-memory accumulator keyed by node unique_id. Each dbt event
-        is merged here (no XCom write); the merged event is flushed to XCom once when the node reaches
-        a terminal state. This replaces the previous per-event XCom push, which wrote on every event
-        (lock contention) and let a trailing ``NodeFinished`` overwrite the captured error message.
+        is merged here (no XCom write); the merged event is flushed to XCom when the node reaches a
+        terminal state and may be re-flushed if a later error event provides the message (e.g. subprocess mode).
+        This replaces the previous per-event XCom push, which wrote on every event (lock contention) and let a trailing ``NodeFinished`` overwrite the captured error message.
     """
     try:
         log_line = json.loads(line)

@@ -174,6 +174,8 @@ Enable and trigger a run of the `jaffle_shop_k8s <https://github.com/astronomer/
 GCP GKE execution mode
 +++++++++++++++++++++++
 
+.. versionadded:: 1.15.0
+
 ``ExecutionMode.GCP_GKE`` works the same way as ``ExecutionMode.KUBERNETES`` but uses the
 `GKEStartPodOperator <https://airflow.apache.org/docs/apache-airflow-providers-google/stable/_api/airflow/providers/google/cloud/operators/kubernetes_engine/index.html>`_
 instead of ``KubernetesPodOperator``. This is the recommended mode for users running

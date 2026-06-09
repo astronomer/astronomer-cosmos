@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main, split-pr-test-workflow]
+    branches: [main]
   # Also run on pull requests originating from forks. Jobs here require sensitive secrets (integration tests,
   # kubernetes, code coverage) and depend on the Authorize job, which requires manually approving the workflow run
   # for external PRs. Jobs that do not use sensitive secrets (type-check still runs here; unit, telemetry and

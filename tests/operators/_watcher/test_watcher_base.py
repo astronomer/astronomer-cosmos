@@ -371,3 +371,16 @@ class TestNodeEventBuffer:
                 Mock(), buffer, {"info": {"name": "RunResultError"}, "data": {"node_info": {"unique_id": self.UID}}}
             )
         mock_push.assert_not_called()
+
+    def test_flush_on_error_when_message_only_in_info_msg(self):
+        """An allowlisted error event whose text is only in info.msg must still re-flush."""
+        buffer: dict = {}
+        event = {
+            "info": {"name": "RunResultError", "msg": "the error"},
+            "data": {"node_info": {"unique_id": self.UID, "node_status": "None"}},
+        }
+        _accumulate_dbt_log_event(buffer, event)
+        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+            _flush_dbt_event_on_error(Mock(), buffer, event)
+        assert mock_push.called
+        assert mock_push.call_args.kwargs["value"]["msg"] == "the error"

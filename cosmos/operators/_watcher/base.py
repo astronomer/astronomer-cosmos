@@ -231,7 +231,9 @@ def _flush_dbt_event_on_error(
     if info.get("name") not in _DBT_ERROR_EVENTS_TYPES:
         return
     data = dbt_log.get("data", {})
-    if not (data.get("msg") or (data.get("run_result") or {}).get("message")):
+    # Mirror the message sources used by _accumulate_dbt_log_event (run_result.message / data.msg /
+    # info.msg) so an error whose text is only in info.msg still triggers the re-flush.
+    if not ((data.get("run_result") or {}).get("message") or data.get("msg") or info.get("msg")):
         return
     unique_id = (data.get("node_info") or {}).get("unique_id")
     if unique_id:

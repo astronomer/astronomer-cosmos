@@ -145,16 +145,25 @@ def build_producer_state_fetcher(
     producer_task_id: str,
     logger: logging.Logger,
 ) -> ProducerStateFetcher | None:
-    """Return a callable that fetches the producer task state for the given Airflow version."""
+    """Return a callable that fetches the producer task state for the given Airflow version.
 
-    # Imported lazily: a module-level import of cosmos.constants here triggers a circular import
-    # during Airflow plugin discovery (cosmos.plugin imports from a half-initialized constants).
-    from cosmos.constants import airflow_supports_task_sdk_runtime
+    On Airflow 3.x the same callable is used from two very different runtime contexts, and
+    the correct data source differs between them -- so the choice is made at call time, not
+    by version alone:
 
-    # Airflow < 3.1 reads producer task state directly from the metadata DB. The task-SDK
-    # ``RuntimeTaskInstance.get_task_states`` raises on Airflow 3.0 outside a supervisor
-    # (e.g. dag.test()), so it is only usable on 3.1+. See apache/airflow#51816, #59093.
-    if not airflow_supports_task_sdk_runtime(airflow_version):
+    * Inside a task-SDK worker (the sensor's synchronous ``poke()``), direct ORM access is
+      forbidden -- ``create_session`` raises ``RuntimeError: Direct database access via the
+      ORM is not allowed in Airflow 3.0`` -- but ``RuntimeTaskInstance.get_task_states`` works
+      because the worker binds ``SUPERVISOR_COMMS``.
+    * Outside a supervisor (``dag.test()`` running inline, or the Airflow 3.0 triggerer process
+      where ``SUPERVISOR_COMMS`` is never bound), ``get_task_states`` raises ``NameError`` while
+      ORM access *is* permitted.
+
+    So on Airflow >= 3.0 we prefer ``get_task_states`` and fall back to the metadata DB only on
+    ``NameError`` (no supervisor). See apache/airflow#51816, #59093.
+    """
+
+    def build_orm_fetcher() -> ProducerStateFetcher | None:
         try:
             TaskInstance, create_session = _load_airflow2_dependencies()
         except ImportError as exc:  # pragma: no cover - defensive guard for stripped test envs
@@ -178,11 +187,18 @@ def build_producer_state_fetcher(
 
         return fetch_state_orm
 
+    # Airflow < 3.0 has no task-SDK runtime: read producer task state directly from the
+    # metadata DB, which is always permitted there.
+    if airflow_version < Version("3.0.0"):
+        return build_orm_fetcher()
+
     try:
         RuntimeTaskInstance = _load_airflow3_dependencies()
     except (ImportError, NameError) as exc:  # pragma: no cover - Airflow 3 libs missing
-        logger.warning("Could not load Airflow 3 RuntimeTaskInstance: %s", exc)
-        return None
+        logger.warning("Could not load Airflow 3 RuntimeTaskInstance, falling back to ORM: %s", exc)
+        return build_orm_fetcher()
+
+    orm_fetcher = build_orm_fetcher()
 
     def fetch_state_airflow3() -> str | None:
         try:
@@ -191,9 +207,15 @@ def build_producer_state_fetcher(
                 task_ids=[producer_task_id],
                 run_ids=[run_id],
             )
-        except NameError as exc:  # pragma: no cover - Airflow 3.0 missing supervisor comms
-            logger.warning("RuntimeTaskInstance.get_task_states unavailable due to NameError: %s", exc)
-            return None
+        except NameError as exc:
+            # No task-SDK supervisor (e.g. dag.test() inline, or the Airflow 3.0 triggerer):
+            # SUPERVISOR_COMMS is unbound. Read producer state from the metadata DB, which is
+            # permitted in these non-supervisor contexts.
+            logger.debug(
+                "RuntimeTaskInstance.get_task_states unavailable (no supervisor: %s); reading state from the metadata DB",
+                exc,
+            )
+            return orm_fetcher() if orm_fetcher is not None else None
         state = task_states.get(run_id, {}).get(producer_task_id)
         if state is not None:
             return str(state)

@@ -1064,8 +1064,8 @@ class TestDbtConsumerWatcherSensor:
         fetcher.assert_called_once_with()
         assert status is None
 
-    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.1.0"), reason="task-SDK get_task_states path is Airflow >= 3.1")
-    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.1.0"))
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="task-SDK get_task_states path is Airflow >= 3.0")
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.0.0"))
     @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states")
     def test_get_producer_task_status_airflow3(self, mock_get_task_states):
         sensor = self.make_sensor()
@@ -1085,8 +1085,8 @@ class TestDbtConsumerWatcherSensor:
             dag_id="example_dag", task_ids=[sensor.producer_task_id], run_ids=["run_3"]
         )
 
-    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.1.0"), reason="task-SDK get_task_states path is Airflow >= 3.1")
-    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.1.0"))
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="task-SDK get_task_states path is Airflow >= 3.0")
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.0.0"))
     @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states")
     def test_get_producer_task_status_airflow3_missing_state(self, mock_get_task_states):
         sensor = self.make_sensor()
@@ -1105,6 +1105,40 @@ class TestDbtConsumerWatcherSensor:
         mock_get_task_states.assert_called_once_with(
             dag_id="example_dag", task_ids=[sensor.producer_task_id], run_ids=["run_3_missing"]
         )
+
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="task-SDK get_task_states path is Airflow >= 3.0")
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states")
+    def test_get_producer_task_status_airflow3_falls_back_to_orm_without_supervisor(self, mock_get_task_states):
+        # Regression for the Airflow 3.0 worker crash: inside a task-SDK worker get_task_states
+        # works, but with no supervisor (e.g. dag.test()) it raises NameError because
+        # SUPERVISOR_COMMS is unbound. There the metadata DB IS readable, so the fetcher must
+        # fall back to the ORM instead of propagating the NameError.
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status = DbtConsumerWatcherSensor._get_producer_task_status.__get__(
+            sensor, DbtConsumerWatcherSensor
+        )
+        ti = MagicMock()
+        ti.dag_id = "example_dag"
+        context = self.make_context(ti, run_id="run_3_no_supervisor")
+
+        mock_get_task_states.side_effect = NameError("name 'SUPERVISOR_COMMS' is not defined")
+
+        orm_ti = MagicMock()
+        orm_ti.state = "success"
+        session = MagicMock()
+        session.query.return_value.filter_by.return_value.one_or_none.return_value = orm_ti
+        create_session_cm = MagicMock()
+        create_session_cm.return_value.__enter__.return_value = session
+
+        with patch(
+            "cosmos.operators._watcher.state._load_airflow2_dependencies",
+            return_value=(MagicMock(), create_session_cm),
+        ):
+            status = sensor._get_producer_task_status(context)
+
+        assert status == "success"
+        mock_get_task_states.assert_called_once()
 
     @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
     @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.0.0"))

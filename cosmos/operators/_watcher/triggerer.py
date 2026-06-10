@@ -7,8 +7,9 @@ from typing import Any
 
 from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
+from packaging.version import Version
 
-from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION, airflow_supports_task_sdk_runtime
+from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
@@ -116,11 +117,19 @@ class WatcherTrigger(BaseTrigger):
             self.run_id,
             self.map_index,
         )
-        # Airflow 3.0's task-SDK XCom API raises outside a supervisor (e.g. dag.test()), so only
-        # use it on 3.1+; Airflow < 3.1 reads XCom directly from the metadata DB. See #51816.
-        if airflow_supports_task_sdk_runtime(AIRFLOW_VERSION):
+        # Airflow < 3.0 has no task-SDK runtime: read XCom directly from the metadata DB.
+        if AIRFLOW_VERSION < Version("3.0.0"):
+            return await self.get_xcom_val_af2(key)
+        # Airflow >= 3.0: prefer the task-SDK XCom API. A real triggerer binds SUPERVISOR_COMMS
+        # (TriggererJobRunner.init_comms) and forbids direct ORM access -- create_session raises
+        # "Direct database access via the ORM is not allowed in Airflow 3.0" -- so XCom.get_one
+        # is the only path that works there. Only outside a supervisor (dag.test() running
+        # inline) is SUPERVISOR_COMMS unbound, making XCom.get_one raise ImportError/NameError;
+        # there ORM access IS permitted, so fall back to the metadata DB. A version gate cannot
+        # tell these apart. See apache/airflow#51816, #59093.
+        try:
             return await self.get_xcom_val_af3(key)
-        else:
+        except (ImportError, NameError):
             return await self.get_xcom_val_af2(key)
 
     async def _get_node_status(self) -> Any | None:

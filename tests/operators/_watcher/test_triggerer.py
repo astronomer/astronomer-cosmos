@@ -133,9 +133,12 @@ class TestWatcherTrigger:
     @pytest.mark.parametrize(
         "airflow_version, expected_val",
         [
-            (Version("2.11.0"), "af2"),  # Airflow < 3.1 uses the direct-DB get_xcom_val_af2
-            (Version("3.0.0"), "af2"),  # Airflow 3.0 lacks SUPERVISOR_COMMS, so also uses get_xcom_val_af2
-            (Version("3.1.0"), "af3"),  # Airflow >= 3.1 uses the task-SDK get_xcom_val_af3
+            (Version("2.11.0"), "af2"),  # Airflow < 3.0 reads XCom directly from the metadata DB
+            # Airflow >= 3.0 uses the task-SDK get_xcom_val_af3: a real triggerer binds
+            # SUPERVISOR_COMMS (init_comms) and forbids ORM access, so the SDK is the only path
+            # that works there.
+            (Version("3.0.0"), "af3"),
+            (Version("3.1.0"), "af3"),
         ],
     )
     async def test_get_xcom_val_branches(self, airflow_version, expected_val):
@@ -148,6 +151,19 @@ class TestWatcherTrigger:
                 with patch.object(self.trigger, "get_xcom_val_af3", AsyncMock(return_value="af3")):
                     val = await self.trigger.get_xcom_val("key")
                     assert val == "af3"
+
+    @pytest.mark.parametrize("raised", [ImportError("no SUPERVISOR_COMMS"), NameError("SUPERVISOR_COMMS")])
+    async def test_get_xcom_val_af3_falls_back_to_orm_without_supervisor(self, raised):
+        # On Airflow >= 3.0 the task-SDK XCom path is primary, but outside a supervisor
+        # (dag.test() running inline) SUPERVISOR_COMMS is unbound and XCom.get_one raises
+        # ImportError/NameError. There ORM access is permitted, so we must fall back to it.
+        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("3.0.0")):
+            with patch.object(self.trigger, "get_xcom_val_af3", AsyncMock(side_effect=raised)):
+                with patch.object(self.trigger, "get_xcom_val_af2", AsyncMock(return_value="af2")) as mock_af2:
+                    val = await self.trigger.get_xcom_val("key")
+
+        assert val == "af2"
+        mock_af2.assert_awaited_once_with("key")
 
     @pytest.mark.parametrize(
         "xcom_status_val, producer_state, expected",
@@ -264,19 +280,30 @@ class TestWatcherTrigger:
         AIRFLOW_VERSION < Version("3.0.0"), reason="RuntimeTaskInstance import exists on Airflow >= 3.0"
     )
     @pytest.mark.asyncio
-    async def test_get_producer_task_status_airflow3_import_error(self):
+    async def test_get_producer_task_status_airflow3_import_error_falls_back_to_orm(self):
+        # If the task-SDK RuntimeTaskInstance cannot be imported (stripped env), the fetcher must
+        # fall back to the metadata-DB ORM path rather than degrade to None.
         def _import_side_effect(name: str, *args, **kwargs):
             if name == "airflow.sdk.execution_time.task_runner":
                 raise ModuleNotFoundError("missing runtime")
             return _real_import(name, *args, **kwargs)
 
-        # Pin to 3.1.0 so the task-SDK branch is taken; that is where the RuntimeTaskInstance
-        # import is attempted (and here blocked), which must degrade to None rather than raise.
-        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("3.1.0")):
-            with patch("builtins.__import__", side_effect=_import_side_effect):
-                state = await self.trigger._get_producer_task_status()
+        orm_ti = MagicMock()
+        orm_ti.state = "success"
+        session = MagicMock()
+        session.query.return_value.filter_by.return_value.one_or_none.return_value = orm_ti
+        create_session_cm = MagicMock()
+        create_session_cm.return_value.__enter__.return_value = session
 
-        assert state is None
+        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("3.1.0")):
+            with patch(
+                "cosmos.operators._watcher.state._load_airflow2_dependencies",
+                return_value=(MagicMock(), create_session_cm),
+            ):
+                with patch("builtins.__import__", side_effect=_import_side_effect):
+                    state = await self.trigger._get_producer_task_status()
+
+        assert state == "success"
 
     @pytest.mark.asyncio
     async def test_run_producer_success_model_not_run(self, caplog):

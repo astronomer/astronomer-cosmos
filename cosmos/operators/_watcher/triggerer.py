@@ -79,13 +79,25 @@ class WatcherTrigger(BaseTrigger):
     async def get_xcom_val_af3(self, key: str) -> Any | None:
         from airflow.sdk.execution_time.xcom import XCom
 
-        return await sync_to_async(XCom.get_one)(
-            run_id=self.run_id,
-            key=key,
-            task_id=self.producer_task_id,
-            dag_id=self.dag_id,
-            map_index=self.map_index,
-        )
+        try:
+            return await sync_to_async(XCom.get_one)(
+                run_id=self.run_id,
+                key=key,
+                task_id=self.producer_task_id,
+                dag_id=self.dag_id,
+                map_index=self.map_index,
+            )
+        except ImportError:
+            # On Airflow 3.0, ``XCom.get_one`` unconditionally imports ``SUPERVISOR_COMMS``
+            # from ``airflow.sdk.execution_time.task_runner`` -- a symbol that only exists on
+            # Airflow 3.1+. Outside a task-SDK supervisor process (most notably ``dag.test()``,
+            # which runs deferred triggers inline) that import raises, the deferred task is
+            # re-queued forever, and the DAG run hangs silently. A real triggerer process has the
+            # supervisor environment, so the SDK path works there and stays primary; only the
+            # non-supervisor case falls back to the direct-DB ORM path, which the ``ti.xcom_pull``
+            # implementation on AF 3.0 reads straight from ``XComModel`` (no supervisor needed).
+            # See apache/airflow#51816 and apache/airflow#59093.
+            return await self.get_xcom_val_af2(key)
 
     async def get_xcom_val_af2(self, key: str) -> Any | None:
         from airflow.models import TaskInstance

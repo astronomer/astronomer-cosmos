@@ -52,6 +52,24 @@ class TestWatcherTrigger:
             )
             assert result == expected_value
 
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Require Airflow >= 3.0.0")
+    @pytest.mark.asyncio
+    async def test_get_xcom_val_af3_falls_back_to_af2_on_import_error(self):
+        # On Airflow 3.0, XCom.get_one imports SUPERVISOR_COMMS (3.1+ only) and raises
+        # ImportError outside a supervisor (e.g. dag.test()). The SDK path must fall back to
+        # the direct-DB ORM path instead of propagating the error. See apache/airflow#51816.
+        expected_value = {"foo": "bar"}
+
+        with patch("cosmos.operators._watcher.triggerer.sync_to_async") as mock_sync_to_async:
+            mock_get_one = AsyncMock(side_effect=ImportError("cannot import name 'SUPERVISOR_COMMS'"))
+            mock_sync_to_async.return_value = mock_get_one
+
+            with patch.object(self.trigger, "get_xcom_val_af2", AsyncMock(return_value=expected_value)) as mock_af2:
+                result = await self.trigger.get_xcom_val_af3("test_key")
+
+            mock_af2.assert_awaited_once_with("test_key")
+            assert result == expected_value
+
     @pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.0.0"), reason="Require Airflow < 3.0.0")
     @pytest.mark.asyncio
     async def test_get_xcom_val_af2(self):

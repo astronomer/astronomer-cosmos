@@ -147,14 +147,21 @@ def build_producer_state_fetcher(
 ) -> ProducerStateFetcher | None:
     """Return a callable that fetches the producer task state for the given Airflow version."""
 
-    if airflow_version < Version("3.0.0"):
+    # Imported lazily: a module-level import of cosmos.constants here triggers a circular import
+    # during Airflow plugin discovery (cosmos.plugin imports from a half-initialized constants).
+    from cosmos.constants import airflow_supports_task_sdk_runtime
+
+    # Airflow < 3.1 reads producer task state directly from the metadata DB. The task-SDK
+    # ``RuntimeTaskInstance.get_task_states`` raises on Airflow 3.0 outside a supervisor
+    # (e.g. dag.test()), so it is only usable on 3.1+. See apache/airflow#51816, #59093.
+    if not airflow_supports_task_sdk_runtime(airflow_version):
         try:
             TaskInstance, create_session = _load_airflow2_dependencies()
         except ImportError as exc:  # pragma: no cover - defensive guard for stripped test envs
-            logger.warning("Could not import Airflow 2 state dependencies: %s", exc)
+            logger.warning("Could not import ORM state dependencies: %s", exc)
             return None
 
-        def fetch_state_airflow2() -> str | None:
+        def fetch_state_orm() -> str | None:
             with create_session() as session:
                 ti = (
                     session.query(TaskInstance)
@@ -169,7 +176,7 @@ def build_producer_state_fetcher(
                     return str(ti.state)
                 return None
 
-        return fetch_state_airflow2
+        return fetch_state_orm
 
     try:
         RuntimeTaskInstance = _load_airflow3_dependencies()

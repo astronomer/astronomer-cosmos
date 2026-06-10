@@ -52,24 +52,6 @@ class TestWatcherTrigger:
             )
             assert result == expected_value
 
-    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Require Airflow >= 3.0.0")
-    @pytest.mark.asyncio
-    async def test_get_xcom_val_af3_falls_back_to_af2_on_import_error(self):
-        # On Airflow 3.0, XCom.get_one imports SUPERVISOR_COMMS (3.1+ only) and raises
-        # ImportError outside a supervisor (e.g. dag.test()). The SDK path must fall back to
-        # the direct-DB ORM path instead of propagating the error. See apache/airflow#51816.
-        expected_value = {"foo": "bar"}
-
-        with patch("cosmos.operators._watcher.triggerer.sync_to_async") as mock_sync_to_async:
-            mock_get_one = AsyncMock(side_effect=ImportError("cannot import name 'SUPERVISOR_COMMS'"))
-            mock_sync_to_async.return_value = mock_get_one
-
-            with patch.object(self.trigger, "get_xcom_val_af2", AsyncMock(return_value=expected_value)) as mock_af2:
-                result = await self.trigger.get_xcom_val_af3("test_key")
-
-            mock_af2.assert_awaited_once_with("test_key")
-            assert result == expected_value
-
     @pytest.mark.skipif(AIRFLOW_VERSION >= Version("3.0.0"), reason="Require Airflow < 3.0.0")
     @pytest.mark.asyncio
     async def test_get_xcom_val_af2(self):
@@ -151,8 +133,8 @@ class TestWatcherTrigger:
     @pytest.mark.parametrize(
         "airflow_version, expected_val",
         [
-            (Version("2.11.0"), "af2"),  # Airflow < 3 uses get_xcom_val_af2
-            (Version("3.0.0"), "af3"),  # Airflow >= 3 uses get_xcom_val_af3
+            (Version("2.11.0"), "af2"),  # Airflow < 3.1 uses the direct-DB get_xcom_val_af2
+            (Version("3.1.0"), "af3"),  # Airflow >= 3.1 uses the task-SDK get_xcom_val_af3
         ],
     )
     async def test_get_xcom_val_branches(self, airflow_version, expected_val):
@@ -287,8 +269,11 @@ class TestWatcherTrigger:
                 raise ModuleNotFoundError("missing runtime")
             return _real_import(name, *args, **kwargs)
 
-        with patch("builtins.__import__", side_effect=_import_side_effect):
-            state = await self.trigger._get_producer_task_status()
+        # Pin to 3.1.0 so the task-SDK branch is taken; that is where the RuntimeTaskInstance
+        # import is attempted (and here blocked), which must degrade to None rather than raise.
+        with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", Version("3.1.0")):
+            with patch("builtins.__import__", side_effect=_import_side_effect):
+                state = await self.trigger._get_producer_task_status()
 
         assert state is None
 

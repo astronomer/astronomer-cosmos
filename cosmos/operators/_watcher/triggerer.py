@@ -7,9 +7,8 @@ from typing import Any
 
 from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
-from packaging.version import Version
 
-from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
+from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION, airflow_supports_task_sdk_runtime
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
@@ -79,25 +78,13 @@ class WatcherTrigger(BaseTrigger):
     async def get_xcom_val_af3(self, key: str) -> Any | None:
         from airflow.sdk.execution_time.xcom import XCom
 
-        try:
-            return await sync_to_async(XCom.get_one)(
-                run_id=self.run_id,
-                key=key,
-                task_id=self.producer_task_id,
-                dag_id=self.dag_id,
-                map_index=self.map_index,
-            )
-        except ImportError:
-            # On Airflow 3.0, ``XCom.get_one`` unconditionally imports ``SUPERVISOR_COMMS``
-            # from ``airflow.sdk.execution_time.task_runner`` -- a symbol that only exists on
-            # Airflow 3.1+. Outside a task-SDK supervisor process (most notably ``dag.test()``,
-            # which runs deferred triggers inline) that import raises, the deferred task is
-            # re-queued forever, and the DAG run hangs silently. A real triggerer process has the
-            # supervisor environment, so the SDK path works there and stays primary; only the
-            # non-supervisor case falls back to the direct-DB ORM path, which the ``ti.xcom_pull``
-            # implementation on AF 3.0 reads straight from ``XComModel`` (no supervisor needed).
-            # See apache/airflow#51816 and apache/airflow#59093.
-            return await self.get_xcom_val_af2(key)
+        return await sync_to_async(XCom.get_one)(
+            run_id=self.run_id,
+            key=key,
+            task_id=self.producer_task_id,
+            dag_id=self.dag_id,
+            map_index=self.map_index,
+        )
 
     async def get_xcom_val_af2(self, key: str) -> Any | None:
         from airflow.models import TaskInstance
@@ -129,10 +116,12 @@ class WatcherTrigger(BaseTrigger):
             self.run_id,
             self.map_index,
         )
-        if AIRFLOW_VERSION < Version("3.0.0"):
-            return await self.get_xcom_val_af2(key)
-        else:
+        # Airflow 3.0's task-SDK XCom API raises outside a supervisor (e.g. dag.test()), so only
+        # use it on 3.1+; Airflow < 3.1 reads XCom directly from the metadata DB. See #51816.
+        if airflow_supports_task_sdk_runtime(AIRFLOW_VERSION):
             return await self.get_xcom_val_af3(key)
+        else:
+            return await self.get_xcom_val_af2(key)
 
     async def _get_node_status(self) -> Any | None:
         """Return the dbt node status from XCom.

@@ -9,6 +9,19 @@ from packaging.version import Version
 
 AIRFLOW_VERSION = Version(airflow.__version__)
 
+
+def airflow_supports_task_sdk_runtime(version: Version = AIRFLOW_VERSION) -> bool:
+    """Whether Airflow's task-SDK runtime XCom / task-state APIs are usable in the triggerer.
+
+    ``XCom.get_one`` and ``RuntimeTaskInstance.get_task_states`` import ``SUPERVISOR_COMMS``
+    from ``airflow.sdk.execution_time.task_runner`` -- a symbol that only exists on Airflow
+    3.1+. On Airflow 3.0 those APIs raise outside a task-SDK supervisor process (most notably
+    ``dag.test()``, which runs triggers/tasks inline), so callers must read XCom and producer
+    task state directly from the metadata DB instead. See apache/airflow#51816 and #59093.
+    """
+    return version >= Version("3.1.0")
+
+
 # dbt materialization for models that are inlined as a CTE into downstream models and never written to the warehouse.
 DBT_EPHEMERAL_MATERIALIZATION = "ephemeral"
 

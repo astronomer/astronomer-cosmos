@@ -1064,8 +1064,8 @@ class TestDbtConsumerWatcherSensor:
         fetcher.assert_called_once_with()
         assert status is None
 
-    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
-    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.1.0"), reason="task-SDK get_task_states path is Airflow >= 3.1")
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.1.0"))
     @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states")
     def test_get_producer_task_status_airflow3(self, mock_get_task_states):
         sensor = self.make_sensor()
@@ -1085,8 +1085,8 @@ class TestDbtConsumerWatcherSensor:
             dag_id="example_dag", task_ids=[sensor.producer_task_id], run_ids=["run_3"]
         )
 
-    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.0.0"), reason="Database lookup path in Airflow < 3.0")
-    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @pytest.mark.skipif(AIRFLOW_VERSION < Version("3.1.0"), reason="task-SDK get_task_states path is Airflow >= 3.1")
+    @patch("cosmos.operators._watcher.base.AIRFLOW_VERSION", new=Version("3.1.0"))
     @patch("airflow.sdk.execution_time.task_runner.RuntimeTaskInstance.get_task_states")
     def test_get_producer_task_status_airflow3_missing_state(self, mock_get_task_states):
         sensor = self.make_sensor()

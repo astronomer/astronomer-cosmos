@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 _CHECKSUM_READ_CHUNK_SIZE = 1024 * 1024
 
 
-def calculate_file_checksum(file_path: Path) -> str | None:
+def _calculate_file_checksum(file_path: Path) -> str | None:
     """Return the MD5 checksum of a file, streaming it in chunks, or ``None`` if it cannot be read.
 
     MD5 is used for consistency with the other non-cryptographic content/identifier hashes across Cosmos

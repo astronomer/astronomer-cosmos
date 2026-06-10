@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cosmos.fs import calculate_file_checksum, safe_copy
+from cosmos.fs import _calculate_file_checksum, safe_copy
 
 
 def test_safe_copy_writes_destination(tmp_path: Path) -> None:
@@ -50,18 +50,18 @@ def test_calculate_file_checksum_matches_md5(tmp_path: Path) -> None:
     file_path = tmp_path / "seed.csv"
     file_path.write_bytes(content)
 
-    assert calculate_file_checksum(file_path) == hashlib.md5(content).hexdigest()
+    assert _calculate_file_checksum(file_path) == hashlib.md5(content).hexdigest()
 
 
 def test_calculate_file_checksum_is_stable_across_calls(tmp_path: Path) -> None:
     file_path = tmp_path / "seed.csv"
     file_path.write_bytes(b"a" * (2 * 1024 * 1024))  # larger than one read chunk
 
-    assert calculate_file_checksum(file_path) == calculate_file_checksum(file_path)
+    assert _calculate_file_checksum(file_path) == _calculate_file_checksum(file_path)
 
 
 def test_calculate_file_checksum_returns_none_when_unreadable(tmp_path: Path, caplog) -> None:
     caplog.set_level(logging.WARNING)
 
-    assert calculate_file_checksum(tmp_path / "missing.csv") is None
+    assert _calculate_file_checksum(tmp_path / "missing.csv") is None
     assert "Unable to read file" in caplog.text

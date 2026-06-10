@@ -65,7 +65,7 @@ from cosmos.dbt.project import (
     has_non_empty_dependencies_file,
 )
 from cosmos.dbt.selector import YamlSelectors, select_nodes
-from cosmos.fs import calculate_file_checksum
+from cosmos.fs import _calculate_file_checksum
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -127,7 +127,7 @@ class DbtNode:
         """
         if self.resource_type != DbtResourceType.SEED:
             return None
-        return calculate_file_checksum(self.file_path)
+        return _calculate_file_checksum(self.file_path)
 
     @property
     def has_ephemeral_materialization(self) -> bool:

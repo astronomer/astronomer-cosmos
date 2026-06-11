@@ -18,6 +18,7 @@ from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCal
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.airflow.compatibility import EmptyOperator
+from cosmos.constants import PRODUCER_WATCHER_TASK_ID
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators._watcher.xcom import (
@@ -87,7 +88,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
     _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = store_dbt_resource_status_from_log
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
+        task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
 
         existing_callbacks = kwargs.get("callbacks")
         if existing_callbacks is None:

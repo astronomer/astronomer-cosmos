@@ -2091,6 +2091,68 @@ def test_handle_post_execution_with_multiple_callbacks(
         callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
 
 
+@patch("cosmos.operators.local.load_method_from_module")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+def test_handle_post_execution_with_string_callback(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json, mock_load_method
+):
+    resolved_callback = MagicMock()
+    mock_load_method.return_value = resolved_callback
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        callback="cosmos.io.upload_to_aws_s3",
+        callback_args={"arg1": "value1"},
+    )
+
+    context = {"dag_run": MagicMock(), "task": MagicMock()}
+    operator._handle_post_execution("/tmp/project_dir", context)
+
+    mock_load_method.assert_called_once_with("cosmos.io", "upload_to_aws_s3")
+    resolved_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+def test_handle_post_execution_with_mixed_callbacks(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json, mock_load_method
+):
+    resolved_callback = MagicMock()
+    mock_load_method.return_value = resolved_callback
+    direct_callback = MagicMock()
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        callback=[direct_callback, "cosmos.io.upload_to_aws_s3"],
+        callback_args={"arg1": "value1"},
+    )
+
+    context = {"dag_run": MagicMock(), "task": MagicMock()}
+    operator._handle_post_execution("/tmp/project_dir", context)
+
+    mock_load_method.assert_called_once_with("cosmos.io", "upload_to_aws_s3")
+    direct_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+    resolved_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+def test_resolve_callback_rejects_path_without_module():
+    with pytest.raises(CosmosValueError, match="Invalid callback import path"):
+        ConcreteDbtLocalBaseOperator._resolve_callback("upload_to_aws_s3")
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+def test_resolve_callback_rejects_non_callable(mock_load_method):
+    mock_load_method.return_value = "not-a-callable"
+    with pytest.raises(CosmosValueError, match="did not resolve to a callable"):
+        ConcreteDbtLocalBaseOperator._resolve_callback("cosmos.io.SOME_CONSTANT")
+
+
 @pytest.mark.integration
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
 @patch("cosmos.operators.local.ObjectStoragePath")

@@ -178,7 +178,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param profile_config: ProfileConfig Object
     :param install_deps (deprecated): If true, install dependencies before running the command
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
-    :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
+    :param callback: A callback function, or list of functions, called after a dbt run with a path to the dbt
+        project directory. Each callback may also be given as a string import path (for example
+        "cosmos.io.upload_to_aws_s3"), which is resolved at runtime. This makes it possible to set a callback
+        per dbt node through meta.cosmos.operator_kwargs, where a function object cannot be expressed.
     :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
@@ -216,7 +219,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         install_deps: bool | str = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
-        callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
+        callback: str | Callable[..., Any] | list[str | Callable[..., Any]] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
@@ -645,11 +648,25 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         if self.callback:
             self.callback_args.update({"context": context})
-            if isinstance(self.callback, list):
-                for callback_fn in self.callback:
-                    callback_fn(tmp_project_dir, **self.callback_args)
-            else:
-                self.callback(tmp_project_dir, **self.callback_args)
+            callbacks = self.callback if isinstance(self.callback, list) else [self.callback]
+            for callback_fn in callbacks:
+                self._resolve_callback(callback_fn)(tmp_project_dir, **self.callback_args)
+
+    @staticmethod
+    def _resolve_callback(callback: str | Callable[..., Any]) -> Callable[..., Any]:
+        """Resolve a callback given as a string import path into a callable. Callables are returned as-is."""
+        if not isinstance(callback, str):
+            return callback
+        if "." not in callback:
+            raise CosmosValueError(
+                f"Invalid callback import path {callback!r}. Use a full import path, "
+                f"for example 'cosmos.io.upload_to_aws_s3'."
+            )
+        module_path, method_name = callback.rsplit(".", 1)
+        resolved = load_method_from_module(module_path, method_name)
+        if not callable(resolved):
+            raise CosmosValueError(f"Callback {callback!r} did not resolve to a callable.")
+        return resolved
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if settings.enable_setup_async_task:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import importlib.util
 import inspect
 import json
 import os
@@ -135,18 +134,6 @@ def _read_target_sources_json(project_root: Path) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         logger.warning("Could not parse JSON from %s", path)
         return None
-
-
-# Used for parsing dbt artifacts to generate OpenLineage URIs / Airflow assets.
-# ``find_spec`` only checks availability without importing the heavy openlineage client; the actual
-# ``DbtLocalArtifactProcessor`` import is deferred to ``calculate_openlineage_events_completes``.
-try:
-    is_openlineage_common_available = importlib.util.find_spec("openlineage.common") is not None
-except ImportError:
-    # ImportError (superclass of ModuleNotFoundError) also covers a present-but-broken package, e.g. one
-    # whose parent __init__ fails to import due to missing transitive deps.
-    is_openlineage_common_available = False
-DbtLocalArtifactProcessor = None
 
 
 # The following is related to the ability of Airflow to emit OpenLineage events
@@ -738,12 +725,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     self._sources_json = _read_target_sources_json(tmp_dir_path)
                     self.handle_exception(result)
                     return result
-                if is_openlineage_common_available:
-                    self.calculate_openlineage_events_completes(env, tmp_dir_path, full_cmd)
-                    if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
-                        # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance,
-                        # in that case we're storing as self.openlineage_events_completes
-                        context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
+                events_processed = self.calculate_openlineage_events_completes(env, tmp_dir_path, full_cmd)
+                if events_processed and AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
+                    # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance,
+                    # in that case we're storing as self.openlineage_events_completes
+                    context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
 
                 if self.emit_datasets:
                     self._handle_datasets(context)
@@ -759,12 +745,29 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
                 return result
 
+    @staticmethod
+    def _get_dbt_local_artifact_processor() -> Any:
+        """
+        Lazily import and return the ``DbtLocalArtifactProcessor`` class, or ``None`` when it is unavailable.
+
+        The import is deferred (not done at module load) to avoid pulling the heavy OpenLineage client into the
+        long-lived scheduler/dag-processor at DAG parse time; it only loads when a local dbt task actually emits
+        lineage. ``ImportError`` (the superclass of ``ModuleNotFoundError``) is treated as "unavailable", which also
+        covers a present-but-broken package whose import fails due to missing transitive dependencies.
+        """
+        try:
+            from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
+
+            return DbtLocalArtifactProcessor
+        except ImportError:
+            return None
+
     def calculate_openlineage_events_completes(
         self,
         env: dict[str, str | os.PathLike[Any] | bytes],
         project_dir: Path,
         dbt_command_line: list[str] | None = None,
-    ) -> None:
+    ) -> bool:
         """
         Use openlineage-integration-common to extract lineage events from the artifacts generated after running the dbt
         command. Relies on the following files:
@@ -772,20 +775,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         * {project_dir}/target/manifest.json
         * {project_dir}/target/run_results.json
 
-        Stores the extracted RunEvents on ``self.openlineage_events_completes``.
+        Stores the extracted RunEvents on ``self.openlineage_events_completes`` and returns ``True``. Returns ``False``
+        without doing any work when ``openlineage-integration-common`` is unavailable.
         """
-        # Imported lazily (not at module load) to avoid pulling the heavy openlineage client at DAG parse time.
-        # Cached on the module global so repeat calls and ``@patch``-based tests reuse it.
-        global DbtLocalArtifactProcessor
+        DbtLocalArtifactProcessor = self._get_dbt_local_artifact_processor()
         if DbtLocalArtifactProcessor is None:
-            try:
-                from openlineage.common.provider.dbt.local import (
-                    DbtLocalArtifactProcessor as _DbtLocalArtifactProcessor,
-                )
-            except ImportError:
-                logger.debug("openlineage-integration-common is unavailable; skipping OpenLineage event parsing.")
-                return
-            DbtLocalArtifactProcessor = _DbtLocalArtifactProcessor
+            self.log.debug("openlineage-integration-common is unavailable; skipping OpenLineage event parsing.")
+            return False
 
         # Since openlineage-integration-common relies on the profiles definition, we need to make these newly introduced
         # environment variables to the library. As of 1.0.0, DbtLocalArtifactProcessor did not allow passing environment
@@ -812,6 +808,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.openlineage_events_completes = events.completes
         except (FileNotFoundError, NotImplementedError, ValueError, KeyError, jinja2.exceptions.UndefinedError):
             self.log.debug("Unable to parse OpenLineage events", stack_info=True)
+        return True
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Asset]:
         """

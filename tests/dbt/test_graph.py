@@ -138,7 +138,7 @@ def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
     assert node.resource_name == expected_select
 
 
-def test_dbt_node_checksum_computes_sha256_of_seed_file(tmp_path):
+def test_dbt_node_checksum_computes_md5_of_seed_file(tmp_path):
     import hashlib
 
     content = b"id,name\n1,alice\n"
@@ -150,7 +150,7 @@ def test_dbt_node_checksum_computes_sha256_of_seed_file(tmp_path):
         path_base=tmp_path,
         original_file_path=Path("my_seed.csv"),
     )
-    assert node.checksum == hashlib.sha256(content).hexdigest()
+    assert node.checksum == hashlib.md5(content).hexdigest()
 
 
 def test_dbt_node_checksum_is_none_for_non_seed_nodes(tmp_path):

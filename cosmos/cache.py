@@ -153,11 +153,11 @@ def _create_seed_checksum_key(dag_task_group_identifier: str, unique_id: str) ->
     store the checksum under a fixed-length key: a readable prefix plus a stable hash of the full
     identifier, ensuring long DAG ids / nested task groups / package+resource names never overflow it.
     """
-    digest = hashlib.sha1(f"{dag_task_group_identifier}:{unique_id}".encode()).hexdigest()
+    digest = hashlib.md5(f"{dag_task_group_identifier}:{unique_id}".encode()).hexdigest()
     return f"{VAR_KEY_SEED_CHECKSUM_PREFIX}{digest}"
 
 
-def get_seed_checksum(dag_task_group_identifier: str, unique_id: str) -> str | None:
+def get_cache_seed_checksum(dag_task_group_identifier: str, unique_id: str) -> str | None:
     """Return the seed's last persisted checksum, or ``None`` when none is stored or it cannot be read.
 
     Best-effort: change detection must never fail a seed task, so a missing value or a transient
@@ -172,7 +172,7 @@ def get_seed_checksum(dag_task_group_identifier: str, unique_id: str) -> str | N
     return checksum
 
 
-def store_seed_checksum(dag_task_group_identifier: str, unique_id: str, checksum: str) -> None:
+def store_cache_seed_checksum(dag_task_group_identifier: str, unique_id: str, checksum: str) -> None:
     """Persist a seed's checksum after a successful run.
 
     Best-effort: a failure to store the checksum must never fail a seed that already loaded successfully,

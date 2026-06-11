@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
@@ -17,7 +16,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.cncf.kubernetes.callbacks import KubernetesPodOperatorCallback, client_type
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
-from cosmos.airflow.compatibility import EmptyOperator
+from cosmos.constants import PRODUCER_WATCHER_TASK_ID
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators._watcher.xcom import (
@@ -40,16 +39,20 @@ from cosmos.operators.kubernetes import (
 logger = get_logger(__name__)
 
 
-# Module-level globals used to make per-execution state available to the static
-# K8s callback (see WatcherKubernetesCallback). They are set in
-# DbtProducerWatcherKubernetesOperator.execute, read in the callback, and
-# mirror the per-operator state DbtProducerWatcherOperator threads through its
-# functools.partial-wrapped parser.
-producer_task_context = None
-producer_upstream_failure_skipped_ids: set[str] | None = None
-
-
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
+    """Callback that parses dbt JSON logs from Kubernetes pod output.
+
+    ``tests_per_model``, ``test_results_per_model``, ``context``, and
+    ``upstream_failure_skipped_ids`` are forwarded by ``CosmosKubernetesPodManager``
+    via its ``callback_extra_kwargs`` and arrive in ``progress_callback`` as ``**kwargs``.
+    The ``receives_cosmos_callback_kwargs`` marker opts this callback in to receiving
+    them; user-supplied callbacks without the marker are not given these Cosmos-only
+    kwargs, so their ``progress_callback`` is not broken.
+    """
+
+    # Opts this callback in to receiving callback_extra_kwargs; read by
+    # CosmosKubernetesPodManager._extra_kwargs_for (keep the attribute name in sync).
+    receives_cosmos_callback_kwargs = True
 
     @staticmethod
     def progress_callback(
@@ -72,22 +75,25 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param timestamp: the timestamp of the log line.
         :param pod: the pod from which the log line was read.
         """
-        if "context" not in kwargs:
-            kwargs["context"] = producer_task_context
         store_dbt_resource_status_from_log(
             line,
             kwargs,
-            upstream_failure_skipped_ids=producer_upstream_failure_skipped_ids,
+            tests_per_model=kwargs.get("tests_per_model"),
+            test_results_per_model=kwargs.get("test_results_per_model"),
+            upstream_failure_skipped_ids=kwargs.get("upstream_failure_skipped_ids"),
         )
 
 
 class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
-
     template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
-    _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = store_dbt_resource_status_from_log
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
+        task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
+        self._tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
+        self._test_results_per_model: dict[str, dict[str, str]] = {}
+        # Set in execute() before super().execute() triggers pod_manager. Initialized
+        # here so pod_manager never raises AttributeError if accessed before execute().
+        self._context: Context | None = None
 
         existing_callbacks = kwargs.get("callbacks")
         if existing_callbacks is None:
@@ -109,7 +115,16 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
-        return CosmosKubernetesPodManager(kube_client=self.client, callbacks=self.callbacks)
+        return CosmosKubernetesPodManager(
+            kube_client=self.client,
+            callbacks=self.callbacks,
+            callback_extra_kwargs={
+                "tests_per_model": self._tests_per_model,
+                "test_results_per_model": self._test_results_per_model,
+                "context": self._context,
+                "upstream_failure_skipped_ids": self._upstream_failure_skipped_ids,
+            },
+        )
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         task_instance = context.get("ti")
@@ -130,12 +145,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         _init_xcom_backup(context)
 
         self._upstream_failure_skipped_ids.clear()
-
-        # Make per-execution state available to the static K8s callback. See the
-        # module-level globals at the top of this file for details.
-        global producer_task_context, producer_upstream_failure_skipped_ids
-        producer_task_context = context
-        producer_upstream_failure_skipped_ids = self._upstream_failure_skipped_ids
+        self._context = context
 
         try:
             return_value = super().execute(context, **kwargs)
@@ -155,7 +165,7 @@ class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOpe
 class DbtBuildWatcherKubernetesOperator:
     def __init__(self, *args: Any, **kwargs: Any):
         raise NotImplementedError(
-            "`ExecutionMode.WATCHER` does not expose a DbtBuild operator, since the build command is executed by the producer task."
+            "`ExecutionMode.WATCHER_KUBERNETES` does not expose a DbtBuild operator, since the build command is executed by the producer task."
         )
 
 
@@ -197,13 +207,52 @@ class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
         super().__init__(*args, **kwargs)
 
 
-class DbtTestWatcherKubernetesOperator(EmptyOperator):
-    """
-    As a starting point, this operator does nothing.
-    We'll be implementing this operator as part of: https://github.com/astronomer/astronomer-cosmos/issues/1974
+class DbtTestWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
+    """Sensor that watches the aggregated test status for a dbt model in WATCHER_KUBERNETES execution mode.
+
+    The producer task collects individual test results as they finish and,
+    once every test for a given model has reported, pushes a single
+    aggregated XCom (``"pass"`` or ``"fail"``) under the key returned by
+    ``get_tests_status_xcom_key(model_uid)``. This key sanitizes the dbt
+    model unique ID by replacing ``.`` with ``__`` before appending
+    ``_tests_status`` (for example,
+    ``model.jaffle_shop.stg_orders`` becomes
+    ``model__jaffle_shop__stg_orders_tests_status``).
+
+    This sensor polls that key and returns success when ``"pass"`` or raises
+    ``AirflowException`` when ``"fail"``.
+
+    On manual clear from the Airflow UI or Airflow-level retry, the sensor falls
+    back to launching a pod that runs ``dbt test --select <model>`` for this
+    specific model.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any):
-        desired_keys = ("dag", "task_group", "task_id")
-        new_kwargs = {key: value for key, value in kwargs.items() if key in desired_keys}
-        super().__init__(**new_kwargs)
+    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields
+
+    # See DbtTestWatcherOperator for the reasoning behind hardcoding base_cmd
+    # rather than inheriting from DbtTestMixin.
+    base_cmd = ["test"]
+
+    @property
+    def is_test_sensor(self) -> bool:
+        return True
+
+    def _fallback_to_non_watcher_run(self, try_number: int, context: Context) -> bool:
+        """Launch a pod running ``dbt test --select <model>`` to retry tests for this model.
+
+        Used when the test sensor is manually cleared from the Airflow UI or when
+        Airflow-level retries fire. Producer flags are intentionally not forwarded
+        because some of them (e.g. ``--full-refresh``) are not valid for ``dbt test``.
+        """
+        logger.info(
+            "Running tests for model '%s' from project '%s' (try %s)",
+            self.model_unique_id,
+            self.project_dir,
+            try_number,
+        )
+
+        model_selector = self.model_unique_id.split(".", 2)[2]
+        cmd_flags = ["--select", model_selector]
+        self.build_and_run_cmd(context, cmd_flags=cmd_flags)
+        logger.info("dbt test completed successfully for model '%s'", self.model_unique_id)
+        return True

@@ -41,9 +41,9 @@ from cosmos._utils.importer import load_method_from_module
 from cosmos.cache import (
     _copy_cached_package_lockfile_to_project,
     _get_latest_cached_package_lockfile,
-    get_seed_checksum,
+    get_cache_seed_checksum,
     is_cache_package_lockfile_enabled,
-    store_seed_checksum,
+    store_cache_seed_checksum,
 )
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
@@ -1072,7 +1072,7 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
         # under. When both are available, skip the run if the checksum matches the last successful run;
         # otherwise fall back to always running the seed (change detection is best-effort).
         if current_seed_checksum and dag_task_group_identifier and unique_id:
-            last_run_seed_checksum = get_seed_checksum(dag_task_group_identifier, unique_id)
+            last_run_seed_checksum = get_cache_seed_checksum(dag_task_group_identifier, unique_id)
             should_run = last_run_seed_checksum != current_seed_checksum
             if not should_run:
                 # Return successfully (do NOT raise AirflowSkipException) so downstream models that depend
@@ -1080,7 +1080,7 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
                 self.log.info("Seed `%s` is unchanged since its last successful run; skipping `dbt seed`.", unique_id)
                 return
             super().execute(context, **kwargs)
-            store_seed_checksum(dag_task_group_identifier, unique_id, current_seed_checksum)
+            store_cache_seed_checksum(dag_task_group_identifier, unique_id, current_seed_checksum)
             return
 
         super().execute(context, **kwargs)

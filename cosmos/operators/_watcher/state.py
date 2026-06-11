@@ -155,9 +155,9 @@ def build_producer_state_fetcher(
       forbidden -- ``create_session`` raises ``RuntimeError: Direct database access via the
       ORM is not allowed in Airflow 3.0`` -- but ``RuntimeTaskInstance.get_task_states`` works
       because the worker binds ``SUPERVISOR_COMMS``.
-    * Outside a supervisor (``dag.test()`` running inline, or the Airflow 3.0 triggerer process
-      where ``SUPERVISOR_COMMS`` is never bound), ``get_task_states`` raises ``NameError`` while
-      ORM access *is* permitted.
+    * Outside a supervisor (``dag.test()`` running inline), ``SUPERVISOR_COMMS`` is unbound, so
+      ``get_task_states`` raises ``NameError`` while ORM access *is* permitted. (A real worker and a
+      real triggerer both bind ``SUPERVISOR_COMMS`` and take the task-SDK path above.)
 
     So on Airflow >= 3.0 we prefer ``get_task_states`` and fall back to the metadata DB only on
     ``NameError`` (no supervisor). See apache/airflow#51816, #59093.
@@ -208,9 +208,8 @@ def build_producer_state_fetcher(
                 run_ids=[run_id],
             )
         except NameError as exc:
-            # No task-SDK supervisor (e.g. dag.test() inline, or the Airflow 3.0 triggerer):
-            # SUPERVISOR_COMMS is unbound. Read producer state from the metadata DB, which is
-            # permitted in these non-supervisor contexts.
+            # No task-SDK supervisor (dag.test() running inline): SUPERVISOR_COMMS is unbound. Read
+            # producer state from the metadata DB, which is permitted in this non-supervisor context.
             logger.debug(
                 "RuntimeTaskInstance.get_task_states unavailable (no supervisor: %s); reading state from the metadata DB",
                 exc,

@@ -295,7 +295,7 @@ def store_dbt_resource_status_from_log(
     extra_kwargs: Any,
     *,
     tests_per_model: dict[str, list[str]] | None = None,
-    test_results_per_model: dict[str, list[str]] | None = None,
+    test_results_per_model: dict[str, dict[str, str]] | None = None,
     model_outlet_uris: dict[str, list[str]] | None = None,
     dataset_namespace: str | None = None,
     upstream_failure_skipped_ids: set[str] | None = None,
@@ -314,8 +314,9 @@ def store_dbt_resource_status_from_log(
         Empty dict when no tests exist.
     :param test_results_per_model: Mutable accumulator dict. For each model that has
         tests, collects the terminal statuses of those tests as they finish.
-        Keyed by model unique_id, values are lists of test statuses (e.g. ``["pass", "pass"]``).
-        Mutated in place by this function.
+        Keyed by model unique_id; values are dicts mapping each test's unique_id to its
+        status (e.g. ``{"test.pkg.not_null_orders_id": "pass"}``), so a replayed log line
+        for the same test is idempotent. Mutated in place by this function.
     :param model_outlet_uris: Mutable dict mapping unique_id to outlet URIs.
         Populated lazily from the manifest on first terminal status detection.
     :param dataset_namespace: The OL-compatible dataset namespace for URI construction.

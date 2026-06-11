@@ -212,7 +212,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
-        self.test_results_per_model: dict[str, list[str]] = {}
+        self.test_results_per_model: dict[str, dict[str, str]] = {}
         self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
         self._freshness_callback: Callable[
             [Context, Any, TaskGroup | None, dict[str, DbtNode] | None, dict[str, Any] | None],

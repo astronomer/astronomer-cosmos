@@ -91,6 +91,31 @@ class TestBaseConsumerSensor:
             _process_dbt_log_event(task_instance, dbt_log)
             mock_push.assert_not_called()
 
+    def test_process_dbt_log_event_captures_error_from_run_result_message(self):
+        """dbt-runner mode: the error text lives in NodeFinished.data.run_result.message (data.msg/info.msg
+        are empty there). It must reach the consumer's _dbt_event."""
+        task_instance = Mock()
+        dbt_log = {
+            "data": {
+                "node_info": {
+                    "unique_id": "model.test.bad_model",
+                    "node_status": "error",
+                    "node_started_at": "2024-01-01T00:00:00",
+                    "node_finished_at": "2024-01-01T00:01:00",
+                },
+                "run_result": {"status": "error", "message": "Runtime Error ... Catalog Error: Table does not exist!"},
+                "msg": "",
+            },
+            "info": {"name": "NodeFinished", "msg": ""},
+        }
+
+        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+            _process_dbt_log_event(task_instance, dbt_log)
+
+        value = mock_push.call_args.kwargs["value"]
+        assert value["status"] == "error"
+        assert value["msg"] == "Runtime Error ... Catalog Error: Table does not exist!"
+
     def test_execute_complete_raises_airflow_skip_exception_when_status_is_skipped(self):
         """execute_complete raises AirflowSkipException when the trigger sends status='skipped'."""
 

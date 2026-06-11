@@ -113,7 +113,12 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
     unique_id = node_info.get("unique_id")
     start_time = node_info.get("node_started_at")
     finish_time = node_info.get("node_finished_at")
-    msg = data.get("msg") or info.get("msg")
+    # The error text lives in different places depending on the invocation mode: ``run_result.message`` on
+    # ``NodeFinished`` (dbt-runner mode) and ``data.msg`` on ``RunResultError`` (subprocess mode). The old code
+    # read only ``data.msg``/``info.msg``, which are empty on ``NodeFinished`` -- so a failed dbt-runner node
+    # reached the consumer with no error message. Read ``run_result.message`` first to capture it.
+    run_result = data.get("run_result") or {}
+    msg = run_result.get("message") or data.get("msg") or info.get("msg")
 
     if unique_id:
         dbt_event = {

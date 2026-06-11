@@ -9,7 +9,12 @@ from airflow.providers.cncf.kubernetes.secret import Secret
 from packaging.version import Version
 
 from cosmos.config import ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import LoadMode, TestBehavior, _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION
+from cosmos.constants import (
+    PRODUCER_WATCHER_TASK_ID,
+    LoadMode,
+    TestBehavior,
+    _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION,
+)
 
 if Version(airflow_k8s_provider_version) < _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION:
     pytest.skip(
@@ -76,6 +81,33 @@ project_config = ProjectConfig(
 )
 
 render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=TestBehavior.NONE)
+
+
+def test_producer_default_task_id_matches_watcher_task_id():
+    """The Kubernetes producer must default its ``task_id`` to ``PRODUCER_WATCHER_TASK_ID``.
+
+    Consumer sensors default ``producer_task_id`` to ``PRODUCER_WATCHER_TASK_ID``, so a
+    directly-instantiated producer with a different default would make consumers poll the
+    wrong task and hang. The Cosmos-rendered graph always sets ``task_id`` explicitly, but
+    this guards direct instantiation and keeps parity with ``DbtProducerWatcherOperator``.
+    """
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+    assert op.task_id == PRODUCER_WATCHER_TASK_ID
+
+
+def test_producer_honours_explicit_task_id():
+    """An explicitly-provided ``task_id`` is still respected."""
+    op = DbtProducerWatcherKubernetesOperator(
+        task_id="custom_producer",
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+    assert op.task_id == "custom_producer"
 
 
 @patch("cosmos.operators.watcher_kubernetes._restore_xcom_from_variable")

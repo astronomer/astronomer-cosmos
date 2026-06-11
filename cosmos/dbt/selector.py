@@ -6,6 +6,7 @@ import inspect
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from fnmatch import fnmatch
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -56,6 +57,41 @@ def _fqn_matches(node_fqn: str, fqn_selector_value: str) -> bool:
     FQN is a fully qualified name (e.g. project.folder.model_name); no wildcards or partial matching.
     """
     return node_fqn == fqn_selector_value
+
+
+def _is_selected_fqn(node_fqn: list[str], selector: str) -> bool:
+    """
+    Mirror dbt's fqn matching for a single fqn list (dbt.graph.selector_methods.is_selected_node).
+
+    A dot-separated ``selector`` matches when its parts are a prefix of the node's fqn, the selector
+    equals the node's leaf (model name), or a part contains a glob (``* ? [ ]``) that fnmatches the
+    remainder. See https://docs.getdbt.com/reference/node-selection/methods#fqn
+    """
+    if node_fqn[-1] == selector:
+        return True
+
+    # Dots inside a single fqn segment act as namespace separators in dbt.
+    flat_fqn = [part for segment in node_fqn for part in segment.split(".")]
+    selector_parts = selector.split(".")
+    if len(flat_fqn) < len(selector_parts):
+        return False
+
+    for i, selector_part in enumerate(selector_parts):
+        if any(glob in selector_part for glob in ("*", "?", "[", "]")):
+            return fnmatch(".".join(flat_fqn[i:]), ".".join(selector_parts[i:]))
+        if flat_fqn[i] != selector_part:
+            return False
+    return True
+
+
+def _node_matches_fqn_selector(node_fqn: list[str], selector: str) -> bool:
+    """
+    Return True if ``selector`` matches the node's fqn, with or without the leading package segment.
+
+    Mirrors dbt's QualifiedNameSelectorMethod.node_is_match, which tries the full fqn and the
+    package-scoped fqn so a selector like ``folder.model`` matches regardless of the package prefix.
+    """
+    return _is_selected_fqn(node_fqn, selector) or _is_selected_fqn(node_fqn[1:], selector)
 
 
 def _check_nested_value_in_dict(dict_: dict[Any, Any], pattern: str) -> bool:
@@ -328,12 +364,25 @@ class GraphSelector:
             for node_id, node in nodes.items():
                 node_by_name[node.name] = node_id
 
+            # A versioned/dotted model name (e.g. ``my_model.v1``) is normalised to an underscore in
+            # the node's task name, so match the patched form against node names.
             node_name_patched = self.node_name.replace(".", "_")
-
             if node_name_patched in node_by_name:
-                root_id = node_by_name[node_name_patched]
-                root_nodes.add(root_id)
-            else:
+                root_nodes.add(node_by_name[node_name_patched])
+
+            # A dot-separated selector (e.g. ``folder.model``) is also dbt's default fqn method: match
+            # it against each node's fqn the way dbt does, so manifest-mode selection lines up with
+            # ``dbt ls``. Without this, folder selectors silently select nothing in manifest mode.
+            if "." in self.node_name:
+                root_nodes.update(
+                    {
+                        node_id
+                        for node_id, node in nodes.items()
+                        if node.fqn and _node_matches_fqn_selector(node.fqn, self.node_name)
+                    }
+                )
+
+            if not root_nodes:
                 logger.warning("Selector %s not found.", self.node_name)
                 return selected_nodes
 

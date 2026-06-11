@@ -958,6 +958,61 @@ def test_exclude_nodes_with_period_with_at_operator():
     assert sorted(selected.keys()) == expected
 
 
+def test_select_nodes_with_dot_fqn_folder_selector():
+    """A dotted folder selector (dbt's default fqn method) selects every model under that folder.
+
+    Regression test for https://github.com/astronomer/astronomer-cosmos/issues/1805: in manifest mode
+    ``select=["mart.mart_opr_finance"]`` selected nothing, while ``path:models/mart/mart_opr_finance``
+    worked. Both folder segments map to fqn segments, so the dot selector must match the same models.
+    """
+    project_name = SAMPLE_PROJ_PATH.stem
+    revenue = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{project_name}.mart_opr_revenue",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/mart/mart_opr_finance/mart_opr_revenue.sql"),
+        tags=[],
+        config={},
+        fqn=[project_name, "mart", "mart_opr_finance", "mart_opr_revenue"],
+    )
+    cost = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{project_name}.mart_opr_cost",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/mart/mart_opr_finance/mart_opr_cost.sql"),
+        tags=[],
+        config={},
+        fqn=[project_name, "mart", "mart_opr_finance", "mart_opr_cost"],
+    )
+    other = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{project_name}.other",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/other/other.sql"),
+        tags=[],
+        config={},
+        fqn=[project_name, "other", "other"],
+    )
+    nodes = {n.unique_id: n for n in (revenue, cost, other)}
+    folder_models = {revenue.unique_id, cost.unique_id}
+
+    # The dot selector and the path selector must select the same folder models.
+    by_dot = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["mart.mart_opr_finance"])
+    by_path = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["path:models/mart/mart_opr_finance"])
+    assert set(by_dot.keys()) == folder_models
+    assert set(by_path.keys()) == folder_models
+
+    # A trailing wildcard fnmatches the remainder of the fqn, like dbt.
+    by_glob = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["mart.*"])
+    assert set(by_glob.keys()) == folder_models
+
+    # A non-existent folder selects nothing.
+    assert select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["mart.does_not_exist"]) == {}
+
+
 def test_select_nodes_by_resource_type_source():
     """
     Test that 'resource_type:source' picks up only nodes with resource_type == SOURCE,

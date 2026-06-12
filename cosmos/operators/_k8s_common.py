@@ -25,6 +25,7 @@ try:
 except ImportError:
     from airflow.utils.context import context_merge
 
+from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.config import ProfileConfig
 from cosmos.operators._watcher.xcom import (
     _backup_xcom_to_variable,
@@ -367,20 +368,36 @@ def setup_warning_handler(
     return handler
 
 
-# These module-level globals make per-execution producer state available to the static K8s
-# callback (set by the producer's execute()). While the callback is set during the operator
-# initialization, the context is only created during the operator's execution.
-# Safe because only one producer task runs per worker process at a time.
-_producer_task_context: Any | None = None
-# Mutable set the dbt JSON log parser populates with the unique_ids of nodes whose upstream
-# failure caused a skip; subsequent "skipped" terminal events for those ids are rewritten to
-# "failed" so the consumer sensor fails on attempt 1 (Airflow does not retry SKIPPED). Points
-# at the running producer's DbtProducer*WatcherOperator._upstream_failure_skipped_ids; see #2698.
-_producer_upstream_failure_skipped_ids: set[str] | None = None
+class K8sWatcherProducerProtocol(Protocol):
+    """Structural type for K8s-based watcher producer operators.
+
+    Producers (``DbtProducerWatcherKubernetesOperator``, ``DbtProducerWatcherGcpGkeOperator``)
+    initialise this per-execution state in ``__init__`` and thread it to
+    ``WatcherK8sCallback`` through the pod manager's ``callback_extra_kwargs``.
+    """
+
+    _tests_per_model: dict[str, list[str]]
+    _test_results_per_model: dict[str, dict[str, str]]
+    _context: Context | None
+    _upstream_failure_skipped_ids: set[str]
+    client: Any
+    callbacks: Any
 
 
 class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
-    """K8s pod log callback that parses dbt JSON output and pushes per-model XCom status."""
+    """K8s pod log callback that parses dbt JSON output and pushes per-model XCom status.
+
+    ``tests_per_model``, ``test_results_per_model``, ``context``, and
+    ``upstream_failure_skipped_ids`` are forwarded by ``CosmosKubernetesPodManager``
+    via its ``callback_extra_kwargs`` and arrive in ``progress_callback`` as ``**kwargs``.
+    The ``receives_cosmos_callback_kwargs`` marker opts this callback in to receiving
+    them; user-supplied callbacks without the marker are not given these Cosmos-only
+    kwargs, so their ``progress_callback`` is not broken.
+    """
+
+    # Opts this callback in to receiving callback_extra_kwargs; read by
+    # CosmosKubernetesPodManager._extra_kwargs_for (keep the attribute name in sync).
+    receives_cosmos_callback_kwargs = True
 
     @staticmethod
     def progress_callback(
@@ -405,14 +422,12 @@ class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
         :param timestamp: the timestamp of the log line.
         :param pod: the pod from which the log line was read.
         """
-        if "context" not in kwargs:
-            # This global variable is used to make the task context available to the K8s callback.
-            # While the callback is set during the operator initialization, the context is only created during the operator's execution.
-            kwargs["context"] = _producer_task_context
         store_dbt_resource_status_from_log(
             line,
             kwargs,
-            upstream_failure_skipped_ids=_producer_upstream_failure_skipped_ids,
+            tests_per_model=kwargs.get("tests_per_model"),
+            test_results_per_model=kwargs.get("test_results_per_model"),
+            upstream_failure_skipped_ids=kwargs.get("upstream_failure_skipped_ids"),
         )
 
 
@@ -429,15 +444,34 @@ def inject_watcher_callback(kwargs: dict[str, Any]) -> None:
     kwargs["callbacks"] = normalized_callbacks
 
 
+def build_watcher_pod_manager(operator: K8sWatcherProducerProtocol) -> CosmosKubernetesPodManager:
+    """Build the producer's pod manager, threading watcher state to ``WatcherK8sCallback``.
+
+    The pod manager forwards ``callback_extra_kwargs`` only to callbacks marked with
+    ``receives_cosmos_callback_kwargs`` (i.e. ``WatcherK8sCallback``).
+    """
+    return CosmosKubernetesPodManager(
+        kube_client=operator.client,
+        callbacks=operator.callbacks,
+        callback_extra_kwargs={
+            "tests_per_model": operator._tests_per_model,
+            "test_results_per_model": operator._test_results_per_model,
+            "context": operator._context,
+            "upstream_failure_skipped_ids": operator._upstream_failure_skipped_ids,
+        },
+    )
+
+
 def execute_watcher_producer(
-    operator: DbtK8sOperator, context: Context, parent_execute: Callable[..., Any], **kwargs: Any
+    operator: K8sWatcherProducerProtocol, context: Context, parent_execute: Callable[..., Any], **kwargs: Any
 ) -> Any:
     """Shared ``execute`` logic for K8s watcher producer operators.
 
     On retry, restores any XCom backup and raises ``AirflowSkipException`` (the
     producer does not support Airflow retries). On the first attempt, initialises
-    an XCom backup, runs the parent execute, deletes the backup on success, and
-    backs up XComs on failure so the next try can restore them.
+    an XCom backup, exposes the execution context to the log-parsing callback, runs
+    the parent execute, deletes the backup on success, and backs up XComs on
+    failure so the next try can restore them.
     """
     task_instance = context.get("ti")
     if task_instance is None:
@@ -454,16 +488,10 @@ def execute_watcher_producer(
 
     _init_xcom_backup(context)
 
-    # Reset and expose the producer's upstream-failure skip accumulator for the static callback
-    # (see the module-level globals above). Producers create this set in __init__; guard with
-    # getattr so any non-producer caller of this helper keeps working.
-    skipped_ids = getattr(operator, "_upstream_failure_skipped_ids", None)
-    if skipped_ids is not None:
-        skipped_ids.clear()
-
-    global _producer_task_context, _producer_upstream_failure_skipped_ids
-    _producer_task_context = context
-    _producer_upstream_failure_skipped_ids = skipped_ids
+    operator._upstream_failure_skipped_ids.clear()
+    # The pod manager (a cached_property built while parent_execute runs) snapshots this
+    # state into callback_extra_kwargs, so the context must be set before parent_execute.
+    operator._context = context
 
     try:
         return_value = parent_execute(context, **kwargs)

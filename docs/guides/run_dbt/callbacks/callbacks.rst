@@ -69,6 +69,30 @@ The path naming convention is:
 
 If users are unhappy with this structure or format, they can implement similar methods, which can be based (or not) on the Cosmos standard ones.
 
+Example: Per-Node Callbacks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Individual dbt nodes can override operator arguments through ``meta.cosmos.operator_kwargs`` in the dbt YAML.
+A function object cannot be expressed in YAML, so the ``callback`` is given here as a string import path that
+Cosmos resolves at runtime. ``callback_args`` are passed through unchanged.
+
+.. code-block:: yaml
+
+    version: 2
+
+    models:
+      - name: model_with_custom_callback
+        meta:
+          cosmos:
+            operator_kwargs:
+              callback: "cosmos.io.upload_to_aws_s3"
+              callback_args:
+                aws_conn_id: "aws_s3_conn"
+                bucket_name: "cosmos-artifacts-upload"
+
+The string can point to a built-in helper in ``cosmos/io.py`` or to any importable function in your project.
+A list of import paths is also accepted, and the entries may mix string paths with function objects.
+
 Custom Callbacks
 ~~~~~~~~~~~~~~~~
 

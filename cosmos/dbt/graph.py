@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import datetime
 import functools
-import hashlib
 import itertools
 import json
 import os
@@ -66,26 +65,10 @@ from cosmos.dbt.project import (
     has_non_empty_dependencies_file,
 )
 from cosmos.dbt.selector import YamlSelectors, select_nodes
+from cosmos.fs import _calculate_file_checksum
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
-
-# Read the seed file in fixed-size chunks when checksumming so a large CSV does not have to be loaded
-# into memory all at once.
-_CHECKSUM_READ_CHUNK_SIZE = 1024 * 1024
-
-
-def _calculate_file_checksum(file_path: Path) -> str | None:
-    """Return the SHA256 checksum of a file, streaming it in chunks, or ``None`` if it cannot be read."""
-    digest = hashlib.sha256()
-    try:
-        with open(file_path, "rb") as file:
-            for chunk in iter(lambda: file.read(_CHECKSUM_READ_CHUNK_SIZE), b""):
-                digest.update(chunk)
-    except OSError as exc:
-        logger.warning("Unable to read file `%s` to compute its checksum: %s", file_path, exc)
-        return None
-    return digest.hexdigest()
 
 
 def _normalize_path(path: str | None) -> str:
@@ -131,13 +114,16 @@ class DbtNode:
         """Combined path to the node's file (path_base / original_file_path)."""
         return self.path_base / self.original_file_path
 
-    @property
+    @cached_property
     def checksum(self) -> str | None:
-        """SHA256 checksum of a seed's CSV content, used by ``SeedRenderingBehavior.WHEN_SEED_CHANGES``.
+        """MD5 checksum of a seed's CSV content, used by ``SeedRenderingBehavior.WHEN_SEED_CHANGES``.
 
         Although ``manifest.json`` records a checksum per node, we always recompute it from the seed file
         here so the value is consistent regardless of whether the project was loaded via ``LoadMode.MANIFEST``
         or ``LoadMode.DBT_LS``. Returns ``None`` for non-seed nodes or when the file cannot be read.
+
+        Cached because the value is derived from the seed file at parse time and is read again when building
+        the task's ``extra_context``; the file is not expected to change within a single parse.
         """
         if self.resource_type != DbtResourceType.SEED:
             return None

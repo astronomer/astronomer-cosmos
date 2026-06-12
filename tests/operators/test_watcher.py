@@ -566,7 +566,7 @@ class TestStoreDbtStatusFromLog:
         tests_per_model = {
             "model.pkg.orders": ["test.pkg.not_null_orders_id", "test.pkg.unique_orders_id"],
         }
-        test_results_per_model: dict[str, list[str]] = {}
+        test_results_per_model: dict[str, dict[str, str]] = {}
 
         # First test passes — not all tests reported yet, no XCom push
         log_line_1 = json.dumps(
@@ -618,7 +618,7 @@ class TestStoreDbtStatusFromLog:
         tests_per_model = {
             "model.pkg.orders": ["test.pkg.not_null_orders_id", "test.pkg.unique_orders_id"],
         }
-        test_results_per_model: dict[str, list[str]] = {}
+        test_results_per_model: dict[str, dict[str, str]] = {}
 
         for uid, status in [
             ("test.pkg.not_null_orders_id", "pass"),

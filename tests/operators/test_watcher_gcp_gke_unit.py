@@ -8,7 +8,7 @@ from airflow.exceptions import AirflowSkipException
 from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
 from packaging.version import Version
 
-from cosmos.constants import _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION
+from cosmos.constants import PRODUCER_WATCHER_TASK_ID, _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION
 
 if Version(airflow_k8s_provider_version) < _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION:
     pytest.skip(
@@ -161,6 +161,72 @@ def test_producer_uses_watcher_k8s_callback():
         **GKE_KWARGS,
     )
     assert WatcherK8sCallback in op.callbacks
+
+
+def test_producer_default_task_id_matches_watcher_task_id():
+    """The GCP GKE producer must default its ``task_id`` to ``PRODUCER_WATCHER_TASK_ID``.
+
+    Consumer sensors default ``producer_task_id`` to ``PRODUCER_WATCHER_TASK_ID``, so a
+    directly-instantiated producer with a different default would make consumers poll the
+    wrong task and hang. Mirrors DbtProducerWatcherKubernetesOperator.
+    """
+    op = DbtProducerWatcherGcpGkeOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        **GKE_KWARGS,
+    )
+    assert op.task_id == PRODUCER_WATCHER_TASK_ID
+
+
+def test_producer_honours_explicit_task_id():
+    """An explicitly-provided ``task_id`` is still respected."""
+    op = DbtProducerWatcherGcpGkeOperator(
+        task_id="custom_producer",
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        **GKE_KWARGS,
+    )
+    assert op.task_id == "custom_producer"
+
+
+def test_producer_stores_tests_per_model():
+    """tests_per_model kwarg is stored on the operator for later use in execute()."""
+    tests_per_model = {"model.pkg.orders": ["test.pkg.t1", "test.pkg.t2"]}
+    op = DbtProducerWatcherGcpGkeOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        tests_per_model=tests_per_model,
+        **GKE_KWARGS,
+    )
+    assert op._tests_per_model is tests_per_model
+    assert op._test_results_per_model == {}
+
+
+@patch("cosmos.operators._k8s_common.CosmosKubernetesPodManager")
+def test_producer_pod_manager_wires_callback_extra_kwargs(mock_manager_cls):
+    """pod_manager forwards tests_per_model, test_results_per_model, and context (by reference) to CosmosKubernetesPodManager."""
+    tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
+    op = DbtProducerWatcherGcpGkeOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        tests_per_model=tests_per_model,
+        **GKE_KWARGS,
+    )
+    op.client = MagicMock()
+    sentinel_context = {"ti": MagicMock()}
+    op._context = sentinel_context
+
+    op.pod_manager  # noqa: B018 — access triggers cached_property creation
+
+    mock_manager_cls.assert_called_once()
+    extra = mock_manager_cls.call_args.kwargs["callback_extra_kwargs"]
+    assert extra["tests_per_model"] is tests_per_model
+    assert extra["test_results_per_model"] is op._test_results_per_model
+    assert extra["context"] is sentinel_context
 
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"

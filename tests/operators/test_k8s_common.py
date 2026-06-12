@@ -320,37 +320,96 @@ def _make_dbt_log_line(
 _CALLBACK_KWARGS = dict(client=MagicMock(), mode="sync", container_name="base", timestamp=None, pod=MagicMock())
 
 
-def test_progress_callback_calls_store_dbt_resource_status():
-    import cosmos.operators._k8s_common as mod
+def test_progress_callback_delegates_with_correct_args():
+    """progress_callback forwards context and test maps from kwargs.
 
-    context = {"ti": MagicMock()}
+    ``CosmosKubernetesPodManager`` threads these through ``callback_extra_kwargs``;
+    they arrive in ``progress_callback`` as ``**kwargs`` (see #2543).
+    """
+    mock_context = {"ti": MagicMock()}
+    tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
+    test_results: dict[str, dict[str, str]] = {}
     line = _make_dbt_log_line()
 
     with patch("cosmos.operators._k8s_common.store_dbt_resource_status_from_log") as mock_store:
-        WatcherK8sCallback.progress_callback(line=line, **_CALLBACK_KWARGS, context=context)
-        # The callback forwards the producer's upstream-failure skip accumulator (see #2698);
-        # outside a producer execution this module global is None.
-        mock_store.assert_called_once_with(
-            line,
-            {"context": context},
-            upstream_failure_skipped_ids=mod._producer_upstream_failure_skipped_ids,
+        WatcherK8sCallback.progress_callback(
+            line=line,
+            **_CALLBACK_KWARGS,
+            context=mock_context,
+            tests_per_model=tests_per_model,
+            test_results_per_model=test_results,
         )
 
+    mock_store.assert_called_once()
+    args, call_kwargs = mock_store.call_args
+    assert args[0] == line
+    assert args[1]["context"] is mock_context
+    assert call_kwargs["tests_per_model"] is tests_per_model
+    assert call_kwargs["test_results_per_model"] is test_results
+    assert call_kwargs["upstream_failure_skipped_ids"] is None
 
-def test_progress_callback_uses_global_context_when_not_in_kwargs():
-    import cosmos.operators._k8s_common as mod
 
-    fake_context = {"ti": MagicMock()}
-    original = mod._producer_task_context
-    try:
-        mod._producer_task_context = fake_context
+def test_callback_opts_in_to_cosmos_callback_kwargs():
+    """The marker attribute read by CosmosKubernetesPodManager._extra_kwargs_for must be set."""
+    assert WatcherK8sCallback.receives_cosmos_callback_kwargs is True
 
-        with patch("cosmos.operators._k8s_common.store_dbt_resource_status_from_log") as mock_store:
-            WatcherK8sCallback.progress_callback(line=_make_dbt_log_line(), **_CALLBACK_KWARGS)
-            call_kwargs = mock_store.call_args[0][1]
-            assert call_kwargs["context"] is fake_context
-    finally:
-        mod._producer_task_context = original
+
+# ---------------------------------------------------------------------------
+# build_watcher_pod_manager
+# ---------------------------------------------------------------------------
+
+
+def test_build_watcher_pod_manager_wires_callback_extra_kwargs():
+    """The pod manager receives the producer's per-execution state by reference."""
+    from cosmos.operators._k8s_common import build_watcher_pod_manager
+
+    operator = MagicMock()
+    operator._tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
+    operator._test_results_per_model = {}
+    operator._context = {"ti": MagicMock()}
+    operator._upstream_failure_skipped_ids = set()
+
+    with patch("cosmos.operators._k8s_common.CosmosKubernetesPodManager") as mock_manager_cls:
+        build_watcher_pod_manager(operator)
+
+    mock_manager_cls.assert_called_once_with(
+        kube_client=operator.client,
+        callbacks=operator.callbacks,
+        callback_extra_kwargs={
+            "tests_per_model": operator._tests_per_model,
+            "test_results_per_model": operator._test_results_per_model,
+            "context": operator._context,
+            "upstream_failure_skipped_ids": operator._upstream_failure_skipped_ids,
+        },
+    )
+
+
+def test_pod_manager_passes_extra_kwargs_only_to_marked_callbacks():
+    """callback_extra_kwargs reach WatcherK8sCallback but not unmarked user callbacks (#2543)."""
+    from cosmos.airflow._override import CosmosKubernetesPodManager
+
+    extra = {"tests_per_model": {"m": ["t"]}, "test_results_per_model": {}, "context": {"ti": MagicMock()}}
+    manager = CosmosKubernetesPodManager(
+        kube_client=MagicMock(),
+        callbacks=[WatcherK8sCallback],
+        callback_extra_kwargs=extra,
+    )
+    assert manager._callback_extra_kwargs is extra
+
+    # WatcherK8sCallback opts in via the marker -> receives the kwargs (same object).
+    assert manager._extra_kwargs_for(WatcherK8sCallback) is extra
+
+    # A user-supplied callback without the marker receives nothing, so its progress_callback
+    # (which may not accept Cosmos-only kwargs) is never passed them and cannot raise TypeError.
+    class UserCallback:
+        @staticmethod
+        def progress_callback(*, line, client, mode, container_name, timestamp, pod): ...
+
+    assert manager._extra_kwargs_for(UserCallback) == {}
+
+    # Default when omitted is an empty dict so the spread is always safe.
+    bare_manager = CosmosKubernetesPodManager(kube_client=MagicMock())
+    assert bare_manager._callback_extra_kwargs == {}
 
 
 # ---------------------------------------------------------------------------
@@ -423,20 +482,18 @@ def test_execute_watcher_producer_raises_when_ti_missing():
 
 @patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
-def test_execute_watcher_producer_sets_global_context(mock_init, mock_delete):
-    import cosmos.operators._k8s_common as mod
-
+def test_execute_watcher_producer_sets_context_before_parent_execute(mock_init, mock_delete):
+    """The operator's _context (read by build_watcher_pod_manager) is set before parent_execute runs."""
+    operator = MagicMock()
     ti = MagicMock()
     ti.try_number = 1
     context = {"ti": ti, "run_id": "test_run"}
     captured: dict[str, Any] = {}
 
     def capture_context(ctx, **kwargs):
-        captured["context"] = mod._producer_task_context
+        captured["context"] = operator._context
 
-    original = mod._producer_task_context
-    try:
-        execute_watcher_producer(MagicMock(), context, capture_context)
-        assert captured["context"] is context
-    finally:
-        mod._producer_task_context = original
+    execute_watcher_producer(operator, context, capture_context)
+
+    assert captured["context"] is context
+    operator._upstream_failure_skipped_ids.clear.assert_called_once_with()

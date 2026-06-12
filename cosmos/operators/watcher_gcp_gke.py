@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
@@ -13,7 +12,8 @@ if TYPE_CHECKING:  # pragma: no cover
 import cosmos.operators._k8s_common as _k8s_common
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.airflow.compatibility import EmptyOperator
-from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
+from cosmos.constants import PRODUCER_WATCHER_TASK_ID
+from cosmos.operators._watcher.base import BaseConsumerSensor
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
@@ -28,10 +28,14 @@ from cosmos.operators.gcp_gke import (
 
 class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
     template_fields: tuple[str, ...] = tuple(DbtBuildGcpGkeOperator.template_fields) + ("deferrable",)
-    _process_log_line_callable: Callable[[str, dict[str, Any]], None] | None = store_dbt_resource_status_from_log
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        task_id = kwargs.pop("task_id", "dbt_producer_watcher_operator")
+        task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
+        self._tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
+        self._test_results_per_model: dict[str, dict[str, str]] = {}
+        # Set in execute() before super().execute() triggers pod_manager. Initialized
+        # here so pod_manager never raises AttributeError if accessed before execute().
+        self._context: Context | None = None
         _k8s_common.inject_watcher_callback(kwargs)
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
@@ -44,7 +48,7 @@ class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
-        return CosmosKubernetesPodManager(kube_client=self.client, callbacks=self.callbacks)
+        return _k8s_common.build_watcher_pod_manager(self)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         # Bind before passing, because bare super() doesn't work inside lambdas or when called outside this method.

@@ -38,11 +38,11 @@ from cosmos.cache import (
     _update_partial_parse_cache,
     create_cache_profile,
     delete_unused_dbt_cache,
+    get_cache_seed_checksum,
     get_cached_profile,
-    get_seed_checksum,
     is_cache_package_lockfile_enabled,
     is_profile_cache_enabled,
-    store_seed_checksum,
+    store_cache_seed_checksum,
     were_yaml_selectors_modified,
 )
 from cosmos.constants import (
@@ -494,33 +494,33 @@ def test_create_seed_checksum_key_is_bounded_prefixed_and_scoped():
 
 
 @patch("cosmos.cache.Variable")
-def test_get_seed_checksum_returns_stored_value(mock_variable):
+def test_get_cache_seed_checksum_returns_stored_value(mock_variable):
     mock_variable.get.return_value = "stored-checksum"
-    assert get_seed_checksum("my_dag", "seed.pkg.my_seed") == "stored-checksum"
+    assert get_cache_seed_checksum("my_dag", "seed.pkg.my_seed") == "stored-checksum"
     mock_variable.get.assert_called_once_with(_create_seed_checksum_key("my_dag", "seed.pkg.my_seed"), default_var=None)
 
 
 @patch("cosmos.cache.Variable")
-def test_get_seed_checksum_swallows_backend_errors(mock_variable, caplog):
+def test_get_cache_seed_checksum_swallows_backend_errors(mock_variable, caplog):
     from sqlalchemy.exc import SQLAlchemyError
 
     mock_variable.get.side_effect = SQLAlchemyError("db down")
     caplog.set_level(logging.WARNING)
-    assert get_seed_checksum("my_dag", "seed.pkg.my_seed") is None
+    assert get_cache_seed_checksum("my_dag", "seed.pkg.my_seed") is None
     assert "Failed to read seed checksum" in caplog.text
 
 
 @patch("cosmos.cache.Variable")
-def test_store_seed_checksum_persists_value(mock_variable):
-    store_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")
+def test_store_cache_seed_checksum_persists_value(mock_variable):
+    store_cache_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")
     mock_variable.set.assert_called_once_with(_create_seed_checksum_key("my_dag", "seed.pkg.my_seed"), "new-checksum")
 
 
 @patch("cosmos.cache.Variable")
-def test_store_seed_checksum_swallows_backend_errors(mock_variable, caplog):
+def test_store_cache_seed_checksum_swallows_backend_errors(mock_variable, caplog):
     from airflow.exceptions import AirflowException
 
     mock_variable.set.side_effect = AirflowException("cannot write")
     caplog.set_level(logging.WARNING)
-    store_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")  # must not raise
+    store_cache_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")  # must not raise
     assert "Failed to persist seed checksum" in caplog.text

@@ -146,6 +146,12 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
         self._upstream_failure_skipped_ids.clear()
         self._context = context
+        # pod_manager is a cached_property whose callback_extra_kwargs captured
+        # self._context at creation time. If the manager was created before
+        # execute() ran, it is still holding context=None and log callbacks
+        # would be unable to push model/test status XComs — refresh it.
+        if "pod_manager" in self.__dict__:
+            self.pod_manager._callback_extra_kwargs["context"] = context
 
         try:
             return_value = super().execute(context, **kwargs)

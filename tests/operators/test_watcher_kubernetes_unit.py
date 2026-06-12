@@ -379,6 +379,36 @@ def test_producer_pod_manager_wires_callback_extra_kwargs(mock_manager_cls):
     assert extra["context"] is sentinel_context
 
 
+@patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_execute_refreshes_context_on_cached_pod_manager(mock_execute, mock_init, mock_delete):
+    """pod_manager accessed before execute() must not keep a stale context=None (#2543 follow-up).
+
+    callback_extra_kwargs captures self._context when the manager is first
+    created; execute() must refresh the cached manager so the log callbacks
+    can push model/test status XComs.
+    """
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        tests_per_model={"model.pkg.orders": ["test.pkg.t1"]},
+    )
+    op.client = MagicMock()
+
+    manager = op.pod_manager  # created before execute(): captures context=None
+    assert manager._callback_extra_kwargs["context"] is None
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+    op.execute(context=context)
+
+    assert op.pod_manager is manager  # still the same cached manager
+    assert manager._callback_extra_kwargs["context"] is context
+
+
 def test_pod_manager_passes_extra_kwargs_only_to_marked_callbacks():
     """callback_extra_kwargs reach WatcherKubernetesCallback but not unmarked user callbacks (#2543)."""
     from cosmos.airflow._override import CosmosKubernetesPodManager

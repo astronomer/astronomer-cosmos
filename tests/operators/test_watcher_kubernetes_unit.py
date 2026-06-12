@@ -461,6 +461,7 @@ def test_progress_callback_delegates_with_correct_args(mock_store):
     mock_store.assert_called_once()
     args, call_kwargs = mock_store.call_args
     assert args[0] == '{"info": {"msg": "test"}}'
+    assert args[1] == {"context": mock_context}  # allowlist: nothing else leaks past the unwrap
     assert args[1]["context"] is mock_context
     assert call_kwargs["tests_per_model"] is tests_per_model
     assert call_kwargs["test_results_per_model"] is test_results

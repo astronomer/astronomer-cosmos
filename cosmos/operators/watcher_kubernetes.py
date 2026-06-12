@@ -81,8 +81,10 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param timestamp: the timestamp of the log line.
         :param pod: the pod from which the log line was read.
         """
+        # Don't leak other callback kwargs: the parser only needs "context" in this case.
         holder = kwargs.get("context_holder")
-        extra_kwargs = {**kwargs, "context": holder["context"] if holder else None}
+        context = holder.get("context") if holder else None
+        extra_kwargs = {"context": context} if context else {}
         store_dbt_resource_status_from_log(
             line,
             extra_kwargs,

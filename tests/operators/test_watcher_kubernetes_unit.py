@@ -339,8 +339,8 @@ def test_producer_stores_tests_per_model():
 @patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
 @patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_execute_sets_context_instance_attr(mock_execute, mock_init, mock_delete):
-    """execute() stores context as an instance attribute for pod_manager to use."""
+def test_execute_sets_context_in_holder(mock_execute, mock_init, mock_delete):
+    """execute() publishes the execution context through the mutable holder shared with pod_manager."""
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
         profile_config=None,
@@ -353,12 +353,12 @@ def test_execute_sets_context_instance_attr(mock_execute, mock_init, mock_delete
 
     op.execute(context=context)
 
-    assert op._context is context
+    assert op._context_holder["context"] is context
 
 
 @patch("cosmos.operators.watcher_kubernetes.CosmosKubernetesPodManager")
 def test_producer_pod_manager_wires_callback_extra_kwargs(mock_manager_cls):
-    """pod_manager forwards tests_per_model, test_results_per_model, and context (by reference) to CosmosKubernetesPodManager."""
+    """pod_manager forwards tests_per_model, test_results_per_model, and the context holder (by reference) to CosmosKubernetesPodManager."""
     tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
@@ -367,8 +367,6 @@ def test_producer_pod_manager_wires_callback_extra_kwargs(mock_manager_cls):
         tests_per_model=tests_per_model,
     )
     op.client = MagicMock()
-    sentinel_context = {"ti": MagicMock()}
-    op._context = sentinel_context
 
     op.pod_manager  # noqa: B018 — access triggers cached_property creation
 
@@ -376,18 +374,18 @@ def test_producer_pod_manager_wires_callback_extra_kwargs(mock_manager_cls):
     extra = mock_manager_cls.call_args.kwargs["callback_extra_kwargs"]
     assert extra["tests_per_model"] is tests_per_model
     assert extra["test_results_per_model"] is op._test_results_per_model
-    assert extra["context"] is sentinel_context
+    assert extra["context_holder"] is op._context_holder
 
 
 @patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
 @patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_execute_refreshes_context_on_cached_pod_manager(mock_execute, mock_init, mock_delete):
-    """pod_manager accessed before execute() must not keep a stale context=None (#2543 follow-up).
+def test_pod_manager_created_before_execute_sees_execution_context(mock_execute, mock_init, mock_delete):
+    """pod_manager accessed before execute() must not hold a stale context=None (#2543 follow-up).
 
-    callback_extra_kwargs captures self._context when the manager is first
-    created; execute() must refresh the cached manager so the log callbacks
-    can push model/test status XComs.
+    callback_extra_kwargs captures the mutable context holder by reference,
+    so the context set by execute() is visible to the manager no matter when
+    it was created and the log callbacks can push model/test status XComs.
     """
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
@@ -397,8 +395,8 @@ def test_execute_refreshes_context_on_cached_pod_manager(mock_execute, mock_init
     )
     op.client = MagicMock()
 
-    manager = op.pod_manager  # created before execute(): captures context=None
-    assert manager._callback_extra_kwargs["context"] is None
+    manager = op.pod_manager  # created before execute(): context not yet known
+    assert manager._callback_extra_kwargs["context_holder"]["context"] is None
 
     ti = MagicMock()
     ti.try_number = 1
@@ -406,14 +404,18 @@ def test_execute_refreshes_context_on_cached_pod_manager(mock_execute, mock_init
     op.execute(context=context)
 
     assert op.pod_manager is manager  # still the same cached manager
-    assert manager._callback_extra_kwargs["context"] is context
+    assert manager._callback_extra_kwargs["context_holder"]["context"] is context
 
 
 def test_pod_manager_passes_extra_kwargs_only_to_marked_callbacks():
     """callback_extra_kwargs reach WatcherKubernetesCallback but not unmarked user callbacks (#2543)."""
     from cosmos.airflow._override import CosmosKubernetesPodManager
 
-    extra = {"tests_per_model": {"m": ["t"]}, "test_results_per_model": {}, "context": {"ti": MagicMock()}}
+    extra = {
+        "tests_per_model": {"m": ["t"]},
+        "test_results_per_model": {},
+        "context_holder": {"context": {"ti": MagicMock()}},
+    }
     manager = CosmosKubernetesPodManager(
         kube_client=MagicMock(),
         callbacks=[WatcherKubernetesCallback],
@@ -439,7 +441,7 @@ def test_pod_manager_passes_extra_kwargs_only_to_marked_callbacks():
 
 @patch("cosmos.operators.watcher_kubernetes.store_dbt_resource_status_from_log")
 def test_progress_callback_delegates_with_correct_args(mock_store):
-    """progress_callback forwards context and test maps from kwargs."""
+    """progress_callback unwraps the context holder and forwards test maps from kwargs."""
     mock_context = {"ti": MagicMock()}
     tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
     test_results = {}
@@ -451,7 +453,7 @@ def test_progress_callback_delegates_with_correct_args(mock_store):
         container_name="dbt",
         timestamp=None,
         pod=MagicMock(),
-        context=mock_context,
+        context_holder={"context": mock_context},
         tests_per_model=tests_per_model,
         test_results_per_model=test_results,
     )

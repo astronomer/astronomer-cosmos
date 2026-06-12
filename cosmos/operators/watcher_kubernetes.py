@@ -42,12 +42,18 @@ logger = get_logger(__name__)
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
     """Callback that parses dbt JSON logs from Kubernetes pod output.
 
-    ``tests_per_model``, ``test_results_per_model``, ``context``, and
+    ``tests_per_model``, ``test_results_per_model``, ``context_holder``, and
     ``upstream_failure_skipped_ids`` are forwarded by ``CosmosKubernetesPodManager``
     via its ``callback_extra_kwargs`` and arrive in ``progress_callback`` as ``**kwargs``.
     The ``receives_cosmos_callback_kwargs`` marker opts this callback in to receiving
     them; user-supplied callbacks without the marker are not given these Cosmos-only
     kwargs, so their ``progress_callback`` is not broken.
+
+    ``context_holder`` is a mutable dict owned by the producer operator and captured
+    by reference when the pod manager is created; ``execute()`` sets its ``"context"``
+    entry, so this callback sees the live execution context no matter when the manager
+    was created. ``progress_callback`` unwraps it into the plain ``context`` expected
+    by ``store_dbt_resource_status_from_log``.
     """
 
     # Opts this callback in to receiving callback_extra_kwargs; read by
@@ -75,9 +81,11 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param timestamp: the timestamp of the log line.
         :param pod: the pod from which the log line was read.
         """
+        holder = kwargs.get("context_holder")
+        extra_kwargs = {**kwargs, "context": holder["context"] if holder else None}
         store_dbt_resource_status_from_log(
             line,
-            kwargs,
+            extra_kwargs,
             tests_per_model=kwargs.get("tests_per_model"),
             test_results_per_model=kwargs.get("test_results_per_model"),
             upstream_failure_skipped_ids=kwargs.get("upstream_failure_skipped_ids"),
@@ -91,9 +99,10 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self._tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self._test_results_per_model: dict[str, dict[str, str]] = {}
-        # Set in execute() before super().execute() triggers pod_manager. Initialized
-        # here so pod_manager never raises AttributeError if accessed before execute().
-        self._context: Context | None = None
+        # Mutable holder shared by reference with pod_manager's callback_extra_kwargs.
+        # execute() sets its "context" entry (the holder itself is never reassigned),
+        # so a pod_manager created before execute() still sees the live context.
+        self._context_holder: dict[str, Context | None] = {"context": None}
 
         existing_callbacks = kwargs.get("callbacks")
         if existing_callbacks is None:
@@ -121,7 +130,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             callback_extra_kwargs={
                 "tests_per_model": self._tests_per_model,
                 "test_results_per_model": self._test_results_per_model,
-                "context": self._context,
+                "context_holder": self._context_holder,
                 "upstream_failure_skipped_ids": self._upstream_failure_skipped_ids,
             },
         )
@@ -145,13 +154,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         _init_xcom_backup(context)
 
         self._upstream_failure_skipped_ids.clear()
-        self._context = context
-        # pod_manager is a cached_property whose callback_extra_kwargs captured
-        # self._context at creation time. If the manager was created before
-        # execute() ran, it is still holding context=None and log callbacks
-        # would be unable to push model/test status XComs — refresh it.
-        if "pod_manager" in self.__dict__:
-            self.pod_manager._callback_extra_kwargs["context"] = context
+        self._context_holder["context"] = context
 
         try:
             return_value = super().execute(context, **kwargs)

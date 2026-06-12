@@ -11,8 +11,8 @@ if TYPE_CHECKING:  # pragma: no cover
 
 import cosmos.operators._k8s_common as _k8s_common
 from cosmos.airflow._override import CosmosKubernetesPodManager
-from cosmos.airflow.compatibility import EmptyOperator
 from cosmos.constants import PRODUCER_WATCHER_TASK_ID
+from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor
 from cosmos.operators.base import (
     DbtRunMixin,
@@ -24,6 +24,8 @@ from cosmos.operators.gcp_gke import (
     DbtRunGcpGkeOperator,
     DbtSourceGcpGkeOperator,
 )
+
+logger = get_logger(__name__)
 
 
 class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
@@ -118,12 +120,52 @@ class DbtRunWatcherGcpGkeOperator(DbtConsumerWatcherGcpGkeSensor):
         super().__init__(*args, **kwargs)
 
 
-class DbtTestWatcherGcpGkeOperator(EmptyOperator):
-    """
-    As a starting point, this operator does nothing.
+class DbtTestWatcherGcpGkeOperator(DbtConsumerWatcherGcpGkeSensor):
+    """Sensor that watches the aggregated test status for a dbt model in WATCHER_GCP_GKE execution mode.
+
+    The producer task collects individual test results as they finish and,
+    once every test for a given model has reported, pushes a single
+    aggregated XCom (``"pass"`` or ``"fail"``) under the key returned by
+    ``get_tests_status_xcom_key(model_uid)``. This key sanitizes the dbt
+    model unique ID by replacing ``.`` with ``__`` before appending
+    ``_tests_status`` (for example,
+    ``model.jaffle_shop.stg_orders`` becomes
+    ``model__jaffle_shop__stg_orders_tests_status``).
+
+    This sensor polls that key and returns success when ``"pass"`` or raises
+    ``AirflowException`` when ``"fail"``.
+
+    On manual clear from the Airflow UI or Airflow-level retry, the sensor falls
+    back to launching a GKE pod that runs ``dbt test --select <model>`` for this
+    specific model.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any):
-        desired_keys = ("dag", "task_group", "task_id")
-        new_kwargs = {key: value for key, value in kwargs.items() if key in desired_keys}
-        super().__init__(**new_kwargs)
+    template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields
+
+    # See DbtTestWatcherOperator for the reasoning behind hardcoding base_cmd
+    # rather than inheriting from DbtTestMixin.
+    base_cmd = ["test"]
+
+    @property
+    def is_test_sensor(self) -> bool:
+        return True
+
+    def _fallback_to_non_watcher_run(self, try_number: int, context: Context) -> bool:
+        """Launch a GKE pod running ``dbt test --select <model>`` to retry tests for this model.
+
+        Used when the test sensor is manually cleared from the Airflow UI or when
+        Airflow-level retries fire. Producer flags are intentionally not forwarded
+        because some of them (e.g. ``--full-refresh``) are not valid for ``dbt test``.
+        """
+        logger.info(
+            "Running tests for model '%s' from project '%s' (try %s)",
+            self.model_unique_id,
+            self.project_dir,
+            try_number,
+        )
+
+        model_selector = self.model_unique_id.split(".", 2)[2]
+        cmd_flags = ["--select", model_selector]
+        self.build_and_run_cmd(context, cmd_flags=cmd_flags)
+        logger.info("dbt test completed successfully for model '%s'", self.model_unique_id)
+        return True

@@ -70,7 +70,6 @@ def new_test_dag(dag: DAG, expected_dag_state: DagRunState = DagRunState.SUCCESS
         # In Airflow 3.0, dag.test() does not properly register Assets as active, must be registered manually
         from airflow.models.asset import AssetActive, AssetModel
         from airflow.utils.session import create_session
-
         from sqlalchemy import select
 
         with create_session() as session:
@@ -96,9 +95,7 @@ def new_test_dag(dag: DAG, expected_dag_state: DagRunState = DagRunState.SUCCESS
 
                     if asset_model.active is None:
                         # Set the Asset as "active"
-                        session.add(
-                            AssetActive.for_asset(asset_model)
-                        )
+                        session.add(AssetActive.for_asset(asset_model))
                         session.flush()
 
         dr = dag.test(logical_date=timezone.utcnow())

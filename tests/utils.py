@@ -67,6 +67,40 @@ def new_test_dag(dag: DAG, expected_dag_state: DagRunState = DagRunState.SUCCESS
         sync_bag_to_db(dagbag, bundle_name="test_bundle", bundle_version="1")
         dr = dag.test(logical_date=timezone.utcnow())
     elif AIRFLOW_VERSION >= version.Version("3.0"):
+        # In Airflow 3.0, dag.test() does not properly register Assets as active, must be registered manually
+        from airflow.models.asset import AssetActive, AssetModel
+        from airflow.utils.session import create_session
+
+        from sqlalchemy import select
+
+        with create_session() as session:
+            # Loop through each Task in the DAG, looking for outlets
+            for task in dag.tasks:
+                for outlet in getattr(task, "outlets", []):
+                    if not hasattr(outlet, "uri"):
+                        continue  # Skip the outlet
+
+                    name = getattr(outlet, "name", outlet.uri)
+                    uri = outlet.uri
+
+                    # Retrieve Assets from DB to validate if they exist
+                    asset_model = session.execute(
+                        select(AssetModel).where(AssetModel.name == name, AssetModel.uri == uri)
+                    ).scalar_one_or_none()
+
+                    if asset_model is None:
+                        # Add the Asset
+                        asset_model = AssetModel(name=name, uri=uri)
+                        session.add(asset_model)
+                        session.flush()
+
+                    if asset_model.active is None:
+                        # Set the Asset as "active"
+                        session.add(
+                            AssetActive.for_asset(asset_model)
+                        )
+                        session.flush()
+
         dr = dag.test(logical_date=timezone.utcnow())
     else:
         dr = dag.test()

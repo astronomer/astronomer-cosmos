@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -180,3 +181,69 @@ def change_working_directory(path: str) -> Generator[None, None, None]:
         yield
     finally:
         os.chdir(previous_cwd)
+
+
+def _resolve_dags_folder() -> str | None:
+    """Return the realpath of the Airflow DAGs folder, or ``None`` if it cannot be determined.
+
+    ``airflow.settings.DAGS_FOLDER`` is the resolved path Airflow itself appends to ``sys.path`` on
+    both Airflow 2 and 3 (and on Astro). Note that Airflow 3 custom DAG bundles may live outside
+    ``DAGS_FOLDER``; those are not covered here.
+    """
+    try:
+        from airflow.settings import DAGS_FOLDER
+    except Exception:
+        return None
+    return os.path.realpath(DAGS_FOLDER) if DAGS_FOLDER else None
+
+
+# dbt-core discovers plugins by importing *every* importable top-level module whose name starts with
+# ``dbt_`` (see ``dbt.plugins.manager._get_dbt_modules``, which scans the whole ``sys.path`` via
+# ``pkgutil.iter_modules``). Airflow puts its DAGs folder on the path, so when Cosmos runs ``dbt``
+# (the default for ``LoadMode.DBT_LS`` uses the in-process ``dbtRunner`` since Cosmos 1.9), dbt's
+# plugin discovery imports any DAG file named ``dbt_*.py``. That executes the DAG file -- leaking and
+# duplicating DAGs across unrelated Cosmos DAGs (in-process) or crashing the dbt command when the DAG
+# file re-imports Airflow (subprocess). The two helpers below keep the DAGs folder out of dbt's
+# reach: ``exclude_dags_folder_from_sys_path`` for in-process ``dbtRunner`` (live ``sys.path``) and
+# ``remove_dags_folder_from_pythonpath`` for subprocess dbt (inherited ``PYTHONPATH``).
+# See https://github.com/astronomer/astronomer-cosmos/issues/1673
+@contextmanager
+def exclude_dags_folder_from_sys_path() -> Generator[None, None, None]:
+    """Temporarily remove the Airflow DAGs folder from ``sys.path`` while dbt runs in-process.
+
+    Used around in-process ``dbtRunner`` invocations so dbt's ``dbt_*`` plugin discovery does not
+    import DAG files, while leaving genuinely installed dbt plugins (which live in site-packages, not
+    the DAGs folder) untouched.
+    """
+    target = _resolve_dags_folder()
+
+    removed: list[str] = []
+    if target:
+        removed = [path for path in sys.path if os.path.realpath(path) == target]
+        for path in removed:
+            sys.path.remove(path)
+    try:
+        yield
+    finally:
+        for path in removed:
+            sys.path.insert(0, path)
+
+
+def remove_dags_folder_from_pythonpath(env: dict[str, str]) -> dict[str, str]:
+    """Return a copy of ``env`` with the Airflow DAGs folder removed from ``PYTHONPATH``.
+
+    Companion to :func:`exclude_dags_folder_from_sys_path` for the subprocess code path: a dbt
+    subprocess derives its ``sys.path`` from the inherited ``PYTHONPATH``, so dbt's ``dbt_*`` plugin
+    discovery would otherwise import DAG files from the DAGs folder -- crashing the dbt command when
+    the DAG file re-imports Airflow, or running DAG-file side effects. Only the DAGs-folder entries
+    are dropped; every other entry (including genuinely installed dbt plugins) is preserved.
+    """
+    pythonpath = env.get("PYTHONPATH")
+    target = _resolve_dags_folder()
+    if not pythonpath or not target:
+        return env
+
+    kept = [entry for entry in pythonpath.split(os.pathsep) if not (entry and os.path.realpath(entry) == target)]
+    sanitized = dict(env)
+    sanitized["PYTHONPATH"] = os.pathsep.join(kept)
+    return sanitized

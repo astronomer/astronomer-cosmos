@@ -64,6 +64,7 @@ from cosmos.dbt.project import (
     get_dbt_packages_subpath,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
+    remove_dags_folder_from_pythonpath,
 )
 from cosmos.dbt.selector import YamlSelectors, select_nodes
 from cosmos.log import get_logger
@@ -300,6 +301,9 @@ def is_freshness_effective(freshness: dict[str, Any] | None) -> bool:
 
 def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
     """Run a command in a subprocess, returning the stdout."""
+    # Keep the Airflow DAGs folder off the dbt subprocess's PYTHONPATH so dbt's dbt_* plugin
+    # discovery does not import DAG files. See https://github.com/astronomer/astronomer-cosmos/issues/1673
+    env_vars = remove_dags_folder_from_pythonpath(env_vars)
     process = Popen(
         command,
         stdout=PIPE,

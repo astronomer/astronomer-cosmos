@@ -7,7 +7,7 @@ from functools import cache as functools_cache
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
-from cosmos.dbt.project import change_working_directory, environ
+from cosmos.dbt.project import change_working_directory, environ, exclude_dags_folder_from_sys_path
 from cosmos.exceptions import CosmosDbtRunError
 from cosmos.log import get_logger
 
@@ -91,7 +91,7 @@ def run_command(
     # command that is used by `InvocationMode.SUBPROCESS`, and in that scenario the first command is necessarily the path
     # to the dbt executable.
     cli_args = command[1:]
-    with change_working_directory(cwd), environ(env):
+    with change_working_directory(cwd), environ(env), exclude_dags_folder_from_sys_path():
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
         runner = get_runner(callbacks=callbacks)
         try:

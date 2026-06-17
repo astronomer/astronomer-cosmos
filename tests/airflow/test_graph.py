@@ -387,6 +387,45 @@ def test_build_airflow_graph_with_after_all():
     assert dag.leaves[0].select == "tag:some"
 
 
+def test_build_airflow_graph_with_after_all_and_empty_nodes():
+    """Empty ``nodes`` (e.g. an empty or mocked manifest) must not raise UnboundLocalError.
+
+    Regression test for https://github.com/astronomer/astronomer-cosmos/issues/2813: with
+    ``TestBehavior.AFTER_ALL`` the per-node loop never runs when ``nodes`` is empty, so the
+    AFTER_ALL branch used to read an unbound ``task_or_group_args``.
+    """
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        render_config = RenderConfig(
+            test_behavior=TestBehavior.AFTER_ALL,
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+        )
+        tasks_map = build_airflow_graph(
+            nodes={},
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            dbt_project_name="astro_shop",
+            render_config=render_config,
+        )
+
+    # The AFTER_ALL test task is still created, but it has no upstream leaves to depend on.
+    assert list(tasks_map.keys()) == ["astro_shop_test"]
+    assert [task.task_id for task in dag.tasks] == ["astro_shop_test"]
+
+
 @pytest.mark.integration
 def test_build_airflow_graph_with_build():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:

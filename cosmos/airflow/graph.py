@@ -1060,6 +1060,27 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             tests_per_model=tests_per_model,
         )
 
+    # Arguments shared by every node's task/group as well as the AFTER_ALL/detached test tasks below.
+    # Defined before the loop so it is always bound, even when ``nodes`` is empty (e.g. an empty or
+    # mocked manifest), which would otherwise raise UnboundLocalError in the AFTER_ALL branch.
+    task_or_group_args: dict[str, Any] = {
+        # Arguments to this method:
+        "dag": dag,
+        "task_group": parent_task_group,
+        "node": None,
+        "task_args": task_args,
+        "dbt_project_name": dbt_project_name,
+        "render_config": render_config,
+        # Properties from ExecutionConfig:
+        "execution_mode": execution_mode,
+        "test_indirect_selection": test_indirect_selection,
+        # Argument to DbtDag or DbtTaskGroup:
+        "on_warning_callback": on_warning_callback,
+        # Calculated in this method:
+        "detached_from_parent": detached_from_parent,
+        "node_converters": render_config.node_converters or {},
+    }
+
     for node_id, node in nodes.items():
         task_group = (
             create_task_groups_based_on_folder(dag, node, parent_task_group, task_groups)
@@ -1067,24 +1088,12 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             else task_group
         )
         task_or_group_args = {
-            # Arguments to this method:
-            "dag": dag,
+            **task_or_group_args,
             "task_group": task_group,
             "node": node,
-            "task_args": task_args,
-            "dbt_project_name": dbt_project_name,
-            "render_config": render_config,
-            # Properties from ExecutionConfig:
-            "execution_mode": execution_mode,
-            "test_indirect_selection": test_indirect_selection,
-            # Argument to DbtDag or DbtTaskGroup:
-            "on_warning_callback": on_warning_callback,
-            # Calculated in this method:
-            "detached_from_parent": detached_from_parent,
-            "node_converters": render_config.node_converters or {},
         }
 
-        task_or_group = generate_task_or_group(**task_or_group_args, filtered_nodes=nodes)  # type: ignore[arg-type]
+        task_or_group = generate_task_or_group(**task_or_group_args, filtered_nodes=nodes)
         if task_or_group is not None:
             tasks_map[node_id] = task_or_group
         task_group = parent_task_group
@@ -1108,7 +1117,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         }
         # AFTER_ALL test is a single DAG-level task: place it at root so task_id stays e.g. "astro_shop_test"
         test_task_args["task_group"] = parent_task_group
-        test_task = generate_or_convert_task(**test_task_args)  # type: ignore[arg-type]
+        test_task = generate_or_convert_task(**test_task_args)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
@@ -1132,7 +1141,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
                 "task_meta": test_meta,
                 "resource_type": node.resource_type,
             }
-            test_task = generate_or_convert_task(**test_task_args)  # type: ignore[arg-type]
+            test_task = generate_or_convert_task(**test_task_args)
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)

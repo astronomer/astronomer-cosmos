@@ -609,6 +609,116 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
         # assert dataset_model == 1
 
 
+@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.10"),
+    reason="Outlets are only overridden in Airflow 2.10 and 2.11 in DbtLocalBaseOperator.",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
+    from airflow.datasets import Dataset, DatasetAlias
+    from airflow.models.dataset import DatasetAliasModel
+    from sqlalchemy.orm.exc import FlushError
+
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            emit_datasets=False,
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+
+        run_operator_dataset = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run_operator_dataset",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            outlets=[Dataset(uri="manual_outlet__run_dataset")],
+        )
+
+        run_operator_alias = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run_operator_alias",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            outlets=[DatasetAlias(name="manual_outlet__run_alias")],
+        )
+
+        run_operator_alias_model = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run_operator_alias_model",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            outlets=[DatasetAliasModel(name="manual_outlet__run_alias_model")],
+        )
+
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        seed_operator >> [run_operator_dataset, run_operator_alias, run_operator_alias_model] >> test_operator
+
+    assert seed_operator.outlets == []  # because emit_datasets=False,
+
+    # Handling Dataset
+    assert run_operator_dataset.outlets == [
+        DatasetAlias(name="manual_outlet__run_dataset"),
+        DatasetAlias(name="test_id_1__run_operator_dataset"),
+    ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_dataset.outlets)
+
+    # Handling DatasetAlias
+    assert run_operator_alias.outlets == [
+        DatasetAlias(name="manual_outlet__run_alias"),
+        DatasetAlias(name="test_id_1__run_operator_alias"),
+    ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_alias.outlets)
+
+    # Handling DatasetAliasModel passed by user and the DatasetAlias outlet by the Operator
+    assert run_operator_alias_model.outlets == [
+        DatasetAlias(name="manual_outlet__run_alias_model"),
+        DatasetAlias(name="test_id_1__run_operator_alias_model"),
+    ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_alias_model.outlets)
+
+    assert test_operator.outlets == [DatasetAlias(name="test_id_1__test")]
+
+    with pytest.raises(FlushError):
+        run_test_dag(dag, custom_tester=True)
+        # This is a known limitation of Airflow 2.10.0 and 2.10.1
+        # https://github.com/apache/airflow/issues/42495
+
+        # When this is solved, we can uncomment the following:
+        # dag_run, session = run_test_dag(dag)
+
+        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
+        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
+        # based on the resolution of the issue logged in Airflow:
+        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
+        # assert dataset_model == 1
+
+
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.Version("3.0.0"),
     reason="From Airflow 3.0 onwards, we started using AssetAlias, which changed the original behaviour",
@@ -2089,6 +2199,68 @@ def test_handle_post_execution_with_multiple_callbacks(
 
     for callback_fn in multiple_callbacks:
         callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+def test_handle_post_execution_with_string_callback(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json, mock_load_method
+):
+    resolved_callback = MagicMock()
+    mock_load_method.return_value = resolved_callback
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        callback="cosmos.io.upload_to_aws_s3",
+        callback_args={"arg1": "value1"},
+    )
+
+    context = {"dag_run": MagicMock(), "task": MagicMock()}
+    operator._handle_post_execution("/tmp/project_dir", context)
+
+    mock_load_method.assert_called_once_with("cosmos.io", "upload_to_aws_s3")
+    resolved_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+def test_handle_post_execution_with_mixed_callbacks(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json, mock_load_method
+):
+    resolved_callback = MagicMock()
+    mock_load_method.return_value = resolved_callback
+    direct_callback = MagicMock()
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        callback=[direct_callback, "cosmos.io.upload_to_aws_s3"],
+        callback_args={"arg1": "value1"},
+    )
+
+    context = {"dag_run": MagicMock(), "task": MagicMock()}
+    operator._handle_post_execution("/tmp/project_dir", context)
+
+    mock_load_method.assert_called_once_with("cosmos.io", "upload_to_aws_s3")
+    direct_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+    resolved_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+def test_resolve_callback_rejects_path_without_module():
+    with pytest.raises(CosmosValueError, match="Invalid callback import path"):
+        ConcreteDbtLocalBaseOperator._resolve_callback("upload_to_aws_s3")
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+def test_resolve_callback_rejects_non_callable(mock_load_method):
+    mock_load_method.return_value = "not-a-callable"
+    with pytest.raises(CosmosValueError, match="did not resolve to a callable"):
+        ConcreteDbtLocalBaseOperator._resolve_callback("cosmos.io.SOME_CONSTANT")
 
 
 @pytest.mark.integration

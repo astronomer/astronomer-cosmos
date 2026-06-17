@@ -2,12 +2,14 @@ import math
 import time
 from collections.abc import Callable
 from datetime import timedelta
+from typing import Any
 
 import pendulum
 from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provider_version
-from airflow.providers.cncf.kubernetes.callbacks import ExecutionMode
+from airflow.providers.cncf.kubernetes.callbacks import ExecutionMode, KubernetesPodOperatorCallback
 from airflow.providers.cncf.kubernetes.utils.pod_manager import PodLoggingStatus, PodManager
 from airflow.utils.timezone import utcnow
+from kubernetes import client
 from kubernetes.client.models.v1_pod import V1Pod
 from packaging.version import Version
 from pendulum import DateTime
@@ -21,6 +23,30 @@ from cosmos.constants import _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION
 # It can be removed once it is fixed in the upstream provider.
 class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
     """Create, monitor, and otherwise interact with Kubernetes pods for use with the KubernetesPodOperator."""
+
+    def __init__(
+        self,
+        kube_client: client.CoreV1Api,
+        callbacks: list[type[KubernetesPodOperatorCallback]] | None = None,
+        callback_extra_kwargs: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(kube_client=kube_client, callbacks=callbacks)
+        self._callback_extra_kwargs = callback_extra_kwargs or {}
+
+    def _extra_kwargs_for(self, callback: Any) -> dict[str, Any]:
+        """Return ``callback_extra_kwargs`` only for callbacks that opt in via the marker.
+
+        Cosmos threads its internal state (``tests_per_model``, ``test_results_per_model``,
+        ``context``, ``upstream_failure_skipped_ids``) to ``WatcherKubernetesCallback``
+        through ``callback_extra_kwargs``. ``DbtProducerWatcherKubernetesOperator`` preserves
+        user-supplied callbacks, which must not receive these Cosmos-only kwargs, or their
+        ``progress_callback`` could raise ``TypeError`` while reading pod logs. Only callbacks
+        marked with ``receives_cosmos_callback_kwargs = True`` (i.e. ``WatcherKubernetesCallback``)
+        are given them.
+        """
+        if getattr(callback, "receives_cosmos_callback_kwargs", False):
+            return self._callback_extra_kwargs
+        return {}
 
     def fetch_container_logs(  # noqa: C901
         self,
@@ -123,6 +149,7 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
                                         container_name=container_name,
                                         timestamp=message_timestamp,
                                         pod=pod,
+                                        **self._extra_kwargs_for(callback),
                                     )
                                 self._log_message(
                                     message_to_log,
@@ -148,6 +175,7 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
                                 container_name=container_name,
                                 timestamp=message_timestamp,
                                 pod=pod,
+                                **self._extra_kwargs_for(callback),
                             )
                         self._log_message(
                             message_to_log, container_name, container_name_log_prefix_enabled, log_formatter

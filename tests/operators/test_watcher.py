@@ -197,10 +197,12 @@ def test_dbt_producer_log_format_always_json():
     assert op.log_format == "json"
 
 
-@patch("airflow.models.Variable")
+@patch("cosmos.operators._watcher.xcom.delete_variable")
 @patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
-def test_dbt_producer_watcher_operator_pushes_completion_status_on_success(mock_execute, mock_persist, mock_variable):
+def test_dbt_producer_watcher_operator_pushes_completion_status_on_success(
+    mock_execute, mock_persist, mock_delete_variable
+):
     """Test that operator pushes 'completed' status to XCom on success."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     mock_ti = _MockTI()
@@ -212,10 +214,12 @@ def test_dbt_producer_watcher_operator_pushes_completion_status_on_success(mock_
     mock_execute.assert_called_once()
 
 
-@patch("airflow.models.Variable")
+@patch("cosmos.operators._watcher.xcom.delete_variable")
 @patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
-def test_dbt_producer_watcher_operator_pushes_completion_status_on_failure(mock_execute, mock_persist, mock_variable):
+def test_dbt_producer_watcher_operator_pushes_completion_status_on_failure(
+    mock_execute, mock_persist, mock_delete_variable
+):
     """Test that operator pushes 'completed' status to XCom even when execution fails."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     mock_ti = _MockTI()
@@ -566,7 +570,7 @@ class TestStoreDbtStatusFromLog:
         tests_per_model = {
             "model.pkg.orders": ["test.pkg.not_null_orders_id", "test.pkg.unique_orders_id"],
         }
-        test_results_per_model: dict[str, list[str]] = {}
+        test_results_per_model: dict[str, dict[str, str]] = {}
 
         # First test passes — not all tests reported yet, no XCom push
         log_line_1 = json.dumps(
@@ -618,7 +622,7 @@ class TestStoreDbtStatusFromLog:
         tests_per_model = {
             "model.pkg.orders": ["test.pkg.not_null_orders_id", "test.pkg.unique_orders_id"],
         }
-        test_results_per_model: dict[str, list[str]] = {}
+        test_results_per_model: dict[str, dict[str, str]] = {}
 
         for uid, status in [
             ("test.pkg.not_null_orders_id", "pass"),

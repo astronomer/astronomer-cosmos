@@ -41,9 +41,9 @@ from cosmos._utils.importer import load_method_from_module
 from cosmos.cache import (
     _copy_cached_package_lockfile_to_project,
     _get_latest_cached_package_lockfile,
-    get_seed_checksum,
+    get_cache_seed_checksum,
     is_cache_package_lockfile_enabled,
-    store_seed_checksum,
+    store_cache_seed_checksum,
 )
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
@@ -178,7 +178,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param profile_config: ProfileConfig Object
     :param install_deps (deprecated): If true, install dependencies before running the command
     :param copy_dbt_packages: If true, copy pre-existing `dbt_packages` (before running dbt deps)
-    :param callback: A callback function called on after a dbt run with a path to the dbt project directory.
+    :param callback: A callback function, or list of functions, called after a dbt run with a path to the dbt
+        project directory. Each callback may also be given as a string import path (for example
+        "cosmos.io.upload_to_aws_s3"), which is resolved at runtime. This makes it possible to set a callback
+        per dbt node through meta.cosmos.operator_kwargs, where a function object cannot be expressed.
     :param manifest_filepath: The path to the user-defined Manifest file. It's "" by default.
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
@@ -216,7 +219,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         install_deps: bool | str = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
-        callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
+        callback: str | Callable[..., Any] | list[str | Callable[..., Any]] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
@@ -572,7 +575,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _install_dependencies(
         self, tmp_dir_path: Path, flags: list[str], env: dict[str, str | bytes | os.PathLike[Any]]
     ) -> None:
-        self._cache_package_lockfile(tmp_dir_path)
         deps_command = [self.dbt_executable_path, "deps"] + flags
 
         for filename in DBT_DEPENDENCIES_FILE_NAMES:
@@ -645,11 +647,25 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         if self.callback:
             self.callback_args.update({"context": context})
-            if isinstance(self.callback, list):
-                for callback_fn in self.callback:
-                    callback_fn(tmp_project_dir, **self.callback_args)
-            else:
-                self.callback(tmp_project_dir, **self.callback_args)
+            callbacks = self.callback if isinstance(self.callback, list) else [self.callback]
+            for callback_fn in callbacks:
+                self._resolve_callback(callback_fn)(tmp_project_dir, **self.callback_args)
+
+    @staticmethod
+    def _resolve_callback(callback: str | Callable[..., Any]) -> Callable[..., Any]:
+        """Resolve a callback given as a string import path into a callable. Callables are returned as-is."""
+        if not isinstance(callback, str):
+            return callback
+        if "." not in callback:
+            raise CosmosValueError(
+                f"Invalid callback import path {callback!r}. Use a full import path, "
+                f"for example 'cosmos.io.upload_to_aws_s3'."
+            )
+        module_path, method_name = callback.rsplit(".", 1)
+        resolved = load_method_from_module(module_path, method_name)
+        if not callable(resolved):
+            raise CosmosValueError(f"Callback {callback!r} did not resolve to a callable.")
+        return resolved
 
     def _handle_async_execution(self, tmp_project_dir: str, context: Context, async_context: dict[str, Any]) -> None:
         if settings.enable_setup_async_task:
@@ -700,6 +716,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
+                self._cache_package_lockfile(tmp_dir_path)
                 if self._should_install_deps():
                     self._install_dependencies(
                         tmp_dir_path, flags + self._process_global_flag("--vars", self.vars), env
@@ -848,9 +865,18 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
             if AIRFLOW_VERSION.major == 2:
                 self.log.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
+                from airflow.datasets import DatasetAlias
 
-                for outlet in new_outlets:
-                    context["outlet_events"][dataset_alias_name].add(outlet)  # type: ignore[index]
+                alias_names = {dataset_alias_name} | {
+                    outlet.name
+                    for outlet in self.outlets  # type: ignore[attr-defined]
+                    if isinstance(outlet, DatasetAlias) and outlet.name != dataset_alias_name
+                }
+
+                for alias_name in alias_names:
+                    for outlet in new_outlets:
+                        context["outlet_events"][alias_name].add(outlet)  # type: ignore[index]
+
             else:  # AIRFLOW_VERSION.major == 3
                 self.log.info("Assigning outlets with DatasetAlias in Airflow 3")
                 from airflow.sdk.definitions.asset import AssetAlias
@@ -941,7 +967,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
     template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: C901
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
@@ -981,11 +1007,33 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                 and settings.enable_dataset_alias
                 and AIRFLOW_VERSION >= Version("2.10")
             ):
-                from airflow.datasets import DatasetAlias
+                from airflow.datasets import Dataset, DatasetAlias
+                from airflow.models.dataset import DatasetAliasModel
 
                 dag_id = kwargs.get("dag")
                 task_group_id = kwargs.get("task_group")
-                operator_kwargs["outlets"] = [
+
+                # issue-1591: Handle passed-in outlets when enable_dataset_alias is True
+                outlets: list[DatasetAlias] = []
+
+                for outlet in kwargs.get("outlets", []):
+                    if isinstance(outlet, DatasetAlias):
+                        outlets.append(outlet)  # Keep as-is
+
+                    # Handle Datasets
+                    elif isinstance(outlet, Dataset):
+                        dataset_alias_name = outlet.uri
+                        outlets.append(DatasetAlias(name=dataset_alias_name))
+
+                    # Handle DatasetAliasModel, which is not JSON serializable in 2.10
+                    elif isinstance(outlet, DatasetAliasModel):
+                        dataset_alias_name = outlet.name
+                        outlets.append(DatasetAlias(name=dataset_alias_name))
+
+                    else:
+                        logger.warning(f"Unknown outlet type {outlet}")  # Otherwise, pass
+
+                operator_kwargs["outlets"] = outlets + [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]
 
@@ -1074,7 +1122,7 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
         # under. When both are available, skip the run if the checksum matches the last successful run;
         # otherwise fall back to always running the seed (change detection is best-effort).
         if current_seed_checksum and dag_task_group_identifier and unique_id:
-            last_run_seed_checksum = get_seed_checksum(dag_task_group_identifier, unique_id)
+            last_run_seed_checksum = get_cache_seed_checksum(dag_task_group_identifier, unique_id)
             should_run = last_run_seed_checksum != current_seed_checksum
             if not should_run:
                 # Return successfully (do NOT raise AirflowSkipException) so downstream models that depend
@@ -1082,7 +1130,7 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
                 self.log.info("Seed `%s` is unchanged since its last successful run; skipping `dbt seed`.", unique_id)
                 return
             super().execute(context, **kwargs)
-            store_seed_checksum(dag_task_group_identifier, unique_id, current_seed_checksum)
+            store_cache_seed_checksum(dag_task_group_identifier, unique_id, current_seed_checksum)
             return
 
         super().execute(context, **kwargs)

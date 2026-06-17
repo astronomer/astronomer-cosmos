@@ -575,7 +575,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _install_dependencies(
         self, tmp_dir_path: Path, flags: list[str], env: dict[str, str | bytes | os.PathLike[Any]]
     ) -> None:
-        self._cache_package_lockfile(tmp_dir_path)
         deps_command = [self.dbt_executable_path, "deps"] + flags
 
         for filename in DBT_DEPENDENCIES_FILE_NAMES:
@@ -717,6 +716,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
+                self._cache_package_lockfile(tmp_dir_path)
                 if self._should_install_deps():
                     self._install_dependencies(
                         tmp_dir_path, flags + self._process_global_flag("--vars", self.vars), env
@@ -863,9 +863,18 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
             if AIRFLOW_VERSION.major == 2:
                 logger.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
+                from airflow.datasets import DatasetAlias
 
-                for outlet in new_outlets:
-                    context["outlet_events"][dataset_alias_name].add(outlet)  # type: ignore[index]
+                alias_names = {dataset_alias_name} | {
+                    outlet.name
+                    for outlet in self.outlets  # type: ignore[attr-defined]
+                    if isinstance(outlet, DatasetAlias) and outlet.name != dataset_alias_name
+                }
+
+                for alias_name in alias_names:
+                    for outlet in new_outlets:
+                        context["outlet_events"][alias_name].add(outlet)  # type: ignore[index]
+
             else:  # AIRFLOW_VERSION.major == 3
                 logger.info("Assigning outlets with DatasetAlias in Airflow 3")
                 from airflow.sdk.definitions.asset import AssetAlias
@@ -956,7 +965,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
     template_fields: Sequence[str] = AbstractDbtLocalBase.template_fields
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: C901
         # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
         # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
         # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
@@ -996,11 +1005,33 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                 and settings.enable_dataset_alias
                 and AIRFLOW_VERSION >= Version("2.10")
             ):
-                from airflow.datasets import DatasetAlias
+                from airflow.datasets import Dataset, DatasetAlias
+                from airflow.models.dataset import DatasetAliasModel
 
                 dag_id = kwargs.get("dag")
                 task_group_id = kwargs.get("task_group")
-                operator_kwargs["outlets"] = [
+
+                # issue-1591: Handle passed-in outlets when enable_dataset_alias is True
+                outlets: list[DatasetAlias] = []
+
+                for outlet in kwargs.get("outlets", []):
+                    if isinstance(outlet, DatasetAlias):
+                        outlets.append(outlet)  # Keep as-is
+
+                    # Handle Datasets
+                    elif isinstance(outlet, Dataset):
+                        dataset_alias_name = outlet.uri
+                        outlets.append(DatasetAlias(name=dataset_alias_name))
+
+                    # Handle DatasetAliasModel, which is not JSON serializable in 2.10
+                    elif isinstance(outlet, DatasetAliasModel):
+                        dataset_alias_name = outlet.name
+                        outlets.append(DatasetAlias(name=dataset_alias_name))
+
+                    else:
+                        logger.warning(f"Unknown outlet type {outlet}")  # Otherwise, pass
+
+                operator_kwargs["outlets"] = outlets + [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]
 

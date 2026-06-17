@@ -151,6 +151,10 @@ class KeywordArgValueStr(KeywordArgValue, str):
     pass
 
 
+class KeywordArgValueInt(KeywordArgValue, int):
+    pass
+
+
 @dataclass
 class KeywordArg:
     key: str
@@ -196,6 +200,22 @@ def test_dbtmodelconfig_extract_config_with_kwarg_str():
     computed = dbt_model._extract_config(kwarg, config_name)
     expected = ["some_conf:abc"]
     assert computed == expected
+
+
+def test_dbtmodelconfig_extract_config_with_kwarg_key_mismatch():
+    dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
+    kwarg = KeywordArg(key="other_conf", value=KeywordArgValueStr("abc"))
+    config_name = "some_conf"
+    computed = dbt_model._extract_config(kwarg, config_name)
+    assert computed is None
+
+
+def test_dbtmodelconfig_extract_config_with_kwarg_non_list_non_str():
+    dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
+    kwarg = KeywordArg(key="some_conf", value=KeywordArgValueInt(5))
+    config_name = "some_conf"
+    computed = dbt_model._extract_config(kwarg, config_name)
+    assert computed == 5
 
 
 def test_dbtmodelconfig_with_sources(tmp_path):

@@ -44,6 +44,7 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
+    SeedRenderingBehavior,
 )
 from cosmos.dbt.executable import get_system_dbt, is_dbt_installed_in_same_environment
 from cosmos.dbt.graph import DbtGraph
@@ -129,6 +130,19 @@ def validate_arguments(
         logger.warning("Specifying a schema in the `task_args` is deprecated. Please use the `profile_args` instead.")
         if profile_config.profile_mapping:
             profile_config.profile_mapping.profile_args["schema"] = task_args["schema"]
+
+    # SeedRenderingBehavior.WHEN_SEED_CHANGES decides at task runtime whether to run `dbt seed`, which
+    # requires Cosmos to run dbt directly on the Airflow worker with filesystem access to the seed files.
+    if render_config.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES and (
+        execution_config.execution_mode
+        not in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV, ExecutionMode.AIRFLOW_ASYNC)
+    ):
+        raise CosmosValueError(
+            "SeedRenderingBehavior.WHEN_SEED_CHANGES is only supported with ExecutionMode.LOCAL, "
+            "ExecutionMode.VIRTUALENV or ExecutionMode.AIRFLOW_ASYNC, which run dbt directly on the "
+            f"Airflow worker. The configured execution_mode is {execution_config.execution_mode}. Use "
+            "SeedRenderingBehavior.ALWAYS, or switch to a supported execution mode."
+        )
 
     if execution_config.execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV]:
         profile_config.validate_profiles_yml()

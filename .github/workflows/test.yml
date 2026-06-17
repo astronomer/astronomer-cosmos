@@ -3,10 +3,11 @@ name: test
 on:
   push: # Run on pushes to the default branch
     branches: [main]
-  # Also run on pull requests originating from forks. Jobs that require sensitive secrets (integration tests,
-  # kubernetes, code coverage) depend on the Authorize job, which requires manually approving the workflow run for
-  # external PRs. Jobs that do not use sensitive secrets (type-check, unit tests, performance, telemetry) run
-  # without approval.
+  # Also run on pull requests originating from forks. Every test job here is secret-dependent
+  # (integration tests, kubernetes, code coverage) and depends on the Authorize job, which requires
+  # manually approving the workflow run for external PRs. Jobs that need no secrets (type-check,
+  # unit, telemetry and performance tests) run in the separate, unprivileged test-unprivileged.yml
+  # workflow without that approval; only Check-changed-files is duplicated across both.
   pull_request_target:
     branches: [main, 'release-*'] # zizmor: ignore[dangerous-triggers]
 
@@ -28,7 +29,7 @@ jobs:
     steps:
       - run: true
 
-  # Skip unit/integration tests when only non-code files changed (Type-Check still runs).
+  # Skip the integration and kubernetes tests when only non-code files changed.
   Check-changed-files:
     runs-on: ubuntu-latest
     permissions:
@@ -37,7 +38,7 @@ jobs:
     outputs:
       code_changed: ${{ steps.check.outputs.code_changed }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -113,81 +114,6 @@ jobs:
           done <<< "$FILES"
           echo "code_changed=$CODE_CHANGED" >> "$GITHUB_OUTPUT"
 
-  Type-Check:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-          persist-credentials: false
-
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: "3.10"
-          architecture: "x64"
-
-      - run: pip3 install "hatch>=1.14.2"
-      - run: hatch run tests.py3.10-3.1-1.9:type-check
-
-  Run-Unit-Tests:
-    needs: Check-changed-files
-    if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
-        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
-        dbt-version: ["1.10"]
-        exclude:
-          # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
-          - python-version: "3.13"
-            airflow-version: "2.9"
-          - python-version: "3.13"
-            airflow-version: "2.10"
-          - python-version: "3.13"
-            airflow-version: "2.11"
-          - python-version: "3.13"
-            airflow-version: "3.0"
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-          persist-credentials: false
-
-      - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: |
-            ~/.cache/pip
-            .local/share/hatch/
-          key: unit-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install packages and dependencies
-        run: |
-          python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
-          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
-
-      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
-        run: |
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-cov
-
-      - name: Upload coverage to Github
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: coverage-unit-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
-          path: .coverage
-          include-hidden-files: true
-
   Run-Integration-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
@@ -227,7 +153,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -285,7 +211,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
-      - name: Upload coverage to Github
+      - name: Upload coverage to GitHub
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-split${{ matrix.split-group }}
@@ -318,7 +244,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -365,7 +291,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
-      - name: Upload coverage to Github
+      - name: Upload coverage to GitHub
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-integration-expensive-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
@@ -405,7 +331,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -482,7 +408,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -509,7 +435,7 @@ jobs:
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-async
 
-      - name: Upload coverage to Github
+      - name: Upload coverage to GitHub
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-integration-dbt-async-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
@@ -553,7 +479,7 @@ jobs:
         dbt-version: ["2.0"]  # dbt Fusion
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -605,7 +531,7 @@ jobs:
           AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
           RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
-      - name: Upload coverage to Github
+      - name: Upload coverage to GitHub
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
@@ -628,131 +554,6 @@ jobs:
           RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
 
-  Run-Telemetry-Tests:
-    needs: Check-changed-files
-    if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11"]
-        airflow-version: ["2.10"]
-        dbt-version: ["1.9"]
-    env:
-      SCARF_NO_ANALYTICS: "false"
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-          persist-credentials: false
-
-      - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: |
-            ~/.cache/pip
-            .local/share/hatch/
-          key: telemetry-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install packages and dependencies
-        run: |
-          python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
-          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
-
-      - name: Run telemetry tests
-        run: |
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-telemetry
-
-      - name: Upload coverage to Github
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: coverage-telemetry-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
-          path: .coverage
-          include-hidden-files: true
-
-  Run-Performance-Tests:
-    needs: Check-changed-files
-    if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11"]
-        airflow-version: ["2.10", "3.0"]
-        dbt-version: ["1.9"]
-        num-models: [1, 10, 50, 100, 500]
-    services:
-      postgres:
-        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-          persist-credentials: false
-
-      - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: |
-            ~/.cache/pip
-            .local/share/hatch/
-          key: perf-test-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install packages and dependencies
-        run: |
-          python -m pip install uv
-          uv pip install --system "hatch>=1.14.2"
-          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
-
-      - name: Run performance tests against against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
-        id: run-performance-tests
-        run: |
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-performance-setup
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-performance
-
-          # read the performance results and set them as an env var for the next step
-          # format: NUM_MODELS={num_models}\nTIME={end - start}\n
-          cat /tmp/performance_results.txt > "$GITHUB_STEP_SUMMARY"
-        env:
-          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-          AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
-          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 180.0
-          PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
-          COSMOS_CONN_POSTGRES_PASSWORD: ${{ secrets.COSMOS_CONN_POSTGRES_PASSWORD }}
-          POSTGRES_HOST: localhost
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-          POSTGRES_SCHEMA: public
-          POSTGRES_PORT: 5432
-          MODEL_COUNT: ${{ matrix.num-models }}
-    env:
-      AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
-      AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
-      PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
-
   Run-Kubernetes-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
@@ -766,7 +567,7 @@ jobs:
         airflow-version: [ "2.10", "3.0" ]
         dbt-version: [ "1.11" ]
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -814,7 +615,7 @@ jobs:
           POSTGRES_SCHEMA: public
           POSTGRES_PORT: 5432
 
-      - name: Upload coverage to Github
+      - name: Upload coverage to GitHub
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-integration-kubernetes-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
@@ -825,16 +626,16 @@ jobs:
     if: github.event.action != 'labeled'
     needs:
       - Authorize
-      - Run-Unit-Tests
       - Run-Integration-Tests
       - Run-Integration-Tests-Expensive
       - Run-Kubernetes-Tests
-      - Run-Telemetry-Tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # Required to read artifacts from the sibling test-unprivileged.yml run.
+      actions: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -846,17 +647,79 @@ jobs:
       - name: Install coverage
         run: |
           pip3 install coverage
-      - name: Download all coverage artifacts
+      - name: Download coverage artifacts from this run
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: ./coverage
+          pattern: coverage-*
+
+      # The unit, telemetry and dbt-loom tests run in the unprivileged test-unprivileged.yml
+      # workflow, so their coverage lands in a separate workflow run for the same commit. Locate
+      # that run by head SHA and wait until those coverage artifacts are available. (The performance
+      # tests run in that same workflow but upload no coverage, so they are irrelevant here — we
+      # wait only on the coverage-producing artifacts, never on the whole run, so the longer-running
+      # performance matrix does not hold this step up.)
+      #
+      # By the time this job runs, those artifacts are expected to already exist: this job only
+      # starts after its `needs` (the integration and kubernetes jobs) complete, which take
+      # ~5-18 min, whereas the unprivileged unit/telemetry/dbt-loom tests run in parallel from the
+      # same commit and finish well within that window. So the first attempt below almost always
+      # finds the artifacts and breaks immediately. The retry loop is a safety gate for the rare
+      # race where this job reaches this step before the unprivileged run has uploaded them; it
+      # waits up to 5 minutes (15 attempts x 20s) before failing rather than silently dropping
+      # coverage.
+      - name: Locate unprivileged test run for this commit
+        id: unprivileged-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          HEAD_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          RUN_ID=""
+          FOUND=""
+          for attempt in $(seq 1 15); do
+            RUN_ID=$(gh api \
+              "repos/${{ github.repository }}/actions/workflows/test-unprivileged.yml/runs?head_sha=${HEAD_SHA}&per_page=1" \
+              --jq '.workflow_runs[0].id // ""')
+            if [ -n "$RUN_ID" ]; then
+              NAMES=$(gh api \
+                "repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
+                --jq '.artifacts[].name')
+              if echo "$NAMES" | grep -q '^coverage-unit-test-' \
+                && echo "$NAMES" | grep -q '^coverage-telemetry-test-' \
+                && echo "$NAMES" | grep -q '^coverage-integration-dbt-loom-test-'; then
+                echo "Found unit, telemetry and dbt-loom coverage artifacts in run ${RUN_ID}."
+                FOUND=1
+                break
+              fi
+            fi
+            echo "Waiting for test-unprivileged.yml coverage artifacts (attempt ${attempt}/15)…"
+            sleep 20
+          done
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::No test-unprivileged.yml run found for ${HEAD_SHA}; its coverage would be missing."
+            exit 1
+          fi
+          if [ -z "$FOUND" ]; then
+            echo "::error::test-unprivileged.yml run ${RUN_ID} did not publish all expected coverage artifacts (unit, telemetry, dbt-loom) after waiting; refusing to upload partial coverage."
+            exit 1
+          fi
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Download unit, telemetry and dbt-loom coverage from the unprivileged run
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          path: ./coverage
+          pattern: coverage-*
+          run-id: ${{ steps.unprivileged-run.outputs.run_id }}
+          github-token: ${{ github.token }}
+
       - name: Combine coverage
         run: |
           coverage combine ./coverage/coverage*/.coverage
           coverage report
           coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354  # v6.0.1
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v6.0.2
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}

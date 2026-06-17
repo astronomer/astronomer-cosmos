@@ -609,6 +609,116 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
         # assert dataset_model == 1
 
 
+@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.10"),
+    reason="Outlets are only overridden in Airflow 2.10 and 2.11 in DbtLocalBaseOperator.",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
+    from airflow.datasets import Dataset, DatasetAlias
+    from airflow.models.dataset import DatasetAliasModel
+    from sqlalchemy.orm.exc import FlushError
+
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            emit_datasets=False,
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+
+        run_operator_dataset = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run_operator_dataset",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            outlets=[Dataset(uri="manual_outlet__run_dataset")],
+        )
+
+        run_operator_alias = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run_operator_alias",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            outlets=[DatasetAlias(name="manual_outlet__run_alias")],
+        )
+
+        run_operator_alias_model = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run_operator_alias_model",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            outlets=[DatasetAliasModel(name="manual_outlet__run_alias_model")],
+        )
+
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        seed_operator >> [run_operator_dataset, run_operator_alias, run_operator_alias_model] >> test_operator
+
+    assert seed_operator.outlets == []  # because emit_datasets=False,
+
+    # Handling Dataset
+    assert run_operator_dataset.outlets == [
+        DatasetAlias(name="manual_outlet__run_dataset"),
+        DatasetAlias(name="test_id_1__run_operator_dataset"),
+    ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_dataset.outlets)
+
+    # Handling DatasetAlias
+    assert run_operator_alias.outlets == [
+        DatasetAlias(name="manual_outlet__run_alias"),
+        DatasetAlias(name="test_id_1__run_operator_alias"),
+    ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_alias.outlets)
+
+    # Handling DatasetAliasModel passed by user and the DatasetAlias outlet by the Operator
+    assert run_operator_alias_model.outlets == [
+        DatasetAlias(name="manual_outlet__run_alias_model"),
+        DatasetAlias(name="test_id_1__run_operator_alias_model"),
+    ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_alias_model.outlets)
+
+    assert test_operator.outlets == [DatasetAlias(name="test_id_1__test")]
+
+    with pytest.raises(FlushError):
+        run_test_dag(dag, custom_tester=True)
+        # This is a known limitation of Airflow 2.10.0 and 2.10.1
+        # https://github.com/apache/airflow/issues/42495
+
+        # When this is solved, we can uncomment the following:
+        # dag_run, session = run_test_dag(dag)
+
+        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
+        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
+        # based on the resolution of the issue logged in Airflow:
+        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
+        # assert dataset_model == 1
+
+
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.Version("3.0.0"),
     reason="From Airflow 3.0 onwards, we started using AssetAlias, which changed the original behaviour",
@@ -1063,32 +1173,60 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     assert "Unable to emit OpenLineage events due to lack of dependencies or data." in caplog.text
 
 
+def _write_target_sql_fixture(tmp_path: Path) -> None:
+    """Create a fake dbt ``target/`` tree with two .sql files and one non-SQL artefact."""
+    compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
+    run_dir = tmp_path / "target" / "run" / "pkg" / "models"
+    compiled_dir.mkdir(parents=True)
+    run_dir.mkdir(parents=True)
+    (compiled_dir / "a.sql").write_text("SELECT 1\n")
+    (run_dir / "b.sql").write_text("SELECT 2\n")
+    # Non-SQL artefact under target/ must be ignored.
+    (tmp_path / "target" / "manifest.json").write_text("{}")
+
+
+def _assert_compiled_sql_aggregated(operator: AbstractDbtLocalBase) -> None:
+    """Verify aggregated ``compiled_sql`` contains both fixture files, excludes non-SQL, and has no trailing blank line."""
+    assert "-- target/compiled/pkg/models/a.sql" in operator.compiled_sql
+    assert "-- target/run/pkg/models/b.sql" in operator.compiled_sql
+    assert "SELECT 1" in operator.compiled_sql
+    assert "SELECT 2" in operator.compiled_sql
+    assert "manifest.json" not in operator.compiled_sql
+    # Invariant: chunks are separated by a blank line and the aggregated string has no
+    # leading or trailing whitespace.
+    assert "\n\n" in operator.compiled_sql
+    assert operator.compiled_sql == operator.compiled_sql.strip()
+
+
 @pytest.mark.skipif(version.parse(airflow_version).major == 3, reason="Test only applies to Airflow 2")
-def test_store_compiled_sql_airflow2() -> None:
+def test_store_compiled_sql_airflow2(tmp_path: Path) -> None:
+    # should_store_compiled_sql=False is a no-op even when target/ has files.
+    _write_target_sql_fixture(tmp_path)
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=False,
     )
-    # here we just need to call the method to make sure it doesn't raise an exception
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
+    assert dbt_base_operator.compiled_sql == ""
 
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=True,
     )
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
-    # here we call the method and see if it tries to access the context["ti"]
-    # it should, and it should raise a KeyError because we didn't pass in a ti
+    _assert_compiled_sql_aggregated(dbt_base_operator)
+
+    # _override_rtif tries to access context["ti"]; it should raise KeyError when ti is absent.
     with pytest.raises(KeyError):
         dbt_base_operator._override_rtif(
             context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
@@ -1096,30 +1234,34 @@ def test_store_compiled_sql_airflow2() -> None:
 
 
 @pytest.mark.skipif(version.parse(airflow_version).major == 2, reason="Test only applies to Airflow 3")
-def test_store_compiled_sql_airflow3() -> None:
+def test_store_compiled_sql_airflow3(tmp_path: Path) -> None:
+    # should_store_compiled_sql=False is a no-op even when target/ has files.
+    _write_target_sql_fixture(tmp_path)
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=False,
     )
-    # here we just need to call the method to make sure it doesn't raise an exception
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
+    assert dbt_base_operator.compiled_sql == ""
 
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="my-task",
-        project_dir="my/dir",
+        project_dir=str(tmp_path),
         should_store_compiled_sql=True,
     )
     dbt_base_operator.store_compiled_sql(
-        tmp_project_dir="my/dir",
+        tmp_project_dir=str(tmp_path),
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
-    # Test Airflow 3 behavior - should set flag
+    _assert_compiled_sql_aggregated(dbt_base_operator)
+
+    # Airflow 3 only flips a flag; Airflow itself re-renders templates post-execute.
     dbt_base_operator._override_rtif(
         context=Context(execution_date=datetime(2023, 2, 15, 12, 30)),
     )
@@ -2059,6 +2201,68 @@ def test_handle_post_execution_with_multiple_callbacks(
         callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
 
 
+@patch("cosmos.operators.local.load_method_from_module")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+def test_handle_post_execution_with_string_callback(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json, mock_load_method
+):
+    resolved_callback = MagicMock()
+    mock_load_method.return_value = resolved_callback
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        callback="cosmos.io.upload_to_aws_s3",
+        callback_args={"arg1": "value1"},
+    )
+
+    context = {"dag_run": MagicMock(), "task": MagicMock()}
+    operator._handle_post_execution("/tmp/project_dir", context)
+
+    mock_load_method.assert_called_once_with("cosmos.io", "upload_to_aws_s3")
+    resolved_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+def test_handle_post_execution_with_mixed_callbacks(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json, mock_load_method
+):
+    resolved_callback = MagicMock()
+    mock_load_method.return_value = resolved_callback
+    direct_callback = MagicMock()
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        callback=[direct_callback, "cosmos.io.upload_to_aws_s3"],
+        callback_args={"arg1": "value1"},
+    )
+
+    context = {"dag_run": MagicMock(), "task": MagicMock()}
+    operator._handle_post_execution("/tmp/project_dir", context)
+
+    mock_load_method.assert_called_once_with("cosmos.io", "upload_to_aws_s3")
+    direct_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+    resolved_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+def test_resolve_callback_rejects_path_without_module():
+    with pytest.raises(CosmosValueError, match="Invalid callback import path"):
+        ConcreteDbtLocalBaseOperator._resolve_callback("upload_to_aws_s3")
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+def test_resolve_callback_rejects_non_callable(mock_load_method):
+    mock_load_method.return_value = "not-a-callable"
+    with pytest.raises(CosmosValueError, match="did not resolve to a callable"):
+        ConcreteDbtLocalBaseOperator._resolve_callback("cosmos.io.SOME_CONSTANT")
+
+
 @pytest.mark.integration
 @patch("cosmos.operators.local.AbstractDbtLocalBase._configure_remote_target_path")
 @patch("cosmos.operators.local.ObjectStoragePath")
@@ -2577,7 +2781,131 @@ class TestReadTargetSourcesJson:
         target = tmp_path / "target"
         target.mkdir()
         sources_file = target / "sources.json"
-        sources_file.write_text("not valid json {{{")
+        sources_file.write_text("not valid json {{{{")
 
         result = _read_target_sources_json(tmp_path)
         assert result is None
+
+
+def _seed_change_extra_context(*, checksum="current-checksum"):
+    return {
+        "should_run_if_seed_changed": True,
+        "dbt_dag_task_group_identifier": "my_dag",
+        "dbt_node_config": {
+            "unique_id": "seed.pkg.my_seed",
+            "checksum": checksum,
+        },
+    }
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_skips_when_unchanged(mock_build_and_run_cmd, mock_variable, caplog):
+    """When the seed checksum is unchanged, execute() must not run `dbt seed` and must not raise (success)."""
+    mock_variable.get.return_value = "current-checksum"  # stored == current
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config,
+        task_id="my_seed",
+        project_dir="my/dir",
+        extra_context=_seed_change_extra_context(),
+    )
+    caplog.set_level(logging.INFO)
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_not_called()
+    mock_variable.set.assert_not_called()
+    assert "unchanged" in caplog.text
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_runs_and_persists_when_changed(mock_build_and_run_cmd, mock_variable):
+    """When the seed checksum changed, execute() runs `dbt seed` and persists the new checksum."""
+    mock_variable.get.return_value = "stale-checksum"  # differs from current
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config,
+        task_id="my_seed",
+        project_dir="my/dir",
+        extra_context=_seed_change_extra_context(),
+    )
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    mock_variable.set.assert_called_once()
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_runs_when_checksum_unresolved(mock_build_and_run_cmd, mock_variable):
+    """When the current checksum could not be resolved, execute() runs the seed without touching Variables."""
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config,
+        task_id="my_seed",
+        project_dir="my/dir",
+        extra_context=_seed_change_extra_context(checksum=None),
+    )
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    mock_variable.get.assert_not_called()
+    mock_variable.set.assert_not_called()
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_full_refresh_bypasses_detection(mock_build_and_run_cmd, mock_variable):
+    """--full-refresh always runs the seed, even when the checksum is unchanged."""
+    mock_variable.get.return_value = "current-checksum"  # unchanged
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config,
+        task_id="my_seed",
+        project_dir="my/dir",
+        full_refresh=True,
+        extra_context=_seed_change_extra_context(),
+    )
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    mock_variable.get.assert_not_called()
+
+
+@patch("cosmos.cache.Variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.build_and_run_cmd")
+def test_dbt_seed_local_operator_runs_normally_without_change_detection(mock_build_and_run_cmd, mock_variable):
+    """Without the change-detection flag (ALWAYS), execute() runs `dbt seed` and never touches Variables."""
+    operator = DbtSeedLocalOperator(profile_config=profile_config, task_id="my_seed", project_dir="my/dir")
+    operator.execute(context={})
+    mock_build_and_run_cmd.assert_called_once()
+    mock_variable.get.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "full_refresh,expected",
+    [
+        (True, True),
+        (False, False),
+        ("true", True),
+        (" true ", True),  # rendered templates may carry surrounding whitespace
+        ("false", False),
+        ("", False),
+    ],
+)
+def test_dbt_seed_local_operator_is_full_refresh(full_refresh, expected):
+    operator = DbtSeedLocalOperator(
+        profile_config=profile_config, task_id="my_seed", project_dir="my/dir", full_refresh=full_refresh
+    )
+    assert operator._is_full_refresh() is expected
+
+
+def test_dbt_local_operator_warns_on_output_only_template_fields(caplog):
+    """Test that passing compiled_sql or freshness to local operators emits a warning."""
+    from cosmos.operators.local import DbtRunLocalOperator
+
+    with caplog.at_level("WARNING", logger="cosmos.operators.local"):
+        DbtRunLocalOperator(
+            task_id="fake-task",
+            profile_config=profile_config,
+            project_dir="fake-dir",
+            compiled_sql="SELECT 1",
+            freshness="test",
+        )
+
+    assert "compiled_sql" in caplog.text
+    assert "freshness" in caplog.text
+    assert "output-only template field" in caplog.text

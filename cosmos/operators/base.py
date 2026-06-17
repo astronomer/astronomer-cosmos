@@ -24,7 +24,7 @@ if TYPE_CHECKING:  # pragma: no cover
 try:
     from airflow.utils.operator_helpers import context_to_airflow_vars  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover
-    from airflow.sdk.execution_time.context import context_to_airflow_vars  # type: ignore[no-redef]
+    from airflow.sdk.execution_time.context import context_to_airflow_vars
 
 from airflow.utils.strings import to_boolean
 

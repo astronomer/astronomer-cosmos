@@ -18,6 +18,7 @@ from cosmos.constants import (
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
 )
+from cosmos.dbt.graph import DbtNode
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
@@ -51,7 +52,7 @@ if TYPE_CHECKING:
         from airflow.sdk import DAG
     except ImportError:
         from airflow.models.dag import DAG  # type: ignore[assignment]
-    from airflow.operators.empty import EmptyOperator
+    from cosmos.airflow.compatibility import EmptyOperator
 
     try:
         from airflow.sdk import TaskGroup
@@ -251,7 +252,7 @@ def _ensure_subprocess_model_outlet_uris(
         manifest_path = Path(project_dir) / "target" / "manifest.json"
         if manifest_path.exists():
             model_outlet_uris.update(compute_model_outlet_uris(manifest_path, dataset_namespace))
-        model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []  # type: ignore[assignment]
+        model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []
 
 
 def _rewrite_upstream_failure_skip_status(
@@ -294,7 +295,7 @@ def store_dbt_resource_status_from_log(
     extra_kwargs: Any,
     *,
     tests_per_model: dict[str, list[str]] | None = None,
-    test_results_per_model: dict[str, list[str]] | None = None,
+    test_results_per_model: dict[str, dict[str, str]] | None = None,
     model_outlet_uris: dict[str, list[str]] | None = None,
     dataset_namespace: str | None = None,
     upstream_failure_skipped_ids: set[str] | None = None,
@@ -313,8 +314,9 @@ def store_dbt_resource_status_from_log(
         Empty dict when no tests exist.
     :param test_results_per_model: Mutable accumulator dict. For each model that has
         tests, collects the terminal statuses of those tests as they finish.
-        Keyed by model unique_id, values are lists of test statuses (e.g. ``["pass", "pass"]``).
-        Mutated in place by this function.
+        Keyed by model unique_id; values are dicts mapping each test's unique_id to its
+        status (e.g. ``{"test.pkg.not_null_orders_id": "pass"}``), so a replayed log line
+        for the same test is idempotent. Mutated in place by this function.
     :param model_outlet_uris: Mutable dict mapping unique_id to outlet URIs.
         Populated lazily from the manifest on first terminal status detection.
     :param dataset_namespace: The OL-compatible dataset namespace for URI construction.
@@ -406,8 +408,8 @@ def store_dbt_resource_status_from_log(
 _PRODUCER_ONLY_FLAGS: tuple[str, ...] = ("--select", "--exclude", "--log-format")
 
 
-class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
-    template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
+class BaseConsumerSensor(BaseSensorOperator):
+    template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")
     poke_retry_number: int = 0
 
     def __init__(
@@ -512,7 +514,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             raw_flags = upstream_task.add_cmd_flags()
             extra_flags = self._filter_flags(raw_flags)
 
-        model_selector = self.model_unique_id.split(".", 2)[2]
+        model_selector = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = extra_flags + ["--select", model_selector]
 
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]
@@ -779,17 +781,14 @@ def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> 
     is skipped on retry, this task still succeeds (trigger_rule=NONE_FAILED), preventing
     the skip from propagating to tasks downstream of the group.
     """
-    try:
-        from airflow.providers.standard.operators.empty import EmptyOperator
-    except ImportError:
-        from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+    from cosmos.airflow.compatibility import EmptyOperator
 
     try:
         from airflow.task.trigger_rule import TriggerRule
     except ImportError:
-        from airflow.utils.trigger_rule import TriggerRule  # type: ignore[no-redef]
+        from airflow.utils.trigger_rule import TriggerRule
 
-    return EmptyOperator(  # type: ignore[no-untyped-call]
+    return EmptyOperator(
         task_id=task_id,
         dag=dag,
         task_group=task_group,

@@ -24,6 +24,7 @@ except ImportError:
     from airflow.utils.task_group import TaskGroup
 
 from cosmos import settings
+from cosmos.airflow.compatibility import EMPTY_OPERATOR_CLASS_PATH
 from cosmos.config import ExecutionConfig, RenderConfig
 from cosmos.constants import (
     DBT_SETUP_ASYNC_TASK_ID,
@@ -35,6 +36,7 @@ from cosmos.constants import (
     TESTABLE_DBT_RESOURCES,
     DbtResourceType,
     ExecutionMode,
+    SeedRenderingBehavior,
     SourceRenderingBehavior,
     TestBehavior,
     TestIndirectSelection,
@@ -365,6 +367,60 @@ def create_task_metadata(  # noqa: C901
         # `AIRFLOW__COSMOS__PRE_DBT_FUSION=1`.
         models_select_key = "models" if settings.pre_dbt_fusion else "select"
 
+        # Apply seed rendering behavior before the TestBehavior.BUILD branch so it is honored
+        # regardless of the test behavior (under BUILD, seeds would otherwise be rendered as DbtBuild tasks).
+        if node.resource_type == DbtResourceType.SEED:
+            if render_config.seed_rendering_behavior == SeedRenderingBehavior.NONE:
+                # Do not render the seed in the DAG/TaskGroup at all.
+                return None
+            if render_config.seed_rendering_behavior == SeedRenderingBehavior.RENDER_ONLY:
+                # Render the seed as a no-op placeholder so it stays visible in the DAG
+                # topology/lineage, but never run `dbt seed`.
+                task_id, args = _get_task_id_and_args(
+                    node=node,
+                    args=args,
+                    use_task_group=use_task_group,
+                    normalize_task_id=render_config.normalize_task_id,
+                    normalize_task_display_name=render_config.normalize_task_display_name,
+                    resource_suffix=node.resource_type.value,
+                    execution_mode=execution_mode,
+                )
+                # EmptyOperator does not accept custom dbt parameters (e.g. profile_args); recreate the args.
+                args = {"task_display_name": args["task_display_name"]} if "task_display_name" in args else {}
+                return TaskMetadata(id=task_id, operator_class=EMPTY_OPERATOR_CLASS_PATH, arguments=args)
+            if render_config.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES:
+                # Render the seed as usual, but flag the task so the operator skips running
+                # `dbt seed` when the CSV content is unchanged since the last successful run.
+                extra_context["should_run_if_seed_changed"] = True
+
+        if node.has_ephemeral_materialization and render_config.ephemeral_models_as_empty_operator:
+            # Ephemeral models are inlined as CTEs into downstream models and never written to the
+            # warehouse, so running them via a dbt operator (whether `dbt run` or `dbt build`) is a
+            # no-op. Render them as empty operators while keeping the node in the graph so the
+            # dependency chain passing through it is preserved. This check sits before the
+            # TestBehavior.BUILD branch so it is honored regardless of the test behavior.
+            is_build = (
+                render_config.test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES
+            )
+            task_id, args = _get_task_id_and_args(
+                node=node,
+                args=args,
+                use_task_group=use_task_group,
+                normalize_task_id=render_config.normalize_task_id,
+                normalize_task_display_name=render_config.normalize_task_display_name,
+                resource_suffix=resource_suffix,
+                include_resource_type=is_build,
+                execution_mode=execution_mode,
+            )
+            # EmptyOperator does not accept custom dbt parameters (e.g. profile_args); keep only the display name.
+            args = {"task_display_name": args["task_display_name"]} if "task_display_name" in args else {}
+            return TaskMetadata(
+                id=task_id,
+                owner=node.owner if render_config.enable_owner_inheritance else "",
+                operator_class=EMPTY_OPERATOR_CLASS_PATH,
+                arguments=args,
+            )
+
         if render_config.test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"
@@ -417,7 +473,11 @@ def create_task_metadata(  # noqa: C901
                     args = {"task_display_name": args["task_display_name"]}
                 else:
                     args = {}
-                return TaskMetadata(id=task_id, operator_class="airflow.operators.empty.EmptyOperator", arguments=args)
+                return TaskMetadata(
+                    id=task_id,
+                    operator_class=EMPTY_OPERATOR_CLASS_PATH,
+                    arguments=args,
+                )
         else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"
@@ -788,7 +848,7 @@ def _add_watcher_dependencies(
         )
         for task in node_tasks:
             if hasattr(task, "producer_task_id"):
-                task.producer_task_id = producer_airflow_task.task_id  # type: ignore[union-attr]
+                task.producer_task_id = producer_airflow_task.task_id
             if needs_wait_for_downstream:
                 task.wait_for_downstream = True  # type: ignore[union-attr]
 

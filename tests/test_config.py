@@ -5,7 +5,7 @@ from unittest.mock import Mock, PropertyMock, call, patch
 import pytest
 
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, InvocationMode, SourceRenderingBehavior
+from cosmos.constants import ExecutionMode, InvocationMode, SeedRenderingBehavior, SourceRenderingBehavior, TestBehavior
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.athena.access_key import AthenaAccessKeyProfileMapping
 from cosmos.profiles.postgres.user_pass import PostgresUserPasswordProfileMapping
@@ -278,6 +278,11 @@ def test_render_config_source_rendering_behavior_none_warns_and_normalizes():
     assert config.source_rendering_behavior == SourceRenderingBehavior.NONE
 
 
+def test_render_config_ephemeral_models_as_empty_operator_defaults_to_true():
+    """Ephemeral models are rendered as EmptyOperator by default."""
+    assert RenderConfig().ephemeral_models_as_empty_operator is True
+
+
 @pytest.mark.parametrize(
     "execution_mode, invocation_mode, expectation",
     [
@@ -330,3 +335,22 @@ def test_remote_manifest_path(manifest_path, given_manifest_conn_id, used_manife
         dbt_project_path="/tmp/some-path", manifest_path=manifest_path, manifest_conn_id=given_manifest_conn_id
     )
     assert project_config.manifest_path == ObjectStoragePath(manifest_path, conn_id=used_manifest_conn_id)
+
+
+def test_render_config_seed_rendering_when_seed_changes_with_build_raises():
+    """WHEN_SEED_CHANGES cannot be combined with TestBehavior.BUILD."""
+    with pytest.raises(CosmosValueError, match="WHEN_SEED_CHANGES is incompatible with TestBehavior.BUILD"):
+        RenderConfig(
+            seed_rendering_behavior=SeedRenderingBehavior.WHEN_SEED_CHANGES,
+            test_behavior=TestBehavior.BUILD,
+        )
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.AFTER_EACH, TestBehavior.AFTER_ALL, TestBehavior.NONE])
+def test_render_config_seed_rendering_when_seed_changes_allowed_with_non_build(test_behavior):
+    config = RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.WHEN_SEED_CHANGES, test_behavior=test_behavior)
+    assert config.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES
+
+
+def test_render_config_seed_rendering_behavior_defaults_to_always():
+    assert RenderConfig().seed_rendering_behavior == SeedRenderingBehavior.ALWAYS

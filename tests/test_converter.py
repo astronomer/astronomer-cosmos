@@ -1,5 +1,6 @@
 import logging
 import tempfile
+from contextlib import nullcontext as does_not_raise
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -9,6 +10,8 @@ from airflow.exceptions import ParamValidationError
 from airflow.models import DAG
 from packaging.version import Version
 
+from cosmos import DbtDag
+from cosmos.airflow.compatibility import EmptyOperator
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     AIRFLOW_VERSION,
@@ -16,11 +19,13 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
+    SeedRenderingBehavior,
     TestBehavior,
 )
 from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
+from cosmos.operators.local import DbtRunLocalOperator
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
 from cosmos.telemetry import _decompress_telemetry_metadata
 
@@ -29,6 +34,7 @@ SAMPLE_DBT_PROJECT = Path(__file__).parent / "sample/"
 SAMPLE_DBT_MANIFEST = Path(__file__).parent / "sample/manifest.json"
 MULTIPLE_PARENTS_TEST_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt/multiple_parents_test/"
 DBT_PROJECTS_PROJ_WITH_DEPS_DIR = Path(__file__).parent.parent / "dev/dags/dbt" / "jaffle_shop"
+ALTERED_JAFFLE_SHOP_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt" / "altered_jaffle_shop"
 
 skipif_airflow_lt_3_dag_doc_hash = pytest.mark.skipif(
     AIRFLOW_VERSION < Version("3.0.0"),
@@ -1519,3 +1525,91 @@ def test_telemetry_metadata_not_stored_when_disabled(mock_should_emit, mock_load
 
     # Verify metadata is NOT stored when telemetry is disabled
     assert "__cosmos_telemetry_metadata__" not in dag.params
+
+
+@pytest.mark.parametrize(
+    "execution_mode, expectation",
+    [
+        (ExecutionMode.LOCAL, does_not_raise()),
+        (ExecutionMode.VIRTUALENV, does_not_raise()),
+        (ExecutionMode.AIRFLOW_ASYNC, does_not_raise()),
+        (ExecutionMode.DOCKER, pytest.raises(CosmosValueError)),
+        (ExecutionMode.KUBERNETES, pytest.raises(CosmosValueError)),
+        (ExecutionMode.WATCHER, pytest.raises(CosmosValueError)),
+    ],
+)
+def test_validate_arguments_seed_when_seed_changes_execution_mode(execution_mode, expectation):
+    """WHEN_SEED_CHANGES is only allowed for worker-filesystem execution modes."""
+    project_config = ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST, project_name="xubiru")
+    render_config = RenderConfig(seed_rendering_behavior=SeedRenderingBehavior.WHEN_SEED_CHANGES)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=execution_mode)
+    with expectation:
+        validate_arguments(
+            execution_config=execution_config,
+            profile_config=profile_config,
+            project_config=project_config,
+            render_config=render_config,
+            task_args={},
+        )
+
+
+def _build_altered_jaffle_shop_dag(dag_id, ephemeral_models_as_empty_operator):
+    """Render altered_jaffle_shop (which has a customers -> ephemeral_customers -> ephemeral_customers_downstream
+    lineage) into a DbtDag by invoking ``dbt ls`` on the project, so tests can inspect the rendered tasks via
+    ``dag.tasks_map``."""
+    return DbtDag(
+        dag_id=dag_id,
+        start_date=datetime(2024, 4, 16),
+        project_config=ProjectConfig(ALTERED_JAFFLE_SHOP_DBT_PROJECT),
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.LOCAL),
+        render_config=RenderConfig(
+            load_method=LoadMode.DBT_LS,
+            test_behavior=TestBehavior.NONE,
+            emit_datasets=False,
+            ephemeral_models_as_empty_operator=ephemeral_models_as_empty_operator,
+        ),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="example_conn",
+                profile_args={"schema": "public"},
+                disable_event_tracking=True,
+            ),
+        ),
+        operator_args={"install_deps": True},
+    )
+
+
+@pytest.mark.integration
+def test_dbt_dag_renders_ephemeral_model_as_empty_operator():
+    """By default, an ephemeral model is rendered as an EmptyOperator, and the dependency chain that passes
+    through it (customers -> ephemeral_customers -> ephemeral_customers_downstream) is preserved."""
+    dag = _build_altered_jaffle_shop_dag("ephemeral_dag", ephemeral_models_as_empty_operator=True)
+
+    ephemeral_task = dag.tasks_map["model.altered_jaffle_shop.ephemeral_customers"]
+    downstream_task = dag.tasks_map["model.altered_jaffle_shop.ephemeral_customers_downstream"]
+    upstream_task = dag.tasks_map["model.altered_jaffle_shop.customers"]
+
+    # The ephemeral model becomes an EmptyOperator instead of a dbt run task.
+    assert isinstance(ephemeral_task, EmptyOperator)
+    # The downstream (table) model is still a regular dbt run task.
+    assert isinstance(downstream_task, DbtRunLocalOperator)
+    # The lineage is preserved through the empty operator: customers >> ephemeral_customers >> downstream.
+    assert upstream_task.task_id in ephemeral_task.upstream_task_ids
+    assert downstream_task.task_id in ephemeral_task.downstream_task_ids
+
+
+@pytest.mark.integration
+def test_dbt_dag_renders_ephemeral_model_as_dbt_run_when_disabled():
+    """With ephemeral_models_as_empty_operator=False, an ephemeral model is rendered as a regular dbt run task."""
+    dag = _build_altered_jaffle_shop_dag("ephemeral_dag_disabled", ephemeral_models_as_empty_operator=False)
+
+    ephemeral_task = dag.tasks_map["model.altered_jaffle_shop.ephemeral_customers"]
+    assert isinstance(ephemeral_task, DbtRunLocalOperator)
+    assert not isinstance(ephemeral_task, EmptyOperator)

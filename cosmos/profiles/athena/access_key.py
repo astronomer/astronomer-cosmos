@@ -98,6 +98,6 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
         """
         from airflow.providers.amazon.aws.hooks.base_aws import AwsGenericHook
 
-        hook = AwsGenericHook(self.conn_id)  # type: ignore[var-annotated]
+        hook = AwsGenericHook(self.conn_id)
         credentials = hook.get_credentials()
         return credentials

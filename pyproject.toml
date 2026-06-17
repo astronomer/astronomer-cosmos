@@ -77,7 +77,7 @@ dbt-spark = ["dbt-spark"]
 dbt-sqlserver = ["dbt-sqlserver"]
 dbt-teradata = ["dbt-teradata"]
 dbt-vertica = ["dbt-vertica<=1.5.4"]
-openlineage = ["openlineage-integration-common!=1.15.0", "openlineage-airflow"]
+openlineage = ["openlineage-integration-common!=1.15.0", "apache-airflow-providers-openlineage"]
 amazon = [
     "apache-airflow-providers-amazon[s3fs]>=3.0.0",
 ]
@@ -199,6 +199,7 @@ test-integration-dbtf-setup = 'sh scripts/test/integration-dbtf-setup.sh'
 test-integration-dbtf = 'sh scripts/test/integration-dbtf.sh'
 test-integration-dbt-1-5-4 = 'sh scripts/test/integration-dbt-1-5-4.sh'
 test-integration-dbt-async = 'sh scripts/test/integration-dbt-async.sh {matrix:dbt}'
+test-integration-dbt-loom = 'sh scripts/test/integration-dbt-loom.sh {matrix:dbt}'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
 test-telemetry = 'sh scripts/test/telemetry.sh'
 
@@ -254,7 +255,7 @@ known_third_party = ["airflow", "jinja2"]
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-no_warn_unused_ignores = true
+no_warn_unused_ignores = false
 
 [tool.ruff]
 line-length = 120

@@ -75,7 +75,7 @@ in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
 try:
     from airflow.sdk._shared.configuration.exceptions import AirflowConfigException as SdkConfigException
 except ImportError:
-    SdkConfigException = airflow.exceptions.AirflowConfigException  # type: ignore[misc]
+    SdkConfigException = airflow.exceptions.AirflowConfigException
 
 try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")

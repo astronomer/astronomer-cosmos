@@ -26,6 +26,7 @@ from cosmos.constants import (
     ExecutionMode,
     SourceRenderingBehavior,
 )
+from cosmos.dbt.graph import DbtNode
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
@@ -196,10 +197,12 @@ def test_dbt_producer_log_format_always_json():
     assert op.log_format == "json"
 
 
-@patch("airflow.models.Variable")
+@patch("cosmos.operators._watcher.xcom.delete_variable")
 @patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
-def test_dbt_producer_watcher_operator_pushes_completion_status_on_success(mock_execute, mock_persist, mock_variable):
+def test_dbt_producer_watcher_operator_pushes_completion_status_on_success(
+    mock_execute, mock_persist, mock_delete_variable
+):
     """Test that operator pushes 'completed' status to XCom on success."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     mock_ti = _MockTI()
@@ -211,10 +214,12 @@ def test_dbt_producer_watcher_operator_pushes_completion_status_on_success(mock_
     mock_execute.assert_called_once()
 
 
-@patch("airflow.models.Variable")
+@patch("cosmos.operators._watcher.xcom.delete_variable")
 @patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
-def test_dbt_producer_watcher_operator_pushes_completion_status_on_failure(mock_execute, mock_persist, mock_variable):
+def test_dbt_producer_watcher_operator_pushes_completion_status_on_failure(
+    mock_execute, mock_persist, mock_delete_variable
+):
     """Test that operator pushes 'completed' status to XCom even when execution fails."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     mock_ti = _MockTI()
@@ -565,7 +570,7 @@ class TestStoreDbtStatusFromLog:
         tests_per_model = {
             "model.pkg.orders": ["test.pkg.not_null_orders_id", "test.pkg.unique_orders_id"],
         }
-        test_results_per_model: dict[str, list[str]] = {}
+        test_results_per_model: dict[str, dict[str, str]] = {}
 
         # First test passes — not all tests reported yet, no XCom push
         log_line_1 = json.dumps(
@@ -617,7 +622,7 @@ class TestStoreDbtStatusFromLog:
         tests_per_model = {
             "model.pkg.orders": ["test.pkg.not_null_orders_id", "test.pkg.unique_orders_id"],
         }
-        test_results_per_model: dict[str, list[str]] = {}
+        test_results_per_model: dict[str, dict[str, str]] = {}
 
         for uid, status in [
             ("test.pkg.not_null_orders_id", "pass"),
@@ -1227,7 +1232,7 @@ class TestDbtConsumerWatcherSensor:
         sensor.build_and_run_cmd.assert_called_once()
         args, kwargs = sensor.build_and_run_cmd.call_args
         assert "--select" in kwargs["cmd_flags"]
-        assert MODEL_UNIQUE_ID.split(".", 2)[2] in kwargs["cmd_flags"]
+        assert DbtNode.get_resource_name_from_unique_id(MODEL_UNIQUE_ID) in kwargs["cmd_flags"]
 
     def test_fallback_strips_producer_log_format_by_default(self):
         """Producer's ``--log-format json`` (internal, used for event-stream parsing) must not leak into
@@ -2493,6 +2498,31 @@ def test_dbt_source_watcher_operator_template_fields():
         assert field in DbtSourceWatcherOperator.template_fields
 
 
+def test_dbt_source_watcher_operator_fallback_runs_source_freshness():
+    """On retry the source sensor should run ``dbt source freshness --select source:<resource_name>``
+    locally for its specific source.
+    """
+    from cosmos.operators.watcher import DbtSourceWatcherOperator
+
+    source_uid = "source.jaffle_shop.raw.orders"
+    extra_context = {"dbt_node_config": {"unique_id": source_uid}}
+    sensor = DbtSourceWatcherOperator(
+        task_id="raw_orders.source",
+        project_dir="/tmp/project",
+        profile_config=None,
+        extra_context=extra_context,
+    )
+    sensor.build_and_run_cmd = MagicMock()
+    context = MagicMock()
+
+    result = sensor._fallback_to_non_watcher_run(2, context)
+
+    assert result is True
+    sensor.build_and_run_cmd.assert_called_once()
+    _, kwargs = sensor.build_and_run_cmd.call_args
+    assert kwargs["cmd_flags"] == ["--select", "source:raw.orders"]
+
+
 class TestDbtTestWatcherOperator:
     """Tests for DbtTestWatcherOperator — the sensor that watches aggregated test results."""
 
@@ -2589,7 +2619,7 @@ class TestDbtTestWatcherOperator:
         mock_fallback_to_non_watcher_run.assert_called_once()
         sensor.build_and_run_cmd.assert_called_once()
         _, kwargs = sensor.build_and_run_cmd.call_args
-        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".", 2)[2]]
+        assert kwargs["cmd_flags"] == ["--select", DbtNode.get_resource_name_from_unique_id(self.MODEL_UID)]
 
     def test_fallback_via_poke_does_not_forward_producer_flags(self):
         """Driving through ``poke`` on retry, the fallback should issue ``dbt test`` with
@@ -2611,7 +2641,7 @@ class TestDbtTestWatcherOperator:
 
         mock_fallback_to_non_watcher_run.assert_called_once()
         _, kwargs = sensor.build_and_run_cmd.call_args
-        assert kwargs["cmd_flags"] == ["--select", self.MODEL_UID.split(".", 2)[2]]
+        assert kwargs["cmd_flags"] == ["--select", DbtNode.get_resource_name_from_unique_id(self.MODEL_UID)]
         assert "--full-refresh" not in kwargs["cmd_flags"]
         assert sensor.base_cmd == ["test"]
 
@@ -2982,6 +3012,15 @@ class TestProducerSourceFreshness:
         producer._apply_node_state_tokens(context, [("model.pkg.m1", "skipped")])
         assert "existing_model" in producer.exclude
         assert "m1" in producer.exclude
+
+    def test_apply_node_state_tokens_skips_malformed_unique_id(self):
+        producer = self._make_producer()
+        producer.exclude = None
+        ti = MagicMock()
+        context = {"ti": ti}
+        producer._apply_node_state_tokens(context, [("malformed_uid", "skipped"), ("model.pkg.m1", "skipped")])
+        # The malformed id is skipped while the valid one still makes it into exclude.
+        assert producer.exclude == "m1"
 
     def test_apply_node_state_tokens_noop_when_empty(self):
         producer = self._make_producer()

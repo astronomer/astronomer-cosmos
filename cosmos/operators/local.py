@@ -480,7 +480,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 ).delete()
                 session.add(rtif)
             else:
-                logger.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+                self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
 
         _override_rtif_airflow_2_x()
 
@@ -1031,7 +1031,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                         outlets.append(DatasetAlias(name=dataset_alias_name))
 
                     else:
-                        logger.warning(f"Unknown outlet type {outlet}")  # Otherwise, pass
+                        self.log.warning(f"Unknown outlet type {outlet}")  # Otherwise, pass
 
                 operator_kwargs["outlets"] = outlets + [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))

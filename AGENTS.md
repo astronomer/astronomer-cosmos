@@ -141,11 +141,12 @@ logger = logging.getLogger(__name__)
 logging.error(...)  # never call the root logger directly either
 ```
 
-Inside operators, log via `self.log` (provided by Airflow's `LoggingMixin`) rather than a module-level logger, so messages land in the per-task-instance log shown in the Airflow UI:
+Inside operator instance methods, log via `self.log` (Cosmos's `AbstractDbtBase` routes it through `get_logger`, so it keeps the `(astronomer-cosmos)` prefix and scoped log levels):
 ```python
 def execute(self, context):
     self.log.info("Running command: %s", self.command)
 ```
+Use module-level `get_logger(__name__)` where `self` isn't available (module-level helpers, `@staticmethod`s).
 
 Use **lazy logging**: pass the format string and arguments separately. Do not embed f-strings, `.format()`, or `%` interpolation in log messages — the logger formats them only when the record passes the level filter.
 

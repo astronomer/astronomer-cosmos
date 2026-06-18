@@ -75,19 +75,27 @@ def _get_task_group_id(ti: Any) -> str | None:
     return group_id
 
 
-def _init_xcom_backup(context: Any) -> None:
-    """Activate incremental XCom backup for the current producer execution.
+def _init_xcom_backup(context: Any, *, persist: bool = True) -> None:
+    """Activate the XCom backup buffer for the current producer execution.
 
-    After this call every ``safe_xcom_push`` will also persist the key/value
-    pair to an Airflow Variable so the backup is crash-safe.  The state is
-    stored on the task instance itself — no module-level globals.
+    Always creates the in-memory backup buffer on the task instance, so every
+    ``safe_xcom_push`` accumulates the node statuses pushed during this run.
+
+    When ``persist`` is ``True`` (the reliable default), a Variable key is also
+    set on the task instance, which makes ``safe_xcom_push`` additionally
+    persist the buffer to an Airflow Variable after every push so the backup is
+    crash-safe across a producer retry.  When ``persist`` is ``False`` the
+    statuses are kept only in process memory (no Variable I/O): faster, but lost
+    if the producer is killed by an OS signal and retried.  The state is stored
+    on the task instance itself — no module-level globals.
     """
     ti = context["ti"]
-    dag_id = ti.dag_id
-    run_id = context["run_id"]
-    task_group_id = _get_task_group_id(ti)
-    ti._cosmos_xcom_backup_var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
     ti._cosmos_xcom_backup_buffer = {}
+    if persist:
+        dag_id = ti.dag_id
+        run_id = context["run_id"]
+        task_group_id = _get_task_group_id(ti)
+        ti._cosmos_xcom_backup_var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
 
 
 def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:

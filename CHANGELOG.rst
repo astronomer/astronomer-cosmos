@@ -1,6 +1,19 @@
 Changelog
 =========
 
+1.15.0 (Unreleased)
+-------------------
+
+Features
+
+* Add the ``enable_watcher_reliable_retry`` configuration for ``ExecutionMode.WATCHER``. When set to
+  ``False``, the producer keeps per-node dbt statuses only in process memory instead of durably
+  backing them up to an Airflow Variable, removing the per-node Variable I/O and improving producer
+  performance. The trade-off is that a producer signal-kill/OOM and retry loses the in-memory
+  statuses, so the affected consumer sensors re-run their dbt node locally. Defaults to ``True``
+  (the existing durable, crash-safe behaviour). The long-term reliable-and-fast replacement is
+  tracked in #2771 (Airflow 3.3 Task & Asset Store). See #2776.
+
 1.14.2 (2026-05-21)
 -------------------
 

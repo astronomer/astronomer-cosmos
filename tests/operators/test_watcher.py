@@ -318,6 +318,68 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(mock_execute, mock_re
     mock_execute.assert_not_called()
 
 
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators._watcher.xcom._persist_backup")
+@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_success(
+    mock_execute, mock_delete, mock_persist
+):
+    """With enable_watcher_reliable_retry=False, statuses stay in memory: no Variable persist or delete (#2776)."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "test_run"}
+
+    op.execute(context=context)
+
+    assert mock_ti.store.get("task_status") == "completed"
+    # In-memory mode: a buffer exists, but no Variable key is set and nothing is persisted/deleted.
+    assert getattr(mock_ti, "_cosmos_xcom_backup_var_key", None) is None
+    mock_persist.assert_not_called()
+    mock_delete.assert_not_called()
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators._watcher.xcom._persist_backup")
+@patch("cosmos.operators.watcher._backup_xcom_to_variable")
+@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_failure(
+    mock_execute, mock_delete, mock_backup, mock_persist
+):
+    """With enable_watcher_reliable_retry=False, a producer failure does not back statuses up to a Variable (#2776)."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "test_run"}
+
+    mock_execute.side_effect = RuntimeError("dbt build failed")
+
+    with pytest.raises(RuntimeError):
+        op.execute(context=context)
+
+    assert mock_ti.store.get("task_status") == "completed"
+    mock_backup.assert_not_called()
+    mock_delete.assert_not_called()
+    mock_persist.assert_not_called()
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators.watcher._restore_xcom_from_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_in_memory_skips_restore_on_retry(mock_execute, mock_restore):
+    """With enable_watcher_reliable_retry=False, a retry still skips but does not restore from a Variable (#2776)."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    ti = _MockTI()
+    ti.try_number = 2
+    context = {"ti": ti, "run_id": "test_run"}
+
+    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+        op.execute(context=context)
+
+    mock_restore.assert_not_called()
+    mock_execute.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "event, expected_message",
     [
@@ -2478,6 +2540,68 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
     assert tis["watcher_upstream_failure_recovery.model_a_run"].state == "success"
 
     # Producer/gateway/post_dbt sanity (matches the gateway-prevents-skip test).
+    assert tis["watcher_upstream_failure_recovery.dbt_producer_watcher_done"].state == "success"
+    assert tis["post_dbt"].state == "success"
+
+
+@pytest.mark.integration
+def test_dbt_task_group_watcher_in_memory_retry_recovers_skipped_downstream(
+    caplog, reset_fail_once_sequence, monkeypatch
+):
+    """Companion to the retry-recovery test with ``enable_watcher_reliable_retry=False`` (#2776).
+
+    In in-memory mode the producer does not durably back node statuses up to an Airflow Variable, so
+    after the producer fails and Airflow retries it (clearing the first attempt's XComs), the
+    consumer sensors find no restored status and fall back to running their dbt node locally. The DAG
+    must still end SUCCESS -- correctness is preserved via the existing consumer-fallback path; only
+    efficiency degrades (more consumers re-run dbt than in the reliable default).
+    """
+    from airflow import DAG
+
+    from cosmos import DbtTaskGroup
+
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator
+
+    monkeypatch.setattr("cosmos.settings.enable_watcher_reliable_retry", False)
+    reset_fail_once_sequence("_cosmos_recovery_fail_once_seq")
+
+    caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
+
+    with DAG(
+        dag_id="watcher_in_memory_recovery_test",
+        start_date=datetime(2023, 1, 1),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        dagrun_timeout=timedelta(seconds=180),
+    ) as dag:
+        dbt_group = DbtTaskGroup(
+            group_id="watcher_upstream_failure_recovery",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_UPSTREAM_FAILURE_RECOVERY_PATH),
+            profile_config=profile_config,
+            render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.NONE),
+            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=180)},
+        )
+
+        gateway = dag.task_dict["watcher_upstream_failure_recovery.dbt_producer_watcher_done"]
+        for root_task in dbt_group.get_roots():
+            if root_task.task_id.endswith("_done") or root_task.task_id.endswith("dbt_producer_watcher"):
+                continue
+            gateway >> root_task
+
+        post_dbt = EmptyOperator(task_id="post_dbt")
+        dbt_group >> post_dbt
+
+    outcome = new_test_dag(dag, expected_dag_state=DagRunState.SUCCESS)
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+
+    # Even without the durable Variable backup, the consumer-fallback path recovers every model.
+    assert tis["watcher_upstream_failure_recovery.model_downstream_run"].state == "success"
+    assert tis["watcher_upstream_failure_recovery.model_flaky_run"].state == "success"
+    assert tis["watcher_upstream_failure_recovery.model_a_run"].state == "success"
     assert tis["watcher_upstream_failure_recovery.dbt_producer_watcher_done"].state == "success"
     assert tis["post_dbt"].state == "success"
 

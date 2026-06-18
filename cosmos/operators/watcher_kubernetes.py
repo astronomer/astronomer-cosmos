@@ -135,24 +135,34 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
         try_number = getattr(task_instance, "try_number", 1)
 
+        # When enable_watcher_reliable_retry is disabled, node statuses are kept only in process memory
+        # (no Airflow Variable backup): faster, but lost on a producer signal-kill/OOM retry, in
+        # which case consumer sensors fall back to running their dbt node locally. See #2776.
+        from cosmos import settings
+
+        reliable_retry = settings.enable_watcher_reliable_retry
+
         if try_number > 1:
-            _restore_xcom_from_variable(context)
+            if reliable_retry:
+                _restore_xcom_from_variable(context)
             raise AirflowSkipException(
                 "DbtProducerWatcherKubernetesOperator does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
 
-        _init_xcom_backup(context)
+        _init_xcom_backup(context, persist=reliable_retry)
 
         self._upstream_failure_skipped_ids.clear()
         self._context = context
 
         try:
             return_value = super().execute(context, **kwargs)
-            _delete_xcom_backup_variable(context)
+            if reliable_retry:
+                _delete_xcom_backup_variable(context)
             return return_value
         except Exception:
-            _backup_xcom_to_variable(context)
+            if reliable_retry:
+                _backup_xcom_to_variable(context)
             raise
 
 

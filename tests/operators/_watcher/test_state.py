@@ -229,6 +229,18 @@ class TestInitXcomBackup:
         with pytest.raises(AttributeError, match="task_group"):
             _init_xcom_backup(context)
 
+    def test_persist_false_sets_buffer_but_no_var_key(self):
+        # In-memory mode (enable_watcher_reliable_retry=False): the backup buffer is created so node
+        # statuses accumulate in process memory, but no Variable key is set, so safe_xcom_push
+        # never persists to an Airflow Variable. See #2776.
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "manual__2026-01-01"}
+
+        _init_xcom_backup(context, persist=False)
+
+        assert ti._cosmos_xcom_backup_buffer == {}
+        assert getattr(ti, "_cosmos_xcom_backup_var_key", None) is None
+
 
 class TestPersistBackup:
     @patch("cosmos.operators._watcher.xcom.set_variable")
@@ -268,6 +280,20 @@ class TestSafeXcomPushBackup:
         safe_xcom_push(ti, "key", "value")
 
         assert ti.store["key"] == "value"
+        mock_persist.assert_not_called()
+
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
+    def test_accumulates_in_buffer_without_persisting_when_not_reliable(self, mock_persist):
+        # In-memory mode: the buffer is active (persist=False) so the push is recorded in memory,
+        # but without a Variable key safe_xcom_push must not persist to a Variable. See #2776.
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run"}
+        _init_xcom_backup(context, persist=False)
+
+        safe_xcom_push(ti, "status_key", "success")
+
+        assert ti.store["status_key"] == "success"
+        assert ti._cosmos_xcom_backup_buffer["status_key"] == "success"
         mock_persist.assert_not_called()
 
 

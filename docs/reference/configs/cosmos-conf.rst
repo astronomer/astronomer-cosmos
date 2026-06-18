@@ -402,6 +402,20 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE``
 
+.. _enable_watcher_reliable_retry:
+
+`enable_watcher_reliable_retry`_:
+    (Introduced in Cosmos 1.15.0) Controls how the watcher producer task preserves per-node dbt statuses so that, if the producer is retried, consumer sensors do not lose them.
+
+    When ``True`` (default), each status is durably backed up to an Airflow Variable, so statuses survive a producer retry or OOM kill — consumers continue without re-running dbt. This is the reliable behaviour, but rewriting the backup Variable on every dbt node is measurable producer CPU/IO on large projects.
+
+    When ``False``, statuses are kept only in the producer's process memory (no Variable writes), which removes that overhead and improves producer performance. The trade-off: if the producer is killed by an OS signal (``SIGTERM``/``SIGKILL``/OOM) and Airflow retries it, the in-memory statuses are lost; the affected consumer sensors then fall back to running their dbt node locally. Results stay correct, but those transformations may run a second time.
+
+    A future approach that delivers reliability and performance together is tracked in `#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task & Asset Store, AIP-103).
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_WATCHER_RELIABLE_RETRY``
+
 [openlineage]
 ~~~~~~~~~~~~~
 

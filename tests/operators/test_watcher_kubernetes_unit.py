@@ -150,7 +150,7 @@ def test_deletes_backup_on_success(mock_execute, mock_init, mock_delete):
 
     op.execute(context=context)
 
-    mock_init.assert_called_once_with(context)
+    mock_init.assert_called_once_with(context, persist=True)
     mock_delete.assert_called_once_with(context)
     mock_execute.assert_called_once()
 
@@ -176,8 +176,80 @@ def test_keeps_backup_on_failure(mock_execute, mock_init, mock_delete, mock_back
     with pytest.raises(RuntimeError):
         op.execute(context=context)
 
-    mock_init.assert_called_once_with(context)
+    mock_init.assert_called_once_with(context, persist=True)
     mock_backup.assert_called_once_with(context)
+    mock_delete.assert_not_called()
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators.watcher_kubernetes._restore_xcom_from_variable")
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_skips_retry_attempt_in_memory_mode(mock_execute, mock_restore):
+    """With enable_watcher_reliable_retry=False, a retry still skips but does not restore from a Variable (#2776)."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+
+    ti = MagicMock()
+    ti.try_number = 2
+    context = {"ti": ti, "run_id": "test_run"}
+
+    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+        op.execute(context=context)
+
+    mock_restore.assert_not_called()
+    mock_execute.assert_not_called()
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_in_memory_mode_skips_variable_backup_on_success(mock_execute, mock_init, mock_delete):
+    """With enable_watcher_reliable_retry=False, the producer keeps the buffer in memory only (#2776)."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    op.execute(context=context)
+
+    mock_init.assert_called_once_with(context, persist=False)
+    mock_delete.assert_not_called()
+    mock_execute.assert_called_once()
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators.watcher_kubernetes._backup_xcom_to_variable")
+@patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
+def test_in_memory_mode_skips_variable_backup_on_failure(mock_execute, mock_init, mock_delete, mock_backup):
+    """With enable_watcher_reliable_retry=False, a producer failure does not back statuses up to a Variable (#2776)."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti}
+
+    mock_execute.side_effect = RuntimeError("dbt build failed")
+
+    with pytest.raises(RuntimeError):
+        op.execute(context=context)
+
+    mock_init.assert_called_once_with(context, persist=False)
+    mock_backup.assert_not_called()
     mock_delete.assert_not_called()
 
 

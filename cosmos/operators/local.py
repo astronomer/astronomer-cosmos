@@ -759,7 +759,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
 
             return DbtLocalArtifactProcessor
-        except ImportError:
+        except ImportError:  # pragma: no cover
+            # Exercised only when ``openlineage-integration-common`` is absent/broken, which CI always installs.
             return None
 
     def calculate_openlineage_events_completes(
@@ -780,7 +781,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         without doing any work when ``openlineage-integration-common`` is unavailable.
         """
         DbtLocalArtifactProcessor = self._get_dbt_local_artifact_processor()
-        if DbtLocalArtifactProcessor is None:
+        if DbtLocalArtifactProcessor is None:  # pragma: no cover
+            # Reached only when ``openlineage-integration-common`` is unavailable, which CI always installs.
             self.log.debug("openlineage-integration-common is unavailable; skipping OpenLineage event parsing.")
             return False
 

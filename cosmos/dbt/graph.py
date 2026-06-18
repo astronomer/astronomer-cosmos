@@ -1361,13 +1361,9 @@ class DbtGraph:
         """
         try:
             if manifest_path.stat().st_size == 0:
-                raise CosmosLoadDbtException(
-                    f"Failed to load dbt manifest at `{manifest_path}`: file is empty"
-                )
+                raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
         except OSError as e:
-            raise CosmosLoadDbtException(
-                f"Failed to load dbt manifest at `{manifest_path}`: {e}"
-            ) from e
+            raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: {e}") from e
 
         if settings.enable_orjson_parser and orjson:
             try:

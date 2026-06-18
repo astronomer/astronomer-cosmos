@@ -558,6 +558,48 @@ def test_load_from_dbt_manifest_handles_null_manifest(tmp_path):
     assert dbt_graph.filtered_nodes == {}
 
 
+def test_load_from_dbt_manifest_handles_empty_manifest(tmp_path):
+    """When manifest file is empty, raises CosmosLoadDbtException."""
+    manifest_file = tmp_path / "manifest_empty.json"
+    manifest_file.write_text("")
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="test")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_from_dbt_manifest()
+    assert f"Failed to load dbt manifest at `{manifest_file}`: file is empty" in str(err_info.value)
+
+
+def test_load_from_dbt_manifest_handles_invalid_json_manifest(tmp_path):
+    """When manifest file contains invalid JSON, raises CosmosLoadDbtException."""
+    manifest_file = tmp_path / "manifest_invalid.json"
+    manifest_file.write_text("{invalid")
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="test")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_from_dbt_manifest()
+    assert f"Failed to load dbt manifest at `{manifest_file}`: file is not valid JSON" in str(err_info.value)
+
+
 def test_load_from_dbt_manifest_resolves_package_path(tmp_path):
     """Package nodes get file_path under project_path/dbt_packages/<package_name>/."""
     manifest = {

@@ -725,8 +725,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     self._sources_json = _read_target_sources_json(tmp_dir_path)
                     self.handle_exception(result)
                     return result
-                events_processed = self.calculate_openlineage_events_completes(env, tmp_dir_path, full_cmd)
-                if events_processed and AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
+                processor_available = self.calculate_openlineage_events_completes(env, tmp_dir_path, full_cmd)
+                if processor_available and AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
                     # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance,
                     # in that case we're storing as self.openlineage_events_completes
                     context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
@@ -775,7 +775,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         * {project_dir}/target/manifest.json
         * {project_dir}/target/run_results.json
 
-        Stores the extracted RunEvents on ``self.openlineage_events_completes`` and returns ``True``. Returns ``False``
+        Stores the extracted RunEvents on ``self.openlineage_events_completes``. Returns ``True`` when the OpenLineage
+        processor is available (parsing was attempted; individual parse failures are caught and logged), and ``False``
         without doing any work when ``openlineage-integration-common`` is unavailable.
         """
         DbtLocalArtifactProcessor = self._get_dbt_local_artifact_processor()

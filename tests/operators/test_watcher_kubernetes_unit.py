@@ -146,7 +146,7 @@ def test_deletes_backup_on_success(mock_execute, mock_init, mock_delete):
 
     ti = MagicMock()
     ti.try_number = 1
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
     op.execute(context=context)
 
@@ -169,7 +169,7 @@ def test_keeps_backup_on_failure(mock_execute, mock_init, mock_delete, mock_back
 
     ti = MagicMock()
     ti.try_number = 1
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
     mock_execute.side_effect = RuntimeError("dbt build failed")
 
@@ -217,7 +217,7 @@ def test_in_memory_mode_skips_variable_backup_on_success(mock_execute, mock_init
 
     ti = MagicMock()
     ti.try_number = 1
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
     op.execute(context=context)
 
@@ -241,7 +241,7 @@ def test_in_memory_mode_skips_variable_backup_on_failure(mock_execute, mock_init
 
     ti = MagicMock()
     ti.try_number = 1
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
     mock_execute.side_effect = RuntimeError("dbt build failed")
 
@@ -421,7 +421,7 @@ def test_execute_sets_context_instance_attr(mock_execute, mock_init, mock_delete
     )
     ti = MagicMock()
     ti.try_number = 1
-    context = {"ti": ti}
+    context = {"ti": ti, "run_id": "test_run"}
 
     op.execute(context=context)
 

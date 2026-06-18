@@ -76,7 +76,7 @@ def _get_task_group_id(ti: Any) -> str | None:
 
 
 def _init_xcom_backup(context: Any, *, persist: bool = True) -> None:
-    """Create the producer's in-memory backup buffer; when ``persist``, also set the Variable key so ``safe_xcom_push`` backs it up durably."""
+    """Create the producer's XCom backup buffer; if ``persist``, also back it up to an Airflow Variable."""
     ti = context["ti"]
     ti._cosmos_xcom_backup_buffer = {}
     if persist:

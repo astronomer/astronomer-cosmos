@@ -46,11 +46,13 @@ from cosmos.cache import (
     were_yaml_selectors_modified,
 )
 from cosmos.constants import (
+    DBT_MANIFEST_FILE_NAME,
     DBT_PARTIAL_PARSE_FILE_NAME,
     DBT_TARGET_DIR_NAME,
     DEFAULT_PROFILES_FILE_NAME,
     _default_s3_conn,
 )
+from cosmos.dbt.project import get_partial_parse_path
 from cosmos.settings import dbt_profile_cache_dir_name
 
 START_DATE = datetime(2024, 4, 16)
@@ -130,9 +132,9 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
     assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text
 
 
-@patch("cosmos.cache.shutil.copyfile")
+@patch("cosmos.cache.safe_copy")
 @patch("cosmos.cache.get_partial_parse_path")
-def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
+def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_safe_copy):
     mock_get_partial_parse_path.side_effect = lambda cache_dir: cache_dir / "partial_parse.yml"
 
     latest_partial_parse_filepath = Path("/path/to/latest_partial_parse.yml")
@@ -144,12 +146,41 @@ def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
 
     _update_partial_parse_cache(latest_partial_parse_filepath, cache_dir)
 
-    # Assert shutil.copyfile was called twice with the correct arguments
+    # Assert safe_copy was called twice with the correct Path arguments
     calls = [
-        call(str(latest_partial_parse_filepath), str(cache_path)),
-        call(str(latest_partial_parse_filepath.parent / "manifest.json"), str(manifest_path)),
+        call(latest_partial_parse_filepath, cache_path),
+        call(latest_partial_parse_filepath.parent / "manifest.json", manifest_path),
     ]
-    mock_copyfile.assert_has_calls(calls)
+    mock_safe_copy.assert_has_calls(calls)
+
+
+def test_update_partial_parse_cache_writes_files_atomically(tmp_path):
+    """End-to-end regression: cache files end up with the expected content and no
+    temp artefacts are left behind, exercising the safe_copy (temp-file + rename)
+    path that protects concurrent readers from observing partial writes
+    (see #971/#972).
+    """
+    src_target_dir = tmp_path / "src" / DBT_TARGET_DIR_NAME
+    src_target_dir.mkdir(parents=True)
+    src_partial = src_target_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    src_manifest = src_target_dir / DBT_MANIFEST_FILE_NAME
+    src_partial.write_bytes(b"partial-content")
+    src_manifest.write_bytes(b"manifest-content")
+
+    cache_dir = tmp_path / "cache"
+
+    _update_partial_parse_cache(src_partial, cache_dir)
+
+    cached_partial = get_partial_parse_path(cache_dir)
+    cached_manifest = cached_partial.parent / DBT_MANIFEST_FILE_NAME
+
+    assert cached_partial.read_bytes() == b"partial-content"
+    assert cached_manifest.read_bytes() == b"manifest-content"
+    # safe_copy must clean up its temp files even on the happy path.
+    assert sorted(p.name for p in cached_partial.parent.iterdir()) == [
+        DBT_MANIFEST_FILE_NAME,
+        DBT_PARTIAL_PARSE_FILE_NAME,
+    ]
 
 
 @pytest.fixture

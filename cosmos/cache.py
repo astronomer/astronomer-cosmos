@@ -249,7 +249,7 @@ def _update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: 
     """
     cache_path = get_partial_parse_path(cache_dir)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path = get_partial_parse_path(cache_dir).parent / DBT_MANIFEST_FILE_NAME
+    manifest_path = cache_path.parent / DBT_MANIFEST_FILE_NAME
     latest_manifest_filepath = latest_partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
 
     # Use safe_copy (atomic temp-file + rename) so concurrent readers of these cache files

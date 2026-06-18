@@ -603,7 +603,6 @@ def generate_task_or_group(
     filtered_nodes: dict[str, DbtNode] | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
-
     task_or_group: BaseOperator | TaskGroup | None = None
     detached_from_parent = detached_from_parent or {}
     use_task_group = (
@@ -1013,6 +1012,13 @@ def _add_test_tasks(
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
     if render_config.test_behavior == TestBehavior.AFTER_ALL:
+        if not nodes:
+            # No dbt nodes were rendered (e.g. an empty or fully-filtered
+            # manifest). There are no models to test, no leaf tasks to attach a
+            # test to, and ``task_or_group_args`` was never populated by the
+            # per-node loop. Skip the aggregate test task instead of crashing
+            # with an UnboundLocalError/TypeError. See #2813.
+            return
         test_meta = create_test_task_metadata(
             f"{dbt_project_name}_test",
             execution_mode,
@@ -1025,11 +1031,11 @@ def _add_test_tasks(
         test_task_args = {
             **task_or_group_args,
             "task_meta": test_meta,
-            "resource_type": DbtResourceType.TEST,  # type: ignore
+            "resource_type": DbtResourceType.TEST,
         }
         # AFTER_ALL test is a single DAG-level task: place it at root so task_id stays e.g. "astro_shop_test"
         test_task_args["task_group"] = parent_task_group
-        test_task = generate_or_convert_task(**test_task_args)  # type: ignore[arg-type]
+        test_task = generate_or_convert_task(**test_task_args)
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
@@ -1054,9 +1060,9 @@ def _add_test_tasks(
             test_task_args = {
                 **task_or_group_args,
                 "task_meta": test_meta,
-                "resource_type": node.resource_type,  # type: ignore
+                "resource_type": node.resource_type,
             }
-            test_task = generate_or_convert_task(**test_task_args)  # type: ignore[arg-type]
+            test_task = generate_or_convert_task(**test_task_args)
             tasks_map[node_id] = test_task
 
 
@@ -1156,7 +1162,7 @@ def build_airflow_graph(
             "node_converters": render_config.node_converters or {},
         }
 
-        task_or_group = generate_task_or_group(**task_or_group_args, filtered_nodes=nodes)  # type: ignore[arg-type]
+        task_or_group = generate_task_or_group(**task_or_group_args, filtered_nodes=nodes)
         if task_or_group is not None:
             tasks_map[node_id] = task_or_group
         task_group = parent_task_group

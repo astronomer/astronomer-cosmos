@@ -767,6 +767,10 @@ def _add_watcher_producer_task(
     The producer task is the task that will be used to produce the events for the watcher execution mode.
     """
     producer_task_args = task_args.copy()
+    # The producer never emits datasets itself (consumer tasks do), but it must still compute
+    # per-model outlet URIs when consumers will emit. Carry that intent as an explicit flag so the
+    # producer can decide whether to generate model URIs without overloading other signals.
+    producer_task_args["_should_generate_model_uris"] = task_args.get("emit_datasets", True)
     # Producer should not emit datasets — consumer tasks handle their own emission
     producer_task_args["emit_datasets"] = False
     if tests_per_model is not None:

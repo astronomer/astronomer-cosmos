@@ -214,6 +214,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self.test_results_per_model: dict[str, dict[str, str]] = {}
         self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
+        self._should_generate_model_uris: bool = kwargs.pop(
+            "_should_generate_model_uris", kwargs.get("emit_datasets", True)
+        )
         self._freshness_callback: Callable[
             [Context, Any, TaskGroup | None, dict[str, DbtNode] | None, dict[str, Any] | None],
             list[tuple[str, str]],
@@ -252,6 +255,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             test_results_per_model=self.test_results_per_model,
             model_outlet_uris=self._model_outlet_uris,
             dataset_namespace=self._dataset_namespace,
+            should_generate_model_uris=self._should_generate_model_uris,
             upstream_failure_skipped_ids=self._upstream_failure_skipped_ids,
         )
 
@@ -449,8 +453,14 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._apply_node_state_tokens(context, freshness_results)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
-        # Pre-compute the dataset namespace for per-model outlet URI generation.
-        self._dataset_namespace = get_dataset_namespace(self.profile_config)
+        # Resolve the dataset namespace only when the producer will generate per-model outlet
+        # URIs. With emit_datasets=False the producer does no dataset work, so we skip the
+        # namespace's profile resolution and leave it None. URI generation is gated explicitly by
+        # should_generate_model_uris in the log parser -- this None is just the disabled-state
+        # invariant, not a control signal.
+        self._dataset_namespace = (
+            get_dataset_namespace(self.profile_config) if self._should_generate_model_uris else None
+        )
         self._model_outlet_uris.clear()
         self._upstream_failure_skipped_ids.clear()
 

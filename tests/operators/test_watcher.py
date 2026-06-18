@@ -519,6 +519,52 @@ class TestStoreDbtStatusFromLog:
 
         assert "model__pkg__running_model_status" not in ti.store
 
+    @staticmethod
+    def _emitting_model_log_line() -> str:
+        return json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "success",
+                        "unique_id": "model.pkg.my_model",
+                        "resource_type": "model",
+                    }
+                }
+            }
+        )
+
+    def test_store_dbt_resource_status_from_log_skips_uri_generation_when_disabled(self):
+        """should_generate_model_uris=False skips outlet URI computation even with a namespace set."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        with patch("cosmos.operators._watcher.base._ensure_subprocess_model_outlet_uris") as mock_ensure:
+            store_dbt_resource_status_from_log(
+                self._emitting_model_log_line(),
+                {"context": ctx, "project_dir": "/tmp/project"},
+                dataset_namespace="postgres://host:5432",
+                should_generate_model_uris=False,
+            )
+
+        mock_ensure.assert_not_called()
+        assert ti.store.get("model__pkg__my_model_status") == {"status": "success", "outlet_uris": []}
+
+    def test_store_dbt_resource_status_from_log_generates_uris_when_enabled(self):
+        """should_generate_model_uris=True triggers outlet URI computation for emitting resources."""
+        ti = _MockTI()
+        ctx = {"ti": ti}
+
+        with patch("cosmos.operators._watcher.base._ensure_subprocess_model_outlet_uris") as mock_ensure:
+            store_dbt_resource_status_from_log(
+                self._emitting_model_log_line(),
+                {"context": ctx, "project_dir": "/tmp/project"},
+                model_outlet_uris={},
+                dataset_namespace="postgres://host:5432",
+                should_generate_model_uris=True,
+            )
+
+        mock_ensure.assert_called_once_with({}, "postgres://host:5432", "/tmp/project")
+
     def test_store_dbt_resources_status_from_log_detects_passed_test_status(self):
         """Test that a passed test status is correctly parsed and stored in XCom."""
         ti = _MockTI()
@@ -920,6 +966,52 @@ def test_producer_respects_explicit_invocation_mode():
 
     op2 = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=InvocationMode.DBT_RUNNER)
     assert op2.invocation_mode == InvocationMode.DBT_RUNNER
+
+
+@pytest.mark.parametrize(
+    "should_generate_model_uris, expected_namespace_calls",
+    [
+        (True, 1),
+        (False, 0),
+    ],
+)
+def test_producer_resolves_namespace_only_when_generating_model_uris(
+    should_generate_model_uris, expected_namespace_calls
+):
+    """With datasets disabled the producer does no dataset work: it must not resolve the namespace
+    (no profile parsing) and leaves _dataset_namespace as None. URI generation itself is gated by
+    the explicit should_generate_model_uris flag in the log parser (covered by the parser tests)."""
+    op = DbtProducerWatcherOperator(
+        project_dir=".",
+        profile_config=profile_config,
+        _should_generate_model_uris=should_generate_model_uris,
+    )
+    context = {"ti": _MockTI(), "run_id": "run-1"}
+
+    with (
+        patch("cosmos.operators.watcher.get_dataset_namespace", return_value="postgres://host:5432") as mock_namespace,
+        patch("cosmos.operators.local.DbtLocalBaseOperator.execute", return_value=None),
+        patch("cosmos.operators.watcher.safe_xcom_push"),
+        patch("cosmos.operators.watcher._delete_xcom_backup_variable"),
+    ):
+        op.execute(context)
+
+    assert mock_namespace.call_count == expected_namespace_calls
+    expected_namespace = "postgres://host:5432" if should_generate_model_uris else None
+    assert op._dataset_namespace == expected_namespace
+
+
+def test_make_parse_callable_forwards_should_generate_model_uris():
+    """The parser callable forwards the producer's _should_generate_model_uris control flag."""
+    op = DbtProducerWatcherOperator(
+        project_dir=".",
+        profile_config=profile_config,
+        _should_generate_model_uris=False,
+    )
+
+    callable_ = op._make_parse_callable()
+
+    assert callable_.keywords["should_generate_model_uris"] is False
 
 
 def test_run_subprocess_sets_process_log_line_callable():

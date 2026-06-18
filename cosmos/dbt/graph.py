@@ -1363,7 +1363,7 @@ class DbtGraph:
             try:
                 with manifest_path.open("rb") as fp:
                     content = fp.read()
-                    if not content.strip():
+                    if not content or content.isspace():
                         raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
                     manifest = orjson.loads(content)
             except orjson.JSONDecodeError as e:
@@ -1376,7 +1376,7 @@ class DbtGraph:
             try:
                 with manifest_path.open("r") as fp:
                     content = fp.read()
-                    if not content.strip():
+                    if not content or content.isspace():
                         raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
                     manifest = json.loads(content)
             except (json.JSONDecodeError, UnicodeDecodeError) as e:

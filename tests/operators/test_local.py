@@ -1469,7 +1469,8 @@ def test_dbt_local_artifact_processor_imported_lazily():
             "print('OK')",
         ]
     )
-    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    # timeout so a stalled child fails the test deterministically instead of hanging the suite.
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stderr
     assert "OK" in result.stdout
 

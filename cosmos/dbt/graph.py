@@ -1379,7 +1379,7 @@ class DbtGraph:
                     if not content.strip():
                         raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
                     manifest = json.loads(content)
-            except json.JSONDecodeError as e:
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 raise CosmosLoadDbtException(
                     f"Failed to load dbt manifest at `{manifest_path}`: file is not valid JSON ({e})"
                 ) from e

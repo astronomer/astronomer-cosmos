@@ -52,7 +52,7 @@ from cosmos.constants import (
     FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP,
     InvocationMode,
 )
-from cosmos.dataset import construct_dataset_uri, get_dataset_alias_name
+from cosmos.dataset import get_dataset_alias_name, make_dataset_uri_builder
 from cosmos.dbt.project import (
     copy_dbt_packages,
     copy_manifest_file_if_exists,
@@ -825,10 +825,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """
         uris = []
 
+        # Build all URIs through one builder so the Airflow 3 URI migration warning is logged
+        # once for this call instead of once per dataset (#2778).
+        build_uri = make_dataset_uri_builder()
         for completed in self.openlineage_events_completes:
             for output in getattr(completed, source):
-                dataset_uri = construct_dataset_uri(output.namespace, output.name)
-                uris.append(dataset_uri)
+                uris.append(build_uri(output.namespace, output.name))
         self.log.debug("URIs to be converted to Asset: %s", uris)
 
         assets = [Asset(uri) for uri in uris]

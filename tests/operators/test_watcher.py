@@ -2548,14 +2548,7 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
 def test_dbt_task_group_watcher_in_memory_retry_recovers_skipped_downstream(
     caplog, reset_fail_once_sequence, monkeypatch
 ):
-    """Companion to the retry-recovery test with ``enable_watcher_reliable_retry=False`` (#2776).
-
-    In in-memory mode the producer does not durably back node statuses up to an Airflow Variable, so
-    after the producer fails and Airflow retries it (clearing the first attempt's XComs), the
-    consumer sensors find no restored status and fall back to running their dbt node locally. The DAG
-    must still end SUCCESS -- correctness is preserved via the existing consumer-fallback path; only
-    efficiency degrades (more consumers re-run dbt than in the reliable default).
-    """
+    """In-memory mode (enable_watcher_reliable_retry=False): after a producer retry, consumers fall back to local dbt runs and the DAG still ends SUCCESS (#2776)."""
     from airflow import DAG
 
     from cosmos import DbtTaskGroup

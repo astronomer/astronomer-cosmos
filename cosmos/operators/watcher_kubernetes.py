@@ -135,9 +135,6 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
         try_number = getattr(task_instance, "try_number", 1)
 
-        # When enable_watcher_reliable_retry is disabled, node statuses are kept only in process memory
-        # (no Airflow Variable backup): faster, but lost on a producer signal-kill/OOM retry, in
-        # which case consumer sensors fall back to running their dbt node locally. See #2776.
         from cosmos import settings
 
         reliable_retry = settings.enable_watcher_reliable_retry

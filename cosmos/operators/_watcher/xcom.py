@@ -76,19 +76,7 @@ def _get_task_group_id(ti: Any) -> str | None:
 
 
 def _init_xcom_backup(context: Any, *, persist: bool = True) -> None:
-    """Activate the XCom backup buffer for the current producer execution.
-
-    Always creates the in-memory backup buffer on the task instance, so every
-    ``safe_xcom_push`` accumulates the node statuses pushed during this run.
-
-    When ``persist`` is ``True`` (the reliable default), a Variable key is also
-    set on the task instance, which makes ``safe_xcom_push`` additionally
-    persist the buffer to an Airflow Variable after every push so the backup is
-    crash-safe across a producer retry.  When ``persist`` is ``False`` the
-    statuses are kept only in process memory (no Variable I/O): faster, but lost
-    if the producer is killed by an OS signal and retried.  The state is stored
-    on the task instance itself — no module-level globals.
-    """
+    """Create the producer's in-memory backup buffer; when ``persist``, also set the Variable key so ``safe_xcom_push`` backs it up durably."""
     ti = context["ti"]
     ti._cosmos_xcom_backup_buffer = {}
     if persist:

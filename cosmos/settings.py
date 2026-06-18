@@ -69,12 +69,6 @@ enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_ta
 # this would also be used to run the producer task
 watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
 
-# DBT Watcher Execution Mode - producer status backup durability.
-# When True (default), the watcher producer durably backs up each node-status XCom to an Airflow
-# Variable so the statuses survive a producer retry/OOM (reliable, but per-node Variable I/O - see
-# cosmos-benchmark#38). When False, statuses are kept only in process memory: no Variable I/O
-# (faster), but a producer signal-kill/OOM loses them and consumer sensors re-run their dbt node.
-# Long-term reliable+fast replacement tracked in #2771 (Airflow 3.3 Task & Asset Store, AIP-103).
 enable_watcher_reliable_retry = conf.getboolean("cosmos", "enable_watcher_reliable_retry", fallback=True)
 
 # The following environment variable is populated in Astro Cloud

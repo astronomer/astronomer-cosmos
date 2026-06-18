@@ -133,6 +133,7 @@ def test_skips_retry_attempt(mock_execute, mock_restore, caplog):
     mock_execute.assert_not_called()
 
 
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
 @patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
@@ -155,6 +156,7 @@ def test_deletes_backup_on_success(mock_execute, mock_init, mock_delete):
     mock_execute.assert_called_once()
 
 
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators.watcher_kubernetes._backup_xcom_to_variable")
 @patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
 @patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")

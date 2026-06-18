@@ -234,6 +234,7 @@ def test_dbt_producer_watcher_operator_pushes_completion_status_on_failure(
     mock_execute.assert_called_once()
 
 
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.watcher._delete_xcom_backup_variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
@@ -248,6 +249,7 @@ def test_dbt_producer_watcher_operator_deletes_backup_on_success(mock_execute, m
     mock_delete.assert_called_once_with(context)
 
 
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.watcher._delete_xcom_backup_variable")
 @patch("cosmos.operators.watcher._backup_xcom_to_variable")
@@ -303,6 +305,7 @@ def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message
     assert any("ephemeral model or if the model sql file is empty" in message for message in caplog.messages)
 
 
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators.watcher._restore_xcom_from_variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_skips_retry_attempt(mock_execute, mock_restore):

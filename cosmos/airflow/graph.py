@@ -1061,8 +1061,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         )
 
     # Arguments shared by every node's task/group as well as the AFTER_ALL/detached test tasks below.
-    # Defined before the loop so it is always bound, even when ``nodes`` is empty (e.g. an empty or
-    # mocked manifest), which would otherwise raise UnboundLocalError in the AFTER_ALL branch.
+    # Defined before the loop so it is always bound, even when ``nodes`` is empty
     task_or_group_args: dict[str, Any] = {
         # Arguments to this method:
         "dag": dag,

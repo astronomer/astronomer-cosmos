@@ -1174,6 +1174,35 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     assert "Unable to emit OpenLineage events due to lack of dependencies or data." in caplog.text
 
 
+@patch("cosmos.dataset.AIRFLOW_VERSION", new=version.Version("3.0.0"))
+@patch("cosmos.dataset.settings")
+def test_get_datasets_warns_uri_migration_once(mock_settings, caplog):
+    """get_datasets emits the Airflow 3 URI migration warning once, not once per dataset (#2778)."""
+    mock_settings.use_dataset_airflow3_uri_standard = False
+
+    class MockOutput:
+        def __init__(self, name):
+            self.namespace = "postgres://host:5432"
+            self.name = name
+
+    class MockEvent:
+        outputs = [MockOutput("db.public.t1"), MockOutput("db.public.t2"), MockOutput("db.public.t3")]
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+    dbt_base_operator.openlineage_events_completes = [MockEvent()]
+
+    with caplog.at_level(logging.WARNING):
+        assets = dbt_base_operator.get_datasets("outputs")
+
+    assert len(assets) == 3
+    assert caplog.text.count("Airflow 3.0.0 Asset (Dataset) URIs validation rules changed") == 1
+
+
 def _write_target_sql_fixture(tmp_path: Path) -> None:
     """Create a fake dbt ``target/`` tree with two .sql files and one non-SQL artefact."""
     compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"

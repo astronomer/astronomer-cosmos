@@ -104,10 +104,11 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             normalized_callbacks = [existing_callbacks]
         normalized_callbacks.append(WatcherKubernetesCallback)
         kwargs["callbacks"] = normalized_callbacks
-        # On failure, flush the in-memory status backup to a Variable so a retry can restore it (#2776).
-        kwargs["on_failure_callback"] = _compose_failure_backup_callback(kwargs.get("on_failure_callback"))
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
+        # Compose after super().__init__ so a DAG-level default_args on_failure_callback is preserved
+        # (not overridden); it flushes the in-memory status backup to a Variable on failure (#2776).
+        self.on_failure_callback = _compose_failure_backup_callback(getattr(self, "on_failure_callback", None))
         # Mutable set populated by the log parser when dbt emits SkippingDetails
         # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
         # for those unique_ids are rewritten to "failed" so the consumer sensor

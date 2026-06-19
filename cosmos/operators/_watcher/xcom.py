@@ -114,12 +114,13 @@ def _backup_xcom_to_variable(context: Any) -> None:
 
 
 def _compose_failure_backup_callback(existing: Any) -> Any:
-    """Append ``_backup_xcom_to_variable`` to any user-provided ``on_failure_callback``(s)."""
+    """Append ``_backup_xcom_to_variable`` to any existing ``on_failure_callback``(s), idempotently."""
     if existing is None:
         return _backup_xcom_to_variable
-    if isinstance(existing, (list, tuple)):
-        return [*existing, _backup_xcom_to_variable]
-    return [existing, _backup_xcom_to_variable]
+    callbacks = list(existing) if isinstance(existing, (list, tuple)) else [existing]
+    if _backup_xcom_to_variable not in callbacks:
+        callbacks.append(_backup_xcom_to_variable)
+    return callbacks
 
 
 def _delete_xcom_backup_variable(context: Any) -> None:

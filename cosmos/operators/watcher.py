@@ -225,13 +225,14 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
-        # On failure, flush the in-memory status backup to a Variable so a retry can restore it (#2776).
-        kwargs["on_failure_callback"] = _compose_failure_backup_callback(kwargs.get("on_failure_callback"))
         # invocation_mode is intentionally NOT forced here; the parent's _discover_invocation_mode()
         # picks DBT_RUNNER when available and falls back to SUBPROCESS otherwise.
         # An explicit invocation_mode passed by the caller is preserved as-is.
         super().__init__(task_id=task_id, *args, **kwargs)
         self.log_format = "json"
+        # Compose after super().__init__ so a DAG-level default_args on_failure_callback is preserved
+        # (not overridden); it flushes the in-memory status backup to a Variable on failure (#2776).
+        self.on_failure_callback = _compose_failure_backup_callback(getattr(self, "on_failure_callback", None))
 
         # Mutable dict populated lazily from the manifest; shared with the log parser.
         self._dataset_namespace: str | None = None

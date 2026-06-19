@@ -395,6 +395,27 @@ def test_dbt_producer_watcher_operator_registers_failure_backup_callback():
     assert _user_cb in composed and _backup_xcom_to_variable in composed
 
 
+def test_dbt_producer_watcher_operator_preserves_default_args_failure_callback():
+    """A DAG-level default_args on_failure_callback is preserved (composed, not overridden) (#2776)."""
+    from airflow import DAG
+
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
+
+    def _user_cb(context):
+        pass
+
+    with DAG(
+        dag_id="watcher_default_args_cb",
+        start_date=datetime(2023, 1, 1),
+        default_args={"on_failure_callback": _user_cb},
+    ):
+        op = DbtProducerWatcherOperator(task_id="producer", project_dir=".", profile_config=None)
+
+    composed = op.on_failure_callback
+    composed = list(composed) if isinstance(composed, (list, tuple)) else [composed]
+    assert _user_cb in composed and _backup_xcom_to_variable in composed
+
+
 @pytest.mark.parametrize(
     "event, expected_message",
     [

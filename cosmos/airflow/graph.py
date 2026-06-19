@@ -927,12 +927,18 @@ def create_task_groups_based_on_folder(
     """
     task_group = None
     resource_file_path_parts = str(node.original_file_path).split("/")[:-1]
+    # Cache groups by their cumulative path rather than the bare folder name, so
+    # that folders sharing a leaf name under different parents (e.g.
+    # ``staging/aurora`` and ``marts/aurora``) become distinct task groups instead
+    # of collapsing into the first one created.
+    cumulative_path = ""
     for resource_file_path_part in resource_file_path_parts:
-        if resource_file_path_part in task_groups:
-            task_group = task_groups[resource_file_path_part]
+        cumulative_path = f"{cumulative_path}/{resource_file_path_part}" if cumulative_path else resource_file_path_part
+        if cumulative_path in task_groups:
+            task_group = task_groups[cumulative_path]
         else:
             task_group = TaskGroup(dag=dag, group_id=resource_file_path_part, parent_group=parent_task_group)
-            task_groups[resource_file_path_part] = task_group
+            task_groups[cumulative_path] = task_group
         parent_task_group = task_group
     return task_group
 

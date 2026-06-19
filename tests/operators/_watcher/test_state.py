@@ -198,6 +198,7 @@ class TestInitXcomBackup:
         assert isinstance(ti._cosmos_xcom_backup_var_key, str)
         assert "test_dag" in ti._cosmos_xcom_backup_var_key
         assert ti._cosmos_xcom_backup_buffer == {}
+        assert ti._cosmos_xcom_persist_incrementally is True
 
     def test_includes_task_group_id_when_present(self):
         ti = _MockTI()
@@ -228,6 +229,29 @@ class TestInitXcomBackup:
 
         with pytest.raises(AttributeError, match="task_group"):
             _init_xcom_backup(context)
+
+    def test_persist_false_sets_buffer_and_key_but_not_incremental(self):
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "manual__2026-01-01"}
+
+        _init_xcom_backup(context, persist=False)
+
+        assert ti._cosmos_xcom_backup_buffer == {}
+        assert isinstance(ti._cosmos_xcom_backup_var_key, str)
+        assert ti._cosmos_xcom_persist_incrementally is False
+
+
+def test_compose_backup_callback():
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable, _compose_backup_callback
+
+    def _user(context):
+        pass
+
+    assert _compose_backup_callback(None) is _backup_xcom_to_variable
+    assert _compose_backup_callback(_user) == [_user, _backup_xcom_to_variable]
+    assert _compose_backup_callback([_user]) == [_user, _backup_xcom_to_variable]
+    # idempotent: does not double-add when already present
+    assert _compose_backup_callback([_user, _backup_xcom_to_variable]) == [_user, _backup_xcom_to_variable]
 
 
 class TestPersistBackup:
@@ -270,6 +294,18 @@ class TestSafeXcomPushBackup:
         assert ti.store["key"] == "value"
         mock_persist.assert_not_called()
 
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
+    def test_accumulates_in_buffer_without_persisting_when_not_reliable(self, mock_persist):
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run"}
+        _init_xcom_backup(context, persist=False)
+
+        safe_xcom_push(ti, "status_key", "success")
+
+        assert ti.store["status_key"] == "success"
+        assert ti._cosmos_xcom_backup_buffer["status_key"] == "success"
+        mock_persist.assert_not_called()
+
 
 class TestBackupXcomToVariable:
     @patch("cosmos.operators._watcher.xcom._persist_backup")
@@ -282,6 +318,21 @@ class TestBackupXcomToVariable:
         _backup_xcom_to_variable(context)
 
         mock_persist.assert_called_once_with(ti._cosmos_xcom_backup_var_key, {"k": "v"})
+
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
+    def test_lazy_mode_callback_flushes_buffer_populated_by_safe_xcom_push(self, mock_persist):
+        # In-memory (lazy) mode: safe_xcom_push only buffers (no per-push persist); the on-failure
+        # callback (_backup_xcom_to_variable) then flushes the accumulated buffer to the Variable once.
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run"}
+        _init_xcom_backup(context, persist=False)
+
+        safe_xcom_push(ti, "model__a_status", {"status": "success"})
+        mock_persist.assert_not_called()
+
+        _backup_xcom_to_variable(context)
+
+        mock_persist.assert_called_once_with(ti._cosmos_xcom_backup_var_key, {"model__a_status": {"status": "success"}})
 
     @patch("cosmos.operators._watcher.xcom._persist_backup")
     def test_noop_without_init(self, mock_persist):

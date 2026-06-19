@@ -32,7 +32,7 @@ from cosmos.operators._watcher.base import (
 )
 from cosmos.operators._watcher.state import DBT_SOURCE_FRESHNESS_STALE_STATUSES, DBT_SUCCESS_STATUSES
 from cosmos.operators._watcher.xcom import (
-    _backup_xcom_to_variable,
+    _compose_backup_callback,
     _delete_xcom_backup_variable,
     _init_xcom_backup,
     _restore_xcom_from_variable,
@@ -233,6 +233,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # An explicit invocation_mode passed by the caller is preserved as-is.
         super().__init__(task_id=task_id, *args, **kwargs)
         self.log_format = "json"
+        # Flush the in-memory backup to a Variable so the producer retry can restore it. A graceful
+        # failure with retries left is UP_FOR_RETRY (on_retry_callback), not FAILED, so register on
+        # both; composed after super().__init__ to preserve a DAG-level default_args callback (#2776).
+        self.on_retry_callback = _compose_backup_callback(getattr(self, "on_retry_callback", None))
+        self.on_failure_callback = _compose_backup_callback(getattr(self, "on_failure_callback", None))
 
         # Mutable dict populated lazily from the manifest; shared with the log parser.
         self._dataset_namespace: str | None = None
@@ -470,6 +475,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         try_number = getattr(task_instance, "try_number", 1)
 
+        from cosmos import settings
+
+        reliable_retry = settings.enable_watcher_reliable_retry
+
         if try_number > 1:
             _restore_xcom_from_variable(context)
             raise AirflowSkipException(
@@ -477,7 +486,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
 
-        _init_xcom_backup(context)
+        _init_xcom_backup(context, persist=reliable_retry)
 
         if self._check_source_freshness:
             self._apply_source_freshness(context)
@@ -485,12 +494,14 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try:
             return_value = super().execute(context=context, **kwargs)
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
-            _delete_xcom_backup_variable(context)
+            if reliable_retry:
+                _delete_xcom_backup_variable(context)
             return return_value
 
         except Exception:
+            # The on-failure callback flushes the in-memory backup to the Variable; here we only
+            # record that the producer finished so consumer sensors stop waiting.
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
-            _backup_xcom_to_variable(context)
             raise
 
 

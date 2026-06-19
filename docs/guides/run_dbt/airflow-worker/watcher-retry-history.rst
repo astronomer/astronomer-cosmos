@@ -63,10 +63,10 @@ Does the Airflow state match dbt's?
        retry without any manual intervention
        (`#2684 <https://github.com/astronomer/astronomer-cosmos/pull/2684>`_).
    * - **1.15.0**
-     - **Yes**. Same as 1.14.2. The new ``enable_watcher_reliable_retry`` configuration does not
-       change the outcome: when it is ``False`` the producer keeps model statuses only in memory, so
-       after a producer kill the affected consumers re-run their dbt node — the DAG state still
-       matches dbt's (`#2776 <https://github.com/astronomer/astronomer-cosmos/issues/2776>`_).
+     - **Yes**. Same as 1.14.2 for both values of ``enable_watcher_reliable_retry`` — see
+       *Task-level retry — producer*. With ``False`` a hard producer kill can make some consumers
+       re-run a transformation, but the final DAG state still matches dbt's
+       (`#2776 <https://github.com/astronomer/astronomer-cosmos/issues/2776>`_).
 
 Task-level retry — consumer
 +++++++++++++++++++++++++++++
@@ -119,10 +119,10 @@ Task-level retry — consumer
        JSON output on retry can opt in via
        ``operator_args={"dbt_cmd_flags": ["--log-format", "json"]}``.
    * - **1.15.0**
-     - Same as 1.14.2. When ``enable_watcher_reliable_retry`` is ``False`` and the producer is
-       retried, the first attempt's statuses are not restored, so more consumers fall back to
-       running their dbt node locally
-       (`#2776 <https://github.com/astronomer/astronomer-cosmos/issues/2776>`_).
+     - Same as 1.14.2. With ``enable_watcher_reliable_retry=False`` only a *hard* producer kill
+       (``SIGKILL``/OOM) leaves consumers without restored statuses, so they fall back to running
+       their dbt node; a graceful producer failure still restores them — see
+       *Task-level retry — producer*.
 
 Task-level retry — producer
 +++++++++++++++++++++++++++++
@@ -187,13 +187,14 @@ Task-level retry — producer
        `#2625 <https://github.com/astronomer/astronomer-cosmos/issues/2625>`_).
    * - **1.15.0**
      - Same as 1.14.2 by default. A new ``enable_watcher_reliable_retry`` configuration
-       (`#2776 <https://github.com/astronomer/astronomer-cosmos/issues/2776>`_) lets users opt out of
-       the durable Variable backup: when set to ``False``, the producer keeps model statuses only in
-       process memory and writes no Variable, removing the per-model Variable I/O. The trade-off is
-       that a producer signal-kill/OOM and retry loses the statuses, so the affected consumers fall
-       back to running their dbt node locally — results stay correct, but some transformations re-run.
-       The default remains ``True`` (durable backup, unchanged from 1.14.2). The long-term reliable
-       and fast replacement is tracked in
+       (`#2776 <https://github.com/astronomer/astronomer-cosmos/issues/2776>`_) controls *when* the
+       producer's in-memory status backup is written to the Variable. When ``True`` (default) it is
+       written eagerly after every dbt node, surviving even a hard ``SIGKILL``/OOM kill. When ``False``
+       it is written only once, on failure, via the producer's ``on_failure_callback``: this removes
+       the per-node Variable I/O, and a *graceful* failure (e.g. a dbt error) still flushes the backup
+       so consumers recover as before — only a *hard* kill, where the callback cannot run, loses the
+       statuses and makes the affected consumers re-run their dbt node (results stay correct). The
+       long-term reliable-and-fast replacement is tracked in
        `#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task &
        Asset Store).
 
@@ -243,10 +244,10 @@ Automatic retries
        the producer's first attempt are now re-run on Airflow retry instead of staying SKIPPED
        (`#2684 <https://github.com/astronomer/astronomer-cosmos/pull/2684>`_).
    * - **1.15.0**
-     - **Works.** Same as 1.14.2 with ``enable_watcher_reliable_retry=True`` (default). With
-       ``enable_watcher_reliable_retry=False`` the producer restores no statuses on auto-retry, so the
-       affected consumers re-run their dbt node via fallback — correct, but with extra compute
-       (`#2776 <https://github.com/astronomer/astronomer-cosmos/issues/2776>`_).
+     - **Works.** Same as 1.14.2 by default. With ``enable_watcher_reliable_retry=False`` a *graceful*
+       producer failure still restores statuses on auto-retry (flushed by the ``on_failure_callback``);
+       only a hard ``SIGKILL``/OOM kill loses them, making the affected consumers re-run their dbt node
+       — correct, but with extra compute. See *Task-level retry — producer*.
 
 Full DAG / TaskGroup clear
 ++++++++++++++++++++++++++
@@ -294,9 +295,9 @@ Full DAG / TaskGroup clear
        `#2683 <https://github.com/astronomer/astronomer-cosmos/pull/2683>`_ — see
        *Task-level retry — producer*).
    * - **1.15.0**
-     - **Works.** Same as 1.14.2. With ``enable_watcher_reliable_retry=False`` the producer restores
-       no statuses after a clear, so consumers re-run their dbt node via fallback
-       (`#2776 <https://github.com/astronomer/astronomer-cosmos/issues/2776>`_).
+     - **Works.** Same as 1.14.2. ``enable_watcher_reliable_retry`` does not change full-clear
+       behaviour; its only effect is on the producer's failure-time backup — see
+       *Task-level retry — producer*.
 
 Avoid duplicate or concurrent runs of the same dbt transformation in the same DAG run
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

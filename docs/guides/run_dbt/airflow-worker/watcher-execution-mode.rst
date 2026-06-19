@@ -216,8 +216,8 @@ XCom values from a backup so that consumer sensors can still read model statuses
 By default (``enable_watcher_reliable_retry = True``), each XCom push is incrementally backed up to an Airflow
 Variable. This ensures that when the producer fails and Airflow clears XCom entries before the retry,
 the backed-up values can be restored. On a successful run, the backup Variable is automatically deleted
-to avoid stale data accumulating over time. This durable backup can be disabled to improve producer
-performance — see :ref:`producer-status-backup` below.
+to avoid stale data accumulating over time. These eager per-node writes can be deferred to a single
+on-failure write to improve producer performance — see :ref:`producer-status-backup` below.
 
 **How consumer retries work:**
 
@@ -248,21 +248,51 @@ Producer status backup: reliability vs performance
 
 To let consumer sensors read model statuses after a producer retry, the producer must preserve the
 per-node statuses it pushed on its first attempt (Airflow clears a task's XComs when it is retried).
-How that is done is controlled by the ``enable_watcher_reliable_retry`` configuration:
+The producer accumulates these statuses in an in-memory buffer during the run; the
+``enable_watcher_reliable_retry`` configuration controls **when** that buffer is written to the Airflow
+Variable that survives the retry:
 
-- ``True`` (default) — each status is durably backed up to an Airflow Variable, so it survives a
-  producer retry or OOM kill. Consumers continue without re-running dbt. This is the reliable
-  behaviour, but rewriting the backup Variable on every dbt node is measurable producer CPU/IO on
-  large projects.
-- ``False`` — statuses are kept only in the producer's process memory; no Variable is written. This
-  removes the per-node Variable overhead and improves producer performance. The trade-off: if the
-  producer is killed by an OS signal (``SIGTERM``/``SIGKILL``/OOM) and Airflow retries it, the
-  in-memory statuses are lost, and the affected consumer sensors fall back to running their dbt node
-  locally. Results stay correct, but those transformations may run a second time.
+- ``True`` (default) — the buffer is written to the Variable **eagerly, after every dbt node**, so the
+  statuses survive any producer failure, including a hard ``SIGKILL``/OOM kill. Consumers never re-run
+  dbt on a producer retry. This is the most reliable option, but the per-node Variable writes are
+  measurable producer CPU/IO on large projects.
+- ``False`` — the buffer is written to the Variable **only once, on failure**, via the producer's
+  ``on_failure_callback``. This removes the per-node Variable I/O and improves producer performance. A
+  *graceful* producer failure (for example a dbt model error) still flushes the buffer, so consumers
+  recover exactly as in the reliable mode. The trade-off: a *hard* kill (``SIGKILL``/OOM), where Airflow
+  cannot run the callback, loses the in-memory statuses, so on the retry the affected consumer sensors
+  fall back to running their dbt node locally. Results stay correct, but those transformations may run
+  a second time.
+
+.. list-table:: ``enable_watcher_reliable_retry`` comparison
+   :header-rows: 1
+   :widths: 40 30 30
+
+   * - Behaviour
+     - ``True`` (default)
+     - ``False``
+   * - Per-dbt-node Airflow Variable writes
+     - Yes — one per node
+     - No
+   * - Producer CPU/IO overhead
+     - Higher; scales with node count
+     - Minimal
+   * - When the backup Variable is written
+     - Eagerly, after every node
+     - Once, on failure (via ``on_failure_callback``)
+   * - Recovers after a graceful producer failure (e.g. dbt error)
+     - Yes
+     - Yes
+   * - Recovers after a hard kill (``SIGKILL``/OOM)
+     - Yes
+     - No — affected consumers re-run their dbt node
+   * - Correct final DAG state
+     - Yes
+     - Yes
 
 Set it via the ``[cosmos]`` section or the ``AIRFLOW__COSMOS__ENABLE_WATCHER_RELIABLE_RETRY`` environment
-variable. Consider ``False`` for large dbt projects where the producer's Variable I/O is a bottleneck
-and occasional duplicate consumer runs on a producer kill are acceptable.
+variable. Consider ``False`` for large dbt projects where the producer's per-node Variable I/O is a
+bottleneck and occasional duplicate consumer runs after a hard producer kill are acceptable.
 
 A future approach that delivers reliability and performance together is tracked in
 `#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task & Asset

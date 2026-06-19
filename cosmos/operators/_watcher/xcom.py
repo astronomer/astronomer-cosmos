@@ -76,14 +76,14 @@ def _get_task_group_id(ti: Any) -> str | None:
 
 
 def _init_xcom_backup(context: Any, *, persist: bool = True) -> None:
-    """Create the producer's XCom backup buffer; if ``persist``, also back it up to an Airflow Variable."""
+    """Set up the producer's in-memory backup buffer and Variable key; ``persist`` writes to the Variable on every push, otherwise it is flushed only on failure via the producer's on-failure callback."""
     ti = context["ti"]
     ti._cosmos_xcom_backup_buffer = {}
-    if persist:
-        dag_id = ti.dag_id
-        run_id = context["run_id"]
-        task_group_id = _get_task_group_id(ti)
-        ti._cosmos_xcom_backup_var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
+    ti._cosmos_xcom_persist_incrementally = persist
+    dag_id = ti.dag_id
+    run_id = context["run_id"]
+    task_group_id = _get_task_group_id(ti)
+    ti._cosmos_xcom_backup_var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
 
 
 def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
@@ -111,6 +111,15 @@ def _backup_xcom_to_variable(context: Any) -> None:
     _persist_backup(var_key, backup_buffer)
     if backup_buffer:
         logger.debug("Backed up %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
+
+
+def _compose_failure_backup_callback(existing: Any) -> Any:
+    """Append ``_backup_xcom_to_variable`` to any user-provided ``on_failure_callback``(s)."""
+    if existing is None:
+        return _backup_xcom_to_variable
+    if isinstance(existing, (list, tuple)):
+        return [*existing, _backup_xcom_to_variable]
+    return [existing, _backup_xcom_to_variable]
 
 
 def _delete_xcom_backup_variable(context: Any) -> None:

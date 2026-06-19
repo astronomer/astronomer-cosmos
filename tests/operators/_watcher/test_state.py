@@ -198,6 +198,7 @@ class TestInitXcomBackup:
         assert isinstance(ti._cosmos_xcom_backup_var_key, str)
         assert "test_dag" in ti._cosmos_xcom_backup_var_key
         assert ti._cosmos_xcom_backup_buffer == {}
+        assert ti._cosmos_xcom_persist_incrementally is True
 
     def test_includes_task_group_id_when_present(self):
         ti = _MockTI()
@@ -229,14 +230,26 @@ class TestInitXcomBackup:
         with pytest.raises(AttributeError, match="task_group"):
             _init_xcom_backup(context)
 
-    def test_persist_false_sets_buffer_but_no_var_key(self):
+    def test_persist_false_sets_buffer_and_key_but_not_incremental(self):
         ti = _MockTI()
         context = {"ti": ti, "run_id": "manual__2026-01-01"}
 
         _init_xcom_backup(context, persist=False)
 
         assert ti._cosmos_xcom_backup_buffer == {}
-        assert getattr(ti, "_cosmos_xcom_backup_var_key", None) is None
+        assert isinstance(ti._cosmos_xcom_backup_var_key, str)
+        assert ti._cosmos_xcom_persist_incrementally is False
+
+
+def test_compose_failure_backup_callback():
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable, _compose_failure_backup_callback
+
+    def _user(context):
+        pass
+
+    assert _compose_failure_backup_callback(None) is _backup_xcom_to_variable
+    assert _compose_failure_backup_callback(_user) == [_user, _backup_xcom_to_variable]
+    assert _compose_failure_backup_callback([_user]) == [_user, _backup_xcom_to_variable]
 
 
 class TestPersistBackup:

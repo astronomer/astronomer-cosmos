@@ -113,11 +113,12 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
         backup_buffer: dict[str, Any] | None = getattr(task_instance, "_cosmos_xcom_backup_buffer", None)
         if backup_buffer is not None:
             backup_buffer[key] = value
-            var_key = getattr(task_instance, "_cosmos_xcom_backup_var_key", None)
-            if isinstance(var_key, str):
-                from cosmos.operators._watcher.xcom import _persist_backup
+            if getattr(task_instance, "_cosmos_xcom_persist_incrementally", False):
+                var_key = getattr(task_instance, "_cosmos_xcom_backup_var_key", None)
+                if isinstance(var_key, str):
+                    from cosmos.operators._watcher.xcom import _persist_backup
 
-                _persist_backup(var_key, backup_buffer)
+                    _persist_backup(var_key, backup_buffer)
 
 
 # TODO: Unify the Airflow call from cosmos/operators/_watcher/triggerer.py and cosmos/operators/watcher.py

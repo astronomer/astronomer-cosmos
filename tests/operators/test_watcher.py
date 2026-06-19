@@ -252,10 +252,9 @@ def test_dbt_producer_watcher_operator_deletes_backup_on_success(mock_execute, m
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.watcher._delete_xcom_backup_variable")
-@patch("cosmos.operators.watcher._backup_xcom_to_variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
-def test_dbt_producer_watcher_operator_keeps_backup_on_failure(mock_execute, mock_backup, mock_delete, mock_persist):
-    """Test that the XCom backup Variable is persisted (not deleted) when execution fails."""
+def test_dbt_producer_watcher_operator_keeps_backup_on_failure(mock_execute, mock_delete, mock_persist):
+    """On failure the backup Variable is kept (not deleted) for the retry; the on-failure callback does the flush."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     mock_ti = _MockTI()
     context = {"ti": mock_ti, "run_id": "test_run"}
@@ -265,7 +264,6 @@ def test_dbt_producer_watcher_operator_keeps_backup_on_failure(mock_execute, moc
     with pytest.raises(RuntimeError):
         op.execute(context=context)
 
-    mock_backup.assert_called_once_with(context)
     mock_delete.assert_not_called()
 
 
@@ -336,21 +334,19 @@ def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_succes
     op.execute(context=context)
 
     assert mock_ti.store.get("task_status") == "completed"
-    # In-memory mode: a buffer exists, but no Variable key is set and nothing is persisted/deleted.
-    assert getattr(mock_ti, "_cosmos_xcom_backup_var_key", None) is None
+    assert mock_ti._cosmos_xcom_persist_incrementally is False
     mock_persist.assert_not_called()
     mock_delete.assert_not_called()
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
-@patch("cosmos.operators.watcher._backup_xcom_to_variable")
 @patch("cosmos.operators.watcher._delete_xcom_backup_variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_failure(
-    mock_execute, mock_delete, mock_backup, mock_persist
+    mock_execute, mock_delete, mock_persist
 ):
-    """With enable_watcher_reliable_retry=False, a producer failure does not back statuses up to a Variable (#2776)."""
+    """In-memory mode: a producer failure persists nothing inline and deletes nothing; the on-failure callback flushes the backup (#2776)."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     mock_ti = _MockTI()
     context = {"ti": mock_ti, "run_id": "test_run"}
@@ -361,7 +357,6 @@ def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_failur
         op.execute(context=context)
 
     assert mock_ti.store.get("task_status") == "completed"
-    mock_backup.assert_not_called()
     mock_delete.assert_not_called()
     mock_persist.assert_not_called()
 
@@ -369,8 +364,8 @@ def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_failur
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
 @patch("cosmos.operators.watcher._restore_xcom_from_variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
-def test_dbt_producer_watcher_operator_in_memory_skips_restore_on_retry(mock_execute, mock_restore):
-    """With enable_watcher_reliable_retry=False, a retry still skips but does not restore from a Variable (#2776)."""
+def test_dbt_producer_watcher_operator_in_memory_restores_on_retry(mock_execute, mock_restore):
+    """In-memory mode still restores on retry: a graceful attempt-1 failure flushes via the on-failure callback (#2776)."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
     ti.try_number = 2
@@ -379,8 +374,25 @@ def test_dbt_producer_watcher_operator_in_memory_skips_restore_on_retry(mock_exe
     with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
         op.execute(context=context)
 
-    mock_restore.assert_not_called()
+    mock_restore.assert_called_once_with(context)
     mock_execute.assert_not_called()
+
+
+def test_dbt_producer_watcher_operator_registers_failure_backup_callback():
+    """The producer flushes its in-memory backup on failure via an on_failure_callback, composed with any user callback (#2776)."""
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
+
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    callbacks = op.on_failure_callback
+    callbacks = list(callbacks) if isinstance(callbacks, (list, tuple)) else [callbacks]
+    assert _backup_xcom_to_variable in callbacks
+
+    def _user_cb(context):
+        pass
+
+    op2 = DbtProducerWatcherOperator(project_dir=".", profile_config=None, on_failure_callback=_user_cb)
+    composed = list(op2.on_failure_callback)
+    assert _user_cb in composed and _backup_xcom_to_variable in composed
 
 
 @pytest.mark.parametrize(

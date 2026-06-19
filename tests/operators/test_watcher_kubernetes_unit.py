@@ -157,12 +157,11 @@ def test_deletes_backup_on_success(mock_execute, mock_init, mock_delete):
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
-@patch("cosmos.operators.watcher_kubernetes._backup_xcom_to_variable")
 @patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
 @patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_keeps_backup_on_failure(mock_execute, mock_init, mock_delete, mock_backup):
-    """Test that the XCom backup Variable is persisted (not deleted) when execution fails."""
+def test_keeps_backup_on_failure(mock_execute, mock_init, mock_delete):
+    """On failure the backup Variable is kept (not deleted) for the retry; the on-failure callback does the flush."""
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
         profile_config=None,
@@ -179,15 +178,14 @@ def test_keeps_backup_on_failure(mock_execute, mock_init, mock_delete, mock_back
         op.execute(context=context)
 
     mock_init.assert_called_once_with(context, persist=True)
-    mock_backup.assert_called_once_with(context)
     mock_delete.assert_not_called()
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
 @patch("cosmos.operators.watcher_kubernetes._restore_xcom_from_variable")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_skips_retry_attempt_in_memory_mode(mock_execute, mock_restore):
-    """With enable_watcher_reliable_retry=False, a retry still skips but does not restore from a Variable (#2776)."""
+def test_in_memory_mode_restores_on_retry(mock_execute, mock_restore):
+    """In-memory mode still restores on retry: a graceful attempt-1 failure flushes via the on-failure callback (#2776)."""
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
         profile_config=None,
@@ -201,7 +199,7 @@ def test_skips_retry_attempt_in_memory_mode(mock_execute, mock_restore):
     with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
         op.execute(context=context)
 
-    mock_restore.assert_not_called()
+    mock_restore.assert_called_once_with(context)
     mock_execute.assert_not_called()
 
 
@@ -229,12 +227,11 @@ def test_in_memory_mode_skips_variable_backup_on_success(mock_execute, mock_init
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
-@patch("cosmos.operators.watcher_kubernetes._backup_xcom_to_variable")
 @patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
 @patch("cosmos.operators.watcher_kubernetes._init_xcom_backup")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
-def test_in_memory_mode_skips_variable_backup_on_failure(mock_execute, mock_init, mock_delete, mock_backup):
-    """With enable_watcher_reliable_retry=False, a producer failure does not back statuses up to a Variable (#2776)."""
+def test_in_memory_mode_skips_variable_backup_on_failure(mock_execute, mock_init, mock_delete):
+    """In-memory mode: a producer failure deletes nothing; the on-failure callback flushes the backup (#2776)."""
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
         profile_config=None,
@@ -251,8 +248,17 @@ def test_in_memory_mode_skips_variable_backup_on_failure(mock_execute, mock_init
         op.execute(context=context)
 
     mock_init.assert_called_once_with(context, persist=False)
-    mock_backup.assert_not_called()
     mock_delete.assert_not_called()
+
+
+def test_producer_registers_failure_backup_callback():
+    """The Kubernetes producer registers _backup_xcom_to_variable as an on_failure_callback (#2776)."""
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
+
+    op = DbtProducerWatcherKubernetesOperator(project_dir=".", profile_config=None, image="dbt-image:latest")
+    callbacks = op.on_failure_callback
+    callbacks = list(callbacks) if isinstance(callbacks, (list, tuple)) else [callbacks]
+    assert _backup_xcom_to_variable in callbacks
 
 
 def test_raises_exception_when_task_instance_missing():

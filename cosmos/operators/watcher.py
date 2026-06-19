@@ -32,7 +32,7 @@ from cosmos.operators._watcher.base import (
 )
 from cosmos.operators._watcher.state import DBT_SOURCE_FRESHNESS_STALE_STATUSES, DBT_SUCCESS_STATUSES
 from cosmos.operators._watcher.xcom import (
-    _backup_xcom_to_variable,
+    _compose_failure_backup_callback,
     _delete_xcom_backup_variable,
     _init_xcom_backup,
     _restore_xcom_from_variable,
@@ -225,6 +225,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
         kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
+        # On failure, flush the in-memory status backup to a Variable so a retry can restore it (#2776).
+        kwargs["on_failure_callback"] = _compose_failure_backup_callback(kwargs.get("on_failure_callback"))
         # invocation_mode is intentionally NOT forced here; the parent's _discover_invocation_mode()
         # picks DBT_RUNNER when available and falls back to SUBPROCESS otherwise.
         # An explicit invocation_mode passed by the caller is preserved as-is.
@@ -465,8 +467,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         reliable_retry = settings.enable_watcher_reliable_retry
 
         if try_number > 1:
-            if reliable_retry:
-                _restore_xcom_from_variable(context)
+            _restore_xcom_from_variable(context)
             raise AirflowSkipException(
                 "Dbt WATCHER producer task does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
@@ -485,9 +486,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             return return_value
 
         except Exception:
+            # The on-failure callback flushes the in-memory backup to the Variable; here we only
+            # record that the producer finished so consumer sensors stop waiting.
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
-            if reliable_retry:
-                _backup_xcom_to_variable(context)
             raise
 
 

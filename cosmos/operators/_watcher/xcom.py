@@ -113,8 +113,8 @@ def _backup_xcom_to_variable(context: Any) -> None:
         logger.debug("Backed up %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
 
 
-def _compose_failure_backup_callback(existing: Any) -> Any:
-    """Append ``_backup_xcom_to_variable`` to any existing ``on_failure_callback``(s), idempotently."""
+def _compose_backup_callback(existing: Any) -> Any:
+    """Append ``_backup_xcom_to_variable`` to any existing callback(s), idempotently (used for on_retry_callback and on_failure_callback)."""
     if existing is None:
         return _backup_xcom_to_variable
     callbacks = list(existing) if isinstance(existing, (list, tuple)) else [existing]

@@ -20,7 +20,7 @@ from cosmos.constants import PRODUCER_WATCHER_TASK_ID
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators._watcher.xcom import (
-    _compose_failure_backup_callback,
+    _compose_backup_callback,
     _delete_xcom_backup_variable,
     _init_xcom_backup,
     _restore_xcom_from_variable,
@@ -106,9 +106,11 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         kwargs["callbacks"] = normalized_callbacks
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
-        # Compose after super().__init__ so a DAG-level default_args on_failure_callback is preserved
-        # (not overridden); it flushes the in-memory status backup to a Variable on failure (#2776).
-        self.on_failure_callback = _compose_failure_backup_callback(getattr(self, "on_failure_callback", None))
+        # Flush the in-memory backup to a Variable so the producer retry can restore it. A graceful
+        # failure with retries left is UP_FOR_RETRY (on_retry_callback), not FAILED, so register on
+        # both; composed after super().__init__ to preserve a DAG-level default_args callback (#2776).
+        self.on_retry_callback = _compose_backup_callback(getattr(self, "on_retry_callback", None))
+        self.on_failure_callback = _compose_backup_callback(getattr(self, "on_failure_callback", None))
         # Mutable set populated by the log parser when dbt emits SkippingDetails
         # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
         # for those unique_ids are rewritten to "failed" so the consumer sensor

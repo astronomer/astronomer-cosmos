@@ -190,7 +190,7 @@ Task-level retry — producer
        (`#2776 <https://github.com/astronomer/astronomer-cosmos/issues/2776>`_) controls *when* the
        producer's in-memory status backup is written to the Variable. When ``True`` (default) it is
        written eagerly after every dbt node, surviving even a hard ``SIGKILL``/OOM kill. When ``False``
-       it is written only once, on failure, via the producer's ``on_failure_callback``: this removes
+       it is written once, when the producer is retried, via the producer's ``on_retry_callback``: this removes
        the per-node Variable I/O, and a *graceful* failure (e.g. a dbt error) still flushes the backup
        so consumers recover as before — only a *hard* kill, where the callback cannot run, loses the
        statuses and makes the affected consumers re-run their dbt node (results stay correct). The
@@ -245,7 +245,7 @@ Automatic retries
        (`#2684 <https://github.com/astronomer/astronomer-cosmos/pull/2684>`_).
    * - **1.15.0**
      - **Works.** Same as 1.14.2 by default. With ``enable_watcher_reliable_retry=False`` a *graceful*
-       producer failure still restores statuses on auto-retry (flushed by the ``on_failure_callback``);
+       producer failure still restores statuses on auto-retry (flushed by the ``on_retry_callback``);
        only a hard ``SIGKILL``/OOM kill loses them, making the affected consumers re-run their dbt node
        — correct, but with extra compute. See *Task-level retry — producer*.
 

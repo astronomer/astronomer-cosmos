@@ -409,7 +409,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 
     When ``True`` (default), the backup is written eagerly after every dbt node. Statuses survive any producer failure, including a hard ``SIGKILL``/OOM kill, so consumers never re-run dbt on a retry. This is the most reliable option, but the per-node Variable writes are measurable producer CPU/IO on large projects.
 
-    When ``False``, the backup is written only once, on failure, via the producer's ``on_failure_callback``. This removes the per-node Variable I/O and improves producer performance. A graceful producer failure (for example a dbt model error) still flushes the backup, so consumers recover as in the reliable mode; only a hard kill (``SIGKILL``/OOM, where Airflow cannot run the callback) loses the in-memory statuses, in which case the affected consumer sensors re-run their dbt node locally. Results stay correct.
+    When ``False``, the backup is written once, when the producer is retried, via the producer's ``on_retry_callback`` (a graceful failure with retries left is ``UP_FOR_RETRY``, not ``FAILED``). This removes the per-node Variable I/O and improves producer performance. A graceful producer failure (for example a dbt model error) still flushes the backup, so consumers recover as in the reliable mode; only a hard kill (``SIGKILL``/OOM, where Airflow cannot run the callback) loses the in-memory statuses, in which case the affected consumer sensors re-run their dbt node locally. Results stay correct.
 
     A future approach that delivers reliability and performance together is tracked in `#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task & Asset Store, AIP-103).
 

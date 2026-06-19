@@ -378,20 +378,22 @@ def test_dbt_producer_watcher_operator_in_memory_restores_on_retry(mock_execute,
     mock_execute.assert_not_called()
 
 
-def test_dbt_producer_watcher_operator_registers_failure_backup_callback():
-    """The producer flushes its in-memory backup on failure via an on_failure_callback, composed with any user callback (#2776)."""
+def test_dbt_producer_watcher_operator_registers_backup_callbacks():
+    """The producer flushes its in-memory backup on both on_retry_callback (the retry path) and on_failure_callback, composed with any user callbacks (#2776)."""
     from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
 
+    def _norm(cb):
+        return list(cb) if isinstance(cb, (list, tuple)) else [cb]
+
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    callbacks = op.on_failure_callback
-    callbacks = list(callbacks) if isinstance(callbacks, (list, tuple)) else [callbacks]
-    assert _backup_xcom_to_variable in callbacks
+    assert _backup_xcom_to_variable in _norm(op.on_retry_callback)
+    assert _backup_xcom_to_variable in _norm(op.on_failure_callback)
 
     def _user_cb(context):
         pass
 
-    op2 = DbtProducerWatcherOperator(project_dir=".", profile_config=None, on_failure_callback=_user_cb)
-    composed = list(op2.on_failure_callback)
+    op2 = DbtProducerWatcherOperator(project_dir=".", profile_config=None, on_retry_callback=_user_cb)
+    composed = _norm(op2.on_retry_callback)
     assert _user_cb in composed and _backup_xcom_to_variable in composed
 
 
@@ -2642,6 +2644,10 @@ def test_dbt_task_group_watcher_in_memory_retry_recovers_skipped_downstream(
     assert tis["watcher_upstream_failure_recovery.model_downstream_run"].state == "success"
     assert tis["watcher_upstream_failure_recovery.model_flaky_run"].state == "success"
     assert tis["watcher_upstream_failure_recovery.model_a_run"].state == "success"
+    # Distinguishes a real restore from full fallback: model_a succeeded on the producer's first
+    # attempt, so its consumer reads the status flushed by the retry callback and completes as a
+    # sensor (try_number == 1) instead of re-running dbt. In the full-fallback path it would be > 1.
+    assert tis["watcher_upstream_failure_recovery.model_a_run"].try_number == 1
     assert tis["watcher_upstream_failure_recovery.dbt_producer_watcher_done"].state == "success"
     assert tis["post_dbt"].state == "success"
 

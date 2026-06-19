@@ -32,7 +32,7 @@ from cosmos.operators._watcher.base import (
 )
 from cosmos.operators._watcher.state import DBT_SOURCE_FRESHNESS_STALE_STATUSES, DBT_SUCCESS_STATUSES
 from cosmos.operators._watcher.xcom import (
-    _compose_failure_backup_callback,
+    _compose_backup_callback,
     _delete_xcom_backup_variable,
     _init_xcom_backup,
     _restore_xcom_from_variable,
@@ -230,9 +230,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # An explicit invocation_mode passed by the caller is preserved as-is.
         super().__init__(task_id=task_id, *args, **kwargs)
         self.log_format = "json"
-        # Compose after super().__init__ so a DAG-level default_args on_failure_callback is preserved
-        # (not overridden); it flushes the in-memory status backup to a Variable on failure (#2776).
-        self.on_failure_callback = _compose_failure_backup_callback(getattr(self, "on_failure_callback", None))
+        # Flush the in-memory backup to a Variable so the producer retry can restore it. A graceful
+        # failure with retries left is UP_FOR_RETRY (on_retry_callback), not FAILED, so register on
+        # both; composed after super().__init__ to preserve a DAG-level default_args callback (#2776).
+        self.on_retry_callback = _compose_backup_callback(getattr(self, "on_retry_callback", None))
+        self.on_failure_callback = _compose_backup_callback(getattr(self, "on_failure_callback", None))
 
         # Mutable dict populated lazily from the manifest; shared with the log parser.
         self._dataset_namespace: str | None = None

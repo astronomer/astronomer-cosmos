@@ -256,8 +256,8 @@ Variable that survives the retry:
   statuses survive any producer failure, including a hard ``SIGKILL``/OOM kill. Consumers never re-run
   dbt on a producer retry. This is the most reliable option, but the per-node Variable writes are
   measurable producer CPU/IO on large projects.
-- ``False`` — the buffer is written to the Variable **only once, on failure**, via the producer's
-  ``on_failure_callback``. This removes the per-node Variable I/O and improves producer performance. A
+- ``False`` — the buffer is written to the Variable **once, when the producer is retried**, via the
+  producer's retry callback (``on_retry_callback``). This removes the per-node Variable I/O and improves producer performance. A
   *graceful* producer failure (for example a dbt model error) still flushes the buffer, so consumers
   recover exactly as in the reliable mode. The trade-off: a *hard* kill (``SIGKILL``/OOM), where Airflow
   cannot run the callback, loses the in-memory statuses, so on the retry the affected consumer sensors
@@ -279,7 +279,7 @@ Variable that survives the retry:
      - Minimal
    * - When the backup Variable is written
      - Eagerly, after every node
-     - Once, on failure (via ``on_failure_callback``)
+     - Once, when the producer is retried (via ``on_retry_callback``)
    * - Recovers after a graceful producer failure (e.g. dbt error)
      - Yes
      - Yes

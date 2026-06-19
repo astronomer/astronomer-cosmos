@@ -251,14 +251,14 @@ def test_in_memory_mode_skips_variable_backup_on_failure(mock_execute, mock_init
     mock_delete.assert_not_called()
 
 
-def test_producer_registers_failure_backup_callback():
-    """The Kubernetes producer registers _backup_xcom_to_variable as an on_failure_callback (#2776)."""
+def test_producer_registers_backup_callbacks():
+    """The Kubernetes producer registers _backup_xcom_to_variable on both on_retry_callback and on_failure_callback (#2776)."""
     from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
 
     op = DbtProducerWatcherKubernetesOperator(project_dir=".", profile_config=None, image="dbt-image:latest")
-    callbacks = op.on_failure_callback
-    callbacks = list(callbacks) if isinstance(callbacks, (list, tuple)) else [callbacks]
-    assert _backup_xcom_to_variable in callbacks
+    for cb in (op.on_retry_callback, op.on_failure_callback):
+        cb = list(cb) if isinstance(cb, (list, tuple)) else [cb]
+        assert _backup_xcom_to_variable in cb
 
 
 def test_raises_exception_when_task_instance_missing():

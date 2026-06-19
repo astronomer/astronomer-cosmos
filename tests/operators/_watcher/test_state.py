@@ -241,17 +241,17 @@ class TestInitXcomBackup:
         assert ti._cosmos_xcom_persist_incrementally is False
 
 
-def test_compose_failure_backup_callback():
-    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable, _compose_failure_backup_callback
+def test_compose_backup_callback():
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable, _compose_backup_callback
 
     def _user(context):
         pass
 
-    assert _compose_failure_backup_callback(None) is _backup_xcom_to_variable
-    assert _compose_failure_backup_callback(_user) == [_user, _backup_xcom_to_variable]
-    assert _compose_failure_backup_callback([_user]) == [_user, _backup_xcom_to_variable]
+    assert _compose_backup_callback(None) is _backup_xcom_to_variable
+    assert _compose_backup_callback(_user) == [_user, _backup_xcom_to_variable]
+    assert _compose_backup_callback([_user]) == [_user, _backup_xcom_to_variable]
     # idempotent: does not double-add when already present
-    assert _compose_failure_backup_callback([_user, _backup_xcom_to_variable]) == [_user, _backup_xcom_to_variable]
+    assert _compose_backup_callback([_user, _backup_xcom_to_variable]) == [_user, _backup_xcom_to_variable]
 
 
 class TestPersistBackup:

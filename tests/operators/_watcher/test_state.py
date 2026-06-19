@@ -320,6 +320,21 @@ class TestBackupXcomToVariable:
         mock_persist.assert_called_once_with(ti._cosmos_xcom_backup_var_key, {"k": "v"})
 
     @patch("cosmos.operators._watcher.xcom._persist_backup")
+    def test_lazy_mode_callback_flushes_buffer_populated_by_safe_xcom_push(self, mock_persist):
+        # In-memory (lazy) mode: safe_xcom_push only buffers (no per-push persist); the on-failure
+        # callback (_backup_xcom_to_variable) then flushes the accumulated buffer to the Variable once.
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run"}
+        _init_xcom_backup(context, persist=False)
+
+        safe_xcom_push(ti, "model__a_status", {"status": "success"})
+        mock_persist.assert_not_called()
+
+        _backup_xcom_to_variable(context)
+
+        mock_persist.assert_called_once_with(ti._cosmos_xcom_backup_var_key, {"model__a_status": {"status": "success"}})
+
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
     def test_noop_without_init(self, mock_persist):
         ti = _MockTI()
         context = {"ti": ti}

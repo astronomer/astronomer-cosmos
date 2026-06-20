@@ -1360,29 +1360,20 @@ class DbtGraph:
                 orjson is enabled but not installed, or if the parsed manifest root is not a dictionary
         """
         try:
-            if manifest_path.stat().st_size == 0:
-                raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
+            with manifest_path.open("rb") as fp:
+                content = fp.read()
         except OSError as e:
             raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: {e}") from e
 
-        if settings.enable_orjson_parser and orjson:
-            try:
-                with manifest_path.open("rb") as fp:
-                    manifest = orjson.loads(fp.read())
-            except (json.JSONDecodeError, ValueError) as e:
-                raise CosmosLoadDbtException(
-                    f"Failed to load dbt manifest at `{manifest_path}`: file is not valid JSON ({e})"
-                ) from e
-        elif settings.enable_orjson_parser:
-            raise CosmosLoadDbtException("orjson is not installed. Install it with: pip install orjson")
-        else:
-            try:
-                with manifest_path.open("r") as fp:
-                    manifest = json.load(fp)
-            except json.JSONDecodeError as e:
-                raise CosmosLoadDbtException(
-                    f"Failed to load dbt manifest at `{manifest_path}`: file is not valid JSON ({e})"
-                ) from e
+        if not content:
+            raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
+
+        try:
+            manifest = orjson.loads(content) if (settings.enable_orjson_parser and orjson) else json.loads(content)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise CosmosLoadDbtException(
+                f"Failed to load dbt manifest at `{manifest_path}`: file is not valid JSON ({e})"
+            ) from e
 
         if manifest is None:
             return {}

@@ -138,3 +138,55 @@ class TestOrjsonParserEquivalence:
         with patch.object(settings, "enable_orjson_parser", False):
             with pytest.raises(CosmosLoadDbtException, match="expected top-level JSON object"):
                 dbt_graph._load_manifest_from_file(manifest_file)
+
+
+class TestManifestFileErrorHandling:
+    """Tests for manifest file error handling — empty files and invalid JSON."""
+
+    def test_load_manifest_from_file_raises_on_empty_file(self, tmp_path):
+        """An empty manifest file raises CosmosLoadDbtException."""
+        manifest_file = tmp_path / "manifest.json"
+        manifest_file.write_text("")
+
+        dbt_graph = _make_dbt_graph(manifest_file)
+
+        with patch.object(settings, "enable_orjson_parser", False):
+            with pytest.raises(CosmosLoadDbtException, match="file is empty"):
+                dbt_graph._load_manifest_from_file(manifest_file)
+
+    def test_load_manifest_from_file_raises_on_empty_file_with_orjson(self, tmp_path):
+        """An empty manifest file raises CosmosLoadDbtException when orjson is enabled."""
+        manifest_file = tmp_path / "manifest.json"
+        manifest_file.write_text("")
+
+        dbt_graph = _make_dbt_graph(manifest_file)
+
+        with patch.object(settings, "enable_orjson_parser", True):
+            with pytest.raises(CosmosLoadDbtException, match="file is empty"):
+                dbt_graph._load_manifest_from_file(manifest_file)
+
+    def test_load_manifest_from_file_raises_on_invalid_json(self, tmp_path):
+        """Invalid JSON content raises CosmosLoadDbtException."""
+        manifest_file = tmp_path / "manifest.json"
+        manifest_file.write_text("{invalid json content}")
+
+        dbt_graph = _make_dbt_graph(manifest_file)
+
+        with patch.object(settings, "enable_orjson_parser", False):
+            with pytest.raises(CosmosLoadDbtException, match="file is not valid JSON"):
+                dbt_graph._load_manifest_from_file(manifest_file)
+
+    @pytest.mark.skipif(
+        not __import__("importlib").util.find_spec("orjson"),
+        reason="orjson not installed",
+    )
+    def test_load_manifest_from_file_raises_on_invalid_json_with_orjson(self, tmp_path):
+        """Invalid JSON content raises CosmosLoadDbtException when orjson is enabled."""
+        manifest_file = tmp_path / "manifest.json"
+        manifest_file.write_text("{invalid json content}")
+
+        dbt_graph = _make_dbt_graph(manifest_file)
+
+        with patch.object(settings, "enable_orjson_parser", True):
+            with pytest.raises(CosmosLoadDbtException, match="file is not valid JSON"):
+                dbt_graph._load_manifest_from_file(manifest_file)

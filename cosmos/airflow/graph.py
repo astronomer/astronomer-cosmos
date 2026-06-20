@@ -1092,7 +1092,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             "node": node,
         }
 
-        task_or_group = generate_task_or_group(**task_or_group_args, filtered_nodes=nodes)
+        task_or_group = generate_task_or_group(**task_or_group_args, filtered_nodes=nodes)  # type: ignore[arg-type]
         if task_or_group is not None:
             tasks_map[node_id] = task_or_group
         task_group = parent_task_group

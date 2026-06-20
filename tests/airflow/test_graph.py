@@ -429,7 +429,7 @@ def test_build_airflow_graph_with_after_all_and_empty_nodes():
     # The AFTER_ALL test task is still created, but it has no upstream leaves to depend on.
     assert list(tasks_map.keys()) == ["astro_shop_test"]
     assert [task.task_id for task in dag.tasks] == ["astro_shop_test"]
-    assert isinstance(tasks_map["astro_shop_test"], EmptyOperator
+    assert isinstance(tasks_map["astro_shop_test"], EmptyOperator)
 
 
 @pytest.mark.integration

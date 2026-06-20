@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
 try:  # Airflow 3
@@ -1060,13 +1061,12 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             tests_per_model=tests_per_model,
         )
 
-    # Arguments shared by every node's task/group as well as the AFTER_ALL/detached test tasks below.
-    # Defined before the loop so it is always bound, even when ``nodes`` is empty
-    task_or_group_args: dict[str, Any] = {
+    # Immutable base args shared by every node's task/group as well as the AFTER_ALL/detached test tasks below.
+    # ``node`` and ``task_group`` are intentionally omitted so per-node dicts are built cleanly each iteration.
+    base_task_or_group_args: dict[str, Any] = {
         # Arguments to this method:
         "dag": dag,
         "task_group": parent_task_group,
-        "node": None,
         "task_args": task_args,
         "dbt_project_name": dbt_project_name,
         "render_config": render_config,
@@ -1080,6 +1080,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         "node_converters": render_config.node_converters or {},
     }
 
+    last_node: DbtNode | None = None
     for node_id, node in nodes.items():
         task_group = (
             create_task_groups_based_on_folder(dag, node, parent_task_group, task_groups)
@@ -1087,7 +1088,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             else task_group
         )
         task_or_group_args = {
-            **task_or_group_args,
+            **base_task_or_group_args,
             "task_group": task_group,
             "node": node,
         }
@@ -1096,6 +1097,7 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
         if task_or_group is not None:
             tasks_map[node_id] = task_or_group
         task_group = parent_task_group
+        last_node = node
 
     # If test_behaviour=="after_all", there will be one test task, run by the end of the DAG
     # The end of a DAG is defined by the DAG leaf tasks (tasks which do not have downstream tasks)
@@ -1109,14 +1111,23 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
             render_config=render_config,
             enable_owner_inheritance=render_config.enable_owner_inheritance,
         )
+        # When nodes is empty, create a minimal placeholder so node_converters for TEST don't crash on node.unique_id.
+        after_all_node: DbtNode = last_node or DbtNode(
+            unique_id=f"test.{dbt_project_name}",
+            resource_type=DbtResourceType.TEST,
+            depends_on=[],
+            path_base=Path("."),
+            original_file_path=Path("."),
+        )
         test_task_args = {
-            **task_or_group_args,
+            **base_task_or_group_args,
+            # AFTER_ALL test is a single DAG-level task: place it at root so task_id stays e.g. "astro_shop_test"
+            "task_group": parent_task_group,
             "task_meta": test_meta,
             "resource_type": DbtResourceType.TEST,
+            "node": after_all_node,
         }
-        # AFTER_ALL test is a single DAG-level task: place it at root so task_id stays e.g. "astro_shop_test"
-        test_task_args["task_group"] = parent_task_group
-        test_task = generate_or_convert_task(**test_task_args)
+        test_task = generate_or_convert_task(**test_task_args)  # type: ignore[arg-type]
         leaves_ids = calculate_leaves(tasks_ids=list(tasks_map.keys()), nodes=nodes)
         for leaf_node_id in leaves_ids:
             tasks_map[leaf_node_id] >> test_task
@@ -1136,11 +1147,12 @@ def build_airflow_graph(  # noqa: C901 TODO: https://github.com/astronomer/astro
                 enable_owner_inheritance=render_config.enable_owner_inheritance,
             )
             test_task_args = {
-                **task_or_group_args,
+                **base_task_or_group_args,
                 "task_meta": test_meta,
                 "resource_type": node.resource_type,
+                "node": node,
             }
-            test_task = generate_or_convert_task(**test_task_args)
+            test_task = generate_or_convert_task(**test_task_args)  # type: ignore[arg-type]
             tasks_map[node_id] = test_task
 
     create_airflow_task_dependencies(nodes, tasks_map)

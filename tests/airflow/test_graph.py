@@ -407,6 +407,7 @@ def test_build_airflow_graph_with_after_all_and_empty_nodes():
                 ),
             ),
         }
+
         def _convert_test(dag: DAG, task_group: TaskGroup | None, node: DbtNode, task_id: str, **kwargs):
             return EmptyOperator(dag=dag, task_group=task_group, task_id=task_id)
 

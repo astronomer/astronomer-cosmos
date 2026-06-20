@@ -407,9 +407,14 @@ def test_build_airflow_graph_with_after_all_and_empty_nodes():
                 ),
             ),
         }
+        def _convert_test(dag: DAG, task_group: TaskGroup | None, node: DbtNode, task_id: str, **kwargs):
+            return EmptyOperator(dag=dag, task_group=task_group, task_id=task_id)
+
         render_config = RenderConfig(
             test_behavior=TestBehavior.AFTER_ALL,
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            node_converters={DbtResourceType.TEST: _convert_test},
+            node_conversion_by_task_group=False,
         )
         tasks_map = build_airflow_graph(
             nodes={},
@@ -424,6 +429,7 @@ def test_build_airflow_graph_with_after_all_and_empty_nodes():
     # The AFTER_ALL test task is still created, but it has no upstream leaves to depend on.
     assert list(tasks_map.keys()) == ["astro_shop_test"]
     assert [task.task_id for task in dag.tasks] == ["astro_shop_test"]
+    assert isinstance(tasks_map["astro_shop_test"], EmptyOperator
 
 
 @pytest.mark.integration

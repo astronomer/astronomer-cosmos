@@ -7,6 +7,9 @@ Profile mappings are utilities provided by Cosmos that translate `Apache Airflow
 you can use the same connection objects you use in Airflow to authenticate with your database in dbt. To do so, there's
 a class in Cosmos for each Airflow connection to dbt profile mapping.
 
+.. note::
+   Adapters without a built-in ProfileMapping (such as ``dbt-glue``, ``dbt-athena``, etc.) are still fully supported in Cosmos. In these cases, you can bypass ProfileMapping and use a user-provided ``profiles.yml`` file instead. See :ref:`use-your-profiles-yml` for more information.
+
 You can find the available profile mappings on the left-hand side of this page. Each profile mapping is imported from
 ``cosmos.profiles`` and takes two arguments:
 

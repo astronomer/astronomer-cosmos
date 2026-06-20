@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +18,7 @@ from cosmos.dataset import (
     construct_dataset_uri,
     get_dataset_alias_name,
     get_dataset_namespace,
+    make_dataset_uri_builder,
 )
 
 START_DATE = datetime(2024, 4, 16)
@@ -248,24 +250,85 @@ class TestConstructDatasetUri:
         assert uri == "postgres://host:5432/mydb/public/customers"
 
     @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("3.0.0"))
-    @patch("cosmos.dataset.settings")
-    def test_airflow3_uri(self, mock_settings):
-        mock_settings.use_dataset_airflow3_uri_standard = False
-        uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
+    def test_airflow3_uri(self):
+        # warn_uri_migration=False: this test only asserts the returned URI, so suppress the
+        # migration warning to keep logs quiet and independent of the env's Cosmos settings.
+        uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers", warn_uri_migration=False)
         assert uri == "postgres://host:5432/mydb/public/customers"
 
     @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("3.0.0"))
     @patch("cosmos.dataset.settings")
-    def test_airflow3_uri_no_warning_when_flag_set(self, mock_settings):
+    def test_airflow3_with_airflow3_standard_does_not_warn(self, mock_settings, caplog):
         mock_settings.use_dataset_airflow3_uri_standard = True
-        uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
+        with caplog.at_level(logging.WARNING):
+            uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
+
         assert uri == "postgres://host:5432/mydb/public/customers"
+        assert "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed" not in caplog.text
+
+    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("cosmos.dataset.settings")
+    def test_airflow3_warning_can_be_suppressed_by_caller(self, mock_settings, caplog):
+        mock_settings.use_dataset_airflow3_uri_standard = False
+        with caplog.at_level(logging.WARNING):
+            uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers", warn_uri_migration=False)
+
+        assert uri == "postgres://host:5432/mydb/public/customers"
+        assert "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed" not in caplog.text
+
+
+# --- Tests for make_dataset_uri_builder ---
+
+
+class TestMakeDatasetUriBuilder:
+    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("cosmos.dataset.settings")
+    def test_warns_once_across_many_builds(self, mock_settings, caplog):
+        mock_settings.use_dataset_airflow3_uri_standard = False
+        build_uri = make_dataset_uri_builder()
+
+        with caplog.at_level(logging.WARNING):
+            uris = [build_uri("postgres://host:5432", f"db.public.t{i}") for i in range(5)]
+
+        assert len(uris) == 5
+        assert caplog.text.count("Airflow 3.0.0 Asset (Dataset) URIs validation rules changed") == 1
+
+    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("cosmos.dataset.settings")
+    def test_each_builder_warns_again(self, mock_settings, caplog):
+        """State is per-builder, so a later builder (e.g. a later task run) warns once more."""
+        mock_settings.use_dataset_airflow3_uri_standard = False
+
+        with caplog.at_level(logging.WARNING):
+            make_dataset_uri_builder()("postgres://host:5432", "db.public.t1")
+            make_dataset_uri_builder()("postgres://host:5432", "db.public.t2")
+
+        assert caplog.text.count("Airflow 3.0.0 Asset (Dataset) URIs validation rules changed") == 2
 
 
 # --- Tests for compute_model_outlet_uris ---
 
 
 class TestComputeModelOutletUris:
+    @staticmethod
+    def _manifest_with_two_emitting_nodes():
+        return {
+            "nodes": {
+                "model.jaffle_shop.customers": {
+                    "resource_type": "model",
+                    "database": "postgres",
+                    "schema": "public",
+                    "alias": "customers",
+                },
+                "seed.jaffle_shop.raw_orders": {
+                    "resource_type": "seed",
+                    "database": "postgres",
+                    "schema": "public",
+                    "alias": "raw_orders",
+                },
+            }
+        }
+
     def test_reads_manifest_and_computes_uris(self, tmp_path):
         manifest = {
             "nodes": {
@@ -297,6 +360,19 @@ class TestComputeModelOutletUris:
         assert "model.jaffle_shop.customers" in result
         assert "seed.jaffle_shop.raw_orders" in result
         assert "test.jaffle_shop.not_null" not in result
+
+    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("3.0.0"))
+    @patch("cosmos.dataset.settings")
+    def test_warns_once_per_manifest_computation_not_globally(self, mock_settings, tmp_path, caplog):
+        mock_settings.use_dataset_airflow3_uri_standard = False
+        manifest_path = tmp_path / "manifest.json"
+        manifest_path.write_text(json.dumps(self._manifest_with_two_emitting_nodes()))
+
+        with caplog.at_level(logging.WARNING):
+            result = compute_model_outlet_uris(str(manifest_path), "postgres://host:5432")
+            compute_model_outlet_uris(str(manifest_path), "postgres://host:5432")
+
+        assert caplog.text.count("Airflow 3.0.0 Asset (Dataset) URIs validation rules changed") == 2
         assert len(result) == 2
 
     def test_missing_manifest_returns_empty(self):

@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import zlib
@@ -609,6 +610,116 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
         # assert dataset_model == 1
 
 
+@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
+@pytest.mark.skipif(
+    version.parse(airflow_version) < version.parse("2.10"),
+    reason="Outlets are only overridden in Airflow 2.10 and 2.11 in DbtLocalBaseOperator.",
+)
+@pytest.mark.integration
+def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
+    from airflow.datasets import Dataset, DatasetAlias
+    from airflow.models.dataset import DatasetAliasModel
+    from sqlalchemy.orm.exc import FlushError
+
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            emit_datasets=False,
+            dbt_cmd_flags=["--select", "raw_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+
+        run_operator_dataset = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run_operator_dataset",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            outlets=[Dataset(uri="manual_outlet__run_dataset")],
+        )
+
+        run_operator_alias = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run_operator_alias",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            outlets=[DatasetAlias(name="manual_outlet__run_alias")],
+        )
+
+        run_operator_alias_model = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run_operator_alias_model",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+            outlets=[DatasetAliasModel(name="manual_outlet__run_alias_model")],
+        )
+
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            dbt_cmd_flags=["--models", "stg_customers"],
+            install_deps=True,
+            append_env=True,
+        )
+        seed_operator >> [run_operator_dataset, run_operator_alias, run_operator_alias_model] >> test_operator
+
+    assert seed_operator.outlets == []  # because emit_datasets=False,
+
+    # Handling Dataset
+    assert run_operator_dataset.outlets == [
+        DatasetAlias(name="manual_outlet__run_dataset"),
+        DatasetAlias(name="test_id_1__run_operator_dataset"),
+    ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_dataset.outlets)
+
+    # Handling DatasetAlias
+    assert run_operator_alias.outlets == [
+        DatasetAlias(name="manual_outlet__run_alias"),
+        DatasetAlias(name="test_id_1__run_operator_alias"),
+    ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_alias.outlets)
+
+    # Handling DatasetAliasModel passed by user and the DatasetAlias outlet by the Operator
+    assert run_operator_alias_model.outlets == [
+        DatasetAlias(name="manual_outlet__run_alias_model"),
+        DatasetAlias(name="test_id_1__run_operator_alias_model"),
+    ]
+
+    assert all(isinstance(outlet, DatasetAlias) for outlet in run_operator_alias_model.outlets)
+
+    assert test_operator.outlets == [DatasetAlias(name="test_id_1__test")]
+
+    with pytest.raises(FlushError):
+        run_test_dag(dag, custom_tester=True)
+        # This is a known limitation of Airflow 2.10.0 and 2.10.1
+        # https://github.com/apache/airflow/issues/42495
+
+        # When this is solved, we can uncomment the following:
+        # dag_run, session = run_test_dag(dag)
+
+        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
+        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
+        # based on the resolution of the issue logged in Airflow:
+        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
+        # assert dataset_model == 1
+
+
 @pytest.mark.skipif(
     version.parse(airflow_version) < version.Version("3.0.0"),
     reason="From Airflow 3.0 onwards, we started using AssetAlias, which changed the original behaviour",
@@ -1063,6 +1174,35 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     assert "Unable to emit OpenLineage events due to lack of dependencies or data." in caplog.text
 
 
+@patch("cosmos.dataset.AIRFLOW_VERSION", new=version.Version("3.0.0"))
+@patch("cosmos.dataset.settings")
+def test_get_datasets_warns_uri_migration_once(mock_settings, caplog):
+    """get_datasets emits the Airflow 3 URI migration warning once, not once per dataset (#2778)."""
+    mock_settings.use_dataset_airflow3_uri_standard = False
+
+    class MockOutput:
+        def __init__(self, name):
+            self.namespace = "postgres://host:5432"
+            self.name = name
+
+    class MockEvent:
+        outputs = [MockOutput("db.public.t1"), MockOutput("db.public.t2"), MockOutput("db.public.t3")]
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+    dbt_base_operator.openlineage_events_completes = [MockEvent()]
+
+    with caplog.at_level(logging.WARNING):
+        assets = dbt_base_operator.get_datasets("outputs")
+
+    assert len(assets) == 3
+    assert caplog.text.count("Airflow 3.0.0 Asset (Dataset) URIs validation rules changed") == 1
+
+
 def _write_target_sql_fixture(tmp_path: Path) -> None:
     """Create a fake dbt ``target/`` tree with two .sql files and one non-SQL artefact."""
     compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
@@ -1318,9 +1458,9 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
     mock_build_and_run_cmd.assert_called_once_with(context={}, cmd_flags=[])
 
 
-@patch("cosmos.operators.local.DbtLocalArtifactProcessor")
-def test_calculate_openlineage_events_completes_openlineage_errors(mock_processor, caplog):
-    instance = mock_processor.return_value
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
+def test_calculate_openlineage_events_completes_openlineage_errors(mock_get_processor, caplog):
+    instance = mock_get_processor.return_value.return_value
     instance.parse = MagicMock(side_effect=KeyError)
     caplog.set_level(logging.DEBUG)
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
@@ -1338,10 +1478,35 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     assert "Unable to parse OpenLineage events" in caplog.text
 
 
+def test_dbt_local_artifact_processor_imported_lazily():
+    """Regression: importing ``cosmos.operators.local`` must not import the heavy openlineage
+    ``DbtLocalArtifactProcessor`` at module load (that import is what we defer to keep it off the DAG-parse path).
+
+    Runs in a subprocess with a meta-path finder that blocks ``openlineage.common.provider.dbt.local``, so importing
+    Cosmos succeeds only if that import is genuinely deferred. This holds whether or not openlineage is installed."""
+    code = "\n".join(
+        [
+            "import sys",
+            "from importlib.abc import MetaPathFinder",
+            "BLOCKED = 'openlineage.common.provider.dbt.local'",
+            "class _Blocker(MetaPathFinder):",
+            "    def find_spec(self, name, path, target=None):",
+            "        assert name != BLOCKED, BLOCKED + ' imported at module load time'",
+            "        return None",
+            "sys.meta_path.insert(0, _Blocker())",
+            "import cosmos.operators.local",
+            "print('OK')",
+        ]
+    )
+    # timeout so a stalled child fails the test deterministically instead of hanging the suite.
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    assert "OK" in result.stdout
+
+
 @patch("cosmos.operators.local.DbtLocalBaseOperator._handle_post_execution")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception")
-@patch("cosmos.operators.local.DbtLocalArtifactProcessor")
-@patch("cosmos.operators.local.is_openlineage_common_available", True)
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
 @patch("cosmos.config.ProfileConfig.ensure_profile")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.invoke_dbt")
 @patch("cosmos.operators.local.DbtLocalBaseOperator._clone_project")
@@ -1351,7 +1516,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
     mock_clone_project,
     mock_invoke_dbt,
     mock_ensure_profile,
-    mock_processor,
+    mock_get_processor,
     mock_handle_exception,
     mock_handle_post_execution,
     tmp_path,
@@ -1362,6 +1527,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
     mock_ensure_profile.return_value.__enter__.return_value = (profile_path, {})
     mock_invoke_dbt.return_value = MagicMock()
 
+    mock_processor = mock_get_processor.return_value
     mock_processor_instance = MagicMock()
     mock_processor_instance.parse.return_value = MagicMock(completes=[])
     mock_processor.return_value = mock_processor_instance
@@ -2089,6 +2255,68 @@ def test_handle_post_execution_with_multiple_callbacks(
 
     for callback_fn in multiple_callbacks:
         callback_fn.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+def test_handle_post_execution_with_string_callback(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json, mock_load_method
+):
+    resolved_callback = MagicMock()
+    mock_load_method.return_value = resolved_callback
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        callback="cosmos.io.upload_to_aws_s3",
+        callback_args={"arg1": "value1"},
+    )
+
+    context = {"dag_run": MagicMock(), "task": MagicMock()}
+    operator._handle_post_execution("/tmp/project_dir", context)
+
+    mock_load_method.assert_called_once_with("cosmos.io", "upload_to_aws_s3")
+    resolved_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
+@patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
+@patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
+def test_handle_post_execution_with_mixed_callbacks(
+    mock_override_rtif, mock_store_compiled_sql, mock_store_freshness_json, mock_load_method
+):
+    resolved_callback = MagicMock()
+    mock_load_method.return_value = resolved_callback
+    direct_callback = MagicMock()
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        callback=[direct_callback, "cosmos.io.upload_to_aws_s3"],
+        callback_args={"arg1": "value1"},
+    )
+
+    context = {"dag_run": MagicMock(), "task": MagicMock()}
+    operator._handle_post_execution("/tmp/project_dir", context)
+
+    mock_load_method.assert_called_once_with("cosmos.io", "upload_to_aws_s3")
+    direct_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+    resolved_callback.assert_called_once_with("/tmp/project_dir", arg1="value1", context=context)
+
+
+def test_resolve_callback_rejects_path_without_module():
+    with pytest.raises(CosmosValueError, match="Invalid callback import path"):
+        ConcreteDbtLocalBaseOperator._resolve_callback("upload_to_aws_s3")
+
+
+@patch("cosmos.operators.local.load_method_from_module")
+def test_resolve_callback_rejects_non_callable(mock_load_method):
+    mock_load_method.return_value = "not-a-callable"
+    with pytest.raises(CosmosValueError, match="did not resolve to a callable"):
+        ConcreteDbtLocalBaseOperator._resolve_callback("cosmos.io.SOME_CONSTANT")
 
 
 @pytest.mark.integration

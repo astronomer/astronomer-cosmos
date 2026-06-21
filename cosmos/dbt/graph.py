@@ -1392,7 +1392,15 @@ class DbtGraph:
         logger.info("Trying to parse the dbt project `%s` using a dbt manifest...", self.project.project_name)
 
         if not self.project.is_manifest_available():
-            raise CosmosLoadDbtException(f"Unable to load manifest using {self.project.manifest_path}")
+            if self.project.manifest_path is None:
+                raise CosmosLoadDbtException(
+                    "Unable to load dbt manifest: ProjectConfig.manifest_path is not set. "
+                    "Provide a path to a valid manifest.json file."
+                )
+            raise CosmosLoadDbtException(
+                f"Unable to load dbt manifest at `{self.project.manifest_path}`: "
+                f"file does not exist or is not accessible."
+            )
 
         if not self.execution_config.project_path:
             raise CosmosLoadDbtException("Unable to load manifest without ExecutionConfig.dbt_project_path")

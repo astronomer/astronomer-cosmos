@@ -1722,8 +1722,8 @@ def test_load_via_dbt_ls_file():
 @pytest.mark.parametrize(
     "stdout,returncode",
     [
-        ("all good", None),
-        ("WarnErrorOptions", None),
+        ("all good", 0),
+        ("WarnErrorOptions", 0),
         pytest.param("fail", 599, marks=pytest.mark.xfail(raises=CosmosLoadDbtException)),
         pytest.param("Error", None, marks=pytest.mark.xfail(raises=CosmosLoadDbtException)),
     ],
@@ -1831,10 +1831,11 @@ def test_run_command_none_argument(mock_popen, caplog):
     env_vars = {"fake": "env_var"}
 
     mock_popen.return_value.communicate.return_value = ("Invalid None argument", None)
+    mock_popen.return_value.returncode = None
     with pytest.raises(CosmosLoadDbtException) as exc_info:
         run_command(fake_command, fake_dir, env_vars, InvocationMode.SUBPROCESS)
 
-    expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nstderr: None\nstdout: Invalid None argument"
+    expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nExit code: None\nstderr: None\nstdout: Invalid None argument"
     assert str(exc_info.value) == expected
 
 

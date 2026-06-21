@@ -303,7 +303,9 @@ def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dic
         )
 
     if returncode or "Error" in stdout.replace("WarnErrorOptions", ""):
-        details = f"stderr: {stderr}\nstdout: {stdout}"
+        stdout_msg = f"stdout: {stdout}" if stdout else "stdout: (no output captured)"
+        stderr_msg = f"stderr: {stderr}" if stderr else "stderr: (no output captured)"
+        details = f"{stderr_msg}\n{stdout_msg}\nexit code: {returncode}"
         raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
 
     return stdout
@@ -336,8 +338,13 @@ def run_command_with_dbt_runner(command: list[str], tmp_dir: Path | None, env_va
             )
             stderr = "\n".join([f"{name}: {result}" for name, result in zip(node_names, node_results)])
 
-    if stderr:
-        details = f"stderr: {stderr}\nstdout: {stdout}"
+    if not response.success:
+        exit_code = getattr(response, "exit_code", None)
+        stdout_msg = f"stdout: {stdout}" if stdout else "stdout: (no output captured)"
+        stderr_msg = f"stderr: {stderr}" if stderr else "stderr: (no output captured)"
+        details = f"{stderr_msg}\n{stdout_msg}"
+        if exit_code is not None:
+            details += f"\nexit code: {exit_code}"
         raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
 
     return stdout

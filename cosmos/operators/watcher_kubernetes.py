@@ -38,6 +38,10 @@ from cosmos.operators.kubernetes import (
 
 logger = get_logger(__name__)
 
+# Contract keys between operator and callback.
+CONTEXT_HOLDER_KEY = "context_holder"
+CONTEXT_KEY = "context"
+
 
 class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
     """Callback that parses dbt JSON logs from Kubernetes pod output.
@@ -82,8 +86,9 @@ class WatcherKubernetesCallback(KubernetesPodOperatorCallback):  # type: ignore[
         :param pod: the pod from which the log line was read.
         """
         # Don't leak other callback kwargs: the parser only needs "context" in this case.
-        holder = kwargs.get("context_holder")
-        context = holder.get("context") if holder else None
+        holder = kwargs.get(CONTEXT_HOLDER_KEY)
+        context = holder.get(CONTEXT_KEY) if holder else None
+        # `store_dbt_resource_status_from_log` expects context be passed in a dict of this shape.
         extra_kwargs = {"context": context} if context else {}
         store_dbt_resource_status_from_log(
             line,
@@ -104,7 +109,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         # Mutable holder shared by reference with pod_manager's callback_extra_kwargs.
         # execute() sets its "context" entry (the holder itself is never reassigned),
         # so a pod_manager created before execute() still sees the live context.
-        self._context_holder: dict[str, Context | None] = {"context": None}
+        self._context_holder: dict[str, Context | None] = {CONTEXT_KEY: None}
 
         existing_callbacks = kwargs.get("callbacks")
         if existing_callbacks is None:
@@ -137,7 +142,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
             callback_extra_kwargs={
                 "tests_per_model": self._tests_per_model,
                 "test_results_per_model": self._test_results_per_model,
-                "context_holder": self._context_holder,
+                CONTEXT_HOLDER_KEY: self._context_holder,
                 "upstream_failure_skipped_ids": self._upstream_failure_skipped_ids,
             },
         )
@@ -165,7 +170,7 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         _init_xcom_backup(context, persist=reliable_retry)
 
         self._upstream_failure_skipped_ids.clear()
-        self._context_holder["context"] = context
+        self._context_holder[CONTEXT_KEY] = context
 
         # On failure super().execute() raises and the on-failure callback flushes the backup.
         return_value = super().execute(context, **kwargs)

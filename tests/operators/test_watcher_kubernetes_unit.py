@@ -23,6 +23,8 @@ if Version(airflow_k8s_provider_version) < _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION
     )
 else:
     from cosmos.operators.watcher_kubernetes import (
+        CONTEXT_HOLDER_KEY,
+        CONTEXT_KEY,
         DbtBuildWatcherKubernetesOperator,
         DbtConsumerWatcherKubernetesSensor,
         DbtProducerWatcherKubernetesOperator,
@@ -433,7 +435,7 @@ def test_execute_sets_context_in_holder(mock_execute, mock_init, mock_delete):
 
     op.execute(context=context)
 
-    assert op._context_holder["context"] is context
+    assert op._context_holder[CONTEXT_KEY] is context
 
 
 @patch("cosmos.operators.watcher_kubernetes.CosmosKubernetesPodManager")
@@ -454,7 +456,7 @@ def test_producer_pod_manager_wires_callback_extra_kwargs(mock_manager_cls):
     extra = mock_manager_cls.call_args.kwargs["callback_extra_kwargs"]
     assert extra["tests_per_model"] is tests_per_model
     assert extra["test_results_per_model"] is op._test_results_per_model
-    assert extra["context_holder"] is op._context_holder
+    assert extra[CONTEXT_HOLDER_KEY] is op._context_holder
 
 
 @patch("cosmos.operators.watcher_kubernetes._delete_xcom_backup_variable")
@@ -476,7 +478,7 @@ def test_pod_manager_created_before_execute_sees_execution_context(mock_execute,
     op.client = MagicMock()
 
     manager = op.pod_manager  # created before execute(): context not yet known
-    assert manager._callback_extra_kwargs["context_holder"]["context"] is None
+    assert manager._callback_extra_kwargs[CONTEXT_HOLDER_KEY][CONTEXT_KEY] is None
 
     ti = MagicMock()
     ti.try_number = 1
@@ -484,7 +486,7 @@ def test_pod_manager_created_before_execute_sees_execution_context(mock_execute,
     op.execute(context=context)
 
     assert op.pod_manager is manager  # still the same cached manager
-    assert manager._callback_extra_kwargs["context_holder"]["context"] is context
+    assert manager._callback_extra_kwargs[CONTEXT_HOLDER_KEY][CONTEXT_KEY] is context
 
 
 def test_pod_manager_passes_extra_kwargs_only_to_marked_callbacks():
@@ -494,7 +496,7 @@ def test_pod_manager_passes_extra_kwargs_only_to_marked_callbacks():
     extra = {
         "tests_per_model": {"m": ["t"]},
         "test_results_per_model": {},
-        "context_holder": {"context": {"ti": MagicMock()}},
+        CONTEXT_HOLDER_KEY: {CONTEXT_KEY: {"ti": MagicMock()}},
     }
     manager = CosmosKubernetesPodManager(
         kube_client=MagicMock(),
@@ -533,7 +535,7 @@ def test_progress_callback_delegates_with_correct_args(mock_store):
         container_name="dbt",
         timestamp=None,
         pod=MagicMock(),
-        context_holder={"context": mock_context},
+        context_holder={CONTEXT_KEY: mock_context},
         tests_per_model=tests_per_model,
         test_results_per_model=test_results,
     )

@@ -275,7 +275,7 @@ class CustomCallback2:
             [CustomCallback1, CustomCallback2, WatcherK8sCallback],
             id="multiple",
         ),
-        pytest.param((), [WatcherK8sCallback], id="empty_list"),
+        pytest.param([], [WatcherK8sCallback], id="empty_list"),
         pytest.param((), [WatcherK8sCallback], id="empty_tuple"),
     ),
 )

@@ -52,7 +52,7 @@ from cosmos.constants import (
     FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP,
     InvocationMode,
 )
-from cosmos.dataset import construct_dataset_uri, get_dataset_alias_name
+from cosmos.dataset import get_dataset_alias_name, make_dataset_uri_builder
 from cosmos.dbt.project import (
     copy_dbt_packages,
     copy_manifest_file_if_exists,
@@ -136,17 +136,6 @@ def _read_target_sources_json(project_root: Path) -> dict[str, Any] | None:
         return None
 
 
-# The following is related to the ability of Cosmos parsing dbt artifacts and generating OpenLineage URIs
-# It is used for emitting Airflow assets and not necessarily OpenLineage events
-try:
-    from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
-
-    is_openlineage_common_available = True
-except ModuleNotFoundError:
-    is_openlineage_common_available = False
-    DbtLocalArtifactProcessor = None
-
-
 # The following is related to the ability of Airflow to emit OpenLineage events
 # This will decide if the method `get_openlineage_facets_on_complete` will be called by the Airflow OpenLineage listener or not
 try:
@@ -204,7 +193,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """Warn when output-only template fields are passed directly to local operators."""
         for field in _OUTPUT_ONLY_TEMPLATE_FIELDS:
             if field in kwargs:
-                logger.warning(
+                self.log.warning(
                     "The '%s' argument passed to %s will be overwritten at runtime; "
                     "it is an output-only template field.",
                     field,
@@ -300,16 +289,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """
         if dbt_runner.is_available():
             self.invocation_mode = InvocationMode.DBT_RUNNER
-            logger.info("dbtRunner is available. Using dbtRunner for invoking dbt.")
+            self.log.info("dbtRunner is available. Using dbtRunner for invoking dbt.")
         else:
             self.invocation_mode = InvocationMode.SUBPROCESS
-            logger.info("Could not import dbtRunner. Falling back to subprocess for invoking dbt.")
+            self.log.info("Could not import dbtRunner. Falling back to subprocess for invoking dbt.")
 
     def handle_exception_subprocess(self, result: FullOutputSubprocessResult) -> None:
         if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
             raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
-            logger.error("\n".join(result.full_output))
+            self.log.error("\n".join(result.full_output))
             raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
 
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
@@ -389,10 +378,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             dest_object_storage_path = ObjectStoragePath(dest_file_path, conn_id=dest_conn_id)
             dest_object_storage_path.parent.mkdir(parents=True, exist_ok=True)
             ObjectStoragePath(file_path).copy(dest_object_storage_path)
-            logger.debug("Copied %s to %s", file_path, dest_object_storage_path)
+            self.log.debug("Copied %s to %s", file_path, dest_object_storage_path)
 
         elapsed_time = time.time() - start_time
-        logger.info("SQL files upload completed in %.2f seconds.", elapsed_time)
+        self.log.info("SQL files upload completed in %.2f seconds.", elapsed_time)
 
     def _upload_sql_files_xcom(self, context: Context, tmp_project_dir: str, resource_type: str) -> None:
         start_time = time.time()
@@ -405,16 +394,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             compressed_sql = zlib.compress(sql_query.encode("utf-8"))
             compressed_b64_sql = base64.b64encode(compressed_sql).decode("utf-8")
             context["ti"].xcom_push(key=_sanitize_xcom_key(sql_model_path), value=compressed_b64_sql)
-            logger.debug("SQL files %s uploaded to xcom.", sql_model_path)
+            self.log.debug("SQL files %s uploaded to xcom.", sql_model_path)
 
         elapsed_time = time.time() - start_time
-        logger.info("SQL files upload to xcom completed in %.2f seconds.", elapsed_time)
+        self.log.info("SQL files upload to xcom completed in %.2f seconds.", elapsed_time)
 
     def _delete_sql_files(self) -> None:
         """Deletes the entire run-specific directory from the remote target."""
         dest_target_dir, dest_conn_id = self._configure_remote_target_path()
         if not dest_target_dir or not dest_conn_id:
-            logger.warning("Remote target path or connection ID not configured. Skipping deletion.")
+            self.log.warning("Remote target path or connection ID not configured. Skipping deletion.")
             return
 
         dag_task_group_identifier = self.extra_context["dbt_dag_task_group_identifier"]
@@ -424,9 +413,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
         if run_dir_path.exists():
             run_dir_path.rmdir(recursive=True)
-            logger.info("Deleted remote run directory: %s", run_dir_path_str)
+            self.log.info("Deleted remote run directory: %s", run_dir_path_str)
         else:
-            logger.debug("Remote run directory does not exist, skipping deletion: %s", run_dir_path_str)
+            self.log.debug("Remote run directory does not exist, skipping deletion: %s", run_dir_path_str)
 
     def store_freshness_json(self, tmp_project_dir: str, context: Context) -> None:
         """
@@ -480,14 +469,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 ).delete()
                 session.add(rtif)
             else:
-                logger.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
+                self.log.info("Warning: ti is of type TaskInstancePydantic. Cannot update template_fields.")
 
         _override_rtif_airflow_2_x()
 
     def run_subprocess(
         self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
     ) -> FullOutputSubprocessResult:
-        logger.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
+        self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
             command=command,
             env=env,
@@ -524,7 +513,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         return sql_content
 
     def _clone_project(self, tmp_dir_path: Path) -> None:
-        logger.info(
+        self.log.info(
             "Cloning project to writable temp directory %s from %s",
             tmp_dir_path,
             self.project_dir,
@@ -534,9 +523,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
         )
         if self.copy_dbt_packages:
-            logger.info("Copying dbt packages to temporary folder.")
+            self.log.info("Copying dbt packages to temporary folder.")
             copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
-            logger.info("Completed copying dbt packages to temporary folder.")
+            self.log.info("Completed copying dbt packages to temporary folder.")
 
         copy_manifest_file_if_exists(self.manifest_filepath, Path(tmp_dir_path))
 
@@ -544,7 +533,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         if self.cache_dir is None:
             return
         latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
-        logger.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
+        self.log.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
         if latest_partial_parse is not None:
             cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
 
@@ -580,8 +569,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         for filename in DBT_DEPENDENCIES_FILE_NAMES:
             filepath = tmp_dir_path / filename
             if filepath.is_file():
-                logger.debug("Checking for the %s dependencies file.", str(filename))
-                logger.debug("Contents of the <%s> dependencies file:\n %s", str(filepath), str(filepath.read_text()))
+                self.log.debug("Checking for the %s dependencies file.", str(filename))
+                self.log.debug("Contents of the <%s> dependencies file:\n %s", str(filepath), str(filepath.read_text()))
 
         self.invoke_dbt(command=deps_command, env=env, cwd=tmp_dir_path)
 
@@ -600,13 +589,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def _handle_datasets(self, context: Context) -> None:
         inlets = self.get_datasets("inputs")
         outlets = self.get_datasets("outputs")
-        logger.info("Inlets: %s", inlets)
-        logger.info("Outlets: %s", outlets)
+        self.log.info("Inlets: %s", inlets)
+        self.log.info("Outlets: %s", outlets)
         self.register_dataset(inlets, outlets, context)
 
         if settings.enable_uri_xcom and (uris := [outlet.uri for outlet in outlets]):
             context["ti"].xcom_push(key="uri", value=uris)
-            logger.info("Pushed outlet URI(s) to XCom: %s", uris)
+            self.log.info("Pushed outlet URI(s) to XCom: %s", uris)
 
     def _update_partial_parse_cache(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
@@ -625,12 +614,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 raw = json.load(fp)
         except json.JSONDecodeError as exc:
             raise AirflowException("Invalid JSON in run_results.json") from exc
-        logger.debug("Loaded run results from %s", run_results_path)
+        self.log.debug("Loaded run results from %s", run_results_path)
 
         compressed = base64.b64encode(zlib.compress(json.dumps(raw).encode())).decode()
         context["ti"].xcom_push(key="run_results", value=compressed)
 
-        logger.info("Pushed run results to XCom")
+        self.log.info("Pushed run results to XCom")
 
     def _handle_post_execution(
         self, tmp_project_dir: str, context: Context, push_run_results_to_xcom: bool = False
@@ -712,7 +701,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             with self.profile_config.ensure_profile() as profile_values:
                 profile_path, env_vars = profile_values
                 env.update(env_vars)
-                logger.debug("Using environment variables keys: %s", env.keys())
+                self.log.debug("Using environment variables keys: %s", env.keys())
 
                 flags = self._generate_dbt_flags(tmp_project_dir, profile_path)
 
@@ -736,12 +725,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     self._sources_json = _read_target_sources_json(tmp_dir_path)
                     self.handle_exception(result)
                     return result
-                if is_openlineage_common_available:
-                    self.calculate_openlineage_events_completes(env, tmp_dir_path, full_cmd)
-                    if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
-                        # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance,
-                        # in that case we're storing as self.openlineage_events_completes
-                        context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
+                processor_available = self.calculate_openlineage_events_completes(env, tmp_dir_path, full_cmd)
+                if processor_available and AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
+                    # Airflow 3 does not support associating 'openlineage_events_completes' with task_instance,
+                    # in that case we're storing as self.openlineage_events_completes
+                    context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
 
                 if self.emit_datasets:
                     self._handle_datasets(context)
@@ -757,12 +745,30 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
                 return result
 
+    @staticmethod
+    def _get_dbt_local_artifact_processor() -> Any:
+        """
+        Lazily import and return the ``DbtLocalArtifactProcessor`` class, or ``None`` when it is unavailable.
+
+        The import is deferred (not done at module load) to avoid pulling the heavy OpenLineage client into the
+        long-lived scheduler/dag-processor at DAG parse time; it only loads when a local dbt task actually emits
+        lineage. ``ImportError`` (the superclass of ``ModuleNotFoundError``) is treated as "unavailable", which also
+        covers a present-but-broken package whose import fails due to missing transitive dependencies.
+        """
+        try:
+            from openlineage.common.provider.dbt.local import DbtLocalArtifactProcessor
+
+            return DbtLocalArtifactProcessor
+        except ImportError:  # pragma: no cover
+            # Exercised only when ``openlineage-integration-common`` is absent/broken, which CI always installs.
+            return None
+
     def calculate_openlineage_events_completes(
         self,
         env: dict[str, str | os.PathLike[Any] | bytes],
         project_dir: Path,
         dbt_command_line: list[str] | None = None,
-    ) -> None:
+    ) -> bool:
         """
         Use openlineage-integration-common to extract lineage events from the artifacts generated after running the dbt
         command. Relies on the following files:
@@ -770,8 +776,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         * {project_dir}/target/manifest.json
         * {project_dir}/target/run_results.json
 
-        Return a list of RunEvents
+        Stores the extracted RunEvents on ``self.openlineage_events_completes``. Returns ``True`` when the OpenLineage
+        processor is available (parsing was attempted; individual parse failures are caught and logged), and ``False``
+        without doing any work when ``openlineage-integration-common`` is unavailable.
         """
+        DbtLocalArtifactProcessor = self._get_dbt_local_artifact_processor()
+        if DbtLocalArtifactProcessor is None:  # pragma: no cover
+            # Reached only when ``openlineage-integration-common`` is unavailable, which CI always installs.
+            self.log.debug("openlineage-integration-common is unavailable; skipping OpenLineage event parsing.")
+            return False
+
         # Since openlineage-integration-common relies on the profiles definition, we need to make these newly introduced
         # environment variables to the library. As of 1.0.0, DbtLocalArtifactProcessor did not allow passing environment
         # variables as an argument, so we need to inject them to the system environment variables.
@@ -796,7 +810,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
         except (FileNotFoundError, NotImplementedError, ValueError, KeyError, jinja2.exceptions.UndefinedError):
-            logger.debug("Unable to parse OpenLineage events", stack_info=True)
+            self.log.debug("Unable to parse OpenLineage events", stack_info=True)
+        return True
 
     def get_datasets(self, source: Literal["inputs", "outputs"]) -> list[Asset]:
         """
@@ -810,11 +825,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """
         uris = []
 
+        # Build all URIs through one builder so the Airflow 3 URI migration warning is logged
+        # once for this call instead of once per dataset (#2778).
+        build_uri = make_dataset_uri_builder()
         for completed in self.openlineage_events_completes:
             for output in getattr(completed, source):
-                dataset_uri = construct_dataset_uri(output.namespace, output.name)
-                uris.append(dataset_uri)
-        logger.debug("URIs to be converted to Asset: %s", uris)
+                uris.append(build_uri(output.namespace, output.name))
+        self.log.debug("URIs to be converted to Asset: %s", uris)
 
         assets = [Asset(uri) for uri in uris]
 
@@ -841,14 +858,16 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             from airflow.models.dag import DAG  # type: ignore[assignment]
 
         if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
-            logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")
+            self.log.error(
+                "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
+            )
             raise AirflowCompatibilityError(
                 "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
             )
         elif AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
             from airflow.utils.session import create_session
 
-            logger.info("Assigning inlets/outlets without DatasetAlias")
+            self.log.info("Assigning inlets/outlets without DatasetAlias")
             with create_session() as session:
                 self.outlets.extend(new_outlets)  # type: ignore[attr-defined]
                 self.inlets.extend(new_inlets)  # type: ignore[attr-defined]
@@ -862,7 +881,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
 
             if AIRFLOW_VERSION.major == 2:
-                logger.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
+                self.log.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
                 from airflow.datasets import DatasetAlias
 
                 alias_names = {dataset_alias_name} | {
@@ -876,7 +895,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                         context["outlet_events"][alias_name].add(outlet)  # type: ignore[index]
 
             else:  # AIRFLOW_VERSION.major == 3
-                logger.info("Assigning outlets with DatasetAlias in Airflow 3")
+                self.log.info("Assigning outlets with DatasetAlias in Airflow 3")
                 from airflow.sdk.definitions.asset import AssetAlias
 
                 # This line was necessary in Airflow 3.0.0, but this may become automatic in newer versions
@@ -904,7 +923,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         elif hasattr(task_instance, "openlineage_events_completes"):
             openlineage_events_completes = task_instance.openlineage_events_completes
         else:
-            logger.info("Unable to emit OpenLineage events due to lack of data.")
+            self.log.info("Unable to emit OpenLineage events due to lack of data.")
 
         if openlineage_events_completes is not None:
             for completed in openlineage_events_completes:
@@ -917,7 +936,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 run_facets = {**run_facets, **completed.run.facets}
                 job_facets = {**job_facets, **completed.job.facets}
         else:
-            logger.info("Unable to emit OpenLineage events due to lack of dependencies or data.")
+            self.log.info("Unable to emit OpenLineage events due to lack of dependencies or data.")
 
         return OperatorLineage(
             inputs=inputs,
@@ -1029,7 +1048,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                         outlets.append(DatasetAlias(name=dataset_alias_name))
 
                     else:
-                        logger.warning(f"Unknown outlet type {outlet}")  # Otherwise, pass
+                        self.log.warning(f"Unknown outlet type {outlet}")  # Otherwise, pass
 
                 operator_kwargs["outlets"] = outlets + [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
@@ -1353,7 +1372,7 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
 
     def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
         """Uploads the generated documentation to S3."""
-        logger.info(
+        self.log.info(
             'Attempting to upload generated docs to S3 using S3Hook("%s")',
             self.connection_id,
         )
@@ -1372,7 +1391,7 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
         for filename in self.required_files:
             key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
             s3_path = f"s3://{self.bucket_name}/{key}"
-            logger.info("Uploading %s to %s", filename, s3_path)
+            self.log.info("Uploading %s to %s", filename, s3_path)
 
             hook.load_file(
                 filename=f"{target_dir}/{filename}",
@@ -1419,7 +1438,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
 
     def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
         """Uploads the generated documentation to Azure Blob Storage."""
-        logger.info(
+        self.log.info(
             'Attempting to upload generated docs to Azure Blob Storage using WasbHook(conn_id="%s")',
             self.connection_id,
         )
@@ -1433,7 +1452,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
         )
 
         for filename in self.required_files:
-            logger.info(
+            self.log.info(
                 "Uploading %s to %s",
                 filename,
                 f"wasb://{self.bucket_name}/{filename}",
@@ -1463,7 +1482,7 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
 
     def upload_to_cloud_storage(self, project_dir: str, **kwargs: Any) -> None:
         """Uploads the generated documentation to Google Cloud Storage"""
-        logger.info(
+        self.log.info(
             'Attempting to upload generated docs to Storage using GCSHook(conn_id="%s")',
             self.connection_id,
         )
@@ -1475,7 +1494,7 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
 
         for filename in self.required_files:
             blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
-            logger.info("Uploading %s to %s", filename, f"gs://{self.bucket_name}/{blob_name}")
+            self.log.info("Uploading %s to %s", filename, f"gs://{self.bucket_name}/{blob_name}")
             hook.upload(
                 filename=f"{target_dir}/{filename}",
                 bucket_name=self.bucket_name,

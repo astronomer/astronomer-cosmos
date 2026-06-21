@@ -12,6 +12,7 @@ from cosmos.operators._k8s_common import (
     DbtTestWarningHandler,
     WatcherK8sCallback,
     _build_env_vars,
+    compose_watcher_backup_callbacks,
     execute_watcher_producer,
     inject_watcher_callback,
 )
@@ -424,6 +425,7 @@ def test_pod_manager_passes_extra_kwargs_only_to_marked_callbacks():
         pytest.param({"extra_arg": "value"}, id="forwards_kwargs"),
     ),
 )
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
 def test_execute_watcher_producer(mock_init, mock_delete, extra_kwargs: dict):
@@ -436,7 +438,7 @@ def test_execute_watcher_producer(mock_init, mock_delete, extra_kwargs: dict):
 
     assert result == "result"
     parent_execute.assert_called_once_with(context, **extra_kwargs)
-    mock_init.assert_called_once_with(context)
+    mock_init.assert_called_once_with(context, persist=True)
     mock_delete.assert_called_once_with(context)
 
 
@@ -456,10 +458,12 @@ def test_execute_watcher_producer_skips_retry(mock_restore):
     parent_execute.assert_not_called()
 
 
-@patch("cosmos.operators._k8s_common._backup_xcom_to_variable")
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
-def test_execute_watcher_producer_backs_up_on_failure(mock_init, mock_delete, mock_backup):
+def test_execute_watcher_producer_keeps_backup_on_failure(mock_init, mock_delete):
+    """On failure the backup Variable is kept (not deleted) for the retry; the on-failure
+    callback (see ``compose_watcher_backup_callbacks``) performs the flush, not ``execute``."""
     ti = MagicMock()
     ti.try_number = 1
     context = {"ti": ti, "run_id": "test_run"}
@@ -468,8 +472,24 @@ def test_execute_watcher_producer_backs_up_on_failure(mock_init, mock_delete, mo
     with pytest.raises(RuntimeError, match="boom"):
         execute_watcher_producer(MagicMock(), context, parent_execute)
 
-    mock_init.assert_called_once_with(context)
-    mock_backup.assert_called_once_with(context)
+    mock_init.assert_called_once_with(context, persist=True)
+    mock_delete.assert_not_called()
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._init_xcom_backup")
+def test_execute_watcher_producer_in_memory_mode_skips_variable_backup(mock_init, mock_delete):
+    """With enable_watcher_reliable_retry=False the producer keeps the buffer in memory only (#2776)."""
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti, "run_id": "test_run"}
+    parent_execute = MagicMock(return_value="result")
+
+    result = execute_watcher_producer(MagicMock(), context, parent_execute)
+
+    assert result == "result"
+    mock_init.assert_called_once_with(context, persist=False)
     mock_delete.assert_not_called()
 
 
@@ -497,3 +517,40 @@ def test_execute_watcher_producer_sets_context_before_parent_execute(mock_init, 
 
     assert captured["context"] is context
     operator._upstream_failure_skipped_ids.clear.assert_called_once_with()
+
+
+# ---------------------------------------------------------------------------
+# compose_watcher_backup_callbacks
+# ---------------------------------------------------------------------------
+
+
+def test_compose_watcher_backup_callbacks_registers_on_both_callbacks():
+    """The XCom backup flush is appended to both on_retry_callback and on_failure_callback (#2776)."""
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
+
+    operator = MagicMock()
+    operator.on_retry_callback = None
+    operator.on_failure_callback = None
+
+    compose_watcher_backup_callbacks(operator)
+
+    for cb in (operator.on_retry_callback, operator.on_failure_callback):
+        callbacks = list(cb) if isinstance(cb, (list, tuple)) else [cb]
+        assert _backup_xcom_to_variable in callbacks
+
+
+def test_compose_watcher_backup_callbacks_preserves_existing():
+    """An existing default_args callback is preserved when the backup flush is appended (#2776)."""
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable
+
+    existing = MagicMock()
+    operator = MagicMock()
+    operator.on_retry_callback = existing
+    operator.on_failure_callback = [existing]
+
+    compose_watcher_backup_callbacks(operator)
+
+    assert existing in operator.on_retry_callback
+    assert _backup_xcom_to_variable in operator.on_retry_callback
+    assert existing in operator.on_failure_callback
+    assert _backup_xcom_to_variable in operator.on_failure_callback

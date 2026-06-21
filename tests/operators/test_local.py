@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import zlib
@@ -1173,6 +1174,35 @@ def test_run_operator_emits_events_without_openlineage_events_completes(caplog):
     assert "Unable to emit OpenLineage events due to lack of dependencies or data." in caplog.text
 
 
+@patch("cosmos.dataset.AIRFLOW_VERSION", new=version.Version("3.0.0"))
+@patch("cosmos.dataset.settings")
+def test_get_datasets_warns_uri_migration_once(mock_settings, caplog):
+    """get_datasets emits the Airflow 3 URI migration warning once, not once per dataset (#2778)."""
+    mock_settings.use_dataset_airflow3_uri_standard = False
+
+    class MockOutput:
+        def __init__(self, name):
+            self.namespace = "postgres://host:5432"
+            self.name = name
+
+    class MockEvent:
+        outputs = [MockOutput("db.public.t1"), MockOutput("db.public.t2"), MockOutput("db.public.t3")]
+
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        should_store_compiled_sql=False,
+    )
+    dbt_base_operator.openlineage_events_completes = [MockEvent()]
+
+    with caplog.at_level(logging.WARNING):
+        assets = dbt_base_operator.get_datasets("outputs")
+
+    assert len(assets) == 3
+    assert caplog.text.count("Airflow 3.0.0 Asset (Dataset) URIs validation rules changed") == 1
+
+
 def _write_target_sql_fixture(tmp_path: Path) -> None:
     """Create a fake dbt ``target/`` tree with two .sql files and one non-SQL artefact."""
     compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
@@ -1428,9 +1458,9 @@ def test_operator_execute_without_flags(mock_build_and_run_cmd, operator_class):
     mock_build_and_run_cmd.assert_called_once_with(context={}, cmd_flags=[])
 
 
-@patch("cosmos.operators.local.DbtLocalArtifactProcessor")
-def test_calculate_openlineage_events_completes_openlineage_errors(mock_processor, caplog):
-    instance = mock_processor.return_value
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
+def test_calculate_openlineage_events_completes_openlineage_errors(mock_get_processor, caplog):
+    instance = mock_get_processor.return_value.return_value
     instance.parse = MagicMock(side_effect=KeyError)
     caplog.set_level(logging.DEBUG)
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
@@ -1448,10 +1478,35 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_processo
     assert "Unable to parse OpenLineage events" in caplog.text
 
 
+def test_dbt_local_artifact_processor_imported_lazily():
+    """Regression: importing ``cosmos.operators.local`` must not import the heavy openlineage
+    ``DbtLocalArtifactProcessor`` at module load (that import is what we defer to keep it off the DAG-parse path).
+
+    Runs in a subprocess with a meta-path finder that blocks ``openlineage.common.provider.dbt.local``, so importing
+    Cosmos succeeds only if that import is genuinely deferred. This holds whether or not openlineage is installed."""
+    code = "\n".join(
+        [
+            "import sys",
+            "from importlib.abc import MetaPathFinder",
+            "BLOCKED = 'openlineage.common.provider.dbt.local'",
+            "class _Blocker(MetaPathFinder):",
+            "    def find_spec(self, name, path, target=None):",
+            "        assert name != BLOCKED, BLOCKED + ' imported at module load time'",
+            "        return None",
+            "sys.meta_path.insert(0, _Blocker())",
+            "import cosmos.operators.local",
+            "print('OK')",
+        ]
+    )
+    # timeout so a stalled child fails the test deterministically instead of hanging the suite.
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    assert "OK" in result.stdout
+
+
 @patch("cosmos.operators.local.DbtLocalBaseOperator._handle_post_execution")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception")
-@patch("cosmos.operators.local.DbtLocalArtifactProcessor")
-@patch("cosmos.operators.local.is_openlineage_common_available", True)
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
 @patch("cosmos.config.ProfileConfig.ensure_profile")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.invoke_dbt")
 @patch("cosmos.operators.local.DbtLocalBaseOperator._clone_project")
@@ -1461,7 +1516,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
     mock_clone_project,
     mock_invoke_dbt,
     mock_ensure_profile,
-    mock_processor,
+    mock_get_processor,
     mock_handle_exception,
     mock_handle_post_execution,
     tmp_path,
@@ -1472,6 +1527,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
     mock_ensure_profile.return_value.__enter__.return_value = (profile_path, {})
     mock_invoke_dbt.return_value = MagicMock()
 
+    mock_processor = mock_get_processor.return_value
     mock_processor_instance = MagicMock()
     mock_processor_instance.parse.return_value = MagicMock(completes=[])
     mock_processor.return_value = mock_processor_instance

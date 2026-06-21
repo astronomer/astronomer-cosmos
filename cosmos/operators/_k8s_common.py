@@ -28,7 +28,7 @@ except ImportError:
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.config import ProfileConfig
 from cosmos.operators._watcher.xcom import (
-    _backup_xcom_to_variable,
+    _compose_backup_callback,
     _delete_xcom_backup_variable,
     _init_xcom_backup,
     _restore_xcom_from_variable,
@@ -444,6 +444,17 @@ def inject_watcher_callback(kwargs: dict[str, Any]) -> None:
     kwargs["callbacks"] = normalized_callbacks
 
 
+def compose_watcher_backup_callbacks(operator: Any) -> None:
+    """Append the XCom backup flush to the producer's retry/failure callbacks.
+
+    A graceful failure with retries left is UP_FOR_RETRY (on_retry_callback), not
+    FAILED, so register on both. Must be called after ``super().__init__`` to preserve
+    a DAG-level ``default_args`` callback (#2776).
+    """
+    operator.on_retry_callback = _compose_backup_callback(getattr(operator, "on_retry_callback", None))
+    operator.on_failure_callback = _compose_backup_callback(getattr(operator, "on_failure_callback", None))
+
+
 def build_watcher_pod_manager(operator: K8sWatcherProducerProtocol) -> CosmosKubernetesPodManager:
     """Build the producer's pod manager, threading watcher state to ``WatcherK8sCallback``.
 
@@ -470,14 +481,19 @@ def execute_watcher_producer(
     On retry, restores any XCom backup and raises ``AirflowSkipException`` (the
     producer does not support Airflow retries). On the first attempt, initialises
     an XCom backup, exposes the execution context to the log-parsing callback, runs
-    the parent execute, deletes the backup on success, and backs up XComs on
-    failure so the next try can restore them.
+    the parent execute, and deletes the backup on success. On failure the producer's
+    on-failure/on-retry callback (see ``compose_watcher_backup_callbacks``) flushes
+    the backup so the next try can restore it.
     """
     task_instance = context.get("ti")
     if task_instance is None:
         raise AirflowException(f"{type(operator).__name__} expects a task instance in the execution context")
 
     try_number = getattr(task_instance, "try_number", 1)
+
+    from cosmos import settings
+
+    reliable_retry = settings.enable_watcher_reliable_retry
 
     if try_number > 1:
         _restore_xcom_from_variable(context)
@@ -486,17 +502,15 @@ def execute_watcher_producer(
             f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
         )
 
-    _init_xcom_backup(context)
+    _init_xcom_backup(context, persist=reliable_retry)
 
     operator._upstream_failure_skipped_ids.clear()
     # The pod manager (a cached_property built while parent_execute runs) snapshots this
     # state into callback_extra_kwargs, so the context must be set before parent_execute.
     operator._context = context
 
-    try:
-        return_value = parent_execute(context, **kwargs)
+    # On failure parent_execute() raises and the on-failure callback flushes the backup.
+    return_value = parent_execute(context, **kwargs)
+    if reliable_retry:
         _delete_xcom_backup_variable(context)
-        return return_value
-    except Exception:
-        _backup_xcom_to_variable(context)
-        raise
+    return return_value

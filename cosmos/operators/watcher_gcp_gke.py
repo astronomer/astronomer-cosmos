@@ -41,6 +41,8 @@ class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
         _k8s_common.inject_watcher_callback(kwargs)
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
+        # Flush the in-memory XCom backup to a Variable on failure so the producer retry can restore it.
+        _k8s_common.compose_watcher_backup_callbacks(self)
         # Mutable set populated by the log parser when dbt emits SkippingDetails
         # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
         # for those unique_ids are rewritten to "failed" so the consumer sensor

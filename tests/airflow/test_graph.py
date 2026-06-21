@@ -2339,6 +2339,27 @@ def test_add_watcher_producer_task_sets_check_source_freshness_flag(source_rende
             assert "_check_source_freshness" not in task_metadata.arguments
 
 
+@pytest.mark.parametrize("emit_datasets", [True, False])
+def test_add_watcher_producer_task_preserves_consumer_emit_datasets_flag(emit_datasets):
+    """The producer does not emit datasets, but it needs to know whether consumers will."""
+    task_args = {"project_dir": "/tmp/sample_project", "profile_config": None, "emit_datasets": emit_datasets}
+
+    with patch("cosmos.airflow.graph.create_airflow_task") as mock_create_task:
+        mock_create_task.return_value = MagicMock()
+
+        _add_watcher_producer_task(
+            dag=MagicMock(),
+            task_group=None,
+            tasks_map={},
+            render_config=RenderConfig(),
+            task_args=task_args,
+        )
+
+    task_metadata = mock_create_task.call_args[0][0]
+    assert task_metadata.arguments["emit_datasets"] is False
+    assert task_metadata.arguments["_should_generate_model_uris"] is emit_datasets
+
+
 def test_add_watcher_producer_task_passes_freshness_callback_via_setup_operator_args():
     """freshness_callback supplied via setup_operator_args (merged into task_args before the call) is forwarded to the producer."""
     my_callback = MagicMock()

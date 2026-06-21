@@ -11,7 +11,6 @@ _STARTUP_EVENTS = [{"name": "MainReportVersion", "msg": "Running with dbt=1.0.0"
 _real_import = __import__
 
 
-@pytest.mark.asyncio
 class TestWatcherTrigger:
 
     def setup_method(self):
@@ -82,6 +81,7 @@ class TestWatcherTrigger:
                 none_result = await self.trigger.get_xcom_val_af2("test_key")
                 assert none_result is None
 
+    @pytest.mark.asyncio
     async def test_get_node_status_with_dict_xcom(self):
         """When XCom value is a dict, extract status and outlet_uris."""
         xcom_dict = {"status": "success", "outlet_uris": ["postgres://host:5432/db/schema/table"]}
@@ -90,6 +90,7 @@ class TestWatcherTrigger:
         assert status == "success"
         assert self.trigger._outlet_uris == ["postgres://host:5432/db/schema/table"]
 
+    @pytest.mark.asyncio
     async def test_get_node_status_with_none_xcom(self):
         """When XCom value is None (not yet pushed), return None."""
         with patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=None)):
@@ -104,6 +105,7 @@ class TestWatcherTrigger:
             (None, None, None),
         ],
     )
+    @pytest.mark.asyncio
     async def test_parse_dbt_node_status_and_compiled_sql(self, xcom_val, expected_status, expected_compiled_sql):
         async def mock_get_xcom_val(key):
             if key.endswith("_compiled_sql"):
@@ -117,6 +119,7 @@ class TestWatcherTrigger:
             assert status == expected_status
             assert compiled_sql == expected_compiled_sql
 
+    @pytest.mark.asyncio
     async def test_parse_dbt_node_status_for_test_sensor(self):
         """When is_test_sensor=True, _parse_dbt_node_status_and_compiled_sql reads the aggregated tests_status key."""
         self.trigger.is_test_sensor = True
@@ -137,6 +140,7 @@ class TestWatcherTrigger:
             (Version("3.0.0"), "af3"),  # Airflow >= 3 uses get_xcom_val_af3
         ],
     )
+    @pytest.mark.asyncio
     async def test_get_xcom_val_branches(self, airflow_version, expected_val):
         with patch("cosmos.operators._watcher.triggerer.AIRFLOW_VERSION", airflow_version):
             if expected_val == "af2":
@@ -164,6 +168,7 @@ class TestWatcherTrigger:
     )
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
     @patch("cosmos.operators._watcher.triggerer._log_dbt_event")
+    @pytest.mark.asyncio
     async def test_run_various_outcomes(
         self, mock_dbt_event, mock_startup_events, xcom_status_val, producer_state, expected
     ):
@@ -185,6 +190,7 @@ class TestWatcherTrigger:
 
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
     @patch("cosmos.operators._watcher.triggerer._log_dbt_event")
+    @pytest.mark.asyncio
     async def test_run_success_with_outlet_uris(self, mock_dbt_event, mock_startup_events):
         """When model succeeds and outlet URIs are present, TriggerEvent includes them."""
         outlet_uris = ["postgres://host:5432/db/schema/table"]
@@ -303,6 +309,7 @@ class TestWatcherTrigger:
 
     @patch("cosmos.operators._watcher.triggerer._log_dbt_event")
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    @pytest.mark.asyncio
     async def test_run_poke_interval_and_debug_log(self, mock_startup_events, mock_dbt_event, caplog):
         get_xcom_val_mock = AsyncMock(return_value=None)
         mock_dbt_event.return_value = None
@@ -427,7 +434,6 @@ class TestBuildSuccessEvent:
         assert event == {"status": "success", "compiled_sql": "SELECT 1", "outlet_uris": ["uri://dataset1"]}
 
 
-@pytest.mark.asyncio
 class TestWatcherTriggerProducerSkipped:
 
     def setup_method(self):
@@ -442,6 +448,7 @@ class TestWatcherTriggerProducerSkipped:
 
     @patch("cosmos.operators._watcher.triggerer._log_dbt_event")
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    @pytest.mark.asyncio
     async def test_run_producer_skipped_yields_producer_skipped_event(
         self, mock_startup_events, mock_dbt_event, caplog
     ):
@@ -466,6 +473,7 @@ class TestWatcherTriggerProducerSkipped:
         assert "was skipped" in caplog.text
 
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._get_producer_task_status", new_callable=AsyncMock)
+    @pytest.mark.asyncio
     async def test_log_startup_events_returns_on_skipped_producer(self, mock_producer_status):
         """Test that _log_startup_events returns early when producer is skipped."""
         mock_producer_status.return_value = "skipped"

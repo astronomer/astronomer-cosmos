@@ -615,6 +615,22 @@ class DbtGraph:
         logger.debug("Value of `dbt_yaml_selectors_cache_key` for <%s>: %s", self.cache_key, cache_args)
         return cache_args
 
+    def _log_concurrent_cache_write(self, cache_name: str) -> None:
+        """Log a benign duplicate-key race when concurrently writing the cache Variable.
+
+        When two schedulers or DAG processors parse the same DAG at once and neither finds an
+        existing ``cosmos_cache__*`` Variable, both attempt the INSERT. The unique constraint on
+        ``variable.key`` lets one win and makes the other raise an ``IntegrityError`` (Postgres
+        ``UniqueViolation``). The value we wanted to write is already present, so the loser treats
+        the duplicate-key error as a no-op and logs it at debug level rather than propagating it.
+        """
+        logger.debug(
+            "Cosmos %s cache for Airflow Variable '%s' was concurrently written by another "
+            "parser (duplicate key); treating as a no-op.",
+            cache_name,
+            self.cache_key,
+        )
+
     def _save_cache_to_variable(self, cache_dict: dict[str, Any], cache_name: str) -> None:
         """Write cache_dict to an Airflow Variable, warning on AirflowRuntimeError.
 
@@ -622,10 +638,15 @@ class DbtGraph:
         DAG processor does not have direct access to a usable Airflow metadata database
         (for example, when the ``variable`` table is unavailable).
         """
+        from sqlalchemy.exc import IntegrityError
+
         try:
             from airflow.sdk.exceptions import AirflowRuntimeError
         except ImportError:
-            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            try:
+                Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            except IntegrityError:
+                self._log_concurrent_cache_write(cache_name)
             return
 
         is_yaml_cache = "yaml" in cache_name.lower()
@@ -637,6 +658,8 @@ class DbtGraph:
         cache_specific_workaround = "" if is_yaml_cache else ", using LoadMode.DBT_MANIFEST"
         try:
             Variable.set(self.cache_key, cache_dict, serialize_json=True)
+        except IntegrityError:
+            self._log_concurrent_cache_write(cache_name)
         except AirflowRuntimeError as e:
             logger.warning(
                 "Failed to save Cosmos %s cache to Airflow Variable '%s': %s. "

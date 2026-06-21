@@ -20,7 +20,7 @@ from cosmos.constants import PRODUCER_WATCHER_TASK_ID
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor, store_dbt_resource_status_from_log
 from cosmos.operators._watcher.xcom import (
-    _backup_xcom_to_variable,
+    _compose_backup_callback,
     _delete_xcom_backup_variable,
     _init_xcom_backup,
     _restore_xcom_from_variable,
@@ -117,6 +117,11 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         kwargs["callbacks"] = normalized_callbacks
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]
+        # Flush the in-memory backup to a Variable so the producer retry can restore it. A graceful
+        # failure with retries left is UP_FOR_RETRY (on_retry_callback), not FAILED, so register on
+        # both; composed after super().__init__ to preserve a DAG-level default_args callback (#2776).
+        self.on_retry_callback = _compose_backup_callback(getattr(self, "on_retry_callback", None))
+        self.on_failure_callback = _compose_backup_callback(getattr(self, "on_failure_callback", None))
         # Mutable set populated by the log parser when dbt emits SkippingDetails
         # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
         # for those unique_ids are rewritten to "failed" so the consumer sensor
@@ -146,6 +151,10 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
         try_number = getattr(task_instance, "try_number", 1)
 
+        from cosmos import settings
+
+        reliable_retry = settings.enable_watcher_reliable_retry
+
         if try_number > 1:
             _restore_xcom_from_variable(context)
             raise AirflowSkipException(
@@ -153,18 +162,16 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
 
-        _init_xcom_backup(context)
+        _init_xcom_backup(context, persist=reliable_retry)
 
         self._upstream_failure_skipped_ids.clear()
         self._context_holder["context"] = context
 
-        try:
-            return_value = super().execute(context, **kwargs)
+        # On failure super().execute() raises and the on-failure callback flushes the backup.
+        return_value = super().execute(context, **kwargs)
+        if reliable_retry:
             _delete_xcom_backup_variable(context)
-            return return_value
-        except Exception:
-            _backup_xcom_to_variable(context)
-            raise
+        return return_value
 
 
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):

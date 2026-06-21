@@ -13,7 +13,8 @@ to use a profile mapping to translate that Airflow connection to a dbt profile. 
 maintain a single connection object in Airflow than it is to maintain a connection object in Airflow and a dbt profile
 in your dbt project.
 
-If you don't already have an Airflow connection, or if there's no readily-available profile mapping for your database,
+If you don't already have an Airflow connection, or if there's no readily-available profile mapping for your database
+(e.g. `dbt-glue <https://github.com/aws-samples/dbt-glue>`_ or other community adapters),
 you can use your own dbt profiles.yml file.
 
 Regardless of which method you use, you'll need to tell Cosmos which profile and target name it should use. Profile config

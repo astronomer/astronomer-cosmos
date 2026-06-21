@@ -239,14 +239,18 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
         # Build base Kubernetes pod args (incl. dbt CLI command)
         self.build_kube_args(context, cmd_flags)
 
-        # self.arguments holds the dbt CLI command as list or string
+        # build_kube_args splits the executable into self.cmds (e.g. ["dbt"]) and the
+        # remaining tokens into self.arguments; recombine both so the leading "dbt" is not
+        # dropped when the command is folded into the bash -c string below (see PR #2488).
+        cmds: Any = self.cmds  # type: ignore[has-type]
         arguments: Any = self.arguments  # type: ignore[has-type]
-        if isinstance(arguments, list):
-            dbt_cmd = [str(part) for part in arguments]
+        cmd_parts = list(cmds) if isinstance(cmds, (list, tuple)) else [cmds]
+        if isinstance(arguments, (list, tuple)):
+            cmd_parts.extend(arguments)
         else:
-            dbt_cmd = [str(arguments)]
+            cmd_parts.append(arguments)
 
-        dbt_cmd_str = " ".join(dbt_cmd)
+        dbt_cmd_str = " ".join([str(part) for part in cmd_parts])
         docs_target = f"{self.project_dir}/target"
 
         upload_cmd = self.build_upload_shell_command(docs_target)

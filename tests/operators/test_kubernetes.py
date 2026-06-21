@@ -867,3 +867,10 @@ def test_dbt_docs_s3_kubernetes_operator_uses_connection_id(mock_build_cmd, mock
     assert env_vars["AWS_SECRET_ACCESS_KEY"] == "p"
     assert env_vars["AWS_SESSION_TOKEN"] == "t"
     assert env_vars["AWS_DEFAULT_REGION"] == "us-east-1"
+
+    # Guard the bash -c path: build_kube_args splits "dbt" into self.cmds, so the shell
+    # command must still start with the full "dbt docs generate" and not drop the executable
+    # (regression in the cloud-docs build_and_run_cmd, see PR #2488).
+    assert operator.cmds == ["/bin/bash", "-c"]
+    assert operator.arguments[0].startswith("dbt docs generate")
+    assert " && aws s3 sync " in operator.arguments[0]

@@ -36,6 +36,31 @@ elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
   uv pip install -r requirements/requirements-airflow-3.1-dbt-1.11.txt
 elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
   uv pip install -r requirements/requirements-airflow-3.2-dbt-1.11.txt
+elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
+  # TEMPORARY (Airflow 3.3.0 has not GA'd yet): install the latest 3.3 beta
+  # live from the pre-release constraints instead of a pinned requirements file.
+  # Replace this whole branch with a pinned
+  # requirements/requirements-airflow-3.3-dbt-1.11.txt (copied from a CI
+  # `pip freeze`) once 3.3.0 GAs, mirroring the 3.0-3.2 branches above.
+  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-3.3.0b1/constraints-$PYTHON_VERSION.txt"
+  curl -sSL $CONSTRAINT_URL -o /tmp/constraint.txt
+  # Workaround to remove PyYAML constraint that will work on both Linux and MacOS
+  sed '/PyYAML==/d' /tmp/constraint.txt > /tmp/constraint.txt.tmp
+  mv /tmp/constraint.txt.tmp /tmp/constraint.txt
+  # Install the beta core up front (only line needing --prerelease) so the GA
+  # providers below resolve against the already-pinned 3.3.0b1.
+  uv pip install --prerelease=allow "apache-airflow==3.3.0b1" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-devel-common"
+  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
+  # DBT_VERSION isn't exported on this path; use a separate var so the dbt
+  # version assertion below (which reads $DBT_VERSION) keeps its current behaviour.
+  DBT_INSTALL_VERSION="${DBT_VERSION:-1.11}"
+  uv pip install -U "dbt-core~=$DBT_INSTALL_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
+  uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
+  rm /tmp/constraint.txt
 else
   # Download Airflow constraints according to the version being used
   if [ "$AIRFLOW_VERSION" = "3.0" ] ; then

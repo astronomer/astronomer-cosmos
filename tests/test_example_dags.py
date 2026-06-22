@@ -39,7 +39,7 @@ if importlib.util.find_spec("dbt_loom") is None:
 
 @provide_session
 def get_session(session=None):
-    create_default_connections(session)
+    create_default_connections(session=session)
     return session
 
 

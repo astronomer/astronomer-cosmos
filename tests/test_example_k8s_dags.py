@@ -17,7 +17,7 @@ KUBERNETES_DAG_FILES = ["jaffle_shop_kubernetes.py", "jaffle_shop_watcher_kubern
 
 @provide_session
 def get_session(session=None):
-    create_default_connections(session)
+    create_default_connections(session=session)
     return session
 
 

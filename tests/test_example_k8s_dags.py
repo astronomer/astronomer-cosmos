@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 
 import pytest
-from airflow.models.dagbag import DagBag
 from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
 
@@ -40,7 +39,7 @@ def get_all_dag_files():
 @pytest.mark.integration
 def test_example_dag_kubernetes(session):
     get_all_dag_files()
-    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    db = test_utils.make_dag_bag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert not db.import_errors
     dag = db.get_dag("jaffle_shop_kubernetes")
     test_utils.run_dag(dag)
@@ -57,7 +56,7 @@ from packaging.version import Version
 @pytest.mark.integration
 def test_example_dag_watcher_kubernetes(session):
     get_all_dag_files()
-    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    db = test_utils.make_dag_bag(EXAMPLE_DAGS_DIR, include_examples=False)
     dag = db.get_dag("jaffle_shop_watcher_kubernetes")
     assert not db.import_errors
     assert dag is not None

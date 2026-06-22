@@ -16,6 +16,8 @@ from airflow.models.dagbag import DagBag
 from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
 
+from . import utils as test_utils
+
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 ALL_FILES_TO_IGNORE = [
     f.name for f in EXAMPLE_DAGS_DIR.iterdir() if f.is_file() and f.suffix == ".py" and f.name != "simple_dag_async.py"
@@ -46,7 +48,7 @@ def get_dag_bag() -> DagBag:
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
-    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    db = test_utils.make_dag_bag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert db.dags
     assert not db.import_errors
     return db

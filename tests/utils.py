@@ -41,7 +41,10 @@ def make_dag_bag(*args: Any, **kwargs: Any) -> Any:
     except ImportError:
         from airflow.models.dagbag import DagBag
 
-    if AIRFLOW_VERSION >= version.Version("3.3"):
+    # Compare the release tuple, not the Version: a pre-release sorts below its
+    # final release (PEP 440), so Version("3.3.0b1") >= Version("3.3") is False and
+    # would wrongly keep the kwarg on 3.3 betas.
+    if AIRFLOW_VERSION.release[:2] >= (3, 3):
         kwargs.pop("include_examples", None)
     return DagBag(*args, **kwargs)
 

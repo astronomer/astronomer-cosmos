@@ -64,13 +64,13 @@ elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
   # TEMP curation: gcsfs 2026.x requires google-cloud-storage>=3.9 (it imports the
   # google.cloud.storage.asyncio client added in 3.9). The Airflow 3.3 constraints
   # actually install a *compatible* pair (gcsfs==2026.4.0 + google-cloud-storage==
-  # 3.12.0), but the unconstrained `pip install -e .` step below re-resolves
-  # cosmos's google-cloud-* stack and settles google-cloud-storage at 3.1.1 (the
-  # same version the curated 3.2 requirements file lands on). gcsfs 2026.x then
-  # fails against that 3.1.1 ("Please install gcsfs to access Google Storage").
-  # gcsfs 2025.x has no such floor, so hold it to the 2025 line the 3.2 env uses.
-  # Run without --constraint so it isn't pinned back to the constraints' 2026.4.0.
-  # Goes away with the pinned requirements-airflow-3.3-dbt-1.11.txt.
+  # 3.12.0), but the unconstrained `dbt-bigquery` install above caps
+  # google-cloud-storage<3.2 (dbt-bigquery requires "google-cloud-storage<3.2,>=2.4"),
+  # downgrading gcs to 3.1.1 (the same version the curated 3.2 requirements file
+  # lands on). gcsfs 2026.x then fails against that 3.1.1 ("Please install gcsfs to
+  # access Google Storage"). gcsfs 2025.x has no such floor, so hold it to the 2025
+  # line the 3.2 env uses. Run without --constraint so it isn't pinned back to the
+  # constraints' 2026.4.0. Goes away with the pinned requirements-airflow-3.3-dbt-1.11.txt.
   uv pip install "gcsfs<2026"
   rm /tmp/constraint.txt
 else

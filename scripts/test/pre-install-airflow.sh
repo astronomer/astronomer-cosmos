@@ -55,6 +55,7 @@ elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
+  uv pip install "apache-airflow-providers-docker" --constraint /tmp/constraint.txt
   # DBT_VERSION isn't exported on this path; use a separate var so the dbt
   # version assertion below (which reads $DBT_VERSION) keeps its current behaviour.
   DBT_INSTALL_VERSION="${DBT_VERSION:-1.11}"

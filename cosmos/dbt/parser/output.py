@@ -10,9 +10,6 @@ if TYPE_CHECKING:
 
 from cosmos import __version__ as cosmos_version
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-from cosmos.log import get_logger
-
-logger = get_logger(__name__)
 
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
@@ -38,6 +35,7 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
     Usage:
     -----
     full_output = ["...", "Done. PASS=15 WARN=1 ERROR=0 SKIP=0 TOTAL=16", "..."]
+    result = FullOutputSubprocessResult(exit_code=0, output=full_output[-1], full_output=full_output)
     num_warns = parse_number_of_warnings_subprocess(result)
     print(num_warns)
     # Output: 1

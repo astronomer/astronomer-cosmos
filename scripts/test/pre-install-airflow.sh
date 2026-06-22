@@ -61,6 +61,14 @@ elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
   DBT_INSTALL_VERSION="${DBT_VERSION:-1.11}"
   uv pip install -U "dbt-core~=$DBT_INSTALL_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
+  # TEMP curation: the unpinned resolve pulls gcsfs 2026.x, which needs
+  # google-cloud-storage>=3.9 and imports google.cloud.storage.asyncio — broken
+  # against the pinned google-cloud-storage 3.1.1 ("Please install gcsfs to access
+  # Google Storage"). Hold gcsfs to the 2025.x line the curated 3.2 file uses.
+  # No --constraint: gcsfs isn't in the Airflow constraints, and the beta
+  # constraints pin google-cloud-storage, so constraining here would re-conflict.
+  # Goes away with the pinned requirements-airflow-3.3-dbt-1.11.txt.
+  uv pip install "gcsfs<2026"
   rm /tmp/constraint.txt
 else
   # Download Airflow constraints according to the version being used

@@ -2,7 +2,11 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    # TEMP (revert before merge): bump-apache-airflow-3.3.0b1 is listed so a push
+    # event runs THIS branch's workflow + matrix, exercising the new "3.3" integration
+    # cells. pull_request_target reads the matrix from main (where "3.3" doesn't exist
+    # yet), so without this the 3.3 integration jobs won't run until after merge.
+    branches: [main, bump-apache-airflow-3.3.0b1]
   # Also run on pull requests originating from forks. Every test job here is secret-dependent
   # (integration tests, kubernetes, code coverage) and depends on the Authorize job, which requires
   # manually approving the workflow run for external PRs. Jobs that need no secrets (type-check,

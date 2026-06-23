@@ -2502,6 +2502,36 @@ def test_save_yaml_selectors_cache_variable_set_failure(mock_variable_set, tmp_d
     assert "AIRFLOW__COSMOS__REMOTE_CACHE_DIR" in caplog.text
 
 
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_dbt_ls_cache_concurrent_integrity_error(mock_variable_set, tmp_dbt_project_dir, caplog):
+    from sqlalchemy.exc import IntegrityError
+
+    mock_variable_set.side_effect = IntegrityError("INSERT INTO variable", {}, Exception("duplicate key"))
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    with caplog.at_level(logging.DEBUG, logger="cosmos.dbt.graph"):
+        graph.save_dbt_ls_cache("some output")
+    assert "Failed to save Cosmos" not in caplog.text
+    assert "concurrently written by another parser" in caplog.text
+    assert "cosmos_cache__something" in caplog.text
+
+
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_yaml_selectors_cache_concurrent_integrity_error(mock_variable_set, tmp_dbt_project_dir, caplog):
+    from sqlalchemy.exc import IntegrityError
+
+    mock_variable_set.side_effect = IntegrityError("INSERT INTO variable", {}, Exception("duplicate key"))
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    selectors = YamlSelectors(
+        {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+    with caplog.at_level(logging.DEBUG, logger="cosmos.dbt.graph"):
+        graph.save_yaml_selectors_cache(selectors)
+    assert "Failed to save Cosmos" not in caplog.text
+    assert "concurrently written by another parser" in caplog.text
+    assert "cosmos_cache__something" in caplog.text
+
+
 @pytest.mark.integration
 def test_get_dbt_ls_cache_returns_empty_if_non_json_var(airflow_variable):
     graph = DbtGraph(project=ProjectConfig())

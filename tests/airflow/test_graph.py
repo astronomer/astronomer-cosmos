@@ -387,6 +387,43 @@ def test_build_airflow_graph_with_after_all():
     assert dag.leaves[0].select == "tag:some"
 
 
+def test_build_airflow_graph_with_after_all_and_empty_nodes():
+    """Empty ``nodes`` + ``AFTER_ALL`` must not raise (see #2813).
+
+    When the rendered manifest yields no nodes (e.g. an empty or fully-filtered
+    manifest), the per-node loop never runs, so there is nothing to test and no
+    per-node args to build the aggregate test task from. The graph should be
+    built without an ``astro_shop_test`` task rather than crashing.
+    """
+    with DAG("test-empty-after-all", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        render_config = RenderConfig(
+            test_behavior=TestBehavior.AFTER_ALL,
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+        )
+        build_airflow_graph(
+            nodes={},
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            dbt_project_name="astro_shop",
+            render_config=render_config,
+        )
+    assert [task.task_id for task in dag.tasks] == []
+
+
 @pytest.mark.integration
 def test_build_airflow_graph_with_build():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -1908,7 +1945,6 @@ def test_build_airflow_graph_with_node_convert(test_behavior, node_converters, e
 def test_skip_test_task_when_only_detached_tests_exist():
     """Test that no empty test task is created when only detached tests exist with AFTER_EACH test behavior."""
     with DAG("test-skip-test-when-only-detached-tests-exist", start_date=datetime(2025, 1, 1)) as dag:
-
         parent_node1 = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent1",
             resource_type=DbtResourceType.MODEL,
@@ -2337,6 +2373,27 @@ def test_add_watcher_producer_task_sets_check_source_freshness_flag(source_rende
             assert task_metadata.arguments["_check_source_freshness"] is True
         else:
             assert "_check_source_freshness" not in task_metadata.arguments
+
+
+@pytest.mark.parametrize("emit_datasets", [True, False])
+def test_add_watcher_producer_task_preserves_consumer_emit_datasets_flag(emit_datasets):
+    """The producer does not emit datasets, but it needs to know whether consumers will."""
+    task_args = {"project_dir": "/tmp/sample_project", "profile_config": None, "emit_datasets": emit_datasets}
+
+    with patch("cosmos.airflow.graph.create_airflow_task") as mock_create_task:
+        mock_create_task.return_value = MagicMock()
+
+        _add_watcher_producer_task(
+            dag=MagicMock(),
+            task_group=None,
+            tasks_map={},
+            render_config=RenderConfig(),
+            task_args=task_args,
+        )
+
+    task_metadata = mock_create_task.call_args[0][0]
+    assert task_metadata.arguments["emit_datasets"] is False
+    assert task_metadata.arguments["_should_generate_model_uris"] is emit_datasets
 
 
 def test_add_watcher_producer_task_passes_freshness_callback_via_setup_operator_args():

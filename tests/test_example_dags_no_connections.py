@@ -56,6 +56,10 @@ def get_dag_bag() -> DagBag:
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.write("example_cosmos_cleanup_dag.py\n")
 
+        if AIRFLOW_VERSION < Version("2.10.0"):
+            # DatasetAlias was introduced in Airflow 2.10
+            file.write("example_outlets.py\n")
+
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
     db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)

@@ -50,8 +50,8 @@ def test_dbt_kubernetes_build_command():
 
     for command_name, command_operator in result_map.items():
         command_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
+        assert command_operator.cmds == ["dbt"]
         assert command_operator.arguments == [
-            "dbt",
             command_name,
             "--vars",
             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"

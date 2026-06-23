@@ -1,12 +1,24 @@
 Changelog
 =========
 
-1.15.0a1 (2026-06-12)
+1.15.0a2 (2026-06-23)
 ---------------------
+
+Breaking Changes
+
+* Removed the unused ``DBT_NO_TESTS_MSG`` and ``DBT_WARN_MSG`` constants and the module-level logger from ``cosmos.dbt.parser.output`` as part of a parser cleanup; if your custom code imported them, inline the literals (``"Nothing to do"`` / ``"WARN"``) instead by @tatiana in #2832
+
+Behaviour Changes
+
+These changes adjust observable behaviour. Neither breaks the documented public API, but review them before upgrading — especially if you rely on ephemeral models running dbt.
+
+* Ephemeral dbt models now render as ``EmptyOperator`` by default (``RenderConfig.ephemeral_models_as_empty_operator=True``). They no longer run dbt or emit datasets/assets, callbacks, OpenLineage events, or compiled SQL. Set ``RenderConfig(ephemeral_models_as_empty_operator=False)`` to restore the previous behaviour by @pankajkoti in #2759
+* ``on_warning_callback`` now fires for dbt test warnings in ``ExecutionMode.LOCAL`` subprocess mode (previously skipped on dbt 1.10+, where ``PASS=.. WARN=N`` is no longer the final stdout line) by @tatiana in #2832
 
 Features
 
 * Add ``ExecutionMode.WATCHER_KUBERNETES`` mode with test handling by @vricciardulli in #2529 and #2543
+* Add ``ExecutionMode.GCP_GKE`` and ``ExecutionMode.WATCHER_GCP_GKE`` execution modes by @vricciardulli in #2488
 * Support dbt docs on Kubernetes via ``DbtDocsS3KubernetesOperator`` by @jx2lee in #2058
 * Add ``use_tarball`` option to the ``upload_to_gcp_gs`` callback by @TTMichaelA in #2497
 * Add AWS and Azure tarball upload options by @TTMichaelA in #2553
@@ -23,6 +35,7 @@ Features
 * Support ``extra__google_cloud_platform__project`` in ``GoogleCloudServiceAccountDictProfileMapping`` by @jroachgolf84 in #2626
 * Enable the orjson parser for the whole project (experimental) by @corsettigyg in #2552
 * Warn when users pass output-only template fields to local operators by @goingforstudying-ctrl in #2737
+* Add an ``enable_watcher_reliable_retry`` config to harden ``ExecutionMode.WATCHER`` producer retries by @tatiana in #2816
 
 Enhancements
 
@@ -48,12 +61,21 @@ Enhancements
 * Unify operator logging on ``self.log`` by @pankajastro in #2681
 * Centralise ``resource_name`` extraction from dbt ``unique_id`` by @pankajkoti in #2687
 * Tighten ``# type: ignore`` comments to specify error codes by @pankajastro in #2711
+* Defer the OpenLineage processor import to task execution to reduce DAG-parse memory by @pankajastro in #2785
+* Use the SDK ``Variable`` in the ``ExecutionMode.WATCHER`` XCom backup to reduce log noise by @jhorlima in #2804
+* Reduce Airflow 3 Asset URI migration warning noise in ``ExecutionMode.WATCHER`` producer runs by @faridnsh in #2788
+* Log via ``self.log`` inside dbt operators for consistency by @pankajastro in #2798
+* Refactor ``build_airflow_graph`` to satisfy the C901 complexity limit by @00yhj22-debug in #2689
 
 Bug Fixes
 
+* Fix ``on_warning_callback`` skipping dbt test warnings in ``ExecutionMode.LOCAL`` subprocess mode by @tatiana in #2832
 * Fix ``example_cosmos_sources`` to use a dbt project with sources by @jroachgolf84 in #2614
 * Unify Postgres ``profiles.yml`` across dbt example projects by @yeoreums in #2501
 * Pin ``dbt-core<2.0`` in virtualenv example DAGs to avoid alpha pickup by @pankajastro in #2752
+* Cache the packages lockfile regardless of whether dependencies are reinstalled by @ms32035 in #2787
+* Maintain ``outlets`` passed to ``DbtRunLocalOperator`` when ``enable_dataset_alias=True`` by @jroachgolf84 in #2574
+* Treat concurrent ``cosmos_cache`` Variable insert ``IntegrityError`` as benign by @pankajkoti in #2800
 
 Docs
 
@@ -103,9 +125,11 @@ Others
 * Teach AI agents to use pre-commit before committing and pushing by @tatiana in #2702
 * Instruct Claude Code to read ``AGENTS.md`` for commands before running them by @pankajkoti in #2774
 * Document docs build and serve commands, and the docs style guide, in ``CLAUDE.md`` by @pankajkoti in #2637 and #2665
+* Fix the pytest-asyncio warning by marking async tests per-method instead of per-class by @pankajastro in #2795
+* Ignore Claude Code user-local files by @pankajkoti in #2830
 * Bump black from 26.3.1 to 26.5.1 by @pankajkoti in #2727
 * Bump codecov-action to v6.0.2 by @pankajkoti in #2786
-* Dependency updates by @dependabot in #2541, #2555, #2571, #2578, #2579, #2582, #2588, #2589, #2609, #2621, #2627, #2651, #2674, #2707, #2721, #2724, #2725, #2730, #2745, #2783, #2789, and #2790
+* Dependency updates by @dependabot in #2541, #2555, #2571, #2578, #2579, #2582, #2588, #2589, #2609, #2621, #2627, #2651, #2674, #2707, #2721, #2724, #2725, #2730, #2745, #2783, #2789, #2790, #2807, and #2820
 
 1.14.2 (2026-05-21)
 -------------------

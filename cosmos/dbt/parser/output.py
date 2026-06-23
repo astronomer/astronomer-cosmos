@@ -11,10 +11,12 @@ if TYPE_CHECKING:
 from cosmos import __version__ as cosmos_version
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
-DBT_NO_TESTS_MSG = "Nothing to do"
-DBT_WARN_MSG = "WARN"
 DBT_FRESHNESS_WARN_MSG = "WARN freshness of"
-DBT_SUMMARY_WARN_RE = re.compile(r"WARN=(\d+)")
+# The dbt run summary line looks like "Done. PASS=15 WARN=1 ERROR=0 SKIP=0 NO-OP=0 TOTAL=16".
+# Anchor on its shape (``Done.`` ... ``WARN=<count>`` ... ``TOTAL=<n>``) so that a later non-summary
+# line that happens to contain a "WARN=<digits>" token (e.g. a --debug resource/usage report printed
+# after the summary) is not mistaken for the warning count.
+DBT_SUMMARY_WARN_RE = re.compile(r"Done\..*\bWARN=(\d+)\b.*\bTOTAL=\d+")
 
 
 def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> int:
@@ -22,10 +24,12 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
     Parse the number of warnings from the output of a dbt command run via subprocess.
 
     Scans the full output (every stdout line) for the dbt run summary line
-    ``Done. PASS=.. WARN=N ..`` instead of only the last line. Newer dbt versions print a
+    ``Done. PASS=.. WARN=N .. TOTAL=N`` instead of only the last line. Newer dbt versions print a
     deprecation summary, a ``--debug`` resource report and a "Flushing usage events" line
     *after* the summary, so it is no longer guaranteed to be the final stdout line. Reading
-    only the last line silently misses warnings (issues #1951, #2492, #2014).
+    only the last line silently misses warnings (issues #1951, #2492, #2014). The summary is
+    matched by shape (``Done.`` ... ``TOTAL=N``) so a stray ``WARN=<digits>`` token on any other
+    line is not miscounted.
 
     :param result: The result of the dbt command run via subprocess.
     :return: The number of warnings reported by dbt, or 0 if no summary line is found.

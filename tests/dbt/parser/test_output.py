@@ -60,6 +60,27 @@ def test_parse_number_of_warnings_subprocess_without_summary_returns_zero():
     assert parse_number_of_warnings_subprocess(_subprocess_result(full_output)) == 0
 
 
+def test_parse_number_of_warnings_subprocess_only_counts_summary_line():
+    """Only the ``Done. ... WARN=N ... TOTAL=N`` summary line is counted. Because the full output is
+    scanned in reverse, a later non-summary line that happens to contain a ``WARN=<digits>`` token
+    (e.g. a ``--debug`` resource/usage report printed after the summary) must not override the real
+    summary, nor be counted when there is no summary line at all (PR #2832 review)."""
+    # A trailing WARN=<digits> emitted after the real summary is ignored; the summary's count wins.
+    after_summary = [
+        "13:52:44  Done. PASS=0 WARN=1 ERROR=0 SKIP=0 NO-OP=0 TOTAL=1",
+        "13:52:45  Resource report: emitted WARN=99 internal-metric events",
+        "13:52:45  Flushing usage events",
+    ]
+    assert parse_number_of_warnings_subprocess(_subprocess_result(after_summary)) == 1
+
+    # A stray WARN=<digits> with no Done./TOTAL= summary line counts as 0 (callback not triggered).
+    no_summary = [
+        "Running with dbt=1.11.8",
+        "13:52:45  Resource report: emitted WARN=99 internal-metric events",
+    ]
+    assert parse_number_of_warnings_subprocess(_subprocess_result(no_summary)) == 0
+
+
 def test_parse_number_of_warnings_dbt_runner_with_warnings():
     runner_result = MagicMock()
     runner_result.result.results = [

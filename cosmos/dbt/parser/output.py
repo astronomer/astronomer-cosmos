@@ -14,8 +14,6 @@ from cosmos.hooks.subprocess import FullOutputSubprocessResult
 DBT_NO_TESTS_MSG = "Nothing to do"
 DBT_WARN_MSG = "WARN"
 DBT_FRESHNESS_WARN_MSG = "WARN freshness of"
-# The dbt run summary line looks like "Done. PASS=15 WARN=1 ERROR=0 SKIP=0 NO-OP=0 TOTAL=16".
-# It is the only dbt output line that carries a "WARN=<count>" token.
 DBT_SUMMARY_WARN_RE = re.compile(r"WARN=(\d+)")
 
 

@@ -1356,33 +1356,30 @@ class DbtGraph:
             Parsed manifest dictionary
 
         Raises:
-            CosmosLoadDbtException: If orjson is enabled but not installed, or if the parsed manifest root is not a dictionary
+            CosmosLoadDbtException: If the manifest file is empty, not valid JSON, the parsed manifest root is not a dictionary, or `orjson` is enabled but not installed.
         """
 
         if settings.enable_orjson_parser and orjson:
-            try:
-                with manifest_path.open("rb") as fp:
-                    content = fp.read()
-                    if not content or content.isspace():
-                        raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
-                    manifest = orjson.loads(content)
-            except orjson.JSONDecodeError as e:
-                raise CosmosLoadDbtException(
-                    f"Failed to load dbt manifest at `{manifest_path}`: file is not valid JSON ({e})"
-                ) from e
+            open_mode = "rb"
+            parse_function = orjson.loads
+            decode_errors: tuple[type[BaseException], ...] = (orjson.JSONDecodeError,)
         elif settings.enable_orjson_parser:
             raise CosmosLoadDbtException("orjson is not installed. Install it with: pip install orjson")
         else:
-            try:
-                with manifest_path.open("r") as fp:
-                    content = fp.read()
-                    if not content or content.isspace():
-                        raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
-                    manifest = json.loads(content)
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                raise CosmosLoadDbtException(
-                    f"Failed to load dbt manifest at `{manifest_path}`: file is not valid JSON ({e})"
-                ) from e
+            open_mode = "r"
+            parse_function = json.loads
+            decode_errors = (json.JSONDecodeError, UnicodeDecodeError)
+
+        try:
+            with manifest_path.open(open_mode) as fp:
+                content = fp.read()
+                if not content or content.isspace():
+                    raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
+                manifest = parse_function(content)
+        except decode_errors as e:
+            raise CosmosLoadDbtException(
+                f"Failed to load dbt manifest at `{manifest_path}`: file is not valid JSON ({e})"
+            ) from e
 
         if manifest is None:
             return {}

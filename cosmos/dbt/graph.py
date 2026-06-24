@@ -296,12 +296,14 @@ def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dic
     )
     stdout, stderr = process.communicate()
     returncode = process.returncode
+    stdout = stdout or "<no stdout captured>"
+    stderr = stderr or "<no stderr captured>"
 
     if 'Run "dbt deps" to install package dependencies' in stdout and command[1] == "ls":
         raise CosmosLoadDbtException(
             f"Unable to run dbt ls command due to missing dbt_packages. "
             f"Set RenderConfig.dbt_deps=True.\n"
-            f"Exit code: {returncode}\nstdout: {stdout}\nstderr: {stderr}"
+            f"Exit code: {returncode}\nstderr: {stderr}\nstdout: {stdout}"
         )
 
     if returncode != 0 or "Error" in stdout.replace("WarnErrorOptions", ""):

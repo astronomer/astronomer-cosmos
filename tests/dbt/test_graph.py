@@ -1374,7 +1374,7 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen, postgres_profile_c
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nstderr: Some stderr message\nstdout: "
+    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nExit code: 1\nstderr: Some stderr message\nstdout: <no stdout captured>"
     with pytest.raises(CosmosLoadDbtException, match=expected):
         dbt_graph.load_via_dbt_ls()
 
@@ -1396,7 +1396,7 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate, po
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nstderr: \nstdout: Some Runtime Error"
+    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nExit code: .*\nstderr: <no stderr captured>\nstdout: Some Runtime Error"
     with pytest.raises(CosmosLoadDbtException, match=expected):
         dbt_graph.load_via_dbt_ls()
 
@@ -1835,7 +1835,39 @@ def test_run_command_none_argument(mock_popen, caplog):
     with pytest.raises(CosmosLoadDbtException) as exc_info:
         run_command(fake_command, fake_dir, env_vars, InvocationMode.SUBPROCESS)
 
-    expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nExit code: None\nstderr: None\nstdout: Invalid None argument"
+    expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nExit code: None\nstderr: <no stderr captured>\nstdout: Invalid None argument"
+    assert str(exc_info.value) == expected
+
+
+@patch("cosmos.dbt.graph.Popen")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
+def test_run_command_surfaces_stderr_in_exception(mock_popen):
+    fake_command = ["dbt", "ls"]
+    fake_dir = Path("fake_dir")
+    env_vars = {"fake": "env_var"}
+
+    mock_popen.return_value.communicate.return_value = ("", "Some stderr output")
+    mock_popen.return_value.returncode = 1
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        run_command(fake_command, fake_dir, env_vars, InvocationMode.SUBPROCESS)
+
+    expected = "Unable to run ['dbt', 'ls'] due to the error:\nExit code: 1\nstderr: Some stderr output\nstdout: <no stdout captured>"
+    assert str(exc_info.value) == expected
+
+
+@patch("cosmos.dbt.graph.Popen")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
+def test_run_command_surfaces_stdout_in_exception(mock_popen):
+    fake_command = ["dbt", "ls"]
+    fake_dir = Path("fake_dir")
+    env_vars = {"fake": "env_var"}
+
+    mock_popen.return_value.communicate.return_value = ("Some stdout output", "")
+    mock_popen.return_value.returncode = 1
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        run_command(fake_command, fake_dir, env_vars, InvocationMode.SUBPROCESS)
+
+    expected = "Unable to run ['dbt', 'ls'] due to the error:\nExit code: 1\nstderr: <no stderr captured>\nstdout: Some stdout output"
     assert str(exc_info.value) == expected
 
 

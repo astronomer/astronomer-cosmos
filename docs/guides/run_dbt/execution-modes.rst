@@ -180,9 +180,13 @@ If you want to use a container execution mode, use the following decision tree t
     M[ExecutionMode.AZURE_CONTAINER_INSTANCE]
 
     N[Are you a GCP user?]
-    O[ExecutionMode.GCP_CLOUD_RUN_JOB]
+    O[Use GKE Kubernetes cluster?]
+    P[Try experimental high-performance GKE mode?]
+    Q[ExecutionMode.WATCHER_GCP_GKE]
+    R[ExecutionMode.GCP_GKE]
+    S[ExecutionMode.GCP_CLOUD_RUN_JOB]
 
-    P[Review container execution options]
+    T[Review container execution options]
 
     A --> B
     B -->|Yes| C
@@ -204,15 +208,21 @@ If you want to use a container execution mode, use the following decision tree t
     L -->|No| N
 
     N -->|Yes| O
-    N -->|No| P
+    N -->|No| T
+
+    O -->|Yes| P
+    O -->|No| S
+
+    P -->|Yes| Q
+    P -->|No| R
 
     classDef decision fill:#fff3cd,stroke:#b58900,color:#333
     classDef action fill:#e8f5e9,stroke:#2e7d32,color:#333
     classDef result fill:#e3f2fd,stroke:#1565c0,color:#333
 
-    class B,D,E,H,I,L,N decision
-    class J,K,M,O action
-    class C,F,G,P result
+    class B,D,E,H,I,L,N,O,P decision
+    class J,K,M,R,S action
+    class C,F,G,Q,T result
 
 .. _execution-modes-comparison:
 

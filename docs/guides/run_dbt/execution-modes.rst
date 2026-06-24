@@ -141,12 +141,13 @@ In a container
 You can also execute dbt commands in a container. Choosing these kinds of execution modes provides a high degree of isolation. However, they come with limitations where you can only create Airflow connections with the dbt ``profiles.yml`` file and it has slower run times because of container provisioning. They all also require a pre-existing Docker image.
 
 - :ref:`docker <docker>` : Run ``dbt`` commands via Docker containers inside the Airflow worker node.
-- :ref:`kubernetes <kubernetes>`: Run ``dbt`` commands within Kubernetes Pods managed by Cosmos. Also supports GCP GKE via ``ExecutionMode.GCP_GKE``.
-- :ref:`watcher_kubernetes <watcher-kubernetes-execution-mode>`: (experimental since Cosmos 1.13.0) Combines the speed of the watcher execution mode with the isolation of Kubernetes. Also supports GCP GKE via ``ExecutionMode.WATCHER_GCP_GKE``.
+- :ref:`kubernetes <kubernetes>`: Run ``dbt`` commands within Kubernetes Pods managed by Cosmos.
+- :ref:`watcher_kubernetes <watcher-kubernetes-execution-mode>`: (experimental since Cosmos 1.13.0) Combines the speed of the watcher execution mode with the isolation of Kubernetes.
 - :ref:`aws_ecs <aws-container-run-job>`: Run ``dbt`` commands in containers via AWS ECS.
 - :ref:`aws_eks <aws-eks>`: Run ``dbt`` commands via Kubernetes Pods in AWS EKS.
 - :ref:`azure_container_instance <azure-container-instance>`: Run ``dbt`` commands in Azure Container Instances.
 - :ref:`gcp_cloud_run_job <gcp-cloud-run-job>`: Run ``dbt`` commands via a container managed by GCP Cloud Run Job.
+- :ref:`gcp_gke <gcp-gke>`: (experimental since Cosmos 1.15.0) Run ``dbt`` commands via Kubernetes Pods on GCP GKE using ``GKEStartPodOperator``. Includes a watcher variant, ``ExecutionMode.WATCHER_GCP_GKE``.
 
 Choose your container execution mode type
 +++++++++++++++++++++++++++++++++++++++++
@@ -266,14 +267,6 @@ The type of execution mode that you choose directly affects how fast your Cosmos
      - Fast
      - High
      - No
-   * - GCP GKE
-     - Slow
-     - High
-     - No
-   * - Watcher GCP GKE
-     - Fast
-     - High
-     - No
    * - AWS ECS
      - Slow
      - High
@@ -288,5 +281,13 @@ The type of execution mode that you choose directly affects how fast your Cosmos
      - No
    * - GCP Cloud Run Job Instance
      - Slow
+     - High
+     - No
+   * - GCP GKE
+     - Slow
+     - High
+     - No
+   * - Watcher GCP GKE
+     - Fast
      - High
      - No

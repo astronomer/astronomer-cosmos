@@ -42,14 +42,14 @@ elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
   # Replace this whole branch with a pinned
   # requirements/requirements-airflow-3.3-dbt-1.11.txt (copied from a CI
   # `pip freeze`) once 3.3.0 GAs, mirroring the 3.0-3.2 branches above.
-  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-3.3.0b1/constraints-$PYTHON_VERSION.txt"
+  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-3.3.0b2/constraints-$PYTHON_VERSION.txt"
   curl -sSL $CONSTRAINT_URL -o /tmp/constraint.txt
   # Workaround to remove PyYAML constraint that will work on both Linux and MacOS
   sed '/PyYAML==/d' /tmp/constraint.txt > /tmp/constraint.txt.tmp
   mv /tmp/constraint.txt.tmp /tmp/constraint.txt
   # Install the beta core up front (only line needing --prerelease) so the GA
-  # providers below resolve against the already-pinned 3.3.0b1.
-  uv pip install --prerelease=allow "apache-airflow==3.3.0b1" --constraint /tmp/constraint.txt
+  # providers below resolve against the already-pinned 3.3.0b2.
+  uv pip install --prerelease=allow "apache-airflow==3.3.0b2" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-devel-common"
   uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt

@@ -1084,8 +1084,8 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
             # though asset events and ``airflow asset list`` still work, since those read the metadata DB.
             from airflow.sdk.definitions.asset import Asset, AssetAlias
 
-            dag_id = kwargs.get("dag")
-            task_group_id = kwargs.get("task_group")
+            dag = kwargs.get("dag")
+            task_group = kwargs.get("task_group")
 
             asset_outlets: list[AssetAlias] = []
             for outlet in kwargs.get("outlets", []):
@@ -1094,10 +1094,10 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                 elif isinstance(outlet, Asset):
                     asset_outlets.append(AssetAlias(name=outlet.uri))
                 else:
-                    self.log.warning(f"Unknown outlet type {outlet}")  # Otherwise, pass
+                    self.log.warning("Unknown outlet type %s", outlet)  # Otherwise, pass
 
             operator_kwargs["outlets"] = asset_outlets + [
-                AssetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
+                AssetAlias(name=get_dataset_alias_name(dag, task_group, self.task_id))
             ]
 
         if "task_id" in operator_kwargs:

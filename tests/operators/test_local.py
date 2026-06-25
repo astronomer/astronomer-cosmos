@@ -799,6 +799,45 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
     )
 
 
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="From Airflow 3.0 onwards, outlets are declared via AssetAlias at parse time.",
+)
+def test_run_operator_declares_asset_alias_outlet_at_parse_time_airflow_3():
+    """issue-2417: on Airflow 3 the AssetAlias must be a static (parse-time) outlet, otherwise emitted assets
+    never show up in the Airflow "Assets" graph."""
+    from airflow.sdk.definitions.asset import AssetAlias
+
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            emit_datasets=False,
+            install_deps=False,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            install_deps=False,
+        )
+        seed_operator >> run_operator >> test_operator
+
+    assert seed_operator.outlets == []  # because emit_datasets=False
+    assert run_operator.outlets == [AssetAlias(name="test_id_1__run")]
+    assert test_operator.outlets == [AssetAlias(name="test_id_1__test")]
+
+
 @pytest.mark.integration
 def test_dbt_dag_with_group_nodes_by_folder():
     """

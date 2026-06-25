@@ -838,6 +838,59 @@ def test_run_operator_declares_asset_alias_outlet_at_parse_time_airflow_3():
     assert test_operator.outlets == [AssetAlias(name="test_id_1__test")]
 
 
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="From Airflow 3.0 onwards, outlets are declared via AssetAlias at parse time (issue-2417).",
+)
+def test_run_operator_manual_outlets_airflow_3(caplog):
+    """issue-2417: user-supplied outlets are normalized to AssetAlias on Airflow 3, and unknown types warn."""
+    from airflow.sdk.definitions.asset import Asset, AssetAlias
+
+    with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+            outlets=[Asset(uri="manual_asset"), AssetAlias(name="manual_alias"), "unexpected_outlet"],
+        )
+
+    assert run_operator.outlets == [
+        AssetAlias(name="manual_asset"),  # Asset -> AssetAlias(name=uri)
+        AssetAlias(name="manual_alias"),  # AssetAlias kept as-is
+        AssetAlias(name="test_id_2__run"),  # auto outlet appended by Cosmos
+    ]
+    assert "Unknown outlet type unexpected_outlet" in caplog.text
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="_ensure_asset_alias_outlet only applies on Airflow 3 (issue-2417).",
+)
+def test_ensure_asset_alias_outlet_airflow_3():
+    """The runtime helper appends the alias only when it is missing, avoiding a duplicate of the parse-time outlet."""
+    from airflow.sdk.definitions.asset import AssetAlias
+
+    with DAG("test_id_3", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+        )
+
+    # The alias is already declared at parse time, so re-ensuring it is a no-op (dedup branch).
+    assert run_operator.outlets == [AssetAlias(name="test_id_3__run")]
+    run_operator._ensure_asset_alias_outlet("test_id_3__run")
+    assert run_operator.outlets == [AssetAlias(name="test_id_3__run")]
+
+    # A new alias name is appended (append branch).
+    run_operator._ensure_asset_alias_outlet("another_alias")
+    assert run_operator.outlets == [AssetAlias(name="test_id_3__run"), AssetAlias(name="another_alias")]
+
+
 @pytest.mark.integration
 def test_dbt_dag_with_group_nodes_by_folder():
     """

@@ -20,17 +20,17 @@ from cosmos.operators.base import (
     DbtSeedMixin,
     DbtSnapshotMixin,
 )
-from cosmos.operators.kubernetes import (
-    DbtBuildKubernetesOperator,
-    DbtRunKubernetesOperator,
-    DbtSourceKubernetesOperator,
+from cosmos.operators.gcp_gke import (
+    DbtBuildGcpGkeOperator,
+    DbtRunGcpGkeOperator,
+    DbtSourceGcpGkeOperator,
 )
 
 logger = get_logger(__name__)
 
 
-class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
-    template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
+class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
+    template_fields: tuple[str, ...] = tuple(DbtBuildGcpGkeOperator.template_fields) + ("deferrable",)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
@@ -62,59 +62,70 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         return _k8s_common.execute_watcher_producer(self, context, parent_execute, **kwargs)
 
 
-class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):
-    template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
+class DbtConsumerWatcherGcpGkeSensor(BaseConsumerSensor, DbtRunGcpGkeOperator):
+    template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunGcpGkeOperator.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
-# This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.
-# That said, it is important to raise an exception if users attempt to use TestBehavior.BUILD, until we have a better experience.
-class DbtBuildWatcherKubernetesOperator:
+# This Operator does not seem to make sense for this particular execution mode, since build is executed by the
+# producer task. That said, it is important to raise an exception if users attempt to use TestBehavior.BUILD,
+# until we have a better experience.
+class DbtBuildWatcherGcpGkeOperator:
     def __init__(self, *args: Any, **kwargs: Any):
         raise NotImplementedError(
-            "`ExecutionMode.WATCHER_KUBERNETES` does not expose a DbtBuild operator, since the build command is executed by the producer task."
+            "`ExecutionMode.WATCHER_GCP_GKE` does not expose a DbtBuild operator, "
+            "since the build command is executed by the producer task."
         )
 
 
-class DbtSeedWatcherKubernetesOperator(DbtSeedMixin, DbtConsumerWatcherKubernetesSensor):
+class DbtSeedWatcherGcpGkeOperator(DbtSeedMixin, DbtConsumerWatcherGcpGkeSensor):
     """
     Watches for the progress of dbt seed execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotWatcherKubernetesOperator(DbtSnapshotMixin, DbtConsumerWatcherKubernetesSensor):
+class DbtSnapshotWatcherGcpGkeOperator(DbtSnapshotMixin, DbtConsumerWatcherGcpGkeSensor):
     """
     Watches for the progress of dbt snapshot execution, run by the producer task (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields
-
-
-class DbtSourceWatcherKubernetesOperator(DbtSourceKubernetesOperator):
-    """
-    Executes a dbt source freshness command, synchronously, as ExecutionMode.KUBERNETES.
-    """
-
-    template_fields: tuple[str, ...] = tuple(DbtSourceKubernetesOperator.template_fields)
-
-
-class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
-    """
-    Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
-    """
-
-    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
 
-class DbtTestWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
-    """Sensor that watches the aggregated test status for a dbt model in WATCHER_KUBERNETES execution mode.
+class DbtSourceWatcherGcpGkeOperator(DbtSourceGcpGkeOperator):
+    """
+    Executes a dbt source freshness command, synchronously, as ExecutionMode.GCP_GKE.
+    """
+
+    template_fields: tuple[str, ...] = tuple(DbtSourceGcpGkeOperator.template_fields)
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtRunWatcherGcpGkeOperator(DbtConsumerWatcherGcpGkeSensor):
+    """
+    Watches for the progress of dbt model execution, run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtTestWatcherGcpGkeOperator(DbtConsumerWatcherGcpGkeSensor):
+    """Sensor that watches the aggregated test status for a dbt model in WATCHER_GCP_GKE execution mode.
 
     The producer task collects individual test results as they finish and,
     once every test for a given model has reported, pushes a single
@@ -129,11 +140,11 @@ class DbtTestWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
     ``AirflowException`` when ``"fail"``.
 
     On manual clear from the Airflow UI or Airflow-level retry, the sensor falls
-    back to launching a pod that runs ``dbt test --select <model>`` for this
+    back to launching a GKE pod that runs ``dbt test --select <model>`` for this
     specific model.
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields
+    template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields
 
     # See DbtTestWatcherOperator for the reasoning behind hardcoding base_cmd
     # rather than inheriting from DbtTestMixin.
@@ -144,7 +155,7 @@ class DbtTestWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
         return True
 
     def _fallback_to_non_watcher_run(self, try_number: int, context: Context) -> bool:
-        """Launch a pod running ``dbt test --select <model>`` to retry tests for this model.
+        """Launch a GKE pod running ``dbt test --select <model>`` to retry tests for this model.
 
         Used when the test sensor is manually cleared from the Airflow UI or when
         Airflow-level retries fire. Producer flags are intentionally not forwarded

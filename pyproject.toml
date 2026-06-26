@@ -310,6 +310,7 @@ banned-module-level-imports = [
 # when the user explicitly imports the matching operator class. Eager
 # provider imports here are appropriate.
 "cosmos/operators/kubernetes.py" = ["TID253"]
+"cosmos/operators/_k8s_common.py" = ["TID253"]
 "cosmos/operators/aws_eks.py" = ["TID253"]
 "cosmos/operators/aws_ecs.py" = ["TID253"]
 "cosmos/operators/azure_container_instance.py" = ["TID253"]

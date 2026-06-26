@@ -48,7 +48,7 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
-from cosmos.settings import watcher_dbt_execution_queue
+from cosmos.settings import watcher_dbt_producer_queue, watcher_dbt_watcher_queue
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -227,7 +227,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
-        kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
+        kwargs["queue"] = watcher_dbt_producer_queue or kwargs.get("queue") or DEFAULT_QUEUE
         # invocation_mode is intentionally NOT forced here; the parent's _discover_invocation_mode()
         # picks DBT_RUNNER when available and falls back to SUBPROCESS otherwise.
         # An explicit invocation_mode passed by the caller is preserved as-is.
@@ -519,6 +519,9 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):
         deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
+        # Set the Worker queue for lightweight "watcher" tasks to run on (similar to config for producer tasks)
+        kwargs["queue"] = watcher_dbt_watcher_queue or kwargs.get("queue") or DEFAULT_QUEUE
+
         super().__init__(
             poke_interval=poke_interval,
             profile_config=profile_config,

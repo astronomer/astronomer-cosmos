@@ -62,12 +62,13 @@ enable_memory_optimised_imports = conf.getboolean("cosmos", "enable_memory_optim
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
 enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)
 
-# DBT Watcher Execution Mode Watcher Task Retry Queue
-# in watcher mode, if the producer watcher fails, the consumer tasks run the individual models on retry.
-# since these tasks are sensors that require low memory/cpu on their first try,
-# this setting allows retries to run on a queue with larger resources, which is often necessary for larger dbt projects
-# this would also be used to run the producer task
-watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
+# Separate queue configuration for each watcher task type:
+# - watcher_dbt_producer_queue: queue for the DbtProducerWatcherOperator task
+# - watcher_dbt_watcher_queue: queue for DbtConsumerWatcherSensor tasks on their initial run
+# - watcher_dbt_retry_queue: queue for DbtConsumerWatcherSensor tasks on retries (typically needs more resources)
+watcher_dbt_producer_queue: str | None = conf.get("cosmos", "watcher_dbt_producer_queue", fallback=None)
+watcher_dbt_watcher_queue: str | None = conf.get("cosmos", "watcher_dbt_watcher_queue", fallback=None)
+watcher_dbt_retry_queue: str | None = conf.get("cosmos", "watcher_dbt_retry_queue", fallback=None)
 
 enable_watcher_reliable_retry = conf.getboolean("cosmos", "enable_watcher_reliable_retry", fallback=True)
 

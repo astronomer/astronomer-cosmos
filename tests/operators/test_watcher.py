@@ -128,26 +128,53 @@ def test_dbt_producer_watcher_operator_priority_weight_default():
 
 
 @pytest.mark.parametrize(
-    "queue_override, expected_queue",
+    "queue_override, kwarg_queue, expected_queue",
     [
-        ("custom_retry_queue", "custom_retry_queue"),
-        (None, DEFAULT_QUEUE),
+        ("custom_watcher_queue", None, "custom_watcher_queue"),
+        (None, None, DEFAULT_QUEUE),
+        ("custom_watcher_queue", "explicit_kwarg_queue", "custom_watcher_queue"),
+        (None, "explicit_kwarg_queue", "explicit_kwarg_queue"),
     ],
 )
-def test_dbt_producer_watcher_operator_queue(queue_override, expected_queue):
-    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", queue_override):
-        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+def test_dbt_producer_watcher_operator_queue(queue_override, kwarg_queue, expected_queue):
+    with patch("cosmos.operators.watcher.watcher_dbt_producer_queue", queue_override):
+        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, queue=kwarg_queue)
 
         assert op.queue == expected_queue
+
+
+@pytest.mark.parametrize(
+    "queue_override, kwarg_queue, expected_queue",
+    [
+        ("custom_watcher_queue", None, "custom_watcher_queue"),
+        (None, None, DEFAULT_QUEUE),
+        ("custom_watcher_queue", "explicit_kwarg_queue", "custom_watcher_queue"),
+        (None, "explicit_kwarg_queue", "explicit_kwarg_queue"),
+    ],
+)
+def test_dbt_consumer_watcher_sensor_queue(queue_override, kwarg_queue, expected_queue):
+    with patch("cosmos.operators.watcher.watcher_dbt_watcher_queue", queue_override):
+        sensor = DbtConsumerWatcherSensor(
+            project_dir=".",
+            profiles_dir=".",
+            profile_config=profile_config,
+            model_unique_id="model.pkg.my_model",
+            poke_interval=1,
+            producer_task_id="dbt_producer_watcher_operator",
+            task_id="consumer_sensor",
+            queue=kwarg_queue,
+        )
+
+        assert sensor.queue == expected_queue
 
 
 @pytest.mark.integration
 def test_producer_queue_from_setup_operator_args_when_both_set():
     """
-    When both setup_operator_args queue and watcher_dbt_execution_queue are set,
-    producer should use queue from watcher_dbt_execution_queue.
+    When both setup_operator_args queue and watcher_dbt_producer_queue are set,
+    producer should use queue from watcher_dbt_producer_queue.
     """
-    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", "watcher_queue"):
+    with patch("cosmos.operators.watcher.watcher_dbt_producer_queue", "watcher_queue"):
         watcher_dag = DbtDag(
             project_config=project_config,
             profile_config=profile_config,
@@ -166,10 +193,10 @@ def test_producer_queue_from_setup_operator_args_when_both_set():
 @pytest.mark.integration
 def test_producer_queue_from_setup_operator_args():
     """
-    When only setup_operator_args is set (no queue in watcher_dbt_execution_queue),
+    When only setup_operator_args is set (no queue in watcher_dbt_producer_queue),
     producer should use queue from setup_operator_args.
     """
-    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", None):
+    with patch("cosmos.operators.watcher.watcher_dbt_producer_queue", None):
         watcher_dag = DbtDag(
             project_config=project_config,
             profile_config=profile_config,

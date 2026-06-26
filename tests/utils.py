@@ -26,6 +26,29 @@ from cosmos.constants import AIRFLOW_VERSION
 log = logging.getLogger(__name__)
 
 
+def make_dag_bag(*args: Any, **kwargs: Any) -> Any:
+    """Construct a ``DagBag``, dropping ``include_examples`` on Airflow >= 3.3.
+
+    Airflow 3.3 removed the ``include_examples`` kwarg from ``DagBag`` as part of
+    AIP-66 ("provider example DAGs as dedicated bundles", apache/airflow#66161);
+    example loading is now gated by ``[core] load_examples``. Pointing
+    ``dag_folder`` at a directory still loads only that directory, so dropping the
+    kwarg preserves the test's intent. Also tracks the import-location move to
+    ``airflow.dag_processing.dagbag`` in Airflow 3.1+.
+    """
+    try:
+        from airflow.dag_processing.dagbag import DagBag
+    except ImportError:
+        from airflow.models.dagbag import DagBag
+
+    # Compare the release tuple, not the Version: a pre-release sorts below its
+    # final release (PEP 440), so Version("3.3.0b2") >= Version("3.3") is False and
+    # would wrongly keep the kwarg on 3.3 betas.
+    if AIRFLOW_VERSION.release[:2] >= (3, 3):
+        kwargs.pop("include_examples", None)
+    return DagBag(*args, **kwargs)
+
+
 def run_dag(
     dag: DAG,
     conn_file_path: str | None = None,
@@ -47,9 +70,9 @@ def new_test_dag(dag: DAG, expected_dag_state: DagRunState = DagRunState.SUCCESS
         # because create_dagrun() checks for DagVersion and DagModel records
 
         try:
-            from airflow.dag_processing.dagbag import DagBag, sync_bag_to_db
+            from airflow.dag_processing.dagbag import sync_bag_to_db
         except ImportError:
-            from airflow.models.dagbag import DagBag, sync_bag_to_db
+            from airflow.models.dagbag import sync_bag_to_db
 
         from airflow.models.dagbundle import DagBundleModel
         from airflow.utils.session import create_session
@@ -62,7 +85,7 @@ def new_test_dag(dag: DAG, expected_dag_state: DagRunState = DagRunState.SUCCESS
             session.commit()
 
         # This creates both DagModel and DagVersion records
-        dagbag = DagBag(include_examples=False)
+        dagbag = make_dag_bag(include_examples=False)
         dagbag.bag_dag(dag)
         sync_bag_to_db(dagbag, bundle_name="test_bundle", bundle_version="1")
         dr = dag.test(logical_date=timezone.utcnow())

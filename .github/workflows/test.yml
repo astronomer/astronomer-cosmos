@@ -628,6 +628,8 @@ jobs:
       - Authorize
       - Run-Integration-Tests
       - Run-Integration-Tests-Expensive
+      - Run-Integration-Tests-DBT-Async
+      - Run-Integration-dbt-fusion-Tests
       - Run-Kubernetes-Tests
     runs-on: ubuntu-latest
     permissions:

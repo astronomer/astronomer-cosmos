@@ -10,40 +10,43 @@ if TYPE_CHECKING:
 
 from cosmos import __version__ as cosmos_version
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
-from cosmos.log import get_logger
 
-logger = get_logger(__name__)
-
-DBT_NO_TESTS_MSG = "Nothing to do"
-DBT_WARN_MSG = "WARN"
 DBT_FRESHNESS_WARN_MSG = "WARN freshness of"
+# The dbt run summary line looks like "Done. PASS=15 WARN=1 ERROR=0 SKIP=0 NO-OP=0 TOTAL=16".
+# Anchor on its shape (``Done.`` ... ``WARN=<count>`` ... ``TOTAL=<n>``) so that a later non-summary
+# line that happens to contain a "WARN=<digits>" token (e.g. a --debug resource/usage report printed
+# after the summary) is not mistaken for the warning count.
+DBT_SUMMARY_WARN_RE = re.compile(r"Done\..*\bWARN=(\d+)\b.*\bTOTAL=\d+")
 
 
 def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> int:
     """
-    Parses the dbt test output message and returns the number of warnings.
+    Parse the number of warnings from the output of a dbt command run via subprocess.
 
-    :param result: String containing the output to be parsed.
-    :return: An integer value associated with the keyword, or 0 if parsing fails.
+    Scans the full output (every stdout line) for the dbt run summary line
+    ``Done. PASS=.. WARN=N .. TOTAL=N`` instead of only the last line. Newer dbt versions print a
+    deprecation summary, a ``--debug`` resource report and a "Flushing usage events" line
+    *after* the summary, so it is no longer guaranteed to be the final stdout line. Reading
+    only the last line silently misses warnings (issues #1951, #2492, #2014). The summary is
+    matched by shape (``Done.`` ... ``TOTAL=N``) so a stray ``WARN=<digits>`` token on any other
+    line is not miscounted.
+
+    :param result: The result of the dbt command run via subprocess.
+    :return: The number of warnings reported by dbt, or 0 if no summary line is found.
 
     Usage:
     -----
-    output_str = "Done. PASS=15 WARN=1 ERROR=0 SKIP=0 TOTAL=16"
-    num_warns = parse_output(output_str)
+    full_output = ["...", "Done. PASS=15 WARN=1 ERROR=0 SKIP=0 TOTAL=16", "..."]
+    result = FullOutputSubprocessResult(exit_code=0, output=full_output[-1], full_output=full_output)
+    num_warns = parse_number_of_warnings_subprocess(result)
     print(num_warns)
     # Output: 1
     """
-    output = result.output
-    num = 0
-    if DBT_NO_TESTS_MSG not in result.output and DBT_WARN_MSG in result.output:
-        try:
-            num = int(output.split(f"{DBT_WARN_MSG}=")[1].split()[0])
-        except ValueError:
-            logger.error(
-                "Could not parse number of %ss. Check your dbt/airflow version or if --quiet is not being used",
-                DBT_WARN_MSG,
-            )
-    return num
+    for line in reversed(result.full_output):
+        match = DBT_SUMMARY_WARN_RE.search(line)
+        if match:
+            return int(match.group(1))
+    return 0
 
 
 # Python 3.13 exposes a deprecated operator, we can replace it in the future

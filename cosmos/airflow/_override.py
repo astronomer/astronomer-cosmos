@@ -37,11 +37,11 @@ class CosmosKubernetesPodManager(PodManager):  # type: ignore[misc]
         """Return ``callback_extra_kwargs`` only for callbacks that opt in via the marker.
 
         Cosmos threads its internal state (``tests_per_model``, ``test_results_per_model``,
-        ``context``, ``upstream_failure_skipped_ids``) to ``WatcherKubernetesCallback``
-        through ``callback_extra_kwargs``. ``DbtProducerWatcherKubernetesOperator`` preserves
+        ``context``, ``upstream_failure_skipped_ids``) to ``WatcherK8sCallback`` through
+        ``callback_extra_kwargs``. The K8s-based watcher producer operators preserve
         user-supplied callbacks, which must not receive these Cosmos-only kwargs, or their
         ``progress_callback`` could raise ``TypeError`` while reading pod logs. Only callbacks
-        marked with ``receives_cosmos_callback_kwargs = True`` (i.e. ``WatcherKubernetesCallback``)
+        marked with ``receives_cosmos_callback_kwargs = True`` (i.e. ``WatcherK8sCallback``)
         are given them.
         """
         if getattr(callback, "receives_cosmos_callback_kwargs", False):

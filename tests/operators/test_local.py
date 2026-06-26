@@ -1127,6 +1127,44 @@ def test_run_test_operator_without_callback(invocation_mode):
 
 
 @pytest.mark.integration
+def test_run_test_operator_with_callback_and_trailing_dbt_output(failing_test_dbt_project):
+    """Regression for issues #1951, #2492 and #2014.
+
+    In SUBPROCESS invocation mode the dbt warning count used to be parsed from only the last
+    stdout line. Running dbt with ``--debug`` makes it print a resource report and a
+    "Command ... succeeded" line *after* the ``Done. ... WARN=N ...`` summary, so the summary is
+    no longer the last line. Before the fix on_warning_callback was silently skipped; now it must
+    fire with the warning details in the context.
+    """
+    on_warning_callback = MagicMock()
+
+    with DAG("test-warning-trailing-output", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_test_dbt_project,
+            task_id="seed",
+            append_env=True,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_test_dbt_project,
+            task_id="test",
+            append_env=True,
+            on_warning_callback=on_warning_callback,
+            invocation_mode=InvocationMode.SUBPROCESS,
+            dbt_cmd_global_flags=["--debug"],
+        )
+        seed_operator >> test_operator
+    run_test_dag(dag)
+
+    assert on_warning_callback.called
+    context = on_warning_callback.call_args.args[0]
+    assert context.get("test_names")
+    assert context.get("test_results")
+
+
+@pytest.mark.integration
 def test_run_operator_emits_events():
     class MockRun:
         facets = {"c": 3}

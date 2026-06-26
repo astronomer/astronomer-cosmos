@@ -138,3 +138,64 @@ class TestOrjsonParserEquivalence:
         with patch.object(settings, "enable_orjson_parser", False):
             with pytest.raises(CosmosLoadDbtException, match="expected top-level JSON object"):
                 dbt_graph._load_manifest_from_file(manifest_file)
+
+    def test_load_manifest_from_file_raises_on_empty_file(self, tmp_path):
+        manifest_file = tmp_path / "manifest.json"
+        manifest_file.write_text("")
+        dbt_graph = _make_dbt_graph(manifest_file)
+
+        with patch.object(settings, "enable_orjson_parser", False):
+            with pytest.raises(CosmosLoadDbtException, match="file is empty"):
+                dbt_graph._load_manifest_from_file(manifest_file)
+
+    @pytest.mark.skipif(
+        not __import__("importlib").util.find_spec("orjson"),
+        reason="orjson not installed",
+    )
+    def test_load_manifest_from_file_raises_on_empty_file_orjson(self, tmp_path):
+        manifest_file = tmp_path / "manifest.json"
+        manifest_file.write_text("")
+        dbt_graph = _make_dbt_graph(manifest_file)
+
+        with patch.object(settings, "enable_orjson_parser", True):
+            with pytest.raises(CosmosLoadDbtException, match="file is empty"):
+                dbt_graph._load_manifest_from_file(manifest_file)
+
+    def test_load_manifest_from_file_raises_on_truncated_json(self, tmp_path):
+        """Standard json path: raises CosmosLoadDbtException on malformed JSON."""
+        manifest_file = tmp_path / "manifest.json"
+        manifest_file.write_text("{invalid")
+        dbt_graph = _make_dbt_graph(manifest_file)
+
+        with patch.object(settings, "enable_orjson_parser", False):
+            with pytest.raises(CosmosLoadDbtException, match="file is not valid JSON"):
+                dbt_graph._load_manifest_from_file(manifest_file)
+
+    @pytest.mark.skipif(
+        not __import__("importlib").util.find_spec("orjson"),
+        reason="orjson not installed",
+    )
+    def test_load_manifest_from_file_raises_on_invalid_root_type_orjson(self, tmp_path):
+        """Non-dict, non-null roots (e.g. JSON arrays) raise CosmosLoadDbtException."""
+        manifest_file = tmp_path / "manifest.json"
+        manifest_file.write_text("[1, 2, 3]")
+
+        dbt_graph = _make_dbt_graph(manifest_file)
+
+        with patch.object(settings, "enable_orjson_parser", True):
+            with pytest.raises(CosmosLoadDbtException, match="expected top-level JSON object"):
+                dbt_graph._load_manifest_from_file(manifest_file)
+
+    @pytest.mark.skipif(
+        not __import__("importlib").util.find_spec("orjson"),
+        reason="orjson not installed",
+    )
+    def test_load_manifest_from_file_raises_on_truncated_json_orjson(self, tmp_path):
+        """orjson path: raises CosmosLoadDbtException on malformed JSON."""
+        manifest_file = tmp_path / "manifest.json"
+        manifest_file.write_text("{invalid")
+        dbt_graph = _make_dbt_graph(manifest_file)
+
+        with patch.object(settings, "enable_orjson_parser", True):
+            with pytest.raises(CosmosLoadDbtException, match="file is not valid JSON"):
+                dbt_graph._load_manifest_from_file(manifest_file)

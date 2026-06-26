@@ -54,8 +54,7 @@ elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
   # branches above, so 3.3 is handled consistently with the other versions.
   # https://linear.app/astronomer/issue/BOSS-524
   CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-3-3/constraints-$PYTHON_VERSION.txt"
-  curl -sSL $CONSTRAINT_URL -o /tmp/constraint.txt
-  # Workaround to remove PyYAML constraint that will work on both Linux and MacOS
+  curl -sSL "$CONSTRAINT_URL" -o /tmp/constraint.txt
   sed '/PyYAML==/d' /tmp/constraint.txt > /tmp/constraint.txt.tmp
   mv /tmp/constraint.txt.tmp /tmp/constraint.txt
   # Install the core up front (only line needing --prerelease) so the GA

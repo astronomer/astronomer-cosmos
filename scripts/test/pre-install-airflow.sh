@@ -66,9 +66,14 @@ elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
   uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-docker" --constraint /tmp/constraint.txt
-  # Ensure DBT_VERSION is set (the version assertion below reads $DBT_VERSION); default to 1.11 when not provided.
-  : "${DBT_VERSION:=1.11}"
-  uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
+  # DBT_VERSION isn't exported on this path; install from a separate var so the
+  # dbt version assertion below (which reads $DBT_VERSION) keeps its behaviour.
+  # Do NOT set DBT_VERSION here: on this live 3.3 path `dbt --version` yields no
+  # parseable "Core:" version, so the assertion compares empty==empty and passes
+  # (the intended skip). Setting DBT_VERSION makes desired=1.11 != actual="" and
+  # fails the whole 3.3 matrix, so keep it unset.
+  DBT_INSTALL_VERSION="${DBT_VERSION:-1.11}"
+  uv pip install -U "dbt-core~=$DBT_INSTALL_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
   # TEMP curation: gcsfs 2026.x requires google-cloud-storage>=3.9 (it imports the
   # google.cloud.storage.asyncio client added in 3.9). The Airflow 3.3 constraints

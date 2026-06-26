@@ -30,7 +30,11 @@ from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
     store_dbt_resource_status_from_log,
 )
-from cosmos.operators._watcher.state import DBT_SOURCE_FRESHNESS_STALE_STATUSES, DBT_SUCCESS_STATUSES
+from cosmos.operators._watcher.state import (
+    DBT_NODE_STATUS_SKIPPED,
+    DBT_SOURCE_FRESHNESS_STALE_STATUSES,
+    DBT_SUCCESS_STATUSES,
+)
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
     _delete_xcom_backup_variable,
@@ -123,7 +127,7 @@ def _default_freshness_callback(
     # and test hash-suffixed unique_ids are not valid dbt --exclude selectors.
     excludable = [uid for uid in visited if nodes.get(uid) and nodes[uid].resource_type in _excludable_resource_types]
     logger.info("Nodes to skip due to stale sources: %s", excludable)
-    return [(uid, "skipped") for uid in excludable]
+    return [(uid, DBT_NODE_STATUS_SKIPPED) for uid in excludable]
 
 
 class _StdoutFilter:

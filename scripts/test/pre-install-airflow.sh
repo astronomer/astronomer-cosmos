@@ -54,7 +54,7 @@ elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
   # branches above, so 3.3 is handled consistently with the other versions.
   # https://linear.app/astronomer/issue/BOSS-524
   CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-3-3/constraints-$PYTHON_VERSION.txt"
-  curl -sSL "$CONSTRAINT_URL" -o /tmp/constraint.txt
+  curl -fsSL "$CONSTRAINT_URL" -o /tmp/constraint.txt
   sed '/PyYAML==/d' /tmp/constraint.txt > /tmp/constraint.txt.tmp
   mv /tmp/constraint.txt.tmp /tmp/constraint.txt
   # Install the core up front (only line needing --prerelease) so the GA
@@ -66,10 +66,9 @@ elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
   uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
   uv pip install "apache-airflow-providers-docker" --constraint /tmp/constraint.txt
-  # DBT_VERSION isn't exported on this path; use a separate var so the dbt
-  # version assertion below (which reads $DBT_VERSION) keeps its current behaviour.
-  DBT_INSTALL_VERSION="${DBT_VERSION:-1.11}"
-  uv pip install -U "dbt-core~=$DBT_INSTALL_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
+  # Ensure DBT_VERSION is set (the version assertion below reads $DBT_VERSION); default to 1.11 when not provided.
+  : "${DBT_VERSION:=1.11}"
+  uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
   # TEMP curation: gcsfs 2026.x requires google-cloud-storage>=3.9 (it imports the
   # google.cloud.storage.asyncio client added in 3.9). The Airflow 3.3 constraints

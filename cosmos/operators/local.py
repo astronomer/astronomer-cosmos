@@ -304,7 +304,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             # Surface failing nodes via context["exception"] for on_failure_callback (issue-1806)
             failure_details = extract_dbt_failure_details(result.full_output)
             if failure_details:
-                message += " Errors:\n" + "\n".join(failure_details)
+                message += " Details:\n" + "\n".join(failure_details)
             raise AirflowException(message)
 
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:

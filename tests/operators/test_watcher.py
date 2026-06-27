@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import ANY, MagicMock, Mock, patch
@@ -2433,6 +2434,62 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
 
     dbt_error_message = """Database Error in model model_f (models/model_f.sql)\n  column "this_column_does_not_exist_at_all" does not exist\n  LINE 1"""
     assert dbt_error_message in caplog.text
+
+
+@pytest.mark.integration
+def test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event(tmp_path, monkeypatch):
+    """Functional check against the real dbt interface: a failed dbt-runner node carries its error only in
+    ``NodeFinished.run_result.message`` (``data.msg``/``info.msg`` do not), so ``_process_dbt_log_event`` must
+    read it for the WATCHER consumer to log the failure. Runs real dbt-runner against Postgres so the assertion
+    cannot drift from dbt's event shape the way a hand-built mock can. Regression for #2456."""
+    from dbt.cli.main import dbtRunner
+    from google.protobuf.json_format import MessageToJson
+
+    from cosmos.operators._watcher.base import _process_dbt_log_event
+
+    project_dir = tmp_path / "watcher_failing_tests"
+    shutil.copytree(DBT_WATCHER_FAILING_TESTS_PATH, project_dir)
+
+    events: list[str] = []
+    runner = dbtRunner(callbacks=[lambda event: events.append(MessageToJson(event, preserving_proto_field_name=True))])
+    # Generate profiles.yml from the same example_conn-based ProfileConfig the other watcher integration tests use,
+    # so connection details are not duplicated/hardcoded in the test.
+    with profile_config.ensure_profile() as (profiles_yml_path, env_vars):
+        for key, value in env_vars.items():
+            monkeypatch.setenv(key, value)
+        runner.invoke(
+            [
+                "run",
+                "--project-dir",
+                str(project_dir),
+                "--profiles-dir",
+                str(profiles_yml_path.parent),
+                "--profile",
+                profile_config.profile_name,
+                "--target",
+                profile_config.target_name,
+            ]
+        )
+
+    node_finished = next(
+        (
+            log
+            for event in events
+            if (log := json.loads(event)).get("info", {}).get("name") == "NodeFinished"
+            and "model_f" in (log.get("data", {}).get("node_info", {}).get("unique_id") or "")
+        ),
+        None,
+    )
+    assert node_finished is not None, "did not capture a NodeFinished event for the failing model"
+    # Premise of the fix: the error is absent from data.msg/info.msg and present only in run_result.message.
+    assert not node_finished["data"].get("msg")
+
+    with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+        _process_dbt_log_event(Mock(), node_finished)
+
+    pushed = mock_push.call_args.kwargs["value"]
+    assert pushed["status"] == "error"
+    assert "this_column_does_not_exist_at_all" in pushed["msg"]
 
 
 @pytest.mark.skipif(

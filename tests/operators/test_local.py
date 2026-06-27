@@ -1831,6 +1831,28 @@ def test_handle_exception_subprocess(caplog):
     assert "\n".join(full_output) in caplog.text
 
 
+def test_handle_exception_subprocess_surfaces_failing_tests():
+    """Failing dbt nodes are included in the raised exception (reachable via context["exception"]). issue-1806."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=None,
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+    full_output = [
+        "20:30:02  Failure in test not_null_my_model_id (models/schema.yml)",
+        "20:30:02    Got 5 results, configured to fail if != 0",
+    ]
+    result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=full_output)
+
+    with pytest.raises(AirflowException) as err_context:
+        operator.handle_exception_subprocess(result)
+
+    message = str(err_context.value)
+    assert "non-zero exit code 1" in message
+    assert "not_null_my_model_id" in message
+    assert "Got 5 results, configured to fail if != 0" in message
+
+
 @pytest.fixture
 def mock_context():
     return MagicMock()

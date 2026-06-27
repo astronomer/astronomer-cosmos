@@ -2437,7 +2437,7 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
 
 
 @pytest.mark.integration
-def test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event(tmp_path):
+def test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event(tmp_path, monkeypatch):
     """Functional check against the real dbt interface: a failed dbt-runner node carries its error only in
     ``NodeFinished.run_result.message`` (``data.msg``/``info.msg`` do not), so ``_process_dbt_log_event`` must
     read it for the WATCHER consumer to log the failure. Runs real dbt-runner against Postgres so the assertion
@@ -2449,19 +2449,27 @@ def test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event(tmp_pat
 
     project_dir = tmp_path / "watcher_failing_tests"
     shutil.copytree(DBT_WATCHER_FAILING_TESTS_PATH, project_dir)
-    profiles_dir = tmp_path / "profiles"
-    profiles_dir.mkdir()
-    (profiles_dir / "profiles.yml").write_text(
-        "default:\n  target: dev\n  outputs:\n    dev:\n      type: postgres\n      host: 0.0.0.0\n"
-        "      port: 5432\n      user: postgres\n      password: postgres\n      dbname: postgres\n"
-        "      schema: public\n      threads: 4\n"
-    )
 
     events: list[str] = []
     runner = dbtRunner(callbacks=[lambda event: events.append(MessageToJson(event, preserving_proto_field_name=True))])
-    runner.invoke(
-        ["run", "--project-dir", str(project_dir), "--profiles-dir", str(profiles_dir), "--profile", "default"]
-    )
+    # Generate profiles.yml from the same example_conn-based ProfileConfig the other watcher integration tests use,
+    # so connection details are not duplicated/hardcoded in the test.
+    with profile_config.ensure_profile() as (profiles_yml_path, env_vars):
+        for key, value in env_vars.items():
+            monkeypatch.setenv(key, value)
+        runner.invoke(
+            [
+                "run",
+                "--project-dir",
+                str(project_dir),
+                "--profiles-dir",
+                str(profiles_yml_path.parent),
+                "--profile",
+                profile_config.profile_name,
+                "--target",
+                profile_config.target_name,
+            ]
+        )
 
     node_finished = next(
         (

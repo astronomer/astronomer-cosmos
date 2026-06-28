@@ -763,6 +763,11 @@ class BaseConsumerSensor(BaseSensorOperator):
         if status is not None:
             self._cache_compiled_sql(ti, context)
 
+        if status is None:
+            return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
+
+        # Log the dbt event only once the node is terminal; poke runs every interval, so logging before
+        # this point would repeat the line on each poke.
         dbt_events = get_xcom_val(
             task_instance=context["ti"],
             key=get_dbt_event_xcom_key(self.model_unique_id),
@@ -770,9 +775,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         _log_dbt_event(dbt_events)
 
-        if status is None:
-            return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
-        elif is_dbt_node_status_skipped(status):
+        if is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )

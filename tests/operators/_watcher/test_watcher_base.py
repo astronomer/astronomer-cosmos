@@ -158,6 +158,44 @@ class TestBaseConsumerSensor:
             with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
                 sensor.poke(context)
 
+    def test_poke_logs_dbt_event_only_at_terminal(self):
+        """poke must not log the per-node dbt event while the node is still running (status None); it logs
+        once the node is terminal. Regression for #2456 on the non-deferrable path."""
+
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+        )
+        mock_ti = Mock()
+        mock_ti.try_number = 1
+        context = {"ti": mock_ti, "run_id": "run_123"}
+
+        with (
+            patch.object(sensor, "_get_producer_task_status", return_value="running"),
+            patch.object(sensor, "_log_startup_events"),
+            patch.object(sensor, "_cache_compiled_sql"),
+            patch("cosmos.operators._watcher.base.get_xcom_val", return_value={"status": "success", "msg": "ok"}),
+            patch("cosmos.operators._watcher.base._log_dbt_event") as mock_log,
+        ):
+            # Node still running: must not log (it would duplicate on each poke).
+            with (
+                patch.object(sensor, "_get_node_status", return_value=None),
+                patch.object(sensor, "_handle_no_dbt_node_status", return_value=False),
+            ):
+                assert sensor.poke(context) is False
+            mock_log.assert_not_called()
+
+            # Node terminal: logs exactly once.
+            with patch.object(sensor, "_get_node_status", return_value="success"):
+                assert sensor.poke(context) is True
+            mock_log.assert_called_once()
+
 
 class TestHandleNoDbtNodeStatus:
     """Tests for BaseConsumerSensor._handle_no_dbt_node_status."""

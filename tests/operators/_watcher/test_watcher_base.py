@@ -129,9 +129,32 @@ class TestBaseConsumerSensor:
             project_dir="/tmp/sample_project",
             extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
         )
-        context = Mock()
+        context = {"ti": Mock()}
         with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
             sensor.execute_complete(context, {"status": "skipped", "reason": "source_not_fresh"})
+
+    def test_execute_complete_logs_dbt_event_on_success(self):
+        """Deferrable path: execute_complete logs the per-node dbt event once on success, not only on failure.
+
+        Regression for #2456 - removing the per-poll trigger log must not drop the single terminal log line."""
+
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+        )
+        context = {"ti": Mock()}
+        with (
+            patch("cosmos.operators._watcher.base.get_xcom_val", return_value={"status": "success", "msg": "ok"}),
+            patch("cosmos.operators._watcher.base._log_dbt_event") as mock_log,
+        ):
+            sensor.execute_complete(context, {"status": "success"})
+        mock_log.assert_called_once()
 
     def test_poke_raises_airflow_skip_exception_when_status_is_skipped(self):
         """poke raises AirflowSkipException when node status is 'skipped'."""

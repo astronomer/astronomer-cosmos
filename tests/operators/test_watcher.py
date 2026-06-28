@@ -292,7 +292,7 @@ def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message
     )
     sensor.model_unique_id = "model.pkg.skipped_model"
 
-    context = {"dag_run": MagicMock()}
+    context = {"dag_run": MagicMock(), "ti": MagicMock()}
     event = {"status": "success", "reason": WatcherEventReason.NODE_NOT_RUN}
 
     with caplog.at_level(logging.INFO):
@@ -1585,7 +1585,7 @@ class TestDbtConsumerWatcherSensor:
     def test_execute_complete_extracts_compiled_sql(self, mock_override_rtif):
         """Test that execute_complete extracts compiled_sql from the event and sets it on the sensor."""
         sensor = self.make_sensor()
-        context = Mock()
+        context = {"ti": MagicMock()}
 
         assert sensor.compiled_sql == ""  # Initially empty
 
@@ -1598,7 +1598,7 @@ class TestDbtConsumerWatcherSensor:
     def test_execute_complete_handles_missing_compiled_sql(self):
         """Test that execute_complete handles events without compiled_sql gracefully."""
         sensor = self.make_sensor()
-        context = Mock()
+        context = {"ti": MagicMock()}
 
         assert sensor.compiled_sql == ""  # Initially empty
 

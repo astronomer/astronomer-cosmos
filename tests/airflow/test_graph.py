@@ -1269,6 +1269,58 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
 
 
 @pytest.mark.parametrize(
+    "exclude,expected_exclude",
+    [
+        (["resource_type:unit_test"], "resource_type:unit_test"),
+        (["resource_type:unit_test", "tag:skip_in_tests"], "resource_type:unit_test tag:skip_in_tests"),
+    ],
+)
+def test_create_test_task_metadata_forwards_render_config_exclude_to_node_test(exclude, expected_exclude):
+    """RenderConfig.exclude must reach per-model (AFTER_EACH) / detached test tasks, not only AFTER_ALL. See #1763."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"task_arg": "value"},
+        node=sample_node,
+        render_config=RenderConfig(exclude=exclude),
+    )
+    assert metadata.arguments["select"] == "node_name"
+    assert metadata.arguments["exclude"] == expected_exclude
+
+
+def test_create_test_task_metadata_without_render_config_exclude_preserves_existing_exclude():
+    """An empty RenderConfig.exclude must not clobber an exclude supplied through operator/task args."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"exclude": "tag:my_custom_exclude"},
+        node=sample_node,
+        render_config=RenderConfig(exclude=[]),
+    )
+    assert metadata.arguments["exclude"] == "tag:my_custom_exclude"
+
+
+@pytest.mark.parametrize(
     "input,expected", [("snake_case", "SnakeCase"), ("snake_case_with_underscores", "SnakeCaseWithUnderscores")]
 )
 def test_snake_case_to_camelcase(input, expected):

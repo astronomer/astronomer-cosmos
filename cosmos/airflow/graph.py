@@ -155,6 +155,19 @@ def exclude_detached_tests_if_needed(
         task_args["exclude"] = _convert_list_to_str(exclude_items) or ""
 
 
+def forward_render_exclude_to_test(task_args: dict[str, Any], render_config: RenderConfig | None) -> None:
+    """
+    Forward ``RenderConfig.exclude`` to a node-based (AFTER_EACH / detached) test task, in-place.
+
+    Without this, ``RenderConfig.exclude`` was only honored by the aggregate AFTER_ALL test task,
+    so e.g. ``exclude=["resource_type:unit_test"]`` did not stop unit tests from running for the
+    AFTER_EACH / BUILD behaviors. Exclusions are purely additive, so forwarding them is safe;
+    ``select`` / ``selector`` are intentionally not forwarded here (see the docs note). See #1763.
+    """
+    if render_config is not None and render_config.exclude:
+        task_args["exclude"] = _convert_list_to_str(render_config.exclude)
+
+
 def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_override: dict[str, Any]) -> None:
     """
     Changes in-place the profile configuration if it needs to be overridden.
@@ -211,6 +224,8 @@ def create_test_task_metadata(
             task_args["select"] = node.resource_name.split(".")[0]
         else:  # tested with node.resource_type == DbtResourceType.SEED or DbtResourceType.SNAPSHOT
             task_args["select"] = node.resource_name
+
+        forward_render_exclude_to_test(task_args, render_config)
 
         extra_context = {"dbt_node_config": node.context_dict}
         task_owner = node.owner
@@ -678,6 +693,7 @@ def generate_task_or_group(
                     test_indirect_selection,
                     task_args=task_args,
                     node=node,
+                    render_config=render_config,
                     on_warning_callback=on_warning_callback,
                     detached_from_parent=detached_from_parent,
                     enable_owner_inheritance=render_config.enable_owner_inheritance,

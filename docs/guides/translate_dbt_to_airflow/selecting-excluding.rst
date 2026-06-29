@@ -145,6 +145,32 @@ Examples:
         )
     )
 
+How ``exclude`` and ``select`` interact with test tasks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``RenderConfig.exclude`` is passed through to the generated **test tasks for every test
+behavior** (``AFTER_EACH``, ``BUILD`` and ``AFTER_ALL``). This means an exclusion such as
+``exclude=["resource_type:unit_test"]`` is applied to the ``dbt test`` commands too, so you can
+exclude a specific test or a whole resource type without also having to repeat it in
+``operator_args``. Exclusions are purely additive, which makes this safe to forward.
+
+.. code-block:: python
+
+    from cosmos.airflow.dag import DbtDag
+    from cosmos.config import RenderConfig
+
+    jaffle_shop = DbtDag(
+        render_config=RenderConfig(
+            exclude=["resource_type:unit_test"],  # excluded from both the run and the test tasks
+        )
+    )
+
+``RenderConfig.select`` / ``RenderConfig.selector``, on the other hand, are forwarded to the test
+task **only** for ``TestBehavior.AFTER_ALL``. They are intentionally not forwarded to the per-model
+``AFTER_EACH`` / ``BUILD`` test tasks, because combining a global selection with the per-model
+selection would require resolving dbt's union / intersection set semantics, which Cosmos does not
+attempt. Those test tasks are already scoped to their own model's selection.
+
 Using ``selector``
 ~~~~~~~~~~~~~~~~~~
 .. note::

@@ -21,7 +21,7 @@ from airflow.models import Variable
 try:
     import orjson
 except ImportError:  # pragma: no cover
-    orjson = None  # type: ignore[assignment]
+    orjson = None
 
 if TYPE_CHECKING:
     try:
@@ -43,6 +43,7 @@ from cosmos.cache import (
 )
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
+    DBT_EPHEMERAL_MATERIALIZATION,
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
     DBT_LOG_PATH_ENVVAR,
@@ -64,6 +65,7 @@ from cosmos.dbt.project import (
     has_non_empty_dependencies_file,
 )
 from cosmos.dbt.selector import YamlSelectors, select_nodes
+from cosmos.fs import _calculate_file_checksum
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -112,6 +114,26 @@ class DbtNode:
         """Combined path to the node's file (path_base / original_file_path)."""
         return self.path_base / self.original_file_path
 
+    @cached_property
+    def checksum(self) -> str | None:
+        """MD5 checksum of a seed's CSV content, used by ``SeedRenderingBehavior.WHEN_SEED_CHANGES``.
+
+        Although ``manifest.json`` records a checksum per node, we always recompute it from the seed file
+        here so the value is consistent regardless of whether the project was loaded via ``LoadMode.MANIFEST``
+        or ``LoadMode.DBT_LS``. Returns ``None`` for non-seed nodes or when the file cannot be read.
+
+        Cached because the value is derived from the seed file at parse time and is read again when building
+        the task's ``extra_context``; the file is not expected to change within a single parse.
+        """
+        if self.resource_type != DbtResourceType.SEED:
+            return None
+        return _calculate_file_checksum(self.file_path)
+
+    @property
+    def has_ephemeral_materialization(self) -> bool:
+        """Whether the node is materialized as ephemeral (inlined as a CTE, never written to the warehouse)."""
+        return str(self.config.get("materialized") or "").lower() == DBT_EPHEMERAL_MATERIALIZATION
+
     @property
     def meta(self) -> dict[str, Any]:
         """
@@ -159,14 +181,48 @@ class DbtNode:
             )
         return operator_kwargs
 
+    @staticmethod
+    def get_resource_name_from_unique_id(unique_id: str) -> str:
+        """
+        Return the ``resource_name`` segment of a dbt node ``unique_id``.
+
+        Per the `dbt manifest spec
+        <https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details>`_,
+        a node ``unique_id`` is ``<resource_type>.<package>.<resource_name>``.
+        Both ``resource_type`` and ``package`` are constrained identifiers that
+        cannot contain dots, so the first two dots are unambiguous separators
+        and everything after the second dot is the full resource name.
+
+        For versioned models, dbt appends a fourth segment:
+        ``model.<package>.<resource_name>.<version>`` (see
+        `node_args.py <https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31>`_).
+        Splitting with ``maxsplit=2`` preserves that suffix:
+        ``model.pkg.my_model.v1`` -> ``my_model.v1``.
+
+        :raises ValueError: if ``unique_id`` does not have the expected
+            ``<resource_type>.<package>.<resource_name>`` shape, i.e. fewer
+            than two dots or any empty segment (e.g. ``model..name``, ``..``,
+            ``model.pkg.``). Malformed inputs are surfaced loudly rather than
+            silently mis-parsed.
+        """
+        # ``maxsplit=2`` caps the result at 3 elements, so a well-formed
+        # unique_id always yields exactly 3 non-empty parts (the versioned/source
+        # suffixes stay attached to the third part).
+        parts = unique_id.split(".", 2)
+        if len(parts) != 3 or not all(parts):
+            raise ValueError(
+                f"Malformed dbt unique_id, expected '<resource_type>.<package>.<resource_name>': {unique_id!r}"
+            )
+        return parts[2]
+
     @property
     def resource_name(self) -> str:
         """
         Use this property to retrieve the resource name for command generation, for instance: ["dbt", "run", "--models", f"{resource_name}"].
-        The unique_id format is defined as [<resource_type>.<package>.<resource_name>](https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details).
-        For a special case like a versioned model, the unique_id follows this pattern: [model.<package>.<resource_name>.<version>](https://github.com/dbt-labs/dbt-core/blob/main/core/dbt/contracts/graph/node_args.py#L26C3-L31)
+        Delegates to :meth:`get_resource_name_from_unique_id`, which documents the dbt ``unique_id`` format
+        (including the versioned-model variant ``model.<package>.<resource_name>.<version>``).
         """
-        return self.unique_id.split(".", 2)[2]
+        return self.get_resource_name_from_unique_id(self.unique_id)
 
     @property
     def name(self) -> str:
@@ -200,6 +256,7 @@ class DbtNode:
             "has_non_detached_test": self.has_non_detached_test,
             "resource_name": self.resource_name,
             "name": self.name,
+            "checksum": self.checksum,
         }
 
 
@@ -558,6 +615,22 @@ class DbtGraph:
         logger.debug("Value of `dbt_yaml_selectors_cache_key` for <%s>: %s", self.cache_key, cache_args)
         return cache_args
 
+    def _log_concurrent_cache_write(self, cache_name: str) -> None:
+        """Log a benign duplicate-key race when concurrently writing the cache Variable.
+
+        When two schedulers or DAG processors parse the same DAG at once and neither finds an
+        existing ``cosmos_cache__*`` Variable, both attempt the INSERT. The unique constraint on
+        ``variable.key`` lets one win and makes the other raise an ``IntegrityError`` (Postgres
+        ``UniqueViolation``). The value we wanted to write is already present, so the loser treats
+        the duplicate-key error as a no-op and logs it at debug level rather than propagating it.
+        """
+        logger.debug(
+            "Cosmos %s cache for Airflow Variable '%s' was concurrently written by another "
+            "parser (duplicate key); treating as a no-op.",
+            cache_name,
+            self.cache_key,
+        )
+
     def _save_cache_to_variable(self, cache_dict: dict[str, Any], cache_name: str) -> None:
         """Write cache_dict to an Airflow Variable, warning on AirflowRuntimeError.
 
@@ -565,10 +638,15 @@ class DbtGraph:
         DAG processor does not have direct access to a usable Airflow metadata database
         (for example, when the ``variable`` table is unavailable).
         """
+        from sqlalchemy.exc import IntegrityError
+
         try:
             from airflow.sdk.exceptions import AirflowRuntimeError
         except ImportError:
-            Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            try:
+                Variable.set(self.cache_key, cache_dict, serialize_json=True)
+            except IntegrityError:
+                self._log_concurrent_cache_write(cache_name)
             return
 
         is_yaml_cache = "yaml" in cache_name.lower()
@@ -580,6 +658,8 @@ class DbtGraph:
         cache_specific_workaround = "" if is_yaml_cache else ", using LoadMode.DBT_MANIFEST"
         try:
             Variable.set(self.cache_key, cache_dict, serialize_json=True)
+        except IntegrityError:
+            self._log_concurrent_cache_write(cache_name)
         except AirflowRuntimeError as e:
             logger.warning(
                 "Failed to save Cosmos %s cache to Airflow Variable '%s': %s. "
@@ -1276,16 +1356,30 @@ class DbtGraph:
             Parsed manifest dictionary
 
         Raises:
-            CosmosLoadDbtException: If orjson is enabled but not installed, or if the parsed manifest root is not a dictionary
+            CosmosLoadDbtException: If the manifest file is empty, not valid JSON, the parsed manifest root is not a dictionary, or `orjson` is enabled but not installed.
         """
+
         if settings.enable_orjson_parser and orjson:
-            with manifest_path.open("rb") as fp:
-                manifest = orjson.loads(fp.read())
+            open_mode = "rb"
+            parse_function = orjson.loads
+            decode_errors: tuple[type[BaseException], ...] = (orjson.JSONDecodeError,)
         elif settings.enable_orjson_parser:
             raise CosmosLoadDbtException("orjson is not installed. Install it with: pip install orjson")
         else:
-            with manifest_path.open("r") as fp:
-                manifest = json.load(fp)
+            open_mode = "r"
+            parse_function = json.loads
+            decode_errors = (json.JSONDecodeError, UnicodeDecodeError)
+
+        try:
+            with manifest_path.open(open_mode) as fp:
+                content = fp.read()
+                if not content or content.isspace():
+                    raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
+                manifest = parse_function(content)
+        except decode_errors as e:
+            raise CosmosLoadDbtException(
+                f"Failed to load dbt manifest at `{manifest_path}`: file is not valid JSON ({e})"
+            ) from e
 
         if manifest is None:
             return {}

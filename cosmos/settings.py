@@ -69,13 +69,15 @@ enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_ta
 # this would also be used to run the producer task
 watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
 
+enable_watcher_reliable_retry = conf.getboolean("cosmos", "enable_watcher_reliable_retry", fallback=True)
+
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
 
 try:
     from airflow.sdk._shared.configuration.exceptions import AirflowConfigException as SdkConfigException
 except ImportError:
-    SdkConfigException = airflow.exceptions.AirflowConfigException  # type: ignore[misc]
+    SdkConfigException = airflow.exceptions.AirflowConfigException
 
 try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")

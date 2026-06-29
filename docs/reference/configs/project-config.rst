@@ -23,6 +23,8 @@ variables that should be used for rendering and execution. It takes the followin
 - ``env_vars``: (new in v1.3) A dictionary of environment variables used for rendering and execution. Rendering with
   env vars is only supported when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
 - ``install_dbt_deps``: (new in v1.9) Run dbt deps during DAG parsing and task execution if True (default).
+  To control ``dbt deps`` per DAG run via an Airflow template, set ``ExecutionConfig.install_dbt_deps``
+  instead, which overrides this value at task execution time only.
 - ``copy_dbt_packages``: (new in v1.10) Copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
 - ``partial_parse``: (new in v1.4) If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
   for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``

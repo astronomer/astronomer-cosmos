@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import msgpack
 import yaml
+from airflow.exceptions import AirflowException
 from airflow.models import DagRun, Variable
 
 try:
@@ -20,6 +21,7 @@ except ImportError:
     from airflow.models.dag import DAG  # type: ignore[assignment]
 from airflow.utils.session import provide_session
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from cosmos import settings
@@ -56,6 +58,10 @@ from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
+# Seeds rendered with ``SeedRenderingBehavior.WHEN_SEED_CHANGES`` persist the last-run CSV checksum as an
+# Airflow Variable, scoped per ``DbtDag``/``DbtTaskGroup`` and seed, so the same seed rendered in different
+# DAGs tracks its state independently (a DAG never wrongly skips a seed because a different DAG ran it).
+VAR_KEY_SEED_CHECKSUM_PREFIX = "cosmos_seed_checksum__"
 
 
 def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
@@ -70,7 +76,7 @@ def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
     remote_cache_conn_id = remote_cache_dir_conn_id
     if not remote_cache_conn_id:
         cache_dir_schema = cache_dir_str.split("://")[0]
-        remote_cache_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(cache_dir_schema, None)  # type: ignore[assignment]
+        remote_cache_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(cache_dir_schema, None)
     if remote_cache_conn_id is None:
         return _configured_cache_dir
 
@@ -81,7 +87,7 @@ def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
 
     _configured_cache_dir = ObjectStoragePath(cache_dir_str, conn_id=remote_cache_conn_id)
 
-    if not _configured_cache_dir.exists():  # type: ignore[no-untyped-call]
+    if not _configured_cache_dir.exists():
         # TODO: Check if we should raise an error instead in case the provided path does not exist.
         _configured_cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -138,6 +144,45 @@ def _create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
 
 def create_cache_key(cache_identifier: str) -> str:
     return f"{VAR_KEY_CACHE_PREFIX}{cache_identifier}"
+
+
+def _create_seed_checksum_key(dag_task_group_identifier: str, unique_id: str) -> str:
+    """Return a bounded, stable Airflow Variable key scoped to a DbtDag/DbtTaskGroup and seed.
+
+    Airflow Variable keys are length-bounded (the ``variable.key`` column is commonly 250 chars), so we
+    store the checksum under a fixed-length key: a readable prefix plus a stable hash of the full
+    identifier, ensuring long DAG ids / nested task groups / package+resource names never overflow it.
+    """
+    digest = hashlib.md5(f"{dag_task_group_identifier}:{unique_id}".encode()).hexdigest()
+    return f"{VAR_KEY_SEED_CHECKSUM_PREFIX}{digest}"
+
+
+def get_cache_seed_checksum(dag_task_group_identifier: str, unique_id: str) -> str | None:
+    """Return the seed's last persisted checksum, or ``None`` when none is stored or it cannot be read.
+
+    Best-effort: change detection must never fail a seed task, so a missing value or a transient
+    metadatabase/Variable backend error is logged and treated as "no stored checksum" (the seed runs).
+    """
+    key = _create_seed_checksum_key(dag_task_group_identifier, unique_id)
+    try:
+        checksum: str | None = Variable.get(key, default_var=None)
+    except (AirflowException, SQLAlchemyError) as exc:
+        logger.warning("Failed to read seed checksum from Variable `%s`: %s", key, exc)
+        return None
+    return checksum
+
+
+def store_cache_seed_checksum(dag_task_group_identifier: str, unique_id: str, checksum: str) -> None:
+    """Persist a seed's checksum after a successful run.
+
+    Best-effort: a failure to store the checksum must never fail a seed that already loaded successfully,
+    so storage errors are logged and swallowed rather than raised.
+    """
+    key = _create_seed_checksum_key(dag_task_group_identifier, unique_id)
+    try:
+        Variable.set(key, checksum)
+    except (AirflowException, SQLAlchemyError) as exc:
+        logger.warning("Failed to persist seed checksum under Variable `%s`: %s", key, exc)
 
 
 def _obtain_cache_dir_path(cache_identifier: str, base_dir: Path = settings.cache_dir) -> Path:

@@ -21,7 +21,7 @@ To respect the dbt requirement of having the same profile to benefit from partia
 If users don't follow these guidelines, Cosmos will use different profiles to parse the dbt project and to run tasks, and the user won't leverage dbt partial parsing.
 Their logs will contain multiple ``INFO`` messages similar to the following, meaning that Cosmos is not using partial parsing:
 
-.. code-block::
+.. code-block:: text
 
     13:33:16  Unable to do partial parsing because profile has changed
     13:33:16  Unable to do partial parsing because env vars used in profiles.yml have changed
@@ -33,7 +33,7 @@ If the `Apache Airflow® <https://airflow.apache.org/>`_ scheduler and worker pr
 
 Otherwise, users may see messages similar to the following in their logs:
 
-.. code-block::
+.. code-block:: text
 
     [2024-03-14, 17:04:57 GMT] {{subprocess.py:94}} INFO - Unable to do partial parsing because config vars, config profile, or config target have changed
 

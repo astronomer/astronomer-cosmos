@@ -33,7 +33,7 @@ But that for a specific node or group of nodes, the user would like to replace:
 
 They could apply this different configuration to all the project seeds by doing:
 
-.. code-block::
+.. code-block:: yaml
 
     seeds:
       my_dbt_project:

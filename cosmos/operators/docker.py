@@ -39,7 +39,7 @@ except ImportError:
     )
 
 
-class DbtDockerBaseOperator(AbstractDbtBase, DockerOperator):  # type: ignore
+class DbtDockerBaseOperator(AbstractDbtBase, DockerOperator):  # type: ignore[misc]
     """
     Executes a dbt core cli command in a Docker container.
 

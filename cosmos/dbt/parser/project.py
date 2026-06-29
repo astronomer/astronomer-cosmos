@@ -203,7 +203,7 @@ class DbtModel:
                     and isinstance(node.args[0], jinja2.nodes.Const)
                     and node.node.name == "var"
                 ):
-                    value += self.dbt_vars[node.args[0].value]  # type: ignore
+                    value += self.dbt_vars[node.args[0].value]
         elif isinstance(first_arg, jinja2.nodes.Const):
             # and add it to the config
             value = first_arg.value
@@ -221,7 +221,6 @@ class DbtModel:
                     selector_config |= set(extracted_config) if isinstance(extracted_config, (str, list)) else set()
         return selector_config
 
-    # TODO following needs coverage:
     def _extract_config(self, kwarg: Any, config_name: str) -> Any:
         if hasattr(kwarg, "key") and kwarg.key == config_name:
             try:

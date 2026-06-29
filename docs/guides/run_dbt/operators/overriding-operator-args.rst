@@ -21,18 +21,18 @@ Users could either use ``operator_args`` or ``default args`` for defining the de
         default_args={"pool": "default_pool"},
     )
 
-While configuring in the ``dbt_project.yml`` a different behaviour for the model "expensive", that should use the "expensive-pool":
+While configuring in the dbt model YAML (e.g. ``models/schema.yml``) a different behaviour for the model "expensive", that should use the "expensive-pool":
 
-.. code-block::
+.. code-block:: yaml
 
     version: 2
-        models:
-          - name: expensive
-            description: description
-            meta:
-              cosmos:
-                operator_kwargs:
-                  pool: expensive-pool
+    models:
+      - name: expensive
+        description: description
+        meta:
+          cosmos:
+            operator_kwargs:
+              pool: expensive-pool
 
 
 More information about this feature can be found in :ref:`custom-airflow-properties`.

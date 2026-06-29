@@ -44,6 +44,7 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
+    SeedRenderingBehavior,
 )
 from cosmos.dbt.executable import get_system_dbt, is_dbt_installed_in_same_environment
 from cosmos.dbt.graph import DbtGraph
@@ -130,6 +131,19 @@ def validate_arguments(
         if profile_config.profile_mapping:
             profile_config.profile_mapping.profile_args["schema"] = task_args["schema"]
 
+    # SeedRenderingBehavior.WHEN_SEED_CHANGES decides at task runtime whether to run `dbt seed`, which
+    # requires Cosmos to run dbt directly on the Airflow worker with filesystem access to the seed files.
+    if render_config.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES and (
+        execution_config.execution_mode
+        not in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV, ExecutionMode.AIRFLOW_ASYNC)
+    ):
+        raise CosmosValueError(
+            "SeedRenderingBehavior.WHEN_SEED_CHANGES is only supported with ExecutionMode.LOCAL, "
+            "ExecutionMode.VIRTUALENV or ExecutionMode.AIRFLOW_ASYNC, which run dbt directly on the "
+            f"Airflow worker. The configured execution_mode is {execution_config.execution_mode}. Use "
+            "SeedRenderingBehavior.ALWAYS, or switch to a supported execution mode."
+        )
+
     if execution_config.execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV]:
         profile_config.validate_profiles_yml()
         has_non_empty_dependencies = execution_config.project_path and has_non_empty_dependencies_file(
@@ -141,6 +155,9 @@ def validate_arguments(
                 render_config.load_method == LoadMode.DBT_LS
                 or (render_config.load_method == LoadMode.AUTOMATIC and not project_config.is_manifest_available())
             )
+            # ExecutionConfig.install_dbt_deps intentionally overrides the parse-time value for execution only,
+            # so the parse-time consistency check does not apply when it is set.
+            and execution_config.install_dbt_deps is None
             and (render_config.dbt_deps != task_args.get("install_deps", True))
         ):
             err_msg = f"When using `LoadMode.DBT_LS` and `{execution_config.execution_mode}`, the value of `dbt_deps` in `RenderConfig` should be the same as the `operator_args['install_deps']` value."
@@ -256,7 +273,11 @@ def override_configuration(
         operator_args["invocation_mode"] = execution_config.invocation_mode
 
     if execution_config.execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV, ExecutionMode.WATCHER):
-        if "install_deps" not in operator_args:
+        # ExecutionConfig.install_dbt_deps overrides ProjectConfig.install_dbt_deps and the deprecated
+        # operator_args value for execution only; otherwise fall back to those existing values.
+        if execution_config.install_dbt_deps is not None:
+            operator_args["install_deps"] = execution_config.install_dbt_deps
+        elif "install_deps" not in operator_args:
             operator_args["install_deps"] = project_config.install_dbt_deps
         if "copy_dbt_packages" not in operator_args:
             operator_args["copy_dbt_packages"] = project_config.copy_dbt_packages

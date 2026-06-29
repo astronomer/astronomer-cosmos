@@ -11,7 +11,7 @@ class DatabricksOauthProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Databricks connections with the client auth to dbt profiles.
 
-    https://docs.getdbt.com/reference/warehouse-setups/databricks-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/databricks-setup
     https://airflow.apache.org/docs/apache-airflow-providers-databricks/stable/connections/databricks.html
     """
 

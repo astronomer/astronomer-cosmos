@@ -213,10 +213,11 @@ XCom values from a backup so that consumer sensors can still read model statuses
 
 **XCom backup and restore:**
 
-During execution, each XCom push is incrementally backed up to an Airflow Variable. This ensures that
-when the producer fails and Airflow clears XCom entries before the retry, the backed-up values can be
-restored. On a successful run, the backup Variable is automatically deleted to avoid stale data
-accumulating over time.
+By default (``enable_watcher_reliable_retry = True``), each XCom push is incrementally backed up to an Airflow
+Variable. This ensures that when the producer fails and Airflow clears XCom entries before the retry,
+the backed-up values can be restored. On a successful run, the backup Variable is automatically deleted
+to avoid stale data accumulating over time. These eager per-node writes can be deferred to a single
+on-failure write to improve producer performance — see :ref:`producer-status-backup` below.
 
 **How consumer retries work:**
 
@@ -237,6 +238,66 @@ accumulating over time.
 - During the retry of the sensor tasks, they will effectively run the corresponding dbt commands.
 
 The overall retry behavior will be further improved once `#1978 <https://github.com/astronomer/astronomer-cosmos/issues/1978>`_ is implemented.
+
+.. _producer-status-backup:
+
+Producer status backup: reliability vs performance
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. versionadded:: 1.15.0
+
+To let consumer sensors read model statuses after a producer retry, the producer must preserve the
+per-node statuses it pushed on its first attempt (Airflow clears a task's XComs when it is retried).
+The producer accumulates these statuses in an in-memory buffer during the run; the
+``enable_watcher_reliable_retry`` configuration controls **when** that buffer is written to the Airflow
+Variable that survives the retry:
+
+- ``True`` (default) — the buffer is written to the Variable **eagerly, after every dbt node**, so the
+  statuses survive any producer failure, including a hard ``SIGKILL``/OOM kill. Consumers never re-run
+  dbt on a producer retry. This is the most reliable option, but the per-node Variable writes are
+  measurable producer CPU/IO on large projects.
+- ``False`` — the buffer is written to the Variable **once, when the producer is retried**, via the
+  producer's retry callback (``on_retry_callback``). This removes the per-node Variable I/O and improves producer performance. A
+  *graceful* producer failure (for example a dbt model error) still flushes the buffer, so consumers
+  recover exactly as in the reliable mode. The trade-off: a *hard* kill (``SIGKILL``/OOM), where Airflow
+  cannot run the callback, loses the in-memory statuses, so on the retry the affected consumer sensors
+  fall back to running their dbt node locally. Results stay correct, but those transformations may run
+  a second time.
+
+.. list-table:: ``enable_watcher_reliable_retry`` comparison
+   :header-rows: 1
+   :widths: 40 30 30
+
+   * - Behaviour
+     - ``True`` (default)
+     - ``False``
+   * - Per-dbt-node Airflow Variable writes
+     - Yes — one per node
+     - No
+   * - Producer CPU/IO overhead
+     - Higher; scales with node count
+     - Minimal
+   * - When the backup Variable is written
+     - Eagerly, after every node
+     - Once, when the producer is retried (via ``on_retry_callback``)
+   * - Recovers after a graceful producer failure (e.g. dbt error)
+     - Yes
+     - Yes
+   * - Recovers after a hard kill (``SIGKILL``/OOM)
+     - Yes
+     - No — affected consumers re-run their dbt node
+   * - Correct final DAG state
+     - Yes
+     - Yes
+
+Set it via the ``[cosmos]`` section or the ``AIRFLOW__COSMOS__ENABLE_WATCHER_RELIABLE_RETRY`` environment
+variable. Consider ``False`` for large dbt projects where the producer's per-node Variable I/O is a
+bottleneck and occasional duplicate consumer runs after a hard producer kill are acceptable.
+
+A future approach that delivers reliability and performance together is tracked in
+`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task & Asset
+Store, AIP-103), which would let retries resume from the point of failure without the per-node
+Variable backup.
 
 Producer done gateway task (DbtTaskGroup only)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import urllib.parse
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
     from cosmos.config import ProfileConfig
 
     try:
-        from airflow.sdk import DAG  # type: ignore[assignment]
+        from airflow.sdk import DAG
 
         # Airflow 3.1 onwards
         from airflow.utils.task_group import TaskGroup
@@ -193,7 +194,7 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     return None
 
 
-def construct_dataset_uri(namespace: str, name: str) -> str:
+def construct_dataset_uri(namespace: str, name: str, warn_uri_migration: bool = True) -> str:
     """
     Construct an Airflow Asset/Dataset URI from an OL-compatible namespace and
     dataset name.
@@ -204,6 +205,9 @@ def construct_dataset_uri(namespace: str, name: str) -> str:
 
     :param namespace: The OL-compatible dataset namespace (e.g. ``postgres://host:5432``).
     :param name: The dot-delimited dataset name (e.g. ``database.schema.table``).
+    :param warn_uri_migration: Whether to emit the Airflow 3 URI migration warning for this URI.
+        Callers that create multiple URIs in one task run should pass ``False`` after
+        the first generated URI.
     """
     airflow_2_uri = namespace + "/" + urllib.parse.quote(name)
     airflow_3_uri = namespace + "/" + urllib.parse.quote(name).replace(".", "/")
@@ -211,29 +215,56 @@ def construct_dataset_uri(namespace: str, name: str) -> str:
     if AIRFLOW_VERSION < Version("3.0.0"):
         if settings.use_dataset_airflow3_uri_standard:
             return airflow_3_uri
+        if warn_uri_migration:
+            logger.warning(
+                "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs "
+                "(standard used by Cosmos) will no longer be valid. "
+                "Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to <%s>. "
+                "Previously, with Airflow 2.x, the URI was <%s>. "
+                "If you want to use the Airflow 3 URI standard while still using Airflow 2, please set: "
+                "export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1 "
+                "Remember to update any DAGs that are scheduled using this dataset.",
+                airflow_3_uri,
+                airflow_2_uri,
+            )
+        return airflow_2_uri
+
+    if warn_uri_migration and not settings.use_dataset_airflow3_uri_standard:
         logger.warning(
             "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs "
-            "(standard used by Cosmos) will no longer be valid. "
-            "Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to <%s>. "
-            "Previously, with Airflow 2.x, the URI was <%s>. "
-            "If you want to use the Airflow 3 URI standard while still using Airflow 2, please set: "
-            "export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1 "
-            "Remember to update any DAGs that are scheduled using this dataset.",
+            "(standard used by Cosmos) are no longer accepted. "
+            "Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <%s>. "
+            "Before, with Airflow 2.x, the URI used to be <%s>. "
+            "Please, change any DAGs that were scheduled using the old standard to the new one.",
             airflow_3_uri,
             airflow_2_uri,
         )
-        return airflow_2_uri
-
-    logger.warning(
-        "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs "
-        "(standard used by Cosmos) are no longer accepted. "
-        "Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <%s>. "
-        "Before, with Airflow 2.x, the URI used to be <%s>. "
-        "Please, change any DAGs that were scheduled using the old standard to the new one.",
-        airflow_3_uri,
-        airflow_2_uri,
-    )
     return airflow_3_uri
+
+
+def make_dataset_uri_builder() -> Callable[[str, str], str]:
+    """Return a :func:`construct_dataset_uri` wrapper that emits the Airflow 3 URI
+    migration warning only for the first URI it builds.
+
+    A single task run can generate many dataset URIs -- one per dbt
+    model/seed/snapshot, plus OpenLineage inputs/outputs -- and emitting the
+    migration warning for every one floods the logs (#2778). Callers that build
+    URIs in bulk should route them all through one builder so the guidance is
+    logged once instead of once per dataset.
+
+    The "already warned" state lives in the returned closure rather than at
+    module level, so each new builder (i.e. each task run) warns once again
+    instead of being silenced permanently for the lifetime of the worker process.
+    """
+    warned = False
+
+    def build(namespace: str, name: str) -> str:
+        nonlocal warned
+        uri = construct_dataset_uri(namespace, name, warn_uri_migration=not warned)
+        warned = True
+        return uri
+
+    return build
 
 
 def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict[str, list[str]]:
@@ -260,6 +291,7 @@ def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict
         return {}
 
     result: dict[str, list[str]] = {}
+    build_uri = make_dataset_uri_builder()
     for unique_id, node in manifest.get("nodes", {}).items():
         resource_type = node.get("resource_type", "")
         if resource_type not in _DATASET_EMITTING_RESOURCE_TYPES:
@@ -272,7 +304,6 @@ def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict
         if not all([database, schema, alias]):
             continue
 
-        uri = construct_dataset_uri(namespace, f"{database}.{schema}.{alias}")
-        result[unique_id] = [uri]
+        result[unique_id] = [build_uri(namespace, f"{database}.{schema}.{alias}")]
 
     return result

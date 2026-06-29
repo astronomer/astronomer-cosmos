@@ -25,10 +25,12 @@ from airflow.utils.db import create_session
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.cache import (
+    VAR_KEY_SEED_CHECKSUM_PREFIX,
     _calculate_yaml_selectors_cache_current_version,
     _configure_remote_cache_dir,
     _copy_partial_parse_to_project,
     _create_cache_identifier,
+    _create_seed_checksum_key,
     _get_latest_cached_package_lockfile,
     _get_latest_partial_parse,
     _get_or_create_profile_cache_dir,
@@ -36,9 +38,11 @@ from cosmos.cache import (
     _update_partial_parse_cache,
     create_cache_profile,
     delete_unused_dbt_cache,
+    get_cache_seed_checksum,
     get_cached_profile,
     is_cache_package_lockfile_enabled,
     is_profile_cache_enabled,
+    store_cache_seed_checksum,
     were_yaml_selectors_modified,
 )
 from cosmos.constants import (
@@ -476,3 +480,47 @@ def test_were_yaml_selectors_modified_false():
     previous_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
     current_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
     assert were_yaml_selectors_modified(previous_version, current_version) is False
+
+
+def test_create_seed_checksum_key_is_bounded_prefixed_and_scoped():
+    key = _create_seed_checksum_key("a" * 500, "seed.pkg." + "b" * 500)
+    assert key.startswith(VAR_KEY_SEED_CHECKSUM_PREFIX)
+    assert len(key) <= 250
+    # Different DAG/task-group identifier or seed -> different key.
+    assert key != _create_seed_checksum_key("other_dag", "seed.pkg.b" * 500)
+    assert _create_seed_checksum_key("dag", "seed.pkg.a") != _create_seed_checksum_key("dag", "seed.pkg.b")
+    # Stable across calls for the same inputs.
+    assert _create_seed_checksum_key("dag", "seed.pkg.a") == _create_seed_checksum_key("dag", "seed.pkg.a")
+
+
+@patch("cosmos.cache.Variable")
+def test_get_cache_seed_checksum_returns_stored_value(mock_variable):
+    mock_variable.get.return_value = "stored-checksum"
+    assert get_cache_seed_checksum("my_dag", "seed.pkg.my_seed") == "stored-checksum"
+    mock_variable.get.assert_called_once_with(_create_seed_checksum_key("my_dag", "seed.pkg.my_seed"), default_var=None)
+
+
+@patch("cosmos.cache.Variable")
+def test_get_cache_seed_checksum_swallows_backend_errors(mock_variable, caplog):
+    from sqlalchemy.exc import SQLAlchemyError
+
+    mock_variable.get.side_effect = SQLAlchemyError("db down")
+    caplog.set_level(logging.WARNING)
+    assert get_cache_seed_checksum("my_dag", "seed.pkg.my_seed") is None
+    assert "Failed to read seed checksum" in caplog.text
+
+
+@patch("cosmos.cache.Variable")
+def test_store_cache_seed_checksum_persists_value(mock_variable):
+    store_cache_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")
+    mock_variable.set.assert_called_once_with(_create_seed_checksum_key("my_dag", "seed.pkg.my_seed"), "new-checksum")
+
+
+@patch("cosmos.cache.Variable")
+def test_store_cache_seed_checksum_swallows_backend_errors(mock_variable, caplog):
+    from airflow.exceptions import AirflowException
+
+    mock_variable.set.side_effect = AirflowException("cannot write")
+    caplog.set_level(logging.WARNING)
+    store_cache_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")  # must not raise
+    assert "Failed to persist seed checksum" in caplog.text

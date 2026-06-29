@@ -147,6 +147,7 @@ You can also execute dbt commands in a container. Choosing these kinds of execut
 - :ref:`aws_eks <aws-eks>`: Run ``dbt`` commands via Kubernetes Pods in AWS EKS.
 - :ref:`azure_container_instance <azure-container-instance>`: Run ``dbt`` commands in Azure Container Instances.
 - :ref:`gcp_cloud_run_job <gcp-cloud-run-job>`: Run ``dbt`` commands via a container managed by GCP Cloud Run Job.
+- :ref:`gcp_gke <gcp-gke>`: (experimental since Cosmos 1.15.0) Run ``dbt`` commands via Kubernetes Pods on GCP GKE using ``GKEStartPodOperator``. Includes a watcher variant, ``ExecutionMode.WATCHER_GCP_GKE``.
 
 Choose your container execution mode type
 +++++++++++++++++++++++++++++++++++++++++
@@ -179,9 +180,13 @@ If you want to use a container execution mode, use the following decision tree t
     M[ExecutionMode.AZURE_CONTAINER_INSTANCE]
 
     N[Are you a GCP user?]
-    O[ExecutionMode.GCP_CLOUD_RUN_JOB]
+    O[Use GKE Kubernetes cluster?]
+    P[Try experimental high-performance GKE mode?]
+    Q[ExecutionMode.WATCHER_GCP_GKE]
+    R[ExecutionMode.GCP_GKE]
+    S[ExecutionMode.GCP_CLOUD_RUN_JOB]
 
-    P[Review container execution options]
+    T[Review container execution options]
 
     A --> B
     B -->|Yes| C
@@ -203,15 +208,21 @@ If you want to use a container execution mode, use the following decision tree t
     L -->|No| N
 
     N -->|Yes| O
-    N -->|No| P
+    N -->|No| T
+
+    O -->|Yes| P
+    O -->|No| S
+
+    P -->|Yes| Q
+    P -->|No| R
 
     classDef decision fill:#fff3cd,stroke:#b58900,color:#333
     classDef action fill:#e8f5e9,stroke:#2e7d32,color:#333
     classDef result fill:#e3f2fd,stroke:#1565c0,color:#333
 
-    class B,D,E,H,I,L,N decision
-    class J,K,M,O action
-    class C,F,G,P result
+    class B,D,E,H,I,L,N,O,P decision
+    class J,K,M,R,S action
+    class C,F,G,Q,T result
 
 .. _execution-modes-comparison:
 
@@ -270,5 +281,13 @@ The type of execution mode that you choose directly affects how fast your Cosmos
      - No
    * - GCP Cloud Run Job Instance
      - Slow
+     - High
+     - No
+   * - GCP GKE
+     - Slow
+     - High
+     - No
+   * - Watcher GCP GKE
+     - Fast
      - High
      - No

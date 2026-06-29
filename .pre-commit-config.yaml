@@ -92,7 +92,7 @@ repos:
           - --py310-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 6fec9b7edb08fd9989088709d864a7826dc74e80  # v0.15.12
+    rev: 77039ccbba72c8aede339c5f8ae29b42aced0a2e  # v0.15.18
     hooks:
       - id: ruff-check
         args: [ --fix ]

@@ -7,6 +7,16 @@ Profile mappings are utilities provided by Cosmos that translate `Apache Airflow
 you can use the same connection objects you use in Airflow to authenticate with your database in dbt. To do so, there's
 a class in Cosmos for each Airflow connection to dbt profile mapping.
 
+.. note::
+   Cosmos natively supports all adapters compatible with **dbt Core** and **dbt Fusion** without any reliance on dbt Platform. This includes both official `Trusted Adapters <https://docs.getdbt.com/docs/trusted-adapters>`_ and `Community Adapters <https://docs.getdbt.com/docs/community-adapters>`_.
+   While some of these adapters lack a built-in automated profile mapping class in Cosmos, including
+   `AWS Glue <https://docs.getdbt.com/docs/local/connect-data-platform/glue-setup?version=2.0&name=Fusion>`_,
+   `Dremio <https://docs.getdbt.com/docs/local/connect-data-platform/dremio-setup?version=2.0&name=Fusion>`_,
+   `Azure Synapse <https://docs.getdbt.com/docs/local/connect-data-platform/azuresynapse-setup?version=2.0&name=Fusion>`_, and
+   `IBM Netezza <https://docs.getdbt.com/docs/local/connect-data-platform/ibmnetezza-setup?version=2.0&name=Fusion>`_, among others,
+   they remain fully operational out of the box. In these scenarios, you can simply bypass automated connection mappings entirely and pass a user-provided ``profiles.yml`` file configuration instead.
+   For a detailed implementation guide, see :ref:`use-your-profiles-yml`.
+
 You can find the available profile mappings on the left-hand side of this page. Each profile mapping is imported from
 ``cosmos.profiles`` and takes two arguments:
 

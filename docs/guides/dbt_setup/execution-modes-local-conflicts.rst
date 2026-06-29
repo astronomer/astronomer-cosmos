@@ -72,7 +72,7 @@ The table was created by running  `nox <https://nox.thea.codes/en/stable/>`__ wi
     )
     @nox.parametrize(
         "airflow_version",
-        ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"],
+        ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3"],
     )
     def compatibility(session: nox.Session, airflow_version, dbt_version) -> None:
         """Run both unit and integration tests."""

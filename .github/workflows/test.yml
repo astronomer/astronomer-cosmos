@@ -38,10 +38,15 @@ jobs:
     outputs:
       code_changed: ${{ steps.check.outputs.code_changed }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      # Only the `push` branch below uses the working tree (`git diff`). For pull_request /
+      # pull_request_target the changed-file list comes from the GitHub API, so we must NOT
+      # check out untrusted fork code in this ungated job — that is the pull_request_target
+      # "pwn request" risk actions/checkout v7 refuses by default.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        if: github.event_name == 'push'
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - id: check
@@ -127,7 +132,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2"]
+        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3"]
         dbt-version: [ "1.11" ]
         split-group: [1, 2, 3]
         exclude:
@@ -153,10 +158,13 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -244,10 +252,13 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -331,10 +342,13 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -408,10 +422,13 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -479,10 +496,13 @@ jobs:
         dbt-version: ["2.0"]  # dbt Fusion
 
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -567,10 +587,13 @@ jobs:
         airflow-version: [ "2.10", "3.0" ]
         dbt-version: [ "1.11" ]
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -635,10 +658,13 @@ jobs:
       # Required to read artifacts from the sibling test-unprivileged.yml run.
       actions: read
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - name: Set up Python 3.11
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0

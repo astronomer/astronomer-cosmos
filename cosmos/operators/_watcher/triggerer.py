@@ -14,10 +14,8 @@ from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
     PRODUCER_FINAL_STATES,
-    _log_dbt_event,
     build_producer_state_fetcher,
     get_compiled_sql_xcom_key,
-    get_dbt_event_xcom_key,
     get_status_xcom_key,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
@@ -230,8 +228,6 @@ class WatcherTrigger(BaseTrigger):
 
         while True:
             producer_task_state = await self._get_producer_task_status()
-            dbt_log_event = await self.get_xcom_val(get_dbt_event_xcom_key(self.model_unique_id))
-            _log_dbt_event(dbt_log_event)
             dbt_node_status, compiled_sql = await self._parse_dbt_node_status_and_compiled_sql()
             if is_dbt_node_status_success(dbt_node_status):
                 logger.debug("dbt node '%s' succeeded", self.model_unique_id)

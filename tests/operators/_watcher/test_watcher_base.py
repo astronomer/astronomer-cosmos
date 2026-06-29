@@ -91,6 +91,31 @@ class TestBaseConsumerSensor:
             _process_dbt_log_event(task_instance, dbt_log)
             mock_push.assert_not_called()
 
+    def test_process_dbt_log_event_captures_error_from_run_result_message(self):
+        """dbt-runner mode: the error text lives in NodeFinished.data.run_result.message (data.msg/info.msg
+        are empty there). It must reach the consumer's _dbt_event."""
+        task_instance = Mock()
+        dbt_log = {
+            "data": {
+                "node_info": {
+                    "unique_id": "model.test.bad_model",
+                    "node_status": "error",
+                    "node_started_at": "2024-01-01T00:00:00",
+                    "node_finished_at": "2024-01-01T00:01:00",
+                },
+                "run_result": {"status": "error", "message": "Runtime Error ... Catalog Error: Table does not exist!"},
+                "msg": "",
+            },
+            "info": {"name": "NodeFinished", "msg": ""},
+        }
+
+        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+            _process_dbt_log_event(task_instance, dbt_log)
+
+        value = mock_push.call_args.kwargs["value"]
+        assert value["status"] == "error"
+        assert value["msg"] == "Runtime Error ... Catalog Error: Table does not exist!"
+
     def test_execute_complete_raises_airflow_skip_exception_when_status_is_skipped(self):
         """execute_complete raises AirflowSkipException when the trigger sends status='skipped'."""
 
@@ -104,9 +129,32 @@ class TestBaseConsumerSensor:
             project_dir="/tmp/sample_project",
             extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
         )
-        context = Mock()
+        context = {"ti": Mock()}
         with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
             sensor.execute_complete(context, {"status": "skipped", "reason": "source_not_fresh"})
+
+    def test_execute_complete_logs_dbt_event_on_success(self):
+        """Deferrable path: execute_complete logs the per-node dbt event once on success, not only on failure.
+
+        Regression for #2456 - removing the per-poll trigger log must not drop the single terminal log line."""
+
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+        )
+        context = {"ti": Mock()}
+        with (
+            patch("cosmos.operators._watcher.base.get_xcom_val", return_value={"status": "success", "msg": "ok"}),
+            patch("cosmos.operators._watcher.base._log_dbt_event") as mock_log,
+        ):
+            sensor.execute_complete(context, {"status": "success"})
+        mock_log.assert_called_once()
 
     def test_poke_raises_airflow_skip_exception_when_status_is_skipped(self):
         """poke raises AirflowSkipException when node status is 'skipped'."""
@@ -132,6 +180,44 @@ class TestBaseConsumerSensor:
         ):
             with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
                 sensor.poke(context)
+
+    def test_poke_logs_dbt_event_only_at_terminal(self):
+        """poke must not log the per-node dbt event while the node is still running (status None); it logs
+        once the node is terminal. Regression for #2456 on the non-deferrable path."""
+
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+        )
+        mock_ti = Mock()
+        mock_ti.try_number = 1
+        context = {"ti": mock_ti, "run_id": "run_123"}
+
+        with (
+            patch.object(sensor, "_get_producer_task_status", return_value="running"),
+            patch.object(sensor, "_log_startup_events"),
+            patch.object(sensor, "_cache_compiled_sql"),
+            patch("cosmos.operators._watcher.base.get_xcom_val", return_value={"status": "success", "msg": "ok"}),
+            patch("cosmos.operators._watcher.base._log_dbt_event") as mock_log,
+        ):
+            # Node still running: must not log (it would duplicate on each poke).
+            with (
+                patch.object(sensor, "_get_node_status", return_value=None),
+                patch.object(sensor, "_handle_no_dbt_node_status", return_value=False),
+            ):
+                assert sensor.poke(context) is False
+            mock_log.assert_not_called()
+
+            # Node terminal: logs exactly once.
+            with patch.object(sensor, "_get_node_status", return_value="success"):
+                assert sensor.poke(context) is True
+            mock_log.assert_called_once()
 
 
 class TestHandleNoDbtNodeStatus:

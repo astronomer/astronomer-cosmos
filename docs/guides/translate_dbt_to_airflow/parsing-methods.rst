@@ -142,7 +142,7 @@ Users can force Cosmos to run ``dbt ls`` with subprocess and not ``dbtRunner``, 
     )
 
 
-For more information, check the `RenderConfig docs <./render-config.html>`_.
+For more information, check the :doc:`RenderConfig docs </guides/translate_dbt_to_airflow/render-config>`.
 
 
 ``dbt_ls_file``

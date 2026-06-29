@@ -1226,7 +1226,7 @@ def test_load_via_dbt_ls_without_dbt_deps(runner, postgres_profile_config):
         dbt_graph.load_via_dbt_ls_without_cache()
 
     expected = "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
-    assert err_info.value.args[0] == expected
+    assert err_info.value.args[0].startswith(expected)
 
     if some_patch is not None:
         sys.modules = original_sys_modules

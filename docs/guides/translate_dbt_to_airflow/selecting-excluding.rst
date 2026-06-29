@@ -161,7 +161,9 @@ exclude a specific test or a whole resource type without also having to repeat i
 
     jaffle_shop = DbtDag(
         render_config=RenderConfig(
-            exclude=["resource_type:unit_test"],  # excluded from both the run and the test tasks
+            exclude=[
+                "resource_type:unit_test"
+            ],  # excluded from both the run and the test tasks
         )
     )
 

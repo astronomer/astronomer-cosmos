@@ -387,6 +387,43 @@ def test_build_airflow_graph_with_after_all():
     assert dag.leaves[0].select == "tag:some"
 
 
+def test_build_airflow_graph_with_after_all_and_empty_nodes():
+    """Empty ``nodes`` + ``AFTER_ALL`` must not raise (see #2813).
+
+    When the rendered manifest yields no nodes (e.g. an empty or fully-filtered
+    manifest), the per-node loop never runs, so there is nothing to test and no
+    per-node args to build the aggregate test task from. The graph should be
+    built without an ``astro_shop_test`` task rather than crashing.
+    """
+    with DAG("test-empty-after-all", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        render_config = RenderConfig(
+            test_behavior=TestBehavior.AFTER_ALL,
+            source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+        )
+        build_airflow_graph(
+            nodes={},
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            dbt_project_name="astro_shop",
+            render_config=render_config,
+        )
+    assert [task.task_id for task in dag.tasks] == []
+
+
 @pytest.mark.integration
 def test_build_airflow_graph_with_build():
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
@@ -1908,7 +1945,6 @@ def test_build_airflow_graph_with_node_convert(test_behavior, node_converters, e
 def test_skip_test_task_when_only_detached_tests_exist():
     """Test that no empty test task is created when only detached tests exist with AFTER_EACH test behavior."""
     with DAG("test-skip-test-when-only-detached-tests-exist", start_date=datetime(2025, 1, 1)) as dag:
-
         parent_node1 = DbtNode(
             unique_id=f"{DbtResourceType.MODEL.value}.my_folder.parent1",
             resource_type=DbtResourceType.MODEL,

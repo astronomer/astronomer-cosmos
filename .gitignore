@@ -176,3 +176,7 @@ webserver_config.py
 
 # VI
 *.sw[a-z]
+
+# Claude Code user-local files
+.claude/settings.local.json
+.claude/worktrees/

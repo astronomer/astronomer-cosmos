@@ -38,10 +38,15 @@ jobs:
     outputs:
       code_changed: ${{ steps.check.outputs.code_changed }}
     steps:
+      # Only the `push` branch below uses the working tree (`git diff`). For pull_request /
+      # pull_request_target the changed-file list comes from the GitHub API, so we must NOT
+      # check out untrusted fork code in this ungated job — that is the pull_request_target
+      # "pwn request" risk actions/checkout v7 refuses by default.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        if: github.event_name == 'push'
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - id: check
@@ -157,6 +162,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -248,6 +256,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -335,6 +346,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -412,6 +426,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -483,6 +500,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -571,6 +591,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -639,6 +662,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
 
       - name: Set up Python 3.11
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0

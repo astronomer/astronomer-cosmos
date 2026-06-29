@@ -36,9 +36,10 @@ class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self._tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
         self._test_results_per_model: dict[str, dict[str, str]] = {}
-        # Set in execute() before super().execute() triggers pod_manager. Initialized
-        # here so pod_manager never raises AttributeError if accessed before execute().
-        self._context: Context | None = None
+        # Mutable holder shared by reference with pod_manager's callback_extra_kwargs.
+        # execute() sets its "context" entry (the holder itself is never reassigned),
+        # so a pod_manager created before execute() still sees the live context.
+        self._context_holder: dict[str, Context | None] = {_k8s_common.CONTEXT_KEY: None}
         _k8s_common.inject_watcher_callback(kwargs)
         super().__init__(task_id=task_id, *args, **kwargs)
         self.dbt_cmd_flags += ["--log-format", "json"]

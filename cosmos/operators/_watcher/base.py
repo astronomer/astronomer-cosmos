@@ -23,6 +23,7 @@ from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
+    DbtNodeStatus,
     ProducerTaskState,
     _iso_to_string,
     _log_dbt_event,
@@ -282,7 +283,7 @@ def _rewrite_upstream_failure_skip_status(
     if is_dbt_upstream_failure_skip_event(log_line.get("info", {}).get("name")):
         upstream_failure_skipped_ids.add(unique_id)
     if is_dbt_node_status_skipped(dbt_node_status) and unique_id in upstream_failure_skipped_ids:
-        return "failed"
+        return DbtNodeStatus.FAILED
     return dbt_node_status
 
 

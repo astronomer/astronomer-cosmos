@@ -20,12 +20,31 @@ from packaging.version import Version
 
 ProducerStateFetcher = Callable[[], str | None]
 
-DBT_NODE_STATUS_SKIPPED = "skipped"
 
-# dbt uses different status values for different node types (models/tests):"
-DBT_SUCCESS_STATUSES = frozenset({"success", "pass", "warn"})
-DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error", "runtime error"})
-DBT_SKIPPED_STATUSES = frozenset({DBT_NODE_STATUS_SKIPPED})
+class DbtNodeStatus(str, Enum):
+    """Raw dbt node status values the watcher inspects. dbt uses different values per node type
+    (e.g. models report ``success``/``error``, tests ``pass``/``fail``/``warn``), so the watcher
+    groups them into the ``DBT_*_STATUSES`` sets below rather than checking a single value."""
+
+    SUCCESS = "success"
+    PASS = "pass"
+    WARN = "warn"
+    FAILED = "failed"
+    FAIL = "fail"
+    ERROR = "error"
+    RUNTIME_ERROR = "runtime error"
+    SKIPPED = "skipped"
+
+    def __str__(self) -> str:
+        # Render as the raw dbt value (e.g. "skipped") in logs/XCom rather than "DbtNodeStatus.SKIPPED".
+        return self.value
+
+
+DBT_SUCCESS_STATUSES = frozenset({DbtNodeStatus.SUCCESS, DbtNodeStatus.PASS, DbtNodeStatus.WARN})
+DBT_FAILED_STATUSES = frozenset(
+    {DbtNodeStatus.FAILED, DbtNodeStatus.FAIL, DbtNodeStatus.ERROR, DbtNodeStatus.RUNTIME_ERROR}
+)
+DBT_SKIPPED_STATUSES = frozenset({DbtNodeStatus.SKIPPED})
 
 # dbt event names that signal a node was skipped because an upstream node failed.
 # dbt fires SkippingDetails (non-ephemeral upstream) or LogSkipBecauseError

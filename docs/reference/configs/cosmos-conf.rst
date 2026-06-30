@@ -83,6 +83,9 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     those ids, which is a breaking change for DAGs that reference Cosmos task groups by id. This is expected
     to become the default in Cosmos 2.0.
 
+    Being an Airflow configuration setting, it applies **globally to every Cosmos DAG** in the deployment
+    and cannot be configured per DAG (unlike the ``RenderConfig.group_nodes_by_folder`` option itself).
+
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_HIERARCHICAL_NAMING_FOR_GROUP_NODES_BY_FOLDER``
 

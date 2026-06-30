@@ -39,7 +39,7 @@ if importlib.util.find_spec("dbt_loom") is None:
 
 @provide_session
 def get_session(session=None):
-    create_default_connections(session)
+    create_default_connections(session=session)
     return session
 
 
@@ -53,7 +53,7 @@ def get_dag_bag() -> DagBag:  # noqa: C901
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
 
     if AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS:
-        return DagBag(dag_folder=None, include_examples=False)
+        return test_utils.make_dag_bag(dag_folder=None, include_examples=False)
 
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:
         for dagfile in IGNORED_DAG_FILES:
@@ -89,7 +89,7 @@ def get_dag_bag() -> DagBag:  # noqa: C901
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
-    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    db = test_utils.make_dag_bag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert db.dags
     assert not db.import_errors
     return db
@@ -106,7 +106,7 @@ def get_dag_bag_single_dag(single_dag: str) -> DagBag:
                     f.write(f"{file.name}\n")
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
-    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    db = test_utils.make_dag_bag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert db.dags
     assert not db.import_errors
     return db

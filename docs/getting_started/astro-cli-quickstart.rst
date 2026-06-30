@@ -5,7 +5,7 @@
 Run Cosmos with the Astro CLI
 =============================
 
-Work locally with `Apache Airflow® <https://airflow.apache.org/>`_, dbt, and Astronomer Cosmos using the `Astro CLI <https://github.com/astronomer/astro-cli>`__. While Cosmos fully works with standard Airflow and independently of the Astro CLI, the Astro CLI can simplify creating and running Airflow projects. If you want to get started with Cosmos using only Airflow, see `Getting Started on Open Source Airflow <open-source.html>`_.
+Work locally with `Apache Airflow® <https://airflow.apache.org/>`_, dbt, and Astronomer Cosmos using the `Astro CLI <https://github.com/astronomer/astro-cli>`__. While Cosmos fully works with standard Airflow and independently of the Astro CLI, the Astro CLI can simplify creating and running Airflow projects. If you want to get started with Cosmos using only Airflow, see :doc:`Getting Started on Open Source Airflow </getting_started/open-source>`.
 
 This guide shows you how to run a simple Dag locally with Cosmos, using an example dbt project in Airflow.
 
@@ -136,7 +136,7 @@ Next steps
 ~~~~~~~~~~
 
 - Follow one of the Getting Started Guides where you can bring your own dbt projects and/or Dag code:
-    - `Getting Started on Open-Source <open-source.html>`__
-    - `Getting Started on Astro <astro.html>`__
-    - `Getting Started on MWAA <mwaa.html>`__
-    - `Getting Started on GCC <gcc.html>`__
+    - :doc:`Getting Started on Open-Source </getting_started/open-source>`
+    - :doc:`Getting Started on Astro </getting_started/astro>`
+    - :doc:`Getting Started on MWAA </getting_started/mwaa>`
+    - :doc:`Getting Started on GCC </getting_started/gcc>`

@@ -184,6 +184,38 @@ def test_install_deps_false_skips_dependencies_file_probe(mock_has_deps_file):
     assert dbt_base_operator._should_install_deps() is False
 
 
+@pytest.mark.parametrize("field", ["compiled_sql", "freshness"])
+def test_dbt_local_operator_rejects_output_only_template_fields(field):
+    """``compiled_sql`` and ``freshness`` are populated by Cosmos at runtime.
+
+    Passing them via ``operator_args`` (i.e. as kwargs to the operator) used to
+    be silently overwritten in ``__init__``; we now fail fast at instantiation
+    with a clear error so the misuse is caught immediately.
+    """
+    with pytest.raises(CosmosValueError, match=field):
+        ConcreteDbtLocalBaseOperator(
+            profile_config=profile_config,
+            task_id="my-task",
+            project_dir="my/dir",
+            **{field: "value-the-user-tried-to-set"},
+        )
+
+
+def test_dbt_local_operator_rejects_multiple_output_only_template_fields():
+    """When both forbidden fields are passed, the error names both of them."""
+    with pytest.raises(CosmosValueError) as excinfo:
+        ConcreteDbtLocalBaseOperator(
+            profile_config=profile_config,
+            task_id="my-task",
+            project_dir="my/dir",
+            compiled_sql="x",
+            freshness="y",
+        )
+    message = str(excinfo.value)
+    assert "compiled_sql" in message
+    assert "freshness" in message
+
+
 def test_dbt_base_operator_add_global_flags() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
@@ -2987,11 +3019,16 @@ def test_dbt_seed_local_operator_is_full_refresh(full_refresh, expected):
     assert operator._is_full_refresh() is expected
 
 
-def test_dbt_local_operator_warns_on_output_only_template_fields(caplog):
-    """Test that passing compiled_sql or freshness to local operators emits a warning."""
+def test_dbt_run_local_operator_rejects_output_only_template_fields():
+    """A concrete local operator (through the mixin path) also rejects the fields.
+
+    Exercises the real ``operator_args`` path: ``DbtRunLocalOperator`` routes
+    through ``DbtLocalBaseOperator.__init__``, where the guard inspects the raw
+    kwargs before they are segregated by argspec.
+    """
     from cosmos.operators.local import DbtRunLocalOperator
 
-    with caplog.at_level("WARNING", logger="cosmos.operators.local"):
+    with pytest.raises(CosmosValueError, match="compiled_sql"):
         DbtRunLocalOperator(
             task_id="fake-task",
             profile_config=profile_config,
@@ -2999,7 +3036,3 @@ def test_dbt_local_operator_warns_on_output_only_template_fields(caplog):
             compiled_sql="SELECT 1",
             freshness="test",
         )
-
-    assert "compiled_sql" in caplog.text
-    assert "freshness" in caplog.text
-    assert "output-only template field" in caplog.text

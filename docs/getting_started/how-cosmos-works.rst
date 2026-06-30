@@ -18,9 +18,9 @@ Cosmos creates an interface between a dbt project and Airflow, allowing you to t
 
 You have a number of configuration options, but fundamentally, Cosmos provides the following two functions:
 
-- **Parse your dbt project**: Cosmos parses your dbt project, and translates it into an Airflow Dag. This process uses the `ProjectConfig <../reference/configs/project-config.html>`_ and `RenderConfig <../guides/translate_dbt_to_airflow/render-config.html>`_ to customize specific behavior, allowing you to optimize how your dbt project is represented as a Dag.
+- **Parse your dbt project**: Cosmos parses your dbt project, and translates it into an Airflow Dag. This process uses the :doc:`ProjectConfig </reference/configs/project-config>` and :doc:`RenderConfig </guides/translate_dbt_to_airflow/render-config>` to customize specific behavior, allowing you to optimize how your dbt project is represented as a Dag.
 
-- **Execute the dbt commands**: Cosmos then executes the Dag, using the execution options in your `ExecutionConfig <../reference/configs/execution-config.html>`_ and `ProjectConfig <../reference/configs/project-config.html>`_ to run dbt commands with the appropriate dbt adapter, finally resulting in your dbt SQL running in your data warehouse. Cosmos uses a connection defined in the `ProfileConfig <../profiles/index.html>`_ to execute your SQL in your data warehouse.
+- **Execute the dbt commands**: Cosmos then executes the Dag, using the execution options in your :doc:`ExecutionConfig </reference/configs/execution-config>` and :doc:`ProjectConfig </reference/configs/project-config>` to run dbt commands with the appropriate dbt adapter, finally resulting in your dbt SQL running in your data warehouse. Cosmos uses a connection defined in the :doc:`ProfileConfig </reference/configs/profile-config>` to execute your SQL in your data warehouse.
 
 .. image:: ../_static/how_cosmos_works.png
    :alt: Diagram showing that Cosmos parses dbt projects, with options defined by the ProfileConfig and RenderConfig. Then, Cosmos executes the resulting Dag, with options defined by ExecutionConfig and ProjectConfig.
@@ -28,7 +28,7 @@ You have a number of configuration options, but fundamentally, Cosmos provides t
 Quickstart
 ~~~~~~~~~~
 
-Even though Cosmos is highly extensible, and you have many advanced customization options, you can run a demo with the `Astro CLI <astro-cli-quickstart.html>`_ in just a few minutes. This demo introduces you to the key elements required for Cosmos to parse dbt projects and run Dags.
+Even though Cosmos is highly extensible, and you have many advanced customization options, you can run a demo with the :doc:`Astro CLI </getting_started/astro-cli-quickstart>` in just a few minutes. This demo introduces you to the key elements required for Cosmos to parse dbt projects and run Dags.
 
 Bring your own project
 ~~~~~~~~~~~~~~~~~~~~~~

@@ -219,7 +219,7 @@ The cache values contain a few properties:
 **Shared Cache Behavior**
 
 When using Airflow variables as the backend to store cached cosmos artifacts, both the dbt ls output and the YAML selectors cache will use the same variable. It should not be possible
-to have both artifacts occupy the cache at the same time due to their distinct `RenderConfig.load_mode <./render-config.html>`_ and switching from using one cache to the other will invalidate the cache on the next version check.
+to have both artifacts occupy the cache at the same time due to their distinct :doc:`RenderConfig.load_mode </guides/translate_dbt_to_airflow/render-config>` and switching from using one cache to the other will invalidate the cache on the next version check.
 
 Caching the partial parse file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -237,7 +237,7 @@ Users can customize where to store the cache using the setting ``AIRFLOW__COSMOS
 
 It is possible to switch off this feature by exporting the environment variable ``AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE=0``.
 
-For more information, read the `Cosmos partial parsing documentation <./partial-parsing.html>`_
+For more information, read the :doc:`Cosmos partial parsing documentation </guides/run_dbt/customization/partial-parsing>`
 
 
 Caching the profiles

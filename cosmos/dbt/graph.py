@@ -296,16 +296,19 @@ def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dic
     )
     stdout, stderr = process.communicate()
     returncode = process.returncode
+    stdout = stdout or "<no stdout captured>"
+    stderr = stderr or "<no stderr captured>"
 
     if 'Run "dbt deps" to install package dependencies' in stdout and command[1] == "ls":
         raise CosmosLoadDbtException(
-            "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
+            f"Unable to run dbt ls command due to missing dbt_packages. "
+            f"Set RenderConfig.dbt_deps=True.\n"
+            f"Exit code: {returncode}\nstderr: {stderr}\nstdout: {stdout}"
         )
 
-    if returncode or "Error" in stdout.replace("WarnErrorOptions", ""):
-        details = f"stderr: {stderr}\nstdout: {stdout}"
+    if returncode != 0 or "Error" in stdout.replace("WarnErrorOptions", ""):
+        details = f"Exit code: {returncode}\nstderr: {stderr}\nstdout: {stdout}"
         raise CosmosLoadDbtException(f"Unable to run {command} due to the error:\n{details}")
-
     return stdout
 
 
@@ -1356,16 +1359,30 @@ class DbtGraph:
             Parsed manifest dictionary
 
         Raises:
-            CosmosLoadDbtException: If orjson is enabled but not installed, or if the parsed manifest root is not a dictionary
+            CosmosLoadDbtException: If the manifest file is empty, not valid JSON, the parsed manifest root is not a dictionary, or `orjson` is enabled but not installed.
         """
+
         if settings.enable_orjson_parser and orjson:
-            with manifest_path.open("rb") as fp:
-                manifest = orjson.loads(fp.read())
+            open_mode = "rb"
+            parse_function = orjson.loads
+            decode_errors: tuple[type[BaseException], ...] = (orjson.JSONDecodeError,)
         elif settings.enable_orjson_parser:
             raise CosmosLoadDbtException("orjson is not installed. Install it with: pip install orjson")
         else:
-            with manifest_path.open("r") as fp:
-                manifest = json.load(fp)
+            open_mode = "r"
+            parse_function = json.loads
+            decode_errors = (json.JSONDecodeError, UnicodeDecodeError)
+
+        try:
+            with manifest_path.open(open_mode) as fp:
+                content = fp.read()
+                if not content or content.isspace():
+                    raise CosmosLoadDbtException(f"Failed to load dbt manifest at `{manifest_path}`: file is empty")
+                manifest = parse_function(content)
+        except decode_errors as e:
+            raise CosmosLoadDbtException(
+                f"Failed to load dbt manifest at `{manifest_path}`: file is not valid JSON ({e})"
+            ) from e
 
         if manifest is None:
             return {}

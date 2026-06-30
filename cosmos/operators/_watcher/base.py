@@ -23,6 +23,8 @@ from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
+    DbtNodeStatus,
+    ProducerTaskState,
     _iso_to_string,
     _log_dbt_event,
     build_producer_state_fetcher,
@@ -113,7 +115,10 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
     unique_id = node_info.get("unique_id")
     start_time = node_info.get("node_started_at")
     finish_time = node_info.get("node_finished_at")
-    msg = data.get("msg") or info.get("msg")
+    # The error text lives in different places depending on the invocation mode: ``run_result.message`` on
+    # ``NodeFinished`` (dbt-runner mode) and ``data.msg`` on ``RunResultError`` (subprocess mode).
+    run_result = data.get("run_result") or {}
+    msg = run_result.get("message") or data.get("msg") or info.get("msg")
 
     if unique_id:
         dbt_event = {
@@ -277,8 +282,8 @@ def _rewrite_upstream_failure_skip_status(
         return dbt_node_status
     if is_dbt_upstream_failure_skip_event(log_line.get("info", {}).get("name")):
         upstream_failure_skipped_ids.add(unique_id)
-    if dbt_node_status == "skipped" and unique_id in upstream_failure_skipped_ids:
-        return "failed"
+    if is_dbt_node_status_skipped(dbt_node_status) and unique_id in upstream_failure_skipped_ids:
+        return DbtNodeStatus.FAILED
     return dbt_node_status
 
 
@@ -599,12 +604,20 @@ class BaseConsumerSensor(BaseSensorOperator):
         status = event.get("status")
         reason = event.get("reason")
 
+        # Log the node's dbt event once at terminal (poke() does the same for the non-deferrable path).
+        dbt_events = get_xcom_val(
+            task_instance=context["ti"],
+            key=get_dbt_event_xcom_key(self.model_unique_id),
+            task_ids=self.producer_task_id,
+        )
+        _log_dbt_event(dbt_events)
+
         if status == EventStatus.SKIPPED:
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
 
-        if status == "success" and reason == WatcherEventReason.NODE_NOT_RUN:
+        if status == EventStatus.SUCCESS and reason == WatcherEventReason.NODE_NOT_RUN:
             logger.info(
                 "%s '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
                 self._resource_label,
@@ -618,15 +631,9 @@ class BaseConsumerSensor(BaseSensorOperator):
             if hasattr(self, "_override_rtif"):
                 self._override_rtif(context)
 
-        if status != "failed":
+        if status != EventStatus.FAILED:
             return
 
-        dbt_events = get_xcom_val(
-            task_instance=context["ti"],
-            key=get_dbt_event_xcom_key(self.model_unique_id),
-            task_ids=self.producer_task_id,
-        )
-        _log_dbt_event(dbt_events)
         if reason == WatcherEventReason.NODE_FAILED:
             raise AirflowException(
                 f"dbt {self._resource_label.lower()} '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
@@ -707,7 +714,7 @@ class BaseConsumerSensor(BaseSensorOperator):
 
     def _handle_no_dbt_node_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
         """Handle the case where no dbt node status has been reported yet."""
-        if producer_task_state == "failed":
+        if producer_task_state == ProducerTaskState.FAILED:
             if self.poke_retry_number > 0:
                 raise AirflowException(
                     f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
@@ -716,7 +723,7 @@ class BaseConsumerSensor(BaseSensorOperator):
                 # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
                 return self._fallback_to_non_watcher_run(try_number, context)
 
-        if producer_task_state == "skipped":
+        if producer_task_state == ProducerTaskState.SKIPPED:
             return self._fallback_to_non_watcher_run(try_number, context)
 
         self.poke_retry_number += 1
@@ -760,6 +767,11 @@ class BaseConsumerSensor(BaseSensorOperator):
         if status is not None:
             self._cache_compiled_sql(ti, context)
 
+        if status is None:
+            return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
+
+        # Log the dbt event only once the node is terminal; poke runs every interval, so logging before
+        # this point would repeat the line on each poke.
         dbt_events = get_xcom_val(
             task_instance=context["ti"],
             key=get_dbt_event_xcom_key(self.model_unique_id),
@@ -767,9 +779,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         _log_dbt_event(dbt_events)
 
-        if status is None:
-            return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
-        elif is_dbt_node_status_skipped(status):
+        if is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )

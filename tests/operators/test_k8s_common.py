@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cosmos.operators._k8s_common import (
+    CONTEXT_HOLDER_KEY,
+    CONTEXT_KEY,
     DbtTestWarningHandler,
     WatcherK8sCallback,
     _build_env_vars,
@@ -322,7 +324,7 @@ _CALLBACK_KWARGS = dict(client=MagicMock(), mode="sync", container_name="base", 
 
 
 def test_progress_callback_delegates_with_correct_args():
-    """progress_callback forwards context and test maps from kwargs.
+    """progress_callback unwraps the context holder and forwards test maps from kwargs.
 
     ``CosmosKubernetesPodManager`` threads these through ``callback_extra_kwargs``;
     they arrive in ``progress_callback`` as ``**kwargs`` (see #2543).
@@ -336,7 +338,7 @@ def test_progress_callback_delegates_with_correct_args():
         WatcherK8sCallback.progress_callback(
             line=line,
             **_CALLBACK_KWARGS,
-            context=mock_context,
+            context_holder={CONTEXT_KEY: mock_context},
             tests_per_model=tests_per_model,
             test_results_per_model=test_results,
         )
@@ -344,6 +346,7 @@ def test_progress_callback_delegates_with_correct_args():
     mock_store.assert_called_once()
     args, call_kwargs = mock_store.call_args
     assert args[0] == line
+    assert args[1] == {"context": mock_context}  # allowlist: nothing else leaks past the unwrap
     assert args[1]["context"] is mock_context
     assert call_kwargs["tests_per_model"] is tests_per_model
     assert call_kwargs["test_results_per_model"] is test_results
@@ -367,7 +370,7 @@ def test_build_watcher_pod_manager_wires_callback_extra_kwargs():
     operator = MagicMock()
     operator._tests_per_model = {"model.pkg.orders": ["test.pkg.t1"]}
     operator._test_results_per_model = {}
-    operator._context = {"ti": MagicMock()}
+    operator._context_holder = {CONTEXT_KEY: {"ti": MagicMock()}}
     operator._upstream_failure_skipped_ids = set()
 
     with patch("cosmos.operators._k8s_common.CosmosKubernetesPodManager") as mock_manager_cls:
@@ -379,7 +382,7 @@ def test_build_watcher_pod_manager_wires_callback_extra_kwargs():
         callback_extra_kwargs={
             "tests_per_model": operator._tests_per_model,
             "test_results_per_model": operator._test_results_per_model,
-            "context": operator._context,
+            CONTEXT_HOLDER_KEY: operator._context_holder,
             "upstream_failure_skipped_ids": operator._upstream_failure_skipped_ids,
         },
     )
@@ -389,7 +392,11 @@ def test_pod_manager_passes_extra_kwargs_only_to_marked_callbacks():
     """callback_extra_kwargs reach WatcherK8sCallback but not unmarked user callbacks (#2543)."""
     from cosmos.airflow._override import CosmosKubernetesPodManager
 
-    extra = {"tests_per_model": {"m": ["t"]}, "test_results_per_model": {}, "context": {"ti": MagicMock()}}
+    extra = {
+        "tests_per_model": {"m": ["t"]},
+        "test_results_per_model": {},
+        CONTEXT_HOLDER_KEY: {CONTEXT_KEY: {"ti": MagicMock()}},
+    }
     manager = CosmosKubernetesPodManager(
         kube_client=MagicMock(),
         callbacks=[WatcherK8sCallback],
@@ -503,15 +510,16 @@ def test_execute_watcher_producer_raises_when_ti_missing():
 @patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
 def test_execute_watcher_producer_sets_context_before_parent_execute(mock_init, mock_delete):
-    """The operator's _context (read by build_watcher_pod_manager) is set before parent_execute runs."""
+    """The context holder (read by build_watcher_pod_manager) is populated before parent_execute runs."""
     operator = MagicMock()
+    operator._context_holder = {CONTEXT_KEY: None}
     ti = MagicMock()
     ti.try_number = 1
     context = {"ti": ti, "run_id": "test_run"}
     captured: dict[str, Any] = {}
 
     def capture_context(ctx, **kwargs):
-        captured["context"] = operator._context
+        captured["context"] = operator._context_holder[CONTEXT_KEY]
 
     execute_watcher_producer(operator, context, capture_context)
 

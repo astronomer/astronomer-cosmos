@@ -215,10 +215,10 @@ def create_test_task_metadata(
     :param execution_mode: The Cosmos execution mode we're aiming to run the dbt task at (e.g. local)
     :param task_args: Arguments to be used to instantiate an Airflow Task
     :param on_warning_callback: A callback function called on warnings with additional Context variables “test_names”
-    and “test_results” of type List.
+        and “test_results” of type List.
     :param node: If the test relates to a specific node, the node reference
-    :param render_config: The RenderConfig for the dbt project. Its ``exclude`` is forwarded to the test task
-    (for every test behavior); its ``select`` / ``selector`` are applied only to the TestBehavior.AFTER_ALL task.
+    :param render_config: The RenderConfig for the dbt project. Its ``exclude`` is forwarded to the test task (for
+        every test behavior); its ``select`` / ``selector`` are applied only to the TestBehavior.AFTER_ALL task.
     :param detached_from_parent: Dictionary that maps node ids and their children tests that should be run detached
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """

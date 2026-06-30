@@ -1,6 +1,6 @@
 FROM python:3.12
 
-RUN pip install --force-reinstall 'dbt-postgres>=1.8' 'dbt-core<2.0'
+RUN pip install --force-reinstall 'dbt-postgres>=1.8' 'dbt-core<3.0'
 RUN pip install --force-reinstall dbt-adapters
 RUN pip install --force-reinstall awscli
 

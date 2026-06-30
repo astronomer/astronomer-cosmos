@@ -128,6 +128,15 @@ def calculate_leaves(tasks_ids: list[str], nodes: dict[str, DbtNode]) -> list[st
     return leaves
 
 
+def _split_exclude(value: list[str] | str | None) -> list[str]:
+    """Normalize an ``exclude`` value (space-separated str, list, or None) to a list of items."""
+    if isinstance(value, str):
+        return value.split()
+    if isinstance(value, list):
+        return list(value)
+    return []
+
+
 def exclude_detached_tests_if_needed(
     node: DbtNode,
     task_args: dict[str, str],
@@ -140,14 +149,7 @@ def exclude_detached_tests_if_needed(
     """
     if detached_from_parent is None:
         detached_from_parent = {}
-    current_exclude = task_args.get("exclude")
-    # Handle both list[str] (legacy) and str formats for backward compatibility
-    if isinstance(current_exclude, list):
-        exclude_items = current_exclude
-    elif isinstance(current_exclude, str):
-        exclude_items = current_exclude.split() if current_exclude else []
-    else:
-        exclude_items = []
+    exclude_items = _split_exclude(task_args.get("exclude"))
     tests_detached_from_this_node: list[DbtNode] = detached_from_parent.get(node.unique_id, [])
     for test_node in tests_detached_from_this_node:
         exclude_items.append(test_node.resource_name.split(".")[0])
@@ -155,18 +157,10 @@ def exclude_detached_tests_if_needed(
         task_args["exclude"] = _convert_list_to_str(exclude_items) or ""
 
 
-def _split_exclude(value: list[str] | str | None) -> list[str]:
-    """Normalize an ``exclude`` value (space-separated str, list, or None) to a list of items."""
-    if isinstance(value, str):
-        return value.split()
-    if isinstance(value, list):
-        return list(value)
-    return []
-
-
 def forward_render_exclude_to_test(task_args: dict[str, Any], render_config: RenderConfig | None) -> None:
     """
-    Forward ``RenderConfig.exclude`` to a node-based (AFTER_EACH / detached) test task, in-place.
+    Forward ``RenderConfig.exclude`` to a node command that runs tests, in-place — a per-model
+    (AFTER_EACH / detached) test task, or the inline ``dbt build`` command under TestBehavior.BUILD.
 
     Exclusions are purely additive: the render-level excludes are unioned with any exclude already
     present in ``task_args`` (e.g. supplied via ``operator_args``), preserving both. ``select`` /
@@ -460,6 +454,10 @@ def create_task_metadata(  # noqa: C901
             if test_indirect_selection != TestIndirectSelection.EAGER:
                 args["indirect_selection"] = test_indirect_selection.value
             args["on_warning_callback"] = on_warning_callback
+            # Under BUILD, tests run inline with ``dbt build`` (there is no separate per-model test task),
+            # so forward the render-level exclude here too — otherwise an exclusion such as
+            # exclude=["resource_type:unit_test"] would not be honored for BUILD. See #1763.
+            forward_render_exclude_to_test(args, render_config)
             exclude_detached_tests_if_needed(node, args, detached_from_parent)
             task_id, args = _get_task_id_and_args(
                 node=node,

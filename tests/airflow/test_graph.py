@@ -782,6 +782,30 @@ def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_build_in_buil
     assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
 
 
+def test_create_task_metadata_build_mode_forwards_render_config_exclude():
+    """Under TestBehavior.BUILD, tests run inline with `dbt build`, so RenderConfig.exclude must be
+    forwarded to the build command — otherwise e.g. exclude=["resource_type:unit_test"] would not
+    take effect for BUILD. See https://github.com/astronomer/astronomer-cosmos/issues/1763."""
+    model_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_project.model_a",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("base_path"),
+        original_file_path=Path("models/model_a.sql"),
+        fqn=["my_project", "model_a"],
+    )
+    metadata = create_task_metadata(
+        model_node,
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD, exclude=["resource_type:unit_test"]),
+    )
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+    assert metadata.arguments["select"] == "fqn:my_project.model_a"
+    assert metadata.arguments["exclude"] == "resource_type:unit_test"
+
+
 def test_create_task_metadata_ephemeral_empty_operator_inherits_owner():
     """The ephemeral EmptyOperator inherits the dbt model owner when owner inheritance is enabled (default)."""
     metadata = create_task_metadata(

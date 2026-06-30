@@ -138,7 +138,7 @@ Host from Cloud Storage
 
 For typical users, the recommended setup for hosting dbt docs would look like this:
 
-1. Generate the docs via one of Cosmos' pre-built operators for generating dbt docs (see `Generating Docs <generating-docs.html>`__ for more information)
+1. Generate the docs via one of Cosmos' pre-built operators for generating dbt docs (see :doc:`Generating Docs </guides/dbt_docs/generating-docs>` for more information)
 2. Wherever you dumped the docs, set your ``cosmos.dbt_docs_dir`` to that location.
 3. If you want to use a conn ID other than the default connection, set your ``cosmos.dbt_docs_conn_id``. Otherwise, leave this blank.
 

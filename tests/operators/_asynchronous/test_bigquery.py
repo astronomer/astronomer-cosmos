@@ -76,6 +76,19 @@ def test_dbt_run_airflow_async_bigquery_operator_init_deferrable_defaults_true(p
     assert operator.deferrable is True
 
 
+@pytest.mark.parametrize("field", ["compiled_sql", "freshness"])
+def test_dbt_run_airflow_async_bigquery_operator_rejects_output_only_template_fields(profile_config_mock, field):
+    """The async BigQuery path forwards ``dbt_kwargs`` raw and bypasses the sync
+    guard, so it must reject output-only template fields on its own."""
+    with pytest.raises(CosmosValueError, match=field):
+        DbtRunAirflowAsyncBigqueryOperator(
+            task_id="test_task",
+            project_dir="/path/to/project",
+            profile_config=profile_config_mock,
+            dbt_kwargs={"task_id": "test_task", field: "value-the-user-tried-to-set"},
+        )
+
+
 def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):
     """Test base_cmd property returns the correct dbt command."""
     operator = DbtRunAirflowAsyncBigqueryOperator(

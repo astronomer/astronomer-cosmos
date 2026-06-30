@@ -368,6 +368,11 @@ def setup_warning_handler(
     return handler
 
 
+# Contract keys between operator and callback.
+CONTEXT_HOLDER_KEY = "context_holder"
+CONTEXT_KEY = "context"
+
+
 class K8sWatcherProducerProtocol(Protocol):
     """Structural type for K8s-based watcher producer operators.
 
@@ -378,7 +383,7 @@ class K8sWatcherProducerProtocol(Protocol):
 
     _tests_per_model: dict[str, list[str]]
     _test_results_per_model: dict[str, dict[str, str]]
-    _context: Context | None
+    _context_holder: dict[str, Context | None]
     _upstream_failure_skipped_ids: set[str]
     client: Any
     callbacks: Any
@@ -387,12 +392,18 @@ class K8sWatcherProducerProtocol(Protocol):
 class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
     """K8s pod log callback that parses dbt JSON output and pushes per-model XCom status.
 
-    ``tests_per_model``, ``test_results_per_model``, ``context``, and
+    ``tests_per_model``, ``test_results_per_model``, ``context_holder``, and
     ``upstream_failure_skipped_ids`` are forwarded by ``CosmosKubernetesPodManager``
     via its ``callback_extra_kwargs`` and arrive in ``progress_callback`` as ``**kwargs``.
     The ``receives_cosmos_callback_kwargs`` marker opts this callback in to receiving
     them; user-supplied callbacks without the marker are not given these Cosmos-only
     kwargs, so their ``progress_callback`` is not broken.
+
+    ``context_holder`` is a mutable dict owned by the producer operator and captured
+    by reference when the pod manager is created; ``execute()`` sets its ``"context"``
+    entry, so this callback sees the live execution context no matter when the manager
+    was created. ``progress_callback`` unwraps it into the plain ``context`` expected
+    by ``store_dbt_resource_status_from_log``.
     """
 
     # Opts this callback in to receiving callback_extra_kwargs; read by
@@ -422,9 +433,14 @@ class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
         :param timestamp: the timestamp of the log line.
         :param pod: the pod from which the log line was read.
         """
+        # Don't leak other callback kwargs: the parser only needs "context" in this case.
+        holder = kwargs.get(CONTEXT_HOLDER_KEY)
+        context = holder.get(CONTEXT_KEY) if holder else None
+        # `store_dbt_resource_status_from_log` expects context be passed in a dict of this shape.
+        extra_kwargs = {"context": context} if context else {}
         store_dbt_resource_status_from_log(
             line,
-            kwargs,
+            extra_kwargs,
             tests_per_model=kwargs.get("tests_per_model"),
             test_results_per_model=kwargs.get("test_results_per_model"),
             upstream_failure_skipped_ids=kwargs.get("upstream_failure_skipped_ids"),
@@ -467,7 +483,7 @@ def build_watcher_pod_manager(operator: K8sWatcherProducerProtocol) -> CosmosKub
         callback_extra_kwargs={
             "tests_per_model": operator._tests_per_model,
             "test_results_per_model": operator._test_results_per_model,
-            "context": operator._context,
+            CONTEXT_HOLDER_KEY: operator._context_holder,
             "upstream_failure_skipped_ids": operator._upstream_failure_skipped_ids,
         },
     )
@@ -505,9 +521,10 @@ def execute_watcher_producer(
     _init_xcom_backup(context, persist=reliable_retry)
 
     operator._upstream_failure_skipped_ids.clear()
-    # The pod manager (a cached_property built while parent_execute runs) snapshots this
-    # state into callback_extra_kwargs, so the context must be set before parent_execute.
-    operator._context = context
+    # Publish the context through the mutable holder shared by reference with the pod
+    # manager's callback_extra_kwargs, so the log-parsing callback sees the live context
+    # even if the pod manager (a cached_property) was created before this runs.
+    operator._context_holder[CONTEXT_KEY] = context
 
     # On failure parent_execute() raises and the on-failure callback flushes the backup.
     return_value = parent_execute(context, **kwargs)

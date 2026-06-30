@@ -1,0 +1,38 @@
+# Configuration for the lychee link checker used by the docs "linkcheck" CI job
+# (see .github/workflows/docs-build.yml). Check the docs locally with:
+#   lychee --config lychee.toml 'docs/**/*.rst'
+
+# Only check web links. The docs include example connection strings
+# (postgres://, s3://, gs://, databricks://, ...) that are not real URLs.
+scheme = ["http", "https"]
+
+# Give slow or occasionally throttling hosts a few chances before failing, so a
+# transient network hiccup doesn't make this blocking check flaky. A lower
+# concurrency keeps us from tripping per-host rate limiters.
+max_retries = 4
+retry_wait_time = 3
+timeout = 30
+max_concurrency = 8
+
+# Fail only on genuinely broken links. A 429 (rate limited) or 503/504
+# (service unavailable / gateway timeout) means the host is up but throttling
+# automated requests — common for CI runners hitting docs CDNs — not that the
+# link is broken. 4xx such as 404/403/410 are still treated as failures.
+accept = ["200..=299", "429", "503", "504"]
+
+# Don't treat unreachable loopback / example hosts (e.g. http://localhost:8080)
+# as failures.
+exclude_loopback = true
+
+# URLs an automated checker cannot verify, plus intentional placeholders.
+# Genuinely broken links are fixed in the docs, not excluded here.
+exclude = [
+    # Auth wall — Slack invite links return 403 to unauthenticated requests.
+    'https://join\.slack\.com',
+    # Flaky / rate-limited from CI — intermittent TLS failures.
+    'https://ossrank\.com',
+    # Bot-blocked — the Bitnami Helm chart repo returns 403 to non-Helm clients.
+    'https://charts\.bitnami\.com',
+    # Intentional placeholder in example snippets, not a real repository.
+    'https://github\.com/your-org/',
+]

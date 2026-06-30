@@ -8,9 +8,10 @@ Watcher retry behavior history
 While ``ExecutionMode.WATCHER`` can significantly improve DAG run times, it is based on
 non-idempotent `Apache Airflow® <https://airflow.apache.org/>`_ tasks and relies on a complex retry
 mechanism in which one task's status can affect another task's status. This is the reason
-``ExecutionMode.WATCHER`` has remained marked as experimental for several months — until we can get
-this right. This document aims to present how each aspect of retries has evolved within the Cosmos
-watcher implementation across Cosmos releases.
+``ExecutionMode.WATCHER`` remained marked as experimental for several months — until this retry
+behavior was hardened. With Cosmos 1.15.0, ``ExecutionMode.WATCHER`` is marked stable. This document
+aims to present how each aspect of retries has evolved within the Cosmos watcher implementation
+across Cosmos releases.
 
 Goals
 +++++

@@ -146,8 +146,16 @@ def test_calculate_datached_node_name_under_is_under_250():
     assert calculate_detached_node_name(node) == "detached_1_test"
 
 
+@pytest.fixture
+def hierarchical_naming_disabled(monkeypatch):
+    """Pin the global hierarchical-naming setting to False so the folder-grouping tests stay hermetic
+    regardless of any AIRFLOW__COSMOS__ENABLE_HIERARCHICAL_NAMING_FOR_GROUP_NODES_BY_FOLDER set in the
+    developer's environment. See https://github.com/astronomer/astronomer-cosmos/issues/1763."""
+    monkeypatch.setattr("cosmos.settings.enable_hierarchical_naming_for_group_nodes_by_folder", False)
+
+
 @pytest.mark.integration
-def test_build_airflow_graph_with_after_each():
+def test_build_airflow_graph_with_after_each(hierarchical_naming_disabled):
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,
@@ -341,7 +349,48 @@ def test_generate_task_or_group_with_dynamic_node_type_no_converter_returns_none
 
 
 @pytest.mark.integration
-def test_build_airflow_graph_with_after_all():
+def test_build_airflow_graph_hierarchical_naming_enabled(monkeypatch):
+    """With the global setting enabled, folders that share a leaf name under different parents render
+    as distinct task groups (``gen3.models`` instead of collapsing into ``gen2.models``) — the opt-in
+    #2824 behaviour, wired through build_airflow_graph. See
+    https://github.com/astronomer/astronomer-cosmos/issues/1763."""
+    monkeypatch.setattr("cosmos.settings.enable_hierarchical_naming_for_group_nodes_by_folder", True)
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        build_airflow_graph(
+            nodes=sample_nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(
+                group_nodes_by_folder=True,
+                test_behavior=TestBehavior.AFTER_EACH,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            ),
+            dbt_project_name="astro_shop",
+        )
+    task_groups = dag.task_group_dict
+    # gen3/models becomes its own task group instead of collapsing into gen2.models
+    assert "gen3.models" in task_groups
+    assert len(task_groups) == 5
+    leaf_ids = {leaf.task_id for leaf in dag.leaves}
+    assert leaf_ids == {"gen3.models.child_run", "gen3.models.child2_v2_run"}
+
+
+@pytest.mark.integration
+def test_build_airflow_graph_with_after_all(hierarchical_naming_disabled):
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,
@@ -426,7 +475,7 @@ def test_build_airflow_graph_with_after_all_and_empty_nodes():
 
 
 @pytest.mark.integration
-def test_build_airflow_graph_with_build():
+def test_build_airflow_graph_with_build(hierarchical_naming_disabled):
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,
@@ -1542,7 +1591,7 @@ def test_watcher_producer_preserves_existing_dbt_cmd_flags(test_behavior):
     assert "--resource-type" in producer_task.dbt_cmd_flags
 
 
-def test_custom_meta():
+def test_custom_meta(hierarchical_naming_disabled):
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
             "project_dir": SAMPLE_PROJ_PATH,

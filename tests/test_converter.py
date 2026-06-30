@@ -382,7 +382,10 @@ def test_converter_passes_render_config_exclude_to_test_tasks():
     """
     RenderConfig.exclude must be forwarded to the generated test tasks for every test behavior,
     not only TestBehavior.AFTER_ALL — i.e. exclude=["resource_type:unit_test"] reaches the
-    ``dbt test`` command of each per-model / detached test task. See #1763 / #1865.
+    ``dbt test`` command of each per-model / detached test task.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/1763
+    and https://github.com/astronomer/astronomer-cosmos/issues/1865.
     """
     project_config = ProjectConfig(dbt_project_path=MULTIPLE_PARENTS_TEST_DBT_PROJECT)
     execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
@@ -718,8 +721,11 @@ def test_converter_raises_warning(mock_load_dbt_graph, execution_mode, virtualen
         operator_args=operator_args,
     )
 
-    assert "`ExecutionConfig.virtualenv_dir` is only supported when \
-                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV." in caplog.text
+    assert (
+        "`ExecutionConfig.virtualenv_dir` is only supported when \
+                ExecutionConfig.execution_mode is set to ExecutionMode.VIRTUALENV."
+        in caplog.text
+    )
 
 
 @pytest.mark.parametrize(

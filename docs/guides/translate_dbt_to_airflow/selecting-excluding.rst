@@ -146,7 +146,7 @@ Examples:
     )
 
 How ``exclude`` and ``select`` interact with test tasks
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ``RenderConfig.exclude`` is passed through to the generated **test tasks for every test
 behavior** (``AFTER_EACH``, ``BUILD`` and ``AFTER_ALL``). This means an exclusion such as

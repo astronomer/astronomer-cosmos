@@ -1276,7 +1276,10 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
     ],
 )
 def test_create_test_task_metadata_forwards_render_config_exclude_to_node_test(exclude, expected_exclude):
-    """RenderConfig.exclude must reach per-model (AFTER_EACH) / detached test tasks, not only AFTER_ALL. See #1763."""
+    """RenderConfig.exclude must reach per-model (AFTER_EACH) / detached test tasks, not only AFTER_ALL.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/1763.
+    """
     sample_node = DbtNode(
         unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
         resource_type=DbtResourceType.MODEL,

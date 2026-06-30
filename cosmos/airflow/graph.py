@@ -159,10 +159,8 @@ def forward_render_exclude_to_test(task_args: dict[str, Any], render_config: Ren
     """
     Forward ``RenderConfig.exclude`` to a node-based (AFTER_EACH / detached) test task, in-place.
 
-    Without this, ``RenderConfig.exclude`` was only honored by the aggregate AFTER_ALL test task,
-    so e.g. ``exclude=["resource_type:unit_test"]`` did not stop unit tests from running for the
-    AFTER_EACH / BUILD behaviors. Exclusions are purely additive, so forwarding them is safe;
-    ``select`` / ``selector`` are intentionally not forwarded here (see the docs note). See #1763.
+    Exclusions are purely additive; ``select`` / ``selector`` are intentionally not forwarded here.
+    See https://github.com/astronomer/astronomer-cosmos/issues/1763.
     """
     if render_config is not None and render_config.exclude:
         task_args["exclude"] = _convert_list_to_str(render_config.exclude)

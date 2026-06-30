@@ -33,6 +33,9 @@ exclude = [
     'https://ossrank\.com',
     # Bot-blocked — the Bitnami Helm chart repo returns 403 to non-Helm clients.
     'https://charts\.bitnami\.com',
+    # Bot-blocked / rate-limited from CI — AWS docs intermittently return 403 to
+    # automated requests (they resolve fine in a browser), causing flaky linkcheck failures.
+    'https://docs\.aws\.amazon\.com',
     # Intentional placeholder in example snippets, not a real repository.
     'https://github\.com/your-org/',
 ]

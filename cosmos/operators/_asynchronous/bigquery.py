@@ -95,6 +95,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         task_id = self.dbt_kwargs.pop("task_id")
         self.full_refresh = self.dbt_kwargs.pop("full_refresh", False)
 
+        # This path forwards dbt_kwargs raw and never routes through
+        # DbtLocalBaseOperator.__init__, so apply the same output-only guard here.
+        self._reject_output_only_template_fields(self.dbt_kwargs)
+
         AbstractDbtLocalBase.__init__(
             self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )

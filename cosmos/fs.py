@@ -52,6 +52,13 @@ def safe_copy(src: Path, dst: Path) -> None:
     try:
         shutil.copyfile(src, temp_path)
 
+        # ``mkstemp`` creates the temp file with mode 0o600 regardless of umask, so without this
+        # the destination would always end up owner-only — narrower than the source. Copy the
+        # source's permission bits over so the atomic write preserves the original file mode
+        # (matching the previous ``shutil.copy`` behaviour and keeping shared, group-readable
+        # cache_dir setups working).
+        shutil.copymode(src, temp_path)
+
         # Replace the temporary file with the destination file atomically.
         os.replace(temp_path, dst)
     finally:

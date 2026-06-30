@@ -31,6 +31,19 @@ def test_safe_copy_overwrites_existing_destination(tmp_path: Path) -> None:
     assert dst.read_text() == "new"
 
 
+def test_safe_copy_preserves_source_mode(tmp_path: Path) -> None:
+    # ``mkstemp`` creates the temp file as 0o600; ``safe_copy`` must restore the source's
+    # group/other-readable bits so the atomic write does not narrow access on shared cache dirs.
+    src = tmp_path / "src.txt"
+    src.write_text("hello")
+    src.chmod(0o644)
+    dst = tmp_path / "dst.txt"
+
+    safe_copy(src, dst)
+
+    assert (dst.stat().st_mode & 0o777) == 0o644
+
+
 def test_safe_copy_cleans_up_temp_file_on_failure(tmp_path: Path) -> None:
     src = tmp_path / "src.txt"
     src.write_text("hello")

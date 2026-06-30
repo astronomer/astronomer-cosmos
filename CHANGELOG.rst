@@ -393,7 +393,7 @@ Bug fixes
 * Add databricks oauth mock profile by @fjmacagno in #2164
 * Register listeners in Airflow 3 plugin implementation by @pankajastro in #2187
 * Fix resolution of ``packages-install-path`` when it uses ``env_var`` by @tatiana in #2194
-* Fix ``template_fields`` in ``DbtConsumerWatcherSensor`` to include ``DbtRunLocalOperator`` template_fields`` by @tiovader and @emanuel-luis in #2209
+* Fix ``template_fields`` in ``DbtConsumerWatcherSensor`` to include ``DbtRunLocalOperator`` ``template_fields`` by @tiovader and @emanuel-luis in #2201
 * Emit asset events in ExecutionMode.AIRFLOW_ASYNC mode by @pankajastro in #2184
 * Remove dag_run_id from telemetry tests by @tatiana in #2213
 
@@ -981,7 +981,7 @@ Bug fixes
 Enhancements
 
 * Improve dbt Docs Hosting Debugging -- Update dbt_docs_not_set_up.html by @johnmcochran in #1250
-* Minor refactor on VirtualenvOperators & add test for PR #1253 by @tatiana in #1286
+* Minor refactor on VirtualenvOperators & add test for PR #1252 by @tatiana in #1286
 
 Docs
 
@@ -1199,7 +1199,7 @@ Others
 
 * Enable pre-commit run and fix type-check job by @pankajastro in #957
 * Clean databricks credentials in test/CI by @tatiana in #969
-* Update CODEOWNERS by @tatiana in #969 x
+* Update CODEOWNERS by @tatiana in #968
 * Update emeritus contributors list by @tatiana in #961
 * Promote @dwreeves to committer by @tatiana in #960
 * Pre-commit hook updates in #956
@@ -1475,8 +1475,7 @@ Bug fixes
 * Fix ``on_warning_callback`` behaviour on ``DbtTestLocalOperator`` by @edgga, @marco9663 and @tatiana in #558
 * Use ``returncode`` instead of ``stderr`` to determine dbt graph loading errors by @cliff-lau-cloverhealth in #547
 * Improve error message in ``config.py`` by @meyobagero in #532
-* Fix ``DbtTestOperator`` when test does not have ``test_metadata`` by @tatiana in #558
-* Fix ``target-path`` not specified issue in ``dbt-project.yml`` by @tatiana in #533
+* Fix ``target-path`` not specified issue in ``dbt-project.yml`` by @tatiana (reported in #533, fixed in release PR #562)
 
 Others
 
@@ -1548,7 +1547,7 @@ Others
 
 Enhancements
 
-* Improve logs to include astornomer-cosmos identifier by @tatiana in #450
+* Improve logs to include astronomer-cosmos identifier by @tatiana in #450
 * Support OAuth authentication for Big Query by @MonideepDe in #431
 
 Bug fixes

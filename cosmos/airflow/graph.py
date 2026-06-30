@@ -155,15 +155,30 @@ def exclude_detached_tests_if_needed(
         task_args["exclude"] = _convert_list_to_str(exclude_items) or ""
 
 
+def _split_exclude(value: list[str] | str | None) -> list[str]:
+    """Normalize an ``exclude`` value (space-separated str, list, or None) to a list of items."""
+    if isinstance(value, str):
+        return value.split()
+    if isinstance(value, list):
+        return list(value)
+    return []
+
+
 def forward_render_exclude_to_test(task_args: dict[str, Any], render_config: RenderConfig | None) -> None:
     """
     Forward ``RenderConfig.exclude`` to a node-based (AFTER_EACH / detached) test task, in-place.
 
-    Exclusions are purely additive; ``select`` / ``selector`` are intentionally not forwarded here.
+    Exclusions are purely additive: the render-level excludes are unioned with any exclude already
+    present in ``task_args`` (e.g. supplied via ``operator_args``), preserving both. ``select`` /
+    ``selector`` are intentionally not forwarded here.
     See https://github.com/astronomer/astronomer-cosmos/issues/1763.
     """
-    if render_config is not None and render_config.exclude:
-        task_args["exclude"] = _convert_list_to_str(render_config.exclude)
+    if render_config is None or not render_config.exclude:
+        return
+    existing_items = _split_exclude(task_args.get("exclude"))
+    render_items = _split_exclude(render_config.exclude)
+    merged = existing_items + [item for item in render_items if item not in existing_items]
+    task_args["exclude"] = _convert_list_to_str(merged)
 
 
 def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_override: dict[str, Any]) -> None:

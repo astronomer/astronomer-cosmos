@@ -1323,6 +1323,51 @@ def test_create_test_task_metadata_without_render_config_exclude_preserves_exist
     assert metadata.arguments["exclude"] == "tag:my_custom_exclude"
 
 
+def test_create_test_task_metadata_unions_render_config_exclude_with_existing_exclude():
+    """A render-level exclude must be unioned with (not overwrite) an operator/task-args exclude."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"exclude": "tag:foo"},
+        node=sample_node,
+        render_config=RenderConfig(exclude=["resource_type:unit_test"]),
+    )
+    # Both the operator-supplied and render-level exclusions are preserved (additive).
+    assert metadata.arguments["exclude"] == "tag:foo resource_type:unit_test"
+
+
+def test_create_test_task_metadata_does_not_duplicate_overlapping_excludes():
+    """An exclude present in both task args and RenderConfig must appear only once."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"exclude": "resource_type:unit_test"},
+        node=sample_node,
+        render_config=RenderConfig(exclude=["resource_type:unit_test", "tag:foo"]),
+    )
+    assert metadata.arguments["exclude"] == "resource_type:unit_test tag:foo"
+
+
 @pytest.mark.parametrize(
     "input,expected", [("snake_case", "SnakeCase"), ("snake_case_with_underscores", "SnakeCaseWithUnderscores")]
 )

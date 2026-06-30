@@ -191,6 +191,17 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     _OUTPUT_ONLY_TEMPLATE_FIELDS: tuple[str, ...] = ("compiled_sql", "freshness")
     _process_log_line_callable: Callable[[str, Any], None] | None = None
 
+    @classmethod
+    def _reject_output_only_template_fields(cls, kwargs: dict[str, Any]) -> None:
+        forbidden = [f for f in cls._OUTPUT_ONLY_TEMPLATE_FIELDS if f in kwargs]
+        if forbidden:
+            names = ", ".join(repr(f) for f in forbidden)
+            raise CosmosValueError(
+                f"{names} {'is' if len(forbidden) == 1 else 'are'} output-only "
+                "template field(s) populated by Cosmos at runtime; "
+                "remove them from operator_args."
+            )
+
     def __init__(
         self,
         task_id: str,
@@ -985,17 +996,9 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
         # ``compiled_sql`` and ``freshness`` are template fields populated by
         # Cosmos at runtime, not constructor arguments. They are not part of any
         # __init__ signature, so the argspec-based segregation below silently
-        # drops them — a user who sets them via ``operator_args`` would get no
-        # error and no effect. Reject them up front, before that split, so the
-        # misuse fails fast with a clear message.
-        forbidden = [f for f in self._OUTPUT_ONLY_TEMPLATE_FIELDS if f in kwargs]
-        if forbidden:
-            names = ", ".join(repr(f) for f in forbidden)
-            raise CosmosValueError(
-                f"{names} {'is' if len(forbidden) == 1 else 'are'} output-only "
-                "template field(s) populated by Cosmos at runtime; "
-                "remove them from operator_args."
-            )
+        # drops them. Reject them up front, before that split, so the misuse
+        # fails fast with a clear message.
+        self._reject_output_only_template_fields(kwargs)
 
         base_kwargs = {}
         operator_kwargs = {}

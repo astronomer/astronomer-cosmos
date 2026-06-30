@@ -538,6 +538,25 @@ def test_populate_model_outlet_uris_noop_without_profile(mock_namespace):
     mock_namespace.assert_not_called()
 
 
+@patch("cosmos.dataset.compute_model_outlet_uris")
+@patch("cosmos.dataset.get_dataset_namespace", return_value="postgres://h:5432")
+def test_populate_model_outlet_uris_noop_when_manifest_missing(mock_namespace, mock_compute):
+    """A configured-but-absent manifest file degrades to a no-op (no compute, no datasets)."""
+    from cosmos.operators import _k8s_common
+
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=profile_config,
+        image="dbt-image:latest",
+        manifest_filepath="/does/not/exist/manifest.json",
+    )
+
+    _k8s_common._populate_producer_model_outlet_uris(op)
+
+    assert op._model_outlet_uris == {}
+    mock_compute.assert_not_called()
+
+
 @patch("cosmos.operators.watcher_kubernetes.register_dataset_on_task")
 def test_consumer_emits_datasets_on_success(mock_register):
     """On success the consumer emits one Airflow Asset per outlet URI from the producer."""
@@ -580,6 +599,33 @@ def test_consumer_emit_datasets_noop_without_outlets(mock_register):
     sensor._emit_datasets({"ti": MagicMock()})
 
     mock_register.assert_not_called()
+
+
+@patch("cosmos.settings.enable_uri_xcom", True)
+@patch("cosmos.operators.watcher_kubernetes.register_dataset_on_task")
+def test_consumer_emit_datasets_pushes_uri_xcom_when_enabled(mock_register):
+    """With ``enable_uri_xcom`` the emitted URIs are also pushed to XCom under ``uri``."""
+    sensor = make_sensor()
+    sensor.emit_datasets = True
+    sensor._outlet_uris = ["postgres://h:5432/db/schema/stg_orders"]
+
+    ti = MagicMock()
+    sensor._emit_datasets({"ti": ti})
+
+    ti.xcom_push.assert_called_once_with(key="uri", value=["postgres://h:5432/db/schema/stg_orders"])
+
+
+@patch("cosmos.operators.watcher_kubernetes.DbtConsumerWatcherKubernetesSensor._emit_datasets")
+@patch("cosmos.operators._watcher.base.BaseConsumerSensor.execute")
+def test_consumer_execute_emits_on_success(mock_super_execute, mock_emit):
+    """The non-deferred execute path emits datasets after the parent sensor loop returns."""
+    sensor = make_sensor()
+    context = {"ti": MagicMock()}
+
+    sensor.execute(context)
+
+    mock_super_execute.assert_called_once()
+    mock_emit.assert_called_once_with(context)
 
 
 @patch("cosmos.operators.watcher_kubernetes.DbtConsumerWatcherKubernetesSensor._emit_datasets")

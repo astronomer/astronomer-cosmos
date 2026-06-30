@@ -526,6 +526,33 @@ def test_consumer_emit_datasets_noop_without_outlets(mock_register):
     mock_register.assert_not_called()
 
 
+@patch("cosmos.settings.enable_uri_xcom", True)
+@patch("cosmos.operators.watcher_gcp_gke.register_dataset_on_task")
+def test_consumer_emit_datasets_pushes_uri_xcom_when_enabled(mock_register):
+    """With ``enable_uri_xcom`` the emitted URIs are also pushed to XCom under ``uri``."""
+    sensor = make_sensor()
+    sensor.emit_datasets = True
+    sensor._outlet_uris = ["postgres://h:5432/db/schema/stg_orders"]
+
+    ti = MagicMock()
+    sensor._emit_datasets({"ti": ti})
+
+    ti.xcom_push.assert_called_once_with(key="uri", value=["postgres://h:5432/db/schema/stg_orders"])
+
+
+@patch("cosmos.operators.watcher_gcp_gke.DbtConsumerWatcherGcpGkeSensor._emit_datasets")
+@patch("cosmos.operators._watcher.base.BaseConsumerSensor.execute")
+def test_consumer_execute_emits_on_success(mock_super_execute, mock_emit):
+    """The non-deferred execute path emits datasets after the parent sensor loop returns."""
+    sensor = make_sensor()
+    context = {"ti": MagicMock()}
+
+    sensor.execute(context)
+
+    mock_super_execute.assert_called_once()
+    mock_emit.assert_called_once_with(context)
+
+
 @patch("cosmos.operators.watcher_gcp_gke.DbtConsumerWatcherGcpGkeSensor._emit_datasets")
 @patch("cosmos.operators._watcher.base.BaseConsumerSensor.execute_complete")
 def test_consumer_execute_complete_extracts_outlets_and_emits(mock_super_complete, mock_emit):

@@ -112,7 +112,7 @@ class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOpe
 
         if AIRFLOW_VERSION.major >= 3:
             from airflow.sdk.definitions.asset import Asset
-        else:
+        else:  # pragma: no cover - WATCHER_KUBERNETES requires a cncf-kubernetes provider only present on Airflow 3 CI jobs
             from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
 
         outlets = [Asset(uri=uri) for uri in outlet_uris]

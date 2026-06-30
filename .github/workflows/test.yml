@@ -2,7 +2,10 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    # TEMP — REVERT BEFORE MERGE. Also run on this bump branch so the new dbt-core 2.0
+    # matrix cells are exercised pre-merge: test.yml is pull_request_target, so PR runs read
+    # the matrix from `main`; a push event runs the branch's own workflow (and 2.0 matrix).
+    branches: [main, bump/dbt-core-2.0.0a3]
   # Also run on pull requests originating from forks. Every test job here is secret-dependent
   # (integration tests, kubernetes, code coverage) and depends on the Authorize job, which requires
   # manually approving the workflow run for external PRs. Jobs that need no secrets (type-check,

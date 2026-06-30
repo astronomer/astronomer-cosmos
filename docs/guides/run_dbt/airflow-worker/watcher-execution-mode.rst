@@ -1,9 +1,9 @@
 .. _watcher-execution-mode:
 
-Watcher execution mode (experimental)
-=====================================
+Watcher execution mode
+======================
 
-With the release of **Cosmos 1.11.0**, we are introducing a powerful new experimental execution mode — ``ExecutionMode.WATCHER`` — designed to drastically reduce dbt pipeline run times in `Apache Airflow® <https://airflow.apache.org/>`_.
+Introduced as experimental in **Cosmos 1.11.0** and marked **stable starting with Cosmos 1.15.0**, ``ExecutionMode.WATCHER`` is a powerful execution mode designed to drastically reduce dbt pipeline run times in `Apache Airflow® <https://airflow.apache.org/>`_.
 
 Early benchmarks show that ``ExecutionMode.WATCHER`` can cut total DAG runtime **by up to 80%**, bringing performance **on par with running dbt CLI locally**. Since this execution mode improves the performance by leveraging `dbt threading <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ and Airflow deferrable sensors, the performance gains will depend on three major factors:
 
@@ -678,6 +678,6 @@ Summary
 - ✅ Enables **smarter resource allocation**
 - ✅ Built on proven Cosmos rendering techniques
 
-This is an experimental feature, and we are looking for feedback from the community.
+``ExecutionMode.WATCHER`` was introduced as experimental in Cosmos 1.11.0 and is marked stable starting with Cosmos 1.15.0. We continue to welcome feedback from the community.
 
 Stay tuned for further documentation and base image support for the ``ExecutionMode.WATCHER`` in upcoming releases.

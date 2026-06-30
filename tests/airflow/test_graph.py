@@ -827,6 +827,30 @@ def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_build_in_buil
     assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
 
 
+def test_create_task_metadata_build_mode_forwards_render_config_exclude():
+    """Under TestBehavior.BUILD, tests run inline with `dbt build`, so RenderConfig.exclude must be
+    forwarded to the build command — otherwise e.g. exclude=["resource_type:unit_test"] would not
+    take effect for BUILD. See https://github.com/astronomer/astronomer-cosmos/issues/1763."""
+    model_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_project.model_a",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("base_path"),
+        original_file_path=Path("models/model_a.sql"),
+        fqn=["my_project", "model_a"],
+    )
+    metadata = create_task_metadata(
+        model_node,
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD, exclude=["resource_type:unit_test"]),
+    )
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+    assert metadata.arguments["select"] == "fqn:my_project.model_a"
+    assert metadata.arguments["exclude"] == "resource_type:unit_test"
+
+
 def test_create_task_metadata_ephemeral_empty_operator_inherits_owner():
     """The ephemeral EmptyOperator inherits the dbt model owner when owner inheritance is enabled (default)."""
     metadata = create_task_metadata(
@@ -1311,6 +1335,106 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
         **{"task_arg": "value", "on_warning_callback": True, "emit_datasets": False},
         **additional_arguments,
     }
+
+
+@pytest.mark.parametrize(
+    "exclude,expected_exclude",
+    [
+        (["resource_type:unit_test"], "resource_type:unit_test"),
+        (["resource_type:unit_test", "tag:skip_in_tests"], "resource_type:unit_test tag:skip_in_tests"),
+    ],
+)
+def test_create_test_task_metadata_forwards_render_config_exclude_to_node_test(exclude, expected_exclude):
+    """RenderConfig.exclude must reach per-model (AFTER_EACH) / detached test tasks, not only AFTER_ALL.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/1763.
+    """
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"task_arg": "value"},
+        node=sample_node,
+        render_config=RenderConfig(exclude=exclude),
+    )
+    assert metadata.arguments["select"] == "node_name"
+    assert metadata.arguments["exclude"] == expected_exclude
+
+
+def test_create_test_task_metadata_without_render_config_exclude_preserves_existing_exclude():
+    """An empty RenderConfig.exclude must not clobber an exclude supplied through operator/task args."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"exclude": "tag:my_custom_exclude"},
+        node=sample_node,
+        render_config=RenderConfig(exclude=[]),
+    )
+    assert metadata.arguments["exclude"] == "tag:my_custom_exclude"
+
+
+def test_create_test_task_metadata_unions_render_config_exclude_with_existing_exclude():
+    """A render-level exclude must be unioned with (not overwrite) an operator/task-args exclude."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"exclude": "tag:foo"},
+        node=sample_node,
+        render_config=RenderConfig(exclude=["resource_type:unit_test"]),
+    )
+    # Both the operator-supplied and render-level exclusions are preserved (additive).
+    assert metadata.arguments["exclude"] == "tag:foo resource_type:unit_test"
+
+
+def test_create_test_task_metadata_does_not_duplicate_overlapping_excludes():
+    """An exclude present in both task args and RenderConfig must appear only once."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"exclude": "resource_type:unit_test"},
+        node=sample_node,
+        render_config=RenderConfig(exclude=["resource_type:unit_test", "tag:foo"]),
+    )
+    assert metadata.arguments["exclude"] == "resource_type:unit_test tag:foo"
 
 
 @pytest.mark.parametrize(

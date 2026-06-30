@@ -378,6 +378,75 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
 
 
 @pytest.mark.integration
+def test_converter_passes_render_config_exclude_to_test_tasks():
+    """
+    RenderConfig.exclude must be forwarded to the generated test tasks for every test behavior,
+    not only TestBehavior.AFTER_ALL — i.e. exclude=["resource_type:unit_test"] reaches the
+    ``dbt test`` command of each per-model / detached test task.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/1763
+    and https://github.com/astronomer/astronomer-cosmos/issues/1865.
+    """
+    project_config = ProjectConfig(dbt_project_path=MULTIPLE_PARENTS_TEST_DBT_PROJECT)
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+    render_config = RenderConfig(should_detach_multiple_parents_tests=True, exclude=["resource_type:unit_test"])
+    profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="example_conn",
+            profile_args={"schema": "public"},
+            disable_event_tracking=True,
+        ),
+    )
+    with DAG("sample_dag", start_date=datetime(2024, 4, 16)) as dag:
+        converter = DbtToAirflowConverter(
+            dag=dag,
+            project_config=project_config,
+            profile_config=profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+        )
+    tasks = converter.tasks_map
+
+    assert len(converter.tasks_map) == 4
+
+    # The render-level exclusion is prepended to each test command; for parents of the detached
+    # test the detached test name is then appended (exclusions are additive).
+    args = tasks["model.my_dbt_project.combined_model"].children["combined_model.test"].build_cmd({})[0]
+    assert args[1:] == [
+        "test",
+        "--select",
+        "combined_model",
+        "--exclude",
+        "resource_type:unit_test custom_test_combined_model_combined_model_",
+    ]
+
+    args = tasks["model.my_dbt_project.model_a"].children["model_a.test"].build_cmd({})[0]
+    assert args[1:] == [
+        "test",
+        "--select",
+        "model_a",
+        "--exclude",
+        "resource_type:unit_test custom_test_combined_model_combined_model_",
+    ]
+
+    # model_b is not a parent of the detached test, so it only carries the render-level exclusion
+    args = tasks["model.my_dbt_project.model_b"].children["model_b.test"].build_cmd({})[0]
+    assert args[1:] == ["test", "--select", "model_b", "--exclude", "resource_type:unit_test"]
+
+    # The detached (multiple-parents) test task also honors the render-level exclusion
+    args = tasks["test.my_dbt_project.custom_test_combined_model_combined_model_.c6e4587380"].build_cmd({})[0]
+    assert args[1:] == [
+        "test",
+        "--select",
+        "custom_test_combined_model_combined_model_",
+        "--exclude",
+        "resource_type:unit_test",
+    ]
+
+
+@pytest.mark.integration
 def test_converter_creates_dag_with_test_with_multiple_parents_with_should_detach_multiple_parents_tests_false():
     """
     Validate topology of a project that uses the MULTIPLE_PARENTS_TEST_DBT_PROJECT project

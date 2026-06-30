@@ -120,8 +120,6 @@ from cosmos.operators.base import (
 
 logger = get_logger(__name__)
 
-_OUTPUT_ONLY_TEMPLATE_FIELDS: tuple[str, ...] = ("compiled_sql", "freshness")
-
 
 def _read_target_sources_json(project_root: Path) -> dict[str, Any] | None:
     """Parse ``target/sources.json`` under ``project_root`` if the file exists."""
@@ -187,18 +185,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         "compiled_sql": "sql",
         "freshness": "json",
     }
+    # These template fields are populated by Cosmos at runtime; values supplied
+    # via ``operator_args`` (or directly to the operator) would be silently
+    # overwritten, so reject them at instantiation instead.
+    _OUTPUT_ONLY_TEMPLATE_FIELDS: tuple[str, ...] = ("compiled_sql", "freshness")
     _process_log_line_callable: Callable[[str, Any], None] | None = None
-
-    def _warn_on_output_only_fields(self, kwargs: dict[str, Any]) -> None:
-        """Warn when output-only template fields are passed directly to local operators."""
-        for field in _OUTPUT_ONLY_TEMPLATE_FIELDS:
-            if field in kwargs:
-                self.log.warning(
-                    "The '%s' argument passed to %s will be overwritten at runtime; "
-                    "it is an output-only template field.",
-                    field,
-                    self.__class__.__name__,
-                )
 
     def __init__(
         self,
@@ -991,13 +982,26 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
         # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
         # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
         # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
+        # ``compiled_sql`` and ``freshness`` are template fields populated by
+        # Cosmos at runtime, not constructor arguments. They are not part of any
+        # __init__ signature, so the argspec-based segregation below silently
+        # drops them — a user who sets them via ``operator_args`` would get no
+        # error and no effect. Reject them up front, before that split, so the
+        # misuse fails fast with a clear message.
+        forbidden = [f for f in self._OUTPUT_ONLY_TEMPLATE_FIELDS if f in kwargs]
+        if forbidden:
+            names = ", ".join(repr(f) for f in forbidden)
+            raise CosmosValueError(
+                f"{names} {'is' if len(forbidden) == 1 else 'are'} output-only "
+                "template field(s) populated by Cosmos at runtime; "
+                "remove them from operator_args."
+            )
+
         base_kwargs = {}
         operator_kwargs = {}
         operator_args = {*inspect.signature(BaseOperator.__init__).parameters.keys()}
 
         default_args = kwargs.get("default_args", {})
-
-        self._warn_on_output_only_fields(kwargs)
 
         for arg in operator_args:
             try:

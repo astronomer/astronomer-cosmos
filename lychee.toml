@@ -36,6 +36,9 @@ exclude = [
     # Bot-blocked / rate-limited from CI — AWS docs intermittently return 403 to
     # automated requests (they resolve fine in a browser), causing flaky linkcheck failures.
     'https://docs\.aws\.amazon\.com',
+    # Flaky from CI — this astronomer.io docs page intermittently drops the connection
+    # ("Connection reset by peer") during link checking, though it resolves fine in a browser.
+    'https://www\.astronomer\.io/docs/learn/airflow-ui',
     # Intentional placeholder in example snippets, not a real repository.
     'https://github\.com/your-org/',
 ]

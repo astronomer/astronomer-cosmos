@@ -1,10 +1,14 @@
 .. _watcher-kubernetes-execution-mode:
 
 
-Watcher Kubernetes execution mode (experimental)
-================================================
+Watcher Kubernetes execution mode
+=================================
 
 .. versionadded:: 1.13.0
+
+.. note::
+   ``ExecutionMode.WATCHER_KUBERNETES`` was introduced as experimental in Cosmos 1.13.0 and is marked
+   stable starting with Cosmos 1.15.0.
 
 The ``ExecutionMode.WATCHER_KUBERNETES`` combines the **speed of the** :ref:`watcher-execution-mode` **with the isolation of** :ref:`kubernetes`.
 

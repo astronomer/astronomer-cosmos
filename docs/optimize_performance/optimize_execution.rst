@@ -25,7 +25,7 @@ See :ref:`watcher-execution-mode` for setup instructions and detailed benchmarks
 
 .. note::
 
-   ``ExecutionMode.WATCHER`` is currently experimental. Review its
+   ``ExecutionMode.WATCHER`` is stable starting with Cosmos 1.15.0. Review its
    `known limitations <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html#known-limitations>`_
    before adopting it in production.
 

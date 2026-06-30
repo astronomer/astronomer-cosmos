@@ -23,6 +23,8 @@ from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
+    DbtNodeStatus,
+    ProducerTaskState,
     _iso_to_string,
     _log_dbt_event,
     build_producer_state_fetcher,
@@ -280,8 +282,8 @@ def _rewrite_upstream_failure_skip_status(
         return dbt_node_status
     if is_dbt_upstream_failure_skip_event(log_line.get("info", {}).get("name")):
         upstream_failure_skipped_ids.add(unique_id)
-    if dbt_node_status == "skipped" and unique_id in upstream_failure_skipped_ids:
-        return "failed"
+    if is_dbt_node_status_skipped(dbt_node_status) and unique_id in upstream_failure_skipped_ids:
+        return DbtNodeStatus.FAILED
     return dbt_node_status
 
 
@@ -615,7 +617,7 @@ class BaseConsumerSensor(BaseSensorOperator):
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
 
-        if status == "success" and reason == WatcherEventReason.NODE_NOT_RUN:
+        if status == EventStatus.SUCCESS and reason == WatcherEventReason.NODE_NOT_RUN:
             logger.info(
                 "%s '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
                 self._resource_label,
@@ -629,7 +631,7 @@ class BaseConsumerSensor(BaseSensorOperator):
             if hasattr(self, "_override_rtif"):
                 self._override_rtif(context)
 
-        if status != "failed":
+        if status != EventStatus.FAILED:
             return
 
         if reason == WatcherEventReason.NODE_FAILED:
@@ -712,7 +714,7 @@ class BaseConsumerSensor(BaseSensorOperator):
 
     def _handle_no_dbt_node_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
         """Handle the case where no dbt node status has been reported yet."""
-        if producer_task_state == "failed":
+        if producer_task_state == ProducerTaskState.FAILED:
             if self.poke_retry_number > 0:
                 raise AirflowException(
                     f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
@@ -721,7 +723,7 @@ class BaseConsumerSensor(BaseSensorOperator):
                 # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
                 return self._fallback_to_non_watcher_run(try_number, context)
 
-        if producer_task_state == "skipped":
+        if producer_task_state == ProducerTaskState.SKIPPED:
             return self._fallback_to_non_watcher_run(try_number, context)
 
         self.poke_retry_number += 1

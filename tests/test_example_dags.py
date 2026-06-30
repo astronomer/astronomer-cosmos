@@ -10,16 +10,16 @@ import pytest
 from airflow.models.dagbag import DagBag
 from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
-from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION, PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS
+from cosmos.dbt.executable import get_dbt_version
 
 from . import utils as test_utils
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
-DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
+DBT_VERSION = get_dbt_version()
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
 # DAGs that require seeds to be loaded first (run via dedicated ordered tests below)
 DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag"]

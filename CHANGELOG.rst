@@ -1,8 +1,12 @@
 Changelog
 =========
 
-1.15.0a2 (2026-06-23)
+1.15.0a3 (2026-06-30)
 ---------------------
+
+Now Stable
+
+* ``ExecutionMode.WATCHER`` and ``ExecutionMode.WATCHER_KUBERNETES`` are now stable, effective Cosmos 1.15.0 (they were experimental through 1.14.x).
 
 Breaking Changes
 
@@ -14,6 +18,8 @@ These changes adjust observable behaviour. Neither breaks the documented public 
 
 * Ephemeral dbt models now render as ``EmptyOperator`` by default (``RenderConfig.ephemeral_models_as_empty_operator=True``). They no longer run dbt or emit datasets/assets, callbacks, OpenLineage events, or compiled SQL. Set ``RenderConfig(ephemeral_models_as_empty_operator=False)`` to restore the previous behaviour by @pankajkoti in #2759
 * ``on_warning_callback`` now fires for dbt test warnings in ``ExecutionMode.LOCAL`` subprocess mode (previously skipped on dbt 1.10+, where ``PASS=.. WARN=N`` is no longer the final stdout line) by @tatiana in #2832
+* The output-only template fields ``compiled_sql`` and ``freshness`` are now rejected with ``CosmosValueError`` at task instantiation if passed via ``operator_args`` or directly to a local operator (they were previously overwritten by Cosmos at runtime, so any value silently had no effect); the guard covers both the synchronous local operators and the async BigQuery path by @00yhj22-debug in #2726 and @qorexdevs in #2852
+* ``RenderConfig.exclude`` is now applied to per-model and detached test tasks under ``TestBehavior.AFTER_EACH`` and ``BUILD`` (previously only the ``AFTER_ALL`` aggregate test task honoured it), so exclusions such as ``exclude=["resource_type:unit_test"]`` now take effect without an ``operator_args`` workaround by @tatiana in #2850
 
 Features
 
@@ -36,6 +42,7 @@ Features
 * Enable the orjson parser for the whole project (experimental) by @corsettigyg in #2552
 * Warn when users pass output-only template fields to local operators by @goingforstudying-ctrl in #2737
 * Add an ``enable_watcher_reliable_retry`` config to harden ``ExecutionMode.WATCHER`` producer retries by @tatiana in #2816
+* Add an ``enable_hierarchical_naming_for_group_nodes_by_folder`` config (default ``False``) to opt into hierarchical task-group naming for ``group_nodes_by_folder``, rendering folders that share a leaf name under different parents as distinct task groups by @tatiana in #2862
 
 Enhancements
 
@@ -66,6 +73,8 @@ Enhancements
 * Reduce Airflow 3 Asset URI migration warning noise in ``ExecutionMode.WATCHER`` producer runs by @faridnsh in #2788
 * Log via ``self.log`` inside dbt operators for consistency by @pankajastro in #2798
 * Refactor ``build_airflow_graph`` to satisfy the C901 complexity limit by @00yhj22-debug in #2689
+* Surface dbt ``stdout``/``stderr`` in ``CosmosLoadDbtException`` by @DaPillah in #2826
+* Avoid hard-coded watcher status strings in favour of named constants by @pankajastro in #2841
 
 Bug Fixes
 
@@ -76,6 +85,13 @@ Bug Fixes
 * Cache the packages lockfile regardless of whether dependencies are reinstalled by @ms32035 in #2787
 * Maintain ``outlets`` passed to ``DbtRunLocalOperator`` when ``enable_dataset_alias=True`` by @jroachgolf84 in #2574
 * Treat concurrent ``cosmos_cache`` Variable insert ``IntegrityError`` as benign by @pankajkoti in #2800
+* Forward ``RenderConfig.exclude`` to per-model and detached test tasks for all test behaviours by @tatiana in #2850
+* Fix ``group_nodes_by_folder`` collapsing folders that share a leaf name under different parents (opt-in via ``enable_hierarchical_naming_for_group_nodes_by_folder``) by @anor4k in #2824
+* Raise a clear exception on an empty or invalid dbt manifest instead of an opaque ``JSONDecodeError`` by @karanw330 in #2819
+* Atomically update the ``partial_parse.msgpack`` cache by @mungiyo in #2815
+* Fix stale context in the cached ``pod_manager`` for ``ExecutionMode.WATCHER_KUBERNETES`` by @vricciardulli in #2809
+* Capture the dbt-runner error message in ``ExecutionMode.WATCHER`` consumer logs by @pankajastro in #2806
+* Fix duplicate consumer logs in ``ExecutionMode.WATCHER`` mode by @pankajastro in #2805
 
 Docs
 
@@ -99,6 +115,12 @@ Docs
 * Normalize heading underlines across docs by @pankajkoti in #2641, #2655, #2656, and #2663
 * Add language hints to docs code-block directives by @pankajastro in #2686
 * Add the Cosmos 1.14.2 row to the watcher-retry behavior history by @tatiana in #2742
+* Add additional resources to the contributing docs by @lzdanski in #2460
+* Move the GCP GKE execution modes to a dedicated documentation page by @vricciardulli in #2834
+* Add a note and example for custom profile mapping by @karanw330 in #2825
+* Document the ``self.log`` vs ``get_logger`` logging convention by @pankajastro in #2764
+* Fix a malformed dbt-fusion docs redirect target by @pankajastro in #2849
+* Mark ``ExecutionMode.WATCHER`` and ``ExecutionMode.WATCHER_KUBERNETES`` as stable (effective Cosmos 1.15.0) in the documentation by @pankajkoti in #2865
 
 Others
 
@@ -127,9 +149,13 @@ Others
 * Document docs build and serve commands, and the docs style guide, in ``CLAUDE.md`` by @pankajkoti in #2637 and #2665
 * Fix the pytest-asyncio warning by marking async tests per-method instead of per-class by @pankajastro in #2795
 * Ignore Claude Code user-local files by @pankajkoti in #2830
+* Add ``apache-airflow`` 3.3 to the test matrix by @pankajkoti in #2831
+* Add a blocking lychee linkcheck CI job and fix broken docs links by @pankajastro in #2699
+* Restore running integration tests on external contributors' PRs by @tatiana in #2848
+* Wait for all coverage jobs before combining coverage by @pankajastro in #2842
 * Bump black from 26.3.1 to 26.5.1 by @pankajkoti in #2727
 * Bump codecov-action to v6.0.2 by @pankajkoti in #2786
-* Dependency updates by @dependabot in #2541, #2555, #2571, #2578, #2579, #2582, #2588, #2589, #2609, #2621, #2627, #2651, #2674, #2707, #2721, #2724, #2725, #2730, #2745, #2783, #2789, #2790, #2807, and #2820
+* Dependency updates by @dependabot in #2541, #2555, #2571, #2578, #2579, #2582, #2588, #2589, #2609, #2621, #2627, #2651, #2674, #2707, #2721, #2724, #2725, #2730, #2745, #2783, #2789, #2790, #2802, #2807, #2820, #2833, #2838, #2847, #2853, and #2855
 
 1.14.2 (2026-05-21)
 -------------------

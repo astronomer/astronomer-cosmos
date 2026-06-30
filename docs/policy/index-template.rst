@@ -7,16 +7,26 @@ Index, overview, or landing page template
 
 Introduce the section, explaining why this section of the docs has been grouped together.
 
-Most often, when you create a landing page, it will usually be an ``index.rst`` page and include the ``toctree`` to generate the section.::
+Most often, when you create a landing page, it will usually be an ``index.rst`` page and include the ``toctree`` to generate the section:
+
+.. code-block:: rst
 
     .. toctree::
-       :hidden: # this controls whether or not the TOC is displayed on the index page. Remove if you want the TOC rendered.
-       :caption: Name of the section #This is required for a subsection.
-       :maxdepth: 2 # How many header levels appear in the TOC displayed on the index page.
+       :hidden:
+       :caption: Name of the section
+       :maxdepth: 2
 
-        procedure-template # This way of calling the pages automatically uses the title of the page in the sidebar
-        reference-template
-        Index template <index-template.html> # When you use the ``label <link>`` format, the ``label` appears in the sidebar
+       procedure-template
+       reference-template
+       Index template <index-template.html>
+
+The ``toctree`` options and entries above mean:
+
+- ``:hidden:`` controls whether the table of contents is rendered on the index page itself. Remove it if you want the TOC displayed inline.
+- ``:caption:`` is the section title shown in the sidebar, and is required for a subsection.
+- ``:maxdepth:`` sets how many header levels appear in the generated TOC.
+- Listing a page by name (for example ``procedure-template``) automatically uses that page's title in the sidebar.
+- Using the ``label <link>`` format (for example ``Index template <index-template.html>``) shows ``label`` in the sidebar instead of the page title.
 
 If you are not creating a section landing page, like :ref:`execution-modes`, then it still follows similar conventions.
 
@@ -30,4 +40,4 @@ If the section is large enough, it might make sense to group content on the land
 
 Then, instead of listing all the links, you can call the ``toctree``, without the ``:hidden:`` parameter.
 
-See the :ref:`getting-started` index as an example.
+See the :ref:`getting_started` index as an example.

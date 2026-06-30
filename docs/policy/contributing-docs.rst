@@ -140,7 +140,7 @@ Cosmos docs use the ``image`` tag to call figures and diagrams.
 
 .. tip::
 
-    Be sure to add alt-text to your images! If you're not familiar with writing alt-text, `WebAIM <https://webaim.org/techniques/alttext>`_ offers an overview.
+    Be sure to add alt-text to your images! If you're not familiar with writing alt-text, the `W3C WAI images tutorial <https://www.w3.org/WAI/tutorials/images/>`_ offers an overview.
 
 .. code-block:: text
 
@@ -169,22 +169,18 @@ How you link to material within the docs, and how you link externally are differ
 
 
 Redirects
-++++++++++++++++++++
++++++++++
 
-Cosmos uses the `Sphinx reredirect package <https://documatt.com/sphinx-reredirects/>`_ to manage redirects. When you update a page directory location, ``ref`` label, or file name, you also need to add a redirect.
+Cosmos uses the `Sphinx reredirects package <https://github.com/documatt/sphinx-reredirects>`_ to manage redirects. When you update a page directory location, ``ref`` label, or file name, you also need to add a redirect.
 
-1. Open the ``docs/conf.py`` file and go to the ``Begin docs redirect section``. The redirect section is structured as ``source:target`` pairs, where the old URL is the source and new URL is the target.
-- This section is organized **Alphabetically** by **source**, because multiple sources might redirect to the same **target**.
-2. **Sources** are formatted without the file-type. **Targets** must prepend the filepath with ``../`` and append ``.html`` to the end.
+1. Open the ``docs/conf.py`` file and go to the ``Begin docs redirect section``. The redirect section is structured as ``source:target`` pairs, where the old URL is the source and the new URL is the target. It is organized **alphabetically by source**, because multiple sources might redirect to the same target.
+2. Add the pair. **Sources** are formatted without the file extension, and **targets** must prepend the filepath with ``../`` and append ``.html``. For example, to redirect this file, ``contributing-docs.rst``, to the main ``contributing.rst`` page, the syntax would be:
 
-For example, if we wanted to redirect this file, ``contributing-docs.rst`` to the main ``contributing.rst`` page, the syntax would be:
+   .. code-block::
 
-.. code-block::
+       "policy/contributing-docs": "../policy/contributing.html",
 
-    "policy/contributing-docs": "../policy/contributing.html",
-
-
-3. To test locally if your redirects look, paste ``/policy/contributing-docs.html`` after the localhost address.
+3. To test your redirects locally, append ``/policy/contributing-docs.html`` to the localhost address and confirm it redirects to the new page.
 
 Sidebar generation and formatting
 ++++++++++++++++++++++++++++++++++

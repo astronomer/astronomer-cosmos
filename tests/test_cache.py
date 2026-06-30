@@ -134,11 +134,11 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
 
 @patch("cosmos.cache.safe_copy")
 @patch("cosmos.cache.get_partial_parse_path")
-def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_safe_copy):
+def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_safe_copy, tmp_path):
     mock_get_partial_parse_path.side_effect = lambda cache_dir: cache_dir / "partial_parse.yml"
 
-    latest_partial_parse_filepath = Path("/path/to/latest_partial_parse.yml")
-    cache_dir = Path("/tmp/path/to/cache_directory")
+    latest_partial_parse_filepath = tmp_path / "latest" / "latest_partial_parse.yml"
+    cache_dir = tmp_path / "cache_directory"
 
     # Expected paths
     cache_path = cache_dir / "partial_parse.yml"

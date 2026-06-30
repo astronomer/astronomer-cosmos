@@ -33,6 +33,13 @@ enable_cache_package_lockfile = conf.getboolean("cosmos", "enable_cache_package_
 enable_cache_dbt_ls = conf.getboolean("cosmos", "enable_cache_dbt_ls", fallback=True)
 enable_cache_dbt_yaml_selectors = conf.getboolean("cosmos", "enable_cache_dbt_yaml_selectors", fallback=True)
 enable_lax_selector_parsing = conf.getboolean("cosmos", "enable_lax_selector_parsing", fallback=False)
+# When RenderConfig.group_nodes_by_folder is enabled, key folder task groups by their full path so
+# that folders sharing a leaf name under different parents render as distinct task groups. Defaults
+# to False to preserve existing task-group ids (enabling it is a breaking change for DAGs that
+# reference Cosmos task groups by id); expected to become the default in Cosmos 2.0. See #2824.
+enable_hierarchical_naming_for_group_nodes_by_folder = conf.getboolean(
+    "cosmos", "enable_hierarchical_naming_for_group_nodes_by_folder", fallback=False
+)
 rich_logging = conf.getboolean("cosmos", "rich_logging", fallback=False)
 dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)

@@ -73,6 +73,19 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING``
 
+.. _enable_hierarchical_naming_for_group_nodes_by_folder:
+
+`enable_hierarchical_naming_for_group_nodes_by_folder`_:
+    Only relevant when ``RenderConfig.group_nodes_by_folder`` is enabled. When enabled, folder task groups
+    are keyed by their full folder path, so folders that share a leaf name under different parents
+    (e.g. ``staging/aurora`` and ``marts/aurora``) render as distinct task groups instead of collapsing into
+    the first one created. Disabled by default to preserve the existing task-group ids — enabling it changes
+    those ids, which is a breaking change for DAGs that reference Cosmos task groups by id. This is expected
+    to become the default in Cosmos 2.0.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_HIERARCHICAL_NAMING_FOR_GROUP_NODES_BY_FOLDER``
+
 .. _enable_cache_partial_parse:
 
 `enable_cache_partial_parse`_:

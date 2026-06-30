@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
 try:  # Airflow 3
@@ -919,26 +920,35 @@ def identify_detached_nodes(
 
 
 def create_task_groups_based_on_folder(
-    dag: DAG, node: DbtNode, parent_task_group: TaskGroup | None, task_groups: dict[str, TaskGroup]
+    dag: DAG,
+    node: DbtNode,
+    parent_task_group: TaskGroup | None,
+    task_groups: dict[str, TaskGroup],
+    use_hierarchical_naming: bool = False,
 ) -> TaskGroup | None:
     """
     Generate the parent task group for the given node based on the node's file path. If a TaskGroup is given, it will
     be used as the parent group.
+
+    When ``use_hierarchical_naming`` is True, groups are cached by their cumulative folder path, so that folders
+    sharing a leaf name under different parents (e.g. ``staging/aurora`` and ``marts/aurora``) become distinct task
+    groups instead of collapsing into the first one created. When False (default), groups are cached by the bare
+    folder name, preserving the legacy behaviour — and the existing task-group ids that users may reference — at the
+    cost of collapsing same-named folders. See https://github.com/astronomer/astronomer-cosmos/pull/2824.
     """
     task_group = None
-    resource_file_path_parts = str(node.original_file_path).split("/")[:-1]
-    # Cache groups by their cumulative path rather than the bare folder name, so
-    # that folders sharing a leaf name under different parents (e.g.
-    # ``staging/aurora`` and ``marts/aurora``) become distinct task groups instead
-    # of collapsing into the first one created.
+    # Use ``Path.parts`` (OS-agnostic) rather than ``str(path).split("/")`` so folder grouping also
+    # works on Windows, where ``str(Path(...))`` uses backslash separators.
+    resource_file_path_parts = Path(node.original_file_path).parts[:-1]
     cumulative_path = ""
     for resource_file_path_part in resource_file_path_parts:
         cumulative_path = f"{cumulative_path}/{resource_file_path_part}" if cumulative_path else resource_file_path_part
-        if cumulative_path in task_groups:
-            task_group = task_groups[cumulative_path]
+        cache_key = cumulative_path if use_hierarchical_naming else resource_file_path_part
+        if cache_key in task_groups:
+            task_group = task_groups[cache_key]
         else:
             task_group = TaskGroup(dag=dag, group_id=resource_file_path_part, parent_group=parent_task_group)
-            task_groups[cumulative_path] = task_group
+            task_groups[cache_key] = task_group
         parent_task_group = task_group
     return task_group
 
@@ -1116,6 +1126,7 @@ def build_airflow_graph(
     :return: Dictionary mapping dbt nodes (node.unique_id to Airflow task)
     """
     group_nodes_by_folder = render_config.group_nodes_by_folder
+    use_hierarchical_naming = settings.enable_hierarchical_naming_for_group_nodes_by_folder
     tasks_map: dict[str, TaskGroup | BaseOperator] = {}
     task_groups: dict[str, TaskGroup] = {}
     task_or_group: TaskGroup | BaseOperator | None
@@ -1151,7 +1162,7 @@ def build_airflow_graph(
 
     for node_id, node in nodes.items():
         task_group = (
-            create_task_groups_based_on_folder(dag, node, parent_task_group, task_groups)
+            create_task_groups_based_on_folder(dag, node, parent_task_group, task_groups, use_hierarchical_naming)
             if group_nodes_by_folder
             else task_group
         )

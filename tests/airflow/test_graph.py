@@ -179,13 +179,13 @@ def test_build_airflow_graph_with_after_each():
         "seed_parent_seed",
         "gen2.models.parent.run",
         "gen2.models.parent.test",
-        "gen3.models.child_run",
-        "gen3.models.child2_v2_run",
+        "gen2.models.child_run",
+        "gen2.models.child2_v2_run",
     ]
 
     assert topological_sort == expected_sort
     task_groups = dag.task_group_dict
-    assert len(task_groups) == 5
+    assert len(task_groups) == 4
 
     assert task_groups["gen2.models.parent"].upstream_task_ids == {"seed_parent_seed"}
     assert list(task_groups["gen2.models.parent"].children.keys()) == [
@@ -194,8 +194,8 @@ def test_build_airflow_graph_with_after_each():
     ]
 
     assert len(dag.leaves) == 2
-    assert dag.leaves[0].task_id == "gen3.models.child_run"
-    assert dag.leaves[1].task_id == "gen3.models.child2_v2_run"
+    assert dag.leaves[0].task_id == "gen2.models.child_run"
+    assert dag.leaves[1].task_id == "gen2.models.child2_v2_run"
 
     task_seed_parent_seed = dag.tasks[0]
     task_parent_run = dag.tasks[1]
@@ -374,14 +374,14 @@ def test_build_airflow_graph_with_after_all():
     expected_sort = [
         "seed_parent_seed",
         "gen2.models.parent_run",
-        "gen3.models.child_run",
-        "gen3.models.child2_v2_run",
+        "gen2.models.child_run",
+        "gen2.models.child2_v2_run",
         "astro_shop_test",
     ]
     assert topological_sort == expected_sort
 
     task_groups = dag.task_group_dict
-    assert len(task_groups) == 4
+    assert len(task_groups) == 3
 
     assert len(dag.leaves) == 1
     assert dag.leaves[0].task_id == "astro_shop_test"
@@ -457,17 +457,17 @@ def test_build_airflow_graph_with_build():
     expected_sort = [
         "seed_parent_seed_build",
         "gen2.models.parent_model_build",
-        "gen3.models.child_model_build",
-        "gen3.models.child2_v2_model_build",
+        "gen2.models.child_model_build",
+        "gen2.models.child2_v2_model_build",
     ]
     assert topological_sort == expected_sort
 
     task_groups = dag.task_group_dict
-    assert len(task_groups) == 4
+    assert len(task_groups) == 3
 
     assert len(dag.leaves) == 2
-    assert dag.leaves[0].task_id in ("gen3.models.child_model_build", "gen3.models.child2_v2_model_build")
-    assert dag.leaves[1].task_id in ("gen3.models.child_model_build", "gen3.models.child2_v2_model_build")
+    assert dag.leaves[0].task_id in ("gen2.models.child_model_build", "gen2.models.child2_v2_model_build")
+    assert dag.leaves[1].task_id in ("gen2.models.child_model_build", "gen2.models.child2_v2_model_build")
 
 
 @pytest.mark.integration
@@ -506,10 +506,7 @@ def test_build_airflow_graph_with_override_profile_config():
     assert generated_parent_profile_config.profile_mapping.profile_args["schema"] == "public"
 
 
-def test_create_task_groups_based_on_folder_distinguishes_same_leaf_name():
-    """Folders sharing a leaf name under different parents (e.g. ``staging/aurora``
-    and ``marts/aurora``) must map to distinct TaskGroups instead of collapsing
-    into the first one created."""
+def _same_leaf_name_nodes() -> tuple[DbtNode, DbtNode]:
     staging_node = DbtNode(
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.staging_aurora_orders",
         resource_type=DbtResourceType.MODEL,
@@ -524,14 +521,22 @@ def test_create_task_groups_based_on_folder_distinguishes_same_leaf_name():
         path_base=SAMPLE_PROJ_PATH,
         original_file_path=Path("models/marts/aurora/orders.sql"),
     )
+    return staging_node, marts_node
+
+
+def test_create_task_groups_based_on_folder_distinguishes_same_leaf_name():
+    """With ``use_hierarchical_naming=True``, folders sharing a leaf name under different parents
+    (e.g. ``staging/aurora`` and ``marts/aurora``) must map to distinct TaskGroups instead of
+    collapsing into the first one created."""
+    staging_node, marts_node = _same_leaf_name_nodes()
 
     task_groups: dict = {}
     with DAG("test-folder-collision", start_date=datetime(2022, 1, 1)) as dag:
         staging_group = create_task_groups_based_on_folder(
-            dag=dag, node=staging_node, parent_task_group=None, task_groups=task_groups
+            dag=dag, node=staging_node, parent_task_group=None, task_groups=task_groups, use_hierarchical_naming=True
         )
         marts_group = create_task_groups_based_on_folder(
-            dag=dag, node=marts_node, parent_task_group=None, task_groups=task_groups
+            dag=dag, node=marts_node, parent_task_group=None, task_groups=task_groups, use_hierarchical_naming=True
         )
 
     assert staging_group is not None
@@ -548,6 +553,27 @@ def test_create_task_groups_based_on_folder_distinguishes_same_leaf_name():
         "models/marts",
         "models/marts/aurora",
     }
+
+
+def test_create_task_groups_based_on_folder_collapses_same_leaf_name_by_default():
+    """Default (``use_hierarchical_naming=False``) preserves the legacy behaviour: folders sharing a
+    leaf name are keyed by the bare folder name, so the second ``aurora`` reuses the first group.
+    This keeps existing task-group ids stable (avoiding a breaking change) until the behaviour is
+    flipped in a future major release."""
+    staging_node, marts_node = _same_leaf_name_nodes()
+
+    task_groups: dict = {}
+    with DAG("test-folder-collision-legacy", start_date=datetime(2022, 1, 1)) as dag:
+        staging_group = create_task_groups_based_on_folder(
+            dag=dag, node=staging_node, parent_task_group=None, task_groups=task_groups
+        )
+        marts_group = create_task_groups_based_on_folder(
+            dag=dag, node=marts_node, parent_task_group=None, task_groups=task_groups
+        )
+
+    # Both folders collapse onto the same cached ``aurora`` group (legacy behaviour).
+    assert staging_group is marts_group
+    assert set(task_groups) == {"models", "staging", "marts", "aurora"}
 
 
 def test_calculate_operator_class():
@@ -1545,12 +1571,12 @@ def test_custom_meta():
         )
         # test custom meta (queue, pool)
         for task in dag.tasks:
-            if task.task_id == "gen3.models.child2_v2_run":
+            if task.task_id == "gen2.models.child2_v2_run":
                 assert task.pool == "custom_pool"
             else:
                 assert task.pool == "default_pool"
 
-            if task.task_id == "gen3.models.child_run":
+            if task.task_id == "gen2.models.child_run":
                 assert task.queue == "custom_queue"
             else:
                 assert task.queue == "default"

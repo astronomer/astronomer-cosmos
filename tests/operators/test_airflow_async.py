@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -9,6 +10,7 @@ from cosmos.operators.airflow_async import (
     DbtBuildAirflowAsyncOperator,
     DbtCompileAirflowAsyncOperator,
     DbtLSAirflowAsyncOperator,
+    DbtRunAirflowAsyncOperator,
     DbtRunOperationAirflowAsyncOperator,
     DbtSeedAirflowAsyncOperator,
     DbtSnapshotAirflowAsyncOperator,
@@ -113,3 +115,18 @@ def test_dbt_run_operation_airflow_async_operator_inheritance():
 
 def test_dbt_compile_airflow_async_operator_inheritance():
     assert issubclass(DbtCompileAirflowAsyncOperator, DbtCompileLocalOperator)
+
+
+@pytest.mark.parametrize("field", ["compiled_sql", "freshness"])
+def test_dbt_run_airflow_async_operator_rejects_output_only_template_fields(field):
+    """Output-only template fields (passed as top-level kwargs, e.g. via ``operator_args``)
+    bypass the inner ``dbt_kwargs`` guard and must be rejected up front with a clear error."""
+    profile_config = MagicMock(spec=ProfileConfig)
+
+    with pytest.raises(CosmosValueError, match=field):
+        DbtRunAirflowAsyncOperator(
+            task_id="run_model",
+            project_dir="/tmp/project",
+            profile_config=profile_config,
+            **{field: "value-the-user-tried-to-set"},
+        )

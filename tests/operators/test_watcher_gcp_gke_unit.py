@@ -482,9 +482,11 @@ def test_producer_pod_manager_forwards_outlet_state(mock_manager_cls):
     assert extra["should_generate_model_uris"] is op._should_generate_model_uris
 
 
-@patch("cosmos.operators.watcher_gcp_gke.register_dataset_on_task")
+@patch("cosmos.dataset.register_dataset_on_task")
 def test_consumer_emits_datasets_on_success(mock_register):
-    """On success the consumer emits one Airflow Asset per outlet URI from the producer."""
+    """Smoke test that the GCP GKE consumer inherits BaseConsumerSensor dataset emission and that
+    register_dataset_on_task works for this multiple-inheritance sensor (which does not inherit
+    from the local operator). Full emit behaviour is covered in tests/operators/_watcher."""
     sensor = make_sensor()
     sensor.emit_datasets = True
     # Slash-delimited form so the URI is valid on both Airflow 2 and Airflow 3 (AIP-60).
@@ -500,69 +502,3 @@ def test_consumer_emits_datasets_on_success(mock_register):
     assert inlets == []
     assert [o.uri for o in outlets] == ["postgres://h:5432/db/schema/stg_orders"]
     assert ctx is context
-
-
-@patch("cosmos.operators.watcher_gcp_gke.register_dataset_on_task")
-def test_consumer_emit_datasets_noop_when_disabled(mock_register):
-    """``emit_datasets=False`` short-circuits emission even when outlet URIs are present."""
-    sensor = make_sensor()
-    sensor.emit_datasets = False
-    sensor._outlet_uris = ["postgres://h:5432/db/schema/stg_orders"]
-
-    sensor._emit_datasets({"ti": MagicMock()})
-
-    mock_register.assert_not_called()
-
-
-@patch("cosmos.operators.watcher_gcp_gke.register_dataset_on_task")
-def test_consumer_emit_datasets_noop_without_outlets(mock_register):
-    """No outlet URIs (e.g. no manifest on the producer) means nothing is emitted."""
-    sensor = make_sensor()
-    sensor.emit_datasets = True
-    sensor._outlet_uris = []
-
-    sensor._emit_datasets({"ti": MagicMock()})
-
-    mock_register.assert_not_called()
-
-
-@patch("cosmos.settings.enable_uri_xcom", True)
-@patch("cosmos.operators.watcher_gcp_gke.register_dataset_on_task")
-def test_consumer_emit_datasets_pushes_uri_xcom_when_enabled(mock_register):
-    """With ``enable_uri_xcom`` the emitted URIs are also pushed to XCom under ``uri``."""
-    sensor = make_sensor()
-    sensor.emit_datasets = True
-    sensor._outlet_uris = ["postgres://h:5432/db/schema/stg_orders"]
-
-    ti = MagicMock()
-    sensor._emit_datasets({"ti": ti})
-
-    ti.xcom_push.assert_called_once_with(key="uri", value=["postgres://h:5432/db/schema/stg_orders"])
-
-
-@patch("cosmos.operators.watcher_gcp_gke.DbtConsumerWatcherGcpGkeSensor._emit_datasets")
-@patch("cosmos.operators._watcher.base.BaseConsumerSensor.execute")
-def test_consumer_execute_emits_on_success(mock_super_execute, mock_emit):
-    """The non-deferred execute path emits datasets after the parent sensor loop returns."""
-    sensor = make_sensor()
-    context = {"ti": MagicMock()}
-
-    sensor.execute(context)
-
-    mock_super_execute.assert_called_once()
-    mock_emit.assert_called_once_with(context)
-
-
-@patch("cosmos.operators.watcher_gcp_gke.DbtConsumerWatcherGcpGkeSensor._emit_datasets")
-@patch("cosmos.operators._watcher.base.BaseConsumerSensor.execute_complete")
-def test_consumer_execute_complete_extracts_outlets_and_emits(mock_super_complete, mock_emit):
-    """execute_complete pulls outlet URIs off the trigger event before emitting."""
-    sensor = make_sensor()
-    context = {"ti": MagicMock()}
-    event = {"status": "success", "outlet_uris": ["postgres://h:5432/db/schema/stg_orders"]}
-
-    sensor.execute_complete(context, event)
-
-    assert sensor._outlet_uris == ["postgres://h:5432/db/schema/stg_orders"]
-    mock_super_complete.assert_called_once_with(context, event)
-    mock_emit.assert_called_once_with(context)

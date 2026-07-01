@@ -27,6 +27,7 @@ except ImportError:
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.config import ProfileConfig
+from cosmos.constants import PRODUCER_WATCHER_TASK_ID
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
     _delete_xcom_backup_variable,
@@ -373,26 +374,14 @@ CONTEXT_HOLDER_KEY = "context_holder"
 CONTEXT_KEY = "context"
 
 
-class K8sWatcherProducerProtocol(Protocol):
-    """Structural type for K8s-based watcher producer operators.
-
-    Producers (``DbtProducerWatcherKubernetesOperator``, ``DbtProducerWatcherGcpGkeOperator``)
-    initialise this per-execution state in ``__init__`` and thread it to
-    ``WatcherK8sCallback`` through the pod manager's ``callback_extra_kwargs``.
-    """
-
-    _tests_per_model: dict[str, list[str]]
-    _test_results_per_model: dict[str, dict[str, str]]
-    _context_holder: dict[str, Context | None]
-    _upstream_failure_skipped_ids: set[str]
-    _should_generate_model_uris: bool
-    _dataset_namespace: str | None
-    _model_outlet_uris: dict[str, list[str]]
-    manifest_filepath: str
-    profile_config: Any
-    client: Any
-    callbacks: Any
-    log: Any
+# The K8s-based watcher producers (``DbtProducerWatcherKubernetesOperator``,
+# ``DbtProducerWatcherGcpGkeOperator``) share their per-execution state and the helpers below that
+# read/write it. ``init_watcher_producer`` seeds that state; the operator carries the following
+# contract (typed ``Any`` in the helpers, mirroring ``compose_watcher_backup_callbacks``, because
+# the state is populated dynamically rather than declared on the concrete operator classes):
+#   _tests_per_model, _test_results_per_model, _context_holder, _upstream_failure_skipped_ids,
+#   _should_generate_model_uris, _dataset_namespace, _model_outlet_uris, manifest_filepath,
+#   dbt_cmd_flags, profile_config, client, callbacks, log.
 
 
 class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
@@ -471,6 +460,61 @@ def inject_watcher_callback(kwargs: dict[str, Any]) -> None:
     kwargs["callbacks"] = normalized_callbacks
 
 
+def init_watcher_producer(operator: Any, kwargs: dict[str, Any]) -> str:
+    """Shared pre-``super().__init__`` setup for K8s-based watcher producers.
+
+    Seeds the per-execution state that ``build_watcher_pod_manager`` / ``execute_watcher_producer``
+    rely on, injects the log-parsing callback, and returns the resolved ``task_id`` for the caller
+    to forward to ``super().__init__``. Shared by ``DbtProducerWatcherKubernetesOperator`` and
+    ``DbtProducerWatcherGcpGkeOperator``.
+
+    :param operator: the producer instance being initialised.
+    :param kwargs: the operator's ``__init__`` kwargs; watcher-only keys are popped in place.
+    :returns: the resolved ``task_id``.
+    """
+    task_id: str = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
+    operator._tests_per_model = kwargs.pop("tests_per_model", {})
+    operator._test_results_per_model = {}
+    # Whether the producer should compute per-model outlet URIs. The producer never emits datasets
+    # itself (the consumer sensors do), but it must build the URI map so each consumer can. Wired as
+    # an explicit flag by _add_watcher_producer_task.
+    operator._should_generate_model_uris = kwargs.pop("_should_generate_model_uris", kwargs.get("emit_datasets", True))
+    # manifest_filepath is threaded through task_args by cosmos.converter (from
+    # ProjectConfig.manifest_path). The pod's own target/manifest.json lives inside the container and
+    # is not reachable from the scheduler, so this scheduler-side manifest is the only practical
+    # source for the outlet URI map. Popped here because the K8s base operator (unlike the local one)
+    # doesn't accept it.
+    operator.manifest_filepath = kwargs.pop("manifest_filepath", "") or ""
+    # Mutable per-execution state shared by reference with the log-parsing callback via the pod
+    # manager's callback_extra_kwargs. execute() resolves the namespace and fills the URI map in
+    # place (never reassigns), so a pod_manager created earlier still observes the populated map.
+    operator._dataset_namespace = None
+    operator._model_outlet_uris = {}
+    # Mutable holder shared by reference with pod_manager's callback_extra_kwargs. execute() sets its
+    # "context" entry (the holder itself is never reassigned), so a pod_manager created before
+    # execute() still sees the live context.
+    operator._context_holder = {CONTEXT_KEY: None}
+    inject_watcher_callback(kwargs)
+    return task_id
+
+
+def finalize_watcher_producer(operator: Any) -> None:
+    """Shared post-``super().__init__`` setup for K8s-based watcher producers.
+
+    Forces the dbt JSON log format the parser depends on, wires the XCom-backup flush onto the
+    producer's retry/failure callbacks, and seeds the upstream-failure tracking set. Must run after
+    ``super().__init__`` so ``compose_watcher_backup_callbacks`` can preserve a DAG-level
+    ``default_args`` callback (#2776).
+    """
+    operator.dbt_cmd_flags += ["--log-format", "json"]
+    compose_watcher_backup_callbacks(operator)
+    # Populated by the log parser when dbt emits SkippingDetails or LogSkipBecauseError for a node;
+    # subsequent "skipped" terminal events for those unique_ids are rewritten to "failed" so the
+    # consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+    # Mirrors DbtProducerWatcherOperator._upstream_failure_skipped_ids; see #2698.
+    operator._upstream_failure_skipped_ids = set()
+
+
 def compose_watcher_backup_callbacks(operator: Any) -> None:
     """Append the XCom backup flush to the producer's retry/failure callbacks.
 
@@ -482,7 +526,7 @@ def compose_watcher_backup_callbacks(operator: Any) -> None:
     operator.on_failure_callback = _compose_backup_callback(getattr(operator, "on_failure_callback", None))
 
 
-def build_watcher_pod_manager(operator: K8sWatcherProducerProtocol) -> CosmosKubernetesPodManager:
+def build_watcher_pod_manager(operator: Any) -> CosmosKubernetesPodManager:
     """Build the producer's pod manager, threading watcher state to ``WatcherK8sCallback``.
 
     The pod manager forwards ``callback_extra_kwargs`` only to callbacks marked with
@@ -505,7 +549,7 @@ def build_watcher_pod_manager(operator: K8sWatcherProducerProtocol) -> CosmosKub
     )
 
 
-def _populate_producer_model_outlet_uris(operator: K8sWatcherProducerProtocol) -> None:
+def _populate_producer_model_outlet_uris(operator: Any) -> None:
     """Resolve the dataset namespace and fill ``operator._model_outlet_uris`` from the manifest.
 
     Mirrors the SUBPROCESS producer, but reads ``ProjectConfig.manifest_path`` (threaded as
@@ -549,7 +593,7 @@ def _populate_producer_model_outlet_uris(operator: K8sWatcherProducerProtocol) -
 
 
 def execute_watcher_producer(
-    operator: K8sWatcherProducerProtocol, context: Context, parent_execute: Callable[..., Any], **kwargs: Any
+    operator: Any, context: Context, parent_execute: Callable[..., Any], **kwargs: Any
 ) -> Any:
     """Shared ``execute`` logic for K8s watcher producer operators.
 

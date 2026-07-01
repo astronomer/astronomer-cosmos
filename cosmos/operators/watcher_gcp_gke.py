@@ -11,8 +11,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 import cosmos.operators._k8s_common as _k8s_common
 from cosmos.airflow._override import CosmosKubernetesPodManager
-from cosmos.constants import PRODUCER_WATCHER_TASK_ID
-from cosmos.dataset import register_dataset_on_task
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor
@@ -34,42 +32,9 @@ class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
     template_fields: tuple[str, ...] = tuple(DbtBuildGcpGkeOperator.template_fields) + ("deferrable",)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
-        self._tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
-        self._test_results_per_model: dict[str, dict[str, str]] = {}
-        # Whether the producer should compute per-model outlet URIs. The producer never emits
-        # datasets itself (the consumer sensors do), but it must build the URI map so each
-        # consumer can. Wired as an explicit flag by _add_watcher_producer_task.
-        self._should_generate_model_uris: bool = kwargs.pop(
-            "_should_generate_model_uris", kwargs.get("emit_datasets", True)
-        )
-        # manifest_filepath is threaded through task_args by cosmos.converter (from
-        # ProjectConfig.manifest_path). The pod's own target/manifest.json lives inside the
-        # container and is not reachable from the scheduler, so this scheduler-side manifest is
-        # the only practical source for building the outlet URI map. Popped here because the
-        # K8s base operator (unlike the local one) doesn't accept it.
-        self.manifest_filepath: str = kwargs.pop("manifest_filepath", "") or ""
-        # Mutable per-execution state shared by reference with the log-parsing callback via the
-        # pod manager's callback_extra_kwargs. execute() resolves the namespace and fills the URI
-        # map in place (the dict is never reassigned), so a pod_manager created earlier still
-        # observes the populated map.
-        self._dataset_namespace: str | None = None
-        self._model_outlet_uris: dict[str, list[str]] = {}
-        # Mutable holder shared by reference with pod_manager's callback_extra_kwargs.
-        # execute() sets its "context" entry (the holder itself is never reassigned),
-        # so a pod_manager created before execute() still sees the live context.
-        self._context_holder: dict[str, Context | None] = {_k8s_common.CONTEXT_KEY: None}
-        _k8s_common.inject_watcher_callback(kwargs)
+        task_id = _k8s_common.init_watcher_producer(self, kwargs)
         super().__init__(task_id=task_id, *args, **kwargs)
-        self.dbt_cmd_flags += ["--log-format", "json"]
-        # Flush the in-memory XCom backup to a Variable on failure so the producer retry can restore it.
-        _k8s_common.compose_watcher_backup_callbacks(self)
-        # Mutable set populated by the log parser when dbt emits SkippingDetails
-        # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
-        # for those unique_ids are rewritten to "failed" so the consumer sensor
-        # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
-        # Mirrors DbtProducerWatcherOperator._upstream_failure_skipped_ids; see #2698.
-        self._upstream_failure_skipped_ids: set[str] = set()
+        _k8s_common.finalize_watcher_producer(self)
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
@@ -84,58 +49,17 @@ class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
 class DbtConsumerWatcherGcpGkeSensor(BaseConsumerSensor, DbtRunGcpGkeOperator):
     """Consumer sensor for ``ExecutionMode.WATCHER_GCP_GKE``.
 
-    Polls the producer's per-node status XCom and, on successful model completion,
-    emits one Airflow Asset per outlet URI the producer computed from the manifest --
-    making dbt model lineage visible to downstream catalogs that read Airflow outlets
-    (OpenLineage, OpenMetadata, etc.). Mirrors ``DbtConsumerWatcherKubernetesSensor``,
-    delegating to ``register_dataset_on_task`` because this sensor doesn't inherit from
-    the local operator.
+    Polls the producer's per-node status XCom and, on successful model completion, emits one
+    Airflow Asset per outlet URI the producer computed from the manifest -- making dbt model
+    lineage visible to downstream catalogs that read Airflow outlets (OpenLineage, OpenMetadata,
+    etc.). Dataset emission (``_emit_datasets`` plus the ``execute`` / ``execute_complete`` hooks)
+    is inherited from ``BaseConsumerSensor``.
     """
 
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunGcpGkeOperator.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-
-    def _emit_datasets(self, context: Context) -> None:
-        """Emit one Airflow ``Asset`` per outlet URI received from the producer.
-
-        No-ops when ``self.emit_datasets`` is False (user disabled emission) or when
-        ``self._outlet_uris`` is empty (the producer resolved no outlets for this model --
-        typical when no manifest was available or the adapter has no OL namespace resolver).
-        """
-        if not getattr(self, "emit_datasets", False):
-            return
-        outlet_uris = getattr(self, "_outlet_uris", [])
-        if not outlet_uris:
-            return
-
-        from cosmos import settings
-        from cosmos.constants import AIRFLOW_VERSION
-
-        if AIRFLOW_VERSION.major >= 3:
-            from airflow.sdk.definitions.asset import Asset
-        else:  # pragma: no cover - WATCHER_GCP_GKE requires a cncf-kubernetes provider only present on Airflow 3 CI jobs
-            from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
-
-        outlets = [Asset(uri=uri) for uri in outlet_uris]
-        logger.info("Emitting %d dataset(s) for model '%s': %s", len(outlets), self.model_unique_id, outlet_uris)
-        register_dataset_on_task(self, [], outlets, context)
-
-        if settings.enable_uri_xcom:
-            context["ti"].xcom_push(key="uri", value=outlet_uris)
-
-    def execute(self, context: Context, **kwargs: Any) -> None:
-        super().execute(context, **kwargs)
-        # If we reach here without deferring, the model succeeded -- emit datasets.
-        self._emit_datasets(context)
-
-    def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
-        # Extract outlet URIs from the trigger event before the parent handles status.
-        self._outlet_uris = event.get("outlet_uris", [])
-        super().execute_complete(context, event)
-        # If we reach here without raising, the model succeeded -- emit datasets.
-        self._emit_datasets(context)
 
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the

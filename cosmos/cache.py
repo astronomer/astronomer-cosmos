@@ -333,6 +333,13 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
         # it stays at info; any other OSError (e.g. EACCES on a misconfigured cache_dir, ENOSPC) is likely
         # a persistent problem that would otherwise silently disable partial parse, so it is surfaced at
         # warning.
+        # A mid-sequence failure can leave the target inconsistent: a failed manifest copy leaves a lone
+        # partial_parse.msgpack behind (so dbt would still partial-parse despite the "full parse" message),
+        # and a failed rewrite in ``patch_partial_parse_content`` (which truncates via ``open("wb")`` first)
+        # can leave a corrupt msgpack. Remove both copied artifacts so the advertised full-parse fallback is
+        # actually what happens instead of handing dbt a half-written or manifest-less cache.
+        target_partial_parse_file.unlink(missing_ok=True)
+        target_manifest_filepath.unlink(missing_ok=True)
         # ``errno.ESTALE`` is not defined on every platform; guard the lookup so a missing constant
         # degrades to the warning branch instead of raising ``AttributeError`` while handling the error.
         estale = getattr(errno, "ESTALE", None)

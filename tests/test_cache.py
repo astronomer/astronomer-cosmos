@@ -177,6 +177,38 @@ def test__copy_partial_parse_to_project_falls_back_on_oserror(
     assert matching[0].levelno == expected_level
 
 
+@patch("cosmos.cache.patch_partial_parse_content")
+@patch("cosmos.cache.safe_copy")
+def test__copy_partial_parse_to_project_removes_leftover_artifacts_on_oserror(
+    mock_safe_copy, mock_patch_content, tmp_path
+):
+    # If the partial_parse copy succeeds but a later step fails (e.g. the manifest copy), the target would
+    # otherwise be left holding a lone partial_parse.msgpack and dbt would still partial-parse despite the
+    # "full parse" fallback message. Both artifacts must be removed so the advertised fallback really happens.
+    def fake_safe_copy(src, dst):
+        if src.name == DBT_MANIFEST_FILE_NAME:
+            raise OSError(errno.ENOSPC, "no space")
+        Path(dst).write_bytes(b"copied")
+
+    mock_safe_copy.side_effect = fake_safe_copy
+
+    source_dir = tmp_path / DBT_TARGET_DIR_NAME
+    source_dir.mkdir()
+    partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    partial_parse_filepath.write_bytes(b"")
+    (source_dir / DBT_MANIFEST_FILE_NAME).write_bytes(b"")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        project_path = Path(tmp_dir)
+        # Must not raise.
+        _copy_partial_parse_to_project(partial_parse_filepath, project_path)
+
+        target_partial_parse_file = get_partial_parse_path(project_path)
+        target_manifest_file = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
+        assert not target_partial_parse_file.exists()
+        assert not target_manifest_file.exists()
+
+
 @patch("cosmos.cache.safe_copy")
 @patch("cosmos.cache.get_partial_parse_path")
 def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_safe_copy, tmp_path):

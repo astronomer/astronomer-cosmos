@@ -478,7 +478,8 @@ def test_populate_model_outlet_uris_from_manifest(mock_namespace, mock_compute, 
     assert op._dataset_namespace == "postgres://h:5432"
     assert op._model_outlet_uris is outlet_map  # mutated in place, not reassigned
     assert op._model_outlet_uris == {"model.jaffle.a": ["postgres://h:5432/db.schema.a"]}
-    mock_compute.assert_called_once()
+    # The manifest path is forwarded verbatim (never wrapped in Path) so remote schemes survive.
+    mock_compute.assert_called_once_with(str(manifest), "postgres://h:5432")
 
 
 @patch("cosmos.dataset.compute_model_outlet_uris")
@@ -538,23 +539,31 @@ def test_populate_model_outlet_uris_noop_without_profile(mock_namespace):
     mock_namespace.assert_not_called()
 
 
-@patch("cosmos.dataset.compute_model_outlet_uris")
+@patch("cosmos.dataset.compute_model_outlet_uris", return_value={"model.jaffle.a": ["s3-uri"]})
 @patch("cosmos.dataset.get_dataset_namespace", return_value="postgres://h:5432")
-def test_populate_model_outlet_uris_noop_when_manifest_missing(mock_namespace, mock_compute):
-    """A configured-but-absent manifest file degrades to a no-op (no compute, no datasets)."""
+def test_populate_model_outlet_uris_forwards_remote_manifest_unchanged(mock_namespace, mock_compute):
+    """A remote ``ObjectStoragePath`` manifest (e.g. ``s3://``) is passed to
+    ``compute_model_outlet_uris`` unchanged, so its scheme is preserved (regression guard for
+    wrapping it in ``Path`` which would mangle ``s3://b/m.json`` into ``s3:/b/m.json``)."""
+    try:
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        from airflow.io.path import ObjectStoragePath
+
     from cosmos.operators import _k8s_common
 
+    remote_manifest = ObjectStoragePath("s3://my-bucket/target/manifest.json")
     op = DbtProducerWatcherKubernetesOperator(
         project_dir=".",
         profile_config=profile_config,
         image="dbt-image:latest",
-        manifest_filepath="/does/not/exist/manifest.json",
+        manifest_filepath=remote_manifest,
     )
 
     _k8s_common._populate_producer_model_outlet_uris(op)
 
-    assert op._model_outlet_uris == {}
-    mock_compute.assert_not_called()
+    mock_compute.assert_called_once_with(remote_manifest, "postgres://h:5432")
+    assert op._model_outlet_uris == {"model.jaffle.a": ["s3-uri"]}
 
 
 @patch("cosmos.operators.watcher_kubernetes.register_dataset_on_task")

@@ -12,7 +12,6 @@ import inspect
 import re
 from collections.abc import Callable
 from os import PathLike
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 import kubernetes.client as k8s
@@ -539,14 +538,14 @@ def _populate_producer_model_outlet_uris(operator: K8sWatcherProducerProtocol) -
             type(operator).__name__,
         )
         return
-    manifest_path = Path(operator.manifest_filepath)
-    if not manifest_path.exists():
-        operator.log.warning(
-            "Manifest not found at %s; per-model dataset emission is disabled for this run.",
-            manifest_path,
-        )
-        return
-    operator._model_outlet_uris.update(compute_model_outlet_uris(manifest_path, operator._dataset_namespace))
+    # manifest_filepath is ProjectConfig.manifest_path, an Airflow ObjectStoragePath that may point
+    # at a remote manifest (s3://, gs://, ...). Pass it through unchanged -- wrapping it in Path()
+    # would mangle remote URIs (e.g. "s3://b/m.json" -> "s3:/b/m.json"). compute_model_outlet_uris
+    # reads it via ObjectStoragePath.open() and returns {} (logging) if it's missing or unreadable,
+    # so no local existence check is needed here.
+    operator._model_outlet_uris.update(
+        compute_model_outlet_uris(operator.manifest_filepath, operator._dataset_namespace)
+    )
 
 
 def execute_watcher_producer(

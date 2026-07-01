@@ -25,6 +25,11 @@ if TYPE_CHECKING:
         from airflow import DAG  # type: ignore[assignment]
         from airflow.utils.task_group import TaskGroup
 
+    try:
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        from airflow.io.path import ObjectStoragePath
+
 logger = get_logger(__name__)
 
 
@@ -267,20 +272,28 @@ def make_dataset_uri_builder() -> Callable[[str, str], str]:
     return build
 
 
-def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict[str, list[str]]:
+def compute_model_outlet_uris(manifest_path: str | Path | ObjectStoragePath, namespace: str) -> dict[str, list[str]]:
     """
     Read a dbt manifest and compute per-model outlet URIs.
 
-    :param manifest_path: Path to the ``manifest.json`` file.
+    :param manifest_path: Path to the ``manifest.json`` file. May be a local ``str``/``Path`` or an
+        Airflow ``ObjectStoragePath`` pointing at a remote manifest (e.g. ``s3://``, ``gs://``).
     :param namespace: The OL-compatible dataset namespace (e.g. ``postgres://host:5432``).
     :returns: Mapping of ``{unique_id: [uri]}`` for model, seed, and snapshot nodes.
     """
+    # A plain ``str`` is only ever a local path (the subprocess watcher and tests); remote manifests
+    # arrive as an ObjectStoragePath. Normalising str -> Path lets us read every case via ``.open()``,
+    # mirroring DbtGraph._load_manifest_from_file and preserving remote schemes (s3://, gs://, ...).
+    path = Path(manifest_path) if isinstance(manifest_path, str) else manifest_path
+
     # The manifest may not exist if dbt failed before completing compilation,
     # or if the temp project directory was cleaned up before this function ran.
     # In those cases we gracefully return an empty dict — consumers simply
     # won't emit datasets for the affected run.
     try:
-        with open(manifest_path) as f:
+        # json.load accepts both text and binary streams, so Path.open() ("r") and
+        # ObjectStoragePath.open() ("rb") defaults are both fine.
+        with path.open() as f:
             manifest = json.load(f)
     except (OSError, json.JSONDecodeError):
         logger.warning(

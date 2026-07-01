@@ -1,6 +1,169 @@
 Changelog
 =========
 
+1.15.0 (2026-07-01)
+-------------------
+
+Now Stable
+
+``ExecutionMode.WATCHER`` and ``ExecutionMode.WATCHER_KUBERNETES`` are now stable, effective Cosmos 1.15.0 (they were experimental through 1.14.x). This milestone is the result of an ongoing effort across several releases; the highlights landing in this line include:
+
+* ``ExecutionMode.WATCHER_KUBERNETES`` mode with test handling. See #2529 and #2543.
+* An ``enable_watcher_reliable_retry`` config to harden watcher producer retries. See #2816.
+* Fixes to watcher consumer logging and to the cached ``pod_manager`` context under Kubernetes. See #2805, #2806, and #2809.
+* The documentation now marks both modes as stable. See #2865.
+
+Breaking Changes
+
+* The unused ``DBT_NO_TESTS_MSG`` and ``DBT_WARN_MSG`` constants and the module-level logger have been removed from ``cosmos.dbt.parser.output`` as part of a parser cleanup. If your custom code imported them, inline the literals (``"Nothing to do"`` / ``"WARN"``) instead. See #2832.
+
+Behaviour Changes
+
+These changes adjust observable behaviour. None of them break the documented public API, but review them before upgrading — especially if you rely on ephemeral models running dbt.
+
+* Ephemeral dbt models now render as ``EmptyOperator`` by default (``RenderConfig.ephemeral_models_as_empty_operator=True``). They no longer run dbt or emit datasets/assets, callbacks, OpenLineage events, or compiled SQL. Set ``RenderConfig(ephemeral_models_as_empty_operator=False)`` to restore the previous behaviour. See #2759.
+* ``on_warning_callback`` now fires for dbt test warnings in ``ExecutionMode.LOCAL`` subprocess mode (previously skipped on dbt 1.10+, where ``PASS=.. WARN=N`` is no longer the final stdout line). See #2832.
+* The output-only template fields ``compiled_sql`` and ``freshness`` are now rejected with ``CosmosValueError`` at task instantiation if passed via ``operator_args`` or directly to a local operator (they were previously overwritten by Cosmos at runtime, so any value silently had no effect); the guard covers both the synchronous local operators and the async BigQuery path. See #2726 and #2852.
+* ``RenderConfig.exclude`` is now applied to per-model and detached test tasks under ``TestBehavior.AFTER_EACH`` and ``BUILD`` (previously only the ``AFTER_ALL`` aggregate test task honoured it), so exclusions such as ``exclude=["resource_type:unit_test"]`` now take effect without an ``operator_args`` workaround. See #2850.
+
+Features
+
+* Add ``ExecutionMode.GCP_GKE`` and ``ExecutionMode.WATCHER_GCP_GKE`` execution modes by @vricciardulli in #2488
+* Add ``ExecutionMode.WATCHER_KUBERNETES`` mode with test handling by @vricciardulli in #2529 and #2543
+* Enable the orjson parser for the whole project (experimental) by @corsettigyg in #2552
+* Support dbt docs on Kubernetes via ``DbtDocsS3KubernetesOperator`` by @jx2lee in #2058
+* Add ``use_tarball`` option to the ``upload_to_gcp_gs`` callback by @TTMichaelA in #2497
+* Add AWS and Azure tarball upload options by @TTMichaelA in #2553
+* Expose ``freshness_callback`` in ``ExecutionConfig.setup_operator_args`` for ``ExecutionMode.WATCHER`` by @pankajastro in #2586
+* Allow templating dbt deps installation via ``ExecutionConfig`` by @pankajastro in #2728
+* Add configurable seed rendering behavior by @pankajkoti in #2755
+* Render ephemeral dbt models as ``EmptyOperator`` by default by @pankajkoti in #2759
+* Support per-node callbacks via string import paths by @highlyavailable in #2781
+* Map Snowflake ``query_tag`` from connection extras to dbt profile by @pankajastro in #2650
+* Add Snowflake profile mapping for non-encrypted private key file by @pankajastro in #2660
+* Export Clickhouse and encrypted Snowflake mappings from ``cosmos.profiles`` by @pankajastro in #2668
+* Forward Snowflake ``insecure_mode`` from connection Extra into dbt profile by @toor11 in #2744
+* Extend Snowflake profile mappings with ``authenticator``, ``client_session_keep_alive``, ``host``, and ``port`` by @Aaditya-git in #2748
+* Support ``extra__google_cloud_platform__project`` in ``GoogleCloudServiceAccountDictProfileMapping`` by @jroachgolf84 in #2626
+* Warn when users pass output-only template fields to local operators by @goingforstudying-ctrl in #2737
+* Add an ``enable_watcher_reliable_retry`` config to harden ``ExecutionMode.WATCHER`` producer retries by @tatiana in #2816
+
+Enhancements
+
+* Replace ``openlineage-airflow`` with ``apache-airflow-providers-openlineage`` by @tatiana in #2753
+* Refactor handling of watcher producer-only dbt flags by @tatiana in #2717
+* Disclose the ``--no-static-parser`` flag in ``ExecutionMode.LOCAL`` by @pankajkoti in #2714
+* Refactor ``_default_freshness_callback`` to return a list of ``(id, state)`` tuples by @pankajastro in #2572
+* Restore dynamically resolved user-provided node types by @jroachgolf84 in #2608
+* Promote inline watcher status collections to named constants by @pankajastro in #2671
+* Align ``WATCHER_KUBERNETES`` producer default ``task_id`` with ``PRODUCER_WATCHER_TASK_ID`` by @tatiana in #2794
+* Centralize version-aware ``EmptyOperator`` imports in a compatibility module by @pankajkoti in #2758
+* Move ``safe_copy`` out of ``cosmos.cache`` into ``cosmos.fs`` by @pankajkoti in #2715
+* Refactor seed checksum hashing and caching helpers by @pankajkoti in #2784
+* Avoid O(n^2) string accumulation in ``store_compiled_sql`` by @pankajastro in #2751
+* Use GA versions for ``propagate_logs`` in ``provider_info`` by @pankajastro in #2712
+* Use ``cosmos.log.get_logger`` consistently by @pankajastro in #2670
+* Use lazy logging instead of f-strings in logger calls by @pankajastro in #2672 and #2680
+* Ban eager module-level imports of optional providers via ruff by @tatiana in #2743
+* Remove unused ``# type: ignore`` comments and re-enable ``warn_unused_ignores`` by @pankajastro in #2710 and #2763
+* Drop the Python <3.9 fallback for ``functools.cache`` by @pankajastro in #2732
+* Remove stale Airflow 2.3 comment on ``registry_conn_id`` default by @pankajastro in #2766
+* Remove an outdated TODO on watcher terminal-status handling by @pankajastro in #2697
+* Remove the unused ``DBT_NO_TESTS_MSG`` / ``DBT_WARN_MSG`` constants and the module-level logger from ``cosmos.dbt.parser.output`` by @tatiana in #2832
+* Unify operator logging on ``self.log`` by @pankajastro in #2681
+* Centralise ``resource_name`` extraction from dbt ``unique_id`` by @pankajkoti in #2687
+* Tighten ``# type: ignore`` comments to specify error codes by @pankajastro in #2711
+* Defer the OpenLineage processor import to task execution to reduce DAG-parse memory by @pankajastro in #2785
+* Use the SDK ``Variable`` in the ``ExecutionMode.WATCHER`` XCom backup to reduce log noise by @jhorlima in #2804
+* Reduce Airflow 3 Asset URI migration warning noise in ``ExecutionMode.WATCHER`` producer runs by @faridnsh in #2788
+* Log via ``self.log`` inside dbt operators for consistency by @pankajastro in #2798
+* Refactor ``build_airflow_graph`` to satisfy the C901 complexity limit by @00yhj22-debug in #2689
+* Surface dbt ``stdout``/``stderr`` in ``CosmosLoadDbtException`` by @DaPillah in #2826
+* Avoid hard-coded watcher status strings in favour of named constants by @pankajastro in #2841
+
+Bug Fixes
+
+* Fix ``on_warning_callback`` skipping dbt test warnings in ``ExecutionMode.LOCAL`` subprocess mode by @tatiana in #2832
+* Fix ``example_cosmos_sources`` to use a dbt project with sources by @jroachgolf84 in #2614
+* Unify Postgres ``profiles.yml`` across dbt example projects by @yeoreums in #2501
+* Pin ``dbt-core<2.0`` in virtualenv example DAGs to avoid alpha pickup by @pankajastro in #2752
+* Cache the packages lockfile regardless of whether dependencies are reinstalled by @ms32035 in #2787
+* Maintain ``outlets`` passed to ``DbtRunLocalOperator`` when ``enable_dataset_alias=True`` by @jroachgolf84 in #2574
+* Treat concurrent ``cosmos_cache`` Variable insert ``IntegrityError`` as benign by @pankajkoti in #2800
+* Forward ``RenderConfig.exclude`` to per-model and detached test tasks for all test behaviours by @tatiana in #2850
+* Reject the output-only template fields ``compiled_sql`` and ``freshness`` when passed via ``operator_args`` or to a local operator, on both the synchronous and async BigQuery paths by @00yhj22-debug in #2726 and @qorexdevs in #2852
+* Fix ``group_nodes_by_folder`` collapsing folders that share a leaf name under different parents (opt-in via ``enable_hierarchical_naming_for_group_nodes_by_folder``) by @anor4k in #2824
+* Add an ``enable_hierarchical_naming_for_group_nodes_by_folder`` config (default ``False``) to opt into hierarchical task-group naming for ``group_nodes_by_folder``, rendering folders that share a leaf name under different parents as distinct task groups by @tatiana in #2862
+* Raise a clear exception on an empty or invalid dbt manifest instead of an opaque ``JSONDecodeError`` by @karanw330 in #2819
+* Atomically update the ``partial_parse.msgpack`` cache by @mungiyo in #2815
+* Fix stale context in the cached ``pod_manager`` for ``ExecutionMode.WATCHER_KUBERNETES`` by @vricciardulli in #2809
+* Capture the dbt-runner error message in ``ExecutionMode.WATCHER`` consumer logs by @pankajastro in #2806
+* Fix duplicate consumer logs in ``ExecutionMode.WATCHER`` mode by @pankajastro in #2805
+
+Docs
+
+* Create a glossary stub by @lzdanski in #2461
+* Improve the glossary: fix structure, add Cosmos-specific terms by @pankajastro in #2618
+* Add a top-level FAQ page by @tatiana in #2635
+* Align the FAQ page with the documentation style guide by @tatiana in #2667
+* Update docs for ``DbtDocsS3KubernetesOperator`` by @jx2lee in #2575
+* Add docs for ``ExecutionMode.WATCHER`` and the ``depends_on_past`` limitation by @tatiana in #2602
+* Document watcher mode dbt 1.5+ requirement by @tatiana in #2700
+* Improve clarity for ``watcher_dbt_execution_queue`` by @jroachgolf84 in #2705
+* Document ``compiled_sql`` and ``freshness`` as output-only template fields by @00yhj22-debug in #2719
+* Document seed rendering behavior by @pankajkoti in #2757
+* Document tradeoffs of remote cache and disabling the dbt ls cache by @pankajkoti in #2722
+* Document the LOCAL vs WATCHER benchmark on the Helm chart by @pankajkoti in #2688
+* Enhance S3 dbt docs documentation by @jroachgolf84 in #2765
+* Restore memory-optimised imports docs for Cosmos < 1.14.0 by @pankajkoti in #2604
+* Update dbt and Airflow Spark URLs in profile mapping docstrings by @pankajastro in #2695
+* Remove a duplicate ``node_conversion_by_task_group`` entry in render config docs by @pankajkoti in #2770
+* Capitalize Docker as a product name in prose by @pankajkoti in #2623
+* Normalize heading underlines across docs by @pankajkoti in #2641, #2655, #2656, and #2663
+* Add language hints to docs code-block directives by @pankajastro in #2686
+* Add the Cosmos 1.14.2 row to the watcher-retry behavior history by @tatiana in #2742
+* Add additional resources to the contributing docs by @lzdanski in #2460
+* Move the GCP GKE execution modes to a dedicated documentation page by @vricciardulli in #2834
+* Add a note and example for custom profile mapping by @karanw330 in #2825
+* Document the ``self.log`` vs ``get_logger`` logging convention by @pankajastro in #2764
+* Fix a malformed dbt-fusion docs redirect target by @pankajastro in #2849
+* Mark ``ExecutionMode.WATCHER`` and ``ExecutionMode.WATCHER_KUBERNETES`` as stable (effective Cosmos 1.15.0) in the documentation by @pankajkoti in #2865
+
+Others
+
+* Reduce integration test CI time from ~30 min to ~16 min by @pankajkoti in #2562
+* Speed up Airflow 3.1+ integration tests by caching ``InProcessExecutionAPI`` by @pankajkoti in #2547
+* Carve dbt-loom tests into a dedicated CI job by @pankajastro in #2761
+* Re-enable the cross-project dbt ls example DAG in the dbt-loom CI job by @pankajkoti in #2775
+* Move test jobs that need no secrets to an unprivileged ``pull_request`` workflow by @pankajkoti in #2791
+* Remove the Authorize gate from CI jobs that don't use secrets by @pankajkoti in #2567
+* Avoid running tests when PRs from forks only change docs by @tatiana in #2583
+* Forward extra args to the test-integration hatch script by @tatiana in #2682
+* Add ``release-*`` branches for ``pull_request_target`` to run CI on release branches by @pankajkoti in #2603
+* Pin pre-commit hooks and GitHub Actions to commit SHAs by @pankajkoti in #2610, #2611, #2612, and #2613
+* Set ``persist-credentials: false`` for checkout in the actionlint workflow by @pankajkoti in #2793
+* Stop the stale bot from auto-closing PRs by @pankajkoti in #2746
+* Make local ``hatch run docs:build`` fail on Sphinx warnings by @pankajkoti in #2639
+* Skip the watcher gateway test on Airflow 3.0 by @tatiana in #2607
+* Add an example DAG for seed rendering behavior by @pankajkoti in #2756
+* Add integration tests for ephemeral models rendered as empty operators by @pankajkoti in #2760
+* Improve coverage for ``DbtRunAirflowAsyncBigqueryOperator`` by @pankajastro in #2733
+* Add test coverage for ``DbtModel._extract_config`` branches by @pankajastro in #2779
+* Extract project conventions into ``AGENTS.md``; slim ``CLAUDE.md`` by @tatiana in #2703
+* Document the AI agent attribution convention by @tatiana in #2718
+* Teach AI agents to use pre-commit before committing and pushing by @tatiana in #2702
+* Instruct Claude Code to read ``AGENTS.md`` for commands before running them by @pankajkoti in #2774
+* Document docs build and serve commands, and the docs style guide, in ``CLAUDE.md`` by @pankajkoti in #2637 and #2665
+* Fix the pytest-asyncio warning by marking async tests per-method instead of per-class by @pankajastro in #2795
+* Ignore Claude Code user-local files by @pankajkoti in #2830
+* Add ``apache-airflow`` 3.3 to the test matrix by @pankajkoti in #2831
+* Add a blocking lychee linkcheck CI job and fix broken docs links by @pankajastro in #2699
+* Restore running integration tests on external contributors' PRs by @tatiana in #2848
+* Wait for all coverage jobs before combining coverage by @pankajastro in #2842
+* Bump black from 26.3.1 to 26.5.1 by @pankajkoti in #2727
+* Bump codecov-action to v6.0.2 by @pankajkoti in #2786
+* Dependency updates by @dependabot in #2541, #2555, #2571, #2578, #2579, #2582, #2588, #2589, #2609, #2621, #2627, #2651, #2674, #2707, #2721, #2724, #2725, #2730, #2745, #2783, #2789, #2790, #2802, #2807, #2820, #2833, #2838, #2847, #2853, and #2855
+
 1.14.2 (2026-05-21)
 -------------------
 

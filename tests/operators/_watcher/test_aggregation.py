@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cosmos.operators._watcher.aggregation import (
-    TestResultsPerModel,
+    ResultsTestsPerModel,
     TestResultSummary,
     accumulate_test_result,
     get_aggregated_test_status,
@@ -91,19 +91,19 @@ class TestAccumulateTestResult:
     """Tests for accumulate_test_result."""
 
     def test_returns_model_uid_when_test_found(self):
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         model_uid = accumulate_test_result("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results)
         assert model_uid == "model.pkg.orders"
         assert results == {"model.pkg.orders": {"test.pkg.not_null_orders_id": "pass"}}
 
     def test_returns_none_when_test_not_found(self):
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         model_uid = accumulate_test_result("test.pkg.unknown_test", "pass", TESTS_PER_MODEL, results)
         assert model_uid is None
         assert results == {}
 
     def test_accumulates_multiple_results(self):
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         accumulate_test_result("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results)
         accumulate_test_result("test.pkg.unique_orders_id", "fail", TESTS_PER_MODEL, results)
         assert results == {
@@ -111,7 +111,7 @@ class TestAccumulateTestResult:
         }
 
     def test_accumulates_across_models(self):
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         accumulate_test_result("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results)
         accumulate_test_result("test.pkg.not_null_customers_id", "pass", TESTS_PER_MODEL, results)
         assert results == {
@@ -120,14 +120,14 @@ class TestAccumulateTestResult:
         }
 
     def test_deduplicates_same_test_keeps_worst_status(self):
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         accumulate_test_result("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results)
         accumulate_test_result("test.pkg.not_null_orders_id", "fail", TESTS_PER_MODEL, results)
         # The worse (fail) status should override the earlier pass
         assert results == {"model.pkg.orders": {"test.pkg.not_null_orders_id": "fail"}}
 
     def test_deduplicates_same_test_keeps_first_failure(self):
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         accumulate_test_result("test.pkg.not_null_orders_id", "fail", TESTS_PER_MODEL, results)
         accumulate_test_result("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results)
         # A later pass should NOT override an existing failure
@@ -141,11 +141,11 @@ class TestGetAggregatedTestStatus:
         assert get_aggregated_test_status("model.pkg.unknown", TESTS_PER_MODEL, {}) is None
 
     def test_returns_none_when_not_all_tests_reported(self):
-        results: TestResultsPerModel = {"model.pkg.orders": {"test.pkg.not_null_orders_id": "pass"}}
+        results: ResultsTestsPerModel = {"model.pkg.orders": {"test.pkg.not_null_orders_id": "pass"}}
         assert get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results) is None
 
     def test_returns_summary_pass_when_all_tests_pass(self):
-        results: TestResultsPerModel = {
+        results: ResultsTestsPerModel = {
             "model.pkg.orders": {"test.pkg.not_null_orders_id": "pass", "test.pkg.unique_orders_id": "pass"}
         }
         summary = get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results)
@@ -157,7 +157,7 @@ class TestGetAggregatedTestStatus:
         assert summary.failed_tests == []
 
     def test_returns_summary_fail_when_any_test_fails(self):
-        results: TestResultsPerModel = {
+        results: ResultsTestsPerModel = {
             "model.pkg.orders": {"test.pkg.not_null_orders_id": "pass", "test.pkg.unique_orders_id": "fail"}
         }
         summary = get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results)
@@ -168,7 +168,7 @@ class TestGetAggregatedTestStatus:
         assert summary.failed_tests == ["test.pkg.unique_orders_id"]
 
     def test_returns_summary_fail_when_all_tests_fail(self):
-        results: TestResultsPerModel = {
+        results: ResultsTestsPerModel = {
             "model.pkg.orders": {"test.pkg.not_null_orders_id": "fail", "test.pkg.unique_orders_id": "fail"}
         }
         summary = get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results)
@@ -177,20 +177,20 @@ class TestGetAggregatedTestStatus:
         assert summary.failed_count == 2
 
     def test_single_test_pass(self):
-        results: TestResultsPerModel = {"model.pkg.customers": {"test.pkg.not_null_customers_id": "pass"}}
+        results: ResultsTestsPerModel = {"model.pkg.customers": {"test.pkg.not_null_customers_id": "pass"}}
         summary = get_aggregated_test_status("model.pkg.customers", TESTS_PER_MODEL, results)
         assert summary is not None
         assert summary.status == DbtTestStatus.PASS
         assert summary.total_count == 1
 
     def test_single_test_fail(self):
-        results: TestResultsPerModel = {"model.pkg.customers": {"test.pkg.not_null_customers_id": "fail"}}
+        results: ResultsTestsPerModel = {"model.pkg.customers": {"test.pkg.not_null_customers_id": "fail"}}
         summary = get_aggregated_test_status("model.pkg.customers", TESTS_PER_MODEL, results)
         assert summary is not None
         assert summary.status == DbtTestStatus.FAIL
 
     def test_returns_fail_when_test_has_error_status(self):
-        results: TestResultsPerModel = {
+        results: ResultsTestsPerModel = {
             "model.pkg.orders": {"test.pkg.not_null_orders_id": "pass", "test.pkg.unique_orders_id": "error"}
         }
         summary = get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results)
@@ -200,7 +200,7 @@ class TestGetAggregatedTestStatus:
 
     def test_treats_success_status_as_pass(self):
         """'success' is used by models; tests use 'pass' — both should be treated as success."""
-        results: TestResultsPerModel = {
+        results: ResultsTestsPerModel = {
             "model.pkg.orders": {"test.pkg.not_null_orders_id": "success", "test.pkg.unique_orders_id": "pass"}
         }
         summary = get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results)
@@ -213,7 +213,7 @@ class TestPushTestResultOrAggregate:
 
     @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
     def test_pushes_xcom_dict_when_all_tests_reported(self, mock_xcom_push: MagicMock):
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         ti = MagicMock()
         push_test_result_or_aggregate("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results, ti)
         push_test_result_or_aggregate("test.pkg.unique_orders_id", "pass", TESTS_PER_MODEL, results, ti)
@@ -228,21 +228,21 @@ class TestPushTestResultOrAggregate:
 
     @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
     def test_does_not_push_xcom_before_all_tests_reported(self, mock_xcom_push: MagicMock):
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         ti = MagicMock()
         push_test_result_or_aggregate("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results, ti)
         mock_xcom_push.assert_not_called()
 
     @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
     def test_does_not_push_xcom_for_unknown_test(self, mock_xcom_push: MagicMock):
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         ti = MagicMock()
         push_test_result_or_aggregate("test.pkg.unknown", "pass", TESTS_PER_MODEL, results, ti)
         mock_xcom_push.assert_not_called()
 
     @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
     def test_pushes_fail_dict_when_any_test_fails(self, mock_xcom_push: MagicMock):
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         ti = MagicMock()
         push_test_result_or_aggregate("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results, ti)
         push_test_result_or_aggregate("test.pkg.unique_orders_id", "fail", TESTS_PER_MODEL, results, ti)
@@ -256,7 +256,7 @@ class TestPushTestResultOrAggregate:
     @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
     def test_deduplication_prevents_double_push(self, mock_xcom_push: MagicMock):
         """If a test result is reported twice, it should not count twice toward completion."""
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         ti = MagicMock()
         push_test_result_or_aggregate("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results, ti)
         push_test_result_or_aggregate("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results, ti)
@@ -266,7 +266,7 @@ class TestPushTestResultOrAggregate:
     @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
     def test_replayed_test_result_does_not_prematurely_aggregate(self, mock_xcom_push: MagicMock):
         """A replayed log line for one test must not satisfy the model's completion count (#2543)."""
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         ti = MagicMock()
         # model.pkg.orders has 2 tests; the same test reported twice must not trigger aggregation.
         push_test_result_or_aggregate("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results, ti)
@@ -293,7 +293,7 @@ class TestPushTestResultOrAggregateConcurrency:
         num_tests = 50
         test_ids = [f"test.pkg.test_{i}" for i in range(num_tests)]
         tests_per_model: dict[str, list[str]] = {"model.pkg.big_model": test_ids}
-        results: TestResultsPerModel = {}
+        results: ResultsTestsPerModel = {}
         ti = MagicMock()
         barrier = threading.Barrier(num_tests)
 

@@ -22,7 +22,7 @@ from cosmos.dbt.graph import DbtNode
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import (
-    TestResultsPerModel,
+    ResultsTestsPerModel,
     TestResultSummary,
     TestsPerModel,
     get_tests_status_xcom_key,
@@ -306,7 +306,7 @@ def store_dbt_resource_status_from_log(
     extra_kwargs: Any,
     *,
     tests_per_model: TestsPerModel | None = None,
-    test_results_per_model: TestResultsPerModel | None = None,
+    test_results_per_model: ResultsTestsPerModel | None = None,
     model_outlet_uris: dict[str, list[str]] | None = None,
     dataset_namespace: str | None = None,
     should_generate_model_uris: bool = True,

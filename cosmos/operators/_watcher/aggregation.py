@@ -23,7 +23,7 @@ TestsPerModel: TypeAlias = dict[str, list[str]]
 
 #: Mutable accumulator mapping model unique_id → {test unique_id → terminal status}.
 #: Keying by test unique_id makes duplicated/replayed log lines idempotent.
-TestResultsPerModel: TypeAlias = dict[str, dict[str, str]]
+ResultsTestsPerModel: TypeAlias = dict[str, dict[str, str]]
 
 
 @dataclass(frozen=True)
@@ -65,7 +65,7 @@ def accumulate_test_result(
     test_unique_id: str,
     status: str,
     tests_per_model: TestsPerModel,
-    test_results_per_model: TestResultsPerModel,
+    test_results_per_model: ResultsTestsPerModel,
 ) -> str | None:
     """Record a test's terminal status into test_results_per_model for its parent model.
 
@@ -94,7 +94,7 @@ def accumulate_test_result(
 def get_aggregated_test_status(
     model_uid: str,
     tests_per_model: TestsPerModel,
-    test_results_per_model: TestResultsPerModel,
+    test_results_per_model: ResultsTestsPerModel,
 ) -> TestResultSummary | None:
     """
     Check if all tests for a model have finished and return aggregated status.
@@ -132,7 +132,7 @@ def push_test_result_or_aggregate(
     test_unique_id: str,
     status: str,
     tests_per_model: TestsPerModel,
-    test_results_per_model: TestResultsPerModel,
+    test_results_per_model: ResultsTestsPerModel,
     task_instance: Any,
 ) -> None:
     """Accumulate a test result and, when all tests for the parent model have reported, push aggregated XCom.

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException, AirflowSkipException
 
-from cosmos.operators._watcher.aggregation import TestResultsPerModel, TestsPerModel
+from cosmos.operators._watcher.aggregation import ResultsTestsPerModel, TestsPerModel
 
 try:
     # Airflow 3.1 onwards
@@ -218,7 +218,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self.tests_per_model: TestsPerModel = kwargs.pop("tests_per_model", {})
-        self.test_results_per_model: TestResultsPerModel = {}
+        self.test_results_per_model: ResultsTestsPerModel = {}
         self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
         self._should_generate_model_uris: bool = kwargs.pop(
             "_should_generate_model_uris", kwargs.get("emit_datasets", True)

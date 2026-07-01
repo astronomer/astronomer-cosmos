@@ -54,6 +54,10 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):
         **kwargs: Any,
     ) -> None:
 
+        # Reject output-only template fields up front: the split below routes them into
+        # clean_kwargs, bypassing the inner operator's dbt_kwargs guard.
+        AbstractDbtLocalBase._reject_output_only_template_fields(kwargs)
+
         # Cosmos attempts to pass many kwargs that async operator simply does not accept.
         # We need to pop them.
         clean_kwargs = {}

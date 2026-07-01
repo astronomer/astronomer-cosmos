@@ -10,6 +10,7 @@ if version.parse(airflow_version).major >= _AIRFLOW3_MAJOR_VERSION:
 
     pytest.skip("Skipping Cache tests on Airflow 3.0+", allow_module_level=True)
 
+import errno
 import logging
 import shutil
 import tempfile
@@ -130,6 +131,40 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
         _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
 
     assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "errno_value, expected_level, expected_message",
+    [
+        # ESTALE is an expected transient race (a concurrent task atomically replaced the cache on a
+        # shared network filesystem mid-copy); info.
+        (errno.ESTALE, logging.INFO, "Partial parse cache was replaced concurrently"),
+        # A non-transient error (e.g. EACCES on a misconfigured cache_dir) likely persists and
+        # should not silently disable partial parse — surface it at warning.
+        (errno.EACCES, logging.WARNING, "Skipping partial parse"),
+    ],
+)
+@patch("cosmos.cache.safe_copy")
+def test__copy_partial_parse_to_project_falls_back_on_oserror(
+    mock_safe_copy, tmp_path, caplog, errno_value, expected_level, expected_message
+):
+    # Partial parse is a best-effort optimisation, so any OSError copying the cache must be swallowed
+    # (letting dbt do a full parse) instead of raising — but the log level distinguishes the cause.
+    caplog.set_level(logging.INFO)
+    mock_safe_copy.side_effect = OSError(errno_value, "boom")
+
+    source_dir = tmp_path / DBT_TARGET_DIR_NAME
+    source_dir.mkdir()
+    partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    partial_parse_filepath.write_bytes(b"")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        # Must not raise.
+        _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
+
+    matching = [r for r in caplog.records if expected_message in r.getMessage()]
+    assert matching, f"expected a log containing {expected_message!r}"
+    assert matching[0].levelno == expected_level
 
 
 @patch("cosmos.cache.safe_copy")

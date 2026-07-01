@@ -1,5 +1,4 @@
 import base64
-import errno
 import json
 import logging
 import os
@@ -1081,41 +1080,6 @@ def test_run_operator_copies_manifest_file(caplog, tmp_path):
     run_test_dag(dag)
 
     assert caplog.text.count("Copying the manifest from") == 1
-
-
-@pytest.mark.parametrize(
-    "errno_value, expected_level, expected_message",
-    [
-        # ESTALE is an expected transient race (concurrent cache rewrite on a shared FS); info.
-        (errno.ESTALE, logging.INFO, "Partial parse cache was replaced concurrently"),
-        # A non-transient error (e.g. EACCES on a misconfigured cache_dir) likely persists and
-        # should not silently disable partial parse — surface it at warning.
-        (errno.EACCES, logging.WARNING, "Skipping partial parse"),
-    ],
-)
-def test_handle_partial_parse_falls_back_on_oserror(tmp_path, caplog, errno_value, expected_level, expected_message):
-    # Partial parse is a best-effort optimisation, so any OSError copying the cache must fall back
-    # to a full parse instead of raising — but the log level distinguishes the cause.
-    caplog.set_level(logging.INFO)
-    operator = ConcreteDbtLocalBaseOperator(
-        profile_config=profile_config,
-        task_id="my-task",
-        project_dir="my/dir",
-        cache_dir=tmp_path / "cache",
-    )
-
-    with patch.object(cache, "_get_latest_partial_parse", return_value=tmp_path / "partial_parse.msgpack"):
-        with patch.object(
-            cache,
-            "_copy_partial_parse_to_project",
-            side_effect=OSError(errno_value, "boom"),
-        ):
-            # Must not raise.
-            operator._handle_partial_parse(tmp_path / "project")
-
-    matching = [r for r in caplog.records if expected_message in r.getMessage()]
-    assert matching, f"expected a log containing {expected_message!r}"
-    assert matching[0].levelno == expected_level
 
 
 def test_dbt_base_operator_no_partial_parse() -> None:

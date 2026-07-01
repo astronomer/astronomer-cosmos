@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import functools
 import hashlib
 import json
@@ -315,12 +316,27 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
     source_manifest_filepath = partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
     target_manifest_filepath = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
-    safe_copy(partial_parse_filepath, target_partial_parse_file)
 
-    patch_partial_parse_content(target_partial_parse_file, project_path)
+    try:
+        safe_copy(partial_parse_filepath, target_partial_parse_file)
 
-    if source_manifest_filepath.exists():
-        safe_copy(source_manifest_filepath, target_manifest_filepath)
+        patch_partial_parse_content(target_partial_parse_file, project_path)
+
+        if source_manifest_filepath.exists():
+            safe_copy(source_manifest_filepath, target_manifest_filepath)
+    except OSError as err:
+        # Partial parse is a best-effort optimisation: if the cache cannot be copied we simply skip it
+        # and let dbt do a full parse, rather than failing the task. This mirrors how the torn-read race
+        # was absorbed here (as a ValueError in ``patch_partial_parse_content``) before the cache writes
+        # became atomic in #2815. The log level is split by cause: ESTALE is an expected, transient race
+        # on a shared network filesystem (a concurrent task atomically replaced the source mid-copy), so
+        # it stays at info; any other OSError (e.g. EACCES on a misconfigured cache_dir, ENOSPC) is likely
+        # a persistent problem that would otherwise silently disable partial parse, so it is surfaced at
+        # warning.
+        if getattr(err, "errno", None) == errno.ESTALE:
+            logger.info("Partial parse cache was replaced concurrently (%r); falling back to a full dbt parse", err)
+        else:
+            logger.warning("Skipping partial parse due to %r; falling back to a full dbt parse", err)
 
 
 def _calculate_yaml_selectors_cache_current_version(

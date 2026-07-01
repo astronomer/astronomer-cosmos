@@ -592,9 +592,7 @@ def _populate_producer_model_outlet_uris(operator: Any) -> None:
     )
 
 
-def execute_watcher_producer(
-    operator: Any, context: Context, parent_execute: Callable[..., Any], **kwargs: Any
-) -> Any:
+def execute_watcher_producer(operator: Any, context: Context, parent_execute: Callable[..., Any], **kwargs: Any) -> Any:
     """Shared ``execute`` logic for K8s watcher producer operators.
 
     On retry, restores any XCom backup and raises ``AirflowSkipException`` (the

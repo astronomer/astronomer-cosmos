@@ -537,7 +537,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         latest_partial_parse = cache._get_latest_partial_parse(Path(self.project_dir), self.cache_dir)
         self.log.info("Partial parse is enabled and the latest partial parse file is %s", latest_partial_parse)
         if latest_partial_parse is not None:
-            cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
+            try:
+                cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
+            except OSError as err:
+                # Partial parse is a best-effort optimisation. On a shared network filesystem a
+                # concurrent task rewriting the cache can make this copy fail transiently (e.g. an
+                # ESTALE "Stale file handle" that outlives safe_copy's own retries). Fall back to a
+                # full parse instead of failing the task.
+                self.log.info("Skipping partial parse due to %r; falling back to a full dbt parse", err)
 
     def _generate_dbt_flags(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
         dbt_flags = [

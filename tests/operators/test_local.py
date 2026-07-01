@@ -1082,6 +1082,29 @@ def test_run_operator_copies_manifest_file(caplog, tmp_path):
     assert caplog.text.count("Copying the manifest from") == 1
 
 
+def test_handle_partial_parse_falls_back_on_oserror(tmp_path, caplog) -> None:
+    # A concurrent cache rewrite on a shared filesystem can make the partial-parse copy fail
+    # (e.g. ESTALE). This is a best-effort optimisation, so the task must fall back to a full
+    # parse instead of raising.
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        cache_dir=tmp_path / "cache",
+    )
+
+    with patch.object(cache, "_get_latest_partial_parse", return_value=tmp_path / "partial_parse.msgpack"):
+        with patch.object(
+            cache,
+            "_copy_partial_parse_to_project",
+            side_effect=OSError(116, "Stale file handle"),
+        ):
+            # Must not raise.
+            operator._handle_partial_parse(tmp_path / "project")
+
+    assert "Skipping partial parse" in caplog.text
+
+
 def test_dbt_base_operator_no_partial_parse() -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,

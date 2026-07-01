@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import logging
 from pathlib import Path
@@ -56,6 +57,65 @@ def test_safe_copy_cleans_up_temp_file_on_failure(tmp_path: Path) -> None:
     # The temp file created next to dst must not be left behind.
     assert list(tmp_path.iterdir()) == [src]
     assert not dst.exists()
+
+
+def test_safe_copy_retries_on_stale_file_handle(tmp_path: Path) -> None:
+    # A concurrent writer replacing ``src`` on a network filesystem surfaces as ESTALE; safe_copy
+    # must retry (re-opening the new inode) rather than propagating the error.
+    src = tmp_path / "src.txt"
+    src.write_text("hello")
+    dst = tmp_path / "dst.txt"
+
+    real_copyfile = __import__("shutil").copyfile
+    calls = {"n": 0}
+
+    def flaky_copyfile(source, target, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError(errno.ESTALE, "Stale file handle")
+        return real_copyfile(source, target, *args, **kwargs)
+
+    with patch("cosmos.fs.shutil.copyfile", side_effect=flaky_copyfile):
+        safe_copy(src, dst)
+
+    assert calls["n"] == 2
+    assert dst.read_text() == "hello"
+    # No temp artefacts left behind by the failed first attempt.
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["dst.txt", "src.txt"]
+
+
+def test_safe_copy_raises_after_exhausting_stale_retries(tmp_path: Path) -> None:
+    src = tmp_path / "src.txt"
+    src.write_text("hello")
+    dst = tmp_path / "dst.txt"
+
+    with patch("cosmos.fs.shutil.copyfile", side_effect=OSError(errno.ESTALE, "Stale file handle")):
+        with pytest.raises(OSError) as exc_info:
+            safe_copy(src, dst)
+
+    assert exc_info.value.errno == errno.ESTALE
+    assert list(tmp_path.iterdir()) == [src]
+    assert not dst.exists()
+
+
+def test_safe_copy_does_not_retry_non_stale_oserror(tmp_path: Path) -> None:
+    src = tmp_path / "src.txt"
+    src.write_text("hello")
+    dst = tmp_path / "dst.txt"
+
+    calls = {"n": 0}
+
+    def failing_copyfile(*args, **kwargs):
+        calls["n"] += 1
+        raise OSError(errno.EACCES, "Permission denied")
+
+    with patch("cosmos.fs.shutil.copyfile", side_effect=failing_copyfile):
+        with pytest.raises(OSError) as exc_info:
+            safe_copy(src, dst)
+
+    # A non-ESTALE error is not retried.
+    assert calls["n"] == 1
+    assert exc_info.value.errno == errno.EACCES
 
 
 def test_calculate_file_checksum_matches_md5(tmp_path: Path) -> None:

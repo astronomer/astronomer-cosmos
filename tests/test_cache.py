@@ -133,12 +133,22 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
     assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text
 
 
+# ``errno.ESTALE`` is not defined on every platform, so referencing it directly in the parametrize
+# list would break test collection where it is missing. Look it up safely and skip that case instead.
+_ESTALE = getattr(errno, "ESTALE", None)
+
+
 @pytest.mark.parametrize(
     "errno_value, expected_level, expected_message",
     [
         # ESTALE is an expected transient race (a concurrent task atomically replaced the cache on a
         # shared network filesystem mid-copy); info.
-        (errno.ESTALE, logging.INFO, "Partial parse cache was replaced concurrently"),
+        pytest.param(
+            _ESTALE,
+            logging.INFO,
+            "Partial parse cache was replaced concurrently",
+            marks=pytest.mark.skipif(_ESTALE is None, reason="errno.ESTALE is not available on this platform"),
+        ),
         # A non-transient error (e.g. EACCES on a misconfigured cache_dir) likely persists and
         # should not silently disable partial parse — surface it at warning.
         (errno.EACCES, logging.WARNING, "Skipping partial parse"),

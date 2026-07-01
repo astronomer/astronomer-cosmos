@@ -333,7 +333,10 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
         # it stays at info; any other OSError (e.g. EACCES on a misconfigured cache_dir, ENOSPC) is likely
         # a persistent problem that would otherwise silently disable partial parse, so it is surfaced at
         # warning.
-        if getattr(err, "errno", None) == errno.ESTALE:
+        # ``errno.ESTALE`` is not defined on every platform; guard the lookup so a missing constant
+        # degrades to the warning branch instead of raising ``AttributeError`` while handling the error.
+        estale = getattr(errno, "ESTALE", None)
+        if estale is not None and getattr(err, "errno", None) == estale:
             logger.info("Partial parse cache was replaced concurrently (%r); falling back to a full dbt parse", err)
         else:
             logger.warning("Skipping partial parse due to %r; falling back to a full dbt parse", err)

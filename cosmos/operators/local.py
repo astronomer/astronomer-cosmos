@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import errno
 import inspect
 import json
 import os
@@ -540,11 +541,19 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             try:
                 cache._copy_partial_parse_to_project(latest_partial_parse, tmp_dir_path)
             except OSError as err:
-                # Partial parse is a best-effort optimisation. On a shared network filesystem a
-                # concurrent task rewriting the cache can make this copy fail transiently (e.g. an
-                # ESTALE "Stale file handle" that outlives safe_copy's own retries). Fall back to a
-                # full parse instead of failing the task.
-                self.log.info("Skipping partial parse due to %r; falling back to a full dbt parse", err)
+                # Partial parse is a best-effort optimisation, so we never fail the task over it and
+                # always fall back to a full parse. We still split the log level by cause: ESTALE is
+                # an expected, transient race on a shared network filesystem (a concurrent task
+                # rewriting the cache outlived safe_copy's own retries), so it stays at info; any
+                # other OSError (e.g. EACCES on a misconfigured cache_dir, ENOSPC) is likely a real,
+                # persistent problem that would otherwise silently disable partial parse forever, so
+                # it is surfaced at warning.
+                if getattr(err, "errno", None) == errno.ESTALE:
+                    self.log.info(
+                        "Partial parse cache was replaced concurrently (%r); falling back to a full dbt parse", err
+                    )
+                else:
+                    self.log.warning("Skipping partial parse due to %r; falling back to a full dbt parse", err)
 
     def _generate_dbt_flags(self, tmp_project_dir: str, profile_path: Path) -> list[str]:
         dbt_flags = [

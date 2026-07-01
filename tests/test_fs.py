@@ -3,6 +3,7 @@ from __future__ import annotations
 import errno
 import hashlib
 import logging
+import shutil
 from pathlib import Path
 from unittest.mock import patch
 
@@ -66,7 +67,10 @@ def test_safe_copy_retries_on_stale_file_handle(tmp_path: Path) -> None:
     src.write_text("hello")
     dst = tmp_path / "dst.txt"
 
-    real_copyfile = __import__("shutil").copyfile
+    # ``cosmos.fs.shutil`` is the same module object as ``shutil`` here, so the patch below also
+    # replaces ``shutil.copyfile``. Capture the real implementation now, before patching, so the
+    # retry can actually perform the copy (calling ``shutil.copyfile`` inside would recurse).
+    real_copyfile = shutil.copyfile
     calls = {"n": 0}
 
     def flaky_copyfile(source, target, *args, **kwargs):

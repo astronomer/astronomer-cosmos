@@ -14,7 +14,7 @@ Breaking Changes
 
 Behaviour Changes
 
-These changes adjust observable behaviour. Neither breaks the documented public API, but review them before upgrading — especially if you rely on ephemeral models running dbt.
+These changes adjust observable behaviour. None of them break the documented public API, but review them before upgrading — especially if you rely on ephemeral models running dbt.
 
 * Ephemeral dbt models now render as ``EmptyOperator`` by default (``RenderConfig.ephemeral_models_as_empty_operator=True``). They no longer run dbt or emit datasets/assets, callbacks, OpenLineage events, or compiled SQL. Set ``RenderConfig(ephemeral_models_as_empty_operator=False)`` to restore the previous behaviour by @pankajkoti in #2759
 * ``on_warning_callback`` now fires for dbt test warnings in ``ExecutionMode.LOCAL`` subprocess mode (previously skipped on dbt 1.10+, where ``PASS=.. WARN=N`` is no longer the final stdout line) by @tatiana in #2832

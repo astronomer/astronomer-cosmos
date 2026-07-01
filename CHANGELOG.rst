@@ -1,30 +1,36 @@
 Changelog
 =========
 
-1.15.0a3 (2026-06-30)
----------------------
+1.15.0 (2026-07-01)
+-------------------
 
 Now Stable
 
-* ``ExecutionMode.WATCHER`` and ``ExecutionMode.WATCHER_KUBERNETES`` are now stable, effective Cosmos 1.15.0 (they were experimental through 1.14.x).
+``ExecutionMode.WATCHER`` and ``ExecutionMode.WATCHER_KUBERNETES`` are now stable, effective Cosmos 1.15.0 (they were experimental through 1.14.x). This milestone is the result of an ongoing effort across several releases; the highlights landing in this line include:
+
+* ``ExecutionMode.WATCHER_KUBERNETES`` mode with test handling. See #2529 and #2543.
+* An ``enable_watcher_reliable_retry`` config to harden watcher producer retries. See #2816.
+* Fixes to watcher consumer logging and to the cached ``pod_manager`` context under Kubernetes. See #2805, #2806, and #2809.
+* The documentation now marks both modes as stable. See #2865.
 
 Breaking Changes
 
-* Removed the unused ``DBT_NO_TESTS_MSG`` and ``DBT_WARN_MSG`` constants and the module-level logger from ``cosmos.dbt.parser.output`` as part of a parser cleanup; if your custom code imported them, inline the literals (``"Nothing to do"`` / ``"WARN"``) instead by @tatiana in #2832
+* The unused ``DBT_NO_TESTS_MSG`` and ``DBT_WARN_MSG`` constants and the module-level logger have been removed from ``cosmos.dbt.parser.output`` as part of a parser cleanup. If your custom code imported them, inline the literals (``"Nothing to do"`` / ``"WARN"``) instead. See #2832.
 
 Behaviour Changes
 
 These changes adjust observable behaviour. None of them break the documented public API, but review them before upgrading — especially if you rely on ephemeral models running dbt.
 
-* Ephemeral dbt models now render as ``EmptyOperator`` by default (``RenderConfig.ephemeral_models_as_empty_operator=True``). They no longer run dbt or emit datasets/assets, callbacks, OpenLineage events, or compiled SQL. Set ``RenderConfig(ephemeral_models_as_empty_operator=False)`` to restore the previous behaviour by @pankajkoti in #2759
-* ``on_warning_callback`` now fires for dbt test warnings in ``ExecutionMode.LOCAL`` subprocess mode (previously skipped on dbt 1.10+, where ``PASS=.. WARN=N`` is no longer the final stdout line) by @tatiana in #2832
-* The output-only template fields ``compiled_sql`` and ``freshness`` are now rejected with ``CosmosValueError`` at task instantiation if passed via ``operator_args`` or directly to a local operator (they were previously overwritten by Cosmos at runtime, so any value silently had no effect); the guard covers both the synchronous local operators and the async BigQuery path by @00yhj22-debug in #2726 and @qorexdevs in #2852
-* ``RenderConfig.exclude`` is now applied to per-model and detached test tasks under ``TestBehavior.AFTER_EACH`` and ``BUILD`` (previously only the ``AFTER_ALL`` aggregate test task honoured it), so exclusions such as ``exclude=["resource_type:unit_test"]`` now take effect without an ``operator_args`` workaround by @tatiana in #2850
+* Ephemeral dbt models now render as ``EmptyOperator`` by default (``RenderConfig.ephemeral_models_as_empty_operator=True``). They no longer run dbt or emit datasets/assets, callbacks, OpenLineage events, or compiled SQL. Set ``RenderConfig(ephemeral_models_as_empty_operator=False)`` to restore the previous behaviour. See #2759.
+* ``on_warning_callback`` now fires for dbt test warnings in ``ExecutionMode.LOCAL`` subprocess mode (previously skipped on dbt 1.10+, where ``PASS=.. WARN=N`` is no longer the final stdout line). See #2832.
+* The output-only template fields ``compiled_sql`` and ``freshness`` are now rejected with ``CosmosValueError`` at task instantiation if passed via ``operator_args`` or directly to a local operator (they were previously overwritten by Cosmos at runtime, so any value silently had no effect); the guard covers both the synchronous local operators and the async BigQuery path. See #2726 and #2852.
+* ``RenderConfig.exclude`` is now applied to per-model and detached test tasks under ``TestBehavior.AFTER_EACH`` and ``BUILD`` (previously only the ``AFTER_ALL`` aggregate test task honoured it), so exclusions such as ``exclude=["resource_type:unit_test"]`` now take effect without an ``operator_args`` workaround. See #2850.
 
 Features
 
-* Add ``ExecutionMode.WATCHER_KUBERNETES`` mode with test handling by @vricciardulli in #2529 and #2543
 * Add ``ExecutionMode.GCP_GKE`` and ``ExecutionMode.WATCHER_GCP_GKE`` execution modes by @vricciardulli in #2488
+* Add ``ExecutionMode.WATCHER_KUBERNETES`` mode with test handling by @vricciardulli in #2529 and #2543
+* Enable the orjson parser for the whole project (experimental) by @corsettigyg in #2552
 * Support dbt docs on Kubernetes via ``DbtDocsS3KubernetesOperator`` by @jx2lee in #2058
 * Add ``use_tarball`` option to the ``upload_to_gcp_gs`` callback by @TTMichaelA in #2497
 * Add AWS and Azure tarball upload options by @TTMichaelA in #2553
@@ -39,10 +45,8 @@ Features
 * Forward Snowflake ``insecure_mode`` from connection Extra into dbt profile by @toor11 in #2744
 * Extend Snowflake profile mappings with ``authenticator``, ``client_session_keep_alive``, ``host``, and ``port`` by @Aaditya-git in #2748
 * Support ``extra__google_cloud_platform__project`` in ``GoogleCloudServiceAccountDictProfileMapping`` by @jroachgolf84 in #2626
-* Enable the orjson parser for the whole project (experimental) by @corsettigyg in #2552
 * Warn when users pass output-only template fields to local operators by @goingforstudying-ctrl in #2737
 * Add an ``enable_watcher_reliable_retry`` config to harden ``ExecutionMode.WATCHER`` producer retries by @tatiana in #2816
-* Add an ``enable_hierarchical_naming_for_group_nodes_by_folder`` config (default ``False``) to opt into hierarchical task-group naming for ``group_nodes_by_folder``, rendering folders that share a leaf name under different parents as distinct task groups by @tatiana in #2862
 
 Enhancements
 
@@ -65,6 +69,7 @@ Enhancements
 * Drop the Python <3.9 fallback for ``functools.cache`` by @pankajastro in #2732
 * Remove stale Airflow 2.3 comment on ``registry_conn_id`` default by @pankajastro in #2766
 * Remove an outdated TODO on watcher terminal-status handling by @pankajastro in #2697
+* Remove the unused ``DBT_NO_TESTS_MSG`` / ``DBT_WARN_MSG`` constants and the module-level logger from ``cosmos.dbt.parser.output`` by @tatiana in #2832
 * Unify operator logging on ``self.log`` by @pankajastro in #2681
 * Centralise ``resource_name`` extraction from dbt ``unique_id`` by @pankajkoti in #2687
 * Tighten ``# type: ignore`` comments to specify error codes by @pankajastro in #2711
@@ -86,7 +91,9 @@ Bug Fixes
 * Maintain ``outlets`` passed to ``DbtRunLocalOperator`` when ``enable_dataset_alias=True`` by @jroachgolf84 in #2574
 * Treat concurrent ``cosmos_cache`` Variable insert ``IntegrityError`` as benign by @pankajkoti in #2800
 * Forward ``RenderConfig.exclude`` to per-model and detached test tasks for all test behaviours by @tatiana in #2850
+* Reject the output-only template fields ``compiled_sql`` and ``freshness`` when passed via ``operator_args`` or to a local operator, on both the synchronous and async BigQuery paths by @00yhj22-debug in #2726 and @qorexdevs in #2852
 * Fix ``group_nodes_by_folder`` collapsing folders that share a leaf name under different parents (opt-in via ``enable_hierarchical_naming_for_group_nodes_by_folder``) by @anor4k in #2824
+* Add an ``enable_hierarchical_naming_for_group_nodes_by_folder`` config (default ``False``) to opt into hierarchical task-group naming for ``group_nodes_by_folder``, rendering folders that share a leaf name under different parents as distinct task groups by @tatiana in #2862
 * Raise a clear exception on an empty or invalid dbt manifest instead of an opaque ``JSONDecodeError`` by @karanw330 in #2819
 * Atomically update the ``partial_parse.msgpack`` cache by @mungiyo in #2815
 * Fix stale context in the cached ``pod_manager`` for ``ExecutionMode.WATCHER_KUBERNETES`` by @vricciardulli in #2809

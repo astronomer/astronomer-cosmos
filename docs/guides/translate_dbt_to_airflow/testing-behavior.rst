@@ -49,8 +49,8 @@ Finally, an example DAG and how it is rendered in the `Apache Airflow® <https:/
 
 .. image:: ../../_static/test_behavior_build.png
 
-Retrying models but not tests
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Retrying models but not tests when using TestBehavior.AFTER_ALL
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A common requirement is to retry failing model runs while never retrying tests, for example when tests are slow and
 retrying them would delay or block subsequent DAG runs.

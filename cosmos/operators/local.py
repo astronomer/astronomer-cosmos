@@ -1079,16 +1079,13 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
             and AIRFLOW_VERSION.major == _AIRFLOW3_MAJOR_VERSION
         ):
             # issue-2417: On Airflow 3, declare the AssetAlias as a static (parse-time) outlet so the producing
-            # task is serialized with an asset reference. Without it, the alias is only attached at execution time
-            # (see ``register_dataset``), so emitted assets never appear in the Airflow "Assets" graph - even
-            # though asset events and ``airflow asset list`` still work, since those read the metadata DB.
+            # task is serialized with an asset reference; otherwise it is only attached at runtime (register_dataset).
             from airflow.sdk.definitions.asset import AssetAlias
 
             dag = kwargs.get("dag")
             task_group = kwargs.get("task_group")
 
-            # Preserve any user-supplied outlets as-is (concrete ``Asset`` outlets must keep emitting and
-            # scheduling downstream DAGs) and only append the Cosmos ``AssetAlias`` alongside them.
+            # Keep user outlets as-is so concrete Assets keep emitting/scheduling; only append the Cosmos alias.
             user_outlets = list(kwargs.get("outlets", []))
             operator_kwargs["outlets"] = user_outlets + [
                 AssetAlias(name=get_dataset_alias_name(dag, task_group, self.task_id))

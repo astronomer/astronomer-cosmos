@@ -845,8 +845,8 @@ def test_run_operator_declares_asset_alias_outlet_at_parse_time_airflow_3():
 def test_run_operator_manual_outlets_airflow_3(caplog):
     """issue-2417: user-supplied outlets are preserved as-is on Airflow 3; Cosmos only appends its AssetAlias.
 
-    A user-declared concrete ``Asset`` must keep being emitted and scheduling downstream DAGs - it must not be
-    rewritten into an ``AssetAlias`` (which would silently stop emission/scheduling).
+    A concrete ``Asset`` must not be rewritten into an ``AssetAlias``, which would silently stop it emitting and
+    scheduling downstream DAGs.
     """
     from airflow.sdk.definitions.asset import Asset, AssetAlias
 
@@ -862,12 +862,7 @@ def test_run_operator_manual_outlets_airflow_3(caplog):
             outlets=[manual_asset, manual_alias],
         )
 
-    assert run_operator.outlets == [
-        manual_asset,  # user-supplied concrete Asset preserved unchanged
-        manual_alias,  # user-supplied AssetAlias preserved unchanged
-        AssetAlias(name="test_id_2__run"),  # auto outlet appended by Cosmos
-    ]
-    # The concrete Asset must remain an Asset (not be downgraded to an AssetAlias).
+    assert run_operator.outlets == [manual_asset, manual_alias, AssetAlias(name="test_id_2__run")]
     assert isinstance(run_operator.outlets[0], Asset)
 
 

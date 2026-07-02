@@ -49,6 +49,7 @@ from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
     AIRFLOW_VERSION,
     DBT_DEPENDENCIES_FILE_NAMES,
+    DBT_NOTHING_TO_DO,
     FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP,
     InvocationMode,
 )
@@ -173,6 +174,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     :param target_name: A name to use for the dbt target. If not provided, and no target is found
         in your project's dbt_project.yml, "cosmos_target" is used.
     :param should_store_compiled_sql: If true, store the compiled SQL in the compiled_sql rendered template.
+    :param fail_on_nothing_to_do: If true, exception will be thrown when dbt output includes "Nothing to do ...".
     :param append_env: If True(default), inherits the environment variables
         from current process and then environment variable passed by the user will either update the existing
         inherited environment variables or the new variables gets appended to it.
@@ -214,6 +216,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
         should_upload_compiled_sql: bool = False,
+        fail_on_nothing_to_do: bool = False,
         append_env: bool = True,
         dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]
         **kwargs: Any,
@@ -227,6 +230,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self._sources_json: dict[str, Any] | None = None
         self.should_store_compiled_sql = should_store_compiled_sql
         self.should_upload_compiled_sql = should_upload_compiled_sql
+        self.fail_on_nothing_to_do = fail_on_nothing_to_do
+        self._nothing_to_do_detected = False
         self.openlineage_events_completes: list[RunEvent] = []
         self.invocation_mode = invocation_mode
         self._dbt_runner: dbtRunner | None = None
@@ -303,9 +308,17 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.log.error("\n".join(result.full_output))
             raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
 
+        # If the output includes "Nothing to do ..." and user decides they want to fail the run (with the parameter
+        # fail_on_nothing_to_do), an AirflowException will be thrown
+        elif self.fail_on_nothing_to_do and DBT_NOTHING_TO_DO in "\n".join(result.full_output):
+            raise AirflowException(f"dbt command output included 'Nothing to do'. Selector may be incorrect.")
+
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
         """dbtRunnerResult has an attribute `success` that is False if the command failed."""
-        return dbt_runner.handle_exception_if_needed(result)
+        dbt_runner.handle_exception_if_needed(result)
+        # Like above, the user decides whether to fail execution if "Nothing to do ..." is detected in the output
+        if self.fail_on_nothing_to_do and self._nothing_to_do_detected:
+            raise AirflowException("dbt command output included 'Nothing to do'. Selector may be incorrect.")
 
     def store_compiled_sql(self, tmp_project_dir: str, context: Context) -> None:
         """
@@ -496,7 +509,24 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
             )
 
-        return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks, **kwargs)
+        # Extract the callbacks before (potentially) supplementing them. The _detect_nothing_to_do callback checks
+        # whether the message spit out by the run command contains "Nothing to do ...". The new value for
+        # self._nothing_to_do_detected can then be used to determine if an exception should be thrown
+        callbacks = self._dbt_runner_callbacks
+
+        if self.fail_on_nothing_to_do:
+            self._nothing_to_do_detected = False  # Resetting value to False
+
+            def _detect_nothing_to_do(event: Any) -> None:
+                try:
+                    if DBT_NOTHING_TO_DO in event.info.msg:
+                        self._nothing_to_do_detected = True
+                except AttributeError:
+                    pass
+
+            callbacks = [*(callbacks or []), _detect_nothing_to_do]
+
+        return dbt_runner.run_command(command, env, cwd, callbacks=callbacks, **kwargs)
 
     def _cache_package_lockfile(self, tmp_project_dir: Path) -> None:
         project_dir = Path(self.project_dir)

@@ -799,6 +799,100 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
     )
 
 
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="From Airflow 3.0 onwards, outlets are declared via AssetAlias at parse time.",
+)
+def test_run_operator_declares_asset_alias_outlet_at_parse_time_airflow_3():
+    """issue-2417: on Airflow 3 the AssetAlias must be a static (parse-time) outlet, otherwise emitted assets
+    never show up in the Airflow "Assets" graph."""
+    from airflow.sdk.definitions.asset import AssetAlias
+
+    with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            emit_datasets=False,
+            install_deps=False,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            install_deps=False,
+        )
+        seed_operator >> run_operator >> test_operator
+
+    assert seed_operator.outlets == []  # because emit_datasets=False
+    assert run_operator.outlets == [AssetAlias(name="test_id_1__run")]
+    assert test_operator.outlets == [AssetAlias(name="test_id_1__test")]
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="From Airflow 3.0 onwards, outlets are declared via AssetAlias at parse time (issue-2417).",
+)
+def test_run_operator_manual_outlets_airflow_3(caplog):
+    """issue-2417: user-supplied outlets are preserved as-is on Airflow 3; Cosmos only appends its AssetAlias.
+
+    A concrete ``Asset`` must not be rewritten into an ``AssetAlias``, which would silently stop it emitting and
+    scheduling downstream DAGs.
+    """
+    from airflow.sdk.definitions.asset import Asset, AssetAlias
+
+    manual_asset = Asset(uri="manual_asset")
+    manual_alias = AssetAlias(name="manual_alias")
+    with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+            outlets=[manual_asset, manual_alias],
+        )
+
+    assert run_operator.outlets == [manual_asset, manual_alias, AssetAlias(name="test_id_2__run")]
+    assert isinstance(run_operator.outlets[0], Asset)
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="_ensure_asset_alias_outlet only applies on Airflow 3 (issue-2417).",
+)
+def test_ensure_asset_alias_outlet_airflow_3():
+    """The runtime helper appends the alias only when it is missing, avoiding a duplicate of the parse-time outlet."""
+    from airflow.sdk.definitions.asset import AssetAlias
+
+    with DAG("test_id_3", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+        )
+
+    # The alias is already declared at parse time, so re-ensuring it is a no-op (dedup branch).
+    assert run_operator.outlets == [AssetAlias(name="test_id_3__run")]
+    run_operator._ensure_asset_alias_outlet("test_id_3__run")
+    assert run_operator.outlets == [AssetAlias(name="test_id_3__run")]
+
+    # A new alias name is appended (append branch).
+    run_operator._ensure_asset_alias_outlet("another_alias")
+    assert run_operator.outlets == [AssetAlias(name="test_id_3__run"), AssetAlias(name="another_alias")]
+
+
 @pytest.mark.integration
 def test_dbt_dag_with_group_nodes_by_folder():
     """

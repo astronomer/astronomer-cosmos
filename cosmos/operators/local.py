@@ -900,10 +900,24 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self.log.info("Assigning outlets with DatasetAlias in Airflow 3")
                 from airflow.sdk.definitions.asset import AssetAlias
 
-                # This line was necessary in Airflow 3.0.0, but this may become automatic in newer versions
-                self.outlets.append(AssetAlias(dataset_alias_name))  # type: ignore[attr-defined]
+                self._ensure_asset_alias_outlet(dataset_alias_name)
+                asset_alias = AssetAlias(dataset_alias_name)
                 for outlet in new_outlets:
-                    context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)
+                    context["outlet_events"][asset_alias].add(outlet)
+
+    def _ensure_asset_alias_outlet(self, dataset_alias_name: str) -> None:
+        """Append the AssetAlias outlet at runtime only if it is missing (Airflow 3).
+
+        The alias is normally declared as a static outlet at parse time (see ``__init__``, issue-2417). This keeps
+        emission working when outlets were not set at parse time, while avoiding a duplicate alias.
+        """
+        from airflow.sdk.definitions.asset import AssetAlias
+
+        existing_alias_names = {
+            outlet.name for outlet in self.outlets if isinstance(outlet, AssetAlias)  # type: ignore[attr-defined]
+        }
+        if dataset_alias_name not in existing_alias_names:
+            self.outlets.append(AssetAlias(dataset_alias_name))  # type: ignore[attr-defined]
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """
@@ -1060,6 +1074,23 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                 operator_kwargs["outlets"] = outlets + [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]
+        elif (
+            kwargs.get("emit_datasets", True)
+            and settings.enable_dataset_alias
+            and AIRFLOW_VERSION.major == _AIRFLOW3_MAJOR_VERSION
+        ):
+            # issue-2417: On Airflow 3, declare the AssetAlias as a static (parse-time) outlet so the producing
+            # task is serialized with an asset reference; otherwise it is only attached at runtime (register_dataset).
+            from airflow.sdk.definitions.asset import AssetAlias
+
+            dag = kwargs.get("dag")
+            task_group = kwargs.get("task_group")
+
+            # Keep user outlets as-is so concrete Assets keep emitting/scheduling; only append the Cosmos alias.
+            user_outlets = list(kwargs.get("outlets", []))
+            operator_kwargs["outlets"] = user_outlets + [
+                AssetAlias(name=get_dataset_alias_name(dag, task_group, self.task_id))
+            ]
 
         if "task_id" in operator_kwargs:
             operator_kwargs.pop("task_id")

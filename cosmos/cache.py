@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import errno
 import functools
 import hashlib
@@ -338,8 +339,12 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
         # and a failed rewrite in ``patch_partial_parse_content`` (which truncates via ``open("wb")`` first)
         # can leave a corrupt msgpack. Remove both copied artifacts so the advertised full-parse fallback is
         # actually what happens instead of handing dbt a half-written or manifest-less cache.
-        target_partial_parse_file.unlink(missing_ok=True)
-        target_manifest_filepath.unlink(missing_ok=True)
+        # The cleanup itself must stay best-effort: ``unlink(missing_ok=True)`` only swallows a missing file,
+        # so suppress any other OSError (e.g. a permission issue or a concurrent process touching the target)
+        # too — otherwise the cleanup error would mask the original one and still fail the task.
+        for artifact in (target_partial_parse_file, target_manifest_filepath):
+            with contextlib.suppress(OSError):
+                artifact.unlink(missing_ok=True)
         # ``errno.ESTALE`` is not defined on every platform; guard the lookup so a missing constant
         # degrades to the warning branch instead of raising ``AttributeError`` while handling the error.
         estale = getattr(errno, "ESTALE", None)

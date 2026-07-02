@@ -210,6 +210,24 @@ def test__copy_partial_parse_to_project_removes_leftover_artifacts_on_oserror(
 
 
 @patch("cosmos.cache.safe_copy")
+def test__copy_partial_parse_to_project_cleanup_is_best_effort(mock_safe_copy, tmp_path):
+    # The error-path cleanup must not itself fail the task: if unlink raises something other than a
+    # missing file (e.g. a permission error or a concurrent process), it must be suppressed so the
+    # cleanup error cannot mask the original OSError and crash the task.
+    mock_safe_copy.side_effect = OSError(errno.EACCES, "denied")
+
+    source_dir = tmp_path / DBT_TARGET_DIR_NAME
+    source_dir.mkdir()
+    partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    partial_parse_filepath.write_bytes(b"")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        with patch("cosmos.cache.Path.unlink", side_effect=OSError(errno.EACCES, "denied")):
+            # Must not raise, even though the cleanup unlink itself fails.
+            _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
+
+
+@patch("cosmos.cache.safe_copy")
 @patch("cosmos.cache.get_partial_parse_path")
 def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_safe_copy, tmp_path):
     mock_get_partial_parse_path.side_effect = lambda cache_dir: cache_dir / "partial_parse.yml"

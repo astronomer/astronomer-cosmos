@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import errno
 import functools
 import hashlib
 import json
@@ -315,12 +317,41 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
     source_manifest_filepath = partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
     target_manifest_filepath = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
-    safe_copy(partial_parse_filepath, target_partial_parse_file)
 
-    patch_partial_parse_content(target_partial_parse_file, project_path)
+    try:
+        safe_copy(partial_parse_filepath, target_partial_parse_file)
 
-    if source_manifest_filepath.exists():
-        safe_copy(source_manifest_filepath, target_manifest_filepath)
+        patch_partial_parse_content(target_partial_parse_file, project_path)
+
+        if source_manifest_filepath.exists():
+            safe_copy(source_manifest_filepath, target_manifest_filepath)
+    except OSError as err:
+        # Partial parse is a best-effort optimisation: if the cache cannot be copied we simply skip it
+        # and let dbt do a full parse, rather than failing the task. This mirrors how the torn-read race
+        # was absorbed here (as a ValueError in ``patch_partial_parse_content``) before the cache writes
+        # became atomic in #2815. The log level is split by cause: ESTALE is an expected, transient race
+        # on a shared network filesystem (a concurrent task atomically replaced the source mid-copy), so
+        # it stays at info; any other OSError (e.g. EACCES on a misconfigured cache_dir, ENOSPC) is likely
+        # a persistent problem that would otherwise silently disable partial parse, so it is surfaced at
+        # warning.
+        # A mid-sequence failure can leave the target inconsistent: a failed manifest copy leaves a lone
+        # partial_parse.msgpack behind (so dbt would still partial-parse despite the "full parse" message),
+        # and a failed rewrite in ``patch_partial_parse_content`` (which truncates via ``open("wb")`` first)
+        # can leave a corrupt msgpack. Remove both copied artifacts so the advertised full-parse fallback is
+        # actually what happens instead of handing dbt a half-written or manifest-less cache.
+        # The cleanup itself must stay best-effort: ``unlink(missing_ok=True)`` only swallows a missing file,
+        # so suppress any other OSError (e.g. a permission issue or a concurrent process touching the target)
+        # too — otherwise the cleanup error would mask the original one and still fail the task.
+        for artifact in (target_partial_parse_file, target_manifest_filepath):
+            with contextlib.suppress(OSError):
+                artifact.unlink(missing_ok=True)
+        # ``errno.ESTALE`` is not defined on every platform; guard the lookup so a missing constant
+        # degrades to the warning branch instead of raising ``AttributeError`` while handling the error.
+        estale = getattr(errno, "ESTALE", None)
+        if estale is not None and getattr(err, "errno", None) == estale:
+            logger.info("Partial parse cache was replaced concurrently (%r); falling back to a full dbt parse", err)
+        else:
+            logger.warning("Skipping partial parse due to %r; falling back to a full dbt parse", err)
 
 
 def _calculate_yaml_selectors_cache_current_version(

@@ -10,6 +10,7 @@ if version.parse(airflow_version).major >= _AIRFLOW3_MAJOR_VERSION:
 
     pytest.skip("Skipping Cache tests on Airflow 3.0+", allow_module_level=True)
 
+import errno
 import logging
 import shutil
 import tempfile
@@ -130,6 +131,100 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
         _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
 
     assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text
+
+
+# ``errno.ESTALE`` is not defined on every platform, so referencing it directly in the parametrize
+# list would break test collection where it is missing. Look it up safely and skip that case instead.
+_ESTALE = getattr(errno, "ESTALE", None)
+
+
+@pytest.mark.parametrize(
+    "errno_value, expected_level, expected_message",
+    [
+        # ESTALE is an expected transient race (a concurrent task atomically replaced the cache on a
+        # shared network filesystem mid-copy); info.
+        pytest.param(
+            _ESTALE,
+            logging.INFO,
+            "Partial parse cache was replaced concurrently",
+            marks=pytest.mark.skipif(_ESTALE is None, reason="errno.ESTALE is not available on this platform"),
+        ),
+        # A non-transient error (e.g. EACCES on a misconfigured cache_dir) likely persists and
+        # should not silently disable partial parse — surface it at warning.
+        (errno.EACCES, logging.WARNING, "Skipping partial parse"),
+    ],
+)
+@patch("cosmos.cache.safe_copy")
+def test__copy_partial_parse_to_project_falls_back_on_oserror(
+    mock_safe_copy, tmp_path, caplog, errno_value, expected_level, expected_message
+):
+    # Partial parse is a best-effort optimisation, so any OSError copying the cache must be swallowed
+    # (letting dbt do a full parse) instead of raising — but the log level distinguishes the cause.
+    caplog.set_level(logging.INFO)
+    mock_safe_copy.side_effect = OSError(errno_value, "boom")
+
+    source_dir = tmp_path / DBT_TARGET_DIR_NAME
+    source_dir.mkdir()
+    partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    partial_parse_filepath.write_bytes(b"")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        # Must not raise.
+        _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
+
+    matching = [r for r in caplog.records if expected_message in r.getMessage()]
+    assert matching, f"expected a log containing {expected_message!r}"
+    assert matching[0].levelno == expected_level
+
+
+@patch("cosmos.cache.patch_partial_parse_content")
+@patch("cosmos.cache.safe_copy")
+def test__copy_partial_parse_to_project_removes_leftover_artifacts_on_oserror(
+    mock_safe_copy, mock_patch_content, tmp_path
+):
+    # If the partial_parse copy succeeds but a later step fails (e.g. the manifest copy), the target would
+    # otherwise be left holding a lone partial_parse.msgpack and dbt would still partial-parse despite the
+    # "full parse" fallback message. Both artifacts must be removed so the advertised fallback really happens.
+    def fake_safe_copy(src, dst):
+        if src.name == DBT_MANIFEST_FILE_NAME:
+            raise OSError(errno.ENOSPC, "no space")
+        Path(dst).write_bytes(b"copied")
+
+    mock_safe_copy.side_effect = fake_safe_copy
+
+    source_dir = tmp_path / DBT_TARGET_DIR_NAME
+    source_dir.mkdir()
+    partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    partial_parse_filepath.write_bytes(b"")
+    (source_dir / DBT_MANIFEST_FILE_NAME).write_bytes(b"")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        project_path = Path(tmp_dir)
+        # Must not raise.
+        _copy_partial_parse_to_project(partial_parse_filepath, project_path)
+
+        target_partial_parse_file = get_partial_parse_path(project_path)
+        target_manifest_file = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
+        assert not target_partial_parse_file.exists()
+        assert not target_manifest_file.exists()
+
+
+@patch("cosmos.cache.safe_copy")
+def test__copy_partial_parse_to_project_cleanup_is_best_effort(mock_safe_copy, tmp_path):
+    # The error-path cleanup must not itself fail the task: if unlink raises something other than a
+    # missing file (e.g. a permission error or a concurrent process), it must be suppressed so the
+    # cleanup error cannot mask the original OSError and crash the task.
+    mock_safe_copy.side_effect = OSError(errno.EACCES, "denied")
+
+    source_dir = tmp_path / DBT_TARGET_DIR_NAME
+    source_dir.mkdir()
+    partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    partial_parse_filepath.write_bytes(b"")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        with patch("cosmos.cache.Path.unlink", side_effect=OSError(errno.EACCES, "denied")):
+            # Must not raise, even though the cleanup unlink itself fails.
+            _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
 
 
 @patch("cosmos.cache.safe_copy")

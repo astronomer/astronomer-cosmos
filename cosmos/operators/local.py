@@ -901,8 +901,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 from airflow.sdk.definitions.asset import AssetAlias
 
                 self._ensure_asset_alias_outlet(dataset_alias_name)
+                asset_alias = AssetAlias(dataset_alias_name)
                 for outlet in new_outlets:
-                    context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)
+                    context["outlet_events"][asset_alias].add(outlet)
 
     def _ensure_asset_alias_outlet(self, dataset_alias_name: str) -> None:
         """Append the AssetAlias outlet at runtime only if it is missing (Airflow 3).

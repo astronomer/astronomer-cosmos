@@ -93,6 +93,7 @@ from cosmos.constants import (
     OPENLINEAGE_PRODUCER,
 )
 from cosmos.dbt.parser.output import (
+    extract_dbt_failure_details,
     extract_freshness_warn_msg,
     extract_log_issues,
     parse_number_of_warnings_subprocess,
@@ -301,7 +302,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
             self.log.error("\n".join(result.full_output))
-            raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
+            message = f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
+            # Surface failing nodes via context["exception"] for on_failure_callback (issue-1806)
+            failure_details = extract_dbt_failure_details(result.full_output)
+            if failure_details:
+                message += " Details:\n" + "\n".join(failure_details)
+            raise AirflowException(message)
 
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
         """dbtRunnerResult has an attribute `success` that is False if the command failed."""

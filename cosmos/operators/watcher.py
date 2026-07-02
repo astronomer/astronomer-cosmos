@@ -268,6 +268,13 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             upstream_failure_skipped_ids=self._upstream_failure_skipped_ids,
         )
 
+    def handle_exception_subprocess(self, result: Any) -> None:
+        """Skip the full_output dump — the process_log_line callback already logged each line."""
+        if self.skip_exit_code is not None and result.exit_code == self.skip_exit_code:
+            raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
+        elif result.exit_code != 0:
+            raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
+
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> Any:
         """Wire up per-line JSON log parsing before delegating to the subprocess runner.
 

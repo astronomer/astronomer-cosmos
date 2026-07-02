@@ -843,9 +843,15 @@ def test_run_operator_declares_asset_alias_outlet_at_parse_time_airflow_3():
     reason="From Airflow 3.0 onwards, outlets are declared via AssetAlias at parse time (issue-2417).",
 )
 def test_run_operator_manual_outlets_airflow_3(caplog):
-    """issue-2417: user-supplied outlets are normalized to AssetAlias on Airflow 3, and unknown types warn."""
+    """issue-2417: user-supplied outlets are preserved as-is on Airflow 3; Cosmos only appends its AssetAlias.
+
+    A user-declared concrete ``Asset`` must keep being emitted and scheduling downstream DAGs - it must not be
+    rewritten into an ``AssetAlias`` (which would silently stop emission/scheduling).
+    """
     from airflow.sdk.definitions.asset import Asset, AssetAlias
 
+    manual_asset = Asset(uri="manual_asset")
+    manual_alias = AssetAlias(name="manual_alias")
     with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
         run_operator = DbtRunLocalOperator(
             profile_config=real_profile_config,
@@ -853,15 +859,16 @@ def test_run_operator_manual_outlets_airflow_3(caplog):
             task_id="run",
             dag=dag,
             install_deps=False,
-            outlets=[Asset(uri="manual_asset"), AssetAlias(name="manual_alias"), "unexpected_outlet"],
+            outlets=[manual_asset, manual_alias],
         )
 
     assert run_operator.outlets == [
-        AssetAlias(name="manual_asset"),  # Asset -> AssetAlias(name=uri)
-        AssetAlias(name="manual_alias"),  # AssetAlias kept as-is
+        manual_asset,  # user-supplied concrete Asset preserved unchanged
+        manual_alias,  # user-supplied AssetAlias preserved unchanged
         AssetAlias(name="test_id_2__run"),  # auto outlet appended by Cosmos
     ]
-    assert "Unknown outlet type unexpected_outlet" in caplog.text
+    # The concrete Asset must remain an Asset (not be downgraded to an AssetAlias).
+    assert isinstance(run_operator.outlets[0], Asset)
 
 
 @pytest.mark.skipif(

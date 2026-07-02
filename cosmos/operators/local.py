@@ -1082,21 +1082,15 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
             # task is serialized with an asset reference. Without it, the alias is only attached at execution time
             # (see ``register_dataset``), so emitted assets never appear in the Airflow "Assets" graph - even
             # though asset events and ``airflow asset list`` still work, since those read the metadata DB.
-            from airflow.sdk.definitions.asset import Asset, AssetAlias
+            from airflow.sdk.definitions.asset import AssetAlias
 
             dag = kwargs.get("dag")
             task_group = kwargs.get("task_group")
 
-            asset_outlets: list[AssetAlias] = []
-            for outlet in kwargs.get("outlets", []):
-                if isinstance(outlet, AssetAlias):
-                    asset_outlets.append(outlet)  # Keep as-is
-                elif isinstance(outlet, Asset):
-                    asset_outlets.append(AssetAlias(name=outlet.uri))
-                else:
-                    self.log.warning("Unknown outlet type %s", outlet)  # Otherwise, pass
-
-            operator_kwargs["outlets"] = asset_outlets + [
+            # Preserve any user-supplied outlets as-is (concrete ``Asset`` outlets must keep emitting and
+            # scheduling downstream DAGs) and only append the Cosmos ``AssetAlias`` alongside them.
+            user_outlets = list(kwargs.get("outlets", []))
+            operator_kwargs["outlets"] = user_outlets + [
                 AssetAlias(name=get_dataset_alias_name(dag, task_group, self.task_id))
             ]
 

@@ -2797,3 +2797,102 @@ def test_create_task_metadata_seed_rendering_always_no_flag():
     )
     assert metadata.operator_class == "cosmos.operators.local.DbtSeedLocalOperator"
     assert "should_run_if_seed_changed" not in metadata.extra_context
+
+
+def _model_with_node_retries(retries):
+    return DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.proj.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("models/my_model.sql"),
+        tags=[],
+        config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"retries": retries}}}},
+        has_test=True,
+    )
+
+
+def test_retries_after_all_separates_model_and_test():
+    """Per-node ``retries`` reaches the model task, while the AFTER_ALL test task (node=None) keeps the DAG default.
+
+    This is the supported way to retry model runs but not tests (issue #2130).
+    """
+    node = _model_with_node_retries(2)
+    model_meta = create_task_metadata(
+        node, execution_mode=ExecutionMode.LOCAL, args={"retries": 0}, dbt_dag_task_group_identifier="dag"
+    )
+    test_meta = create_test_task_metadata(
+        "proj_test",
+        ExecutionMode.LOCAL,
+        TestIndirectSelection.EAGER,
+        task_args={"retries": 0},
+        render_config=RenderConfig(test_behavior=TestBehavior.AFTER_ALL, select=[], exclude=[]),
+    )
+    assert model_meta.arguments["retries"] == 2
+    assert test_meta.arguments["retries"] == 0
+
+
+def test_retries_after_each_test_inherits_model_operator_kwargs():
+    """AFTER_EACH builds the test task from the model node, so per-node ``retries`` also applies to the test.
+
+    Documents the limitation behind issue #2130: AFTER_EACH cannot retry models without also retrying their tests.
+    """
+    node = _model_with_node_retries(2)
+    test_meta = create_test_task_metadata(
+        "test",
+        ExecutionMode.LOCAL,
+        TestIndirectSelection.EAGER,
+        task_args={"retries": 0},
+        node=node,
+    )
+    assert test_meta.arguments["retries"] == 2
+
+
+def test_retries_after_each_ignores_test_node_operator_kwargs():
+    """Under AFTER_EACH the test task inherits the model's args; a test node's own ``retries`` meta is ignored.
+
+    Documents the limitation behind issue #2130: setting ``operator_kwargs`` on the test itself does not take effect.
+    """
+    model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.proj.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/my_model.sql"),
+        tags=[],
+        config={"materialized": "table"},
+        has_test=True,
+        has_non_detached_test=True,
+    )
+    test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.proj.my_test",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[model.unique_id],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/schema.yml"),
+        config={"meta": {"cosmos": {"operator_kwargs": {"retries": 0}}}},
+    )
+    with DAG("test-retries-after-each", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "retries": 3,
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn", profile_args={"schema": "public"}
+                ),
+            ),
+        }
+        build_airflow_graph(
+            nodes={model.unique_id: model, test.unique_id: test},
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(test_behavior=TestBehavior.AFTER_EACH),
+            dbt_project_name="proj",
+        )
+    # The test node's own retries=0 is ignored; the test task keeps the DAG-level retries=3.
+    assert dag.task_dict["my_model.test"].retries == 3

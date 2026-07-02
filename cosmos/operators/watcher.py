@@ -436,7 +436,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             if self._sources_json is None:
                 raise
             self.log.warning(
-                "dbt source freshness completed with non-zero exit code: %s. " "Proceeding with freshness results.",
+                "dbt source freshness completed with non-zero exit code: %s. Proceeding with freshness results.",
                 exc,
             )
 
@@ -532,41 +532,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):
             deferrable=deferrable,
             **kwargs,
         )
-
-    def _emit_datasets(self, context: Context) -> None:
-        """Emit Airflow datasets for this consumer task's model using outlet URIs from the producer."""
-        if not getattr(self, "emit_datasets", False):
-            return
-        outlet_uris = getattr(self, "_outlet_uris", [])
-        if not outlet_uris:
-            return
-
-        from cosmos import settings
-        from cosmos.constants import AIRFLOW_VERSION
-
-        if AIRFLOW_VERSION.major >= 3:
-            from airflow.sdk.definitions.asset import Asset
-        else:
-            from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
-
-        outlets = [Asset(uri=uri) for uri in outlet_uris]
-        logger.info("Emitting %d dataset(s) for model '%s': %s", len(outlets), self.model_unique_id, outlet_uris)
-        self.register_dataset([], outlets, context)
-
-        if settings.enable_uri_xcom:
-            context["ti"].xcom_push(key="uri", value=outlet_uris)
-
-    def execute(self, context: Context, **kwargs: Any) -> None:
-        super().execute(context, **kwargs)
-        # If we reach here without deferring, the model succeeded — emit datasets
-        self._emit_datasets(context)
-
-    def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
-        # Extract outlet URIs from trigger event before parent handles status
-        self._outlet_uris = event.get("outlet_uris", [])
-        super().execute_complete(context, event)
-        # If we reach here without raising, the model succeeded — emit datasets
-        self._emit_datasets(context)
 
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.

@@ -488,7 +488,7 @@ class TestConsumerEmitDatasets:
         ctx = {"ti": _MockTI()}
         sensor._emit_datasets(ctx)
 
-    @patch.object(DbtConsumerWatcherSensor, "register_dataset")
+    @patch("cosmos.dataset.register_dataset_on_task")
     def test_emit_datasets_calls_register(self, mock_register):
         sensor = self._make_sensor()
         sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
@@ -496,11 +496,13 @@ class TestConsumerEmitDatasets:
         ctx = {"ti": ti}
         sensor._emit_datasets(ctx)
         mock_register.assert_called_once()
+        # register_dataset_on_task(task, new_inlets, new_outlets, context): outlets is the 3rd arg.
         args = mock_register.call_args
-        assert len(args[0][1]) == 1  # one outlet
+        assert args[0][0] is sensor
+        assert len(args[0][2]) == 1  # one outlet
 
     @patch("cosmos.settings.enable_uri_xcom", True)
-    @patch.object(DbtConsumerWatcherSensor, "register_dataset")
+    @patch("cosmos.dataset.register_dataset_on_task")
     def test_emit_datasets_pushes_xcom_when_enabled(self, mock_register):
         sensor = self._make_sensor()
         sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]

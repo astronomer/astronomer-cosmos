@@ -372,6 +372,8 @@ def test_build_watcher_pod_manager_wires_callback_extra_kwargs():
     operator._test_results_per_model = {}
     operator._context_holder = {CONTEXT_KEY: {"ti": MagicMock()}}
     operator._upstream_failure_skipped_ids = set()
+    operator._model_outlet_uris = {}
+    operator._should_generate_model_uris = True
 
     with patch("cosmos.operators._k8s_common.CosmosKubernetesPodManager") as mock_manager_cls:
         build_watcher_pod_manager(operator)
@@ -384,6 +386,8 @@ def test_build_watcher_pod_manager_wires_callback_extra_kwargs():
             "test_results_per_model": operator._test_results_per_model,
             CONTEXT_HOLDER_KEY: operator._context_holder,
             "upstream_failure_skipped_ids": operator._upstream_failure_skipped_ids,
+            "model_outlet_uris": operator._model_outlet_uris,
+            "should_generate_model_uris": operator._should_generate_model_uris,
         },
     )
 

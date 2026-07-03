@@ -170,7 +170,7 @@ Airflow UI, but any value passed in via ``operator_args`` is silently
 overwritten and has no effect.
 
 - ``compiled_sql`` — the SQL Cosmos compiled for a model. See the
-  :doc:`Compiled SQL </guides/cosmos_devex/compiled-sql>` docs for how it
+  :ref:`Compiled SQL <compiled-sql>` docs for how it
   is populated and how to disable it via ``should_store_compiled_sql``.
 - ``freshness`` — the JSON Cosmos captures from ``dbt source freshness`` when
   source nodes run, reset on every task instance.

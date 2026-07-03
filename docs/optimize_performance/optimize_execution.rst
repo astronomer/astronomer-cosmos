@@ -26,7 +26,7 @@ See :ref:`watcher-execution-mode` for setup instructions and detailed benchmarks
 .. note::
 
    ``ExecutionMode.WATCHER`` is stable starting with Cosmos 1.15.0. Review its
-   `known limitations <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html#known-limitations>`_
+   :ref:`known limitations <known-limitations>`
    before adopting it in production.
 
 .. code-block:: python
@@ -110,7 +110,7 @@ If performance is a priority, provide a ``profiles.yml`` file directly. This avo
 entirely.
 
 For how to configure this, see
-`Using your profiles.yml <https://astronomer.github.io/astronomer-cosmos/guides/connect_database/use-your-profiles-yml.html>`_.
+:ref:`Using your profiles.yml <use-your-profiles-yml>`.
 
 
 5. Worker node sizing
@@ -143,9 +143,9 @@ The following table provides recommended concurrency ratios based on execution m
    ``LoadMode.DBT_MANIFEST`` to reduce worker-side parsing overhead. See :ref:`optimize-rendering`.
 
 If you are using ``ExecutionMode.WATCHER``, the producer task is CPU and memory intensive while the consumer sensor
-tasks are lightweight. Use the ``watcher_dbt_producer_queue``, ``watcher_dbt_consumer_queue``, and ``watcher_dbt_retry_queue``
-`configurations <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html#watcher-queue-configuration>`_
-to route each task type to the appropriate worker queue.
+tasks are lightweight. Use the ``watcher_dbt_execution_queue``
+:ref:`configuration <watcher-dbt-execution-queue>`
+to route the producer task and sensor retries to a worker queue with more resources.
 
 
 6. Profile memory usage with debug mode

@@ -330,6 +330,8 @@ the producer-to-consumer dependency differently (``producer >> consumers`` with
 For a detailed history of how retry behavior has evolved across Cosmos releases, see
 :ref:`watcher-retry-history`.
 
+.. _watcher-dbt-execution-queue:
+
 Watcher dbt Execution Queue
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -396,6 +398,8 @@ Starting with Cosmos 1.12.0, the ``DbtConsumerWatcherSensor`` supports
 `deferrable (asynchronous) execution <https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html>`_. Deferrable execution frees up the Airflow worker slot, while task status monitoring is handled by the Airflow triggerer component,
 which increases overall task throughput. By default, the sensor now runs in deferrable mode.
 
+
+.. _known-limitations:
 
 Known limitations
 ~~~~~~~~~~~~~~~~~

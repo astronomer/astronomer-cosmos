@@ -33,7 +33,7 @@ Support
 
 Cosmos 1.11.0a1 adds initial support for running dbt Fusion with Cosmos when using ``ExecutionMode.LOCAL``.
 
-We do not have a solution for using `ExecutionMode.AIRFLOW_ASYNC <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/async-execution-mode.html>`_.
+We do not have a solution for using :ref:`ExecutionMode.AIRFLOW_ASYNC <async-execution-mode>`.
 
 How to use
 ~~~~~~~~~~

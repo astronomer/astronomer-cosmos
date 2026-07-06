@@ -36,7 +36,7 @@ repos:
         types: [file]
         pass_filenames: false
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # v6.0.0
+    rev: v6.0.0  # v6.0.0
     hooks:
       - id: check-added-large-files
         exclude: ^dev/dags/dbt/cross_project/downstream/target/manifest.json$
@@ -55,7 +55,7 @@ repos:
       - id: detect-aws-credentials
         args: ["--allow-missing-credentials"]
   - repo: https://github.com/codespell-project/codespell
-    rev: 2ccb47ff45ad361a21071a7eedda4c37e6ae8c5a  # v2.4.2
+    rev: v2.4.2  # v2.4.2
     hooks:
       - id: codespell
         name: Run codespell to check for common misspellings in files
@@ -67,12 +67,12 @@ repos:
           - -L connexion,aci
           - --ignore-words=.codespell-ignore-words
   - repo: https://github.com/pre-commit/pygrep-hooks
-    rev: 3a6eb0fadf60b3cccfd80bad9dbb6fae7e47b316  # v1.10.0
+    rev: v1.10.0  # v1.10.0
     hooks:
       - id: rst-backticks
       - id: python-check-mock-methods
   - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: ad1b27d73581aa16cca06fc4a0761fc563ffe8e8  # v1.5.6
+    rev: v1.5.6  # v1.5.6
     hooks:
       - id: remove-crlf
       - id: remove-tabs
@@ -85,30 +85,30 @@ repos:
         language: python
         files: ^docs/.*\.(rst|jinja2)$
   - repo: https://github.com/asottile/pyupgrade
-    rev: 75992aaa40730136014f34227e0135f63fc951b4  # v3.21.2
+    rev: v3.21.2  # v3.21.2
     hooks:
       - id: pyupgrade
         args:
           - --py310-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: c59bba8fb259db0fec2bbb77ad8ba51ea7341b56  # v0.15.20
+    rev: v0.15.20  # v0.15.20
     hooks:
       - id: ruff-check
         args: [ --fix ]
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 4160603246a6b365d4a2af661c6d71b0a0f50478  # 26.5.1
+    rev: 26.5.1  # 26.5.1
     hooks:
       - id: black
         args: ["--config", "./pyproject.toml"]
   - repo: https://github.com/asottile/blacken-docs
-    rev: fda77690955e9b63c6687d8806bafd56a526e45f  # 1.20.0
+    rev: 1.20.0  # 1.20.0
     hooks:
       - id: blacken-docs
         alias: black
         additional_dependencies: [black==26.5.1]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: d2823d321df3af8f878f7ee3414dc94d037145b9  # v2.1.0
+    rev: v2.1.0  # v2.1.0
     hooks:
       - id: mypy
         name: mypy-python

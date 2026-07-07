@@ -1107,8 +1107,9 @@ class DbtGraph:
         project = LegacyDbtProject(
             project_name=self.render_config.project_path.stem,
             dbt_root_path=self.render_config.project_path.parent.as_posix(),
-            dbt_models_dir=self.project.models_path.stem if self.project.models_path else "models",
-            dbt_seeds_dir=self.project.seeds_path.stem if self.project.seeds_path else "seeds",
+            dbt_models_dir=[p.stem for p in self.project.models_paths] or None,
+            dbt_seeds_dir=[p.stem for p in self.project.seeds_paths] or None,
+            dbt_snapshots_dir=[p.stem for p in self.project.snapshots_paths] or None,
             dbt_vars=self.dbt_vars,
         )
         nodes = {}

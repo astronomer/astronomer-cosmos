@@ -128,6 +128,37 @@ def test_LegacyDbtProject__handle_config_file_with_selector(input_tags, expected
         assert dbt_project.models["orders"].config.config_selectors == expected_config_selectors
 
 
+def test_LegacyDbtProject_crawls_multiple_dirs(tmp_path):
+    """
+    LegacyDbtProject should support a list of directories for dbt_models_dir/dbt_seeds_dir/dbt_snapshots_dir,
+    crawling files from every directory in each list.
+    """
+    project_dir = tmp_path / "multi_dir_project"
+    for relative_dir in ("models", "models_v2", "seeds", "seeds_v2", "snapshots", "snapshots_v2"):
+        (project_dir / relative_dir).mkdir(parents=True)
+
+    (project_dir / "models" / "model_a.sql").write_text("select 1")
+    (project_dir / "models_v2" / "model_b.sql").write_text("select 2")
+    (project_dir / "seeds" / "seed_a.csv").write_text("id\n1")
+    (project_dir / "seeds_v2" / "seed_b.csv").write_text("id\n2")
+    (project_dir / "snapshots" / "snapshot_a.sql").write_text("{% snapshot snapshot_a %}\nselect 1\n{% endsnapshot %}")
+    (project_dir / "snapshots_v2" / "snapshot_b.sql").write_text(
+        "{% snapshot snapshot_b %}\nselect 2\n{% endsnapshot %}"
+    )
+
+    dbt_project = LegacyDbtProject(
+        project_name="multi_dir_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir=["models", "models_v2"],
+        dbt_seeds_dir=["seeds", "seeds_v2"],
+        dbt_snapshots_dir=["snapshots", "snapshots_v2"],
+    )
+
+    assert set(dbt_project.models.keys()) == {"model_a", "model_b"}
+    assert set(dbt_project.seeds.keys()) == {"seed_a", "seed_b"}
+    assert set(dbt_project.snapshots.keys()) == {"snapshot_a", "snapshot_b"}
+
+
 def test_dbtmodelconfig___repr__():
     dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
     expected_start = (

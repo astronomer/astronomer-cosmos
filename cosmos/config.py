@@ -183,6 +183,30 @@ class RenderConfig:
         return self.dbt_ls_path.exists()
 
 
+def _as_path_list(value: str | Path | list[str | Path]) -> list[str | Path]:
+    """Normalizes a single path or a list of paths into a list of paths."""
+    if isinstance(value, (str, Path)):
+        return [value]
+    return list(value)
+
+
+def _resolve_deprecated_relative_path(
+    plural_value: str | Path | list[str | Path],
+    singular_value: str | Path | None,
+    singular_name: str,
+    plural_name: str,
+) -> str | Path | list[str | Path]:
+    """Returns singular_value (with a DeprecationWarning) if set, otherwise plural_value unchanged."""
+    if singular_value is None:
+        return plural_value
+    warnings.warn(
+        f"ProjectConfig.{singular_name} is deprecated since Cosmos 1.16 and will be removed in "
+        f"Cosmos 2.0. Use ProjectConfig.{plural_name} instead.",
+        DeprecationWarning,
+    )
+    return singular_value
+
+
 class ProjectConfig:
     """
     Class for setting project config.
@@ -192,9 +216,18 @@ class ProjectConfig:
         ``dbt deps`` per DAG run via an Airflow template (e.g. ``"{{ params.install_deps }}"``), set
         ``ExecutionConfig.install_dbt_deps`` instead, which overrides this value at task execution time only.
     :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages (False by default).
-    :param models_relative_path: The relative path to the dbt models directory within the project. Defaults to models
-    :param seeds_relative_path: The relative path to the dbt seeds directory within the project. Defaults to seeds
-    :param snapshots_relative_path: The relative path to the dbt snapshots directory within the project. Defaults to snapshots
+    :param models_relative_paths: The relative path(s) to the dbt models directories within the project. Accepts a single
+        path or a list of paths. Defaults to ``["models"]``
+    :param seeds_relative_paths: The relative path(s) to the dbt seeds directories within the project. Accepts a single
+        path or a list of paths. Defaults to ``["seeds"]``
+    :param snapshots_relative_paths: The relative path(s) to the dbt snapshots directories within the project. Accepts a
+        single path or a list of paths. Defaults to ``["snapshots"]``
+    :param models_relative_path: Deprecated since Cosmos 1.16, use ``models_relative_paths`` instead. Will be removed in
+        Cosmos 2.0.
+    :param seeds_relative_path: Deprecated since Cosmos 1.16, use ``seeds_relative_paths`` instead. Will be removed in
+        Cosmos 2.0.
+    :param snapshots_relative_path: Deprecated since Cosmos 1.16, use ``snapshots_relative_paths`` instead. Will be
+        removed in Cosmos 2.0.
     :param manifest_path: The absolute path to the dbt manifest file. Defaults to None
     :param manifest_conn_id: Name of the Airflow connection used to access the manifest file if it is not stored locally. Defaults to None
     :param project_name: Allows the user to define the project name.
@@ -213,9 +246,9 @@ class ProjectConfig:
     install_dbt_deps: bool = True
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
     manifest_path: Path | ObjectStoragePath | None = None
-    models_path: Path | None = None
-    seeds_path: Path | None = None
-    snapshots_path: Path | None = None
+    models_paths: list[Path] = []
+    seeds_paths: list[Path] = []
+    snapshots_paths: list[Path] = []
     project_name: str
 
     def __init__(
@@ -223,9 +256,12 @@ class ProjectConfig:
         dbt_project_path: str | Path | None = None,
         install_dbt_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
-        models_relative_path: str | Path = "models",
-        seeds_relative_path: str | Path = "seeds",
-        snapshots_relative_path: str | Path = "snapshots",
+        models_relative_paths: str | Path | list[str | Path] = "models",
+        seeds_relative_paths: str | Path | list[str | Path] = "seeds",
+        snapshots_relative_paths: str | Path | list[str | Path] = "snapshots",
+        models_relative_path: str | Path | None = None,
+        seeds_relative_path: str | Path | None = None,
+        snapshots_relative_path: str | Path | None = None,
         manifest_path: str | Path | None = None,
         manifest_conn_id: str | None = None,
         project_name: str | None = None,
@@ -233,6 +269,15 @@ class ProjectConfig:
         dbt_vars: dict[str, str] | None = None,
         partial_parse: bool = True,
     ):
+        models_relative_paths = _resolve_deprecated_relative_path(
+            models_relative_paths, models_relative_path, "models_relative_path", "models_relative_paths"
+        )
+        seeds_relative_paths = _resolve_deprecated_relative_path(
+            seeds_relative_paths, seeds_relative_path, "seeds_relative_path", "seeds_relative_paths"
+        )
+        snapshots_relative_paths = _resolve_deprecated_relative_path(
+            snapshots_relative_paths, snapshots_relative_path, "snapshots_relative_path", "snapshots_relative_paths"
+        )
         # Since we allow dbt_project_path to be defined in ExecutionConfig and RenderConfig
         #   dbt_project_path may not always be defined here.
         # We do, however, still require that both manifest_path and project_name be defined, or neither be defined.
@@ -246,9 +291,9 @@ class ProjectConfig:
 
         if dbt_project_path:
             self.dbt_project_path = Path(dbt_project_path)
-            self.models_path = self.dbt_project_path / Path(models_relative_path)
-            self.seeds_path = self.dbt_project_path / Path(seeds_relative_path)
-            self.snapshots_path = self.dbt_project_path / Path(snapshots_relative_path)
+            self.models_paths = [self.dbt_project_path / Path(p) for p in _as_path_list(models_relative_paths)]
+            self.seeds_paths = [self.dbt_project_path / Path(p) for p in _as_path_list(seeds_relative_paths)]
+            self.snapshots_paths = [self.dbt_project_path / Path(p) for p in _as_path_list(snapshots_relative_paths)]
             if not project_name:
                 self.project_name = self.dbt_project_path.stem
 
@@ -266,6 +311,36 @@ class ProjectConfig:
         self.partial_parse = partial_parse
         self.install_dbt_deps = install_dbt_deps
         self.copy_dbt_packages = copy_dbt_packages
+
+    @property
+    def models_path(self) -> Path | None:
+        """Deprecated since Cosmos 1.16, use ``models_paths`` instead. Will be removed in Cosmos 2.0."""
+        warnings.warn(
+            "ProjectConfig.models_path is deprecated since Cosmos 1.16 and will be removed in Cosmos 2.0. "
+            "Use ProjectConfig.models_paths instead.",
+            DeprecationWarning,
+        )
+        return self.models_paths[0] if self.models_paths else None
+
+    @property
+    def seeds_path(self) -> Path | None:
+        """Deprecated since Cosmos 1.16, use ``seeds_paths`` instead. Will be removed in Cosmos 2.0."""
+        warnings.warn(
+            "ProjectConfig.seeds_path is deprecated since Cosmos 1.16 and will be removed in Cosmos 2.0. "
+            "Use ProjectConfig.seeds_paths instead.",
+            DeprecationWarning,
+        )
+        return self.seeds_paths[0] if self.seeds_paths else None
+
+    @property
+    def snapshots_path(self) -> Path | None:
+        """Deprecated since Cosmos 1.16, use ``snapshots_paths`` instead. Will be removed in Cosmos 2.0."""
+        warnings.warn(
+            "ProjectConfig.snapshots_path is deprecated since Cosmos 1.16 and will be removed in Cosmos 2.0. "
+            "Use ProjectConfig.snapshots_paths instead.",
+            DeprecationWarning,
+        )
+        return self.snapshots_paths[0] if self.snapshots_paths else None
 
     def validate_project(self) -> None:
         """
@@ -285,12 +360,9 @@ class ProjectConfig:
         # while iterating on the `mandatory_paths` map works correctly for all paths, thereby validating the project.
         if self.dbt_project_path:
             project_yml_path = self.dbt_project_path / "dbt_project.yml"
-            mandatory_paths.update(
-                {
-                    "dbt_project.yml": Path(project_yml_path) if project_yml_path else None,
-                    "models directory ": Path(self.models_path) if self.models_path else None,
-                }
-            )
+            mandatory_paths["dbt_project.yml"] = Path(project_yml_path) if project_yml_path else None
+            for models_path in self.models_paths:
+                mandatory_paths[f"models directory {models_path}"] = Path(models_path)
         if self.manifest_path:
             mandatory_paths["manifest"] = self.manifest_path
 

@@ -257,9 +257,9 @@ class LegacyDbtProject:
 
     # optional, user-specified instance variables
     dbt_root_path: str | None = None
-    dbt_models_dir: str | None = None
-    dbt_snapshots_dir: str | None = None
-    dbt_seeds_dir: str | None = None
+    dbt_models_dir: str | list[str] | None = None
+    dbt_snapshots_dir: str | list[str] | None = None
+    dbt_seeds_dir: str | list[str] | None = None
 
     # private instance variables for managing state
     models: dict[str, DbtModel] = field(default_factory=dict)
@@ -267,9 +267,9 @@ class LegacyDbtProject:
     seeds: dict[str, DbtModel] = field(default_factory=dict)
     tests: dict[str, DbtModel] = field(default_factory=dict)
     project_dir: Path = field(init=False)
-    models_dir: Path = field(init=False)
-    snapshots_dir: Path = field(init=False)
-    seeds_dir: Path = field(init=False)
+    models_dir: list[Path] = field(init=False)
+    snapshots_dir: list[Path] = field(init=False)
+    seeds_dir: list[Path] = field(init=False)
 
     dbt_vars: dict[str, str] = field(default_factory=dict)
 
@@ -278,35 +278,47 @@ class LegacyDbtProject:
         Initializes the parser.
         """
         self.dbt_root_path = self.dbt_root_path or "/usr/local/airflow/dags/dbt"
-        self.dbt_models_dir = self.dbt_models_dir or "models"
-        self.dbt_snapshots_dir = self.dbt_snapshots_dir or "snapshots"
-        self.dbt_seeds_dir = self.dbt_seeds_dir or "seeds"
+        dbt_models_dirs = self._as_dir_list(self.dbt_models_dir) or ["models"]
+        dbt_snapshots_dirs = self._as_dir_list(self.dbt_snapshots_dir) or ["snapshots"]
+        dbt_seeds_dirs = self._as_dir_list(self.dbt_seeds_dir) or ["seeds"]
 
         # set the project and model dirs
         self.project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))
-        self.models_dir = self.project_dir / self.dbt_models_dir
-        self.snapshots_dir = self.project_dir / self.dbt_snapshots_dir
-        self.seeds_dir = self.project_dir / self.dbt_seeds_dir
+        self.models_dir = [self.project_dir / dbt_dir for dbt_dir in dbt_models_dirs]
+        self.snapshots_dir = [self.project_dir / dbt_dir for dbt_dir in dbt_snapshots_dirs]
+        self.seeds_dir = [self.project_dir / dbt_dir for dbt_dir in dbt_seeds_dirs]
 
-        # crawl the models in the project
-        for file_name in self.models_dir.rglob("*.sql"):
-            self._handle_sql_file(file_name)
+        for models_dir in self.models_dir:
+            # crawl the models in the project
+            for file_name in models_dir.rglob("*.sql"):
+                self._handle_sql_file(file_name)
 
-        # crawl the models in the project
-        for file_name in self.models_dir.rglob("*.py"):
-            self._handle_sql_file(file_name)
+            # crawl the models in the project
+            for file_name in models_dir.rglob("*.py"):
+                self._handle_sql_file(file_name)
+
+            # crawl the config files in the project
+            for file_name in models_dir.rglob("*.yml"):
+                self._handle_config_file(file_name)
 
         # crawl the snapshots in the project
-        for file_name in self.snapshots_dir.rglob("*.sql"):
-            self._handle_sql_file(file_name)
+        for snapshots_dir in self.snapshots_dir:
+            for file_name in snapshots_dir.rglob("*.sql"):
+                self._handle_sql_file(file_name)
 
         # crawl the seeds in the project
-        for file_name in self.seeds_dir.rglob("*.csv"):
-            self._handle_csv_file(file_name)
+        for seeds_dir in self.seeds_dir:
+            for file_name in seeds_dir.rglob("*.csv"):
+                self._handle_csv_file(file_name)
 
-        # crawl the config files in the project
-        for file_name in self.models_dir.rglob("*.yml"):
-            self._handle_config_file(file_name)
+    @staticmethod
+    def _as_dir_list(value: str | list[str] | None) -> list[str]:
+        """Normalizes a single directory name or a list of directory names into a list."""
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value]
+        return list(value)
 
     def _handle_csv_file(self, path: Path) -> None:
         """
@@ -333,7 +345,7 @@ class LegacyDbtProject:
         model_name = path.stem
 
         # construct the model object, which we'll use to store metadata
-        if str(self.models_dir) in str(path):
+        if any(str(models_dir) in str(path) for models_dir in self.models_dir):
             model = DbtModel(
                 name=model_name,
                 type=DbtModelType.DBT_MODEL,
@@ -343,7 +355,7 @@ class LegacyDbtProject:
             # add the model to the project
             self.models[model.name] = model
 
-        elif str(self.snapshots_dir) in str(path):
+        elif any(str(snapshots_dir) in str(path) for snapshots_dir in self.snapshots_dir):
             model = DbtModel(
                 name=model_name,
                 type=DbtModelType.DBT_SNAPSHOT,

@@ -7,9 +7,14 @@ The ``cosmos.config.ProjectConfig`` allows you to specify information about wher
 variables that should be used for rendering and execution. It takes the following arguments:
 
 - ``dbt_project_path``: The full path to your dbt project. This directory should have a ``dbt_project.yml`` file
-- ``models_relative_path``: The path to your models directory, relative to the ``dbt_project_path``. This defaults to ``models``
-- ``seeds_relative_path``: The path to your seeds directory, relative to the ``dbt_project_path``. This defaults to ``seeds``
-- ``snapshots_relative_path``: The path to your snapshots directory, relative to the ``dbt_project_path``. This defaults to ``snapshots``
+- ``models_relative_paths``: (new in v1.16) The path(s) to your models directories, relative to the ``dbt_project_path``. Accepts a
+  single path or a list of paths, mirroring dbt's own support for multiple ``model-paths``. This defaults to ``["models"]``
+- ``seeds_relative_paths``: (new in v1.16) The path(s) to your seeds directories, relative to the ``dbt_project_path``. Accepts a
+  single path or a list of paths. This defaults to ``["seeds"]``
+- ``snapshots_relative_paths``: (new in v1.16) The path(s) to your snapshots directories, relative to the ``dbt_project_path``.
+  Accepts a single path or a list of paths. This defaults to ``["snapshots"]``
+- ``models_relative_path``, ``seeds_relative_path``, ``snapshots_relative_path``: deprecated since v1.16 in favor of
+  ``models_relative_paths``, ``seeds_relative_paths`` and ``snapshots_relative_paths`` above. Will be removed in Cosmos 2.0.
 - ``manifest_path``: The absolute path to your manifests directory. This is only required if you're using Cosmos' manifest
   parsing mode. Cosmos supports both local and remote paths for manifest parsing (e.g. S3 URL). See :ref:`parsing-methods` for more details.
 - ``project_name`` : The name of the project. If ``dbt_project_path`` is provided, the ``project_name`` defaults to the
@@ -39,9 +44,9 @@ Project config example
 
     config = ProjectConfig(
         dbt_project_path="/path/to/dbt/project",
-        models_relative_path="custom_models_folder",
-        seeds_relative_path="custom_seeds_folder",
-        snapshots_relative_path="custom_snapshots_folder",
+        models_relative_paths=["custom_models_folder", "other_models_folder"],
+        seeds_relative_paths=["custom_seeds_folder"],
+        snapshots_relative_paths=["custom_snapshots_folder"],
         manifest_path="/path/to/manifests",
         env_vars={"MY_ENV_VAR": "my_env_value"},
         dbt_vars={

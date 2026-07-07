@@ -179,12 +179,14 @@ def test__copy_partial_parse_to_project_falls_back_on_oserror(
 
 @patch("cosmos.cache.patch_partial_parse_content")
 @patch("cosmos.cache.safe_copy")
-def test__copy_partial_parse_to_project_removes_leftover_artifacts_on_oserror(
+def test__copy_partial_parse_to_project_removes_leftover_msgpack_on_oserror(
     mock_safe_copy, mock_patch_content, tmp_path
 ):
     # If the partial_parse copy succeeds but a later step fails (e.g. the manifest copy), the target would
     # otherwise be left holding a lone partial_parse.msgpack and dbt would still partial-parse despite the
-    # "full parse" fallback message. Both artifacts must be removed so the advertised fallback really happens.
+    # "full parse" fallback message. The msgpack must be removed so the advertised fallback really happens.
+    # The target manifest must be left untouched: it may be a pre-existing user manifest copied by
+    # ``_clone_project`` that this function never wrote.
     def fake_safe_copy(src, dst):
         if src.name == DBT_MANIFEST_FILE_NAME:
             raise OSError(errno.ENOSPC, "no space")
@@ -200,13 +202,17 @@ def test__copy_partial_parse_to_project_removes_leftover_artifacts_on_oserror(
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         project_path = Path(tmp_dir)
+        target_partial_parse_file = get_partial_parse_path(project_path)
+        target_manifest_file = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
+        # Simulate the user manifest that _clone_project copies into the tmp project before this call.
+        target_manifest_file.parent.mkdir(parents=True)
+        target_manifest_file.write_bytes(b"user-manifest")
+
         # Must not raise.
         _copy_partial_parse_to_project(partial_parse_filepath, project_path)
 
-        target_partial_parse_file = get_partial_parse_path(project_path)
-        target_manifest_file = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
         assert not target_partial_parse_file.exists()
-        assert not target_manifest_file.exists()
+        assert target_manifest_file.read_bytes() == b"user-manifest"
 
 
 @patch("cosmos.cache.safe_copy")

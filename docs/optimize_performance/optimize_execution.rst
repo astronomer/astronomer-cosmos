@@ -143,7 +143,7 @@ The following table provides recommended concurrency ratios based on execution m
    ``LoadMode.DBT_MANIFEST`` to reduce worker-side parsing overhead. See :ref:`optimize-rendering`.
 
 If you are using ``ExecutionMode.WATCHER``, the producer task is CPU and memory intensive while the consumer sensor
-tasks are lightweight. Use the ``watcher_dbt_producer_queue``, ``watcher_dbt_watcher_queue``, and ``watcher_dbt_retry_queue``
+tasks are lightweight. Use the ``watcher_dbt_producer_queue``, ``watcher_dbt_consumer_queue``, and ``watcher_dbt_retry_queue``
 `configurations <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html#watcher-queue-configuration>`_
 to route each task type to the appropriate worker queue.
 

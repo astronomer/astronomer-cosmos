@@ -335,6 +335,9 @@ Watcher dbt Execution Queue
 
 .. versionadded:: 1.14.0
 
+.. versionchanged:: 1.16.0
+    The single ``watcher_dbt_execution_queue`` setting was replaced by three dedicated settings; ``watcher_dbt_producer_queue``, ``watcher_dbt_consumer_queue``, and ``watcher_dbt_retry_queue``, which are described below. ``watcher_dbt_execution_queue`` is deprecated but still honored as a fallback; see `Migrating from watcher_dbt_execution_queue`_.
+
 In watcher execution mode there are three different "types" of tasks that are executed:
 
 - Producer tasks: execute a ``dbt build`` for the dbt project being rendered and orchestrated with watcher execution mode
@@ -348,7 +351,7 @@ Cosmos provides three independent queue settings to properly route each to the m
 .. _watcher-queue-configuration:
 
 - ``watcher_dbt_producer_queue`` — the queue used by ``DbtProducerWatcherOperator`` tasks
-- ``watcher_dbt_watcher_queue`` — the queue used by ``DbtConsumerWatcherSensor`` tasks on their initial (sensor) run
+- ``watcher_dbt_consumer_queue`` — the queue used by ``DbtConsumerWatcherSensor`` tasks on their initial (sensor) run
 - ``watcher_dbt_retry_queue`` — the queue used by ``DbtConsumerWatcherSensor`` tasks on retries, when they execute the dbt command for a failed node
 
 These settings enable you to:
@@ -365,7 +368,7 @@ Set any combination of the three settings in your Airflow configuration:
 
    [cosmos]
    watcher_dbt_producer_queue = high_memory_queue
-   watcher_dbt_watcher_queue = lightweight_queue
+   watcher_dbt_consumer_queue = lightweight_queue
    watcher_dbt_retry_queue = high_memory_queue
 
 Or via environment variables:
@@ -373,22 +376,43 @@ Or via environment variables:
 .. code-block:: bash
 
    export AIRFLOW__COSMOS__WATCHER_DBT_PRODUCER_QUEUE=high_memory_queue
-   export AIRFLOW__COSMOS__WATCHER_DBT_WATCHER_QUEUE=lightweight_queue
+   export AIRFLOW__COSMOS__WATCHER_DBT_CONSUMER_QUEUE=lightweight_queue
    export AIRFLOW__COSMOS__WATCHER_DBT_RETRY_QUEUE=high_memory_queue
 
 **How it works:**
 
 - For watcher producer tasks (``DbtProducerWatcherOperator``), ``watcher_dbt_producer_queue`` is applied at task creation time.
-- For watcher consumer tasks (``DbtConsumerWatcherSensor``), ``watcher_dbt_watcher_queue`` is applied at task creation time for the initial sensor run.
+- For watcher consumer tasks (``DbtConsumerWatcherSensor``), ``watcher_dbt_consumer_queue`` is applied at task creation time for the initial sensor run.
 - For watcher consumer task retries, ``watcher_dbt_retry_queue`` is applied automatically via an `Airflow cluster policy <https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html>`_ (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime.
 
 .. note::
 
   The Cosmos queue settings take priority over any ``queue`` set directly on the operator (e.g. via ``setup_operator_args``). The effective precedence for each task type is:
 
-  - Producer: ``watcher_dbt_producer_queue`` > explicit ``queue`` (from ``setup_operator_args``) > ``operator_args`` > Airflow default queue
-  - Consumer (initial run): ``watcher_dbt_watcher_queue`` > explicit ``queue`` > ``operator_args`` > Airflow default queue
-  - Consumer (retries): ``watcher_dbt_retry_queue`` overrides the queue at runtime via the cluster policy
+  - Producer: ``watcher_dbt_producer_queue`` > deprecated ``watcher_dbt_execution_queue`` > explicit ``queue`` (from ``setup_operator_args``) > ``operator_args`` > Airflow default queue
+  - Consumer (initial run): ``watcher_dbt_consumer_queue`` > explicit ``queue`` > ``operator_args`` > Airflow default queue
+  - Consumer (retries): ``watcher_dbt_retry_queue`` > deprecated ``watcher_dbt_execution_queue`` overrides the queue at runtime via the cluster policy
+
+.. _Migrating from watcher_dbt_execution_queue:
+
+**Migrating from watcher_dbt_execution_queue:**
+
+Prior to Cosmos 1.16.0, a single ``watcher_dbt_execution_queue`` setting was applied to both producer tasks and consumer retries. It is deprecated and will be removed in Cosmos 2.0.0, but existing configurations continue to work without changes: if ``watcher_dbt_producer_queue`` and/or ``watcher_dbt_retry_queue`` are left unset, Cosmos falls back to ``watcher_dbt_execution_queue`` for that task type. Setting it now also emits a ``DeprecationWarning``. There is no fallback for ``watcher_dbt_consumer_queue``, since it configures behavior (routing the *initial* consumer sensor run) that ``watcher_dbt_execution_queue`` never covered.
+
+To migrate, replace:
+
+.. code-block:: ini
+
+   [cosmos]
+   watcher_dbt_execution_queue = high_memory_queue
+
+with:
+
+.. code-block:: ini
+
+   [cosmos]
+   watcher_dbt_producer_queue = high_memory_queue
+   watcher_dbt_retry_queue = high_memory_queue
 
 Installation of Apache Airflow® and dbt
 ++++++++++++++++++++++++++++++++++++++++
@@ -616,7 +640,7 @@ Example: Configure the producer task with custom retry settings.
 
 This allows you to customize ``DbtProducerWatcherOperator`` retry behavior without affecting the arguments used by the other sensor tasks.
 
-If configuring queues, we suggest using the previously mentioned ``watcher_dbt_producer_queue``, ``watcher_dbt_watcher_queue``, and ``watcher_dbt_retry_queue`` configurations instead of ``setup_operator_args``.
+If configuring queues, we suggest using the previously mentioned ``watcher_dbt_producer_queue``, ``watcher_dbt_consumer_queue``, and ``watcher_dbt_retry_queue`` configurations instead of ``setup_operator_args``.
 
 .. note::
    Please note that ``setup_operator_args`` is specific to Cosmos and is not related to Airflow setup or teardown task.

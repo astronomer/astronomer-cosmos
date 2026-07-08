@@ -154,7 +154,7 @@ def test_dbt_producer_watcher_operator_queue(queue_override, kwarg_queue, expect
     ],
 )
 def test_dbt_consumer_watcher_sensor_queue(queue_override, kwarg_queue, expected_queue):
-    with patch("cosmos.operators.watcher.watcher_dbt_watcher_queue", queue_override):
+    with patch("cosmos.operators.watcher.watcher_dbt_consumer_queue", queue_override):
         sensor = DbtConsumerWatcherSensor(
             project_dir=".",
             profiles_dir=".",

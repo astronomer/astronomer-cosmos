@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import warnings
 from pathlib import Path
 
 import airflow
@@ -69,13 +70,29 @@ enable_memory_optimised_imports = conf.getboolean("cosmos", "enable_memory_optim
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
 enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)
 
+# Deprecated: previously used for both the producer task and consumer retries. Kept for backwards
+# compatibility as a fallback for watcher_dbt_producer_queue and watcher_dbt_retry_queue below.
+watcher_dbt_execution_queue: str | None = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
+if watcher_dbt_execution_queue:
+    warnings.warn(
+        "The `watcher_dbt_execution_queue` config is deprecated since Cosmos 1.16.0 and will be removed in "
+        "Cosmos 2.0.0. Use `watcher_dbt_producer_queue` and/or `watcher_dbt_retry_queue` instead.",
+        DeprecationWarning,
+    )
+
 # Separate queue configuration for each watcher task type:
 # - watcher_dbt_producer_queue: queue for the DbtProducerWatcherOperator task
-# - watcher_dbt_watcher_queue: queue for DbtConsumerWatcherSensor tasks on their initial run
+# - watcher_dbt_consumer_queue: queue for DbtConsumerWatcherSensor tasks on their initial run
 # - watcher_dbt_retry_queue: queue for DbtConsumerWatcherSensor tasks on retries (typically needs more resources)
-watcher_dbt_producer_queue: str | None = conf.get("cosmos", "watcher_dbt_producer_queue", fallback=None)
-watcher_dbt_watcher_queue: str | None = conf.get("cosmos", "watcher_dbt_watcher_queue", fallback=None)
-watcher_dbt_retry_queue: str | None = conf.get("cosmos", "watcher_dbt_retry_queue", fallback=None)
+# watcher_dbt_producer_queue and watcher_dbt_retry_queue fall back to the deprecated
+# watcher_dbt_execution_queue if set, preserving pre-1.16.0 behavior for existing users.
+watcher_dbt_producer_queue: str | None = (
+    conf.get("cosmos", "watcher_dbt_producer_queue", fallback=None) or watcher_dbt_execution_queue
+)
+watcher_dbt_consumer_queue: str | None = conf.get("cosmos", "watcher_dbt_consumer_queue", fallback=None)
+watcher_dbt_retry_queue: str | None = (
+    conf.get("cosmos", "watcher_dbt_retry_queue", fallback=None) or watcher_dbt_execution_queue
+)
 
 enable_watcher_reliable_retry = conf.getboolean("cosmos", "enable_watcher_reliable_retry", fallback=True)
 

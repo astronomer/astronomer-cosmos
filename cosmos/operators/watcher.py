@@ -52,7 +52,7 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
-from cosmos.settings import watcher_dbt_producer_queue, watcher_dbt_watcher_queue
+from cosmos.settings import watcher_dbt_consumer_queue, watcher_dbt_producer_queue
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -524,7 +524,7 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):
         **kwargs: Any,
     ) -> None:
         # Set the Worker queue for lightweight "watcher" tasks to run on (similar to config for producer tasks)
-        kwargs["queue"] = watcher_dbt_watcher_queue or kwargs.get("queue") or DEFAULT_QUEUE
+        kwargs["queue"] = watcher_dbt_consumer_queue or kwargs.get("queue") or DEFAULT_QUEUE
 
         super().__init__(
             poke_interval=poke_interval,

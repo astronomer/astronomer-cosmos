@@ -91,7 +91,7 @@ def _relative_dirs(paths: list[Path], project_path: Path | None) -> list[str] | 
     result = []
     for p in paths:
         try:
-            result.append(str(p.relative_to(project_path)))
+            result.append(p.relative_to(project_path).as_posix())
         except ValueError:
             # p falls outside project_path (e.g. an absolute models_relative_paths entry).
             result.append(p.stem)

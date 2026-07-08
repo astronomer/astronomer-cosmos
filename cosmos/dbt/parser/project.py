@@ -292,9 +292,9 @@ class LegacyDbtProject:
         self.seeds_dir = [self.project_dir / dbt_dir for dbt_dir in dbt_seeds_dirs]
 
         for models_dir in self.models_dir:
-            # crawl the models in the project
             for file_name in models_dir.rglob("*.sql"):
-                self._handle_sql_file(file_name)
+                if self._classify_dir(file_name) == DbtModelType.DBT_MODEL:
+                    self._handle_sql_file(file_name)
 
             # crawl the models in the project
             for file_name in models_dir.rglob("*.py"):

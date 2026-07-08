@@ -52,6 +52,19 @@ def test_init_with_project_path_and_list_relative_paths():
     ]
 
 
+def test_models_paths_not_shared_across_instances():
+    """
+    models_paths/seeds_paths/snapshots_paths must not be a shared mutable default - mutating one
+    ProjectConfig instance's list should not affect another's.
+    """
+    config_a = ProjectConfig(manifest_path="a/manifest.json", project_name="a")
+    config_b = ProjectConfig(manifest_path="b/manifest.json", project_name="b")
+
+    config_a.models_paths.append(Path("unexpected"))
+
+    assert config_b.models_paths == []
+
+
 @pytest.mark.parametrize(
     "deprecated_kwarg,plural_attr,expected",
     [

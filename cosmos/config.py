@@ -246,9 +246,9 @@ class ProjectConfig:
     install_dbt_deps: bool = True
     copy_dbt_packages: bool = settings.default_copy_dbt_packages
     manifest_path: Path | ObjectStoragePath | None = None
-    models_paths: list[Path] = []
-    seeds_paths: list[Path] = []
-    snapshots_paths: list[Path] = []
+    models_paths: list[Path]
+    seeds_paths: list[Path]
+    snapshots_paths: list[Path]
     project_name: str
 
     def __init__(
@@ -278,6 +278,10 @@ class ProjectConfig:
         snapshots_relative_paths = _resolve_deprecated_relative_path(
             snapshots_relative_paths, snapshots_relative_path, "snapshots_relative_path", "snapshots_relative_paths"
         )
+        # Assigned here, not as a class-level default, so instances don't share one mutable list.
+        self.models_paths = []
+        self.seeds_paths = []
+        self.snapshots_paths = []
         # Since we allow dbt_project_path to be defined in ExecutionConfig and RenderConfig
         #   dbt_project_path may not always be defined here.
         # We do, however, still require that both manifest_path and project_name be defined, or neither be defined.

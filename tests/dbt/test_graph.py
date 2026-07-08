@@ -3153,6 +3153,17 @@ def test__relative_dirs_empty_and_no_project_path():
     assert _relative_dirs([Path("/some/project/custom/models")], None) == ["models"]
 
 
+def test__relative_dirs_falls_back_when_path_outside_project():
+    """
+    A path outside project_path (e.g. an absolute models_relative_paths entry) should fall back to
+    Path.stem instead of raising ValueError from Path.relative_to.
+    """
+    project_path = Path("/some/project")
+    outside_path = Path("/some/other/models")
+
+    assert _relative_dirs([outside_path], project_path) == ["models"]
+
+
 @pytest.mark.parametrize(
     "pre_dbt_fusion_value,source_rendering_behaviour_value,expected_args_count",
     [

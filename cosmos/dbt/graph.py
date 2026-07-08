@@ -86,9 +86,14 @@ def _relative_dirs(paths: list[Path], project_path: Path | None) -> list[str] | 
     """Returns each path's location relative to project_path, preserving nested subdirectories."""
     if not paths:
         return None
-    if project_path is None:
-        return [p.stem for p in paths]
-    return [str(p.relative_to(project_path)) for p in paths]
+    result = []
+    for p in paths:
+        try:
+            result.append(str(p.relative_to(project_path)) if project_path else p.stem)
+        except ValueError:
+            # p falls outside project_path (e.g. an absolute models_relative_paths entry).
+            result.append(p.stem)
+    return result
 
 
 class CosmosLoadDbtException(Exception):

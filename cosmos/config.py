@@ -343,6 +343,7 @@ class ProjectConfig:
             "ProjectConfig.snapshots_path is deprecated since Cosmos 1.16 and will be removed in Cosmos 2.0. "
             "Use ProjectConfig.snapshots_paths instead.",
             DeprecationWarning,
+            stacklevel=2,
         )
         return self.snapshots_paths[0] if self.snapshots_paths else None
 

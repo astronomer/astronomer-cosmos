@@ -323,6 +323,7 @@ class ProjectConfig:
             "ProjectConfig.models_path is deprecated since Cosmos 1.16 and will be removed in Cosmos 2.0. "
             "Use ProjectConfig.models_paths instead.",
             DeprecationWarning,
+            stacklevel=2,
         )
         return self.models_paths[0] if self.models_paths else None
 

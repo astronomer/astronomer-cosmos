@@ -1517,6 +1517,49 @@ def test_load_via_custom_parser_with_nested_model_dir(tmp_path):
     assert dbt_graph.nodes["my_model"].unique_id == "model.nested_project.my_model"
 
 
+def test_load_via_custom_parser_with_explicit_empty_models_relative_paths(tmp_path):
+    """
+    models_relative_paths=[] means "no model directories" and must not fall back to crawling the
+    default "models" dir under LoadMode.CUSTOM, even if one happens to exist on disk.
+    """
+    project_dir = tmp_path / "empty_list_project"
+    (project_dir / "models").mkdir(parents=True)
+    (project_dir / "models" / "should_not_be_found.sql").write_text("select 1")
+    (project_dir / "profiles.yml").write_text(
+        "test:\n"
+        "  target: test\n"
+        "  outputs:\n"
+        "    test:\n"
+        "      type: postgres\n"
+        "      host: localhost\n"
+        "      user: user\n"
+        "      password: pass\n"
+        "      port: 5432\n"
+        "      dbname: db\n"
+        "      schema: public\n"
+        "      threads: 1\n"
+    )
+
+    project_config = ProjectConfig(dbt_project_path=project_dir, models_relative_paths=[])
+    execution_config = ExecutionConfig(dbt_project_path=project_dir)
+    render_config = RenderConfig(dbt_project_path=project_dir, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=project_dir / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_via_custom_parser()
+
+    assert dbt_graph.nodes == {}
+
+
 @pytest.mark.parametrize("project_name", [("altered_jaffle_shop"), ("jaffle_shop_python")])
 def test_validate_load_via_load_via_custom_parser_deprecated(project_name):
     """Deprecating warnings should be raised when using load_mode CUSTOM."""
@@ -3149,8 +3192,13 @@ def test__relative_dirs_preserves_nested_subdirectories():
 
 
 def test__relative_dirs_empty_and_no_project_path():
-    assert _relative_dirs([], Path("/some/project")) is None
-    assert _relative_dirs([Path("/some/project/custom/models")], None) == ["models"]
+    """
+    An explicitly empty paths list (project_path set) must stay [] rather than falling back to
+    LegacyDbtProject's default - only an unset project_path itself should trigger that fallback (via
+    None), since ProjectConfig always pairs a set project_path with a non-empty paths list otherwise.
+    """
+    assert _relative_dirs([], Path("/some/project")) == []
+    assert _relative_dirs([Path("/some/project/custom/models")], None) is None
 
 
 def test__relative_dirs_falls_back_when_path_outside_project():

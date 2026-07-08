@@ -185,6 +185,24 @@ def test_LegacyDbtProject_accepts_single_dir_as_string(tmp_path):
     assert set(dbt_project.snapshots.keys()) == {"snapshot_a"}
 
 
+def test_LegacyDbtProject_explicit_empty_dir_list_crawls_nothing(tmp_path):
+    """
+    dbt_models_dir=[] means "crawl no model directories" and must not fall back to the "models"
+    default - that default should only apply when dbt_models_dir is left unset (None).
+    """
+    project_dir = tmp_path / "empty_list_project"
+    (project_dir / "models").mkdir(parents=True)
+    (project_dir / "models" / "model_a.sql").write_text("select 1")
+
+    dbt_project = LegacyDbtProject(
+        project_name="empty_list_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir=[],
+    )
+
+    assert dbt_project.models == {}
+
+
 def test_LegacyDbtProject_classifies_nested_snapshots_dir_correctly(tmp_path):
     """
     A snapshots dir nested inside a models dir should still be classified as snapshots, not models -

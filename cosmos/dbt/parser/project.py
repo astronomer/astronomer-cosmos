@@ -278,9 +278,12 @@ class LegacyDbtProject:
         Initializes the parser.
         """
         self.dbt_root_path = self.dbt_root_path or "/usr/local/airflow/dags/dbt"
-        dbt_models_dirs = self._as_dir_list(self.dbt_models_dir) or ["models"]
-        dbt_snapshots_dirs = self._as_dir_list(self.dbt_snapshots_dir) or ["snapshots"]
-        dbt_seeds_dirs = self._as_dir_list(self.dbt_seeds_dir) or ["seeds"]
+        # `is None` (not `or`) so an explicitly empty list (crawl nothing) isn't confused with "unset".
+        dbt_models_dirs = ["models"] if self.dbt_models_dir is None else self._as_dir_list(self.dbt_models_dir)
+        dbt_snapshots_dirs = (
+            ["snapshots"] if self.dbt_snapshots_dir is None else self._as_dir_list(self.dbt_snapshots_dir)
+        )
+        dbt_seeds_dirs = ["seeds"] if self.dbt_seeds_dir is None else self._as_dir_list(self.dbt_seeds_dir)
 
         # set the project and model dirs
         self.project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))

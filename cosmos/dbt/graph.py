@@ -84,12 +84,14 @@ def _normalize_path(path: str | None) -> str:
 
 def _relative_dirs(paths: list[Path], project_path: Path | None) -> list[str] | None:
     """Returns each path's location relative to project_path, preserving nested subdirectories."""
-    if not paths:
+    # None (not []) triggers LegacyDbtProject's own default; only do that when project_path is unset,
+    # so an explicitly empty `paths` list isn't confused with "unspecified".
+    if project_path is None:
         return None
     result = []
     for p in paths:
         try:
-            result.append(str(p.relative_to(project_path)) if project_path else p.stem)
+            result.append(str(p.relative_to(project_path)))
         except ValueError:
             # p falls outside project_path (e.g. an absolute models_relative_paths entry).
             result.append(p.stem)

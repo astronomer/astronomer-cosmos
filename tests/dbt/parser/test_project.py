@@ -159,6 +159,32 @@ def test_LegacyDbtProject_crawls_multiple_dirs(tmp_path):
     assert set(dbt_project.snapshots.keys()) == {"snapshot_a", "snapshot_b"}
 
 
+def test_LegacyDbtProject_accepts_single_dir_as_string(tmp_path):
+    """
+    dbt_models_dir/dbt_seeds_dir/dbt_snapshots_dir should still accept a plain string (not just a list),
+    normalizing it into a single-item list.
+    """
+    project_dir = tmp_path / "single_dir_project"
+    for relative_dir in ("models", "seeds", "snapshots"):
+        (project_dir / relative_dir).mkdir(parents=True)
+
+    (project_dir / "models" / "model_a.sql").write_text("select 1")
+    (project_dir / "seeds" / "seed_a.csv").write_text("id\n1")
+    (project_dir / "snapshots" / "snapshot_a.sql").write_text("{% snapshot snapshot_a %}\nselect 1\n{% endsnapshot %}")
+
+    dbt_project = LegacyDbtProject(
+        project_name="single_dir_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir="models",
+        dbt_seeds_dir="seeds",
+        dbt_snapshots_dir="snapshots",
+    )
+
+    assert set(dbt_project.models.keys()) == {"model_a"}
+    assert set(dbt_project.seeds.keys()) == {"seed_a"}
+    assert set(dbt_project.snapshots.keys()) == {"snapshot_a"}
+
+
 def test_dbtmodelconfig___repr__():
     dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
     expected_start = (

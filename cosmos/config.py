@@ -203,6 +203,7 @@ def _resolve_deprecated_relative_path(
         f"ProjectConfig.{singular_name} is deprecated since Cosmos 1.16 and will be removed in "
         f"Cosmos 2.0. Use ProjectConfig.{plural_name} instead.",
         DeprecationWarning,
+        stacklevel=2,
     )
     return singular_value
 

@@ -82,6 +82,15 @@ def _normalize_path(path: str | None) -> str:
         return Path(path.replace("\\", "/")).as_posix()
 
 
+def _relative_dirs(paths: list[Path], project_path: Path | None) -> list[str] | None:
+    """Returns each path's location relative to project_path, preserving nested subdirectories."""
+    if not paths:
+        return None
+    if project_path is None:
+        return [p.stem for p in paths]
+    return [str(p.relative_to(project_path)) for p in paths]
+
+
 class CosmosLoadDbtException(Exception):
     """
     Exception raised while trying to load a `dbt` project as a `DbtGraph` instance.
@@ -1107,9 +1116,9 @@ class DbtGraph:
         project = LegacyDbtProject(
             project_name=self.render_config.project_path.stem,
             dbt_root_path=self.render_config.project_path.parent.as_posix(),
-            dbt_models_dir=[p.stem for p in self.project.models_paths] or None,
-            dbt_seeds_dir=[p.stem for p in self.project.seeds_paths] or None,
-            dbt_snapshots_dir=[p.stem for p in self.project.snapshots_paths] or None,
+            dbt_models_dir=_relative_dirs(self.project.models_paths, self.project.dbt_project_path),
+            dbt_seeds_dir=_relative_dirs(self.project.seeds_paths, self.project.dbt_project_path),
+            dbt_snapshots_dir=_relative_dirs(self.project.snapshots_paths, self.project.dbt_project_path),
             dbt_vars=self.dbt_vars,
         )
         nodes = {}

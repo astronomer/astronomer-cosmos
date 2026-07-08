@@ -369,8 +369,8 @@ class ProjectConfig:
         if self.dbt_project_path:
             project_yml_path = self.dbt_project_path / "dbt_project.yml"
             mandatory_paths["dbt_project.yml"] = Path(project_yml_path) if project_yml_path else None
-            for models_path in self.models_paths:
-                mandatory_paths[f"models directory {models_path}"] = Path(models_path)
+            for i, models_path in enumerate(self.models_paths):
+                mandatory_paths[f"models directory[{i}]"] = Path(models_path)
         if self.manifest_path:
             mandatory_paths["manifest"] = self.manifest_path
 

@@ -337,6 +337,16 @@ class LegacyDbtProject:
         # add the model to the project
         self.seeds[model_name] = model
 
+    def _classify_dir(self, path: Path) -> DbtModelType | None:
+        """Returns whether path lives under a configured models or snapshots dir; most specific dir wins."""
+        candidates = [(models_dir, DbtModelType.DBT_MODEL) for models_dir in self.models_dir]
+        candidates += [(snapshots_dir, DbtModelType.DBT_SNAPSHOT) for snapshots_dir in self.snapshots_dir]
+        matches = [(dbt_dir, dbt_type) for dbt_dir, dbt_type in candidates if path.is_relative_to(dbt_dir)]
+        if not matches:
+            return None
+        _, dbt_type = max(matches, key=lambda match: len(match[0].parts))
+        return dbt_type
+
     def _handle_sql_file(self, path: Path) -> None:
         """
         Handles a single sql file.
@@ -345,7 +355,8 @@ class LegacyDbtProject:
         model_name = path.stem
 
         # construct the model object, which we'll use to store metadata
-        if any(str(models_dir) in str(path) for models_dir in self.models_dir):
+        resource_type = self._classify_dir(path)
+        if resource_type == DbtModelType.DBT_MODEL:
             model = DbtModel(
                 name=model_name,
                 type=DbtModelType.DBT_MODEL,
@@ -355,7 +366,7 @@ class LegacyDbtProject:
             # add the model to the project
             self.models[model.name] = model
 
-        elif any(str(snapshots_dir) in str(path) for snapshots_dir in self.snapshots_dir):
+        elif resource_type == DbtModelType.DBT_SNAPSHOT:
             model = DbtModel(
                 name=model_name,
                 type=DbtModelType.DBT_SNAPSHOT,

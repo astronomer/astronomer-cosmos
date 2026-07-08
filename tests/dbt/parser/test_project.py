@@ -185,6 +185,30 @@ def test_LegacyDbtProject_accepts_single_dir_as_string(tmp_path):
     assert set(dbt_project.snapshots.keys()) == {"snapshot_a"}
 
 
+def test_LegacyDbtProject_classifies_nested_snapshots_dir_correctly(tmp_path):
+    """
+    A snapshots dir nested inside a models dir should still be classified as snapshots, not models -
+    a substring check on the path string would misclassify it since "models" is a substring of
+    ".../models/snapshots/snapshot_a.sql".
+    """
+    project_dir = tmp_path / "nested_dirs_project"
+    (project_dir / "models" / "snapshots").mkdir(parents=True)
+    (project_dir / "models" / "model_a.sql").write_text("select 1")
+    (project_dir / "models" / "snapshots" / "snapshot_a.sql").write_text(
+        "{% snapshot snapshot_a %}\nselect 1\n{% endsnapshot %}"
+    )
+
+    dbt_project = LegacyDbtProject(
+        project_name="nested_dirs_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir="models",
+        dbt_snapshots_dir="models/snapshots",
+    )
+
+    assert set(dbt_project.models.keys()) == {"model_a"}
+    assert set(dbt_project.snapshots.keys()) == {"snapshot_a"}
+
+
 def test_dbtmodelconfig___repr__():
     dbt_model = DbtModel(name="some_name", type=DbtModelType.DBT_MODEL, path=SAMPLE_MODEL_SQL_PATH)
     expected_start = (

@@ -432,7 +432,7 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                     config=node_config,
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
-                        if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
+                        if node_resource_type == DbtResourceType.SOURCE
                         else False
                     ),
                     fqn=node_dict.get("fqn"),

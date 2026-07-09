@@ -25,6 +25,7 @@ from cosmos.operators._watcher.state import (
 from cosmos.operators._watcher.xcom import (
     _backup_xcom_to_variable,
     _delete_xcom_backup_variable,
+    _delete_xcom_backup_variable_by_ids,
     _init_xcom_backup,
     _persist_backup,
     _restore_xcom_from_variable,
@@ -372,6 +373,28 @@ class TestDeleteXcomBackupVariable:
         mock_delete_variable.side_effect = KeyError("not found")
 
         _delete_xcom_backup_variable(context)  # should not raise
+
+
+class TestDeleteXcomBackupVariableByIds:
+    """Covers the id-based variant used by the DAG-run listener to clean up orphaned backups."""
+
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    def test_deletes_variable(self, mock_delete_variable):
+        _delete_xcom_backup_variable_by_ids("my_dag", "my_group", "test_run")
+
+        mock_delete_variable.assert_called_once_with(_xcom_backup_variable_key("my_dag", "my_group", "test_run"))
+
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    def test_no_task_group(self, mock_delete_variable):
+        _delete_xcom_backup_variable_by_ids("my_dag", None, "test_run")
+
+        mock_delete_variable.assert_called_once_with(_xcom_backup_variable_key("my_dag", None, "test_run"))
+
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    def test_ignores_key_error(self, mock_delete_variable):
+        mock_delete_variable.side_effect = KeyError("not found")
+
+        _delete_xcom_backup_variable_by_ids("my_dag", "my_group", "test_run")  # should not raise
 
 
 class TestRestoreXcomFromVariable:

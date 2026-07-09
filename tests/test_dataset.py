@@ -128,6 +128,29 @@ my_profile:
         profile_config.target_name = "dev"
         assert get_dataset_namespace(profile_config) == "postgres://dbhost:5433"
 
+    def test_profiles_yml_filepath_renders_env_var(self, tmp_path, monkeypatch):
+        """profiles.yml may use dbt's env_var() Jinja; it must be rendered, not passed through literally."""
+        monkeypatch.setenv("DB_HOST", "dbhost")
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST') }}"
+      port: 5433
+      user: user
+      pass: pass
+      dbname: mydb
+      schema: public
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://dbhost:5433"
+
     def test_returns_none_on_error(self):
         profile_config = MagicMock()
         profile_config.profile_mapping = None

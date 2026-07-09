@@ -449,10 +449,6 @@ def create_task_metadata(  # noqa: C901
                 arguments=args,
             )
 
-        # SUPPORTED_BUILD_RESOURCES is also used to build the `--resource-type` CLI flag passed to the
-        # real dbt process (see the WATCHER producer task), so it must stay scoped to dbt's own resource
-        # type vocabulary. DbtResourceType.SEMANTIC_LAYER is a Cosmos-internal reclassification dbt itself
-        # doesn't know about, so it's added here rather than to that constant.
         if render_config.test_behavior == TestBehavior.BUILD and (
             node.resource_type in SUPPORTED_BUILD_RESOURCES or node.resource_type == DbtResourceType.SEMANTIC_LAYER
         ):

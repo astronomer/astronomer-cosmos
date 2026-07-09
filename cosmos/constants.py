@@ -12,10 +12,7 @@ AIRFLOW_VERSION = Version(airflow.__version__)
 # dbt materialization for models that are inlined as a CTE into downstream models and never written to the warehouse.
 DBT_EPHEMERAL_MATERIALIZATION = "ephemeral"
 
-# dbt materializations for adapter-native semantic layer objects (Databricks Unity Catalog metric
-# views, Snowflake semantic views). dbt itself models these as plain `model` nodes; Cosmos
-# reclassifies them to DbtResourceType.SEMANTIC_LAYER at parse time since they are semantically
-# different from regular models.
+# dbt materializations for adapter-native semantic layer objects (Databricks metric views, Snowflake semantic views).
 DBT_SEMANTIC_LAYER_MATERIALIZATIONS = {"metric_view", "semantic_view"}
 
 BIGQUERY_PROFILE_TYPE = "bigquery"

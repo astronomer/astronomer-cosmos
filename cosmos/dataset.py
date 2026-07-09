@@ -11,6 +11,7 @@ from packaging.version import Version
 
 from cosmos import settings
 from cosmos.constants import _DATASET_EMITTING_RESOURCE_TYPES, AIRFLOW_VERSION
+from cosmos.dbt.project import _resolve_env_var
 from cosmos.log import get_logger
 
 if TYPE_CHECKING:
@@ -140,6 +141,8 @@ def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any
         with open(profile_config.profiles_yml_filepath) as f:
             profiles = yaml.safe_load(f)
         target = profiles[profile_config.profile_name]["outputs"][profile_config.target_name]
+        # dbt renders env_var() Jinja in profiles.yml; replicate that since we read the file directly.
+        target = {key: _resolve_env_var(value) if isinstance(value, str) else value for key, value in target.items()}
         adapter_type = target.get("type", "")
         return adapter_type, target
 

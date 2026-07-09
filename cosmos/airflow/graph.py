@@ -337,7 +337,7 @@ def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
             DbtResourceType.MODEL: "DbtRun",
             DbtResourceType.SNAPSHOT: "DbtSnapshot",
             DbtResourceType.SEED: "DbtSeed",
-            DbtResourceType.SEMANTIC_LAYER: "DbtRun",
+            DbtResourceType.SEMANTIC_LAYER: "DbtSemantic",
             DbtResourceType.TEST: "DbtTest",
             DbtResourceType.SOURCE: "DbtSource",
         }

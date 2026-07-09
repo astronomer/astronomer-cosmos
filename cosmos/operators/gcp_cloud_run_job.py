@@ -19,6 +19,7 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtSemanticMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
@@ -215,6 +216,20 @@ class DbtRunGcpCloudRunJobOperator(DbtRunMixin, DbtGcpCloudRunJobBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtGcpCloudRunJobBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticGcpCloudRunJobOperator(DbtSemanticMixin, DbtGcpCloudRunJobBaseOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic layer object (e.g. a
+    Databricks metric view or Snowflake semantic view).
+    """
+
+    template_fields: Sequence[str] = (
+        DbtGcpCloudRunJobBaseOperator.template_fields + DbtSemanticMixin.template_fields  # type: ignore[operator]
+    )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

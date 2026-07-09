@@ -471,6 +471,17 @@ class DbtRunMixin:
         return flags
 
 
+class DbtSemanticMixin(DbtRunMixin):
+    """
+    Mixin for dbt run command on adapter-native semantic layer objects (e.g. Databricks metric
+    views, Snowflake semantic views). The underlying dbt command and flags are the same as
+    DbtRunMixin; this exists as its own type so semantic layer tasks render distinctly in the
+    Airflow UI and can be managed separately as this resource type stabilizes across adapters.
+    """
+
+    ui_color = "#E8A33D"
+
+
 class DbtTestMixin:
     """Mixin for dbt test command."""
 

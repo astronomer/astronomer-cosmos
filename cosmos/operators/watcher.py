@@ -45,6 +45,7 @@ from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
+    DbtSemanticMixin,
     DbtSnapshotMixin,
 )
 from cosmos.operators.local import (
@@ -635,6 +636,18 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticWatcherOperator(DbtSemanticMixin, DbtConsumerWatcherSensor):
+    """
+    Watches for the progress of an adapter-native semantic layer object (e.g. a Databricks metric
+    view or Snowflake semantic view), run by the producer task (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtSemanticMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

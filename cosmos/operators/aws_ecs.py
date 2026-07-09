@@ -18,6 +18,7 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtSemanticMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
@@ -205,6 +206,18 @@ class DbtRunAwsEcsOperator(DbtRunMixin, DbtAwsEcsBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtAwsEcsBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticAwsEcsOperator(DbtSemanticMixin, DbtAwsEcsBaseOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic layer object (e.g. a
+    Databricks metric view or Snowflake semantic view).
+    """
+
+    template_fields: Sequence[str] = DbtAwsEcsBaseOperator.template_fields + DbtSemanticMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

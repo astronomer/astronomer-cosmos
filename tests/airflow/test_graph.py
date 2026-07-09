@@ -916,8 +916,9 @@ def _semantic_layer_node(materialization="metric_view"):
 
 @pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
 def test_create_task_metadata_semantic_layer_model_renders_with_semantic_layer_suffix(materialization):
-    """Semantic layer nodes (Databricks metric views, Snowflake semantic views) are rendered as
-    regular dbt run tasks, but with a `_semantic_layer` suffix distinguishing them from plain models."""
+    """Semantic layer nodes (Databricks metric views, Snowflake semantic views) are rendered via a
+    dedicated DbtSemantic operator (still just running `dbt run` underneath), with a
+    `_semantic_layer` suffix distinguishing them from plain models."""
     metadata = create_task_metadata(
         _semantic_layer_node(materialization),
         execution_mode=ExecutionMode.LOCAL,
@@ -925,7 +926,7 @@ def test_create_task_metadata_semantic_layer_model_renders_with_semantic_layer_s
         dbt_dag_task_group_identifier="",
     )
     assert metadata.id == "my_model_semantic_layer"
-    assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
+    assert metadata.operator_class == "cosmos.operators.local.DbtSemanticLocalOperator"
     assert metadata.arguments == {"select": "my_model"}
 
 

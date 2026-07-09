@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import urllib.parse
 from collections.abc import Callable
 from pathlib import Path
@@ -11,7 +13,6 @@ from packaging.version import Version
 
 from cosmos import settings
 from cosmos.constants import _DATASET_EMITTING_RESOURCE_TYPES, AIRFLOW_VERSION
-from cosmos.dbt.project import _resolve_env_var
 from cosmos.log import get_logger
 
 if TYPE_CHECKING:
@@ -124,6 +125,23 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
     return "__".join(identifiers_list)
 
 
+# Matches dbt's `{{ env_var('NAME') }}` / `{{ env_var('NAME', 'default') }}` Jinja calls only.
+# Deliberately narrower than a general Jinja renderer: profiles.yml values are only ever
+# substituted for this specific dbt construct, so no other Jinja syntax is evaluated.
+_ENV_VAR_PATTERN = re.compile(
+    r"""\{\{\s*env_var\(\s*(['"])(?P<name>.*?)\1\s*(?:,\s*(['"])(?P<default>.*?)\3\s*)?\)\s*\}\}"""
+)
+
+
+def _render_env_var(value: str) -> str:
+    """Substitute dbt-style ``env_var('NAME'[, 'default'])`` Jinja calls with the environment value."""
+
+    def _replace(match: re.Match[str]) -> str:
+        return os.getenv(match.group("name"), match.group("default") or "")
+
+    return _ENV_VAR_PATTERN.sub(_replace, value)
+
+
 def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any]]:
     """
     Extract the adapter type and profile dict from a ProfileConfig.
@@ -142,7 +160,7 @@ def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any
             profiles = yaml.safe_load(f)
         target = profiles[profile_config.profile_name]["outputs"][profile_config.target_name]
         # dbt renders env_var() Jinja in profiles.yml; replicate that since we read the file directly.
-        target = {key: _resolve_env_var(value) if isinstance(value, str) else value for key, value in target.items()}
+        target = {key: _render_env_var(value) if isinstance(value, str) else value for key, value in target.items()}
         adapter_type = target.get("type", "")
         return adapter_type, target
 

@@ -69,8 +69,6 @@ azure-synapse-artifacts==0.22.0
 azure-synapse-spark==0.7.0
 babel==2.18.0
 backoff==2.2.1
-backports-datetime-fromisoformat==2.0.3
-backports.strenum==1.3.1
 backports.tarfile==1.2.0
 beautifulsoup4==4.15.0
 black==25.12.0
@@ -144,7 +142,7 @@ google-api-python-client==2.198.0
 google-auth==2.55.2
 google-auth-httplib2==0.4.0
 google-auth-oauthlib==1.4.0
-google-cloud-aiplatform==1.160.0
+google-cloud-aiplatform==1.148.1
 google-cloud-alloydb==0.11.0
 google-cloud-appengine-logging==1.10.0
 google-cloud-audit-log==0.6.0
@@ -190,7 +188,7 @@ google-cloud-videointelligence==2.20.0
 google-cloud-vision==3.15.0
 google-cloud-workflows==1.23.0
 google-crc32c==1.8.0
-google-genai==2.10.0
+google-genai==1.75.0
 google-resumable-media==2.10.0
 googleapis-common-protos==1.75.0
 greenback==1.3.0
@@ -245,7 +243,7 @@ lazy-object-proxy==1.12.0
 leather==0.4.1
 libcst==1.8.6
 linkify-it-py==2.1.0
-litellm==1.85.7
+litellm==1.82.6
 lockfile==0.12.2
 looker_sdk==26.10.0
 lxml==5.4.0

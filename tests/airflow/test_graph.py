@@ -902,6 +902,48 @@ def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_build_in_buil
     assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
 
 
+def _semantic_layer_node(materialization="metric_view"):
+    return DbtNode(
+        unique_id=f"{DbtResourceType.SEMANTIC_LAYER.value}.my_folder.my_model",
+        resource_type=DbtResourceType.SEMANTIC_LAYER,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={"materialized": materialization},
+    )
+
+
+@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
+def test_create_task_metadata_semantic_layer_model_renders_with_semantic_layer_suffix(materialization):
+    """Semantic layer nodes (Databricks metric views, Snowflake semantic views) are rendered as
+    regular dbt run tasks, but with a `_semantic_layer` suffix distinguishing them from plain models."""
+    metadata = create_task_metadata(
+        _semantic_layer_node(materialization),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+    assert metadata.id == "my_model_semantic_layer"
+    assert metadata.operator_class == "cosmos.operators.local.DbtRunLocalOperator"
+    assert metadata.arguments == {"select": "my_model"}
+
+
+@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
+def test_create_task_metadata_semantic_layer_model_under_build_mode(materialization):
+    """Under TestBehavior.BUILD, semantic layer nodes get full BUILD treatment (like MODEL/SEED/SNAPSHOT),
+    rendering as dbt build tasks rather than falling through to the generic model branch."""
+    metadata = create_task_metadata(
+        _semantic_layer_node(materialization),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
+    )
+    assert metadata.id == "my_model_semantic_layer_build"
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+
+
 def test_create_task_metadata_build_mode_forwards_render_config_exclude():
     """Under TestBehavior.BUILD, tests run inline with `dbt build`, so RenderConfig.exclude must be
     forwarded to the build command — otherwise e.g. exclude=["resource_type:unit_test"] would not

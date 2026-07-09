@@ -421,15 +421,20 @@ def create_task_metadata(  # noqa: C901
                 # `dbt seed` when the CSV content is unchanged since the last successful run.
                 extra_context["should_run_if_seed_changed"] = True
 
+        # SUPPORTED_BUILD_RESOURCES is also used to build the `--resource-type` CLI flag passed to the
+        # real dbt process (see the WATCHER producer task), so it must stay scoped to dbt's own resource
+        # type vocabulary. DbtResourceType.SEMANTIC_LAYER is a Cosmos-internal reclassification dbt itself
+        # doesn't know about, so it's added here rather than to that constant.
+        is_build_eligible = render_config.test_behavior == TestBehavior.BUILD and (
+            node.resource_type in SUPPORTED_BUILD_RESOURCES or node.resource_type == DbtResourceType.SEMANTIC_LAYER
+        )
+
         if node.has_ephemeral_materialization and render_config.ephemeral_models_as_empty_operator:
             # Ephemeral models are inlined as CTEs into downstream models and never written to the
             # warehouse, so running them via a dbt operator (whether `dbt run` or `dbt build`) is a
             # no-op. Render them as empty operators while keeping the node in the graph so the
             # dependency chain passing through it is preserved. This check sits before the
             # TestBehavior.BUILD branch so it is honored regardless of the test behavior.
-            is_build = (
-                render_config.test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES
-            )
             task_id, args = _get_task_id_and_args(
                 node=node,
                 args=args,
@@ -437,7 +442,7 @@ def create_task_metadata(  # noqa: C901
                 normalize_task_id=render_config.normalize_task_id,
                 normalize_task_display_name=render_config.normalize_task_display_name,
                 resource_suffix=resource_suffix,
-                include_resource_type=is_build,
+                include_resource_type=is_build_eligible,
                 execution_mode=execution_mode,
             )
             # EmptyOperator does not accept custom dbt parameters (e.g. profile_args); keep only the display name.
@@ -449,13 +454,7 @@ def create_task_metadata(  # noqa: C901
                 arguments=args,
             )
 
-        # SUPPORTED_BUILD_RESOURCES is also used to build the `--resource-type` CLI flag passed to the
-        # real dbt process (see the WATCHER producer task), so it must stay scoped to dbt's own resource
-        # type vocabulary. DbtResourceType.SEMANTIC_LAYER is a Cosmos-internal reclassification dbt itself
-        # doesn't know about, so it's added here rather than to that constant.
-        if render_config.test_behavior == TestBehavior.BUILD and (
-            node.resource_type in SUPPORTED_BUILD_RESOURCES or node.resource_type == DbtResourceType.SEMANTIC_LAYER
-        ):
+        if is_build_eligible:
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"
             else:

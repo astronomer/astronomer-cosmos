@@ -207,7 +207,13 @@ SUPPORTED_BUILD_RESOURCES = [
 # dbt test runs tests defined on models, sources, snapshots, and seeds.
 # It expects that you have already created those resources through the appropriate commands.
 # https://docs.getdbt.com/reference/commands/test
-TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED}
+TESTABLE_DBT_RESOURCES = {
+    DbtResourceType.MODEL,
+    DbtResourceType.SOURCE,
+    DbtResourceType.SNAPSHOT,
+    DbtResourceType.SEED,
+    DbtResourceType.SEMANTIC_LAYER,
+}
 
 _DATASET_EMITTING_RESOURCE_TYPES = frozenset({"model", "seed", "snapshot"})
 

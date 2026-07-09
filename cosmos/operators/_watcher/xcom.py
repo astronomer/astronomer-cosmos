@@ -136,6 +136,21 @@ def _delete_xcom_backup_variable(context: Any) -> None:
         pass
 
 
+def _delete_xcom_backup_variable_by_ids(dag_id: str, task_group_id: str | None, run_id: str) -> None:
+    """Delete a producer's XCom backup Variable given its identifying DAG/task-group/run ids.
+
+    Unlike ``_delete_xcom_backup_variable``, this doesn't require a live task execution
+    context, so it can be used to clean up orphaned backups once a DAG run has reached a
+    terminal state (e.g. from a DAG-run-level listener).
+    """
+    var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
+    try:
+        delete_variable(var_key)
+        logger.debug("Deleted orphaned XCom backup Variable '%s'", var_key)
+    except KeyError:
+        pass
+
+
 def _restore_xcom_from_variable(context: Any) -> bool:
     """Restore XCom entries from an Airflow Variable backup created by a previous attempt.
 

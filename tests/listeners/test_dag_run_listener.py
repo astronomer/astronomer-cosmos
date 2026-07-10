@@ -148,6 +148,27 @@ def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
     return dag_run
 
 
+def create_dag_run_without_execution(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
+    """Build a DagRun for ``dag`` without persisting it or running any of its tasks.
+
+    ``on_dag_run_failed``/``on_dag_run_success`` only ever read ``dag_run.dag_id``,
+    ``dag_run.run_id`` and ``dag_run.get_dag()`` (the latter just returns the plain ``.dag``
+    attribute, not a DB lookup), so a bare, unpersisted DagRun is enough -- no need to run the
+    DAG's tasks via ``create_dag_run``'s ``dag.test()`` path, which for a WATCHER DAG with
+    deferrable consumer tasks doesn't complete inside Airflow 3.1+'s in-process trigger runner (a
+    pre-existing issue unrelated to this cleanup logic). Airflow 3.1+'s Task SDK ``DAG`` also has
+    no ``create_dagrun()`` method to fall back on, unlike earlier versions.
+    """
+    if AIRFLOW_VERSION < Version("3.1"):
+        return create_dag_run(dag, run_id, run_after)
+
+    from airflow.utils.types import DagRunType
+
+    dag_run = DagRun(dag_id=dag.dag_id, run_id=run_id, run_after=run_after, run_type=DagRunType.MANUAL)
+    dag_run.dag = dag
+    return dag_run
+
+
 @pytest.mark.integration
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
 def test_on_dag_run_success(mock_emit_usage_metrics_if_enabled, caplog):
@@ -381,9 +402,7 @@ class TestCleanupWatcherProducerBackups:
 def test_on_dag_run_hooks_clean_up_watcher_backup_variable(
     mock_emit_usage_metrics_if_enabled, mock_delete_variable_isolated_session
 ):
-    """Covers both terminal-state hooks against a single real DAG run: ``dag.test()`` builds a
-    real WATCHER ``DbtDag`` run via Airflow's Task SDK, which is comparatively slow, so both
-    hooks share the one run rather than each paying for their own."""
+    """Covers both terminal-state hooks against a single real DAG run."""
     with DbtDag(
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
@@ -397,7 +416,7 @@ def test_on_dag_run_hooks_clean_up_watcher_backup_variable(
 
     run_id = str(uuid.uuid1())
     run_after = datetime.now(timezone.utc) - timedelta(seconds=1)
-    dag_run = create_dag_run(dag, run_id, run_after)
+    dag_run = create_dag_run_without_execution(dag, run_id, run_after)
 
     on_dag_run_failed(dag_run, msg="test failed")
     mock_delete_variable_isolated_session.assert_called()

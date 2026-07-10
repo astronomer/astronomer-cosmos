@@ -65,3 +65,29 @@ def delete_variable(key: str) -> None:
         from airflow.models import Variable
 
         Variable.delete(key)
+
+
+def delete_variable_isolated_session(key: str) -> None:
+    """Delete a Variable via a dedicated session, safe to call from the scheduler process.
+
+    The scheduler guards against anything committing its ambient thread-local session
+    mid-transaction (it would corrupt its row locks), but ``airflow.models.Variable.delete()``
+    does exactly that by default. A session bound directly to ``settings.engine`` avoids the
+    collision. ``airflow.sdk.Variable`` has no such issue -- it goes through the Task Execution
+    API rather than a local session -- so it's used as-is when available.
+    """
+    try:
+        from airflow.sdk import Variable
+
+        Variable.delete(key)
+    except ImportError:
+        from airflow import settings
+        from airflow.models import Variable as LegacyVariable
+        from sqlalchemy.orm import sessionmaker
+
+        session = sessionmaker(bind=settings.engine)()
+        try:
+            LegacyVariable.delete(key, session=session)
+            session.commit()
+        finally:
+            session.close()

@@ -5,7 +5,7 @@ Generating Docs
 
 dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official dbt documentation <https://docs.getdbt.com/docs/building-a-dbt-project/documentation>`_. For an example of what the docs look like with the ``jaffle_shop`` project, check out `this site <http://cosmos-demo-dbt-docs.s3-website.eu-north-1.amazonaws.com/>`_.
 
-After generating the dbt docs, you can host them natively within `Apache Airflow® <https://airflow.apache.org/>`_ via the Cosmos Airflow plugin; see :doc:`Hosting Docs </guides/dbt_docs/hosting-docs>` for more information.
+After generating the dbt docs, you can host them natively within `Apache Airflow® <https://airflow.apache.org/>`_ via the Cosmos Airflow plugin; see :ref:`Hosting Docs <hosting-docs>` for more information.
 
 Alternatively, many users choose to serve these docs on a separate static website. This is a great way to share your data models with a broad array of stakeholders.
 
@@ -138,7 +138,7 @@ This is important because the dbt ``target`` directory is created inside the Pod
 Requirements specific to Kubernetes:
 
 - The container image must include your dbt project files.
-- The container image or mounted files must include a ``profiles.yml`` file, because Kubernetes execution mode does not support :doc:`../connect_database/use-profile-mapping`.
+- The container image or mounted files must include a ``profiles.yml`` file, because Kubernetes execution mode does not support :ref:`use-profile-mapping`.
 - The container image must have the AWS CLI available because Cosmos uploads the generated docs with ``aws s3 sync``.
 - The Pod still needs the database credentials and any other secrets required to run ``dbt docs generate``.
 

@@ -12,6 +12,9 @@ AIRFLOW_VERSION = Version(airflow.__version__)
 # dbt materialization for models that are inlined as a CTE into downstream models and never written to the warehouse.
 DBT_EPHEMERAL_MATERIALIZATION = "ephemeral"
 
+# dbt materializations for adapter-native semantic layer objects (Databricks metric views, Snowflake semantic views).
+DBT_SEMANTIC_LAYER_MATERIALIZATIONS = {"metric_view", "semantic_view"}
+
 BIGQUERY_PROFILE_TYPE = "bigquery"
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DBT_PROJECT_FILENAME = "dbt_project.yml"
@@ -180,6 +183,7 @@ class DbtResourceType(aenum.Enum):  # type: ignore[misc]
     TEST = "test"
     SOURCE = "source"
     EXPOSURE = "exposure"
+    SEMANTIC_LAYER = "semantic_layer"
 
     @classmethod
     def _missing_value_(cls, value):  # type: ignore[no-untyped-def]
@@ -200,7 +204,13 @@ SUPPORTED_BUILD_RESOURCES = [
 # dbt test runs tests defined on models, sources, snapshots, and seeds.
 # It expects that you have already created those resources through the appropriate commands.
 # https://docs.getdbt.com/reference/commands/test
-TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED}
+TESTABLE_DBT_RESOURCES = {
+    DbtResourceType.MODEL,
+    DbtResourceType.SOURCE,
+    DbtResourceType.SNAPSHOT,
+    DbtResourceType.SEED,
+    DbtResourceType.SEMANTIC_LAYER,
+}
 
 _DATASET_EMITTING_RESOURCE_TYPES = frozenset({"model", "seed", "snapshot"})
 

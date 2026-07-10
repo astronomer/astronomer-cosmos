@@ -4,14 +4,13 @@ Callbacks
 =========
 
 .. note::
-    Feature available when using ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``.
+    Feature available when using ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV``, and ``ExecutionMode.WATCHER``.
 
-    Callbacks are also supported under ``ExecutionMode.WATCHER``, with one important difference: a callback set
-    via ``operator_args`` (or on ``DbtDag``/``DbtTaskGroup``) fires once per DAG run, on the producer task
-    (``dbt_producer_watcher``), which is the task that actually runs ``dbt build``. The per-model consumer sensor
-    tasks do not invoke dbt in their normal execution path, so the callback receives the ``run_results.json`` for
-    the whole project rather than a single model. See :ref:`watcher-execution-mode` for details on configuring
-    separate callbacks for producer and consumer tasks.
+    Under ``ExecutionMode.WATCHER``, a callback set via ``operator_args`` (or on ``DbtDag``/``DbtTaskGroup``) fires
+    once per DAG run, on the producer task (``dbt_producer_watcher``), which is the task that actually runs
+    ``dbt build``. The per-model consumer sensor tasks do not invoke dbt in their normal execution path, so the
+    callback receives the ``run_results.json`` for the whole project rather than a single model. See
+    :ref:`watcher-execution-mode` for details on configuring separate callbacks for producer and consumer tasks.
 
 .. note::
     Since Cosmos v1.15.0, ephemeral dbt models are rendered as ``EmptyOperator`` tasks by default (``RenderConfig.ephemeral_models_as_empty_operator=True``). Because no dbt command runs for these tasks, callbacks are not invoked for ephemeral models. Set ``ephemeral_models_as_empty_operator=False`` to render them as regular dbt run tasks if you rely on callbacks for them.

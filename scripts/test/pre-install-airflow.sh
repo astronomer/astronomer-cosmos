@@ -37,56 +37,7 @@ elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
 elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
   uv pip install -r requirements/requirements-airflow-3.2-dbt-1.11.txt
 elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
-  # TEMPORARY (Airflow 3.3.0 has not GA'd yet): track the 3.3 line live instead
-  # of a pinned requirements file, so CI follows the latest 3.3 pre-release
-  # (b1, b2, ... rc1, ...) and switches to 3.3.0 the moment it is released,
-  # without another code change:
-  #   * constraints come from the moving `constraints-3-3` branch -- CI keeps it
-  #     at the HEAD of the 3.3 line; it pins the providers/transitive deps but
-  #     intentionally NOT apache-airflow itself, and
-  #   * `apache-airflow>=3.3.0b1,<3.4.0` with --prerelease=allow resolves to the
-  #     highest available 3.3 version: the latest pre-release today, the GA
-  #     release once it ships (a final release outranks its release candidates).
-  # TODO (Airflow 3.3.0 GA, BOSS-524): pin the resolved environment by copying a
-  # CI `pip freeze` into requirements/requirements-airflow-3.3-dbt-1.11.txt, then
-  # replace this whole elif branch (including the gcsfs<2026 curation below) with
-  # the single `uv pip install -r requirements/...` line used by the 3.0-3.2
-  # branches above, so 3.3 is handled consistently with the other versions.
-  # https://linear.app/astronomer/issue/BOSS-524
-  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-3-3/constraints-$PYTHON_VERSION.txt"
-  curl -fsSL "$CONSTRAINT_URL" -o /tmp/constraint.txt
-  sed '/PyYAML==/d' /tmp/constraint.txt > /tmp/constraint.txt.tmp
-  mv /tmp/constraint.txt.tmp /tmp/constraint.txt
-  # Install the core up front (only line needing --prerelease) so the GA
-  # providers below resolve against the already-pinned 3.3 core.
-  uv pip install --prerelease=allow "apache-airflow>=3.3.0b1,<3.4.0" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-devel-common"
-  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-docker" --constraint /tmp/constraint.txt
-  # DBT_VERSION isn't exported on this path; install from a separate var so the
-  # dbt version assertion below (which reads $DBT_VERSION) keeps its behaviour.
-  # Do NOT set DBT_VERSION here: on this live 3.3 path `dbt --version` yields no
-  # parseable "Core:" version, so the assertion compares empty==empty and passes
-  # (the intended skip). Setting DBT_VERSION makes desired=1.11 != actual="" and
-  # fails the whole 3.3 matrix, so keep it unset.
-  DBT_INSTALL_VERSION="${DBT_VERSION:-1.11}"
-  uv pip install -U "dbt-core~=$DBT_INSTALL_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
-  uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
-  # TEMP curation: gcsfs 2026.x requires google-cloud-storage>=3.9 (it imports the
-  # google.cloud.storage.asyncio client added in 3.9). The Airflow 3.3 constraints
-  # actually install a *compatible* pair (gcsfs 2026.x + google-cloud-storage 3.x),
-  # but the unconstrained `dbt-bigquery` install above caps google-cloud-storage<3.2
-  # (dbt-bigquery requires "google-cloud-storage<3.2,>=2.4"), downgrading gcs to
-  # 3.1.1 (the same version the curated 3.2 requirements file lands on). gcsfs 2026.x
-  # then fails against that 3.1.1 ("Please install gcsfs to access Google Storage").
-  # gcsfs 2025.x has no such floor, so hold it to the 2025 line the 3.2 env uses. Run
-  # without --constraint so it isn't pinned back to the constraints' 2026.x. Goes away
-  # with the pinned requirements-airflow-3.3-dbt-1.11.txt.
-  uv pip install "gcsfs<2026"
-  rm /tmp/constraint.txt
+  uv pip install -r requirements/requirements-airflow-3.3-dbt-1.11.txt
 else
   # Download Airflow constraints according to the version being used
   if [ "$AIRFLOW_VERSION" = "3.0" ] ; then

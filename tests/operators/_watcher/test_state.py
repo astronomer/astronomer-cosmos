@@ -378,21 +378,25 @@ class TestDeleteXcomBackupVariable:
 class TestDeleteXcomBackupVariableByIds:
     """Covers the id-based variant used by the DAG-run listener to clean up orphaned backups."""
 
-    @patch("cosmos.operators._watcher.xcom.delete_variable")
-    def test_deletes_variable(self, mock_delete_variable):
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_deletes_variable(self, mock_delete_variable_isolated_session):
         _delete_xcom_backup_variable_by_ids("my_dag", "my_group", "test_run")
 
-        mock_delete_variable.assert_called_once_with(_xcom_backup_variable_key("my_dag", "my_group", "test_run"))
+        mock_delete_variable_isolated_session.assert_called_once_with(
+            _xcom_backup_variable_key("my_dag", "my_group", "test_run")
+        )
 
-    @patch("cosmos.operators._watcher.xcom.delete_variable")
-    def test_no_task_group(self, mock_delete_variable):
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_no_task_group(self, mock_delete_variable_isolated_session):
         _delete_xcom_backup_variable_by_ids("my_dag", None, "test_run")
 
-        mock_delete_variable.assert_called_once_with(_xcom_backup_variable_key("my_dag", None, "test_run"))
+        mock_delete_variable_isolated_session.assert_called_once_with(
+            _xcom_backup_variable_key("my_dag", None, "test_run")
+        )
 
-    @patch("cosmos.operators._watcher.xcom.delete_variable")
-    def test_ignores_key_error(self, mock_delete_variable):
-        mock_delete_variable.side_effect = KeyError("not found")
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_ignores_key_error(self, mock_delete_variable_isolated_session):
+        mock_delete_variable_isolated_session.side_effect = KeyError("not found")
 
         _delete_xcom_backup_variable_by_ids("my_dag", "my_group", "test_run")  # should not raise
 

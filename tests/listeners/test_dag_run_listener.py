@@ -306,8 +306,8 @@ def test_on_dag_run_failed_with_telemetry_metadata(mock_emit_usage_metrics_if_en
 class TestCleanupWatcherProducerBackups:
     """Covers cleanup of orphaned WATCHER producer XCom-backup Variables on DAG-run failure (#2823)."""
 
-    @patch("cosmos.operators._watcher.xcom.delete_variable")
-    def test_deletes_variable_for_producer_in_task_group(self, mock_delete_variable):
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_deletes_variable_for_producer_in_task_group(self, mock_delete_variable_isolated_session):
         with DAG("watcher_dag", start_date=datetime(2022, 1, 1)) as dag:
             with TaskGroup(group_id="my_group"):
                 DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -315,20 +315,20 @@ class TestCleanupWatcherProducerBackups:
         _cleanup_watcher_producer_backups(dag, "watcher_dag", "run123")
 
         expected_key = _xcom_backup_variable_key("watcher_dag", "my_group", "run123")
-        mock_delete_variable.assert_called_once_with(expected_key)
+        mock_delete_variable_isolated_session.assert_called_once_with(expected_key)
 
-    @patch("cosmos.operators._watcher.xcom.delete_variable")
-    def test_deletes_variable_for_producer_without_task_group(self, mock_delete_variable):
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_deletes_variable_for_producer_without_task_group(self, mock_delete_variable_isolated_session):
         with DAG("watcher_dag", start_date=datetime(2022, 1, 1)) as dag:
             DbtProducerWatcherOperator(project_dir=".", profile_config=None)
 
         _cleanup_watcher_producer_backups(dag, "watcher_dag", "run123")
 
         expected_key = _xcom_backup_variable_key("watcher_dag", None, "run123")
-        mock_delete_variable.assert_called_once_with(expected_key)
+        mock_delete_variable_isolated_session.assert_called_once_with(expected_key)
 
-    @patch("cosmos.operators._watcher.xcom.delete_variable")
-    def test_noop_for_non_watcher_dag(self, mock_delete_variable):
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_noop_for_non_watcher_dag(self, mock_delete_variable_isolated_session):
         with DAG("plain_dag", start_date=datetime(2022, 1, 1)) as dag:
             DbtRunLocalOperator(
                 profile_config=profile_config,
@@ -338,7 +338,7 @@ class TestCleanupWatcherProducerBackups:
 
         _cleanup_watcher_producer_backups(dag, "plain_dag", "run123")
 
-        mock_delete_variable.assert_not_called()
+        mock_delete_variable_isolated_session.assert_not_called()
 
     @patch("cosmos.operators._watcher.xcom._delete_xcom_backup_variable_by_ids", side_effect=RuntimeError("boom"))
     def test_swallows_per_task_errors(self, mock_delete_by_ids):
@@ -349,11 +349,33 @@ class TestCleanupWatcherProducerBackups:
 
         mock_delete_by_ids.assert_called_once()
 
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_deletes_variable_for_producer_in_serialized_dag(self, mock_delete_variable_isolated_session):
+        """In a real deployment ``dag`` is a SerializedDAG, not the live DAG built by user code (#2880):
+        its tasks only expose the operator type via the ``task_type`` property, not ``__class__.__name__``."""
+        if AIRFLOW_VERSION < Version("3.0"):
+            from airflow.serialization.serialized_objects import SerializedDAG
+        else:
+            from airflow.serialization.definitions.dag import SerializedDAG
+
+        with DAG("watcher_dag_serialized", start_date=datetime(2022, 1, 1)) as dag:
+            DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+        serialized_dag = SerializedDAG.from_dict(SerializedDAG.to_dict(dag))
+        assert serialized_dag.task_dict["dbt_producer_watcher"].__class__.__name__ != "DbtProducerWatcherOperator"
+
+        _cleanup_watcher_producer_backups(serialized_dag, "watcher_dag_serialized", "run123")
+
+        expected_key = _xcom_backup_variable_key("watcher_dag_serialized", None, "run123")
+        mock_delete_variable_isolated_session.assert_called_once_with(expected_key)
+
 
 @pytest.mark.integration
-@patch("cosmos.operators._watcher.xcom.delete_variable")
+@patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
-def test_on_dag_run_failed_cleans_up_watcher_backup_variable(mock_emit_usage_metrics_if_enabled, mock_delete_variable):
+def test_on_dag_run_failed_cleans_up_watcher_backup_variable(
+    mock_emit_usage_metrics_if_enabled, mock_delete_variable_isolated_session
+):
     with DbtDag(
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
@@ -371,4 +393,30 @@ def test_on_dag_run_failed_cleans_up_watcher_backup_variable(mock_emit_usage_met
 
     on_dag_run_failed(dag_run, msg="test failed")
 
-    mock_delete_variable.assert_called()
+    mock_delete_variable_isolated_session.assert_called()
+
+
+@pytest.mark.integration
+@patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+@patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
+def test_on_dag_run_success_cleans_up_watcher_backup_variable(
+    mock_emit_usage_metrics_if_enabled, mock_delete_variable_isolated_session
+):
+    with DbtDag(
+        project_config=ProjectConfig(
+            DBT_ROOT_PATH / "jaffle_shop",
+        ),
+        profile_config=profile_config,
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_dag_with_backup_on_success",
+    ) as dag:
+        pass
+
+    run_id = str(uuid.uuid1())
+    run_after = datetime.now(timezone.utc) - timedelta(seconds=1)
+    dag_run = create_dag_run(dag, run_id, run_after)
+
+    on_dag_run_success(dag_run, msg="test success")
+
+    mock_delete_variable_isolated_session.assert_called()

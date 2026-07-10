@@ -508,7 +508,20 @@ Advanced config
 Callback support
 ++++++++++++++++
 
-The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` will use the user-defined callback function similar to ``ExecutionMode.LOCAL`` mode.
+.. note::
+   This section covers the Cosmos ``callback`` parameter described in :ref:`callbacks` (for post-execution actions
+   such as uploading dbt artifacts). It is unrelated to Airflow's native ``on_retry_callback``/``on_failure_callback``
+   task callbacks used elsewhere on this page (see :ref:`producer-status-backup`), and to the ``freshness_callback``
+   described below in :ref:`watcher-source-freshness`.
+
+The ``DbtProducerWatcherOperator`` uses the user-defined ``callback`` function similar to ``ExecutionMode.LOCAL`` mode.
+
+A ``callback`` set via ``operator_args`` (or on ``DbtDag``/``DbtTaskGroup``) fires once per DAG run, on the
+producer task (``dbt_producer_watcher``), since that is the task that actually runs ``dbt build``. The callback
+receives the ``run_results.json`` for the whole project rather than a single model, because the per-model
+``DbtConsumerWatcherSensor`` tasks do not invoke dbt in their normal execution path. Note that on a consumer sensor
+retry or manual task clear, the consumer falls back to running that single model's dbt command directly and the
+callback fires again at that point, with the retried model's own ``run_results.json``.
 
 You can define different ``callback`` behaviors for producer and consumer nodes by using ``operator_args`` to configure the consumer callback and ``setup_operator_args`` to override the callback for the producer, as described below.
 

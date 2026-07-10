@@ -3,12 +3,9 @@
 Managing semantic layer
 =======================
 
-Cosmos can render adapter-native semantic layer objects — Databricks Unity Catalog metric views and
-Snowflake semantic views — as their own ``semantic_layer`` resource type, instead of a regular ``model``.
+Cosmos can render adapter-native semantic layer objects (Databricks Unity Catalog metric views and
+Snowflake semantic views) as their own ``semantic_layer`` resource type, instead of a regular ``model``.
 
-.. note::
-    This is about **provider-native** semantic layer objects, not dbt's own Metric Flow. dbt Metric
-    Flow resources (``semantic_model``, ``metric``, ``saved_query``) are untouched and unaffected.
 
 Prerequisites
 ~~~~~~~~~~~~~
@@ -27,7 +24,6 @@ that materialization at parse time and reclassifies the node as ``semantic_layer
 
 - **Task identity:** a ``_semantic_layer`` task name suffix and a ``DbtSemantic*`` operator instead of ``DbtRun*``. The underlying dbt command is still ``dbt run``.
 - **TestBehavior.BUILD:** collapses into ``DbtBuild``, same as any other buildable resource.
-- **Tests:** still render under the default ``TestBehavior.AFTER_EACH``.
 - **Selectors:** ``resource_type:model`` no longer matches it — use ``resource_type:semantic_layer``.
 
 Example

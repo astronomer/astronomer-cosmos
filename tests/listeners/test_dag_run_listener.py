@@ -378,9 +378,12 @@ class TestCleanupWatcherProducerBackups:
 @pytest.mark.integration
 @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
 @patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
-def test_on_dag_run_failed_cleans_up_watcher_backup_variable(
+def test_on_dag_run_hooks_clean_up_watcher_backup_variable(
     mock_emit_usage_metrics_if_enabled, mock_delete_variable_isolated_session
 ):
+    """Covers both terminal-state hooks against a single real DAG run: ``dag.test()`` builds a
+    real WATCHER ``DbtDag`` run via Airflow's Task SDK, which is comparatively slow, so both
+    hooks share the one run rather than each paying for their own."""
     with DbtDag(
         project_config=ProjectConfig(
             DBT_ROOT_PATH / "jaffle_shop",
@@ -397,31 +400,9 @@ def test_on_dag_run_failed_cleans_up_watcher_backup_variable(
     dag_run = create_dag_run(dag, run_id, run_after)
 
     on_dag_run_failed(dag_run, msg="test failed")
-
     mock_delete_variable_isolated_session.assert_called()
 
-
-@pytest.mark.integration
-@patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
-@patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
-def test_on_dag_run_success_cleans_up_watcher_backup_variable(
-    mock_emit_usage_metrics_if_enabled, mock_delete_variable_isolated_session
-):
-    with DbtDag(
-        project_config=ProjectConfig(
-            DBT_ROOT_PATH / "jaffle_shop",
-        ),
-        profile_config=profile_config,
-        execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
-        start_date=datetime(2023, 1, 1),
-        dag_id="watcher_dag_with_backup_on_success",
-    ) as dag:
-        pass
-
-    run_id = str(uuid.uuid1())
-    run_after = datetime.now(timezone.utc) - timedelta(seconds=1)
-    dag_run = create_dag_run(dag, run_id, run_after)
+    mock_delete_variable_isolated_session.reset_mock()
 
     on_dag_run_success(dag_run, msg="test success")
-
     mock_delete_variable_isolated_session.assert_called()

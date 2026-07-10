@@ -2,6 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -351,20 +352,19 @@ class TestCleanupWatcherProducerBackups:
 
     @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
     def test_deletes_variable_for_producer_in_serialized_dag(self, mock_delete_variable_isolated_session):
-        """In a real deployment ``dag`` is a SerializedDAG, not the live DAG built by user code (#2880):
-        its tasks only expose the operator type via the ``task_type`` property, not ``__class__.__name__``."""
-        if AIRFLOW_VERSION < Version("3.0"):
-            from airflow.serialization.serialized_objects import SerializedDAG
-        else:
-            from airflow.serialization.definitions.dag import SerializedDAG
+        """Airflow 3's SerializedBaseOperator has no ``_task_type`` attribute at all (#2880) --
+        only ``task_type`` -- so the class name lookup must use that, not fall through to the
+        generic ``SerializedBaseOperator`` class name. Uses a bare stand-in rather than a real
+        ``SerializedDAG`` round-trip, which needs a fully migrated metadata DB."""
+        fake_task = SimpleNamespace(
+            task_id="dbt_producer_watcher",
+            _task_module="cosmos.operators.watcher",
+            task_type="DbtProducerWatcherOperator",
+            task_group=None,
+        )
+        fake_dag = SimpleNamespace(task_dict={"dbt_producer_watcher": fake_task})
 
-        with DAG("watcher_dag_serialized", start_date=datetime(2022, 1, 1)) as dag:
-            DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-
-        serialized_dag = SerializedDAG.from_dict(SerializedDAG.to_dict(dag))
-        assert serialized_dag.task_dict["dbt_producer_watcher"].__class__.__name__ != "DbtProducerWatcherOperator"
-
-        _cleanup_watcher_producer_backups(serialized_dag, "watcher_dag_serialized", "run123")
+        _cleanup_watcher_producer_backups(fake_dag, "watcher_dag_serialized", "run123")
 
         expected_key = _xcom_backup_variable_key("watcher_dag_serialized", None, "run123")
         mock_delete_variable_isolated_session.assert_called_once_with(expected_key)

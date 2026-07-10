@@ -30,6 +30,7 @@ from cosmos.constants import (
 )
 from cosmos.listeners.dag_run_listener import (
     _cleanup_watcher_producer_backups,
+    _cleanup_watcher_producer_backups_safely,
     get_cosmos_telemetry_metadata,
     on_dag_run_failed,
     on_dag_run_success,
@@ -375,6 +376,16 @@ class TestCleanupWatcherProducerBackups:
         _cleanup_watcher_producer_backups(dag, "watcher_dag", "run123")  # should not raise
 
         mock_delete_by_ids.assert_called_once()
+
+    @patch("cosmos.listeners.dag_run_listener._cleanup_watcher_producer_backups", side_effect=RuntimeError("boom"))
+    def test_safely_swallows_errors_from_cleanup(self, mock_cleanup):
+        """Covers ``_cleanup_watcher_producer_backups_safely``'s own try/except, distinct from
+        ``_cleanup_watcher_producer_backups``'s per-task one covered by ``test_swallows_per_task_errors``."""
+        dag_run = SimpleNamespace(dag_id="watcher_dag", run_id="run123")
+
+        _cleanup_watcher_producer_backups_safely(SimpleNamespace(), dag_run)  # should not raise
+
+        mock_cleanup.assert_called_once()
 
     @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
     def test_deletes_variable_for_producer_in_serialized_dag(self, mock_delete_variable_isolated_session):

@@ -8,8 +8,13 @@ from unittest.mock import patch
 import pytest
 from airflow.models import DAG, DagRun
 from airflow.utils.state import State
-from airflow.utils.task_group import TaskGroup
 from packaging.version import Version
+
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
 
 from cosmos import DbtRunLocalOperator, ProfileConfig, ProjectConfig
 from cosmos.airflow.dag import DbtDag

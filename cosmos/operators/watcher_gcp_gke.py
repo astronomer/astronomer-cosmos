@@ -127,8 +127,8 @@ class DbtRunWatcherGcpGkeOperator(DbtConsumerWatcherGcpGkeSensor):
 
 class DbtSemanticWatcherGcpGkeOperator(DbtSemanticMixin, DbtConsumerWatcherGcpGkeSensor):
     """
-    Watches for the progress of an adapter-native semantic layer object (e.g. a Databricks metric
-    view or Snowflake semantic view), run by the producer task (DbtProducerWatcherOperator).
+    Watches for the progress of an adapter-native semantic layer object, run by the producer task
+    (DbtProducerWatcherOperator).
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields + DbtSemanticMixin.template_fields  # type: ignore[operator]

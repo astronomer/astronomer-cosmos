@@ -167,8 +167,7 @@ class DbtRunAwsEksOperator(DbtAwsEksBaseOperator, DbtRunKubernetesOperator):
 
 class DbtSemanticAwsEksOperator(DbtAwsEksBaseOperator, DbtSemanticKubernetesOperator):
     """
-    Executes a dbt core run command against an adapter-native semantic layer object (e.g. a
-    Databricks metric view or Snowflake semantic view).
+    Executes a dbt core run command against an adapter-native semantic layer object.
     """
 
     template_fields: Sequence[str] = (

@@ -286,9 +286,7 @@ def is_freshness_effective(freshness: dict[str, Any] | None) -> bool:
 
 
 def _classify_resource_type(resource_type: DbtResourceType, config: dict[str, Any]) -> DbtResourceType:
-    """Reclassify adapter-native semantic layer materializations (Databricks metric views, Snowflake
-    semantic views) as DbtResourceType.SEMANTIC_LAYER, since dbt itself models them as plain `model`
-    nodes distinguished only by `config.materialized`."""
+    """Reclassify adapter-native semantic layer materializations as DbtResourceType.SEMANTIC_LAYER."""
     materialization = str(config.get("materialized") or "").lower()
     if resource_type == DbtResourceType.MODEL and materialization in DBT_SEMANTIC_LAYER_MATERIALIZATIONS:
         return DbtResourceType("semantic_layer")

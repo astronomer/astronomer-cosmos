@@ -116,8 +116,8 @@ class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
 
 class DbtSemanticWatcherKubernetesOperator(DbtSemanticMixin, DbtConsumerWatcherKubernetesSensor):
     """
-    Watches for the progress of an adapter-native semantic layer object (e.g. a Databricks metric
-    view or Snowflake semantic view), run by the producer task (DbtProducerWatcherOperator).
+    Watches for the progress of an adapter-native semantic layer object, run by the producer task
+    (DbtProducerWatcherOperator).
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields + DbtSemanticMixin.template_fields  # type: ignore[operator]

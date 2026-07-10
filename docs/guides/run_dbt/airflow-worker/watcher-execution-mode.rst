@@ -510,6 +510,13 @@ Callback support
 
 The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` will use the user-defined callback function similar to ``ExecutionMode.LOCAL`` mode.
 
+A ``callback`` set via ``operator_args`` (or on ``DbtDag``/``DbtTaskGroup``) fires once per DAG run, on the
+producer task (``dbt_producer_watcher``), since that is the task that actually runs ``dbt build``. The callback
+receives the ``run_results.json`` for the whole project rather than a single model, because the per-model consumer
+sensor tasks do not invoke dbt in their normal execution path. Note that on a consumer sensor retry or manual task
+clear, the consumer falls back to running that single model's dbt command directly and the callback fires again at
+that point, with the retried model's own ``run_results.json``.
+
 You can define different ``callback`` behaviors for producer and consumer nodes by using ``operator_args`` to configure the consumer callback and ``setup_operator_args`` to override the callback for the producer, as described below.
 
 .. _watcher-source-freshness:

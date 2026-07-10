@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: stg_b_orders
+    description: "Staging layer for order data. Exposed publicly so project_a can reference it via dbt-loom."
+    access: public
+    columns:
+      - name: order_id
+        description: "Unique identifier for each order"
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "Foreign key to project_a's customer"
+      - name: order_date
+        description: "Date the order was placed"
+      - name: amount
+        description: "Order amount"
+
+  - name: rpt_b_customer_summary
+    description: "Order activity enriched with customer info pulled cross-project from project_a via dbt-loom."
+    columns:
+      - name: order_id
+        description: "Unique identifier for each order"
+        tests:
+          - unique
+          - not_null
+      - name: customer_name
+        description: "Customer name, sourced from project_a"
+      - name: customer_country
+        description: "Customer country, sourced from project_a"

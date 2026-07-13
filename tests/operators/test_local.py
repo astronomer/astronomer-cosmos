@@ -2305,6 +2305,56 @@ def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog
     assert "Completed copying dbt packages to temporary folder." in caplog.text
 
 
+@patch("cosmos.operators.local.prepare_dbt_project_clone_dir")
+@patch("cosmos.operators.local.create_symlinks_for_extra_paths")
+@patch("cosmos.operators.local.copy_manifest_file_if_exists")
+@patch("cosmos.operators.local.create_symlinks")
+def test_clone_project_includes_extra_paths(
+    create_symlinks_mock, copy_manifest_mock, create_symlinks_for_extra_paths_mock, prepare_clone_mock
+):
+    """_clone_project forwards extra_paths to the helper and returns the (possibly nested) clone dir."""
+    project_dir = Path("/fake/project")
+    tmp_dir_path = Path("/fake/tmp")
+    clone_dir = Path("/fake/tmp/__cosmos_extra_path_parent_0__")
+    prepare_clone_mock.return_value = clone_dir
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=project_dir,
+        install_deps=False,
+        extra_paths=["../dbt_sources"],
+        profile_config=profile_config,
+    )
+    result = operator._clone_project(tmp_dir_path)
+
+    prepare_clone_mock.assert_called_once_with(tmp_dir_path, project_dir, ["../dbt_sources"])
+    create_symlinks_for_extra_paths_mock.assert_called_once_with(project_dir, clone_dir, ["../dbt_sources"])
+    assert result == clone_dir
+
+
+@patch("cosmos.operators.local.prepare_dbt_project_clone_dir")
+@patch("cosmos.operators.local.create_symlinks_for_extra_paths")
+@patch("cosmos.operators.local.copy_manifest_file_if_exists")
+@patch("cosmos.operators.local.create_symlinks")
+def test_clone_project_without_extra_paths_skips_helper(
+    create_symlinks_mock, copy_manifest_mock, create_symlinks_for_extra_paths_mock, prepare_clone_mock
+):
+    """When no extra_paths are configured, the helper is not invoked and the clone dir is the temp dir itself."""
+    tmp_dir_path = Path("/fake/tmp")
+    prepare_clone_mock.return_value = tmp_dir_path
+
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=Path("/fake/project"),
+        install_deps=False,
+        profile_config=profile_config,
+    )
+    result = operator._clone_project(tmp_dir_path)
+
+    create_symlinks_for_extra_paths_mock.assert_not_called()
+    assert result == tmp_dir_path
+
+
 @patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
 @patch("cosmos.operators.local.AbstractDbtLocalBase.store_compiled_sql")
 @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")

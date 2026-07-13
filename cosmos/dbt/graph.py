@@ -59,10 +59,12 @@ from cosmos.dbt.parser.project import LegacyDbtProject
 from cosmos.dbt.project import (
     copy_dbt_packages,
     create_symlinks,
+    create_symlinks_for_extra_paths,
     environ,
     get_dbt_packages_subpath,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
+    prepare_dbt_project_clone_dir,
 )
 from cosmos.dbt.selector import YamlSelectors, select_nodes
 from cosmos.fs import _calculate_file_checksum
@@ -913,9 +915,13 @@ class DbtGraph:
         self._add_vars_arg(deps_command)
         run_command(deps_command, dbt_project_path, env, self.render_config.invocation_mode, self.log_dir)
 
-    def _copy_or_create_symbolic_links(self, source_dir_path: Path, dest_dir_path: Path) -> None:
+    def _copy_or_create_symbolic_links(self, source_dir_path: Path, dest_dir_path: Path) -> Path:
         """
         This method handles creating symbolic links and/or copying files from the original file to a destination folder.
+
+        It returns the directory dbt should treat as the project root. When ``ProjectConfig.extra_paths`` reference
+        locations above the project root, the clone is nested inside ``dest_dir_path`` so those ``..`` references stay
+        inside the temporary tree; otherwise the returned directory is ``dest_dir_path`` itself.
 
         Create symbolic links related to:
         * overall dbt project
@@ -961,10 +967,18 @@ class DbtGraph:
         # C. (Non-practical) Middle performance and deps may become outdated: Users manage `dbt deps` outside of Cosmos and give pre-generated dbt packages. Dependencies may become outdated. More expensive than A, similar behaviour.
         # D. Middle performance and up-to-date deps: Users run `dbt deps` outside of Cosmos and give pre-generated dbt packages. Cosmos runs dbt deps taking into account those user-generated files.
 
-        create_symlinks(source_dir_path, dest_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link)
+        clone_dir = prepare_dbt_project_clone_dir(dest_dir_path, source_dir_path, self.project.extra_paths)
+
+        create_symlinks(source_dir_path, clone_dir, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link)
 
         if self.project.copy_dbt_packages:
-            copy_dbt_packages(source_dir_path, dest_dir_path)
+            copy_dbt_packages(source_dir_path, clone_dir)
+
+        if self.project.extra_paths:
+            logger.info("Including extra paths in temporary folder: %s", self.project.extra_paths)
+            create_symlinks_for_extra_paths(source_dir_path, clone_dir, self.project.extra_paths)
+
+        return clone_dir
 
     def load_via_dbt_ls_without_cache(self) -> None:
         """
@@ -989,7 +1003,10 @@ class DbtGraph:
             logger.debug("Content of the dbt project dir %s: `%s`", project_path, os.listdir(project_path))
             tmpdir_path = Path(tmpdir)
 
-            self._copy_or_create_symbolic_links(project_path, tmpdir_path)
+            # ``_copy_or_create_symbolic_links`` may nest the clone inside the temporary directory so that
+            # ``extra_paths`` living above the project root resolve inside the temporary tree; from here on
+            # ``tmpdir_path`` refers to the effective dbt project root (equal to the temp dir when unused).
+            tmpdir_path = self._copy_or_create_symbolic_links(project_path, tmpdir_path)
 
             latest_partial_parse = None
             if self.project.partial_parse:
@@ -1014,7 +1031,7 @@ class DbtGraph:
 
                 self.local_flags = [
                     "--project-dir",
-                    str(tmpdir),
+                    str(tmpdir_path),
                     "--profiles-dir",
                     str(profile_path.parent),
                     "--profile",

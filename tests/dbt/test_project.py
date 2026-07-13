@@ -9,12 +9,15 @@ from cosmos.constants import DBT_DEFAULT_PACKAGES_FOLDER, DBT_PROJECT_FILENAME, 
 from cosmos.dbt.project import (
     _resolve_env_var,
     change_working_directory,
+    compute_extra_paths_parent_depth,
     copy_dbt_packages,
     copy_manifest_file_if_exists,
     create_symlinks,
+    create_symlinks_for_extra_paths,
     environ,
     get_dbt_packages_subpath,
     has_non_empty_dependencies_file,
+    prepare_dbt_project_clone_dir,
 )
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -139,6 +142,139 @@ def test_create_symlinks(tmp_path):
     for child in tmp_dir.iterdir():
         assert child.is_symlink()
         assert child.name not in ("logs", "target", "profiles.yml", "dbt_packages")
+
+
+def _make_extra_paths_layout(tmp_path):
+    """
+    workspace/{dbt_utils, monorepo/{dbt_sources, my_project}} — a project that references paths one and two
+    levels above its root, exactly like ``model-paths: ["models", "../dbt_sources"]`` and
+    ``packages.yml: - local: "../../dbt_utils"``.
+    """
+    base = tmp_path / "workspace"
+    project = base / "monorepo" / "my_project"
+    (project / "models").mkdir(parents=True)
+    (project / "dbt_project.yml").write_text("name: my_project\n")
+
+    shared_sources = base / "monorepo" / "dbt_sources"  # referenced as ../dbt_sources
+    shared_sources.mkdir()
+    (shared_sources / "source.sql").write_text("select 1")
+
+    dbt_utils = base / "dbt_utils"  # referenced as ../../dbt_utils
+    dbt_utils.mkdir()
+    (dbt_utils / "dbt_project.yml").write_text("name: dbt_utils\n")
+
+    return project, shared_sources, dbt_utils
+
+
+def _clone_into(project, tmp_dir, extra_paths):
+    """Mimic Cosmos: nest the clone, symlink the project's own files, then reproduce the extra paths."""
+    clone_dir = prepare_dbt_project_clone_dir(tmp_dir, project, extra_paths)
+    for child in os.listdir(project):
+        os.symlink(project / child, clone_dir / child)
+    create_symlinks_for_extra_paths(project, clone_dir, extra_paths)
+    return clone_dir
+
+
+def test_compute_extra_paths_parent_depth(tmp_path):
+    project, _s, _u = _make_extra_paths_layout(tmp_path)
+    assert compute_extra_paths_parent_depth(project, []) == 0
+    assert compute_extra_paths_parent_depth(project, ["models"]) == 0  # inside the project
+    assert compute_extra_paths_parent_depth(project, ["../dbt_sources"]) == 1
+    assert compute_extra_paths_parent_depth(project, ["../dbt_sources", "../../dbt_utils"]) == 2
+
+
+def test_prepare_dbt_project_clone_dir_no_extra_paths_uses_tmp_dir(tmp_path):
+    """With no upward extra paths the clone dir is the temp dir itself (unchanged behaviour)."""
+    project, _s, _u = _make_extra_paths_layout(tmp_path)
+    assert prepare_dbt_project_clone_dir(tmp_path, project, []) == tmp_path
+
+
+def test_prepare_dbt_project_clone_dir_nests_for_parent_references(tmp_path):
+    """A ``../../`` reference nests the clone two levels below the temp dir."""
+    project, _s, _u = _make_extra_paths_layout(tmp_path)
+    clone = prepare_dbt_project_clone_dir(tmp_path, project, ["../../dbt_utils"])
+    assert clone.is_dir()
+    assert len(clone.relative_to(tmp_path).parts) == 2
+
+
+def test_extra_paths_resolve_inside_temp_tree_without_leaking(tmp_path):
+    """Both ``../`` and ``../../`` references resolve to the real content, from links kept inside the temp tree.
+
+    This is the regression: an un-nested clone would materialise ``../../dbt_utils`` at the filesystem root and
+    ``../dbt_sources`` in a shared ``/tmp`` sibling; nesting keeps every reproduced link inside the temp dir.
+    """
+    project, shared_sources, dbt_utils = _make_extra_paths_layout(tmp_path)
+    extra = ["../dbt_sources", "../../dbt_utils"]
+
+    tmp_dir = tmp_path / "clone_root"
+    tmp_dir.mkdir()
+    clone = _clone_into(project, tmp_dir, extra)
+
+    # From the clone, the exact references dbt performs resolve to the original content.
+    assert (clone / "../dbt_sources/source.sql").read_text() == "select 1"
+    assert (clone / "../../dbt_utils/dbt_project.yml").read_text() == "name: dbt_utils\n"
+
+    # The reproduced links live inside the temp tree (cleaned up with it), not at ``/`` or in a shared ``/tmp``.
+    for ref in ("../dbt_sources", "../../dbt_utils"):
+        link = Path(os.path.normpath(clone / ref))
+        assert str(link).startswith(str(tmp_dir) + os.sep)
+
+    # The user's real source directories are untouched.
+    assert shared_sources.exists() and dbt_utils.exists()
+
+
+def test_create_symlinks_for_extra_paths_inside_clone(tmp_path):
+    """An extra path inside the project is linked in place; depth stays 0 so the clone is not nested."""
+    project, _shared_sources, _dbt_utils = _make_extra_paths_layout(tmp_path)
+    (project / "macros").mkdir()
+
+    tmp_dir = tmp_path / "clone_root"
+    tmp_dir.mkdir()
+    clone = _clone_into(project, tmp_dir, ["macros"])
+
+    assert clone == tmp_dir
+    assert (clone / "macros").is_symlink()
+
+
+def test_create_symlinks_for_extra_paths_skips_missing(tmp_path, caplog):
+    """A non-existent extra path is skipped with a warning rather than raising."""
+    project, _shared_sources, _dbt_utils = _make_extra_paths_layout(tmp_path)
+    tmp_dir = tmp_path / "clone_root"
+    tmp_dir.mkdir()
+    clone = prepare_dbt_project_clone_dir(tmp_dir, project, ["../does_not_exist"])
+
+    assert create_symlinks_for_extra_paths(project, clone, ["../does_not_exist"]) is None
+    assert "does not exist" in caplog.text
+
+
+def test_create_symlinks_for_extra_paths_is_idempotent(tmp_path):
+    """Re-running against an already-linked destination reuses it without error."""
+    project, shared_sources, _dbt_utils = _make_extra_paths_layout(tmp_path)
+    tmp_dir = tmp_path / "clone_root"
+    tmp_dir.mkdir()
+    clone = prepare_dbt_project_clone_dir(tmp_dir, project, ["../dbt_sources"])
+
+    create_symlinks_for_extra_paths(project, clone, ["../dbt_sources"])
+    create_symlinks_for_extra_paths(project, clone, ["../dbt_sources"])  # must not raise
+
+    assert (clone / "../dbt_sources/source.sql").read_text() == "select 1"
+
+
+def test_create_symlinks_for_extra_paths_conflicting_destination_is_skipped(tmp_path, caplog):
+    """A pre-existing, unrelated destination is left untouched and skipped with a warning."""
+    project, _shared_sources, _dbt_utils = _make_extra_paths_layout(tmp_path)
+    tmp_dir = tmp_path / "clone_root"
+    tmp_dir.mkdir()
+    clone = prepare_dbt_project_clone_dir(tmp_dir, project, ["../dbt_sources"])
+
+    conflict = Path(os.path.normpath(clone / "../dbt_sources"))
+    conflict.mkdir(parents=True)
+    (conflict / "unrelated.txt").write_text("keep me")
+
+    create_symlinks_for_extra_paths(project, clone, ["../dbt_sources"])
+
+    assert "already exists" in caplog.text
+    assert (conflict / "unrelated.txt").read_text() == "keep me"
 
 
 @patch.dict(os.environ, {"VAR1": "value1", "VAR2": "value2"})

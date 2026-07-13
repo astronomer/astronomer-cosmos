@@ -38,6 +38,21 @@ def test_init_with_project_path_and_install_dbt_deps_succeeds():
     assert project_config.install_dbt_deps is False
 
 
+def test_init_extra_paths_defaults_to_empty_list():
+    """extra_paths defaults to an empty list when not provided."""
+    project_config = ProjectConfig(dbt_project_path="path/to/dbt/project")
+    assert project_config.extra_paths == []
+
+
+def test_init_extra_paths_is_stored():
+    """extra_paths is preserved as a list on the ProjectConfig instance."""
+    project_config = ProjectConfig(
+        dbt_project_path="path/to/dbt/project",
+        extra_paths=["../shared_models", Path("/abs/shared_package")],
+    )
+    assert project_config.extra_paths == ["../shared_models", Path("/abs/shared_package")]
+
+
 def test_init_with_manifest_path_and_project_path_succeeds():
     """
     Passing a manifest path AND project path together should succeed

@@ -922,6 +922,56 @@ def test_validate_converter_fetches_project_name_from_render_config(
 
 
 @pytest.mark.parametrize(
+    "execution_mode,operator_args,project_extra_paths,expected",
+    [
+        # Not forwarded for execution modes that do not clone the project locally.
+        (ExecutionMode.KUBERNETES, {}, ["../shared"], None),
+        # Forwarded from ProjectConfig for the local-family execution modes.
+        (ExecutionMode.LOCAL, {}, ["../shared"], ["../shared"]),
+        (ExecutionMode.VIRTUALENV, {}, ["../shared"], ["../shared"]),
+        (ExecutionMode.WATCHER, {}, ["../shared"], ["../shared"]),
+        (ExecutionMode.LOCAL, {}, [], []),
+        # An explicit operator_args value wins over the ProjectConfig value.
+        (ExecutionMode.LOCAL, {"extra_paths": ["../override"]}, ["../shared"], ["../override"]),
+    ],
+)
+@patch("cosmos.config.ProjectConfig.validate_project")
+@patch("cosmos.converter.validate_initial_user_config")
+@patch("cosmos.converter.DbtGraph")
+@patch("cosmos.converter.build_airflow_graph")
+def test_project_config_extra_paths_forwarded_to_operator_args(
+    mock_build_airflow_graph,
+    mock_user_config,
+    mock_dbt_graph,
+    mock_validate_project,
+    execution_mode,
+    operator_args,
+    project_extra_paths,
+    expected,
+):
+    """ProjectConfig.extra_paths is forwarded to operator_args for the local-family execution modes,
+    unless operator_args already provides an explicit value."""
+    project_config = ProjectConfig(
+        project_name="fake-project", dbt_project_path="/some/project/path", extra_paths=project_extra_paths
+    )
+    execution_config = ExecutionConfig(execution_mode=execution_mode)
+    render_config = MagicMock()
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        DbtToAirflowConverter(
+            dag=dag,
+            nodes=nodes,
+            project_config=project_config,
+            profile_config=sample_profile_config,
+            execution_config=execution_config,
+            render_config=render_config,
+            operator_args=operator_args,
+        )
+    _, kwargs = mock_build_airflow_graph.call_args
+
+    assert kwargs["task_args"].get("extra_paths", None) == expected
+
+
+@pytest.mark.parametrize(
     "execution_mode,operator_args,install_dbt_deps,expected",
     [
         (ExecutionMode.KUBERNETES, {}, False, None),

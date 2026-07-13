@@ -145,6 +145,121 @@ def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool
             os.symlink(project_path / child_name, tmp_dir / child_name)
 
 
+def _resolve_extra_source(project_path: Path, extra_path: str | Path) -> Path:
+    """Resolve an entry of ``extra_paths`` to an absolute path (relative entries are relative to the project root)."""
+    source = Path(extra_path)
+    if not source.is_absolute():
+        source = Path(project_path) / source
+    return source.resolve()
+
+
+def compute_extra_paths_parent_depth(project_path: Path, extra_paths: list[str | Path] | None) -> int:
+    """
+    Return how many parent (``..``) levels the deepest *relative* entry in ``extra_paths`` reaches above the
+    dbt project root.
+
+    A reference such as ``model-paths: ["models", "../shared"]`` reaches one level up; a package declared as
+    ``- local: "../../dbt_utils"`` reaches two. Absolute entries, or entries that live inside the project, reach
+    zero. The result tells :func:`prepare_dbt_project_clone_dir` how deeply the project clone must be nested so
+    that every ``..`` reference stays inside the temporary tree.
+    """
+    project_path = Path(project_path).resolve()
+    max_up = 0
+    for extra_path in extra_paths or []:
+        source = _resolve_extra_source(project_path, extra_path)
+        rel_parts = Path(os.path.relpath(source, project_path)).parts
+        up = 0
+        for part in rel_parts:
+            if part == os.pardir:  # os.path.relpath emits all ``..`` components at the front
+                up += 1
+            else:
+                break
+        max_up = max(max_up, up)
+    return max_up
+
+
+def prepare_dbt_project_clone_dir(tmp_dir: Path, project_path: Path, extra_paths: list[str | Path] | None) -> Path:
+    """
+    Return the directory *inside* ``tmp_dir`` into which the dbt project should be cloned.
+
+    Cosmos clones the project into a temporary directory and runs dbt from there. When ``dbt_project.yml`` or
+    ``packages.yml`` reference paths above the project root (``../shared_models``, ``- local: "../../dbt_utils"``),
+    those references must keep resolving after the clone. They can only do so if the clone has enough parent
+    directories above it. A temporary directory sits directly under the OS temp root (e.g. ``/tmp/tmpXXXX``), so a
+    ``../../`` reference from there escapes to the filesystem root — an unwritable, unreadable location on a normal
+    worker, and a location shared between concurrent tasks.
+
+    This helper nests the clone ``compute_extra_paths_parent_depth`` levels below ``tmp_dir`` (using throwaway
+    placeholder parents whose names are irrelevant to dbt, which keys off ``--project-dir`` and the ``name:`` in
+    ``dbt_project.yml``). Every ``..`` reference then resolves to a sibling created *inside* ``tmp_dir``, which is
+    unique per invocation, writable, and cleaned up automatically when the temporary directory is torn down.
+
+    With no upward extra paths the clone directory is ``tmp_dir`` itself, so behaviour is unchanged for projects
+    that do not use this feature.
+    """
+    tmp_dir = Path(tmp_dir)
+    depth = compute_extra_paths_parent_depth(project_path, extra_paths)
+    if depth == 0:
+        # No upward references: the clone is the temporary directory itself, which already exists.
+        return tmp_dir
+    clone_dir = tmp_dir
+    for level in range(depth):
+        clone_dir = clone_dir / f"__cosmos_extra_path_parent_{level}__"
+    clone_dir.mkdir(parents=True, exist_ok=True)
+    return clone_dir
+
+
+def create_symlinks_for_extra_paths(project_path: Path, clone_dir: Path, extra_paths: list[str | Path]) -> None:
+    """
+    Reproduce each of ``extra_paths`` inside the project clone at the same location it occupies relative to the
+    project root, so relative references in ``dbt_project.yml`` / ``packages.yml`` keep resolving.
+
+    Cosmos runs dbt from a temporary clone of the project, symlinking (or copying) the project's own files into it.
+    Anything the ``dbt_project.yml`` references *outside* the project root – for example a shared models/sources
+    folder declared as ``model-paths: ["models", "../shared"]`` or a dbt local package declared in ``packages.yml``
+    as ``- local: "../shared_package"`` – is otherwise missing from the clone, so dbt cannot find it.
+
+    ``clone_dir`` must already be nested deeply enough (see :func:`prepare_dbt_project_clone_dir`) that no
+    reproduced path escapes the temporary tree; every link created here therefore lives inside the temporary
+    directory and needs no explicit cleanup. Symbolic links are used (consistent with :func:`create_symlinks`), so
+    the user's source trees are never copied and read-only sources are supported.
+
+    :param project_path: The dbt project root the clone is built from.
+    :param clone_dir: The (possibly nested) directory the project was cloned into — the clone's project root.
+    :param extra_paths: Absolute paths, or paths relative to ``project_path``, to include in the clone.
+    """
+    clone_dir = Path(clone_dir)
+    project_path = Path(project_path)
+
+    for extra_path in extra_paths:
+        source = _resolve_extra_source(project_path, extra_path)
+
+        if not source.exists():
+            logger.warning("Skipping extra path %s because it does not exist.", source)
+            continue
+
+        relative_to_project = os.path.relpath(source, project_path)
+        destination = Path(os.path.normpath(clone_dir / relative_to_project))
+
+        if destination.is_symlink() and destination.resolve() == source:
+            # Already in place (e.g. the same extra path listed twice); nothing to do.
+            continue
+        if destination.exists() or destination.is_symlink():
+            logger.warning(
+                "Skipping extra path %s because destination %s already exists in the clone.",
+                source,
+                destination,
+            )
+            continue
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.symlink(source, destination)
+        except FileExistsError:
+            logger.debug("Extra path destination %s was created concurrently; reusing it.", destination)
+            continue
+
+
 def get_partial_parse_path(project_dir_path: Path) -> Path:
     """
     Return the partial parse (partial_parse.msgpack) path for a given dbt project directory.

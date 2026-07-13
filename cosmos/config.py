@@ -207,6 +207,15 @@ class ProjectConfig:
     :param partial_parse: If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
         for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``
         execution modes.
+    :param extra_paths: Additional paths to include in the temporary project clone Cosmos builds before running dbt.
+        Cosmos runs dbt from a temporary copy of the project, so anything the ``dbt_project.yml`` references outside the
+        project root is otherwise unavailable. Use this to make such paths available — for example a shared models or
+        sources directory referenced as ``model-paths: ["models", "../shared_models"]``, or a dbt local package
+        declared in ``packages.yml`` as ``- local: ../shared_package``. Each entry may be an absolute path or a path
+        relative to ``dbt_project_path``, and is reproduced in the clone at the same location it occupies relative to
+        the project root, so relative references keep resolving. Only applies to the ``LoadMode.DBT_LS`` load mode and
+        the ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and ``ExecutionMode.WATCHER`` execution modes.
+        Defaults to None.
     """
 
     dbt_project_path: Path | None = None
@@ -216,6 +225,7 @@ class ProjectConfig:
     models_path: Path | None = None
     seeds_path: Path | None = None
     snapshots_path: Path | None = None
+    extra_paths: list[str | Path]
     project_name: str
 
     def __init__(
@@ -232,6 +242,7 @@ class ProjectConfig:
         env_vars: dict[str, str] | None = None,
         dbt_vars: dict[str, str] | None = None,
         partial_parse: bool = True,
+        extra_paths: list[str | Path] | None = None,
     ):
         # Since we allow dbt_project_path to be defined in ExecutionConfig and RenderConfig
         #   dbt_project_path may not always be defined here.
@@ -266,6 +277,7 @@ class ProjectConfig:
         self.partial_parse = partial_parse
         self.install_dbt_deps = install_dbt_deps
         self.copy_dbt_packages = copy_dbt_packages
+        self.extra_paths = list(extra_paths) if extra_paths else []
 
     def validate_project(self) -> None:
         """

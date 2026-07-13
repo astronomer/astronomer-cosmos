@@ -215,7 +215,7 @@ class ProjectConfig:
         relative to ``dbt_project_path``, and is reproduced in the clone at the same location it occupies relative to
         the project root, so relative references keep resolving. Only applies to the ``LoadMode.DBT_LS`` load mode and
         the ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and ``ExecutionMode.WATCHER`` execution modes.
-        Defaults to None.
+        Defaults to an empty list.
     """
 
     dbt_project_path: Path | None = None

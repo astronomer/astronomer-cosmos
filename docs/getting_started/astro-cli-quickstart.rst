@@ -20,7 +20,7 @@ Prerequisites
 
 - `Python <https://www.python.org/downloads/>`_
 - Install `git <https://git-scm.com/install/>`_
-- Install the `Astro CLI <https://docs.astronomer.io/astro/cli/install-cli>`__
+- Install the `Astro CLI <https://www.astronomer.io/docs/astro/cli/install-cli>`__
 - A container manager such as Podman, Docker, or Orbstack. When you install the Astro CLI, it automatically installs Airflow and Podman, so you can immediately start working with Dags after installing the CLI. If you need to use Docker instead of Podman, see `Switch between Docker and Podman <https://www.astronomer.io/docs/astro/cli/switch-container-management>`__.
 - (Optional) Install a database viewer. This guide uses `dBeaver <https://dbeaver.io/download/>`_
 

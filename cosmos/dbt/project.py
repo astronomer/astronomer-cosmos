@@ -153,6 +153,21 @@ def _resolve_extra_source(project_path: Path, extra_path: str | Path) -> Path:
     return source.resolve()
 
 
+def _relpath_to_project(source: Path, project_path: Path) -> str | None:
+    """
+    Return ``source`` expressed relative to ``project_path``, or ``None`` when no relative path exists.
+
+    On Windows ``os.path.relpath`` raises ``ValueError`` when the two paths are on different drives (e.g. the
+    project is on ``C:`` and an absolute extra path is on ``D:``). Such a path cannot be referenced relatively from
+    the project root, so it has no bearing on clone nesting and is materialised by dbt via its absolute path
+    directly; callers treat ``None`` as "nothing to reproduce / no nesting impact".
+    """
+    try:
+        return os.path.relpath(source, project_path)
+    except ValueError:
+        return None
+
+
 def compute_extra_paths_parent_depth(project_path: Path, extra_paths: list[str | Path] | None) -> int:
     """
     Return how many parent (``..``) levels the deepest *relative* entry in ``extra_paths`` reaches above the
@@ -167,7 +182,10 @@ def compute_extra_paths_parent_depth(project_path: Path, extra_paths: list[str |
     max_up = 0
     for extra_path in extra_paths or []:
         source = _resolve_extra_source(project_path, extra_path)
-        rel_parts = Path(os.path.relpath(source, project_path)).parts
+        relative_to_project = _relpath_to_project(source, project_path)
+        if relative_to_project is None:  # e.g. a different Windows drive — no ``..`` chain, no nesting impact
+            continue
+        rel_parts = Path(relative_to_project).parts
         up = 0
         for part in rel_parts:
             if part == os.pardir:  # os.path.relpath emits all ``..`` components at the front
@@ -229,7 +247,10 @@ def create_symlinks_for_extra_paths(project_path: Path, clone_dir: Path, extra_p
     :param extra_paths: Absolute paths, or paths relative to ``project_path``, to include in the clone.
     """
     clone_dir = Path(clone_dir)
-    project_path = Path(project_path)
+    # Resolve consistently with ``compute_extra_paths_parent_depth`` (which drives the clone nesting depth): both
+    # must relativise against the *same* base, or ``relpath`` here could yield more ``..`` than the clone was
+    # nested for and the reproduced link would land outside the temp tree / where dbt won't look for it.
+    project_path = Path(project_path).resolve()
 
     for extra_path in extra_paths:
         source = _resolve_extra_source(project_path, extra_path)
@@ -238,7 +259,12 @@ def create_symlinks_for_extra_paths(project_path: Path, clone_dir: Path, extra_p
             logger.warning("Skipping extra path %s because it does not exist.", source)
             continue
 
-        relative_to_project = os.path.relpath(source, project_path)
+        relative_to_project = _relpath_to_project(source, project_path)
+        if relative_to_project is None:
+            # No relative path exists (e.g. a different Windows drive); dbt resolves such an absolute reference
+            # directly, so there is nothing to reproduce in the clone.
+            logger.debug("Skipping extra path %s because it has no path relative to the project root.", source)
+            continue
         destination = Path(os.path.normpath(clone_dir / relative_to_project))
 
         if destination.is_symlink() and destination.resolve() == source:

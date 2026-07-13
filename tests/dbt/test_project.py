@@ -7,6 +7,7 @@ import yaml
 
 from cosmos.constants import DBT_DEFAULT_PACKAGES_FOLDER, DBT_PROJECT_FILENAME, PACKAGE_LOCKFILE_YML
 from cosmos.dbt.project import (
+    _relpath_to_project,
     _resolve_env_var,
     change_working_directory,
     compute_extra_paths_parent_depth,
@@ -142,6 +143,50 @@ def test_create_symlinks(tmp_path):
     for child in tmp_dir.iterdir():
         assert child.is_symlink()
         assert child.name not in ("logs", "target", "profiles.yml", "dbt_packages")
+
+
+def test_relpath_to_project_returns_none_on_cross_drive(tmp_path):
+    """On Windows os.path.relpath raises ValueError across drives; the helper returns None instead of raising."""
+    with patch("cosmos.dbt.project.os.path.relpath", side_effect=ValueError("path is on mount 'D:', start on 'C:'")):
+        assert _relpath_to_project(Path("D:/shared"), Path("C:/project")) is None
+
+
+def test_extra_paths_cross_drive_has_no_nesting_impact_and_is_skipped(tmp_path):
+    """A cross-drive extra path must not crash: it contributes no nesting and is skipped during reproduction."""
+    project, _shared_sources, dbt_utils = _make_extra_paths_layout(tmp_path)
+    tmp_dir = tmp_path / "clone_root"
+    tmp_dir.mkdir()
+
+    with patch("cosmos.dbt.project._relpath_to_project", return_value=None):
+        assert compute_extra_paths_parent_depth(project, [str(dbt_utils)]) == 0
+        clone = prepare_dbt_project_clone_dir(tmp_dir, project, [str(dbt_utils)])
+        assert clone == tmp_dir
+        # Reproduction skips the entry without raising and creates no link.
+        create_symlinks_for_extra_paths(project, clone, [str(dbt_utils)])
+
+    assert list(clone.iterdir()) == []
+
+
+def test_extra_paths_reproduction_consistent_for_symlinked_project_path(tmp_path):
+    """Depth is computed from the resolved project, so reproduction must use the same resolved base.
+
+    If ``project_path`` is a symlink (or has ``..``/``.`` segments), an unresolved ``relpath`` would place the
+    link where dbt's literal ``../dbt_sources`` reference does not look (and can escape the temp tree). Passing the
+    symlinked project path must still materialise the link at ``clone/../dbt_sources`` inside the temp tree.
+    """
+    project, shared_sources, _dbt_utils = _make_extra_paths_layout(tmp_path)
+    linked_project = tmp_path / "linked_project"
+    linked_project.symlink_to(project)
+
+    tmp_dir = tmp_path / "clone_root"
+    tmp_dir.mkdir()
+    clone = prepare_dbt_project_clone_dir(tmp_dir, linked_project, ["../dbt_sources"])
+    create_symlinks_for_extra_paths(linked_project, clone, ["../dbt_sources"])
+
+    materialised = Path(os.path.normpath(clone / "../dbt_sources"))
+    assert str(materialised).startswith(str(tmp_dir) + os.sep)
+    assert (clone / "../dbt_sources/source.sql").read_text() == "select 1"
+    assert shared_sources.exists()
 
 
 def _make_extra_paths_layout(tmp_path):

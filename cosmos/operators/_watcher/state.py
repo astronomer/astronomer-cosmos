@@ -20,10 +20,31 @@ from packaging.version import Version
 
 ProducerStateFetcher = Callable[[], str | None]
 
-# dbt uses different status values for different node types (models/tests):"
-DBT_SUCCESS_STATUSES = frozenset({"success", "pass", "warn"})
-DBT_FAILED_STATUSES = frozenset({"failed", "fail", "error", "runtime error"})
-DBT_SKIPPED_STATUSES = frozenset({"skipped"})
+
+class DbtNodeStatus(str, Enum):
+    """Raw dbt node status values the watcher inspects. dbt uses different values per node type
+    (e.g. models report ``success``/``error``, tests ``pass``/``fail``/``warn``), so the watcher
+    groups them into the ``DBT_*_STATUSES`` sets below rather than checking a single value."""
+
+    SUCCESS = "success"
+    PASS = "pass"
+    WARN = "warn"
+    FAILED = "failed"
+    FAIL = "fail"
+    ERROR = "error"
+    RUNTIME_ERROR = "runtime error"
+    SKIPPED = "skipped"
+
+    def __str__(self) -> str:
+        # Render as the raw dbt value (e.g. "skipped") in logs/XCom rather than "DbtNodeStatus.SKIPPED".
+        return self.value
+
+
+DBT_SUCCESS_STATUSES = frozenset({DbtNodeStatus.SUCCESS, DbtNodeStatus.PASS, DbtNodeStatus.WARN})
+DBT_FAILED_STATUSES = frozenset(
+    {DbtNodeStatus.FAILED, DbtNodeStatus.FAIL, DbtNodeStatus.ERROR, DbtNodeStatus.RUNTIME_ERROR}
+)
+DBT_SKIPPED_STATUSES = frozenset({DbtNodeStatus.SKIPPED})
 
 # dbt event names that signal a node was skipped because an upstream node failed.
 # dbt fires SkippingDetails (non-ephemeral upstream) or LogSkipBecauseError
@@ -34,13 +55,38 @@ DBT_UPSTREAM_FAILURE_SKIP_EVENT_NAMES = frozenset({"SkippingDetails", "LogSkipBe
 # dbt source freshness statuses that mark a source as stale and propagate skips downstream.
 DBT_SOURCE_FRESHNESS_STALE_STATUSES = frozenset({"error", "warn"})
 
+
+class ProducerTaskState(str, Enum):
+    """Airflow producer task states the watcher inspects (mirrors ``TaskInstanceState`` values)."""
+
+    SUCCESS = "success"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    UPSTREAM_FAILED = "upstream_failed"
+    REMOVED = "removed"
+
+
 # Airflow task states that indicate the producer has finished and will not deliver any more XCom updates.
 # Used to decide whether a sensor retry should fall back to a non-watcher run or keep polling.
-PRODUCER_TERMINAL_STATES = frozenset({"success", "failed", "skipped", "upstream_failed", "removed"})
+PRODUCER_TERMINAL_STATES = frozenset(
+    {
+        ProducerTaskState.SUCCESS,
+        ProducerTaskState.FAILED,
+        ProducerTaskState.SKIPPED,
+        ProducerTaskState.UPSTREAM_FAILED,
+        ProducerTaskState.REMOVED,
+    }
+)
 
 # Airflow task states checked by the watcher trigger to know the producer task has reached its
 # final outcome and the trigger can exit early. Subset of PRODUCER_TERMINAL_STATES.
-PRODUCER_FINAL_STATES = frozenset({"failed", "success", "skipped"})
+PRODUCER_FINAL_STATES = frozenset(
+    {
+        ProducerTaskState.FAILED,
+        ProducerTaskState.SUCCESS,
+        ProducerTaskState.SKIPPED,
+    }
+)
 
 
 class DbtTestStatus(str, Enum):
@@ -110,13 +156,15 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
     """
     with xcom_set_lock:
         task_instance.xcom_push(key=key, value=value)
-        var_key = getattr(task_instance, "_cosmos_xcom_backup_var_key", None)
-        if isinstance(var_key, str):
-            from cosmos.operators._watcher.xcom import _persist_backup
-
-            backup_buffer: dict[str, Any] = task_instance._cosmos_xcom_backup_buffer  # type: ignore[attr-defined]
+        backup_buffer: dict[str, Any] | None = getattr(task_instance, "_cosmos_xcom_backup_buffer", None)
+        if backup_buffer is not None:
             backup_buffer[key] = value
-            _persist_backup(var_key, backup_buffer)
+            if getattr(task_instance, "_cosmos_xcom_persist_incrementally", False):
+                var_key = getattr(task_instance, "_cosmos_xcom_backup_var_key", None)
+                if isinstance(var_key, str):
+                    from cosmos.operators._watcher.xcom import _persist_backup
+
+                    _persist_backup(var_key, backup_buffer)
 
 
 # TODO: Unify the Airflow call from cosmos/operators/_watcher/triggerer.py and cosmos/operators/watcher.py

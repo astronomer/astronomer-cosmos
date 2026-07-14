@@ -8,9 +8,10 @@ Watcher retry behavior history
 While ``ExecutionMode.WATCHER`` can significantly improve DAG run times, it is based on
 non-idempotent `Apache Airflow® <https://airflow.apache.org/>`_ tasks and relies on a complex retry
 mechanism in which one task's status can affect another task's status. This is the reason
-``ExecutionMode.WATCHER`` has remained marked as experimental for several months — until we can get
-this right. This document aims to present how each aspect of retries has evolved within the Cosmos
-watcher implementation across Cosmos releases.
+``ExecutionMode.WATCHER`` remained marked as experimental for several months — until this retry
+behavior was hardened. With Cosmos 1.15.0, ``ExecutionMode.WATCHER`` is marked stable. This document
+aims to present how each aspect of retries has evolved within the Cosmos watcher implementation
+across Cosmos releases.
 
 Goals
 +++++
@@ -62,6 +63,11 @@ Does the Airflow state match dbt's?
        retries re-run the affected models via consumer fallback — so the whole DAG recovers on
        retry without any manual intervention
        (`#2684 <https://github.com/astronomer/astronomer-cosmos/pull/2684>`_).
+   * - **1.15.0**
+     - **Yes**. Same as 1.14.2 for both values of ``enable_watcher_reliable_retry`` — see
+       *Task-level retry — producer*. With ``False`` a hard producer kill can make some consumers
+       re-run a transformation, but the final DAG state still matches dbt's
+       (`#2776 <https://github.com/astronomer/astronomer-cosmos/issues/2776>`_).
 
 Task-level retry — consumer
 +++++++++++++++++++++++++++++
@@ -113,6 +119,11 @@ Task-level retry — consumer
        (`#2713 <https://github.com/astronomer/astronomer-cosmos/pull/2713>`_); users who want
        JSON output on retry can opt in via
        ``operator_args={"dbt_cmd_flags": ["--log-format", "json"]}``.
+   * - **1.15.0**
+     - Same as 1.14.2. With ``enable_watcher_reliable_retry=False`` only a *hard* producer kill
+       (``SIGKILL``/OOM) leaves consumers without restored statuses, so they fall back to running
+       their dbt node; a graceful producer failure still restores them — see
+       *Task-level retry — producer*.
 
 Task-level retry — producer
 +++++++++++++++++++++++++++++
@@ -175,6 +186,18 @@ Task-level retry — producer
        producer in a DAG writes to a distinct backup Variable
        (`#2683 <https://github.com/astronomer/astronomer-cosmos/pull/2683>`_, closes
        `#2625 <https://github.com/astronomer/astronomer-cosmos/issues/2625>`_).
+   * - **1.15.0**
+     - Same as 1.14.2 by default. A new ``enable_watcher_reliable_retry`` configuration
+       (`#2776 <https://github.com/astronomer/astronomer-cosmos/issues/2776>`_) controls *when* the
+       producer's in-memory status backup is written to the Variable. When ``True`` (default) it is
+       written eagerly after every dbt node, surviving even a hard ``SIGKILL``/OOM kill. When ``False``
+       it is written once, when the producer is retried, via the producer's ``on_retry_callback``: this removes
+       the per-node Variable I/O, and a *graceful* failure (e.g. a dbt error) still flushes the backup
+       so consumers recover as before — only a *hard* kill, where the callback cannot run, loses the
+       statuses and makes the affected consumers re-run their dbt node (results stay correct). The
+       long-term reliable-and-fast replacement is tracked in
+       `#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task &
+       Asset Store).
 
 Automatic retries
 +++++++++++++++++
@@ -221,6 +244,11 @@ Automatic retries
        *Task-level retry — producer*). Additionally, downstream models whose upstream failed on
        the producer's first attempt are now re-run on Airflow retry instead of staying SKIPPED
        (`#2684 <https://github.com/astronomer/astronomer-cosmos/pull/2684>`_).
+   * - **1.15.0**
+     - **Works.** Same as 1.14.2 by default. With ``enable_watcher_reliable_retry=False`` a *graceful*
+       producer failure still restores statuses on auto-retry (flushed by the ``on_retry_callback``);
+       only a hard ``SIGKILL``/OOM kill loses them, making the affected consumers re-run their dbt node
+       — correct, but with extra compute. See *Task-level retry — producer*.
 
 Full DAG / TaskGroup clear
 ++++++++++++++++++++++++++
@@ -267,6 +295,10 @@ Full DAG / TaskGroup clear
        (`#2629 <https://github.com/astronomer/astronomer-cosmos/pull/2629>`_,
        `#2683 <https://github.com/astronomer/astronomer-cosmos/pull/2683>`_ — see
        *Task-level retry — producer*).
+   * - **1.15.0**
+     - **Works.** Same as 1.14.2. ``enable_watcher_reliable_retry`` does not change full-clear
+       behaviour; its only effect is on the producer's failure-time backup — see
+       *Task-level retry — producer*.
 
 Avoid duplicate or concurrent runs of the same dbt transformation in the same DAG run
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -322,3 +354,7 @@ Avoid duplicate or concurrent runs of the same dbt transformation in the same DA
        (`#2615 <https://github.com/astronomer/astronomer-cosmos/pull/2615>`_), so the task group
        behaves as a single atomic unit across runs. Topology is unchanged for the default
        ``depends_on_past=False``.
+   * - **1.15.0**
+     - **Met.** Same as 1.14.2. ``enable_watcher_reliable_retry`` does not affect duplicate or
+       concurrent-run protection — the producer still skips on retry, and consumer fallbacks remain
+       gated on the producer's terminal state.

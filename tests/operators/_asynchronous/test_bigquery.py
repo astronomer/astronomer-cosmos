@@ -45,11 +45,14 @@ def test_dbt_run_airflow_async_bigquery_operator_init(profile_config_mock):
     assert operator.full_refresh is False  # Default value should be False
 
 
-def test_dbt_run_airflow_async_bigquery_operator_init_with_deferrable_false_warns(profile_config_mock, caplog):
+def test_dbt_run_airflow_async_bigquery_operator_init_with_deferrable_false_warns(profile_config_mock):
     """Passing deferrable=False must not raise TypeError, be overridden to True, and log a warning."""
-    import logging
+    from unittest.mock import PropertyMock
 
-    with caplog.at_level(logging.WARNING, logger="cosmos.operators._asynchronous.bigquery"):
+    # The operator now logs through ``self.log``. On Airflow 3 that resolves to a non-propagating
+    # structlog logger that pytest's ``caplog`` cannot capture, so assert on the logger directly.
+    mock_log = MagicMock()
+    with patch.object(DbtRunAirflowAsyncBigqueryOperator, "log", new_callable=PropertyMock, return_value=mock_log):
         operator = DbtRunAirflowAsyncBigqueryOperator(
             task_id="test_task",
             project_dir="/path/to/project",
@@ -58,7 +61,8 @@ def test_dbt_run_airflow_async_bigquery_operator_init_with_deferrable_false_warn
             deferrable=False,
         )
     assert operator.deferrable is True
-    assert "deferrable=True" in caplog.text
+    warning_messages = " ".join(str(call.args[0]) for call in mock_log.warning.call_args_list)
+    assert "deferrable=True" in warning_messages
 
 
 def test_dbt_run_airflow_async_bigquery_operator_init_deferrable_defaults_true(profile_config_mock):
@@ -70,6 +74,19 @@ def test_dbt_run_airflow_async_bigquery_operator_init_deferrable_defaults_true(p
         dbt_kwargs={"task_id": "test_task"},
     )
     assert operator.deferrable is True
+
+
+@pytest.mark.parametrize("field", ["compiled_sql", "freshness"])
+def test_dbt_run_airflow_async_bigquery_operator_rejects_output_only_template_fields(profile_config_mock, field):
+    """The async BigQuery path forwards ``dbt_kwargs`` raw and bypasses the sync
+    guard, so it must reject output-only template fields on its own."""
+    with pytest.raises(CosmosValueError, match=field):
+        DbtRunAirflowAsyncBigqueryOperator(
+            task_id="test_task",
+            project_dir="/path/to/project",
+            profile_config=profile_config_mock,
+            dbt_kwargs={"task_id": "test_task", field: "value-the-user-tried-to-set"},
+        )
 
 
 def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):

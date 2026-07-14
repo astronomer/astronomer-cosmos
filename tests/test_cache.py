@@ -38,19 +38,21 @@ from cosmos.cache import (
     _update_partial_parse_cache,
     create_cache_profile,
     delete_unused_dbt_cache,
+    get_cache_seed_checksum,
     get_cached_profile,
-    get_seed_checksum,
     is_cache_package_lockfile_enabled,
     is_profile_cache_enabled,
-    store_seed_checksum,
+    store_cache_seed_checksum,
     were_yaml_selectors_modified,
 )
 from cosmos.constants import (
+    DBT_MANIFEST_FILE_NAME,
     DBT_PARTIAL_PARSE_FILE_NAME,
     DBT_TARGET_DIR_NAME,
     DEFAULT_PROFILES_FILE_NAME,
     _default_s3_conn,
 )
+from cosmos.dbt.project import get_partial_parse_path
 from cosmos.settings import dbt_profile_cache_dir_name
 
 START_DATE = datetime(2024, 4, 16)
@@ -130,13 +132,13 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
     assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text
 
 
-@patch("cosmos.cache.shutil.copyfile")
+@patch("cosmos.cache.safe_copy")
 @patch("cosmos.cache.get_partial_parse_path")
-def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
+def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_safe_copy, tmp_path):
     mock_get_partial_parse_path.side_effect = lambda cache_dir: cache_dir / "partial_parse.yml"
 
-    latest_partial_parse_filepath = Path("/path/to/latest_partial_parse.yml")
-    cache_dir = Path("/tmp/path/to/cache_directory")
+    latest_partial_parse_filepath = tmp_path / "latest" / "latest_partial_parse.yml"
+    cache_dir = tmp_path / "cache_directory"
 
     # Expected paths
     cache_path = cache_dir / "partial_parse.yml"
@@ -144,12 +146,41 @@ def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
 
     _update_partial_parse_cache(latest_partial_parse_filepath, cache_dir)
 
-    # Assert shutil.copyfile was called twice with the correct arguments
+    # Assert safe_copy was called twice with the correct Path arguments
     calls = [
-        call(str(latest_partial_parse_filepath), str(cache_path)),
-        call(str(latest_partial_parse_filepath.parent / "manifest.json"), str(manifest_path)),
+        call(latest_partial_parse_filepath, cache_path),
+        call(latest_partial_parse_filepath.parent / "manifest.json", manifest_path),
     ]
-    mock_copyfile.assert_has_calls(calls)
+    mock_safe_copy.assert_has_calls(calls)
+
+
+def test_update_partial_parse_cache_writes_files_atomically(tmp_path):
+    """End-to-end regression: cache files end up with the expected content and no
+    temp artefacts are left behind, exercising the safe_copy (temp-file + rename)
+    path that protects concurrent readers from observing partial writes
+    (see #971/#972).
+    """
+    src_target_dir = tmp_path / "src" / DBT_TARGET_DIR_NAME
+    src_target_dir.mkdir(parents=True)
+    src_partial = src_target_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    src_manifest = src_target_dir / DBT_MANIFEST_FILE_NAME
+    src_partial.write_bytes(b"partial-content")
+    src_manifest.write_bytes(b"manifest-content")
+
+    cache_dir = tmp_path / "cache"
+
+    _update_partial_parse_cache(src_partial, cache_dir)
+
+    cached_partial = get_partial_parse_path(cache_dir)
+    cached_manifest = cached_partial.parent / DBT_MANIFEST_FILE_NAME
+
+    assert cached_partial.read_bytes() == b"partial-content"
+    assert cached_manifest.read_bytes() == b"manifest-content"
+    # safe_copy must clean up its temp files even on the happy path.
+    assert sorted(p.name for p in cached_partial.parent.iterdir()) == [
+        DBT_MANIFEST_FILE_NAME,
+        DBT_PARTIAL_PARSE_FILE_NAME,
+    ]
 
 
 @pytest.fixture
@@ -494,33 +525,33 @@ def test_create_seed_checksum_key_is_bounded_prefixed_and_scoped():
 
 
 @patch("cosmos.cache.Variable")
-def test_get_seed_checksum_returns_stored_value(mock_variable):
+def test_get_cache_seed_checksum_returns_stored_value(mock_variable):
     mock_variable.get.return_value = "stored-checksum"
-    assert get_seed_checksum("my_dag", "seed.pkg.my_seed") == "stored-checksum"
+    assert get_cache_seed_checksum("my_dag", "seed.pkg.my_seed") == "stored-checksum"
     mock_variable.get.assert_called_once_with(_create_seed_checksum_key("my_dag", "seed.pkg.my_seed"), default_var=None)
 
 
 @patch("cosmos.cache.Variable")
-def test_get_seed_checksum_swallows_backend_errors(mock_variable, caplog):
+def test_get_cache_seed_checksum_swallows_backend_errors(mock_variable, caplog):
     from sqlalchemy.exc import SQLAlchemyError
 
     mock_variable.get.side_effect = SQLAlchemyError("db down")
     caplog.set_level(logging.WARNING)
-    assert get_seed_checksum("my_dag", "seed.pkg.my_seed") is None
+    assert get_cache_seed_checksum("my_dag", "seed.pkg.my_seed") is None
     assert "Failed to read seed checksum" in caplog.text
 
 
 @patch("cosmos.cache.Variable")
-def test_store_seed_checksum_persists_value(mock_variable):
-    store_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")
+def test_store_cache_seed_checksum_persists_value(mock_variable):
+    store_cache_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")
     mock_variable.set.assert_called_once_with(_create_seed_checksum_key("my_dag", "seed.pkg.my_seed"), "new-checksum")
 
 
 @patch("cosmos.cache.Variable")
-def test_store_seed_checksum_swallows_backend_errors(mock_variable, caplog):
+def test_store_cache_seed_checksum_swallows_backend_errors(mock_variable, caplog):
     from airflow.exceptions import AirflowException
 
     mock_variable.set.side_effect = AirflowException("cannot write")
     caplog.set_level(logging.WARNING)
-    store_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")  # must not raise
+    store_cache_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")  # must not raise
     assert "Failed to persist seed checksum" in caplog.text

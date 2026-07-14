@@ -14,10 +14,9 @@ from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
     PRODUCER_FINAL_STATES,
-    _log_dbt_event,
+    ProducerTaskState,
     build_producer_state_fetcher,
     get_compiled_sql_xcom_key,
-    get_dbt_event_xcom_key,
     get_status_xcom_key,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
@@ -230,8 +229,6 @@ class WatcherTrigger(BaseTrigger):
 
         while True:
             producer_task_state = await self._get_producer_task_status()
-            dbt_log_event = await self.get_xcom_val(get_dbt_event_xcom_key(self.model_unique_id))
-            _log_dbt_event(dbt_log_event)
             dbt_node_status, compiled_sql = await self._parse_dbt_node_status_and_compiled_sql()
             if is_dbt_node_status_success(dbt_node_status):
                 logger.debug("dbt node '%s' succeeded", self.model_unique_id)
@@ -248,7 +245,7 @@ class WatcherTrigger(BaseTrigger):
                     event_data["compiled_sql"] = compiled_sql
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
-            elif producer_task_state == "failed":
+            elif producer_task_state == ProducerTaskState.FAILED:
                 logger.error(
                     "Watcher producer task '%s' failed before delivering results for node '%s'",
                     self.producer_task_id,
@@ -256,7 +253,7 @@ class WatcherTrigger(BaseTrigger):
                 )
                 yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_FAILED})  # type: ignore[no-untyped-call]
                 return
-            elif producer_task_state == "skipped":
+            elif producer_task_state == ProducerTaskState.SKIPPED:
                 logger.info(
                     "Watcher producer task '%s' was skipped (e.g. retry). "
                     "Consumer will fall back to running dbt for node '%s'.",
@@ -265,7 +262,7 @@ class WatcherTrigger(BaseTrigger):
                 )
                 yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_SKIPPED})  # type: ignore[no-untyped-call]
                 return
-            elif producer_task_state == "success" and dbt_node_status is None:
+            elif producer_task_state == ProducerTaskState.SUCCESS and dbt_node_status is None:
                 logger.info(
                     "The producer task '%s' succeeded. There is no information about the node '%s' execution.",
                     self.producer_task_id,

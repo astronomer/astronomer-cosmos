@@ -30,9 +30,13 @@ from cosmos.operators._watcher.base import (
     BaseConsumerSensor,
     store_dbt_resource_status_from_log,
 )
-from cosmos.operators._watcher.state import DBT_SOURCE_FRESHNESS_STALE_STATUSES, DBT_SUCCESS_STATUSES
+from cosmos.operators._watcher.state import (
+    DBT_SOURCE_FRESHNESS_STALE_STATUSES,
+    DBT_SUCCESS_STATUSES,
+    DbtNodeStatus,
+)
 from cosmos.operators._watcher.xcom import (
-    _backup_xcom_to_variable,
+    _compose_backup_callback,
     _delete_xcom_backup_variable,
     _init_xcom_backup,
     _restore_xcom_from_variable,
@@ -48,7 +52,7 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
-from cosmos.settings import watcher_dbt_execution_queue
+from cosmos.settings import watcher_dbt_consumer_queue, watcher_dbt_producer_queue
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -123,7 +127,7 @@ def _default_freshness_callback(
     # and test hash-suffixed unique_ids are not valid dbt --exclude selectors.
     excludable = [uid for uid in visited if nodes.get(uid) and nodes[uid].resource_type in _excludable_resource_types]
     logger.info("Nodes to skip due to stale sources: %s", excludable)
-    return [(uid, "skipped") for uid in excludable]
+    return [(uid, DbtNodeStatus.SKIPPED) for uid in excludable]
 
 
 class _StdoutFilter:
@@ -212,8 +216,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
-        self.test_results_per_model: dict[str, list[str]] = {}
+        self.test_results_per_model: dict[str, dict[str, str]] = {}
         self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
+        self._should_generate_model_uris: bool = kwargs.pop(
+            "_should_generate_model_uris", kwargs.get("emit_datasets", True)
+        )
         self._freshness_callback: Callable[
             [Context, Any, TaskGroup | None, dict[str, DbtNode] | None, dict[str, Any] | None],
             list[tuple[str, str]],
@@ -224,12 +231,17 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
-        kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
+        kwargs["queue"] = watcher_dbt_producer_queue or kwargs.get("queue") or DEFAULT_QUEUE
         # invocation_mode is intentionally NOT forced here; the parent's _discover_invocation_mode()
         # picks DBT_RUNNER when available and falls back to SUBPROCESS otherwise.
         # An explicit invocation_mode passed by the caller is preserved as-is.
         super().__init__(task_id=task_id, *args, **kwargs)
         self.log_format = "json"
+        # Flush the in-memory backup to a Variable so the producer retry can restore it. A graceful
+        # failure with retries left is UP_FOR_RETRY (on_retry_callback), not FAILED, so register on
+        # both; composed after super().__init__ to preserve a DAG-level default_args callback (#2776).
+        self.on_retry_callback = _compose_backup_callback(getattr(self, "on_retry_callback", None))
+        self.on_failure_callback = _compose_backup_callback(getattr(self, "on_failure_callback", None))
 
         # Mutable dict populated lazily from the manifest; shared with the log parser.
         self._dataset_namespace: str | None = None
@@ -252,6 +264,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             test_results_per_model=self.test_results_per_model,
             model_outlet_uris=self._model_outlet_uris,
             dataset_namespace=self._dataset_namespace,
+            should_generate_model_uris=self._should_generate_model_uris,
             upstream_failure_skipped_ids=self._upstream_failure_skipped_ids,
         )
 
@@ -317,7 +330,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                     json_str = MessageToJson(event, preserving_proto_field_name=True)
                     parse(json_str, extra_kwargs)
                 except Exception as e:
-                    logger.exception("Error in dbt event callback: %s", e)
+                    self.log.exception("Error in dbt event callback: %s", e)
                     if not callback_error:
                         callback_error.append(e)
 
@@ -371,7 +384,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         ti = context["ti"]
 
         for unique_id, state in node_state_pairs:
-            logger.info("Pre-setting resource '%s' state to %s from source-freshness callback", unique_id, state)
+            self.log.info("Pre-setting resource '%s' state to %s from source-freshness callback", unique_id, state)
             self._push_node_state_xcom(ti, unique_id, state)
 
         # Exclude any node whose pre-set state is non-success from the dbt build.
@@ -387,7 +400,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             try:
                 resource_names.add(DbtNode.get_resource_name_from_unique_id(uid))
             except ValueError:
-                logger.warning("Skipping malformed dbt unique_id while building source-freshness exclude list: %s", uid)
+                self.log.warning(
+                    "Skipping malformed dbt unique_id while building source-freshness exclude list: %s", uid
+                )
         model_names = sorted(resource_names)
         exclude_str = " ".join(model_names)
         if exclude_str:
@@ -420,7 +435,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             # sources.json was never written (e.g. connection error, bad project config).
             if self._sources_json is None:
                 raise
-            logger.warning(
+            self.log.warning(
                 "dbt source freshness completed with non-zero exit code: %s. " "Proceeding with freshness results.",
                 exc,
             )
@@ -447,8 +462,14 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._apply_node_state_tokens(context, freshness_results)
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
-        # Pre-compute the dataset namespace for per-model outlet URI generation.
-        self._dataset_namespace = get_dataset_namespace(self.profile_config)
+        # Resolve the dataset namespace only when the producer will generate per-model outlet
+        # URIs. With emit_datasets=False the producer does no dataset work, so we skip the
+        # namespace's profile resolution and leave it None. URI generation is gated explicitly by
+        # should_generate_model_uris in the log parser -- this None is just the disabled-state
+        # invariant, not a control signal.
+        self._dataset_namespace = (
+            get_dataset_namespace(self.profile_config) if self._should_generate_model_uris else None
+        )
         self._model_outlet_uris.clear()
         self._upstream_failure_skipped_ids.clear()
 
@@ -458,6 +479,10 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         try_number = getattr(task_instance, "try_number", 1)
 
+        from cosmos import settings
+
+        reliable_retry = settings.enable_watcher_reliable_retry
+
         if try_number > 1:
             _restore_xcom_from_variable(context)
             raise AirflowSkipException(
@@ -465,7 +490,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
             )
 
-        _init_xcom_backup(context)
+        _init_xcom_backup(context, persist=reliable_retry)
 
         if self._check_source_freshness:
             self._apply_source_freshness(context)
@@ -473,12 +498,14 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try:
             return_value = super().execute(context=context, **kwargs)
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
-            _delete_xcom_backup_variable(context)
+            if reliable_retry:
+                _delete_xcom_backup_variable(context)
             return return_value
 
         except Exception:
+            # The on-failure callback flushes the in-memory backup to the Variable; here we only
+            # record that the producer finished so consumer sensors stop waiting.
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
-            _backup_xcom_to_variable(context)
             raise
 
 
@@ -496,6 +523,9 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):
         deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
+        # Set the Worker queue for lightweight "watcher" tasks to run on (similar to config for producer tasks)
+        kwargs["queue"] = watcher_dbt_consumer_queue or kwargs.get("queue") or DEFAULT_QUEUE
+
         super().__init__(
             poke_interval=poke_interval,
             profile_config=profile_config,
@@ -589,7 +619,7 @@ class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):
 
     def _fallback_to_non_watcher_run(self, try_number: int, context: Context) -> bool:
         """Run ``dbt source freshness`` locally for this specific source on retry."""
-        logger.info(
+        self.log.info(
             "Retry attempt #%s – Running source freshness for '%s' from project '%s'",
             try_number - 1,
             self.model_unique_id,
@@ -598,7 +628,7 @@ class DbtSourceWatcherOperator(BaseConsumerSensor, DbtSourceLocalOperator):
         resource_name = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = ["--select", f"source:{resource_name}"]
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
-        logger.info("dbt source freshness completed successfully on retry for source '%s'", self.model_unique_id)
+        self.log.info("dbt source freshness completed successfully on retry for source '%s'", self.model_unique_id)
         return True
 
 
@@ -655,7 +685,7 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
         Airflow-level retries fire. Producer flags are intentionally not forwarded
         because some of them (e.g. ``--full-refresh``) are not valid for ``dbt test``.
         """
-        logger.info(
+        self.log.info(
             "Running tests for model '%s' from project '%s' (try %s)",
             self.model_unique_id,
             self.project_dir,
@@ -665,5 +695,5 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
         model_selector = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = ["--select", model_selector]
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)
-        logger.info("dbt test completed successfully for model '%s'", self.model_unique_id)
+        self.log.info("dbt test completed successfully for model '%s'", self.model_unique_id)
         return True

@@ -33,11 +33,8 @@ from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
-from cosmos.log import get_logger
 from cosmos.operators.local import AbstractDbtLocalBase
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
-
-logger = get_logger(__name__)
 
 DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
 
@@ -98,6 +95,10 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         task_id = self.dbt_kwargs.pop("task_id")
         self.full_refresh = self.dbt_kwargs.pop("full_refresh", False)
 
+        # This path forwards dbt_kwargs raw and never routes through
+        # DbtLocalBaseOperator.__init__, so apply the same output-only guard here.
+        self._reject_output_only_template_fields(self.dbt_kwargs)
+
         AbstractDbtLocalBase.__init__(
             self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )
@@ -117,7 +118,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         # To fix this, we temporarily set the base class to only BigQueryInsertJobOperator during initialization,
         # then restore the full inheritance chain afterward.
         if kwargs.pop("deferrable", True) is False:
-            logger.warning(
+            self.log.warning(
                 "DbtRunAirflowAsyncBigqueryOperator requires deferrable=True. "
                 "The provided value of False has been ignored."
             )

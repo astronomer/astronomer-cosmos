@@ -4,7 +4,13 @@ Callbacks
 =========
 
 .. note::
-    Feature available when using ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``.
+    Feature available when using ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV``, and ``ExecutionMode.WATCHER``.
+
+    Under ``ExecutionMode.WATCHER``, a callback set via ``operator_args`` (or on ``DbtDag``/``DbtTaskGroup``) fires
+    once per DAG run, on the producer task (``dbt_producer_watcher``), which is the task that actually runs
+    ``dbt build``. The per-model consumer sensor tasks do not invoke dbt in their normal execution path, so the
+    callback receives the ``run_results.json`` for the whole project rather than a single model. See
+    :ref:`watcher-execution-mode` for details on configuring separate callbacks for producer and consumer tasks.
 
 .. note::
     Since Cosmos v1.15.0, ephemeral dbt models are rendered as ``EmptyOperator`` tasks by default (``RenderConfig.ephemeral_models_as_empty_operator=True``). Because no dbt command runs for these tasks, callbacks are not invoked for ephemeral models. Set ``ephemeral_models_as_empty_operator=False`` to render them as regular dbt run tasks if you rely on callbacks for them.
@@ -68,6 +74,30 @@ The path naming convention is:
 - Target folder with its contents
 
 If users are unhappy with this structure or format, they can implement similar methods, which can be based (or not) on the Cosmos standard ones.
+
+Example: Per-Node Callbacks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Individual dbt nodes can override operator arguments through ``meta.cosmos.operator_kwargs`` in the dbt YAML.
+A function object cannot be expressed in YAML, so the ``callback`` is given here as a string import path that
+Cosmos resolves at runtime. ``callback_args`` are passed through unchanged.
+
+.. code-block:: yaml
+
+    version: 2
+
+    models:
+      - name: model_with_custom_callback
+        meta:
+          cosmos:
+            operator_kwargs:
+              callback: "cosmos.io.upload_to_aws_s3"
+              callback_args:
+                aws_conn_id: "aws_s3_conn"
+                bucket_name: "cosmos-artifacts-upload"
+
+The string can point to a built-in helper in ``cosmos/io.py`` or to any importable function in your project.
+A list of import paths is also accepted, and the entries may mix string paths with function objects.
 
 Custom Callbacks
 ~~~~~~~~~~~~~~~~
@@ -181,6 +211,7 @@ Users can use the same approach to call the data observability platform `monteca
 Limitations and Contributions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Callback support is available only when using ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``.
+Callback support is available when using ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV``, and
+``ExecutionMode.WATCHER`` (see the note above for the granularity difference under ``ExecutionMode.WATCHER``).
 Contributions to extend this functionality to other execution modes are welcome and encouraged. You can reference the
 implementation for ``ExecutionMode.LOCAL`` to add support for other modes.

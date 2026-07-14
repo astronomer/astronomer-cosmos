@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import warnings
 from pathlib import Path
 
 import airflow
@@ -33,6 +34,13 @@ enable_cache_package_lockfile = conf.getboolean("cosmos", "enable_cache_package_
 enable_cache_dbt_ls = conf.getboolean("cosmos", "enable_cache_dbt_ls", fallback=True)
 enable_cache_dbt_yaml_selectors = conf.getboolean("cosmos", "enable_cache_dbt_yaml_selectors", fallback=True)
 enable_lax_selector_parsing = conf.getboolean("cosmos", "enable_lax_selector_parsing", fallback=False)
+# When RenderConfig.group_nodes_by_folder is enabled, key folder task groups by their full path so
+# that folders sharing a leaf name under different parents render as distinct task groups. Defaults
+# to False to preserve existing task-group ids (enabling it is a breaking change for DAGs that
+# reference Cosmos task groups by id); expected to become the default in Cosmos 2.0. See #2824.
+enable_hierarchical_naming_for_group_nodes_by_folder = conf.getboolean(
+    "cosmos", "enable_hierarchical_naming_for_group_nodes_by_folder", fallback=False
+)
 rich_logging = conf.getboolean("cosmos", "rich_logging", fallback=False)
 dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)
@@ -62,12 +70,31 @@ enable_memory_optimised_imports = conf.getboolean("cosmos", "enable_memory_optim
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
 enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)
 
-# DBT Watcher Execution Mode Watcher Task Retry Queue
-# in watcher mode, if the producer watcher fails, the consumer tasks run the individual models on retry.
-# since these tasks are sensors that require low memory/cpu on their first try,
-# this setting allows retries to run on a queue with larger resources, which is often necessary for larger dbt projects
-# this would also be used to run the producer task
-watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
+# Deprecated: previously used for both the producer task and consumer retries. Kept for backwards
+# compatibility as a fallback for watcher_dbt_producer_queue and watcher_dbt_retry_queue below.
+watcher_dbt_execution_queue: str | None = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
+if watcher_dbt_execution_queue:
+    warnings.warn(
+        "The `watcher_dbt_execution_queue` config is deprecated since Cosmos 1.16.0 and will be removed in "
+        "Cosmos 2.0.0. Use `watcher_dbt_producer_queue` and/or `watcher_dbt_retry_queue` instead.",
+        DeprecationWarning,
+    )
+
+# Separate queue configuration for each watcher task type:
+# - watcher_dbt_producer_queue: queue for the DbtProducerWatcherOperator task
+# - watcher_dbt_consumer_queue: queue for DbtConsumerWatcherSensor tasks on their initial run
+# - watcher_dbt_retry_queue: queue for DbtConsumerWatcherSensor tasks on retries (typically needs more resources)
+# watcher_dbt_producer_queue and watcher_dbt_retry_queue fall back to the deprecated
+# watcher_dbt_execution_queue if set, preserving pre-1.16.0 behavior for existing users.
+watcher_dbt_producer_queue: str | None = (
+    conf.get("cosmos", "watcher_dbt_producer_queue", fallback=None) or watcher_dbt_execution_queue
+)
+watcher_dbt_consumer_queue: str | None = conf.get("cosmos", "watcher_dbt_consumer_queue", fallback=None)
+watcher_dbt_retry_queue: str | None = (
+    conf.get("cosmos", "watcher_dbt_retry_queue", fallback=None) or watcher_dbt_execution_queue
+)
+
+enable_watcher_reliable_retry = conf.getboolean("cosmos", "enable_watcher_reliable_retry", fallback=True)
 
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"

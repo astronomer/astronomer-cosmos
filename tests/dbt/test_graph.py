@@ -139,7 +139,7 @@ def test_dbt_node_name_and_select(unique_id, expected_name, expected_select):
     assert node.resource_name == expected_select
 
 
-def test_dbt_node_checksum_computes_sha256_of_seed_file(tmp_path):
+def test_dbt_node_checksum_computes_md5_of_seed_file(tmp_path):
     import hashlib
 
     content = b"id,name\n1,alice\n"
@@ -151,7 +151,7 @@ def test_dbt_node_checksum_computes_sha256_of_seed_file(tmp_path):
         path_base=tmp_path,
         original_file_path=Path("my_seed.csv"),
     )
-    assert node.checksum == hashlib.sha256(content).hexdigest()
+    assert node.checksum == hashlib.md5(content).hexdigest()
 
 
 def test_dbt_node_checksum_is_none_for_non_seed_nodes(tmp_path):
@@ -557,6 +557,48 @@ def test_load_from_dbt_manifest_handles_null_manifest(tmp_path):
     dbt_graph.load_from_dbt_manifest()
     assert dbt_graph.nodes == {}
     assert dbt_graph.filtered_nodes == {}
+
+
+def test_load_from_dbt_manifest_handles_empty_manifest(tmp_path):
+    """When manifest file is empty, raises CosmosLoadDbtException."""
+    manifest_file = tmp_path / "manifest_empty.json"
+    manifest_file.write_text("")
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="test")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_from_dbt_manifest()
+    assert f"Failed to load dbt manifest at `{manifest_file}`: file is empty" in str(err_info.value)
+
+
+def test_load_from_dbt_manifest_handles_invalid_json_manifest(tmp_path):
+    """When manifest file contains invalid JSON, raises CosmosLoadDbtException."""
+    manifest_file = tmp_path / "manifest_invalid.json"
+    manifest_file.write_text("{invalid")
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="test")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        dbt_graph.load_from_dbt_manifest()
+    assert f"Failed to load dbt manifest at `{manifest_file}`: file is not valid JSON" in str(err_info.value)
 
 
 def test_load_from_dbt_manifest_resolves_package_path(tmp_path):
@@ -1185,7 +1227,7 @@ def test_load_via_dbt_ls_without_dbt_deps(runner, postgres_profile_config):
         dbt_graph.load_via_dbt_ls_without_cache()
 
     expected = "Unable to run dbt ls command due to missing dbt_packages. Set RenderConfig.dbt_deps=True."
-    assert err_info.value.args[0] == expected
+    assert err_info.value.args[0].startswith(expected)
 
     if some_patch is not None:
         sys.modules = original_sys_modules
@@ -1375,7 +1417,7 @@ def test_load_via_dbt_ls_with_non_zero_returncode(mock_popen, postgres_profile_c
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nstderr: Some stderr message\nstdout: "
+    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nExit code: 1\nstderr: Some stderr message\nstdout: <no stdout captured>"
     with pytest.raises(CosmosLoadDbtException, match=expected):
         dbt_graph.load_via_dbt_ls()
 
@@ -1397,7 +1439,7 @@ def test_load_via_dbt_ls_with_runtime_error_in_stdout(mock_popen_communicate, po
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nstderr: \nstdout: Some Runtime Error"
+    expected = r"Unable to run \['.+dbt', 'deps', .*\] due to the error:\nExit code: .*\nstderr: <no stderr captured>\nstdout: Some Runtime Error"
     with pytest.raises(CosmosLoadDbtException, match=expected):
         dbt_graph.load_via_dbt_ls()
 
@@ -1723,8 +1765,8 @@ def test_load_via_dbt_ls_file():
 @pytest.mark.parametrize(
     "stdout,returncode",
     [
-        ("all good", None),
-        ("WarnErrorOptions", None),
+        ("all good", 0),
+        ("WarnErrorOptions", 0),
         pytest.param("fail", 599, marks=pytest.mark.xfail(raises=CosmosLoadDbtException)),
         pytest.param("Error", None, marks=pytest.mark.xfail(raises=CosmosLoadDbtException)),
     ],
@@ -1758,7 +1800,7 @@ def test_run_command_with_subprocess_strips_dags_folder_from_pythonpath(tmp_path
 
     with patch("cosmos.dbt.graph.Popen") as mock_popen, patch("airflow.settings.DAGS_FOLDER", dags_folder):
         mock_popen.return_value.communicate.return_value = ("all good", "")
-        mock_popen.return_value.returncode = None
+        mock_popen.return_value.returncode = 0
 
         run_command_with_subprocess(["dbt", "ls"], Path("fake_dir"), env_vars)
 
@@ -1852,10 +1894,43 @@ def test_run_command_none_argument(mock_popen, caplog):
     env_vars = {"fake": "env_var"}
 
     mock_popen.return_value.communicate.return_value = ("Invalid None argument", None)
+    mock_popen.return_value.returncode = None
     with pytest.raises(CosmosLoadDbtException) as exc_info:
         run_command(fake_command, fake_dir, env_vars, InvocationMode.SUBPROCESS)
 
-    expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nstderr: None\nstdout: Invalid None argument"
+    expected = "Unable to run ['invalid-cmd', '<None>'] due to the error:\nExit code: None\nstderr: <no stderr captured>\nstdout: Invalid None argument"
+    assert str(exc_info.value) == expected
+
+
+@patch("cosmos.dbt.graph.Popen")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
+def test_run_command_surfaces_stderr_in_exception(mock_popen):
+    fake_command = ["dbt", "ls"]
+    fake_dir = Path("fake_dir")
+    env_vars = {"fake": "env_var"}
+
+    mock_popen.return_value.communicate.return_value = ("", "Some stderr output")
+    mock_popen.return_value.returncode = 1
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        run_command(fake_command, fake_dir, env_vars, InvocationMode.SUBPROCESS)
+
+    expected = "Unable to run ['dbt', 'ls'] due to the error:\nExit code: 1\nstderr: Some stderr output\nstdout: <no stdout captured>"
+    assert str(exc_info.value) == expected
+
+
+@patch("cosmos.dbt.graph.Popen")
+@patch.dict(sys.modules, {"dbt.cli.main": None})
+def test_run_command_surfaces_stdout_in_exception(mock_popen):
+    fake_command = ["dbt", "ls"]
+    fake_dir = Path("fake_dir")
+    env_vars = {"fake": "env_var"}
+
+    mock_popen.return_value.communicate.return_value = ("Some stdout output", "")
+    mock_popen.return_value.returncode = 1
+    with pytest.raises(CosmosLoadDbtException) as exc_info:
+        run_command(fake_command, fake_dir, env_vars, InvocationMode.SUBPROCESS)
+
+    expected = "Unable to run ['dbt', 'ls'] due to the error:\nExit code: 1\nstderr: <no stderr captured>\nstdout: Some stdout output"
     assert str(exc_info.value) == expected
 
 
@@ -2521,6 +2596,36 @@ def test_save_yaml_selectors_cache_variable_set_failure(mock_variable_set, tmp_d
     assert "Failed to save Cosmos YAML selectors cache" in caplog.text
     assert "cosmos_cache__something" in caplog.text
     assert "AIRFLOW__COSMOS__REMOTE_CACHE_DIR" in caplog.text
+
+
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_dbt_ls_cache_concurrent_integrity_error(mock_variable_set, tmp_dbt_project_dir, caplog):
+    from sqlalchemy.exc import IntegrityError
+
+    mock_variable_set.side_effect = IntegrityError("INSERT INTO variable", {}, Exception("duplicate key"))
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    with caplog.at_level(logging.DEBUG, logger="cosmos.dbt.graph"):
+        graph.save_dbt_ls_cache("some output")
+    assert "Failed to save Cosmos" not in caplog.text
+    assert "concurrently written by another parser" in caplog.text
+    assert "cosmos_cache__something" in caplog.text
+
+
+@patch("cosmos.dbt.graph.Variable.set")
+def test_save_yaml_selectors_cache_concurrent_integrity_error(mock_variable_set, tmp_dbt_project_dir, caplog):
+    from sqlalchemy.exc import IntegrityError
+
+    mock_variable_set.side_effect = IntegrityError("INSERT INTO variable", {}, Exception("duplicate key"))
+    graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
+    selectors = YamlSelectors(
+        {"staging_orders": {"name": "staging_orders", "definition": {"method": "tag", "value": "tag_a"}}},
+        {"select": ["tag:tag_a"], "exclude": None},
+    )
+    with caplog.at_level(logging.DEBUG, logger="cosmos.dbt.graph"):
+        graph.save_yaml_selectors_cache(selectors)
+    assert "Failed to save Cosmos" not in caplog.text
+    assert "concurrently written by another parser" in caplog.text
+    assert "cosmos_cache__something" in caplog.text
 
 
 @pytest.mark.integration

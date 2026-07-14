@@ -82,7 +82,7 @@ The method that Cosmos uses to parse the dbt object, whether its by using the Py
 Rendering
 ~~~~~~~~~
 
-After parsing your dbt project, Cosmos *renders* the project as an Airflow Dag or Task Group. Depending on the specifics of your dbt project, you can choose customizations that speed up overall performance. You can find more information about rendering options in the `RenderConfig <../guides/translate_dbt_to_airflow/render-config.html>`_.
+After parsing your dbt project, Cosmos *renders* the project as an Airflow Dag or Task Group. Depending on the specifics of your dbt project, you can choose customizations that speed up overall performance. You can find more information about rendering options in the :doc:`RenderConfig </guides/translate_dbt_to_airflow/render-config>`.
 
 
 Testing Strategy

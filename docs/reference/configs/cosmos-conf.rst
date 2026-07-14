@@ -73,6 +73,22 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING``
 
+.. _enable_hierarchical_naming_for_group_nodes_by_folder:
+
+`enable_hierarchical_naming_for_group_nodes_by_folder`_:
+    Only relevant when ``RenderConfig.group_nodes_by_folder`` is enabled. When enabled, folder task groups
+    are keyed by their full folder path, so folders that share a leaf name under different parents
+    (e.g. ``staging/aurora`` and ``marts/aurora``) render as distinct task groups instead of collapsing into
+    the first one created. Disabled by default to preserve the existing task-group ids — enabling it changes
+    those ids, which is a breaking change for DAGs that reference Cosmos task groups by id. This is expected
+    to become the default in Cosmos 2.0.
+
+    Being an Airflow configuration setting, it applies **globally to every Cosmos DAG** in the deployment
+    and cannot be configured per DAG (unlike the ``RenderConfig.group_nodes_by_folder`` option itself).
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_HIERARCHICAL_NAMING_FOR_GROUP_NODES_BY_FOLDER``
+
 .. _enable_cache_partial_parse:
 
 `enable_cache_partial_parse`_:
@@ -388,19 +404,58 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_ORJSON_PARSER``
 
+.. _watcher_dbt_producer_queue:
+
+`watcher_dbt_producer_queue`_:
+    (Introduced in Cosmos 1.16.0) When using watcher execution mode, specifies the Airflow worker queue that ``DbtProducerWatcherOperator`` tasks are assigned to. Producer tasks execute a full ``dbt build`` and typically require high-memory workers. This setting takes precedence over any ``queue`` set directly on the operator (e.g. via ``setup_operator_args``).
+
+    If unset, falls back to the deprecated :ref:`watcher_dbt_execution_queue` for backwards compatibility.
+
+    - Default: ``None``
+    - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_PRODUCER_QUEUE``
+
+.. _watcher_dbt_consumer_queue:
+
+`watcher_dbt_consumer_queue`_:
+    (Introduced in Cosmos 1.16.0) When using watcher execution mode, specifies the Airflow worker queue that ``DbtConsumerWatcherSensor`` tasks are assigned to on their initial (sensor) run. On the first attempt, consumer sensors are lightweight — they simply wait for the producer task to complete — so they can run on low-resource workers. This setting takes precedence over any ``queue`` set directly on the operator.
+
+    This is a new queue introduced in Cosmos 1.16.0 and has no equivalent in the deprecated :ref:`watcher_dbt_execution_queue`; there is no backwards-compatible fallback for it.
+
+    - Default: ``None``
+    - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_CONSUMER_QUEUE``
+
+.. _watcher_dbt_retry_queue:
+
+`watcher_dbt_retry_queue`_:
+    (Introduced in Cosmos 1.16.0; previously ``watcher_dbt_execution_queue`` in 1.14.0) When using watcher execution mode, specifies the Airflow worker queue that ``DbtConsumerWatcherSensor`` tasks are assigned to on retries. On retry, consumer sensors execute the dbt command for a failed node and may require significantly more resources than their initial sensor run. The computational cost can vary widely — for example, a Cosmos watcher sensor consumes approximately 200MB on its first attempt, compared to 700MB when running a dbt build for a project with almost 200 models. This behavior is enforced by Cosmos via an `Airflow cluster policy <https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html>`_ (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts.
+
+    If unset, falls back to the deprecated :ref:`watcher_dbt_execution_queue` for backwards compatibility.
+
+    - Default: ``None``
+    - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_RETRY_QUEUE``
+
 .. _watcher_dbt_execution_queue:
 
 `watcher_dbt_execution_queue`_:
-    (Introduced in Cosmos 1.14.0) When using watcher execution mode, tasks may need to run dbt or not, depending on their type (producer vs. consumer) and the retry number. When running the dbt command, tasks use more resources (CPU and memory) than when behaving as sensors. The computational cost of running these tasks can vary widely. For example, a Cosmos watcher sensor consumes approximately 200MB, compared to 700MB consumed by a dbt build task running a project with almost 200 dbt models. This configuration allows users to define which queue to use when dbt commands are run, optimising their Airflow deployment. Internally, Cosmos leverages the [Airflow cluster policy feature](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html). As of now, this configuration will be used:
-    - for watcher producer tasks, during their first execution
-    - for watcher consumer tasks, from their first retry onwards
-    - it will automatically be assigned to the specified queue.
-
-    This behavior is enforced by Cosmos via an Airflow policy (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts.
-    As a result, the configured ``watcher_dbt_execution_queue`` can overwrite any queue set directly on the operator, but only for retries; the initial run continues to use the operator's original queue.
+    .. deprecated:: 1.16.0
+        Deprecated in favor of the dedicated :ref:`watcher_dbt_producer_queue` and :ref:`watcher_dbt_retry_queue` settings, and will be removed in Cosmos 2.0.0. Previously, this single setting was applied to both the ``DbtProducerWatcherOperator`` task and to ``DbtConsumerWatcherSensor`` retries. If set and either of the new settings is left unset, Cosmos continues to use this value for that task type, so existing configurations keep working without changes. It is not used as a fallback for :ref:`watcher_dbt_consumer_queue`, which has no pre-1.16.0 equivalent.
 
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE``
+
+.. _enable_watcher_reliable_retry:
+
+`enable_watcher_reliable_retry`_:
+    (Introduced in Cosmos 1.15.0) Controls *when* the watcher producer writes its in-memory backup of per-node dbt statuses to an Airflow Variable, so that consumer sensors do not lose them if the producer is retried. See :ref:`producer-status-backup` for a side-by-side comparison.
+
+    When ``True`` (default), the backup is written eagerly after every dbt node. Statuses survive any producer failure, including a hard ``SIGKILL``/OOM kill, so consumers never re-run dbt on a retry. This is the most reliable option, but the per-node Variable writes are measurable producer CPU/IO on large projects.
+
+    When ``False``, the backup is written once, when the producer is retried, via the producer's ``on_retry_callback`` (a graceful failure with retries left is ``UP_FOR_RETRY``, not ``FAILED``). This removes the per-node Variable I/O and improves producer performance. A graceful producer failure (for example a dbt model error) still flushes the backup, so consumers recover as in the reliable mode; only a hard kill (``SIGKILL``/OOM, where Airflow cannot run the callback) loses the in-memory statuses, in which case the affected consumer sensors re-run their dbt node locally. Results stay correct.
+
+    A future approach that delivers reliability and performance together is tracked in `#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task & Asset Store, AIP-103).
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_WATCHER_RELIABLE_RETRY``
 
 [openlineage]
 ~~~~~~~~~~~~~

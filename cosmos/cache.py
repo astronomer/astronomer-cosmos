@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
-import shutil
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -153,11 +152,11 @@ def _create_seed_checksum_key(dag_task_group_identifier: str, unique_id: str) ->
     store the checksum under a fixed-length key: a readable prefix plus a stable hash of the full
     identifier, ensuring long DAG ids / nested task groups / package+resource names never overflow it.
     """
-    digest = hashlib.sha1(f"{dag_task_group_identifier}:{unique_id}".encode()).hexdigest()
+    digest = hashlib.md5(f"{dag_task_group_identifier}:{unique_id}".encode()).hexdigest()
     return f"{VAR_KEY_SEED_CHECKSUM_PREFIX}{digest}"
 
 
-def get_seed_checksum(dag_task_group_identifier: str, unique_id: str) -> str | None:
+def get_cache_seed_checksum(dag_task_group_identifier: str, unique_id: str) -> str | None:
     """Return the seed's last persisted checksum, or ``None`` when none is stored or it cannot be read.
 
     Best-effort: change detection must never fail a seed task, so a missing value or a transient
@@ -172,7 +171,7 @@ def get_seed_checksum(dag_task_group_identifier: str, unique_id: str) -> str | N
     return checksum
 
 
-def store_seed_checksum(dag_task_group_identifier: str, unique_id: str, checksum: str) -> None:
+def store_cache_seed_checksum(dag_task_group_identifier: str, unique_id: str, checksum: str) -> None:
     """Persist a seed's checksum after a successful run.
 
     Best-effort: a failure to store the checksum must never fail a seed that already loaded successfully,
@@ -250,11 +249,16 @@ def _update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: 
     """
     cache_path = get_partial_parse_path(cache_dir)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path = get_partial_parse_path(cache_dir).parent / DBT_MANIFEST_FILE_NAME
+    manifest_path = cache_path.parent / DBT_MANIFEST_FILE_NAME
     latest_manifest_filepath = latest_partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
 
-    shutil.copyfile(str(latest_partial_parse_filepath), str(cache_path))
-    shutil.copyfile(str(latest_manifest_filepath), str(manifest_path))
+    # Use safe_copy (atomic temp-file + rename) so concurrent readers of these cache files
+    # never observe a partially-written state. The shared cache_dir is typically read by
+    # parallel DbtLocalBaseOperator tasks (one task often runs while another is writing
+    # the cache back); a non-atomic copyfile can leave the destination half-written and
+    # cause msgpack to fail when the next task tries to load it (see #971/#972).
+    safe_copy(latest_partial_parse_filepath, cache_path)
+    safe_copy(latest_manifest_filepath, manifest_path)
 
 
 def patch_partial_parse_content(partial_parse_filepath: Path, project_path: Path) -> bool:
@@ -311,12 +315,12 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
     source_manifest_filepath = partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
     target_manifest_filepath = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
-    shutil.copy(str(partial_parse_filepath), str(target_partial_parse_file))
+    safe_copy(partial_parse_filepath, target_partial_parse_file)
 
     patch_partial_parse_content(target_partial_parse_file, project_path)
 
     if source_manifest_filepath.exists():
-        shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))
+        safe_copy(source_manifest_filepath, target_manifest_filepath)
 
 
 def _calculate_yaml_selectors_cache_current_version(

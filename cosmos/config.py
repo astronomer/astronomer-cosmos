@@ -213,8 +213,9 @@ class ProjectConfig:
         sources directory referenced as ``model-paths: ["models", "../shared_models"]``, or a dbt local package
         declared in ``packages.yml`` as ``- local: ../shared_package``. Each entry may be an absolute path or a path
         relative to ``dbt_project_path``, and is reproduced in the clone at the same location it occupies relative to
-        the project root, so relative references keep resolving. Only applies to the ``LoadMode.DBT_LS`` load mode and
-        the ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and ``ExecutionMode.WATCHER`` execution modes.
+        the project root, so relative references keep resolving. Used during rendering when ``LoadMode.DBT_LS`` is
+        selected, and during execution for the ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and
+        ``ExecutionMode.WATCHER`` execution modes.
         Defaults to an empty list.
     """
 

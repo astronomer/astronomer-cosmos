@@ -35,6 +35,7 @@ from cosmos.dbt.graph import (
     _normalize_path,
     parse_dbt_ls_output,
     run_command,
+    run_command_with_subprocess,
 )
 from cosmos.dbt.selector import YamlSelectors
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -1745,6 +1746,26 @@ def test_run_command(mock_popen, stdout, returncode):
     assert kwargs["env"] == env_vars
 
     assert return_value == stdout
+
+
+def test_run_command_with_subprocess_strips_dags_folder_from_pythonpath(tmp_path):
+    """run_command_with_subprocess must strip the Airflow DAGs folder from the subprocess's
+    PYTHONPATH so dbt's dbt_* plugin discovery does not import (and crash on) DAG files.
+    See https://github.com/astronomer/astronomer-cosmos/issues/1673"""
+    dags_folder = str(tmp_path)
+    other_entry = "/usr/local/astronomer-cosmos"
+    env_vars = {"PYTHONPATH": os.pathsep.join([other_entry, dags_folder])}
+
+    with patch("cosmos.dbt.graph.Popen") as mock_popen, patch("airflow.settings.DAGS_FOLDER", dags_folder):
+        mock_popen.return_value.communicate.return_value = ("all good", "")
+        mock_popen.return_value.returncode = None
+
+        run_command_with_subprocess(["dbt", "ls"], Path("fake_dir"), env_vars)
+
+    passed_env = mock_popen.call_args.kwargs["env"]
+    assert passed_env["PYTHONPATH"] == other_entry
+    # the caller's env dict must not be mutated in place
+    assert env_vars["PYTHONPATH"] == os.pathsep.join([other_entry, dags_folder])
 
 
 @pytest.mark.integration

@@ -217,16 +217,21 @@ def exclude_dags_folder_from_sys_path() -> Generator[None, None, None]:
     """
     target = _resolve_dags_folder()
 
-    removed: list[str] = []
+    # (original index, path) for each matching entry, so removal can't disturb the recorded
+    # positions of entries found later in the scan.
+    removed: list[tuple[int, str]] = []
     if target:
-        removed = [path for path in sys.path if os.path.realpath(path) == target]
-        for path in removed:
+        removed = [(index, path) for index, path in enumerate(sys.path) if os.path.realpath(path) == target]
+        for _, path in removed:
             sys.path.remove(path)
     try:
         yield
     finally:
-        for path in removed:
-            sys.path.insert(0, path)
+        # Restore in ascending original-index order so each insert lands in its original slot:
+        # every entry restored so far already occupies its correct position, and no not-yet-restored
+        # entry sits before this index either.
+        for index, path in removed:
+            sys.path.insert(index, path)
 
 
 def remove_dags_folder_from_pythonpath(env: dict[str, str]) -> dict[str, str]:
@@ -241,7 +246,7 @@ def remove_dags_folder_from_pythonpath(env: dict[str, str]) -> dict[str, str]:
     pythonpath = env.get("PYTHONPATH")
     target = _resolve_dags_folder()
     if not pythonpath or not target:
-        return env
+        return dict(env)
 
     kept = [entry for entry in pythonpath.split(os.pathsep) if not (entry and os.path.realpath(entry) == target)]
     sanitized = dict(env)

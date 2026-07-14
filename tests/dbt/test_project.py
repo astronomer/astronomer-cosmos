@@ -289,6 +289,28 @@ def test_exclude_dags_folder_from_sys_path_normalizes_non_canonical_entry(tmp_pa
         sys.path[:] = original_sys_path
 
 
+def test_exclude_dags_folder_from_sys_path_preserves_order_with_multiple_entries(tmp_path):
+    """When the DAGs folder appears more than once in sys.path (e.g. once via PYTHONPATH and once
+    inserted directly), restoring must put each occurrence back at its original index rather than
+    always at position 0, or it would reverse their relative order and could shadow unrelated
+    entries sitting between them."""
+    dags_folder = str(tmp_path)
+    original_sys_path = list(sys.path)
+    # Two occurrences of the DAGs folder, with an unrelated entry sitting between them.
+    sys.path.insert(0, "/unrelated/entry")
+    sys.path.insert(0, dags_folder)
+    sys.path.insert(0, dags_folder)
+    expected_sys_path = list(sys.path)
+
+    try:
+        with patch("airflow.settings.DAGS_FOLDER", dags_folder):
+            with exclude_dags_folder_from_sys_path():
+                assert dags_folder not in sys.path
+            assert sys.path == expected_sys_path
+    finally:
+        sys.path[:] = original_sys_path
+
+
 def test_exclude_dags_folder_from_sys_path_noop_when_folder_not_on_path(tmp_path):
     with patch("airflow.settings.DAGS_FOLDER", str(tmp_path)):
         original_sys_path = list(sys.path)
@@ -341,6 +363,8 @@ def test_remove_dags_folder_from_pythonpath_returns_unchanged_when_pythonpath_mi
     with patch("airflow.settings.DAGS_FOLDER", str(tmp_path)):
         result = remove_dags_folder_from_pythonpath(env)
     assert result == env
+    # always a copy, even on the no-op path, per the docstring's contract
+    assert result is not env
 
 
 def test_remove_dags_folder_from_pythonpath_returns_unchanged_when_dags_folder_unresolvable(tmp_path):
@@ -348,3 +372,5 @@ def test_remove_dags_folder_from_pythonpath_returns_unchanged_when_dags_folder_u
     with patch("airflow.settings.DAGS_FOLDER", ""):
         result = remove_dags_folder_from_pythonpath(env)
     assert result == env
+    # always a copy, even on the no-op path, per the docstring's contract
+    assert result is not env

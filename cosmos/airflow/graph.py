@@ -328,6 +328,7 @@ def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
             DbtResourceType.MODEL: "DbtBuild",
             DbtResourceType.SNAPSHOT: "DbtBuild",
             DbtResourceType.SEED: "DbtBuild",
+            DbtResourceType.SEMANTIC_LAYER: "DbtBuild",
             DbtResourceType.TEST: "DbtTest",
             DbtResourceType.SOURCE: "DbtSource",
         }
@@ -336,6 +337,7 @@ def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
             DbtResourceType.MODEL: "DbtRun",
             DbtResourceType.SNAPSHOT: "DbtSnapshot",
             DbtResourceType.SEED: "DbtSeed",
+            DbtResourceType.SEMANTIC_LAYER: "DbtSemantic",
             DbtResourceType.TEST: "DbtTest",
             DbtResourceType.SOURCE: "DbtSource",
         }
@@ -447,7 +449,9 @@ def create_task_metadata(  # noqa: C901
                 arguments=args,
             )
 
-        if render_config.test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
+        if render_config.test_behavior == TestBehavior.BUILD and (
+            node.resource_type in SUPPORTED_BUILD_RESOURCES or node.resource_type == DbtResourceType.SEMANTIC_LAYER
+        ):
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"
             else:
@@ -508,7 +512,7 @@ def create_task_metadata(  # noqa: C901
                     operator_class=EMPTY_OPERATOR_CLASS_PATH,
                     arguments=args,
                 )
-        else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
+        else:  # DbtResourceType.MODEL, SEED, SNAPSHOT and SEMANTIC_LAYER
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"
             else:

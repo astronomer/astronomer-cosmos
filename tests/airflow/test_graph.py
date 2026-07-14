@@ -902,6 +902,91 @@ def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_build_in_buil
     assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
 
 
+def _semantic_layer_node(materialization="metric_view"):
+    return DbtNode(
+        unique_id=f"{DbtResourceType.SEMANTIC_LAYER.value}.my_folder.my_model",
+        resource_type=DbtResourceType.SEMANTIC_LAYER,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={"materialized": materialization},
+    )
+
+
+@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
+def test_create_task_metadata_semantic_layer_model_renders_with_semantic_layer_suffix(materialization):
+    """Semantic layer nodes (Databricks metric views, Snowflake semantic views) are rendered via a
+    dedicated DbtSemantic operator (still just running `dbt run` underneath), with a
+    `_semantic_layer` suffix distinguishing them from plain models."""
+    metadata = create_task_metadata(
+        _semantic_layer_node(materialization),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+    assert metadata.id == "my_model_semantic_layer"
+    assert metadata.operator_class == "cosmos.operators.local.DbtSemanticLocalOperator"
+    assert metadata.arguments == {"select": "my_model"}
+
+
+@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
+def test_create_task_metadata_semantic_layer_model_under_build_mode(materialization):
+    """Under TestBehavior.BUILD, semantic layer nodes get full BUILD treatment (like MODEL/SEED/SNAPSHOT),
+    rendering as dbt build tasks rather than falling through to the generic model branch."""
+    metadata = create_task_metadata(
+        _semantic_layer_node(materialization),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
+    )
+    assert metadata.id == "my_model_semantic_layer_build"
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+
+
+def test_generate_task_or_group_semantic_layer_model_bundles_non_detached_test():
+    """A semantic layer node (metric view / semantic view) with a single-parent test must still get
+    the AFTER_EACH TaskGroup bundling. Regression test: TESTABLE_DBT_RESOURCES previously omitted
+    DbtResourceType.SEMANTIC_LAYER, so `use_task_group` was always False for these nodes and the
+    non-detached test was silently dropped from the DAG."""
+    with DAG("test-semantic-layer-use-task-group", start_date=datetime(2022, 1, 1)) as dag:
+        node = DbtNode(
+            unique_id=f"{DbtResourceType.SEMANTIC_LAYER.value}.my_folder.my_model",
+            resource_type=DbtResourceType.SEMANTIC_LAYER,
+            depends_on=[],
+            path_base=Path("."),
+            original_file_path=Path("."),
+            tags=[],
+            config={"materialized": "metric_view"},
+            has_test=True,
+            has_non_detached_test=True,
+        )
+        task_or_group = generate_task_or_group(
+            dag=dag,
+            task_group=None,
+            node=node,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn",
+                        profile_args={"schema": "public"},
+                    ),
+                ),
+            },
+            render_config=RenderConfig(test_behavior=TestBehavior.AFTER_EACH),
+            node_converters={},
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+        )
+        assert isinstance(task_or_group, TaskGroup)
+        assert "my_model.semantic_layer" in task_or_group.children
+        assert "my_model.test" in task_or_group.children
+
+
 def test_create_task_metadata_build_mode_forwards_render_config_exclude():
     """Under TestBehavior.BUILD, tests run inline with `dbt build`, so RenderConfig.exclude must be
     forwarded to the build command — otherwise e.g. exclude=["resource_type:unit_test"] would not

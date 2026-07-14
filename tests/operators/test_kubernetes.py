@@ -212,8 +212,9 @@ def test_dbt_kubernetes_build_command():
     """
     for command_name, command_operator in result_map.items():
         command_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
-        assert command_operator.cmds == ["dbt"]
+        assert command_operator.cmds == []
         assert command_operator.arguments == [
+            "dbt",
             *command_name,
             "--vars",
             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
@@ -585,6 +586,7 @@ def test_created_pod():
     assert container.image == "my_image"
 
     expected_container_args = [
+        "dbt",
         "ls",
         "--vars",
         "end_time: '{{ "
@@ -598,7 +600,7 @@ def test_created_pod():
         "my/dir",
     ]
     assert container.args == expected_container_args
-    assert container.command == ["dbt"]
+    assert container.command == []
 
 
 @pytest.mark.parametrize(
@@ -667,9 +669,10 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_args):
 
     container = get_or_create_pod.call_args.kwargs["pod_request_obj"].to_dict()["spec"]["containers"][0]
 
-    # build_kube_args now splits the executable into cmds and arguments
-    assert container["command"] == ["dbt"]
-    assert container["args"] == expected_args
+    # By default, cmds is left untouched (empty) so the container image's ENTRYPOINT is
+    # preserved; the full dbt command (including the "dbt" executable) is passed as args.
+    assert container["command"] == []
+    assert container["args"] == ["dbt", *expected_args]
 
 
 @pytest.mark.parametrize(

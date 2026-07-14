@@ -141,8 +141,12 @@ def _build_env_vars(env: dict[str, str | bytes | PathLike[Any]], existing_env_va
 def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[str] | None = None) -> None:
     """Build the dbt command, set env vars, and assign ``cmds``/``arguments`` on the operator.
 
-    Always splits the executable from arguments (``self.cmds = ["dbt"]``, ``self.arguments = [...]``)
-    to handle container images with or without ``ENTRYPOINT ["dbt"]``.
+    If the user has not explicitly set ``cmds`` on the operator, the full dbt command (including
+    the executable) is passed as ``arguments`` and ``cmds`` is left untouched, so the container
+    image's ``ENTRYPOINT`` (if any) is preserved. This matters for images whose ``ENTRYPOINT``
+    performs setup, such as sourcing secrets injected by a sidecar, before running ``dbt``. If the
+    user has explicitly set ``cmds``, we honor that by splitting the executable from the rest of
+    the arguments instead.
     """
     # For the first round, we're going to assume that the command is dbt
     # This means that we don't have openlineage support, but we will create a ticket
@@ -162,11 +166,12 @@ def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[
 
     operator.env_vars = _build_env_vars(env_vars, operator.env_vars)
 
-    # Split the executable from arguments to avoid double invocation when the
-    # container image has ENTRYPOINT ["dbt"]. Setting self.cmds overrides the
-    # image's ENTRYPOINT, so this works regardless of image configuration.
-    operator.cmds = [dbt_cmd[0]]
-    operator.arguments = dbt_cmd[1:]
+    if operator.cmds:
+        # The user explicitly set cmds, so split the executable from the arguments as requested.
+        operator.cmds = [dbt_cmd[0]]
+        operator.arguments = dbt_cmd[1:]
+    else:
+        operator.arguments = dbt_cmd
 
 
 def build_and_run_cmd(

@@ -16,7 +16,7 @@ clean-targets:
     - "dbt_modules"
     - "logs"
 
-require-dbt-version: [">=1.0.0", "<2.0.0"]
+require-dbt-version: [">=1.0.0", "<3.0.0"]
 
 # Sequence used by model_flaky.sql to fail on first run and succeed on subsequent
 # runs (see #2698 regression test). Using a project-specific sequence name

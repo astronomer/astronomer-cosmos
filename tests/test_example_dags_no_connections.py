@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pytest
 from airflow.models.dagbag import DagBag
-from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION
+from cosmos.dbt.executable import get_dbt_version
 
 from . import utils as test_utils
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
-DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
+DBT_VERSION = get_dbt_version()
 
 IGNORED_DAG_FILES = [
     "performance_dag.py",

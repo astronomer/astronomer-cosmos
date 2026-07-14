@@ -2,7 +2,10 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    # TEMP — REVERT BEFORE MERGE. Also run on this bump branch so the new dbt-core 2.0
+    # matrix cells are exercised pre-merge: test.yml is pull_request_target, so PR runs read
+    # the matrix from `main`; a push event runs the branch's own workflow (and 2.0 matrix).
+    branches: [main, bump/dbt-core-2.0.0a3]
   # Also run on pull requests originating from forks. Every test job here is secret-dependent
   # (integration tests, kubernetes, code coverage) and depends on the Authorize job, which requires
   # manually approving the workflow run for external PRs. Jobs that need no secrets (type-check,
@@ -133,7 +136,10 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3"]
-        dbt-version: [ "1.11" ]
+        # "2.0" = dbt Core 2.0, the open-source build of the dbt Fusion engine
+        # (https://docs.getdbt.com/blog/dbt-core-v2-is-here). Installed with pre-releases
+        # allowed via integration-setup.sh (alpha-only today).
+        dbt-version: [ "1.11", "2.0" ]
         split-group: [1, 2, 3]
         exclude:
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.

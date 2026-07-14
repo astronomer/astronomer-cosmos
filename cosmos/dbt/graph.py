@@ -289,7 +289,7 @@ def _classify_resource_type(resource_type: DbtResourceType, config: dict[str, An
     """Reclassify adapter-native semantic layer materializations as DbtResourceType.SEMANTIC_LAYER."""
     materialization = str(config.get("materialized") or "").lower()
     if resource_type == DbtResourceType.MODEL and materialization in DBT_SEMANTIC_LAYER_MATERIALIZATIONS:
-        return DbtResourceType("semantic_layer")
+        return DbtResourceType.SEMANTIC_LAYER
     return resource_type
 
 

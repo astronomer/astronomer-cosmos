@@ -2,9 +2,8 @@ manifests:
   - name: project_b
     type: file
     config:
-      # Use environment variable for flexibility, with fallback to relative path
-      # path: '{{ env_var("PROJECT_B_MANIFEST_PATH", "../project_b_bidirectional/target/manifest.json") }}'
-
-      # For GitHub Actions Integration Tests CI run, set the path to the manifest.json file
-      path: /home/runner/work/astronomer-cosmos/astronomer-cosmos/dev/dags/dbt/cross_project/project_b_bidirectional/target/manifest.json
+      # Use environment variable for flexibility, with fallback to relative path.
+      # CI exports PROJECT_B_MANIFEST_PATH (see scripts/test/integration-dbt-loom.sh); locally
+      # the relative fallback resolves against the project directory during dbt parse.
+      path: '{{ env_var("PROJECT_B_MANIFEST_PATH", "../project_b_bidirectional/target/manifest.json") }}'
 enable_telemetry: false

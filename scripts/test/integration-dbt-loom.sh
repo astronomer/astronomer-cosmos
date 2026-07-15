@@ -68,6 +68,12 @@ pytest -vv \
     --cov-report=xml \
     "tests/test_example_dags.py::test_example_dag[cross_project_dbt_ls_dag]"
 
+# The bidirectional projects' dbt_loom.config.yml resolve their counterpart manifest via these
+# env vars (falling back to a relative path locally). Point them at the absolute paths so the
+# dbt subprocess resolves them from its temp working directory during the run.
+export PROJECT_A_MANIFEST_PATH="$PWD/dev/dags/dbt/cross_project/project_a_bidirectional/target/manifest.json"
+export PROJECT_B_MANIFEST_PATH="$PWD/dev/dags/dbt/cross_project/project_b_bidirectional/target/manifest.json"
+
 export TEST_SINGLE_DAG="cross_project_bidirectional_dag.py"
 pytest -vv \
     --cov=cosmos \

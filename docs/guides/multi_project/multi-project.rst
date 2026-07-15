@@ -335,6 +335,91 @@ To disable automatic asset emission:
         # ...
     )
 
+.. _bidirectional-cross-project-references:
+
+Bidirectional cross-project references
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The setups above assume a clean upstream/downstream split: one project only publishes models,
+the other only consumes them. Some organizations don't have that split - instead, two projects
+each expose a model consumed by the *other*. This works with Cosmos and dbt-loom as long as the
+dependency is acyclic at the individual model level (project A's model that project B consumes
+must not itself depend, even indirectly, on the model project A consumes from project B).
+
+.. code-block:: text
+
+    project_a                                  project_b
+    ├── stg_a_customers (public)  ────────►    rpt_b_customer_summary
+    └── rpt_a_customer_orders     ◄────────    stg_b_orders (public)
+
+Both projects need their own ``dbt_loom.config.yml`` (pointing at each other's manifest), and
+both need ``+access: public`` on the model they expose.
+
+**Generating the manifests requires a specific bootstrap order**
+
+dbt-loom eagerly loads every manifest file referenced in its config as soon as it initializes -
+so you cannot generate both projects' manifests from a clean slate at the same time. One project
+has to be parseable first, before its own cross-referencing model and ``dbt_loom.config.yml``
+exist:
+
+1. Build ``project_b`` *without* its cross-referencing model and *without* its
+   ``dbt_loom.config.yml`` yet - just the model it exposes.
+
+   .. code-block:: bash
+
+       cd project_b && dbt parse   # produces an initial project_b/target/manifest.json
+
+2. Build ``project_a`` fully, including its ``dbt_loom.config.yml`` (pointing at ``project_b``'s
+   manifest, which now exists).
+
+   .. code-block:: bash
+
+       cd project_a && dbt parse   # resolves ref('project_b', ...) via loom
+
+3. Add ``project_b``'s cross-referencing model and its ``dbt_loom.config.yml`` (pointing at
+   ``project_a``'s manifest, which now exists from step 2), then parse ``project_b`` again.
+
+   .. code-block:: bash
+
+       cd project_b && dbt parse   # resolves ref('project_a', ...) via loom
+
+After this one-time bootstrap, both manifest files just persist on disk, so any future
+incremental change only needs the other side's last-generated manifest to already be present -
+there's no need to repeat the bootstrap.
+
+**Why can't I just generate both manifests fresh in one shot?**
+
+Two things have to both succeed for a cross-project ``ref()`` to resolve, and neither can be
+skipped:
+
+1. dbt-loom has to successfully load the *other* project's manifest file and inject its public
+   nodes into the current project's in-memory manifest. If that file doesn't exist yet, dbt-loom
+   raises its own configuration error before parsing even starts.
+2. Independently of dbt-loom, dbt-core's compiler resolves every ``ref()`` against whatever nodes
+   exist in the manifest at that point (this is the same generic check that would flag a plain
+   typo in a normal, single-project ``ref()`` call). If dbt-loom didn't inject the node - for any
+   reason, including simply not being configured - dbt-core has no way to tell "this is a
+   cross-project ref dbt-loom should have resolved" from "this ref target doesn't exist", and
+   raises the same generic dependency-not-found compilation error either way.
+
+In other words, there's no way to defer resolution to execution time: both projects' manifests
+have to be complete and internally consistent *before* either one can be parsed.
+
+**Execution order in Airflow**
+
+Cosmos doesn't wire cross-project task dependencies - it just drops dbt-loom's externally
+injected nodes from the task graph. For a one-directional setup this doesn't matter (the
+downstream task group already comes after the upstream one). For a bidirectional setup, a flat
+``project_a_task_group >> project_b_task_group`` isn't enough, because each project also needs
+the *other* project's table to already exist. Split each project into a task group for the
+model(s) it exposes and a separate task group for the model(s) that consume the other project,
+then depend both "consumer" task groups on both "exposed model" task groups:
+
+.. literalinclude:: ../../../dev/dags/cross_project_bidirectional_dag.py
+    :language: python
+    :start-after: [START cross_project_bidirectional_dag]
+    :end-before: [END cross_project_bidirectional_dag]
+
 Cross-project sources
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -500,6 +585,15 @@ This occurs when dbt-loom can't find the upstream manifest. Solutions:
 This occurred in older Cosmos versions when external nodes (from dbt-loom) didn't have file paths.
 This is now fixed - Cosmos 1.13.0+ automatically skips nodes without file paths.
 
+**Error: "depends on a model named X in package or project Y which was not found" for a
+cross-project ref**
+
+This is dbt-core's own generic dependency-resolution error, not something dbt-loom raises
+directly - it means dbt-loom didn't inject the target node before dbt-core tried to resolve the
+``ref()``. See :ref:`bidirectional-cross-project-references` above for why this happens (most
+commonly: the other project's manifest doesn't exist yet, or wasn't reachable at the path
+configured in ``dbt_loom.config.yml``) and the bootstrap order that avoids it.
+
 **Error: "Table does not exist" during execution**
 
 The upstream tables must exist in the database before running downstream models:
@@ -518,6 +612,8 @@ Best Practices
 5. **Use persistent storage** (not in-memory databases) for cross-project data sharing
 6. **For asset-based scheduling**, use a completion marker task or depend on specific model assets
 7. **Consider AssetAlias** (Airflow 3) / **DatasetAlias** (Airflow 2.10+) for more flexible asset matching
+8. **For bidirectional setups**, follow the bootstrap order in
+   :ref:`bidirectional-cross-project-references` the first time you generate both manifests
 
 Limitations
 ~~~~~~~~~~~

@@ -48,6 +48,14 @@ DBT_PROJECT_B_PATH = DBT_ROOT_PATH / "cross_project" / "project_b_bidirectional"
 PROJECT_A_MANIFEST_PATH = DBT_PROJECT_A_PATH / "target" / "manifest.json"
 PROJECT_B_MANIFEST_PATH = DBT_PROJECT_B_PATH / "target" / "manifest.json"
 
+# dbt-loom reads these from the environment to locate each project's manifest at dbt run time
+# (see each project's dbt_loom.config.yml). Injected into every task group below via
+# ProjectConfig.env_vars so the DAG works locally and in CI without editing any files.
+DBT_LOOM_ENV_VARS = {
+    "PROJECT_A_MANIFEST_PATH": str(PROJECT_A_MANIFEST_PATH),
+    "PROJECT_B_MANIFEST_PATH": str(PROJECT_B_MANIFEST_PATH),
+}
+
 # dbt executable path, that contains the dbt-loom adapter
 DEFAULT_DBT_EXECUTABLE_PATH = Path(__file__).parent.parent.parent / "venv-subprocess" / "bin" / "dbt"
 DBT_EXECUTABLE_PATH = Path(os.getenv("DBT_EXECUTABLE_PATH", DEFAULT_DBT_EXECUTABLE_PATH))
@@ -71,6 +79,8 @@ def _task_group(group_id: str, project_path: Path, manifest_path: Path, project_
             # Specify the manifest path for faster parsing
             manifest_path=str(manifest_path),
             project_name=project_name,
+            # Expose the manifest paths so dbt-loom can resolve the cross-project ref at run time
+            env_vars=DBT_LOOM_ENV_VARS,
         ),
         profile_config=_profile_config(project_name, schema),
         execution_config=ExecutionConfig(dbt_project_path=project_path, dbt_executable_path=DBT_EXECUTABLE_PATH),

@@ -2,8 +2,8 @@ manifests:
   - name: project_a
     type: file
     config:
-      # Use environment variable for flexibility, with fallback to relative path.
-      # CI exports PROJECT_A_MANIFEST_PATH (see scripts/test/integration-dbt-loom.sh); locally
-      # the relative fallback resolves against the project directory during dbt parse.
-      path: '{{ env_var("PROJECT_A_MANIFEST_PATH", "../project_a_bidirectional/target/manifest.json") }}'
+      # dbt-loom substitutes ${VAR} from the process environment (shell-style; it does NOT
+      # render dbt Jinja and has no fallback). The DAG injects PROJECT_A_MANIFEST_PATH via
+      # ProjectConfig.env_vars so this resolves the same way locally and in CI.
+      path: ${PROJECT_A_MANIFEST_PATH}
 enable_telemetry: false

@@ -14,7 +14,7 @@ This proposal adds experimental support for running a [dbt Project on Snowflake]
 The proposed integration adds a new Cosmos execution mode, `ExecutionMode.WATCHER_SNOW_DBT_PROJECT`, and uses a watcher-style architecture:
 
 1. It renders an Airflow `DAG` or `TaskGroup` from a manifest fetched from Snowflake, with one Airflow task per dbt model or test, as in other Cosmos modes.
-2. It executes the project in Snowflake through a single `EXECUTE DBT PROJECT … build` command and projects per-model statuses into the Airflow UI with near-live latency using Snowflake event telemetry. It builds on [Cosmos's watcher architecture](https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html), introduced in Cosmos 1.11 and considered stable starting with 1.15, but requires Snowflake-specific producer and consumer classes.
+2. It executes the project in Snowflake through a single `EXECUTE DBT PROJECT <project_name> ARGS='build ...'` command and projects per-model statuses into the Airflow UI with near-live latency using Snowflake event telemetry. It builds on [Cosmos's watcher architecture](https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html), introduced in Cosmos 1.11 and considered stable starting with 1.15, but requires Snowflake-specific producer and consumer classes.
 
 Airflow remains the single control plane — cross-system dependencies, Asset-based scheduling, per-model observability, callbacks, and lineage — while Snowflake owns authoring, access control, and compute.
 

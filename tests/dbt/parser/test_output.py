@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from cosmos.dbt.parser.output import (
+    extract_dbt_failure_details,
     extract_dbt_runner_issues,
     extract_freshness_warn_msg,
     extract_log_issues,
@@ -115,6 +116,23 @@ def test_extract_log_issues() -> None:
     test_names_no_warns, test_results_no_warns = extract_log_issues(log_list_no_warning)
     assert test_names_no_warns == []
     assert test_results_no_warns == []
+
+
+def test_extract_dbt_failure_details() -> None:
+    log_list = [
+        "20:30:01  \x1b[31mRunning with dbt=1.3.0\x1b[0m",
+        "20:30:02  \x1b[31mFailure in test not_null_my_model_id (models/schema.yml)\x1b[0m",
+        "20:30:02  \x1b[31m  Got 5 results, configured to fail if != 0\x1b[0m",
+        "20:30:03  \x1b[31mError in model my_model (models/my_model.sql)\x1b[0m",
+        "20:30:03  \x1b[31m  Database Error: relation does not exist\x1b[0m",
+    ]
+    details = extract_dbt_failure_details(log_list)
+    assert details == [
+        "Failure in test not_null_my_model_id (models/schema.yml) Got 5 results, configured to fail if != 0",
+        "Error in model my_model (models/my_model.sql) Database Error: relation does not exist",
+    ]
+
+    assert extract_dbt_failure_details(["20:30:01  Running with dbt=1.3.0", "20:30:02  Completed successfully"]) == []
 
 
 def test_extract_dbt_runner_issues():

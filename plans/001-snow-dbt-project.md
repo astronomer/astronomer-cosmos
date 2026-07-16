@@ -196,7 +196,7 @@ This is a new execution mode, but it is not implementable as a registration-only
 
 ## Open questions (for community input)
 
-1. Manifest/profile cache backend: scheduler-local disk or object storage — does anyone have strong operational preferences at 100+ projects per deployment?
+1. Manifest/profile cache backend: scheduler-local disk or Airflow variable or another approach - does anyone have strong operational preferences at 100+ projects per deployment?
 2. Is `WATCHER_SNOW_DBT_PROJECT` the right name, or should the watcher transport be an orthogonal axis (e.g. `ExecutionMode.SNOW_DBT_PROJECT` implying watcher semantics)?
 3. Should the standalone artifact-fetching plumbing (locate and download `target/` for a given query ID) also ship as public, reusable operators or hooks independent of the execution mode?
 4. What customer requirements would justify adding separate render/execution connection IDs or an explicit project-object override after the single-connection API ships?

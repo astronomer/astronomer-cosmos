@@ -23,20 +23,25 @@ def accumulate_test_result(
     status: str,
     tests_per_model: dict[str, list[str]],
     test_results_per_model: dict[str, dict[str, str]],
-) -> str | None:
-    """Record a test's terminal status into test_results_per_model for its parent model.
+) -> list[str]:
+    """Record a test's terminal status into test_results_per_model for every parent model.
+
+    A test can belong to more than one model (e.g. a ``relationships`` test depends on
+    both the model it is defined on and the model it references), so it may appear under
+    several keys in ``tests_per_model``; its status is recorded under each.
 
     Results are keyed by ``test_unique_id`` so that a duplicated or replayed log line for
     the same test (the Kubernetes log reader can replay recent lines after an interruption)
     overwrites its entry instead of being counted as another distinct test.
 
-    Returns the parent model's unique_id if found, else None.
+    Returns the unique_ids of all parent models the test was recorded for (empty if none).
     """
+    matched_model_uids: list[str] = []
     for model_uid, test_uids in tests_per_model.items():
         if test_unique_id in test_uids:
             test_results_per_model.setdefault(model_uid, {})[test_unique_id] = status
-            return model_uid
-    return None
+            matched_model_uids.append(model_uid)
+    return matched_model_uids
 
 
 def get_aggregated_test_status(
@@ -86,8 +91,8 @@ def push_test_result_or_aggregate(
     :param task_instance: The Airflow task instance used for XCom push.
     """
     with _test_results_lock:
-        model_uid = accumulate_test_result(test_unique_id, status, tests_per_model, test_results_per_model)
-        if model_uid is not None:
+        model_uids = accumulate_test_result(test_unique_id, status, tests_per_model, test_results_per_model)
+        for model_uid in model_uids:
             aggregated = get_aggregated_test_status(model_uid, tests_per_model, test_results_per_model)
             if aggregated is not None:
                 safe_xcom_push(

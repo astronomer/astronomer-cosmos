@@ -39,6 +39,7 @@ if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRF
   if [ -f "$REQUIREMENTS_FILE" ]; then
     EFFECTIVE_DBT_VERSION="$DBT_VERSION"
   else
+    echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline."
     REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"
     EFFECTIVE_DBT_VERSION="1.11"
   fi

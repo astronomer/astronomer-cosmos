@@ -6,8 +6,7 @@ set -e
 
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"
-# dbt minor passed by Hatch via {matrix:dbt}. Required: no default, so a caller
-# that forgets to pass it fails loudly instead of silently testing dbt 1.11.
+# dbt minor from Hatch's {matrix:dbt}; required, no default.
 DBT_VERSION="$3"
 if [ -z "$DBT_VERSION" ]; then
   echo "::error::DBT_VERSION (third positional arg) was not provided."
@@ -38,19 +37,13 @@ if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRF
   REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-${DBT_VERSION}.txt"
   if [ ! -f "$REQUIREMENTS_FILE" ]; then
     if [ "$DBT_VERSION" = "1.11" ] || [ "$DBT_VERSION" = "1.12" ]; then
-      # Every one of these Airflow versions is expected to have both a 1.11 and a
-      # 1.12 lockfile. A missing one here is a real gap (add the lockfile), not an
-      # intentionally-uncovered dbt minor -- fail loudly rather than silently
-      # substituting a different lockfile and letting the version assertion below
-      # pass against the wrong dbt minor.
+      # Every Airflow version should have both a 1.11 and 1.12 lockfile; a missing
+      # one is a real gap, not an intentionally-uncovered dbt minor.
       echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
       exit 1
     fi
-    # Other dbt minors (1.5-1.10, 2.0) don't have a lockfile per Airflow version.
-    # Jobs that request them re-pin dbt themselves in a dedicated setup step that
-    # runs after this script (see integration-setup.sh, performance-setup.sh,
-    # kubernetes-setup.sh, integration-dbt-async.sh, integration-dbtf-setup.sh),
-    # so the exact dbt minor installed here is just a throwaway baseline.
+    # Other dbt minors (1.5-1.10, 2.0) have no per-Airflow lockfile; jobs needing
+    # them re-pin dbt in their own setup step, so this is just a throwaway baseline.
     echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline (this job must re-pin dbt itself)."
     REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"
     EFFECTIVE_DBT_VERSION="1.11"
@@ -96,9 +89,8 @@ else
     exit 1
 fi
 
-# Assert against EFFECTIVE_DBT_VERSION, not DBT_VERSION: they differ only when the
-# fallback above substituted the dbt-1.11 baseline for a dbt minor with no lockfile
-# for this Airflow version, in which case 1.11 is genuinely what got installed.
+# EFFECTIVE_DBT_VERSION differs from DBT_VERSION only when the fallback above
+# substituted the dbt-1.11 baseline.
 actual_dbt_version=$(dbt --version 2>/dev/null | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
 if [ "$actual_dbt_version" = "$EFFECTIVE_DBT_VERSION" ]; then
     echo "dbt version is as expected: $EFFECTIVE_DBT_VERSION"

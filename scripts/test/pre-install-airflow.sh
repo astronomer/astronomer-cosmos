@@ -6,9 +6,13 @@ set -e
 
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"
-# dbt minor passed by Hatch via {matrix:dbt}. Defaults to the pinned baseline
-# when the script is invoked with only two args (e.g. local/manual runs).
-DBT_VERSION="${3:-1.11}"
+# dbt minor passed by Hatch via {matrix:dbt}. Required: no default, so a caller
+# that forgets to pass it fails loudly instead of silently testing dbt 1.11.
+DBT_VERSION="$3"
+if [ -z "$DBT_VERSION" ]; then
+  echo "::error::DBT_VERSION (third positional arg) was not provided."
+  exit 1
+fi
 
 # Use this to set the appropriate Python environment in Github Actions,
 # while also not assuming --system when running locally.
@@ -27,19 +31,27 @@ rm -f $AIRFLOW_HOME/airflow.db
 pip install uv
 uv pip install pip --upgrade
 
-# Tracks the dbt minor we can assert on after install. Set when a pinned
-# lockfile actually pins the requested dbt minor, or by the dynamic path below.
-EFFECTIVE_DBT_VERSION=""
+EFFECTIVE_DBT_VERSION="$DBT_VERSION"
 
 if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRFLOW_VERSION" = "2.11" ] || [ "$AIRFLOW_VERSION" = "3.0" ] || [ "$AIRFLOW_VERSION" = "3.1" ] || [ "$AIRFLOW_VERSION" = "3.2" ] || [ "$AIRFLOW_VERSION" = "3.3" ] ; then
-  # Install from the pinned lockfile matching this (airflow, dbt) pair. When no
-  # lockfile exists for the requested dbt minor, fall back to the dbt-1.11
-  # baseline; jobs that need a different dbt minor re-pin it in their own setup.
+  # Install from the pinned lockfile matching this (airflow, dbt) pair.
   REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-${DBT_VERSION}.txt"
-  if [ -f "$REQUIREMENTS_FILE" ]; then
-    EFFECTIVE_DBT_VERSION="$DBT_VERSION"
-  else
-    echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline."
+  if [ ! -f "$REQUIREMENTS_FILE" ]; then
+    if [ "$DBT_VERSION" = "1.11" ] || [ "$DBT_VERSION" = "1.12" ]; then
+      # Every one of these Airflow versions is expected to have both a 1.11 and a
+      # 1.12 lockfile. A missing one here is a real gap (add the lockfile), not an
+      # intentionally-uncovered dbt minor -- fail loudly rather than silently
+      # substituting a different lockfile and letting the version assertion below
+      # pass against the wrong dbt minor.
+      echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
+      exit 1
+    fi
+    # Other dbt minors (1.5-1.10, 2.0) don't have a lockfile per Airflow version.
+    # Jobs that request them re-pin dbt themselves in a dedicated setup step that
+    # runs after this script (see integration-setup.sh, performance-setup.sh,
+    # kubernetes-setup.sh, integration-dbt-async.sh, integration-dbtf-setup.sh),
+    # so the exact dbt minor installed here is just a throwaway baseline.
+    echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline (this job must re-pin dbt itself)."
     REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"
     EFFECTIVE_DBT_VERSION="1.11"
   fi
@@ -69,7 +81,6 @@ else
   uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
   uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0" apache-airflow==$AIRFLOW_VERSION
-  EFFECTIVE_DBT_VERSION="$DBT_VERSION"
 
   # Delete the no longer needed constraint file
   rm /tmp/constraint.txt
@@ -85,17 +96,15 @@ else
     exit 1
 fi
 
-# Assert the installed dbt minor only when we know which one to expect: a lockfile
-# pinned it, or the dynamic path installed it. Jobs that fell back to the dbt-1.11
-# baseline assert against 1.11; jobs that re-pin dbt later verify it themselves.
-if [ -n "$EFFECTIVE_DBT_VERSION" ]; then
-    actual_dbt_version=$(dbt --version 2>/dev/null | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
-    if [ "$actual_dbt_version" = "$EFFECTIVE_DBT_VERSION" ]; then
-        echo "dbt version is as expected: $EFFECTIVE_DBT_VERSION"
-    else
-        echo "dbt version does not match. Expected: $EFFECTIVE_DBT_VERSION, but got: $actual_dbt_version"
-        exit 1
-    fi
+# Assert against EFFECTIVE_DBT_VERSION, not DBT_VERSION: they differ only when the
+# fallback above substituted the dbt-1.11 baseline for a dbt minor with no lockfile
+# for this Airflow version, in which case 1.11 is genuinely what got installed.
+actual_dbt_version=$(dbt --version 2>/dev/null | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
+if [ "$actual_dbt_version" = "$EFFECTIVE_DBT_VERSION" ]; then
+    echo "dbt version is as expected: $EFFECTIVE_DBT_VERSION"
+else
+    echo "dbt version does not match. Expected: $EFFECTIVE_DBT_VERSION, but got: $actual_dbt_version"
+    exit 1
 fi
 
 # Installation of dbt in a separate Python virtual environment:

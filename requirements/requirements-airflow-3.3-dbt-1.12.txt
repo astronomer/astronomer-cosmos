@@ -21,7 +21,12 @@ anyio==4.14.1
 apache-airflow==3.3.0
 apache-airflow-core==3.3.0
 apache-airflow-devel-common==0.1.1
-apache-airflow-providers-amazon==9.31.0
+apache-airflow-providers-amazon==9.31.0; python_version < "3.14"
+# redshift_connector's Python-3.14-conditional floor (>=2.1.13) in 9.25.0+ forces an
+# aiobotocore/s3fs/fsspec/gcsfs cascade whose newest gcsfs needs google-cloud-storage>=3.7,
+# conflicting with dbt-bigquery's <3.2 cap. 9.24.0 predates that marker, so it sidesteps the
+# cascade entirely for the Python 3.14 cell.
+apache-airflow-providers-amazon==9.24.0; python_version >= "3.14"
 apache-airflow-providers-cncf-kubernetes==10.19.0
 apache-airflow-providers-common-compat==1.15.0
 apache-airflow-providers-common-io==1.8.0
@@ -391,7 +396,10 @@ s3fs==2025.12.0
 s3transfer==0.15.0
 sagemaker-studio==1.0.26
 scikit-learn==1.5.2
-scipy==1.15.3
+scipy==1.15.3; python_version < "3.14"
+# scipy 1.15.3 has no cp314 wheel; every release that adds one (1.16.0+) drops Python 3.10
+# support, so no single version covers both — hence the marker split rather than a flat bump.
+scipy==1.16.2; python_version >= "3.14"
 scramp==1.4.10
 secretstorage==3.5.0
 semver==3.0.4

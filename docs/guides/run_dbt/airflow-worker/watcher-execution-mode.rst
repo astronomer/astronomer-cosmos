@@ -335,48 +335,84 @@ Watcher dbt Execution Queue
 
 .. versionadded:: 1.14.0
 
+.. versionchanged:: 1.16.0
+    The single ``watcher_dbt_execution_queue`` setting was replaced by three dedicated settings; ``watcher_dbt_producer_queue``, ``watcher_dbt_consumer_queue``, and ``watcher_dbt_retry_queue``, which are described below. ``watcher_dbt_execution_queue`` is deprecated but still honored as a fallback; see `Migrating from watcher_dbt_execution_queue`_.
+
 In watcher execution mode there are three different "types" of tasks that are executed:
 
 - Producer tasks: execute a ``dbt build`` for the dbt project being rendered and orchestrated with watcher execution mode
 - Consumer tasks: (first try) lightweight sensors that wait for the producer task to complete
 - Consumer tasks: (retries) executes a dbt command for a specific node, **only when there is failure for that node**
 
-Producer tasks typically require a high-memory worker to execute the ``dbt build`` command. On their first attempt, the consumer sensors require minimal CPU and memory resources. However, if these tasks retry, they execute the dbt command for the node, which may require significantly more resources. To ensure that the producer tasks and retry attempts have the appropriate resources for execution, the ``watcher_dbt_execution_queue`` configuration can be set.
+Producer tasks typically require a high-memory worker to execute the ``dbt build`` command. On their first attempt, the consumer sensors require minimal CPU and memory resources. However, if these tasks retry, they execute the dbt command for the node, which may require significantly more resources.
 
-The ``watcher_dbt_execution_queue`` configuration allows you to specify the worker queue that the producer tasks and retry attempts use. This enables you to:
+Cosmos provides three independent queue settings to properly route each to the most appropriate worker:
+
+.. _watcher-queue-configuration:
+
+- ``watcher_dbt_producer_queue`` — the queue used by ``DbtProducerWatcherOperator`` tasks
+- ``watcher_dbt_consumer_queue`` — the queue used by ``DbtConsumerWatcherSensor`` tasks on their initial (sensor) run
+- ``watcher_dbt_retry_queue`` — the queue used by ``DbtConsumerWatcherSensor`` tasks on retries, when they execute the dbt command for a failed node
+
+These settings enable you to:
 
 - **Optimize resource allocation** — Use high-resource workers for producer tasks and sensor retries, and lightweight workers for initial sensor execution.
-- **Improve scheduling efficiency** — Prevent resource contention between producer/retry executions and initial sensor tasks
-- **Scale independently** — Scale "execution" queues (producer and retry) separately from sensor tasks
+- **Improve scheduling efficiency** — Prevent resource contention between producer/retry executions and initial sensor tasks.
+- **Scale independently** — Scale each queue separately based on its actual resource demand.
 
 **Configuration:**
 
-Set the ``watcher_dbt_execution_queue`` in your Airflow configuration:
+Set any combination of the three settings in your Airflow configuration:
+
+.. code-block:: ini
+
+   [cosmos]
+   watcher_dbt_producer_queue = high_memory_queue
+   watcher_dbt_consumer_queue = lightweight_queue
+   watcher_dbt_retry_queue = high_memory_queue
+
+Or via environment variables:
+
+.. code-block:: bash
+
+   export AIRFLOW__COSMOS__WATCHER_DBT_PRODUCER_QUEUE=high_memory_queue
+   export AIRFLOW__COSMOS__WATCHER_DBT_CONSUMER_QUEUE=lightweight_queue
+   export AIRFLOW__COSMOS__WATCHER_DBT_RETRY_QUEUE=high_memory_queue
+
+**How it works:**
+
+- For watcher producer tasks (``DbtProducerWatcherOperator``), ``watcher_dbt_producer_queue`` is applied at task creation time.
+- For watcher consumer tasks (``DbtConsumerWatcherSensor``), ``watcher_dbt_consumer_queue`` is applied at task creation time for the initial sensor run.
+- For watcher consumer task retries, ``watcher_dbt_retry_queue`` is applied automatically via an `Airflow cluster policy <https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html>`_ (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime.
+
+.. note::
+
+  The Cosmos queue settings take priority over any ``queue`` set directly on the operator (e.g. via ``setup_operator_args``). The effective precedence for each task type is:
+
+  - Producer: ``watcher_dbt_producer_queue`` > deprecated ``watcher_dbt_execution_queue`` > explicit ``queue`` (from ``setup_operator_args``) > ``operator_args`` > Airflow default queue
+  - Consumer (initial run): ``watcher_dbt_consumer_queue`` > explicit ``queue`` > ``operator_args`` > Airflow default queue
+  - Consumer (retries): ``watcher_dbt_retry_queue`` > deprecated ``watcher_dbt_execution_queue`` overrides the queue at runtime via the cluster policy
+
+.. _Migrating from watcher_dbt_execution_queue:
+
+**Migrating from watcher_dbt_execution_queue:**
+
+Prior to Cosmos 1.16.0, a single ``watcher_dbt_execution_queue`` setting was applied to both producer tasks and consumer retries. It is deprecated and will be removed in Cosmos 2.0.0, but existing configurations continue to work without changes: if ``watcher_dbt_producer_queue`` and/or ``watcher_dbt_retry_queue`` are left unset, Cosmos falls back to ``watcher_dbt_execution_queue`` for that task type. Setting it now also emits a ``DeprecationWarning``. There is no fallback for ``watcher_dbt_consumer_queue``, since it configures behavior (routing the *initial* consumer sensor run) that ``watcher_dbt_execution_queue`` never covered.
+
+To migrate, replace:
 
 .. code-block:: ini
 
    [cosmos]
    watcher_dbt_execution_queue = high_memory_queue
 
-Or via environment variable:
+with:
 
-.. code-block:: bash
+.. code-block:: ini
 
-   export AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE=high_memory_queue
-
-**How it works:**
-
-- For watcher producer tasks (``DbtProducerWatcherOperator``), the configured queue is used during their first execution
-- For watcher consumer tasks (``DbtConsumerWatcherSensor``), from their first retry onwards, if ``watcher_dbt_execution_queue`` is configured, the task is automatically assigned to the specified queue
-- This behavior is enforced by Cosmos via an `Airflow cluster policy <https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html>`_ (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts
-
-.. note::
-
-  For producer task execution, we encourage users to set the ``watcher_dbt_execution_queue`` configuration. If, for any reason, users prefer to use a different node pool for producer tasks without setting an Airflow Cluster Policy, they can set the ``queue`` argument via ``setup_operator_args``. This, however, would not solve the problem of assigning consumer retries to nodes that may have more memory and CPU available.
-
-  The effective precedence is:
-
-  ``watcher_dbt_execution_queue`` > explicit ``queue`` on the producer (from ``setup_operator_args``) > ``operator_args`` > your Airflow deployment’s default queue.
+   [cosmos]
+   watcher_dbt_producer_queue = high_memory_queue
+   watcher_dbt_retry_queue = high_memory_queue
 
 Installation of Apache Airflow® and dbt
 ++++++++++++++++++++++++++++++++++++++++
@@ -508,7 +544,20 @@ Advanced config
 Callback support
 ++++++++++++++++
 
-The ``DbtProducerWatcherOperator`` and ``DbtConsumerWatcherSensor`` will use the user-defined callback function similar to ``ExecutionMode.LOCAL`` mode.
+.. note::
+   This section covers the Cosmos ``callback`` parameter described in :ref:`callbacks` (for post-execution actions
+   such as uploading dbt artifacts). It is unrelated to Airflow's native ``on_retry_callback``/``on_failure_callback``
+   task callbacks used elsewhere on this page (see :ref:`producer-status-backup`), and to the ``freshness_callback``
+   described below in :ref:`watcher-source-freshness`.
+
+The ``DbtProducerWatcherOperator`` uses the user-defined ``callback`` function similar to ``ExecutionMode.LOCAL`` mode.
+
+A ``callback`` set via ``operator_args`` (or on ``DbtDag``/``DbtTaskGroup``) fires once per DAG run, on the
+producer task (``dbt_producer_watcher``), since that is the task that actually runs ``dbt build``. The callback
+receives the ``run_results.json`` for the whole project rather than a single model, because the per-model
+``DbtConsumerWatcherSensor`` tasks do not invoke dbt in their normal execution path. Note that on a consumer sensor
+retry or manual task clear, the consumer falls back to running that single model's dbt command directly and the
+callback fires again at that point, with the retried model's own ``run_results.json``.
 
 You can define different ``callback`` behaviors for producer and consumer nodes by using ``operator_args`` to configure the consumer callback and ``setup_operator_args`` to override the callback for the producer, as described below.
 
@@ -604,7 +653,7 @@ Example: Configure the producer task with custom retry settings.
 
 This allows you to customize ``DbtProducerWatcherOperator`` retry behavior without affecting the arguments used by the other sensor tasks.
 
-If configuring queues, we suggest using the previously mentioned ``watcher_dbt_execution_queue`` configuration instead of the ``setup_operator_args``.
+If configuring queues, we suggest using the previously mentioned ``watcher_dbt_producer_queue``, ``watcher_dbt_consumer_queue``, and ``watcher_dbt_retry_queue`` configurations instead of ``setup_operator_args``.
 
 .. note::
    Please note that ``setup_operator_args`` is specific to Cosmos and is not related to Airflow setup or teardown task.

@@ -39,7 +39,7 @@ repos:
     rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # v6.0.0
     hooks:
       - id: check-added-large-files
-        exclude: ^dev/dags/dbt/cross_project/downstream/target/manifest.json$
+        exclude: ^dev/dags/dbt/cross_project/(downstream|project_a_bidirectional|project_b_bidirectional)/target/manifest.json$
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
@@ -92,7 +92,7 @@ repos:
           - --py310-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 77039ccbba72c8aede339c5f8ae29b42aced0a2e  # v0.15.18
+    rev: 01a675ea018f2fb714478a5ffb83fcea8374bb06  # v0.15.21
     hooks:
       - id: ruff-check
         args: [ --fix ]

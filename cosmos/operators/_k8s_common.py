@@ -15,7 +15,7 @@ from os import PathLike
 from typing import TYPE_CHECKING, Any, Protocol
 
 import kubernetes.client as k8s
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import convert_env_vars
 from airflow.providers.cncf.kubernetes.callbacks import client_type
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
@@ -26,6 +26,7 @@ except ImportError:
     from airflow.utils.context import context_merge
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import PRODUCER_WATCHER_TASK_ID
 from cosmos.operators._watcher.xcom import (

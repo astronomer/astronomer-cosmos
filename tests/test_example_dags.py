@@ -29,12 +29,14 @@ IGNORED_DAG_FILES = [
     "jaffle_shop_watcher_kubernetes.py",
 ]
 
-# cross_project_manifest_dag.py and cross_project_dbt_ls_dag.py exercise dbt-loom
-# cross-project references and need dbt-loom installed. When it isn't, the
-# dedicated Run-Integration-Tests-dbt-Loom CI job covers these DAGs instead.
+# cross_project_manifest_dag.py, cross_project_dbt_ls_dag.py, and
+# cross_project_bidirectional_dag.py exercise dbt-loom cross-project references and
+# need dbt-loom installed. When it isn't, the dedicated Run-Integration-Tests-dbt-Loom
+# CI job covers these DAGs instead.
 if importlib.util.find_spec("dbt_loom") is None:
     IGNORED_DAG_FILES.append("cross_project_manifest_dag.py")
     IGNORED_DAG_FILES.append("cross_project_dbt_ls_dag.py")
+    IGNORED_DAG_FILES.append("cross_project_bidirectional_dag.py")
 
 
 @provide_session

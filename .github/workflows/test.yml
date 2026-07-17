@@ -2,11 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    # TEMP(revert before merge): also run on the dbt-1.12 bump branch so the new
-    # 1.12 matrix cells actually execute pre-merge. `pull_request_target` reads
-    # the workflow + matrix from the base branch, so it never runs new matrix
-    # cells defined only on the PR head; a `push` run uses the branch's workflow.
-    branches: [main, bump/dbt-core-1.12.0b2]
+    branches: [main]
   # Also run on pull requests originating from forks. Every test job here is secret-dependent
   # (integration tests, kubernetes, code coverage) and depends on the Authorize job, which requires
   # manually approving the workflow run for external PRs. Jobs that need no secrets (type-check,

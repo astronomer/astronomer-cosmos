@@ -239,9 +239,9 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
         # Build base Kubernetes pod args (incl. dbt CLI command)
         self.build_kube_args(context, cmd_flags)
 
-        # build_kube_args splits the executable into self.cmds (e.g. ["dbt"]) and the
-        # remaining tokens into self.arguments; recombine both so the leading "dbt" is not
-        # dropped when the command is folded into the bash -c string below (see PR #2488).
+        # build_kube_args may place the executable in either self.cmds (when cmds is explicitly
+        # ["dbt"]) or self.arguments (the default, where cmds is left unset); recombine both so
+        # the leading "dbt" is not dropped when folded into the bash -c string below (see PR #2488).
         cmds: Any = self.cmds  # type: ignore[has-type]
         arguments: Any = self.arguments  # type: ignore[has-type]
         cmd_parts = list(cmds) if isinstance(cmds, (list, tuple)) else [cmds]

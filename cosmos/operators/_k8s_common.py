@@ -139,10 +139,23 @@ def _build_env_vars(env: dict[str, str | bytes | PathLike[Any]], existing_env_va
 
 
 def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[str] | None = None) -> None:
-    """Build the dbt command, set env vars, and assign ``cmds``/``arguments`` on the operator.
+    """Build the dbt command, set env vars, and assign the dbt ``arguments`` on the operator.
 
-    Always splits the executable from arguments (``self.cmds = ["dbt"]``, ``self.arguments = [...]``)
-    to handle container images with or without ``ENTRYPOINT ["dbt"]``.
+    ``cmds`` is preserved exactly as supplied by the user and never reassigned here:
+
+    - If ``cmds`` is unset, the full dbt command (including the executable) is passed as
+      ``arguments`` and ``cmds`` is left untouched, so the container image's ``ENTRYPOINT``
+      (if any) is preserved. This matters for images whose ``ENTRYPOINT`` performs setup,
+      such as sourcing secrets injected by a sidecar, before running ``dbt``.
+    - If ``cmds`` is exactly the dbt executable (``["dbt"]``), the executable is stripped from
+      ``arguments`` to avoid running ``dbt dbt ...``.
+    - If ``cmds`` is a custom wrapper (e.g. ``["/custom-entrypoint.sh"]``), it is kept as the
+      container command and the full dbt command (including the executable) is passed as
+      ``arguments`` for the wrapper to invoke.
+
+    Note: if the image's ``ENTRYPOINT`` is itself ``dbt`` (i.e. ``["dbt"]``), leaving ``cmds``
+    unset makes Kubernetes run ``ENTRYPOINT`` + ``arguments`` as ``dbt dbt ...``. Set
+    ``cmds=["dbt"]`` for such images so the leading executable is stripped from ``arguments``.
     """
     # For the first round, we're going to assume that the command is dbt
     # This means that we don't have openlineage support, but we will create a ticket
@@ -162,11 +175,13 @@ def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[
 
     operator.env_vars = _build_env_vars(env_vars, operator.env_vars)
 
-    # Split the executable from arguments to avoid double invocation when the
-    # container image has ENTRYPOINT ["dbt"]. Setting self.cmds overrides the
-    # image's ENTRYPOINT, so this works regardless of image configuration.
-    operator.cmds = [dbt_cmd[0]]
-    operator.arguments = dbt_cmd[1:]
+    if operator.cmds == [dbt_cmd[0]]:
+        # cmds already matches the dbt executable; strip it from arguments to avoid duplication.
+        operator.arguments = dbt_cmd[1:]
+    else:
+        # Preserve any user-supplied cmds (a custom entrypoint/wrapper) verbatim, or leave cmds
+        # unset so the image ENTRYPOINT runs; pass the full dbt command (incl. executable) as arguments.
+        operator.arguments = dbt_cmd
 
 
 def build_and_run_cmd(

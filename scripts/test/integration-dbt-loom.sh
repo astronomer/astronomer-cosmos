@@ -47,11 +47,12 @@ else
 fi
 
 # Run the cross-project example DAGs that exercise dbt-loom: the manifest-based
-# DAG and the dbt ls-based DAG. Each is run in its own invocation because
-# TEST_SINGLE_DAG makes test_example_dags.py build a DagBag containing only the
-# named DAG (see get_dag_bag_single_dag). Without it, collection loads every
-# example DAG and asserts no import errors, which fails here because other DAGs
-# need secrets this job doesn't provide (e.g. DATABRICKS_CLUSTER_ID, S3 access).
+# DAG, the dbt ls-based DAG, and the bidirectional manifest-based DAG. Each is run
+# in its own invocation because TEST_SINGLE_DAG makes test_example_dags.py build a
+# DagBag containing only the named DAG (see get_dag_bag_single_dag). Without it,
+# collection loads every example DAG and asserts no import errors, which fails
+# here because other DAGs need secrets this job doesn't provide (e.g.
+# DATABRICKS_CLUSTER_ID, S3 access).
 export TEST_SINGLE_DAG="cross_project_manifest_dag.py"
 pytest -vv \
     --cov=cosmos \
@@ -66,3 +67,11 @@ pytest -vv \
     --cov-report=term-missing \
     --cov-report=xml \
     "tests/test_example_dags.py::test_example_dag[cross_project_dbt_ls_dag]"
+
+export TEST_SINGLE_DAG="cross_project_bidirectional_dag.py"
+pytest -vv \
+    --cov=cosmos \
+    --cov-append \
+    --cov-report=term-missing \
+    --cov-report=xml \
+    "tests/test_example_dags.py::test_example_dag[cross_project_bidirectional_dag]"

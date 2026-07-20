@@ -63,6 +63,10 @@ If you need to run ``dbt`` under a specific container command, set ``cmds`` via 
 - When ``cmds`` is set to ``["dbt"]``, Cosmos runs ``dbt`` as the container command and passes the remaining tokens as ``arguments``.
 - When ``cmds`` is set to a custom wrapper (for example ``["/custom-entrypoint.sh"]``), Cosmos preserves it as the container command and passes the full ``dbt`` command, including the executable, as ``arguments``. The wrapper is responsible for invoking ``dbt`` with those arguments.
 
+.. note::
+
+    If your image's ``ENTRYPOINT`` is itself ``dbt`` (that is, ``["dbt"]``), leaving ``cmds`` unset makes Kubernetes run ``ENTRYPOINT`` followed by ``arguments``, which results in ``dbt dbt ...``. For such images, set ``cmds=["dbt"]`` so Cosmos strips the leading executable from ``arguments``.
+
 For example, to run ``dbt`` through a custom entrypoint script baked into your image:
 
 .. code-block:: python

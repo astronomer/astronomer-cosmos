@@ -139,7 +139,7 @@ def _build_env_vars(env: dict[str, str | bytes | PathLike[Any]], existing_env_va
 
 
 def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[str] | None = None) -> None:
-    """Build the dbt command, set env vars, and assign ``cmds``/``arguments`` on the operator.
+    """Build the dbt command, set env vars, and assign the dbt ``arguments`` on the operator.
 
     ``cmds`` is preserved exactly as supplied by the user and never reassigned here:
 
@@ -152,6 +152,10 @@ def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[
     - If ``cmds`` is a custom wrapper (e.g. ``["/custom-entrypoint.sh"]``), it is kept as the
       container command and the full dbt command (including the executable) is passed as
       ``arguments`` for the wrapper to invoke.
+
+    Note: if the image's ``ENTRYPOINT`` is itself ``dbt`` (i.e. ``["dbt"]``), leaving ``cmds``
+    unset makes Kubernetes run ``ENTRYPOINT`` + ``arguments`` as ``dbt dbt ...``. Set
+    ``cmds=["dbt"]`` for such images so the leading executable is stripped from ``arguments``.
     """
     # For the first round, we're going to assume that the command is dbt
     # This means that we don't have openlineage support, but we will create a ticket

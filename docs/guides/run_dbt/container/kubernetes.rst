@@ -52,6 +52,35 @@ For instance,
 To generate dbt docs and upload them to S3 from the same Pod, use :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator` and Cosmos 1.15.0 or higher.
 See :doc:`../../dbt_docs/generating-docs` for an end-to-end example and the extra requirements for this workflow.
 
+Container command and image ENTRYPOINT
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default, Cosmos leaves the Pod's ``cmds`` unset and passes the full ``dbt`` command (including the ``dbt`` executable) through the Pod's ``arguments``. This preserves the container image's ``ENTRYPOINT``, so images whose ``ENTRYPOINT`` performs setup before ``dbt`` runs (for example, sourcing secrets injected by a sidecar such as a Vault agent) continue to work.
+
+If you need to run ``dbt`` under a specific container command, set ``cmds`` via ``operator_args``. Cosmos handles the value you provide as follows:
+
+- When ``cmds`` is left unset (the default), the image ``ENTRYPOINT`` runs and the full ``dbt`` command is passed as ``arguments``.
+- When ``cmds`` is set to ``["dbt"]``, Cosmos runs ``dbt`` as the container command and passes the remaining tokens as ``arguments``.
+- When ``cmds`` is set to a custom wrapper (for example ``["/custom-entrypoint.sh"]``), Cosmos preserves it as the container command and passes the full ``dbt`` command, including the executable, as ``arguments``. The wrapper is responsible for invoking ``dbt`` with those arguments.
+
+For example, to run ``dbt`` through a custom entrypoint script baked into your image:
+
+.. code-block:: python
+
+    DbtKubernetesOperator(
+        ...,
+        operator_args={"cmds": ["/custom-entrypoint.sh"]},
+    )
+
+This behavior is shared by the ``kubernetes``, ``watcher_kubernetes``, ``aws_eks``, and ``gcp_gke`` execution modes, which all build their Pod command the same way.
+
+Behavior across versions
+++++++++++++++++++++++++
+
+- In Cosmos versions before 1.15.0, Cosmos did not set ``cmds`` on the Pod. The image ``ENTRYPOINT`` was preserved, and any ``cmds`` supplied through ``operator_args`` was used as provided.
+- In Cosmos 1.15.0, Cosmos began setting ``cmds`` to ``["dbt"]`` unconditionally. Because setting the Pod ``cmds`` overrides the container ``command``, this overrode the image ``ENTRYPOINT`` and also discarded any custom ``cmds`` value (`#2889 <https://github.com/astronomer/astronomer-cosmos/issues/2889>`__).
+- Cosmos 1.15.1 restores the earlier behavior: the image ``ENTRYPOINT`` is preserved by default, a custom ``cmds`` is honored as provided, and ``["dbt"]`` is used as the container command only when set explicitly.
+
 Step-by-step instructions
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -82,7 +82,7 @@ Behavior across versions
 ++++++++++++++++++++++++
 
 - In Cosmos versions before 1.15.0, Cosmos did not set ``cmds`` on the Pod. The image ``ENTRYPOINT`` was preserved, and any ``cmds`` supplied through ``operator_args`` was used as provided.
-- In Cosmos 1.15.0, Cosmos began setting ``cmds`` to ``["dbt"]`` unconditionally. Because setting the Pod ``cmds`` overrides the container ``command``, this overrode the image ``ENTRYPOINT`` and also discarded any custom ``cmds`` value (`#2889 <https://github.com/astronomer/astronomer-cosmos/issues/2889>`__).
+- In Cosmos 1.15.0, Cosmos began setting ``cmds`` to ``["dbt"]`` unconditionally. Because setting the Pod ``cmds`` sets the container ``command`` field, this overrode the image ``ENTRYPOINT`` and also discarded any custom ``cmds`` value (`#2889 <https://github.com/astronomer/astronomer-cosmos/issues/2889>`__).
 - Cosmos 1.15.1 restores the earlier behavior: the image ``ENTRYPOINT`` is preserved by default, a custom ``cmds`` is honored as provided, and ``["dbt"]`` is used as the container command only when set explicitly.
 
 Step-by-step instructions

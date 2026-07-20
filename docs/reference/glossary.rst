@@ -87,7 +87,7 @@ Glossary
    profiles.yml
        The file where dbt stores connection information for each data warehouse connection.
        See :ref:`connect_database`, :ref:`use-your-profiles-yml`, or
-       `The profiles.yml file <https://docs.getdbt.com/docs/core/connect-data-platform/connection-profiles>`_
+       `The profiles.yml file <https://docs.getdbt.com/docs/local/profiles.yml>`_
        in the dbt docs.
 
    ProjectConfig

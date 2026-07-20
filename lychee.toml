@@ -8,10 +8,12 @@ scheme = ["http", "https"]
 
 # Give slow or occasionally throttling hosts a few chances before failing, so a
 # transient network hiccup doesn't make this blocking check flaky. A lower
-# concurrency keeps us from tripping per-host rate limiters.
+# concurrency keeps us from tripping per-host rate limiters. The 60s timeout
+# gives occasionally-slow docs CDNs enough headroom to respond before a request
+# is counted as a (job-failing) timeout on shared CI runners.
 max_retries = 4
 retry_wait_time = 3
-timeout = 30
+timeout = 60
 max_concurrency = 8
 
 # Fail only on genuinely broken links. A 429 (rate limited) or 503/504

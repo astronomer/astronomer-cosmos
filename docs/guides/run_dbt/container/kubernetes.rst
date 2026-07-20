@@ -76,7 +76,7 @@ For example, to run ``dbt`` through a custom entrypoint script baked into your i
         operator_args={"cmds": ["/custom-entrypoint.sh"]},
     )
 
-This behavior is shared by the ``kubernetes``, ``watcher_kubernetes``, ``aws_eks``, and ``gcp_gke`` execution modes, which all build their Pod command the same way.
+This behavior is shared by the ``kubernetes``, ``watcher_kubernetes``, ``aws_eks``, ``gcp_gke``, and ``watcher_gcp_gke`` execution modes, which all build their Pod command the same way.
 
 Behavior across versions
 ++++++++++++++++++++++++

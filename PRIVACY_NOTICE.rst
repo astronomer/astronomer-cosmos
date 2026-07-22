@@ -29,23 +29,23 @@ security fixes. Additionally, this information supports key decisions related to
 
 Deployments and individual users can opt out of analytics by setting the configuration:
 
-.. code-block::
+.. code-block:: ini
 
     [cosmos]
-    enable_telemetry = False
+    enable_telemetry = false
 
 or the equivalent environment variable:
 
-.. code-block::
+.. code-block:: bash
 
-    AIRFLOW__COSMOS__ENABLE_TELEMETRY=False
+    AIRFLOW__COSMOS__ENABLE_TELEMETRY=false
 
-As described in the `Scarf documentation <https://docs.scarf.sh/gateway/#do-not-track>`_, it is also possible to opt out by setting one of the following environment variables:
+As described in the `Scarf documentation <https://docs.scarf.sh/gateway/#do-not-track>`_, it is also possible to opt out by setting one of the following environment variables (values are case-insensitive):
 
-.. code-block::
+.. code-block:: bash
 
-    DO_NOT_TRACK=True
-    SCARF_NO_ANALYTICS=True
+    DO_NOT_TRACK=true
+    SCARF_NO_ANALYTICS=true
 
 
 In addition to Scarf's default data collection, Cosmos collects the following information when running Cosmos-powered DAGs:

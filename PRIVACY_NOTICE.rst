@@ -22,7 +22,7 @@ Collection of Data
 ------------------
 
 Astronomer Cosmos integrates `Scarf <https://about.scarf.sh/>`_ to collect basic telemetry data during operation.
-This data is collected and processed by Scarf in accordance with the `Scarf Privacy Policy <https://about.scarf.sh/privacy-policy/>`_.
+This data is collected and processed by Scarf in accordance with the `Scarf Privacy Policy`_.
 It assists the project maintainers in better understanding how Cosmos is used.
 Insights gained from this telemetry are critical for prioritizing patches, minor releases, and
 security fixes. Additionally, this information supports key decisions related to the development roadmap.
@@ -38,14 +38,14 @@ or the equivalent environment variable:
 
 .. code-block:: bash
 
-    AIRFLOW__COSMOS__ENABLE_TELEMETRY=false
+    export AIRFLOW__COSMOS__ENABLE_TELEMETRY=false
 
 As described in the `Scarf documentation <https://docs.scarf.sh/gateway/#do-not-track>`_, it is also possible to opt out by setting one of the following environment variables (values are case-insensitive):
 
 .. code-block:: bash
 
-    DO_NOT_TRACK=true
-    SCARF_NO_ANALYTICS=true
+    export DO_NOT_TRACK=true
+    export SCARF_NO_ANALYTICS=true
 
 
 In addition to Scarf's default data collection, Cosmos collects the following information when running Cosmos-powered DAGs:
@@ -97,4 +97,6 @@ When the **dbt docs plugin** is accessed, the following information is collected
 
 Astronomer does not track user-identifiable information through Cosmos telemetry.
 For details on how Scarf handles the collected data, please refer to the
-`Scarf Privacy Policy <https://about.scarf.sh/privacy-policy/>`__.
+`Scarf Privacy Policy`_.
+
+.. _Scarf Privacy Policy: https://about.scarf.sh/privacy-policy/

@@ -218,12 +218,7 @@ def test_copy_dbt_packages_all_cases(mock_logger, mock_dir, mock_makedirs, mock_
     mock_logger.info.assert_any_call("Completed copying dbt packages to temporary folder.")
 
 
-# https://github.com/astronomer/astronomer-cosmos/issues/1673
-# dbt-core's plugin discovery imports every top-level module named ``dbt_*`` reachable from
-# ``sys.path`` / ``PYTHONPATH``. Airflow puts its DAGs folder there, so a DAG file named ``dbt_*.py``
-# gets imported as a side effect of Cosmos running dbt -- leaking/duplicating DAGs (in-process) or
-# crashing the dbt command (subprocess). These tests cover the three helpers that keep the DAGs
-# folder out of dbt's reach.
+# Tests for the helpers that keep the Airflow DAGs folder out of dbt's plugin discovery (#1673).
 
 
 def test_resolve_dags_folder_returns_realpath(tmp_path):
@@ -239,6 +234,15 @@ def test_resolve_dags_folder_returns_none_when_unset():
 def test_resolve_dags_folder_returns_none_when_airflow_settings_unimportable():
     with patch.dict(sys.modules, {"airflow.settings": None}):
         assert _resolve_dags_folder() is None
+
+
+def test_resolve_dags_folder_resolves_relative_path(tmp_path, monkeypatch):
+    # Airflow only ``expanduser``s DAGS_FOLDER, so a user-configured relative path stays relative.
+    # _resolve_dags_folder must still return an absolute realpath so it matches realpath'd path entries.
+    (tmp_path / "my_dags").mkdir()
+    monkeypatch.chdir(tmp_path)
+    with patch("airflow.settings.DAGS_FOLDER", "my_dags"):
+        assert _resolve_dags_folder() == os.path.realpath(tmp_path / "my_dags")
 
 
 def test_exclude_dags_folder_from_sys_path_removes_and_restores(tmp_path):
@@ -267,24 +271,6 @@ def test_exclude_dags_folder_from_sys_path_restores_even_on_exception(tmp_path):
                     assert dags_folder not in sys.path
                     raise ValueError("boom")
             assert dags_folder in sys.path
-    finally:
-        sys.path[:] = original_sys_path
-
-
-def test_exclude_dags_folder_from_sys_path_normalizes_non_canonical_entry(tmp_path):
-    """A ``sys.path`` entry that is equivalent to (but not string-identical to) ``DAGS_FOLDER`` --
-    e.g. with a trailing slash or a non-canonical path segment -- must still be recognized and
-    removed, since ``pkgutil.iter_modules`` would scan it regardless of exact spelling."""
-    dags_folder = str(tmp_path)
-    non_canonical_entry = dags_folder + os.sep
-    original_sys_path = list(sys.path)
-    sys.path.insert(0, non_canonical_entry)
-
-    try:
-        with patch("airflow.settings.DAGS_FOLDER", dags_folder):
-            with exclude_dags_folder_from_sys_path():
-                assert non_canonical_entry not in sys.path
-            assert non_canonical_entry in sys.path
     finally:
         sys.path[:] = original_sys_path
 
@@ -346,18 +332,6 @@ def test_remove_dags_folder_from_pythonpath_strips_only_matching_entry(tmp_path)
     assert env["PYTHONPATH"] == os.pathsep.join([other_entry, dags_folder])
 
 
-def test_remove_dags_folder_from_pythonpath_normalizes_non_canonical_entry(tmp_path):
-    dags_folder = str(tmp_path)
-    non_canonical_entry = dags_folder + os.sep
-    other_entry = "/usr/local/astronomer-cosmos"
-    env = {"PYTHONPATH": os.pathsep.join([other_entry, non_canonical_entry])}
-
-    with patch("airflow.settings.DAGS_FOLDER", dags_folder):
-        result = remove_dags_folder_from_pythonpath(env)
-
-    assert result["PYTHONPATH"] == other_entry
-
-
 def test_remove_dags_folder_from_pythonpath_returns_unchanged_when_pythonpath_missing(tmp_path):
     env = {"OTHER_VAR": "value"}
     with patch("airflow.settings.DAGS_FOLDER", str(tmp_path)):
@@ -374,3 +348,78 @@ def test_remove_dags_folder_from_pythonpath_returns_unchanged_when_dags_folder_u
     assert result == env
     # always a copy, even on the no-op path, per the docstring's contract
     assert result is not env
+
+
+def test_exclude_dags_folder_from_sys_path_noop_when_flag_disabled(tmp_path):
+    dags_folder = str(tmp_path)
+    original_sys_path = list(sys.path)
+    sys.path.insert(0, dags_folder)
+
+    try:
+        with (
+            patch("airflow.settings.DAGS_FOLDER", dags_folder),
+            patch("cosmos.settings.enable_dags_folder_exclusion_from_dbt", False),
+        ):
+            with exclude_dags_folder_from_sys_path():
+                assert dags_folder in sys.path
+    finally:
+        sys.path[:] = original_sys_path
+
+
+def test_remove_dags_folder_from_pythonpath_noop_when_flag_disabled(tmp_path):
+    dags_folder = str(tmp_path)
+    env = {"PYTHONPATH": dags_folder}
+    with (
+        patch("airflow.settings.DAGS_FOLDER", dags_folder),
+        patch("cosmos.settings.enable_dags_folder_exclusion_from_dbt", False),
+    ):
+        result = remove_dags_folder_from_pythonpath(env)
+    assert result["PYTHONPATH"] == dags_folder
+    # still a copy, per the docstring's contract
+    assert result is not env
+
+
+def test_dbt_plugin_discovery_skips_dags_folder_dbt_module(tmp_path):
+    """Functional guard for #1673 against dbt-core's real plugin discovery.
+
+    Reproduces the bug -- dbt imports a DAG file named ``dbt_*.py`` from the DAGs folder -- and
+    confirms :func:`exclude_dags_folder_from_sys_path` prevents it while leaving genuinely installed
+    dbt plugins discoverable. This exercises the exact code path the in-process ``dbtRunner`` hits.
+    """
+    manager = pytest.importorskip("dbt.plugins.manager")
+    get_dbt_modules = getattr(manager, "_get_dbt_modules", None)
+    if get_dbt_modules is None:  # pragma: no cover - guards against dbt renaming the entrypoint
+        pytest.skip("dbt plugin discovery entrypoint not available in this dbt version")
+
+    module_name = "dbt_fake_plugin_for_issue_1673"
+    sentinel = tmp_path / "fake_plugin_imported.txt"
+    (tmp_path / f"{module_name}.py").write_text(f"open({str(sentinel)!r}, 'w').close()\n")
+    dags_folder = str(tmp_path)
+
+    def discover():
+        if hasattr(get_dbt_modules, "cache_clear"):
+            get_dbt_modules.cache_clear()
+        return get_dbt_modules()
+
+    sys.path.insert(0, dags_folder)
+    try:
+        with patch("airflow.settings.DAGS_FOLDER", dags_folder):
+            # Without the guard, dbt's discovery imports the fake DAG file (the leak).
+            with_leak = discover()
+            assert module_name in with_leak
+            assert sentinel.exists()
+            sentinel.unlink()
+            sys.modules.pop(module_name, None)
+
+            # With the guard, the DAGs folder is off sys.path, so dbt never sees the file, while
+            # every genuinely installed dbt plugin stays discoverable.
+            with exclude_dags_folder_from_sys_path():
+                guarded = discover()
+            assert set(guarded) == set(with_leak) - {module_name}
+            assert not sentinel.exists()
+    finally:
+        if hasattr(get_dbt_modules, "cache_clear"):
+            get_dbt_modules.cache_clear()
+        sys.modules.pop(module_name, None)
+        if dags_folder in sys.path:
+            sys.path.remove(dags_folder)

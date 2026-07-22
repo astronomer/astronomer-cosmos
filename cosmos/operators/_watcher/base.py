@@ -6,9 +6,10 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 
 from cosmos import settings
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     _DATASET_EMITTING_RESOURCE_TYPES,

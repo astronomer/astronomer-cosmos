@@ -50,8 +50,9 @@ def test_dbt_kubernetes_build_command():
 
     for command_name, command_operator in result_map.items():
         command_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
-        assert command_operator.cmds == ["dbt"]
+        assert command_operator.cmds == []
         assert command_operator.arguments == [
+            "dbt",
             command_name,
             "--vars",
             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
@@ -60,6 +61,27 @@ def test_dbt_kubernetes_build_command():
             "--project-dir",
             "my/dir",
         ]
+
+
+def test_dbt_aws_eks_build_command_preserves_custom_cmds():
+    """
+    A user-supplied wrapper ``cmds`` must be preserved unchanged, with the full dbt command
+    (including the ``dbt`` executable) passed as ``arguments`` for the wrapper to invoke
+    (regression for #2889).
+    """
+    operator = DbtLSAwsEksOperator(cmds=["/custom-entrypoint.sh"], **base_kwargs)
+    operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
+    assert operator.cmds == ["/custom-entrypoint.sh"]
+    assert operator.arguments == [
+        "dbt",
+        "ls",
+        "--vars",
+        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
+        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        "--no-version-check",
+        "--project-dir",
+        "my/dir",
+    ]
 
 
 @patch("cosmos.operators.aws_eks._AMAZON_PROVIDER_VERSION", new=Version("9.0.0"))

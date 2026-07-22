@@ -1,7 +1,7 @@
 Privacy Notice
 ==============
 
-By default, telemetry is disabled when running Cosmos on Astronomer: since `Astro Runtime <https://github.com/astronomer/astro-runtime>`_ 3.0-2 (released in May 2025), Airflow 3-based Astro Runtime images set the environment variable ``SCARF_NO_ANALYTICS=True``, which turns off Cosmos telemetry.
+On Astronomer, telemetry is disabled by default when using Airflow 3-based `Astro Runtime <https://github.com/astronomer/astro-runtime>`_ images: since Astro Runtime 3.0-2 (released in May 2025), these images set the environment variable ``SCARF_NO_ANALYTICS=True``, which suppresses Cosmos telemetry emission.
 
 This project follows the `Privacy Policy of Astronomer <https://www.astronomer.io/privacy/>`_.
 

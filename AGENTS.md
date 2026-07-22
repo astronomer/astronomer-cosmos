@@ -37,7 +37,7 @@ hatch run tests.py3.10-3.1-1.9:type-check
 pre-commit run mypy --all-files
 ```
 
-Other available matrix versions: Python `3.10`, `3.11`, `3.12`, `3.13` × Airflow `2.9`, `2.10`, `2.11`, `3.0`, `3.1`, `3.2` × dbt `1.5`–`2.0`.
+Other available matrix versions: Python `3.10`, `3.11`, `3.12`, `3.13`, `3.14` × Airflow `2.9`, `2.10`, `2.11`, `3.0`, `3.1`, `3.2`, `3.3` × dbt `1.5`–`2.0`. Python `3.14` is only wired into CI for Airflow `3.2`/`3.3` with dbt `1.12` (see the pinned lockfiles).
 
 ### Building and Serving Docs
 

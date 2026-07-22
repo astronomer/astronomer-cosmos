@@ -60,7 +60,7 @@ def _resolve_env_var(template_str: str) -> str:
         return os.getenv(name, default)
 
     template = Template(template_str)
-    rendered = template.render(env_var=env_var)
+    rendered: str = template.render(env_var=env_var)
     return rendered
 
 

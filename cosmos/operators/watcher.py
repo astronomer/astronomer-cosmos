@@ -7,7 +7,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 
 try:
     # Airflow 3.1 onwards
@@ -15,6 +15,7 @@ try:
 except ImportError:
     from airflow.utils.task_group import TaskGroup
 
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,

@@ -16,11 +16,12 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 import jinja2
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
 from airflow.utils.strings import to_boolean
 from packaging.version import Version
 
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.io import _construct_dest_file_path
 
 if TYPE_CHECKING:  # pragma: no cover

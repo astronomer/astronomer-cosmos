@@ -1,9 +1,22 @@
 Privacy Notice
 ==============
 
-On Astronomer, telemetry is disabled by default when using Airflow 3-based `Astro Runtime <https://github.com/astronomer/astro-runtime>`_ images: since Astro Runtime 3.0-2 (released in May 2025), these images set the environment variable ``SCARF_NO_ANALYTICS=True``, which suppresses Cosmos telemetry emission.
+By default, telemetry is disabled for Astronomer customers — see `Telemetry on Astronomer`_ for details.
 
 This project follows the `Privacy Policy of Astronomer <https://www.astronomer.io/privacy/>`_.
+
+Telemetry on Astronomer
+-----------------------
+
+Since May 2025, `Astro Runtime <https://www.astronomer.io/docs/runtime/runtime-release-notes>`_ images set the
+environment variable ``SCARF_NO_ANALYTICS=True``, which disables Cosmos telemetry by default:
+
+- Airflow 3-based images: Astro Runtime 3.0-2 and newer
+- Airflow 2-based images: Astro Runtime 11.18.0, 12.9.0, 13.0.0 and newer
+
+`Astro Private Cloud <https://www.astronomer.io/docs/astro-private-cloud/>`_ (APC) also disables telemetry by
+default, setting both ``SCARF_NO_ANALYTICS=True`` and ``DO_NOT_TRACK=True`` in all Deployments, regardless of
+the Astro Runtime version.
 
 Collection of Data
 ------------------
@@ -84,4 +97,4 @@ When the **dbt docs plugin** is accessed, the following information is collected
 
 Astronomer does not track user-identifiable information through Cosmos telemetry.
 For details on how Scarf handles the collected data, please refer to the
-`Scarf Privacy Policy <https://about.scarf.sh/privacy-policy/>`_.
+`Scarf Privacy Policy <https://about.scarf.sh/privacy-policy/>`__.

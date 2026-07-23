@@ -3172,3 +3172,64 @@ def test_add_downstream_nodes():
     target_node = "model.jaffle_shop.stg_payments"
     downstream_nodes = ["model.jaffle_shop.customers", "model.jaffle_shop.orders"]
     assert dbt_graph.nodes.get(target_node).downstream == downstream_nodes
+
+
+@patch("cosmos.dbt.graph.create_symlinks_for_extra_paths")
+@patch("cosmos.dbt.graph.copy_dbt_packages")
+@patch("cosmos.dbt.graph.create_symlinks")
+def test_copy_or_create_symbolic_links_includes_extra_paths(
+    mock_create_symlinks, mock_copy_dbt_packages, mock_create_symlinks_for_extra_paths, tmp_path
+):
+    """_copy_or_create_symbolic_links nests the clone, forwards extra_paths, and returns the clone dir."""
+    source = DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
+    dest = tmp_path / "clone"
+    project_config = ProjectConfig(dbt_project_path=source, extra_paths=["../dbt_sources"])
+    render_config = RenderConfig()
+    execution_config = ExecutionConfig(dbt_project_path=source)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=source / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+
+    result = dbt_graph._copy_or_create_symbolic_links(source, dest)
+
+    # A single ``../`` reference nests the clone one level below ``dest``; the helper is called with that clone dir.
+    assert result.parent == dest
+    mock_create_symlinks_for_extra_paths.assert_called_once_with(source, result, ["../dbt_sources"])
+
+
+@patch("cosmos.dbt.graph.create_symlinks_for_extra_paths")
+@patch("cosmos.dbt.graph.copy_dbt_packages")
+@patch("cosmos.dbt.graph.create_symlinks")
+def test_copy_or_create_symbolic_links_without_extra_paths(
+    mock_create_symlinks, mock_copy_dbt_packages, mock_create_symlinks_for_extra_paths, tmp_path
+):
+    """When no extra_paths are set, the helper is not called and the clone dir is the temp dir itself."""
+    source = DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
+    dest = tmp_path / "clone"
+    project_config = ProjectConfig(dbt_project_path=source)
+    render_config = RenderConfig()
+    execution_config = ExecutionConfig(dbt_project_path=source)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=source / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+
+    result = dbt_graph._copy_or_create_symbolic_links(source, dest)
+
+    mock_create_symlinks_for_extra_paths.assert_not_called()
+    assert result == dest

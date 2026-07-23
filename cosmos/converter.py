@@ -281,6 +281,8 @@ def override_configuration(
             operator_args["install_deps"] = project_config.install_dbt_deps
         if "copy_dbt_packages" not in operator_args:
             operator_args["copy_dbt_packages"] = project_config.copy_dbt_packages
+        if "extra_paths" not in operator_args:
+            operator_args["extra_paths"] = project_config.extra_paths
 
 
 class DbtToAirflowConverter:

@@ -446,6 +446,52 @@ def test_dbt_producer_watcher_operator_preserves_default_args_failure_callback()
     assert _user_cb in composed and _backup_xcom_to_variable in composed
 
 
+def test_dbt_producer_watcher_operator_forwards_extra_paths_to_clone():
+    """extra_paths flow through the inherited AbstractDbtLocalBase._clone_project for WATCHER.
+
+    The producer subclasses DbtLocalBaseOperator and does not override _clone_project,
+    so out-of-project paths (e.g. `- local: ../../dbt_utils` in packages.yml) are
+    materialised in the tmp clone exactly as for LOCAL execution. If a producer-
+    specific clone override is ever added, this test fails and flags that extra_paths
+    must be re-wired.
+    """
+    from pathlib import Path
+    from unittest.mock import patch
+
+    project_dir = Path("/fake/project")
+    tmp_dir_path = Path("/fake/tmp")
+    clone_dir = Path("/fake/tmp/__cosmos_extra_path_parent_0__/__cosmos_extra_path_parent_1__")
+
+    with (
+        patch("cosmos.operators.local.prepare_dbt_project_clone_dir", return_value=clone_dir),
+        patch("cosmos.operators.local.create_symlinks_for_extra_paths") as mock_extra,
+        patch("cosmos.operators.local.create_symlinks"),
+        patch("cosmos.operators.local.copy_manifest_file_if_exists"),
+    ):
+        op = DbtProducerWatcherOperator(
+            task_id="producer",
+            project_dir=str(project_dir),
+            profile_config=None,
+            extra_paths=["../../dbt_utils"],
+        )
+        result = op._clone_project(tmp_dir_path)
+
+    mock_extra.assert_called_once_with(project_dir, clone_dir, ["../../dbt_utils"])
+    assert result == clone_dir
+
+
+def test_dbt_run_watcher_operator_accepts_extra_paths():
+    """Consumers can fall back to running dbt locally on producer hard-kill, so they must
+    also accept and store extra_paths for the same inherited clone path."""
+    op = DbtRunWatcherOperator(
+        task_id="consumer",
+        project_dir=".",
+        profile_config=None,
+        extra_paths=["../../dbt_utils"],
+    )
+    assert op.extra_paths == ["../../dbt_utils"]
+
+
 @pytest.mark.parametrize(
     "event, expected_message",
     [

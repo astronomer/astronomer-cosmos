@@ -57,8 +57,10 @@ from cosmos.dataset import get_dataset_alias_name, make_dataset_uri_builder
 from cosmos.dbt.project import (
     copy_dbt_packages,
     copy_manifest_file_if_exists,
+    create_symlinks_for_extra_paths,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
+    prepare_dbt_project_clone_dir,
 )
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
@@ -210,6 +212,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         invocation_mode: InvocationMode | None = None,
         install_deps: bool | str = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
+        extra_paths: list[str | Path] | None = None,
         manifest_filepath: str = "",
         callback: str | Callable[..., Any] | list[str | Callable[..., Any]] | None = None,
         callback_args: dict[str, Any] | None = None,
@@ -249,6 +252,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         )
         self.install_deps = install_deps if self._has_dependencies_file else False
         self.copy_dbt_packages = copy_dbt_packages
+        self.extra_paths = list(extra_paths) if extra_paths else []
 
         self.manifest_filepath = manifest_filepath
 
@@ -515,22 +519,36 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             sql_content: str = sql_file.read()
         return sql_content
 
-    def _clone_project(self, tmp_dir_path: Path) -> None:
+    def _clone_project(self, tmp_dir_path: Path) -> Path:
+        """
+        Clone the dbt project into a writable temporary directory and return the directory dbt should treat as the
+        project root.
+
+        When ``extra_paths`` reference locations above the project root (e.g. ``- local: "../../dbt_utils"``), the
+        clone is nested inside ``tmp_dir_path`` so those ``..`` references resolve to siblings created *inside* the
+        temporary tree instead of escaping to the filesystem root. With no upward extra paths the returned directory
+        is ``tmp_dir_path`` itself, so behaviour is unchanged for projects that do not use this feature.
+        """
+        clone_dir = prepare_dbt_project_clone_dir(tmp_dir_path, Path(self.project_dir), self.extra_paths)
         self.log.info(
             "Cloning project to writable temp directory %s from %s",
-            tmp_dir_path,
+            clone_dir,
             self.project_dir,
         )
         should_not_create_dbt_deps_symbolic_link = self._should_install_deps() or self.copy_dbt_packages
-        create_symlinks(
-            Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
-        )
+        create_symlinks(Path(self.project_dir), clone_dir, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link)
         if self.copy_dbt_packages:
             self.log.info("Copying dbt packages to temporary folder.")
-            copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
+            copy_dbt_packages(Path(self.project_dir), clone_dir)
             self.log.info("Completed copying dbt packages to temporary folder.")
 
-        copy_manifest_file_if_exists(self.manifest_filepath, Path(tmp_dir_path))
+        if self.extra_paths:
+            self.log.info("Including extra paths in temporary folder: %s", self.extra_paths)
+            create_symlinks_for_extra_paths(Path(self.project_dir), clone_dir, self.extra_paths)
+
+        copy_manifest_file_if_exists(self.manifest_filepath, clone_dir)
+
+        return clone_dir
 
     def _handle_partial_parse(self, tmp_dir_path: Path) -> None:
         if self.cache_dir is None:
@@ -696,7 +714,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
 
-            self._clone_project(tmp_dir_path)
+            # ``_clone_project`` may nest the clone inside the temporary directory to make ``extra_paths`` that live
+            # above the project root resolvable; use the returned directory as the effective dbt project root.
+            tmp_dir_path = self._clone_project(tmp_dir_path)
+            tmp_project_dir = str(tmp_dir_path)
 
             if self.partial_parse:
                 self._handle_partial_parse(tmp_dir_path)

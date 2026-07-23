@@ -18,6 +18,7 @@ from cosmos.operators._watcher.base import BaseConsumerSensor
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
+    DbtSemanticMixin,
     DbtSnapshotMixin,
 )
 from cosmos.operators.gcp_gke import (
@@ -119,6 +120,18 @@ class DbtRunWatcherGcpGkeOperator(DbtConsumerWatcherGcpGkeSensor):
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticWatcherGcpGkeOperator(DbtSemanticMixin, DbtConsumerWatcherGcpGkeSensor):
+    """
+    Watches for the progress of an adapter-native semantic layer object, run by the producer task
+    (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str, ...] = DbtConsumerWatcherGcpGkeSensor.template_fields + DbtSemanticMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

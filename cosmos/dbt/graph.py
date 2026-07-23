@@ -47,6 +47,7 @@ from cosmos.constants import (
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
     DBT_LOG_PATH_ENVVAR,
+    DBT_SEMANTIC_LAYER_MATERIALIZATIONS,
     DBT_TARGET_DIR_NAME,
     DBT_TARGET_PATH_ENVVAR,
     DbtResourceType,
@@ -284,6 +285,14 @@ def is_freshness_effective(freshness: dict[str, Any] | None) -> bool:
     return False
 
 
+def _classify_resource_type(resource_type: DbtResourceType, config: dict[str, Any]) -> DbtResourceType:
+    """Reclassify adapter-native semantic layer materializations as DbtResourceType.SEMANTIC_LAYER."""
+    materialization = str(config.get("materialized") or "").lower()
+    if resource_type == DbtResourceType.MODEL and materialization in DBT_SEMANTIC_LAYER_MATERIALIZATIONS:
+        return DbtResourceType.SEMANTIC_LAYER  # type: ignore[return-value]
+    return resource_type
+
+
 def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
     """Run a command in a subprocess, returning the stdout."""
     process = Popen(
@@ -408,18 +417,20 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                 continue
 
             try:
+                node_config = node_dict.get("config") or {}
+                node_resource_type = _classify_resource_type(DbtResourceType(node_dict["resource_type"]), node_config)
                 node = DbtNode(
                     unique_id=node_dict["unique_id"],
                     package_name=node_dict.get("package_name"),
-                    resource_type=DbtResourceType(node_dict["resource_type"]),
+                    resource_type=node_resource_type,
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     path_base=base_path,
                     original_file_path=Path(_normalize_path(node_file_path)),
                     tags=node_dict.get("tags") or [],
-                    config=node_dict.get("config") or {},
+                    config=node_config,
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
-                        if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
+                        if node_resource_type == DbtResourceType.SOURCE
                         else False
                     ),
                     fqn=node_dict.get("fqn"),
@@ -459,15 +470,16 @@ def _build_dbt_node_from_manifest_resource(
         path_base = project_path
 
     resource_type = DbtResourceType(node_dict["resource_type"])
+    config = node_dict.get("config") or {}
     return DbtNode(
         unique_id=unique_id,
         package_name=package_name,
-        resource_type=resource_type,
+        resource_type=_classify_resource_type(resource_type, config),
         depends_on=node_dict.get("depends_on", {}).get("nodes", []),
         path_base=path_base,
         original_file_path=Path(_normalize_path(original_file_path)),
         tags=node_dict.get("tags") or [],
-        config=node_dict.get("config") or {},
+        config=config,
         has_freshness=(
             is_freshness_effective(node_dict.get("freshness")) if resource_type == DbtResourceType.SOURCE else False
         ),
@@ -1116,7 +1128,7 @@ class DbtGraph:
             tags = [selector for selector in model.config.config_selectors if selector.startswith("tags:")]
             node = DbtNode(
                 unique_id=f"{model.type.value}.{self.project.project_name}.{model_name}",
-                resource_type=DbtResourceType(model.type.value),
+                resource_type=_classify_resource_type(DbtResourceType(model.type.value), config),
                 depends_on=list(model.config.upstream_models),
                 path_base=self.execution_config.project_path,
                 original_file_path=model.path.relative_to(self.render_config.project_path),

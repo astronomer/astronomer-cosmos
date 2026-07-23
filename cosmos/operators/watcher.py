@@ -46,6 +46,7 @@ from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
+    DbtSemanticMixin,
     DbtSnapshotMixin,
 )
 from cosmos.operators.local import (
@@ -109,7 +110,12 @@ def _default_freshness_callback(
     # nodes that have at least one clean upstream path: they may succeed and should not be
     # preemptively excluded.  When a new node is added to visited its own dependents are queued
     # so they can be re-evaluated with the updated skip set.
-    _excludable_resource_types = {DbtResourceType.MODEL, DbtResourceType.SEED, DbtResourceType.SNAPSHOT}
+    _excludable_resource_types = {
+        DbtResourceType.MODEL,
+        DbtResourceType.SEED,
+        DbtResourceType.SNAPSHOT,
+        DbtResourceType.SEMANTIC_LAYER,
+    }
     visited: set[str] = set()
     queue = list(stale_source_ids)
     while queue:
@@ -639,6 +645,18 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticWatcherOperator(DbtSemanticMixin, DbtConsumerWatcherSensor):
+    """
+    Watches for the progress of an adapter-native semantic layer object, run by the producer task
+    (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtSemanticMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

@@ -3,7 +3,14 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from airflow.exceptions import AirflowException, AirflowSkipException
 
-from cosmos.operators._watcher.base import BaseConsumerSensor, _process_dbt_log_event
+from cosmos.operators._watcher.base import (
+    BaseConsumerSensor,
+    _accumulate_dbt_log_event,
+    _flush_dbt_event,
+    _flush_dbt_event_on_error,
+    _process_dbt_log_event,
+    store_dbt_resource_status_from_log,
+)
 from cosmos.operators.local import DbtRunLocalOperator
 
 
@@ -274,3 +281,114 @@ class TestHandleNoDbtNodeStatus:
 
         assert result is False
         assert sensor.poke_retry_number == 1
+
+
+class TestNodeEventBuffer:
+    """Tests for the in-memory per-node event buffer (local watcher log shipping)."""
+
+    UID = "model.pkg.my_model"
+
+    def _runner_node_finished(self, node_status="error", message="DB Error: table missing"):
+        """dbt-runner mode: NodeFinished carries the error in run_result.message."""
+        return {
+            "info": {"name": "NodeFinished", "msg": ""},
+            "data": {
+                "node_info": {
+                    "unique_id": self.UID,
+                    "node_status": node_status,
+                    "node_started_at": "2024-01-01T00:00:00",
+                    "node_finished_at": "2024-01-01T00:01:00",
+                },
+                "run_result": {"status": node_status, "message": message},
+            },
+        }
+
+    def _run_result_error(self, msg="DB Error: table missing"):
+        """subprocess mode: the error arrives in a RunResultError event (node_status='None')."""
+        return {
+            "info": {"name": "RunResultError"},
+            "data": {"node_info": {"unique_id": self.UID, "node_status": "None"}, "msg": msg},
+        }
+
+    def _flushed_value(self, buffer, **kwargs):
+        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+            _flush_dbt_event(Mock(), buffer, self.UID, **kwargs)
+        return mock_push.call_args.kwargs["value"]
+
+    def test_runner_mode_captures_error_from_run_result_message(self):
+        """dbt-runner mode: the error in NodeFinished.run_result.message reaches the consumer."""
+        buffer: dict = {}
+        _accumulate_dbt_log_event(buffer, self._runner_node_finished(message="DB Error: table missing"))
+        value = self._flushed_value(buffer, terminal_status="error")
+        assert value["status"] == "error"
+        assert value["msg"] == "DB Error: table missing"
+        assert value["start_time"] == "00:00:00" and value["finish_time"] == "00:01:00"
+        assert "_has_error_msg" not in value  # internal flag stripped before push
+
+    def test_subprocess_mode_captures_error_from_run_result_error_event(self):
+        """subprocess mode: terminal status flushes first; the later RunResultError re-flush adds the msg."""
+        buffer: dict = {}
+        # Terminal status event (LogModelResult-equivalent) flushes first -- status stamped, no msg yet.
+        first = self._flushed_value(buffer, terminal_status="error")
+        assert first["status"] == "error" and first["msg"] is None
+        # RunResultError arrives afterwards with the error text.
+        err = self._run_result_error(msg="DB Error: table missing")
+        _accumulate_dbt_log_event(buffer, err)
+        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+            _flush_dbt_event_on_error(Mock(), buffer, err)
+        value = mock_push.call_args.kwargs["value"]
+        assert value["status"] == "error"  # not clobbered to "None"
+        assert value["msg"] == "DB Error: table missing"
+
+    def test_error_message_not_overwritten_by_later_empty_message(self):
+        buffer: dict = {}
+        _accumulate_dbt_log_event(buffer, self._run_result_error(msg="real error"))
+        _accumulate_dbt_log_event(buffer, self._runner_node_finished(message=""))  # later, empty
+        value = self._flushed_value(buffer, terminal_status="error")
+        assert value["msg"] == "real error"
+
+    def test_none_string_status_is_ignored(self):
+        buffer: dict = {}
+        _accumulate_dbt_log_event(buffer, self._run_result_error(msg="err"))  # node_status == "None"
+        assert buffer[self.UID]["status"] is None
+
+    @pytest.mark.parametrize("extra_kwargs", [None, {}])
+    def test_store_dbt_resource_status_from_log_tolerates_falsy_extra_kwargs(self, extra_kwargs):
+        """A falsy/None extra_kwargs must not raise during parsing (no context to push to)."""
+        line = '{"info": {"name": "NodeFinished"}, "data": {"node_info": {"unique_id": "model.p.m", "node_status": "success"}}}'
+        # Should be a no-op (no context/ti) rather than raising AttributeError.
+        store_dbt_resource_status_from_log(line, extra_kwargs, node_event_buffer={})
+
+    def test_accumulate_ignores_non_allowlisted_and_missing_unique_id(self):
+        buffer: dict = {}
+        _accumulate_dbt_log_event(
+            buffer, {"info": {"name": "LogStartLine"}, "data": {"node_info": {"unique_id": self.UID}}}
+        )
+        _accumulate_dbt_log_event(buffer, {"info": {"name": "NodeFinished"}, "data": {"node_info": {}}})
+        assert buffer == {}
+
+    def test_flush_on_error_ignores_non_error_and_messageless_events(self):
+        buffer: dict = {}
+        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+            # Not an error event -> no flush.
+            _flush_dbt_event_on_error(
+                Mock(), buffer, {"info": {"name": "NodeFinished"}, "data": {"node_info": {"unique_id": self.UID}}}
+            )
+            # Error event but no message -> no flush.
+            _flush_dbt_event_on_error(
+                Mock(), buffer, {"info": {"name": "RunResultError"}, "data": {"node_info": {"unique_id": self.UID}}}
+            )
+        mock_push.assert_not_called()
+
+    def test_flush_on_error_when_message_only_in_info_msg(self):
+        """An allowlisted error event whose text is only in info.msg must still re-flush."""
+        buffer: dict = {}
+        event = {
+            "info": {"name": "RunResultError", "msg": "the error"},
+            "data": {"node_info": {"unique_id": self.UID, "node_status": "None"}},
+        }
+        _accumulate_dbt_log_event(buffer, event)
+        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+            _flush_dbt_event_on_error(Mock(), buffer, event)
+        assert mock_push.called
+        assert mock_push.call_args.kwargs["value"]["msg"] == "the error"

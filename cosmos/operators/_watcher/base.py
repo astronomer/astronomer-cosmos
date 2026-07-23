@@ -33,6 +33,7 @@ from cosmos.operators._watcher.state import (
     get_dbt_event_xcom_key,
     get_status_xcom_key,
     get_xcom_val,
+    is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
@@ -104,6 +105,12 @@ _DBT_EVENT_ALLOWLIST = _DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES
 
 
 def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
+    """Push a single dbt log event straight to XCom (one write per event, overwriting).
+
+    Retained for callers that do not supply a ``node_event_buffer`` (e.g. the Kubernetes watcher),
+    which keep the original behaviour. The local watcher uses the buffered path
+    (``_accumulate_dbt_log_event`` + ``_flush_dbt_event``) instead.
+    """
     logger.debug("dbt_log: %s", dbt_log)
     data = dbt_log.get("data", {})
     info = dbt_log.get("info", {})
@@ -130,6 +137,129 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
         }
 
         safe_xcom_push(task_instance=task_instance, key=get_dbt_event_xcom_key(unique_id), value=dbt_event)
+
+
+# Guards the in-memory per-node event buffer. dbt runner callbacks fire from multiple threads, so
+# accumulating into the buffer (and flushing it) must be serialised.
+_node_event_buffer_lock = threading.Lock()
+
+
+def _new_buffer_entry() -> dict[str, Any]:
+    return {"status": None, "start_time": None, "finish_time": None, "msg": None, "_has_error_msg": False}
+
+
+def _accumulate_dbt_log_event(node_event_buffer: dict[str, dict[str, Any]], dbt_log: dict[str, Any]) -> None:
+    """Merge a single dbt JSON log event into the producer's in-memory per-node buffer.
+
+    Called for every allowlisted dbt event during the producer run. Nothing is written to XCom here;
+    ``_flush_dbt_event`` writes the merged event when the node is terminal (and again if a later error
+    event adds the message). This avoids a per-event XCom write (and global-lock contention) for every
+    event of every node.
+
+    The error text lives in different places per invocation mode: ``run_result.message`` on
+    ``NodeFinished`` (dbt-runner mode) and ``data.msg`` on ``RunResultError`` (subprocess mode). We read
+    both, and let an error message win so it is not overwritten by a later, often empty, message.
+    """
+    info = dbt_log.get("info", {})
+    event_name = info.get("name")
+    if event_name not in _DBT_EVENT_ALLOWLIST:
+        return
+    data = dbt_log.get("data", {})
+    node_info = data.get("node_info") or {}
+    unique_id = node_info.get("unique_id")
+    if not unique_id:
+        return
+
+    status = node_info.get("node_status")
+    start_time = node_info.get("node_started_at")
+    finish_time = node_info.get("node_finished_at")
+    run_result = data.get("run_result") or {}
+    msg = run_result.get("message") or data.get("msg") or info.get("msg")
+    is_error = (
+        event_name in _DBT_ERROR_EVENTS_TYPES
+        or is_dbt_node_status_failed(status)
+        or is_dbt_node_status_failed(run_result.get("status"))
+    )
+
+    with _node_event_buffer_lock:
+        entry = node_event_buffer.setdefault(unique_id, _new_buffer_entry())
+        # Some non-lifecycle events (e.g. RunResultError) carry the literal string "None" as
+        # node_status; ignore it so it cannot clobber the real terminal status.
+        if status and status != "None":
+            entry["status"] = status
+        if start_time:
+            entry["start_time"] = _iso_to_string(start_time)
+        if finish_time:
+            entry["finish_time"] = _iso_to_string(finish_time)
+        if msg:
+            # An error message wins and must not be overwritten by a later (often empty or generic)
+            # message; a non-error message only fills an as-yet-empty slot.
+            if is_error:
+                entry["msg"] = msg
+                entry["_has_error_msg"] = True
+            elif not entry["_has_error_msg"]:
+                entry["msg"] = msg
+
+
+def _flush_dbt_event(
+    task_instance: Any,
+    node_event_buffer: dict[str, dict[str, Any]],
+    unique_id: str,
+    terminal_status: str | None = None,
+) -> None:
+    """Write a node's buffered event to XCom.
+
+    Called when the node reaches a terminal status (with ``terminal_status`` so the authoritative status
+    is stamped -- subprocess's status-bearing ``LogModelResult`` is not allowlisted, so the entry may
+    otherwise lack one) and again if a later error event adds the message. The entry is intentionally
+    not removed: it may be re-flushed, and the whole buffer is cleared at the start of ``execute``.
+    """
+    with _node_event_buffer_lock:
+        entry = node_event_buffer.setdefault(unique_id, _new_buffer_entry())
+        if terminal_status and terminal_status != "None":
+            entry["status"] = terminal_status
+        value = {key: val for key, val in entry.items() if key != "_has_error_msg"}
+    safe_xcom_push(task_instance=task_instance, key=get_dbt_event_xcom_key(unique_id), value=value)
+
+
+def _flush_dbt_event_on_error(
+    task_instance: Any, node_event_buffer: dict[str, dict[str, Any]], dbt_log: dict[str, Any]
+) -> None:
+    """Re-flush a node when an allowlisted error event carrying a message arrives.
+
+    Subprocess mode emits the error text in a ``RunResultError`` event that arrives *after* the terminal
+    status event already flushed, so this second flush delivers that message to the consumer.
+    """
+    info = dbt_log.get("info", {})
+    if info.get("name") not in _DBT_ERROR_EVENTS_TYPES:
+        return
+    data = dbt_log.get("data", {})
+    # Mirror the message sources used by _accumulate_dbt_log_event (run_result.message / data.msg /
+    # info.msg) so an error whose text is only in info.msg still triggers the re-flush.
+    if not ((data.get("run_result") or {}).get("message") or data.get("msg") or info.get("msg")):
+        return
+    unique_id = (data.get("node_info") or {}).get("unique_id")
+    if unique_id:
+        _flush_dbt_event(task_instance, node_event_buffer, unique_id)
+
+
+def _record_dbt_log_event(
+    node_event_buffer: dict[str, dict[str, Any]] | None, context: Any, dbt_log: dict[str, Any]
+) -> None:
+    """Record a dbt log event, choosing the buffered path or the original per-event push.
+
+    Local watcher (``node_event_buffer`` provided): accumulate in memory; the merged event is flushed
+    to XCom when the node is terminal, and again here if this is an error event carrying the message
+    (subprocess emits it after the terminal event). Otherwise (e.g. the Kubernetes watcher): push per event.
+    """
+    ti = context.get("ti") if context else None
+    if node_event_buffer is not None:
+        _accumulate_dbt_log_event(node_event_buffer, dbt_log)
+        if ti is not None:
+            _flush_dbt_event_on_error(ti, node_event_buffer, dbt_log)
+        return
+    if ti:
+        _process_dbt_log_event(ti, dbt_log)
 
 
 def _extract_compiled_sql(
@@ -306,6 +436,7 @@ def store_dbt_resource_status_from_log(
     dataset_namespace: str | None = None,
     should_generate_model_uris: bool = True,
     upstream_failure_skipped_ids: set[str] | None = None,
+    node_event_buffer: dict[str, dict[str, Any]] | None = None,
 ) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
@@ -336,19 +467,21 @@ def store_dbt_resource_status_from_log(
         ``NodeFinished`` events with ``node_status="skipped"`` for these unique_ids
         are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
         retry it) rather than going SKIPPED. See #2698.
+    :param node_event_buffer: Mutable in-memory accumulator keyed by node unique_id. Each dbt event
+        is merged here (no XCom write); the merged event is flushed to XCom when the node reaches a
+        terminal state and may be re-flushed if a later error event provides the message (e.g. subprocess mode).
+        This replaces the previous per-event XCom push, which wrote on every event (lock contention) and let a trailing ``NodeFinished`` overwrite the captured error message.
     """
+    # extra_kwargs is typed Any and may be falsy/None; normalise so the .get() calls below are safe.
+    extra_kwargs = extra_kwargs or {}
     try:
         log_line = json.loads(line)
-        context = extra_kwargs.get("context") if extra_kwargs else None
-        ti = context.get("ti") if context else None
-
-        if ti:
-            _process_dbt_log_event(ti, log_line)
     except json.JSONDecodeError:
         _surface_non_json_stdout(line)
         log_line = {}
     else:
         context = extra_kwargs.get("context")
+        _record_dbt_log_event(node_event_buffer, context, log_line)
         if context is not None:
             _store_startup_event_from_log(context["ti"], log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
@@ -405,6 +538,11 @@ def store_dbt_resource_status_from_log(
                 store_compiled_sql_for_model(
                     context["ti"], project_dir, unique_id, node_info.get("node_path"), node_info.get("resource_type")
                 )
+
+            # Flush this node's buffered structured event now that it is terminal, stamping the
+            # authoritative terminal status (subprocess's status-bearing event is not allowlisted).
+            if node_event_buffer is not None and unique_id:
+                _flush_dbt_event(context["ti"], node_event_buffer, unique_id, terminal_status=dbt_node_status)
 
     # Additionally, log the message from dbt logs
     _log_dbt_msg(log_line)

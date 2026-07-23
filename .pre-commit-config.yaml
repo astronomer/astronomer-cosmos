@@ -55,7 +55,7 @@ repos:
       - id: detect-aws-credentials
         args: ["--allow-missing-credentials"]
   - repo: https://github.com/codespell-project/codespell
-    rev: 2ccb47ff45ad361a21071a7eedda4c37e6ae8c5a  # v2.4.2
+    rev: 57b21406f092110c18776e39b0bda50d37c945c8  # v2.4.3
     hooks:
       - id: codespell
         name: Run codespell to check for common misspellings in files

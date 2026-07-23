@@ -3532,3 +3532,27 @@ class TestStoreDbtResourceStatusFromLogNonJson:
         with caplog.at_level(logging.INFO, logger="cosmos.operators._watcher.base"):
             store_dbt_resource_status_from_log("", {"context": ctx}, tests_per_model={}, test_results_per_model={})
         assert caplog.text == ""
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION.major < 3,
+    reason="From Airflow 3.0 onwards, outlets are declared via AssetAlias at parse time (issue-2417).",
+)
+def test_consumer_sensor_declares_asset_alias_outlet_at_parse_time_airflow_3():
+    """issue-2417: WATCHER consumer sensors must declare the AssetAlias as a static (parse-time) outlet on
+    Airflow 3, otherwise emitted model assets never appear in the Airflow "Assets" graph."""
+    from airflow import DAG
+    from airflow.sdk.definitions.asset import AssetAlias
+
+    with DAG("watcher_assets_dag", start_date=datetime(2022, 1, 1)):
+        consumer = DbtConsumerWatcherSensor(
+            project_dir=".",
+            profiles_dir=".",
+            profile_config=profile_config,
+            model_unique_id="model.pkg.m",
+            poke_interval=1,
+            producer_task_id="dbt_producer_watcher_operator",
+            task_id="consumer_sensor",
+        )
+
+    assert consumer.outlets == [AssetAlias(name="watcher_assets_dag__consumer_sensor")]

@@ -786,7 +786,10 @@ class TestStoreDbtStatusFromLog:
             test_results_per_model=test_results_per_model,
         )
         assert "test__pkg__unique_orders_id_status" not in ti.store  # no per-test key
-        assert ti.store.get("model__pkg__orders_tests_status") == "pass"
+        aggregated = ti.store.get("model__pkg__orders_tests_status")
+        assert aggregated["status"] == "pass"
+        assert aggregated["passed_count"] == 2
+        assert aggregated["failed_count"] == 0
 
     def test_store_dbt_resource_status_from_log_aggregates_fail_when_any_test_fails(self):
         """When at least one test fails, the aggregated status should be 'fail'."""
@@ -812,7 +815,11 @@ class TestStoreDbtStatusFromLog:
                 test_results_per_model=test_results_per_model,
             )
 
-        assert ti.store.get("model__pkg__orders_tests_status") == "fail"
+        aggregated = ti.store.get("model__pkg__orders_tests_status")
+        assert aggregated["status"] == "fail"
+        assert aggregated["passed_count"] == 1
+        assert aggregated["failed_count"] == 1
+        assert aggregated["failed_tests"] == ["test.pkg.unique_orders_id"]
         # No per-test status keys should exist
         assert "test__pkg__not_null_orders_id_status" not in ti.store
         assert "test__pkg__unique_orders_id_status" not in ti.store

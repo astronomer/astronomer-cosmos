@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import errno
 import functools
 import hashlib
 import json
@@ -315,12 +317,28 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
     source_manifest_filepath = partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
     target_manifest_filepath = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
-    safe_copy(partial_parse_filepath, target_partial_parse_file)
 
-    patch_partial_parse_content(target_partial_parse_file, project_path)
+    try:
+        safe_copy(partial_parse_filepath, target_partial_parse_file)
 
-    if source_manifest_filepath.exists():
-        safe_copy(source_manifest_filepath, target_manifest_filepath)
+        patch_partial_parse_content(target_partial_parse_file, project_path)
+
+        if source_manifest_filepath.exists():
+            safe_copy(source_manifest_filepath, target_manifest_filepath)
+    except OSError as err:
+        # Best-effort: never fail the task over the partial parse cache — fall back to a full dbt parse.
+        # ESTALE means a concurrent task replaced the cache mid-copy on a shared filesystem (NFS/EFS,
+        # see #2867): transient, so info; other OSErrors likely persist, so warning.
+        # Remove the possibly half-written msgpack, but leave the manifest — it may be the user's,
+        # copied earlier by ``_clone_project``. Suppress cleanup errors so they cannot mask ``err``.
+        with contextlib.suppress(OSError):
+            target_partial_parse_file.unlink(missing_ok=True)
+        # ``errno.ESTALE`` is not defined on every platform.
+        estale = getattr(errno, "ESTALE", None)
+        if estale is not None and getattr(err, "errno", None) == estale:
+            logger.info("Partial parse cache was replaced concurrently (%r); falling back to a full dbt parse", err)
+        else:
+            logger.warning("Skipping partial parse due to %r; falling back to a full dbt parse", err)
 
 
 def _calculate_yaml_selectors_cache_current_version(

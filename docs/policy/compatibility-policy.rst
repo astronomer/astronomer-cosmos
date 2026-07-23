@@ -201,8 +201,7 @@ The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
    * - 3.0
      - 3.0
      - None
-     - All 13 tested releases (1.5.1 – 1.15.0). See the existing Runtime 3.0
-       compatibility note.
+      - All 13 tested releases (1.5.1 – 1.15.0).
    * - 3.1
      - 3.1
      - 1.11.3, 1.12.1, 1.13.1, 1.14.0, 1.14.1, 1.14.2, 1.15.0

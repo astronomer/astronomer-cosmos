@@ -215,6 +215,41 @@ def test_profile_config_ensure_profile_with_caching_calls_get_profile_file_conte
         mock_manager.assert_has_calls(expected_calls, any_order=False)
 
 
+@patch("cosmos.config.create_cache_profile")
+@patch("cosmos.config.get_cached_profile", return_value=None)
+@patch("cosmos.config.is_profile_cache_enabled", return_value=True)
+@patch("cosmos.config.logger")
+def test_profile_config_logs_redacted_contents_on_cache_miss(
+    mock_logger,
+    mock_cache_enabled,
+    mock_get_cached_profile,
+    mock_create_cache_profile,
+):
+    """On a cache miss, _get_profile_path should log profile contents with secret fields redacted."""
+    conn = Mock()
+    conn.conn_type = "postgres"
+    conn.host = "localhost"
+    conn.login = "myuser"
+    conn.password = "supersecret"
+    conn.port = 5432
+    conn.schema = "mydb"
+    conn.extra_dejson = {}
+
+    with patch("cosmos.profiles.base.BaseProfileMapping.conn", new_callable=PropertyMock, return_value=conn):
+        profile_mapping = PostgresUserPasswordProfileMapping(conn_id="test", profile_args={})
+        profile_config = ProfileConfig(
+            profile_name="test", target_name="cosmos_target", profile_mapping=profile_mapping
+        )
+
+        mock_create_cache_profile.return_value = Path("/tmp/cosmos/profile/abc/profiles.yml")
+
+        profile_config._get_profile_path(use_mock_values=False)
+
+    log_call_args = " ".join(str(a) for a in mock_logger.info.call_args_list)
+    assert "***" in log_call_args
+    assert "supersecret" not in log_call_args
+
+
 @patch("cosmos.config.shutil.which", return_value=None)
 def test_render_config_without_dbt_cmd(mock_which):
     render_config = RenderConfig()

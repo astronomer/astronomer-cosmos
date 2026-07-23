@@ -477,6 +477,71 @@ def test_dbt_base_operator_handle_exception_dbt_runner_handled_error(mock_extrac
     mock_extract_dbt_runner_issues.assert_called_once()
 
 
+def test_handle_exception_dbt_runner_nothing_to_do():
+    """Tests that an AirflowException is raised when 'Nothing to do ...' is detected and fail_on_nothing_to_do=True."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=MagicMock(),
+        task_id="my-task",
+        project_dir="my/dir",
+        fail_on_nothing_to_do=True,
+    )
+    operator._nothing_to_do_detected = True
+    result = MagicMock()
+    result.success = True
+
+    with pytest.raises(
+        AirflowException, match="dbt command output included 'Nothing to do'. Selector may be incorrect."
+    ):
+        operator.handle_exception_dbt_runner(result)
+
+
+def test_handle_exception_dbt_runner_nothing_to_do_flag_off():
+    """Tests that no exception is raised when 'Nothing to do ...' is detected but fail_on_nothing_to_do=False."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=MagicMock(),
+        task_id="my-task",
+        project_dir="my/dir",
+        fail_on_nothing_to_do=False,
+    )
+    operator._nothing_to_do_detected = True
+    result = MagicMock()
+    result.success = True
+
+    operator.handle_exception_dbt_runner(result)  # should not raise
+
+
+@patch("cosmos.dbt.runner.run_command")
+def test_run_dbt_runner_nothing_to_do_callback(mock_run_command):
+    """Tests that run_dbt_runner injects a callback that sets _nothing_to_do_detected on a matching event."""
+    mock_run_command.return_value = MagicMock()
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=MagicMock(),
+        task_id="my-task",
+        project_dir="my/dir",
+        fail_on_nothing_to_do=True,
+    )
+    operator.invocation_mode = InvocationMode.DBT_RUNNER
+
+    operator.run_dbt_runner(command=["dbt", "run"], env={}, cwd="/tmp")
+
+    _, call_kwargs = mock_run_command.call_args
+    injected_callbacks = call_kwargs["callbacks"]
+    assert injected_callbacks is not None and len(injected_callbacks) == 1
+
+    # Simulate a dbt event carrying the "Nothing to do" message
+    event = MagicMock()
+    event.info.msg = "Nothing to do. Try checking your model configs and model specification args"
+    assert not operator._nothing_to_do_detected
+    injected_callbacks[0](event)
+    assert operator._nothing_to_do_detected
+
+    # Simulate an unrelated event — flag should not be set if it wasn't already
+    operator._nothing_to_do_detected = False
+    event.info.msg = "Completed successfully"
+    injected_callbacks[0](event)
+    assert not operator._nothing_to_do_detected
+
+
 @patch("cosmos.operators.base.context_to_airflow_vars")
 def test_dbt_base_operator_get_env(p_context_to_airflow_vars: MagicMock) -> None:
     """
@@ -1861,6 +1926,35 @@ def test_handle_exception_subprocess(caplog):
 
     assert len(str(err_context.value)) < 100  # Ensure the error message is not too long
     assert "\n".join(full_output) in caplog.text
+
+
+def test_handle_exception_subprocess_nothing_to_do(caplog):
+    """Test that output including 'Nothing to do ...' is properly handled."""
+    caplog.set_level(logging.ERROR)
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=None, task_id="my-task", project_dir="my/dir", fail_on_nothing_to_do=True
+    )
+    full_output = ["Nothing to do ..."]
+    result = FullOutputSubprocessResult(exit_code=0, output="test", full_output=full_output)
+
+    # Test when 'Nothing to do ...' is in the output
+    with pytest.raises(AirflowException) as err_context:
+        operator.handle_exception_subprocess(result)
+
+    assert "dbt command output included 'Nothing to do'. Selector may be incorrect." in str(err_context.value)
+
+
+def test_handle_exception_subprocess_nothing_to_do_flag_off(caplog):
+    """Test that output including 'Nothing to do ...' is properly handled when flag is off."""
+    caplog.set_level(logging.ERROR)
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=None, task_id="my-task", project_dir="my/dir", fail_on_nothing_to_do=False
+    )
+    full_output = ["Nothing to do ..."]
+    result = FullOutputSubprocessResult(exit_code=0, output="test", full_output=full_output)
+
+    # Should not raise any exception
+    operator.handle_exception_subprocess(result)
 
 
 @pytest.fixture

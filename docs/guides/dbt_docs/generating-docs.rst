@@ -3,7 +3,7 @@
 Generating Docs
 ===============
 
-dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official dbt documentation <https://docs.getdbt.com/docs/building-a-dbt-project/documentation>`_. For an example of what the docs look like with the ``jaffle_shop`` project, check out `this site <http://cosmos-demo-dbt-docs.s3-website.eu-north-1.amazonaws.com/>`_.
+dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official dbt documentation <https://docs.getdbt.com/docs/build/documentation>`_. For an example of what the docs look like with the ``jaffle_shop`` project, check out `this site <http://cosmos-demo-dbt-docs.s3-website.eu-north-1.amazonaws.com/>`_.
 
 After generating the dbt docs, you can host them natively within `Apache Airflow® <https://airflow.apache.org/>`_ via the Cosmos Airflow plugin; see :doc:`Hosting Docs </guides/dbt_docs/hosting-docs>` for more information.
 
@@ -26,7 +26,7 @@ Examples
 Upload to S3
 ++++++++++++
 
-S3 supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official S3 documentation <https://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteHosting.html>`_.
+S3 supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official S3 documentation <https://docs.aws.amazon.com/AmazonS3/latest/userguide/WebsiteHosting.html>`_.
 
 You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upload docs to a S3 bucket. The following code snippet shows how to do this with the default jaffle_shop project:
 
@@ -157,7 +157,7 @@ The ``connection_id`` is resolved from Airflow and translated into AWS environme
 Upload to Azure Blob Storage
 ++++++++++++++++++++++++++++
 
-Azure Blob Storage supports serving static files directly from a container. To learn more (and to set it up), check out the `official documentation <https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website>`_.
+Azure Blob Storage supports serving static files directly from a container. To learn more (and to set it up), check out the `official documentation <https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website>`_.
 
 You can use the :class:`~cosmos.operators.DbtDocsAzureStorageOperator` to generate and upload docs to an Azure Blob Storage. The following code snippet shows how to do this with the default jaffle_shop project:
 
@@ -178,7 +178,7 @@ You can use the :class:`~cosmos.operators.DbtDocsAzureStorageOperator` to genera
 Upload to GCS
 +++++++++++++
 
-GCS supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official GCS documentation <https://cloud.google.com/appengine/docs/standard/serving-static-files?tab=python>`_.
+GCS supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official GCS documentation <https://docs.cloud.google.com/appengine/docs/standard/serving-static-files?tab=python>`_.
 
 You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and upload docs to a GCS bucket. The following code snippet shows how to do this with the default jaffle_shop project:
 

@@ -452,7 +452,7 @@ change and are not validated by Cosmos's watcher tests.
 
 dbt versions older than 1.5 have all reached end of life and are no longer
 supported by dbt Labs; see the
-`dbt Core versions <https://docs.getdbt.com/docs/dbt-versions/core>`_ page
+`dbt Core versions <https://docs.getdbt.com/docs/dbt-versions>`_ page
 for current dbt-Labs-supported releases. If you must run an older dbt
 release with Cosmos, use ``ExecutionMode.LOCAL`` instead.
 

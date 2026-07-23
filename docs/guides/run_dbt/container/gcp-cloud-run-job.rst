@@ -9,7 +9,7 @@ The ``gcp_cloud_run_job`` execution mode is particularly useful if you prefer to
 Performance and maintenance considerations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For the ``gcp_cloud_run_job`` execution mode to work, a Cloud Run Job instance must first be created using a previously built Docker container. This container should include the latest ``dbt`` pipelines and profiles. You can find more details in the `Cloud Run Job creation guide <https://cloud.google.com/run/docs/create-jobs>`__ .
+For the ``gcp_cloud_run_job`` execution mode to work, a Cloud Run Job instance must first be created using a previously built Docker container. This container should include the latest ``dbt`` pipelines and profiles. You can find more details in the `Cloud Run Job creation guide <https://docs.cloud.google.com/run/docs/create-jobs>`__.
 
 This execution mode allows you to run ``dbt`` core CLI commands in a Google Cloud Run Job instance. This mode leverages the ``CloudRunExecuteJobOperator`` from the Google Cloud Airflow provider to execute commands within a Cloud Run Job instance, where ``dbt`` is already installed. Similarly to the ``Docker`` and ``Kubernetes`` execution modes, a Docker container should be available, containing the up-to-date ``dbt`` pipelines and profiles.
 
@@ -21,25 +21,25 @@ Setup
 
 This tutorial will guide you through the steps required to use Cloud Run Job instance as the Execution Mode for your dbt code with Astronomer Cosmos. This guide will walk you through the steps required to build the following architecture:
 
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/cosmos_gcp_crj_schematic.png
+.. figure:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos_gcp_crj_schematic.png
     :width: 600
 
 Prerequisites
 ~~~~~~~~~~~~~
 1. Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
 2. `Apache Airflow® <https://airflow.apache.org/>`_
-3. Google Cloud SDK (`install guide <https://cloud.google.com/sdk/docs/install>`_)
+3. Google Cloud SDK (`install guide <https://docs.cloud.google.com/sdk/docs/install-sdk>`_)
 4. Astronomer-cosmos package containing the dbt Cloud Run Job operators
 5. GCP account with:
-    1. A GCP project (`setup guide <https://cloud.google.com/resource-manager/docs/creating-managing-projects#console>`_)
+    1. A GCP project (`setup guide <https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects>`_)
     2. IAM roles:
-        - Basic Role: `Owner <https://cloud.google.com/iam/docs/understanding-roles>`_ (control over whole project) or
-        - Predefined Roles: `Artifact Registry Administrator <https://cloud.google.com/iam/docs/roles-permissions/artifactregistry>`_, `Cloud Run Developer <https://cloud.google.com/iam/docs/roles-permissions/run>`_ (control over specific services)
+        - Basic Role: `Owner <https://docs.cloud.google.com/iam/docs/roles-permissions>`_ (control over whole project) or
+        - Predefined Roles: `Artifact Registry Administrator <https://docs.cloud.google.com/iam/docs/roles-permissions/artifactregistry>`_, `Cloud Run Developer <https://docs.cloud.google.com/iam/docs/roles-permissions/run>`_ (control over specific services)
     3. Enabled service APIs:
         - Artifact Registry API
         - Cloud Run Admin API
         - BigQuery API
-    4. A service account with BigQuery roles: `JobUser <https://cloud.google.com/iam/docs/roles-permissions/bigquery>`_ and `DataEditor <https://cloud.google.com/iam/docs/roles-permissions/bigquery>`_
+    4. A service account with BigQuery roles: `JobUser <https://docs.cloud.google.com/iam/docs/roles-permissions/bigquery>`_ and `DataEditor <https://docs.cloud.google.com/iam/docs/roles-permissions/bigquery>`_
 6. Docker image built with required dbt project and dbt DAG
 7. dbt DAG with Cloud Run Job operators in the Airflow DAGs directory to run in Airflow
 
@@ -181,7 +181,7 @@ After this, the image needs to be pushed to the Artifact Registry:
 
 Take a read of the Dockerfile to understand what it does so that you could use it as a reference in your project.
 
-    - The dags directory containing the `dbt project jaffle_shop <https://github.com/astronomer/cosmos-example/blob/main/dags/dbt/jaffle_shop>`_ is added to the image
+    - The dags directory containing the `dbt project jaffle_shop <https://github.com/astronomer/cosmos-example/tree/main/dags/dbt/jaffle_shop>`_ is added to the image
     - The `bigquery dbt profile <https://github.com/astronomer/cosmos-example/blob/main/gcp_cloud_run_job_example/example_bigquery_profile.yml>`_ file is added to the image
     - The dbt_project.yml is replaced with `bigquery_profile_dbt_project.yml <https://github.com/astronomer/cosmos-example/blob/main/gcp_cloud_run_job_example/bigquery_profile_dbt_project.yml>`_ which contains the profile key pointing to postgres_profile as profile creation is not handled at the moment for K8s operators like in local mode.
 
@@ -244,13 +244,13 @@ Log in to Airflow through a web browser ``http://localhost:8080/``, using the us
 
 Enable and trigger a run of the `jaffle_shop_gcp_cloud_run_job <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_gcp_cloud_run_job.py>`_ DAG. You will be able to see the following successful DAG run.
 
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_gcp_cloud_run_job.png
+.. figure:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_gcp_cloud_run_job.png
     :width: 800
 
 
 You can also verify the tables that were created using dbt in BigQuery Studio:
 
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_big_query.png
+.. figure:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_big_query.png
     :width: 800
 
 

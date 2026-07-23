@@ -94,7 +94,7 @@ dbt Core version removal criteria
 dbt Core versions are removed from support when:
 
 - **dbt Core EOL**: The dbt Core version has reached End of Life according to the
-  `dbt Labs support policy <https://docs.getdbt.com/docs/dbt-versions/core>`_
+  `dbt Labs support policy <https://docs.getdbt.com/docs/dbt-versions>`_
 
 Version removal process
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -214,7 +214,7 @@ Related documentation
   – Python version EOL dates
 - `Apache Airflow EOL Policy <https://airflow.apache.org/docs/apache-airflow/stable/installation/supported-versions.html>`_
   – Airflow version EOL dates
-- `dbt Core Versions <https://docs.getdbt.com/docs/dbt-versions/core>`_
+- `dbt Core Versions <https://docs.getdbt.com/docs/dbt-versions>`_
   – dbt Core version support policy
 - `Astronomer Runtime Version Lifecycle Policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_
   – Astronomer Runtime version EOL dates

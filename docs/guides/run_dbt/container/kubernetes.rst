@@ -30,7 +30,7 @@ To test the DbtKubernetesOperators locally, we encourage you to install the foll
 - Local Airflow (either standalone or using Astro CLI)
 - `Kind <https://kind.sigs.k8s.io/>`_ to run K8s locally
 - `Helm <https://helm.sh/docs/helm/helm_install/>`_ to install Postgres in K8s
-- `Docker <https://docs.docker.com/get-docker/>`_ to create the dbt container image, which will allow Airflow to create a K8s pod which will run dbt
+- `Docker <https://docs.docker.com/get-started/get-docker/>`_ to create the dbt container image, which will allow Airflow to create a K8s pod which will run dbt
 
 At the moment, the user is expected to add to the Docker image both:
 
@@ -166,7 +166,7 @@ Log in to Airflow through a web browser ``http://localhost:8080/``, using the us
 
 Enable and trigger a run of the `jaffle_shop_k8s <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_kubernetes.py>`_ DAG. You will be able to see the following successful DAG run.
 
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_k8s_dag_run.png
+.. figure:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_k8s_dag_run.png
     :width: 800
 
 .. _kubernetes-known-limitations:

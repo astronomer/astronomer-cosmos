@@ -96,9 +96,8 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
      - n/a
      - n/a
 
-- dbt Core 1.5–1.7 fail on Python 3.12+ with ``ModuleNotFoundError: No
-  module named 'distutils'`` — Python 3.12 removed the stdlib ``distutils``
-  module those releases still import.
+- dbt Core 1.5–1.7 fail on Python 3.12+ with ``ModuleNotFoundError: No module named 'distutils'`` —
+  Python 3.12 removed the stdlib ``distutils`` module those releases still import.
 - dbt Core 1.8–1.11 fail on Python 3.14 inside ``dbt_common``'s
   ``mashumaro`` dependency (e.g. ``mashumaro.exceptions.UnserializableField``),
   which hasn't caught up to Python 3.14's typing changes.
@@ -201,7 +200,7 @@ The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
    * - 3.0
      - 3.0
      - None
-      - All 13 tested releases (1.5.1 – 1.15.0).
+     - All 13 tested releases (1.5.1 – 1.15.0). The Cosmos AF3 plugin requires Airflow >= 3.1 — see :doc:`Airflow 3 compatibility notes </policy/airflow3-compatibility>`.
    * - 3.1
      - 3.1
      - 1.11.3, 1.12.1, 1.13.1, 1.14.0, 1.14.1, 1.14.2, 1.15.0
@@ -209,8 +208,7 @@ The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
    * - 3.2, 3.3
      - 3.2, 3.3
      - 1.14.0, 1.14.1, 1.14.2, 1.15.0
-     - 1.5.1, 1.6.0, 1.7.1, 1.8.2, 1.9.2, 1.10.3, 1.11.3, 1.12.1, 1.13.1 — see
-       below.
+     - 1.5.1, 1.6.0, 1.7.1, 1.8.2, 1.9.2, 1.10.3, 1.11.3, 1.12.1, 1.13.1 — see below.
 
 - **Runtime 3.1, Cosmos 1.5.1–1.9.2** fail with an explicit plugin-import
   error:

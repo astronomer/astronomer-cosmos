@@ -6,7 +6,7 @@ Unreleased
 
 Behaviour Changes
 
-* Cosmos now removes the Airflow DAGs folder from dbt's plugin discovery path (``sys.path`` / ``PYTHONPATH``) for the duration of each dbt invocation, so dbt-core no longer imports DAG files named ``dbt_*.py`` as a side effect (which previously leaked or duplicated DAGs in-process and could crash dbt subprocesses). This is enabled by default. As a result, a genuine dbt plugin named ``dbt_*`` placed inside the DAGs folder will no longer be discovered; set ``enable_dags_folder_exclusion_from_dbt=False`` (env var ``AIRFLOW__COSMOS__ENABLE_DAGS_FOLDER_EXCLUSION_FROM_DBT``) to restore the previous behaviour. See #1673 and #2893.
+* Cosmos now removes the Airflow DAGs folder from dbt's plugin discovery path for the duration of each dbt invocation, in both ``InvocationMode.DBT_RUNNER`` (in-process, via ``sys.path``) and ``InvocationMode.SUBPROCESS`` (via ``PYTHONPATH``). Previously dbt-core imported DAG files named ``dbt_*.py`` as a side effect of plugin discovery, which leaked or duplicated DAGs across unrelated Cosmos DAGs when running in-process and could crash the dbt command in subprocess mode. This is enabled by default. As a result, a genuine dbt plugin named ``dbt_*`` placed inside the DAGs folder will no longer be discovered; set ``enable_dags_folder_exclusion_from_dbt=False`` (env var ``AIRFLOW__COSMOS__ENABLE_DAGS_FOLDER_EXCLUSION_FROM_DBT``) to restore the previous behaviour. See #1673 and #2893.
 
 1.15.0 (2026-07-01)
 -------------------

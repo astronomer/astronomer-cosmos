@@ -49,6 +49,52 @@ Finally, an example DAG and how it is rendered in the `Apache Airflow® <https:/
 
 .. image:: ../../_static/test_behavior_build.png
 
+Retrying models but not tests when using TestBehavior.AFTER_ALL
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A common requirement is to retry failing model runs while never retrying tests, for example when tests are slow and
+retrying them would delay or block subsequent DAG runs.
+
+This is achievable with ``TestBehavior.AFTER_ALL``. With this behavior, tests run as a single task at the end of the
+DAG that is independent of any model node, so it keeps the DAG-level ``retries`` default. Per-node ``retries`` then apply
+only to the model (run) tasks.
+
+Set ``retries=0`` as the DAG-wide default and override ``retries`` for the models in your ``dbt_project.yml``:
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+    from cosmos.constants import TestBehavior
+
+    DbtDag(
+        # ...
+        operator_args={"retries": 0},
+        render_config=RenderConfig(test_behavior=TestBehavior.AFTER_ALL),
+    )
+
+.. code-block:: yaml
+
+    # dbt_project.yml — retry every model run twice, leaving the final test task at retries=0
+    models:
+      my_dbt_project:
+        +meta:
+          cosmos:
+            operator_kwargs:
+              retries: 2
+
+.. note::
+
+    This does not work with the default ``TestBehavior.AFTER_EACH``. With ``after_each``, the test task is derived from
+    its model node and inherits the model's task arguments. As a result:
+
+    - Setting ``retries`` on a model (via ``meta.cosmos.operator_kwargs``) also retries its after-each test.
+    - Setting ``operator_kwargs`` on the test itself (via the ``tests``/``data_tests`` config in ``dbt_project.yml`` or
+      the test's ``meta`` in ``schema.yml``) is ignored — the after-each test always uses the model's arguments.
+
+    Use ``after_all`` (shown above) to retry models without retrying tests. The one exception under ``after_each`` is
+    detached tests (see the "Tests with multiple parents" section below on ``should_detach_multiple_parents_tests``): a
+    detached test runs as its own task and does honor its own ``meta.cosmos.operator_kwargs``.
+
 Warning behavior
 ~~~~~~~~~~~~~~~~
 

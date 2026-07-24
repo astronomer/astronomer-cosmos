@@ -214,7 +214,9 @@ def _resolve_deprecated_relative_path(
             f"ProjectConfig.{singular_name} is deprecated since Cosmos 1.16 and will be removed in "
             f"Cosmos 2.0. Use ProjectConfig.{plural_name} instead.",
             DeprecationWarning,
-            stacklevel=2,
+            # stacklevel=3: skip this frame and _resolve_deprecated_relative_path's caller
+            # (ProjectConfig.__init__) to point at the user's own ProjectConfig(...) call site.
+            stacklevel=3,
         )
         return singular_value
     if plural_value is not None:
@@ -231,12 +233,6 @@ class ProjectConfig:
         ``dbt deps`` per DAG run via an Airflow template (e.g. ``"{{ params.install_deps }}"``), set
         ``ExecutionConfig.install_dbt_deps`` instead, which overrides this value at task execution time only.
     :param copy_dbt_packages: Copy dbt_packages directory, if it exists, instead of creating a symbolic link. If not set, fetches the value from [cosmos]default_copy_dbt_packages (False by default).
-    :param models_relative_paths: The relative path(s) to the dbt models directories within the project. Accepts a single
-        path or a list of paths. Defaults to ``["models"]``
-    :param seeds_relative_paths: The relative path(s) to the dbt seeds directories within the project. Accepts a single
-        path or a list of paths. Defaults to ``["seeds"]``
-    :param snapshots_relative_paths: The relative path(s) to the dbt snapshots directories within the project. Accepts a
-        single path or a list of paths. Defaults to ``["snapshots"]``
     :param models_relative_path: Deprecated since Cosmos 1.16, use ``models_relative_paths`` instead. Will be removed in
         Cosmos 2.0.
     :param seeds_relative_path: Deprecated since Cosmos 1.16, use ``seeds_relative_paths`` instead. Will be removed in
@@ -255,6 +251,12 @@ class ProjectConfig:
     :param partial_parse: If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
         for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``
         execution modes.
+    :param models_relative_paths: The relative path(s) to the dbt models directories within the project. Accepts a single
+        path or a list of paths. Keyword-only. Defaults to ``["models"]``
+    :param seeds_relative_paths: The relative path(s) to the dbt seeds directories within the project. Accepts a single
+        path or a list of paths. Keyword-only. Defaults to ``["seeds"]``
+    :param snapshots_relative_paths: The relative path(s) to the dbt snapshots directories within the project. Accepts a
+        single path or a list of paths. Keyword-only. Defaults to ``["snapshots"]``
     """
 
     dbt_project_path: Path | None = None
@@ -271,10 +273,6 @@ class ProjectConfig:
         dbt_project_path: str | Path | None = None,
         install_dbt_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
-        *,
-        models_relative_paths: str | Path | list[str | Path] | None = None,
-        seeds_relative_paths: str | Path | list[str | Path] | None = None,
-        snapshots_relative_paths: str | Path | list[str | Path] | None = None,
         models_relative_path: str | Path | None = None,
         seeds_relative_path: str | Path | None = None,
         snapshots_relative_path: str | Path | None = None,
@@ -284,6 +282,10 @@ class ProjectConfig:
         env_vars: dict[str, str] | None = None,
         dbt_vars: dict[str, str] | None = None,
         partial_parse: bool = True,
+        *,
+        models_relative_paths: str | Path | list[str | Path] | None = None,
+        seeds_relative_paths: str | Path | list[str | Path] | None = None,
+        snapshots_relative_paths: str | Path | list[str | Path] | None = None,
     ):
         models_relative_paths = _resolve_deprecated_relative_path(
             models_relative_paths, models_relative_path, "models", "models_relative_path", "models_relative_paths"

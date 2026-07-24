@@ -159,6 +159,35 @@ def test_LegacyDbtProject_crawls_multiple_dirs(tmp_path):
     assert set(dbt_project.snapshots.keys()) == {"snapshot_a", "snapshot_b"}
 
 
+def test_LegacyDbtProject_yml_config_applies_across_dirs(tmp_path):
+    """
+    A schema.yml in one models dir should be able to configure a model that lives in a different
+    models dir, regardless of dbt_models_dir list order. Regression test for a bug where the yml
+    pass ran per-dir (interleaved with the sql/py crawl) instead of once after every models dir was
+    crawled, so a yml processed before the dir holding its target model would silently drop the
+    config - `marts` is listed (and thus crawled) before `staging`, and `model_b` lives in `staging`.
+    """
+    project_dir = tmp_path / "cross_dir_config_project"
+    (project_dir / "marts").mkdir(parents=True)
+    (project_dir / "staging").mkdir(parents=True)
+
+    (project_dir / "marts" / "model_a.sql").write_text("select 1")
+    (project_dir / "staging" / "model_b.sql").write_text("select 2")
+
+    yaml_data = {"models": [{"name": "model_b", "config": {"tags": ["from_marts_yml"]}}]}
+    with open(project_dir / "marts" / "schema.yml", "w") as fp:
+        yaml.dump(yaml_data, fp)
+
+    dbt_project = LegacyDbtProject(
+        project_name="cross_dir_config_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir=["marts", "staging"],
+    )
+
+    assert set(dbt_project.models.keys()) == {"model_a", "model_b"}
+    assert "tags:from_marts_yml" in dbt_project.models["model_b"].config.config_selectors
+
+
 def test_LegacyDbtProject_accepts_single_dir_as_string(tmp_path):
     """
     dbt_models_dir/dbt_seeds_dir/dbt_snapshots_dir should still accept a plain string (not just a list),

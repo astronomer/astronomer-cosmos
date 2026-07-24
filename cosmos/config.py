@@ -257,6 +257,7 @@ class ProjectConfig:
         dbt_project_path: str | Path | None = None,
         install_dbt_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
+        *,
         models_relative_paths: str | Path | list[str | Path] = "models",
         seeds_relative_paths: str | Path | list[str | Path] = "seeds",
         snapshots_relative_paths: str | Path | list[str | Path] = "snapshots",

@@ -292,15 +292,12 @@ class LegacyDbtProject:
         self.seeds_dir = [self.project_dir / dbt_dir for dbt_dir in dbt_seeds_dirs]
 
         for models_dir in self.models_dir:
-            for file_name in models_dir.rglob("*.sql"):
-                if self._classify_dir(file_name) == DbtModelType.DBT_MODEL:
-                    self._handle_sql_file(file_name)
+            self._crawl_models_dir(models_dir)
 
-            # crawl the models in the project
-            for file_name in models_dir.rglob("*.py"):
-                self._handle_sql_file(file_name)
-
-            # crawl the config files in the project
+        # crawl the config files in the project. This runs as its own pass, after every models_dir
+        # has been crawled above, so a schema.yml in one dir can apply config to a model that lives
+        # in another dir — _handle_config_file only affects models that have already been parsed.
+        for models_dir in self.models_dir:
             for file_name in models_dir.rglob("*.yml"):
                 self._handle_config_file(file_name)
 
@@ -313,6 +310,16 @@ class LegacyDbtProject:
         for seeds_dir in self.seeds_dir:
             for file_name in seeds_dir.rglob("*.csv"):
                 self._handle_csv_file(file_name)
+
+    def _crawl_models_dir(self, models_dir: Path) -> None:
+        """Crawls a single models directory for .sql and .py model files."""
+        for file_name in models_dir.rglob("*.sql"):
+            if self._classify_dir(file_name) == DbtModelType.DBT_MODEL:
+                self._handle_sql_file(file_name)
+
+        # crawl the models in the project
+        for file_name in models_dir.rglob("*.py"):
+            self._handle_sql_file(file_name)
 
     @staticmethod
     def _as_dir_list(value: str | list[str] | None) -> list[str]:

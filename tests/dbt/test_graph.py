@@ -33,6 +33,7 @@ from cosmos.dbt.graph import (
     DbtNode,
     LoadMode,
     _normalize_path,
+    _relative_dirs,
     parse_dbt_ls_output,
     run_command,
     run_command_with_subprocess,
@@ -1470,6 +1471,93 @@ def test_load_via_load_via_custom_parser(project_name, nodes_count):
 
     assert dbt_graph.nodes == dbt_graph.filtered_nodes
     assert len(dbt_graph.nodes) == nodes_count
+
+
+def test_load_via_custom_parser_with_nested_model_dir(tmp_path):
+    """
+    A nested models_relative_paths dir (e.g. "custom/models") should still be crawled under
+    LoadMode.CUSTOM, not silently dropped by truncating the configured path to its last component.
+    """
+    project_dir = tmp_path / "nested_project"
+    (project_dir / "custom" / "models").mkdir(parents=True)
+    (project_dir / "custom" / "models" / "my_model.sql").write_text("select 1")
+    (project_dir / "profiles.yml").write_text(
+        "test:\n"
+        "  target: test\n"
+        "  outputs:\n"
+        "    test:\n"
+        "      type: postgres\n"
+        "      host: localhost\n"
+        "      user: user\n"
+        "      password: pass\n"
+        "      port: 5432\n"
+        "      dbname: db\n"
+        "      schema: public\n"
+        "      threads: 1\n"
+    )
+
+    project_config = ProjectConfig(dbt_project_path=project_dir, models_relative_paths="custom/models")
+    execution_config = ExecutionConfig(dbt_project_path=project_dir)
+    render_config = RenderConfig(dbt_project_path=project_dir, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=project_dir / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_via_custom_parser()
+
+    assert "my_model" in dbt_graph.nodes
+    assert dbt_graph.nodes["my_model"].unique_id == "model.nested_project.my_model"
+
+
+def test_load_via_custom_parser_with_explicit_empty_models_relative_paths(tmp_path):
+    """
+    models_relative_paths=[] means "no model directories" and must not fall back to crawling the
+    default "models" dir under LoadMode.CUSTOM, even if one happens to exist on disk.
+    """
+    project_dir = tmp_path / "empty_list_project"
+    (project_dir / "models").mkdir(parents=True)
+    (project_dir / "models" / "should_not_be_found.sql").write_text("select 1")
+    (project_dir / "profiles.yml").write_text(
+        "test:\n"
+        "  target: test\n"
+        "  outputs:\n"
+        "    test:\n"
+        "      type: postgres\n"
+        "      host: localhost\n"
+        "      user: user\n"
+        "      password: pass\n"
+        "      port: 5432\n"
+        "      dbname: db\n"
+        "      schema: public\n"
+        "      threads: 1\n"
+    )
+
+    project_config = ProjectConfig(dbt_project_path=project_dir, models_relative_paths=[])
+    execution_config = ExecutionConfig(dbt_project_path=project_dir)
+    render_config = RenderConfig(dbt_project_path=project_dir, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=project_dir / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_via_custom_parser()
+
+    assert dbt_graph.nodes == {}
 
 
 @pytest.mark.parametrize("project_name", [("altered_jaffle_shop"), ("jaffle_shop_python")])
@@ -3089,6 +3177,39 @@ def test__normalize_path():
     original_value = "seeds\\seed_ifs_util_manual_event_id.csv"
     expected_value = "seeds/seed_ifs_util_manual_event_id.csv"
     assert _normalize_path(original_value) == expected_value
+
+
+def test__relative_dirs_preserves_nested_subdirectories():
+    """
+    _relative_dirs should return each path's location relative to project_path, not just Path.stem -
+    otherwise a nested dir like "custom/models" collapses to "models" and LegacyDbtProject crawls the
+    wrong directory.
+    """
+    project_path = Path("/usr/local/airflow/dags/dbt/my_project")
+    paths = [project_path / "custom" / "models", project_path / "models_v2"]
+
+    assert _relative_dirs(paths, project_path) == ["custom/models", "models_v2"]
+
+
+def test__relative_dirs_empty_and_no_project_path():
+    """
+    An explicitly empty paths list (project_path set) must stay [] rather than falling back to
+    LegacyDbtProject's default - only an unset project_path itself should trigger that fallback (via
+    None), since ProjectConfig always pairs a set project_path with a non-empty paths list otherwise.
+    """
+    assert _relative_dirs([], Path("/some/project")) == []
+    assert _relative_dirs([Path("/some/project/custom/models")], None) is None
+
+
+def test__relative_dirs_falls_back_when_path_outside_project():
+    """
+    A path outside project_path (e.g. an absolute models_relative_paths entry) should fall back to
+    Path.stem instead of raising ValueError from Path.relative_to.
+    """
+    project_path = Path("/some/project")
+    outside_path = Path("/some/other/models")
+
+    assert _relative_dirs([outside_path], project_path) == ["models"]
 
 
 @pytest.mark.parametrize(

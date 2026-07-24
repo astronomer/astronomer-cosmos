@@ -55,6 +55,220 @@ dbt Core
    Refer to the `dbt documentation <https://docs.getdbt.com/docs/supported-data-platforms>`_
    for adapter-specific version compatibility.
 
+**Verified Python × dbt Core support.** The declared range above is what
+Cosmos tests in CI; whether a given dbt Core release actually installs and
+imports on a given Python version is a property of dbt Core itself, not of
+Cosmos. The table below reflects targeted verification — ``pip install``
+into a plain Python image, then ``import dbt.cli.main`` — checked
+2026-07-23:
+
+.. list-table::
+   :header-rows: 1
+
+   * - dbt Core
+     - 3.10
+     - 3.11
+     - 3.12
+     - 3.13
+     - 3.14
+   * - 1.5 – 1.7
+     - OK
+     - OK
+     - fails
+     - fails
+     - fails
+   * - 1.8 – 1.11
+     - OK
+     - OK
+     - OK
+     - OK
+     - fails
+   * - 1.12
+     - OK
+     - OK
+     - OK
+     - OK
+     - OK
+   * - 2.0 (Fusion)
+     - n/a
+     - n/a
+     - n/a
+     - n/a
+     - n/a
+
+- dbt Core 1.5–1.7 fail on Python 3.12+ with ``ModuleNotFoundError: No module named 'distutils'`` —
+  Python 3.12 removed the stdlib ``distutils`` module those releases still import.
+- dbt Core 1.8–1.11 fail on Python 3.14 inside ``dbt_common``'s
+  ``mashumaro`` dependency (e.g. ``mashumaro.exceptions.UnserializableField``),
+  which hasn't caught up to Python 3.14's typing changes.
+- dbt Fusion (``2.0``) is **not** installed via ``pip install dbt-core==2.0``
+  — there is no such release on PyPI. Fusion ships as a separate
+  binary/installer; this table's pip-based check does not apply to it.
+
+.. note::
+
+   For the authoritative, always-current Python support of a specific
+   release, check the package's PyPI project page — e.g. `dbt-core
+   <https://pypi.org/project/dbt-core/>`_ or `astronomer-cosmos
+   <https://pypi.org/project/astronomer-cosmos/>`_ — and look at that
+   release's ``Requires-Python`` metadata and classifiers. The table above
+   is a point-in-time verification, not a substitute for checking the
+   package you're about to install.
+
+Astronomer Runtime
++++++++++++++++++++
+
+Astronomer Runtime bundles a specific Apache Airflow version with a supported
+Python range. Because Cosmos's supported Airflow and Python ranges above track
+Astronomer Runtime, any Runtime series still in **Maintenance** or **Basic
+Support** is compatible with the current Cosmos release — provided the dbt
+Core version you pair it with also supports that Python version (see the
+verified Python × dbt Core table above).
+
+The table below reflects Runtime series still in Maintenance or Basic Support
+as of 2026-07-23, per the `Astronomer Runtime lifecycle policy
+<https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_.
+Runtime ships new patch and minor versions frequently — treat this table as a
+snapshot and check the `Runtime release notes
+<https://www.astronomer.io/docs/runtime/runtime-release-notes>`_ and lifecycle
+policy pages directly for the current state.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Runtime series
+     - Airflow
+     - Python (bundled by Runtime)
+   * - 3.3
+     - 3.3
+     - 3.12 – 3.14
+   * - 3.2
+     - 3.2
+     - 3.12 – 3.14
+   * - 3.1
+     - 3.1
+     - 3.11 – 3.12
+   * - 3.0
+     - 3.0
+     - 3.11 – 3.12
+   * - 13
+     - 2.11
+     - 3.10 – 3.12
+
+.. note::
+
+   Runtime 11 (Airflow 2.9) and Runtime 12 (Airflow 2.10) are omitted above
+   because their Basic Support windows have already closed. Cosmos still
+   supports Airflow 2.9/2.10 per the matrix above for users pinned to those
+   Runtime series, but new Astro deployments can no longer be created on them.
+
+.. note::
+
+   Cosmos's dbt Core test matrix runs the full 1.5–1.12 range across every
+   supported Airflow/Python combination only for dbt 1.12; older dbt minors
+   are cross-tested against a narrower subset of Airflow/Python pairs (see
+   `.github/workflows/test.yml
+   <https://github.com/astronomer/astronomer-cosmos/blob/main/.github/workflows/test.yml>`_
+   for the exact combinations). If you rely on an older dbt Core minor with an
+   uncommon Airflow/Python pair, validate it in your own CI.
+
+Cosmos and Astronomer Runtime compatibility
++++++++++++++++++++++++++++++++++++++++++++
+
+The table below comes from installing each Cosmos release (1.5.1 to 1.15.0)
+into the official Astronomer Runtime Docker image for every Runtime series,
+then running ``airflow plugins`` to check if the Cosmos plugin loads.
+Verified 2026-07-23 against Runtime images 11.20.0 (default and
+``python-3.9`` variant), 12.12.0, 13.8.0, 3.0-16, 3.1-17, 3.2-6, and 3.3-2.
+
+This only tells you if the plugin loads, not if Cosmos works. Cosmos itself
+has been supported on Airflow 3.0 since Cosmos 1.10.0, but the dbt docs UI
+plugin needs Airflow >= 3.1, so it never loads on Runtime 3.0. See
+:doc:`Airflow 3 compatibility notes </policy/airflow3-compatibility>` for
+what's supported on Airflow 3.0 versus 3.1+.
+
+The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
+1.9.2, 1.10.3, 1.11.3, 1.12.1, 1.13.1, 1.14.0, 1.14.1, 1.14.2, 1.15.0.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Runtime series
+     - Airflow
+     - Python (bundled)
+     - Cosmos versions confirmed working
+     - Cosmos versions confirmed failing
+   * - 11
+     - 2.9
+     - 3.9 – 3.11 (default 3.11)
+     - All 13 tested releases, on the default (Python >= 3.10) image
+     - Cosmos >= 1.12.0, but only on the ``python-3.9`` variant — see below.
+   * - 12, 13
+     - 2.10, 2.11
+     - 3.10 – 3.12
+     - All 13 tested releases (1.5.1 – 1.15.0)
+     - None
+   * - 3.0
+     - 3.0
+     - 3.11 – 3.12
+     - Supported since Cosmos 1.10.0, but the dbt docs UI plugin needs Airflow >= 3.1 and does not load here — see :doc:`Airflow 3 compatibility notes </policy/airflow3-compatibility>`.
+     - 1.5.1 – 1.9.2 (Airflow 3 support was added in Cosmos 1.10.0)
+   * - 3.1
+     - 3.1
+     - 3.11 – 3.12
+     - 1.11.3, 1.12.1, 1.13.1, 1.14.0, 1.14.1, 1.14.2, 1.15.0
+     - 1.5.1, 1.6.0, 1.7.1, 1.8.2, 1.9.2, 1.10.3 — see below.
+   * - 3.2, 3.3
+     - 3.2, 3.3
+     - 3.12 – 3.14
+     - 1.14.0, 1.14.1, 1.14.2, 1.15.0
+     - 1.5.1, 1.6.0, 1.7.1, 1.8.2, 1.9.2, 1.10.3, 1.11.3, 1.12.1, 1.13.1 — see below.
+
+- **Runtime 3.1, Cosmos 1.5.1–1.9.2** fail with an explicit plugin-import
+  error:
+
+  .. code-block:: text
+
+     ERROR - Failed to import plugin cosmos
+     ImportError: cannot import name 'context_to_airflow_vars' from 'airflow...'
+
+  **Cosmos 1.10.3** also fails on Runtime 3.1, but silently: no traceback is
+  printed and the ``cosmos`` entry is simply absent from ``airflow plugins``
+  output.
+
+- **Runtime 3.2 / 3.3, Cosmos 1.5.1** fails with:
+
+  .. code-block:: text
+
+     AttributeError: partially initialized module 'cosmos.plugin' has no
+     attribute 'CosmosPlugin' (most likely due to a circular import)
+
+- **Runtime 3.2 / 3.3, Cosmos 1.6.0–1.13.1** crash the entire ``airflow``
+  process — not only plugin loading — during Airflow's own provider-metadata
+  discovery, which every ``airflow`` invocation runs at startup:
+
+  .. code-block:: text
+
+     File ".../cosmos/settings.py", line 8, in <module>
+         from airflow.configuration import conf
+     ImportError: cannot import name 'conf' from partially initialized module
+     'airflow.configuration' (most likely due to a circular import)
+
+  The cycle: Cosmos's ``apache_airflow_provider`` entry point imports
+  ``cosmos.settings``, which imports ``airflow.configuration`` while Airflow
+  is still in the middle of initializing that same module. Confirmed to
+  reproduce from a bare ``python -c "import airflow"``, so this is not
+  specific to plugins or to the ``airflow`` CLI — any process that imports
+  Airflow with one of these Cosmos versions installed fails to start.
+
+- **Cosmos >= 1.12.0 requires Python >= 3.10.** Runtime 11's default image
+  bundles Python 3.11 and is unaffected, but on its ``python-3.9`` variant,
+  ``pip install`` itself refuses to resolve Cosmos >= 1.12.0 — a plain
+  dependency-version error, not a circular import or plugin-loading
+  failure. This is a Python-version constraint, not an Airflow-version one:
+  the same failure would occur on any Airflow version paired with Python
+  3.9.
+
 Version removal policy
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -218,3 +432,5 @@ Related documentation
   – dbt Core version support policy
 - `Astronomer Runtime Version Lifecycle Policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_
   – Astronomer Runtime version EOL dates
+- `Astronomer Runtime Release Notes <https://www.astronomer.io/docs/runtime/runtime-release-notes>`_
+  – Runtime-to-Airflow-to-Python version mappings

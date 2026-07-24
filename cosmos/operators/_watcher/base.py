@@ -518,12 +518,9 @@ class BaseConsumerSensor(BaseSensorOperator):
                 self.__class__.__name__,
             )
 
-        upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)
-
-        extra_flags: list[str] = []
-        if upstream_task and hasattr(upstream_task, "add_cmd_flags"):
-            raw_flags = upstream_task.add_cmd_flags()
-            extra_flags = self._filter_flags(raw_flags)
+        # Use self, not the producer task object: dag.get_task() returns it unrendered.
+        raw_flags = self.add_cmd_flags()  # type: ignore[attr-defined]
+        extra_flags = self._filter_flags(raw_flags)
 
         model_selector = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = extra_flags + ["--select", model_selector]

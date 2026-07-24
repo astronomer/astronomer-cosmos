@@ -1467,6 +1467,60 @@ def test_create_test_task_metadata_without_render_config_exclude_preserves_exist
     assert metadata.arguments["exclude"] == "tag:my_custom_exclude"
 
 
+def test_create_test_task_metadata_preserves_task_args_on_warning_callback():
+    """An unset top-level on_warning_callback must not clobber one supplied via operator_args."""
+
+    def callback(context):
+        pass
+
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"on_warning_callback": callback},
+        node=sample_node,
+    )
+    assert metadata.arguments["on_warning_callback"] is callback
+
+
+def test_create_test_task_metadata_top_level_on_warning_callback_wins():
+    """An explicit top-level on_warning_callback still takes precedence over task_args."""
+
+    def task_args_callback(context):
+        pass
+
+    def top_level_callback(context):
+        pass
+
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"on_warning_callback": task_args_callback},
+        on_warning_callback=top_level_callback,
+        node=sample_node,
+    )
+    assert metadata.arguments["on_warning_callback"] is top_level_callback
+
+
 def test_create_test_task_metadata_unions_render_config_exclude_with_existing_exclude():
     """A render-level exclude must be unioned with (not overwrite) an operator/task-args exclude."""
     sample_node = DbtNode(

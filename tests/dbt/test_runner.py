@@ -130,6 +130,56 @@ def test_run_command_calls_cleanup_dbt_adapters():
     mock_cleanup.assert_called_once()
 
 
+def test_run_command_excludes_dags_folder_from_sys_path():
+    """run_command wraps the dbtRunner invoke with exclude_dags_folder_from_sys_path so dbt's
+    dbt_* plugin discovery does not import DAG files during in-process parsing/execution.
+    See https://github.com/astronomer/astronomer-cosmos/issues/1673"""
+    fake_result = MagicMock()
+    fake_result.success = True
+    fake_result.exception = None
+    fake_result.result = None
+
+    fake_runner = MagicMock()
+    fake_runner.invoke.return_value = fake_result
+
+    call_order = []
+
+    class TrackingContextManager:
+        def __init__(self, label):
+            self.label = label
+
+        def __enter__(self):
+            call_order.append(f"{self.label}_enter")
+
+        def __exit__(self, *args):
+            call_order.append(f"{self.label}_exit")
+
+    def fake_invoke(*args, **kwargs):
+        call_order.append("invoke")
+        return fake_result
+
+    fake_runner.invoke.side_effect = fake_invoke
+
+    with (
+        patch.object(dbt_runner, "get_runner", return_value=fake_runner),
+        patch.object(dbt_runner, "_cleanup_dbt_adapters"),
+        patch.object(dbt_runner, "change_working_directory", return_value=TrackingContextManager("cwd")),
+        patch.object(dbt_runner, "environ"),
+        patch.object(dbt_runner, "exclude_dags_folder_from_sys_path", return_value=TrackingContextManager("exclude")),
+        patch.object(dbt_runner, "logger"),
+    ):
+        dbt_runner.run_command(
+            command=["dbt", "ls"],
+            env={},
+            cwd="/tmp/project",
+        )
+
+    assert call_order == ["exclude_enter", "cwd_enter", "invoke", "cwd_exit", "exclude_exit"]
+    # exclude must enter before the chdir so a relative DAGS_FOLDER resolves against the Airflow
+    # process cwd, not the dbt project dir. See https://github.com/astronomer/astronomer-cosmos/issues/1673
+    assert call_order.index("exclude_enter") < call_order.index("cwd_enter")
+
+
 def test_run_command_calls_cleanup_dbt_adapters_when_invoke_raises():
     """run_command calls _cleanup_dbt_adapters even when runner.invoke raises (try/finally)."""
     fake_runner = MagicMock()

@@ -412,6 +412,31 @@ def test_dbt_base_operator_run_dbt_runner(mock_chdir, mock_environ):
     assert mock_environ.update.call_args[0][0] == env_vars
 
 
+def test_run_subprocess_strips_dags_folder_from_pythonpath(tmp_path):
+    """run_subprocess must strip the Airflow DAGs folder from the subprocess's PYTHONPATH so dbt's
+    dbt_* plugin discovery does not import (and crash on) DAG files.
+    See https://github.com/astronomer/astronomer-cosmos/issues/1673"""
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+    mock_hook = MagicMock()
+    dbt_base_operator.subprocess_hook = mock_hook
+
+    dags_folder = str(tmp_path)
+    other_entry = "/usr/local/astronomer-cosmos"
+    env = {"PYTHONPATH": os.pathsep.join([other_entry, dags_folder])}
+
+    with patch("airflow.settings.DAGS_FOLDER", dags_folder):
+        dbt_base_operator.run_subprocess(command=["dbt", "run"], env=env, cwd="some-dir")
+
+    passed_env = mock_hook.run_command.call_args.kwargs["env"]
+    assert passed_env["PYTHONPATH"] == other_entry
+    # the caller's env dict must not be mutated in place
+    assert env["PYTHONPATH"] == os.pathsep.join([other_entry, dags_folder])
+
+
 @pytest.mark.parametrize(
     ["skip_exception", "exception_code_returned", "expected_exception"],
     [

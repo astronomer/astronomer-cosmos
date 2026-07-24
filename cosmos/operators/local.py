@@ -59,6 +59,7 @@ from cosmos.dbt.project import (
     copy_manifest_file_if_exists,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
+    remove_dags_folder_from_pythonpath,
 )
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
@@ -480,6 +481,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
     ) -> FullOutputSubprocessResult:
         self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
+        # Keep the Airflow DAGs folder off the dbt subprocess's PYTHONPATH so dbt's dbt_* plugin
+        # discovery does not import (and crash on) DAG files. See https://github.com/astronomer/astronomer-cosmos/issues/1673
+        env = remove_dags_folder_from_pythonpath(env)
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
             command=command,
             env=env,

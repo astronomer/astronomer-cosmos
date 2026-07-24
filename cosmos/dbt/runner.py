@@ -91,7 +91,10 @@ def run_command(
     # command that is used by `InvocationMode.SUBPROCESS`, and in that scenario the first command is necessarily the path
     # to the dbt executable.
     cli_args = command[1:]
-    with change_working_directory(cwd), environ(env), exclude_dags_folder_from_sys_path():
+    # ``exclude_dags_folder_from_sys_path`` must enter *before* ``change_working_directory`` so it
+    # resolves ``DAGS_FOLDER`` against the Airflow process cwd. A relative ``DAGS_FOLDER`` resolved
+    # after the chdir would point at the dbt project dir and fail to strip the real DAGs folder.
+    with exclude_dags_folder_from_sys_path(), change_working_directory(cwd), environ(env):
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
         runner = get_runner(callbacks=callbacks)
         try:

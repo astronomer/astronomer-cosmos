@@ -145,11 +145,14 @@ def test_run_command_excludes_dags_folder_from_sys_path():
     call_order = []
 
     class TrackingContextManager:
+        def __init__(self, label):
+            self.label = label
+
         def __enter__(self):
-            call_order.append("exclude_enter")
+            call_order.append(f"{self.label}_enter")
 
         def __exit__(self, *args):
-            call_order.append("exclude_exit")
+            call_order.append(f"{self.label}_exit")
 
     def fake_invoke(*args, **kwargs):
         call_order.append("invoke")
@@ -160,9 +163,9 @@ def test_run_command_excludes_dags_folder_from_sys_path():
     with (
         patch.object(dbt_runner, "get_runner", return_value=fake_runner),
         patch.object(dbt_runner, "_cleanup_dbt_adapters"),
-        patch.object(dbt_runner, "change_working_directory"),
+        patch.object(dbt_runner, "change_working_directory", return_value=TrackingContextManager("cwd")),
         patch.object(dbt_runner, "environ"),
-        patch.object(dbt_runner, "exclude_dags_folder_from_sys_path", return_value=TrackingContextManager()),
+        patch.object(dbt_runner, "exclude_dags_folder_from_sys_path", return_value=TrackingContextManager("exclude")),
         patch.object(dbt_runner, "logger"),
     ):
         dbt_runner.run_command(
@@ -171,7 +174,10 @@ def test_run_command_excludes_dags_folder_from_sys_path():
             cwd="/tmp/project",
         )
 
-    assert call_order == ["exclude_enter", "invoke", "exclude_exit"]
+    assert call_order == ["exclude_enter", "cwd_enter", "invoke", "cwd_exit", "exclude_exit"]
+    # exclude must enter before the chdir so a relative DAGS_FOLDER resolves against the Airflow
+    # process cwd, not the dbt project dir. See https://github.com/astronomer/astronomer-cosmos/issues/1673
+    assert call_order.index("exclude_enter") < call_order.index("cwd_enter")
 
 
 def test_run_command_calls_cleanup_dbt_adapters_when_invoke_raises():

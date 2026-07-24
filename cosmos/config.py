@@ -191,21 +191,35 @@ def _as_path_list(value: str | Path | list[str | Path]) -> list[str | Path]:
 
 
 def _resolve_deprecated_relative_path(
-    plural_value: str | Path | list[str | Path],
+    plural_value: str | Path | list[str | Path] | None,
     singular_value: str | Path | None,
+    default: str,
     singular_name: str,
     plural_name: str,
 ) -> str | Path | list[str | Path]:
-    """Returns singular_value (with a DeprecationWarning) if set, otherwise plural_value unchanged."""
-    if singular_value is None:
+    """Resolves a plural relative-path arg and its deprecated singular counterpart into one value.
+
+    Raises if both are explicitly set, since it would otherwise be unclear (and was previously
+    silently resolved by preferring the deprecated singular value) which one should win. Returns
+    singular_value (with a DeprecationWarning) if only it is set, plural_value if only it is set,
+    and `default` if neither is set.
+    """
+    if plural_value is not None and singular_value is not None:
+        raise CosmosValueError(
+            f"ProjectConfig.{plural_name} and the deprecated ProjectConfig.{singular_name} were both "
+            f"set. Remove ProjectConfig.{singular_name} and use only ProjectConfig.{plural_name}."
+        )
+    if singular_value is not None:
+        warnings.warn(
+            f"ProjectConfig.{singular_name} is deprecated since Cosmos 1.16 and will be removed in "
+            f"Cosmos 2.0. Use ProjectConfig.{plural_name} instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return singular_value
+    if plural_value is not None:
         return plural_value
-    warnings.warn(
-        f"ProjectConfig.{singular_name} is deprecated since Cosmos 1.16 and will be removed in "
-        f"Cosmos 2.0. Use ProjectConfig.{plural_name} instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return singular_value
+    return default
 
 
 class ProjectConfig:
@@ -258,9 +272,9 @@ class ProjectConfig:
         install_dbt_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         *,
-        models_relative_paths: str | Path | list[str | Path] = "models",
-        seeds_relative_paths: str | Path | list[str | Path] = "seeds",
-        snapshots_relative_paths: str | Path | list[str | Path] = "snapshots",
+        models_relative_paths: str | Path | list[str | Path] | None = None,
+        seeds_relative_paths: str | Path | list[str | Path] | None = None,
+        snapshots_relative_paths: str | Path | list[str | Path] | None = None,
         models_relative_path: str | Path | None = None,
         seeds_relative_path: str | Path | None = None,
         snapshots_relative_path: str | Path | None = None,
@@ -272,13 +286,17 @@ class ProjectConfig:
         partial_parse: bool = True,
     ):
         models_relative_paths = _resolve_deprecated_relative_path(
-            models_relative_paths, models_relative_path, "models_relative_path", "models_relative_paths"
+            models_relative_paths, models_relative_path, "models", "models_relative_path", "models_relative_paths"
         )
         seeds_relative_paths = _resolve_deprecated_relative_path(
-            seeds_relative_paths, seeds_relative_path, "seeds_relative_path", "seeds_relative_paths"
+            seeds_relative_paths, seeds_relative_path, "seeds", "seeds_relative_path", "seeds_relative_paths"
         )
         snapshots_relative_paths = _resolve_deprecated_relative_path(
-            snapshots_relative_paths, snapshots_relative_path, "snapshots_relative_path", "snapshots_relative_paths"
+            snapshots_relative_paths,
+            snapshots_relative_path,
+            "snapshots",
+            "snapshots_relative_path",
+            "snapshots_relative_paths",
         )
         # Assigned here, not as a class-level default, so instances don't share one mutable list.
         self.models_paths = []
@@ -329,6 +347,17 @@ class ProjectConfig:
         )
         return self.models_paths[0] if self.models_paths else None
 
+    @models_path.setter
+    def models_path(self, value: Path | None) -> None:
+        """Deprecated since Cosmos 1.16, use ``models_paths`` instead. Will be removed in Cosmos 2.0."""
+        warnings.warn(
+            "ProjectConfig.models_path is deprecated since Cosmos 1.16 and will be removed in Cosmos 2.0. "
+            "Use ProjectConfig.models_paths instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.models_paths = [value] if value is not None else []
+
     @property
     def seeds_path(self) -> Path | None:
         """Deprecated since Cosmos 1.16, use ``seeds_paths`` instead. Will be removed in Cosmos 2.0."""
@@ -340,6 +369,17 @@ class ProjectConfig:
         )
         return self.seeds_paths[0] if self.seeds_paths else None
 
+    @seeds_path.setter
+    def seeds_path(self, value: Path | None) -> None:
+        """Deprecated since Cosmos 1.16, use ``seeds_paths`` instead. Will be removed in Cosmos 2.0."""
+        warnings.warn(
+            "ProjectConfig.seeds_path is deprecated since Cosmos 1.16 and will be removed in Cosmos 2.0. "
+            "Use ProjectConfig.seeds_paths instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.seeds_paths = [value] if value is not None else []
+
     @property
     def snapshots_path(self) -> Path | None:
         """Deprecated since Cosmos 1.16, use ``snapshots_paths`` instead. Will be removed in Cosmos 2.0."""
@@ -350,6 +390,17 @@ class ProjectConfig:
             stacklevel=2,
         )
         return self.snapshots_paths[0] if self.snapshots_paths else None
+
+    @snapshots_path.setter
+    def snapshots_path(self, value: Path | None) -> None:
+        """Deprecated since Cosmos 1.16, use ``snapshots_paths`` instead. Will be removed in Cosmos 2.0."""
+        warnings.warn(
+            "ProjectConfig.snapshots_path is deprecated since Cosmos 1.16 and will be removed in Cosmos 2.0. "
+            "Use ProjectConfig.snapshots_paths instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.snapshots_paths = [value] if value is not None else []
 
     def validate_project(self) -> None:
         """

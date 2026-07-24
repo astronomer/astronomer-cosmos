@@ -102,6 +102,48 @@ def test_deprecated_singular_path_property_still_works(deprecated_attr, expected
         assert getattr(project_config, deprecated_attr) == expected
 
 
+@pytest.mark.parametrize(
+    "plural_kwarg,deprecated_kwarg",
+    [
+        ("models_relative_paths", "models_relative_path"),
+        ("seeds_relative_paths", "seeds_relative_path"),
+        ("snapshots_relative_paths", "snapshots_relative_path"),
+    ],
+)
+def test_init_with_both_plural_and_deprecated_singular_relative_path_raises(plural_kwarg, deprecated_kwarg):
+    """
+    Passing both a plural *_relative_paths kwarg and its deprecated singular counterpart is ambiguous -
+    it should raise instead of silently preferring the deprecated one and discarding the plural value.
+    """
+    kwargs = {
+        "dbt_project_path": "path/to/dbt/project",
+        plural_kwarg: ["custom"],
+        deprecated_kwarg: "custom",
+    }
+    with pytest.raises(CosmosValueError, match=deprecated_kwarg):
+        ProjectConfig(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "deprecated_attr,plural_attr",
+    [
+        ("models_path", "models_paths"),
+        ("seeds_path", "seeds_paths"),
+        ("snapshots_path", "snapshots_paths"),
+    ],
+)
+def test_deprecated_singular_path_property_setter_still_works(deprecated_attr, plural_attr):
+    """
+    Setting the deprecated singular *_path property - previously a plain writable attribute - should
+    still work: it must raise a DeprecationWarning and replace the plural *_paths list with a
+    single-item list, rather than raising AttributeError now that *_path is a property.
+    """
+    project_config = ProjectConfig(dbt_project_path="path/to/dbt/project")
+    with pytest.deprecated_call():
+        setattr(project_config, deprecated_attr, Path("elsewhere"))
+    assert getattr(project_config, plural_attr) == [Path("elsewhere")]
+
+
 def test_init_with_project_path_and_install_dbt_deps_succeeds():
     """
     Passing only dbt_project_path and install_dbt_deps should succeed and set install_dbt_deps to the value defined

@@ -14,6 +14,7 @@ from typing import Any, ClassVar
 import jinja2
 import yaml
 
+from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -319,7 +320,8 @@ class LegacyDbtProject:
 
         # crawl the models in the project
         for file_name in models_dir.rglob("*.py"):
-            self._handle_sql_file(file_name)
+            if self._classify_dir(file_name) == DbtModelType.DBT_MODEL:
+                self._handle_sql_file(file_name)
 
     @staticmethod
     def _as_dir_list(value: str | list[str] | None) -> list[str]:
@@ -328,7 +330,11 @@ class LegacyDbtProject:
             return []
         if isinstance(value, str):
             return [value]
-        return list(value)
+        if isinstance(value, list):
+            return list(value)
+        raise CosmosValueError(
+            f"Expected a directory name (str) or a list of directory names, got {type(value).__name__}: {value!r}."
+        )
 
     def _handle_csv_file(self, path: Path) -> None:
         """

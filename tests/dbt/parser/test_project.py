@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 from cosmos.dbt.parser.project import DbtModel, DbtModelType, LegacyDbtProject
+from cosmos.exceptions import CosmosValueError
 
 DBT_PROJECT_PATH = Path(__name__).parent.parent.parent.parent.parent / "dev/dags/dbt/"
 SAMPLE_CSV_PATH = DBT_PROJECT_PATH / "jaffle_shop/seeds/raw_customers.csv"
@@ -230,6 +231,37 @@ def test_LegacyDbtProject_explicit_empty_dir_list_crawls_nothing(tmp_path):
     )
 
     assert dbt_project.models == {}
+
+
+def test_LegacyDbtProject_rejects_invalid_dir_type():
+    """
+    dbt_models_dir/dbt_seeds_dir/dbt_snapshots_dir should raise a clear error for a misconfigured value
+    that is neither a string nor a list of strings, instead of failing obscurely downstream.
+    """
+    with pytest.raises(CosmosValueError, match="Expected a directory name"):
+        LegacyDbtProject(project_name="bad_config_project", dbt_models_dir=123)
+
+
+def test_LegacyDbtProject_py_file_in_nested_snapshots_dir_is_skipped(tmp_path):
+    """
+    A .py file living inside a snapshots dir nested under a models dir must not be picked up by the
+    unfiltered *.py crawl: the nested snapshots dir is more specific than the models dir, so it would
+    be classified as a snapshot and crash in DbtModel.__post_init__, which expects a
+    "{% snapshot ... %}" jinja block - not a bare .py file.
+    """
+    project_dir = tmp_path / "nested_py_project"
+    (project_dir / "models" / "snapshots").mkdir(parents=True)
+    (project_dir / "models" / "model_a.sql").write_text("select 1")
+    (project_dir / "models" / "snapshots" / "__init__.py").write_text("")
+
+    dbt_project = LegacyDbtProject(
+        project_name="nested_py_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir="models",
+        dbt_snapshots_dir="models/snapshots",
+    )
+
+    assert set(dbt_project.models.keys()) == {"model_a"}
 
 
 def test_LegacyDbtProject_classifies_nested_snapshots_dir_correctly(tmp_path):

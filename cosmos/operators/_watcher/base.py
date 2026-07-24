@@ -519,7 +519,8 @@ class BaseConsumerSensor(BaseSensorOperator):
             )
 
         # Use self, not the producer task object: dag.get_task() returns it unrendered.
-        raw_flags = self.add_cmd_flags()  # type: ignore[attr-defined]
+        add_cmd_flags = getattr(self, "add_cmd_flags", None)
+        raw_flags: list[str] = add_cmd_flags() if callable(add_cmd_flags) else []
         extra_flags = self._filter_flags(raw_flags)
 
         model_selector = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)

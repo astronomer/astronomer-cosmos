@@ -379,47 +379,116 @@ def test_remove_dags_folder_from_pythonpath_noop_when_flag_disabled(tmp_path):
     assert result is not env
 
 
-def test_dbt_plugin_discovery_skips_dags_folder_dbt_module(tmp_path):
-    """Functional guard for #1673 against dbt-core's real plugin discovery.
+def _prepare_dbt_leak_repro(tmp_path):
+    """Set up a #1673 reproduction: a minimal non-connecting dbt project plus a ``dbt_*.py`` DAG file
+    in a separate DAGs folder that records (via a sentinel file) whether it got imported.
 
-    Reproduces the bug -- dbt imports a DAG file named ``dbt_*.py`` from the DAGs folder -- and
-    confirms :func:`exclude_dags_folder_from_sys_path` prevents it while leaving genuinely installed
-    dbt plugins discoverable. This exercises the exact code path the in-process ``dbtRunner`` hits.
+    Returns ``(project_dir, dags_folder, sentinel, parse_command)``.
     """
-    manager = pytest.importorskip("dbt.plugins.manager")
-    get_dbt_modules = getattr(manager, "_get_dbt_modules", None)
-    if get_dbt_modules is None:  # pragma: no cover - guards against dbt renaming the entrypoint
-        pytest.skip("dbt plugin discovery entrypoint not available in this dbt version")
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    (project_dir / "dbt_project.yml").write_text("name: probe\nprofile: probe\nconfig-version: 2\nversion: '1.0'\n")
+    (project_dir / "profiles.yml").write_text(
+        "probe:\n"
+        "  target: dev\n"
+        "  outputs:\n"
+        "    dev:\n"
+        "      type: postgres\n"
+        "      host: localhost\n"
+        "      user: u\n"
+        "      password: p\n"
+        "      port: 5432\n"
+        "      dbname: db\n"
+        "      schema: public\n"
+        "      threads: 1\n"
+    )
+    dags_folder = tmp_path / "dags"
+    dags_folder.mkdir()
+    sentinel = tmp_path / "imported.txt"
+    (dags_folder / "dbt_victim.py").write_text(f"open({str(sentinel)!r}, 'w').close()\n")
+    parse_command = ["dbt", "parse", "--project-dir", str(project_dir), "--profiles-dir", str(project_dir)]
+    return project_dir, dags_folder, sentinel, parse_command
 
-    module_name = "dbt_fake_plugin_for_issue_1673"
-    sentinel = tmp_path / "fake_plugin_imported.txt"
-    (tmp_path / f"{module_name}.py").write_text(f"open({str(sentinel)!r}, 'w').close()\n")
-    dags_folder = str(tmp_path)
 
-    def discover():
-        if hasattr(get_dbt_modules, "cache_clear"):
-            get_dbt_modules.cache_clear()
-        return get_dbt_modules()
+def _reset_dbt_plugin_discovery_cache():
+    """Reset dbt-core's process-global plugin-discovery caches so a subsequent in-process invocation
+    re-runs discovery (dbt memoizes discovered ``dbt_*`` modules for the lifetime of the process)."""
+    import dbt.plugins
+    import dbt.plugins.manager as manager
 
-    sys.path.insert(0, dags_folder)
+    if hasattr(manager._get_dbt_modules, "cache_clear"):
+        manager._get_dbt_modules.cache_clear()
+    manager._MODULES_CACHE = None
+    dbt.plugins.PLUGIN_MANAGER = None
+    sys.modules.pop("dbt_victim", None)
+
+
+def test_run_command_dbt_runner_excludes_dags_folder_dbt_module(tmp_path):
+    """#1673, in-process ``InvocationMode.DBT_RUNNER`` path.
+
+    Drives Cosmos's own ``cosmos.dbt.runner.run_command`` (which wraps the dbt invocation with
+    :func:`exclude_dags_folder_from_sys_path`) against a real ``dbtRunner``. Toggling
+    ``enable_dags_folder_exclusion_from_dbt`` shows the leak (disabled: dbt's plugin discovery imports
+    the DAG file off ``sys.path``) and the fix (enabled: the DAGs folder is stripped for the invocation).
+    """
+    from cosmos.dbt import runner as dbt_runner
+
+    project_dir, dags_folder, sentinel, cmd = _prepare_dbt_leak_repro(tmp_path)
+
+    sys.path.insert(0, str(dags_folder))  # mimic Airflow putting the DAGs folder on sys.path
     try:
-        with patch("airflow.settings.DAGS_FOLDER", dags_folder):
-            # Without the guard, dbt's discovery imports the fake DAG file (the leak).
-            with_leak = discover()
-            assert module_name in with_leak
-            assert sentinel.exists()
-            sentinel.unlink()
-            sys.modules.pop(module_name, None)
+        # Exclusion disabled: dbt's in-process plugin discovery imports the DAG file.
+        _reset_dbt_plugin_discovery_cache()
+        with (
+            patch("airflow.settings.DAGS_FOLDER", str(dags_folder)),
+            patch("cosmos.settings.enable_dags_folder_exclusion_from_dbt", False),
+        ):
+            dbt_runner.run_command(command=cmd, env=dict(os.environ), cwd=str(project_dir))
+        assert sentinel.exists(), "expected dbt plugin discovery to import the dbt_*.py DAG file"
 
-            # With the guard, the DAGs folder is off sys.path, so dbt never sees the file, while
-            # every genuinely installed dbt plugin stays discoverable.
-            with exclude_dags_folder_from_sys_path():
-                guarded = discover()
-            assert set(guarded) == set(with_leak) - {module_name}
-            assert not sentinel.exists()
+        sentinel.unlink()
+
+        # Exclusion enabled (default): run_command keeps the DAGs folder off sys.path for the invocation.
+        _reset_dbt_plugin_discovery_cache()
+        with (
+            patch("airflow.settings.DAGS_FOLDER", str(dags_folder)),
+            patch("cosmos.settings.enable_dags_folder_exclusion_from_dbt", True),
+        ):
+            dbt_runner.run_command(command=cmd, env=dict(os.environ), cwd=str(project_dir))
+        assert not sentinel.exists(), "DAGs folder should have been kept off sys.path"
     finally:
-        if hasattr(get_dbt_modules, "cache_clear"):
-            get_dbt_modules.cache_clear()
-        sys.modules.pop(module_name, None)
-        if dags_folder in sys.path:
-            sys.path.remove(dags_folder)
+        _reset_dbt_plugin_discovery_cache()
+        if str(dags_folder) in sys.path:
+            sys.path.remove(str(dags_folder))
+
+
+def test_run_command_with_subprocess_excludes_dags_folder_dbt_module(tmp_path):
+    """#1673, ``InvocationMode.SUBPROCESS`` path.
+
+    Drives Cosmos's own ``cosmos.dbt.graph.run_command_with_subprocess`` (which sanitizes the env via
+    :func:`remove_dags_folder_from_pythonpath`) against a real ``dbt`` subprocess. Toggling
+    ``enable_dags_folder_exclusion_from_dbt`` shows the leak (disabled: the subprocess imports the DAG
+    file off ``PYTHONPATH``) and the fix (enabled: the DAGs folder is stripped from ``PYTHONPATH``).
+    """
+    from cosmos.dbt.graph import run_command_with_subprocess
+
+    project_dir, dags_folder, sentinel, cmd = _prepare_dbt_leak_repro(tmp_path)
+    base_env = {**os.environ, "PYTHONPATH": str(dags_folder)}
+
+    # Exclusion disabled: the dbt subprocess imports the DAG file via PYTHONPATH.
+    with (
+        patch("airflow.settings.DAGS_FOLDER", str(dags_folder)),
+        patch("cosmos.settings.enable_dags_folder_exclusion_from_dbt", False),
+    ):
+        run_command_with_subprocess(cmd, tmp_dir=project_dir, env_vars=dict(base_env))
+    assert sentinel.exists(), "expected the dbt subprocess to import the dbt_*.py DAG file"
+
+    sentinel.unlink()
+
+    # Exclusion enabled (default): the DAGs folder is stripped from the subprocess PYTHONPATH.
+    with (
+        patch("airflow.settings.DAGS_FOLDER", str(dags_folder)),
+        patch("cosmos.settings.enable_dags_folder_exclusion_from_dbt", True),
+    ):
+        run_command_with_subprocess(cmd, tmp_dir=project_dir, env_vars=dict(base_env))
+    assert not sentinel.exists(), "DAGs folder should have been kept off PYTHONPATH"

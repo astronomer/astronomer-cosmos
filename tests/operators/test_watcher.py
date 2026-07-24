@@ -1441,9 +1441,8 @@ class TestDbtConsumerWatcherSensor:
 
     def test_fallback_to_non_watcher_run(self):
         sensor = self.make_sensor()
-        ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--select", "some_model", "--threads", "2"]
-        context = self.make_context(ti)
+        sensor.add_cmd_flags = MagicMock(return_value=["--full-refresh"])
+        context = self.make_context(MagicMock())
         sensor.build_and_run_cmd = MagicMock()
 
         result = sensor._fallback_to_non_watcher_run(2, context)
@@ -1451,17 +1450,36 @@ class TestDbtConsumerWatcherSensor:
         assert result is True
         sensor.build_and_run_cmd.assert_called_once()
         args, kwargs = sensor.build_and_run_cmd.call_args
-        assert "--select" in kwargs["cmd_flags"]
+        assert "--full-refresh" in kwargs["cmd_flags"]
         assert DbtNode.get_resource_name_from_unique_id(MODEL_UNIQUE_ID) in kwargs["cmd_flags"]
+
+    def test_fallback_uses_own_rendered_full_refresh_not_producer_task(self):
+        """Regression for #2908: flags must come from this consumer's own (already-rendered)
+        ``add_cmd_flags()``, not from the producer task object fetched via ``dag.get_task()``,
+        which Airflow never renders for this run. Reading from the producer silently dropped
+        ``--full-refresh`` whenever it was templated (e.g. ``"{{ params.full_refresh }}"``),
+        since dbt's ``to_boolean`` treats that literal string as falsy.
+        """
+        sensor = self.make_sensor(full_refresh=True)
+        ti = MagicMock()
+        # Simulates the bug: the producer object dag.get_task() would return is unrendered.
+        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = []
+        context = self.make_context(ti)
+        sensor.build_and_run_cmd = MagicMock()
+
+        sensor._fallback_to_non_watcher_run(2, context)
+
+        cmd_flags = sensor.build_and_run_cmd.call_args.kwargs["cmd_flags"]
+        assert "--full-refresh" in cmd_flags
+        ti.task.dag.get_task.assert_not_called()
 
     def test_fallback_strips_producer_log_format_by_default(self):
         """Producer's ``--log-format json`` (internal, used for event-stream parsing) must not leak into
         the consumer's user-facing retry dbt command when the user hasn't asked for JSON.
         """
         sensor = self.make_sensor()
-        ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--log-format", "json", "--threads", "2"]
-        context = self.make_context(ti)
+        sensor.add_cmd_flags = MagicMock(return_value=["--log-format", "json"])
+        context = self.make_context(MagicMock())
         sensor.build_and_run_cmd = MagicMock()
 
         sensor._fallback_to_non_watcher_run(2, context)
@@ -1479,9 +1497,8 @@ class TestDbtConsumerWatcherSensor:
         the producer's flags; ``self.dbt_cmd_flags`` is preserved for ``build_cmd`` to pick up.
         """
         sensor = self.make_sensor(dbt_cmd_flags=["--log-format", "json"])
-        ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--log-format", "json", "--threads", "2"]
-        context = self.make_context(ti)
+        sensor.add_cmd_flags = MagicMock(return_value=["--log-format", "json"])
+        context = self.make_context(MagicMock())
         sensor.build_and_run_cmd = MagicMock()
 
         sensor._fallback_to_non_watcher_run(2, context)
@@ -1494,9 +1511,8 @@ class TestDbtConsumerWatcherSensor:
         """For versioned dbt models (e.g. ``model.pkg.my_model.v1``) the selector must keep the version suffix."""
         sensor = self.make_sensor()
         sensor.model_unique_id = "model.jaffle_shop.stg_orders.v1"
-        ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = []
-        context = self.make_context(ti)
+        sensor.add_cmd_flags = MagicMock(return_value=[])
+        context = self.make_context(MagicMock())
         sensor.build_and_run_cmd = MagicMock()
 
         sensor._fallback_to_non_watcher_run(2, context)

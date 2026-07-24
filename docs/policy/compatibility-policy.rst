@@ -172,22 +172,20 @@ policy pages directly for the current state.
    for the exact combinations). If you rely on an older dbt Core minor with an
    uncommon Airflow/Python pair, validate it in your own CI.
 
-Cosmos and Astronomer Runtime compatibility (verified)
-++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Cosmos and Astronomer Runtime compatibility
++++++++++++++++++++++++++++++++++++++++++++
 
-The ranges above describe what Cosmos declares and tests in CI. The table
-below reflects targeted, empirical verification instead: each Cosmos release
-from 1.5.1 to 1.15.0 was ``pip install``-ed into the official Astronomer
-Runtime Docker image for each Runtime series, then checked by running
-``airflow plugins`` — the same plugin-loading path Airflow itself uses at
-startup — rather than a bare ``import cosmos``. Verified 2026-07-23 against
-Runtime images 11.20.0 (default and ``python-3.9`` variant), 12.12.0, 13.8.0,
-3.0-16, 3.1-17, 3.2-6, and 3.3-2.
+The table below comes from installing each Cosmos release (1.5.1 to 1.15.0)
+into the official Astronomer Runtime Docker image for every Runtime series,
+then running ``airflow plugins`` to check if the Cosmos plugin loads.
+Verified 2026-07-23 against Runtime images 11.20.0 (default and
+``python-3.9`` variant), 12.12.0, 13.8.0, 3.0-16, 3.1-17, 3.2-6, and 3.3-2.
 
-Because this checks plugin *registration* specifically, it is not the same
-question as "does Cosmos work." The Runtime 3.0 row below is the clearest
-example: no tested Cosmos release registers a plugin there, but that is
-expected — it does not mean Cosmos itself is unsupported on Airflow 3.0.
+This only tells you if the plugin loads, not if Cosmos works. Cosmos itself
+has been supported on Airflow 3.0 since Cosmos 1.10.0, but the dbt docs UI
+plugin needs Airflow >= 3.1, so it never loads on Runtime 3.0. See
+:doc:`Airflow 3 compatibility notes </policy/airflow3-compatibility>` for
+what's supported on Airflow 3.0 versus 3.1+.
 
 The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
 1.9.2, 1.10.3, 1.11.3, 1.12.1, 1.13.1, 1.14.0, 1.14.1, 1.14.2, 1.15.0.
@@ -213,8 +211,8 @@ The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
    * - 3.0
      - 3.0
      - 3.11 – 3.12
-     - N/A — no plugin registration is expected here; see below
-     - N/A — no plugin registration is expected here; see below
+     - Supported since Cosmos 1.10.0, but the dbt docs UI plugin needs Airflow >= 3.1 and does not load here — see :doc:`Airflow 3 compatibility notes </policy/airflow3-compatibility>`.
+     - 1.5.1 – 1.9.2 (Airflow 3 support was added in Cosmos 1.10.0)
    * - 3.1
      - 3.1
      - 3.11 – 3.12
@@ -225,15 +223,6 @@ The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
      - 3.12 – 3.14
      - 1.14.0, 1.14.1, 1.14.2, 1.15.0
      - 1.5.1, 1.6.0, 1.7.1, 1.8.2, 1.9.2, 1.10.3, 1.11.3, 1.12.1, 1.13.1 — see below.
-
-- **Runtime 3.0 (Airflow 3.0), all tested Cosmos releases**: no ``cosmos``
-  entry appears in ``airflow plugins`` output, including the newest releases
-  tested (1.14.x, 1.15.0). This is expected, not a Cosmos defect: Cosmos's
-  core DAG/task functionality has been supported on Airflow 3 since Cosmos
-  1.10.0, but the FastAPI-based Cosmos plugin (dbt docs UI, external views)
-  requires Airflow >= 3.1 by design and simply does not register on 3.0. See
-  :doc:`Airflow 3 compatibility notes </policy/airflow3-compatibility>` for
-  what Cosmos supports on Airflow 3.0 versus 3.1+.
 
 - **Runtime 3.1, Cosmos 1.5.1–1.9.2** fail with an explicit plugin-import
   error:

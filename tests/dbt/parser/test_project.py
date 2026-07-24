@@ -242,6 +242,30 @@ def test_LegacyDbtProject_rejects_invalid_dir_type():
         LegacyDbtProject(project_name="bad_config_project", dbt_models_dir=123)
 
 
+def test_LegacyDbtProject__as_dir_list_returns_empty_for_none():
+    """
+    _as_dir_list(None) should return [] directly. __post_init__ already substitutes the
+    "models"/"seeds"/"snapshots" default via its own `is None` check before ever calling this method,
+    so this branch is otherwise unreachable through normal usage - covering it directly documents the
+    intended behavior in case _as_dir_list is ever called on its own (it's a @staticmethod).
+    """
+    assert LegacyDbtProject._as_dir_list(None) == []
+
+
+def test_LegacyDbtProject__classify_dir_returns_none_for_unmatched_path(tmp_path):
+    """
+    _classify_dir should return None for a path that isn't under any configured models or snapshots
+    dir. In practice _handle_sql_file only ever receives paths from rglob() over a configured dir, so
+    this branch is otherwise unreachable - covering it directly documents the fallback behavior.
+    """
+    dbt_project = LegacyDbtProject(
+        project_name="jaffle_shop",
+        dbt_root_path=DBT_PROJECT_PATH,
+    )
+    outside_path = tmp_path / "not_a_configured_dir" / "some_file.sql"
+    assert dbt_project._classify_dir(outside_path) is None
+
+
 def test_LegacyDbtProject_py_file_in_nested_snapshots_dir_is_skipped(tmp_path):
     """
     A .py file living inside a snapshots dir nested under a models dir must not be picked up by the

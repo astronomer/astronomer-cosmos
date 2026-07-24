@@ -386,3 +386,203 @@ def test_test_sensor_runs_dbt_test_on_retry():
     _, kwargs = sensor.build_and_run_cmd.call_args
     assert kwargs["cmd_flags"] == ["--select", "stg_orders"]
     assert sensor.base_cmd == ["test"]
+
+
+# ---------------------------------------------------------------------------
+# Per-model outlet emission (ExecutionMode.WATCHER_KUBERNETES)
+#
+# The producer builds an outlet URI map from the scheduler-side manifest and
+# threads it (plus should_generate_model_uris) to the log-parsing callback; each
+# consumer sensor then emits one Airflow Asset per URI on success. The map is
+# pre-populated on the scheduler because the pod's manifest isn't reachable from
+# there. See cosmos.operators._k8s_common.
+# ---------------------------------------------------------------------------
+
+
+def test_producer_initialises_outlet_state():
+    """The producer defaults ``_should_generate_model_uris`` to True and initialises
+    the (empty, mutable) outlet map and unset namespace at construction time."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+    assert op._should_generate_model_uris is True
+    assert op._model_outlet_uris == {}
+    assert op._dataset_namespace is None
+    assert op.manifest_filepath == ""
+
+
+def test_producer_respects_should_generate_model_uris_flag():
+    """``_should_generate_model_uris`` is wired explicitly by ``_add_watcher_producer_task``
+    and must be honoured over the operator-level ``emit_datasets`` default."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        _should_generate_model_uris=False,
+    )
+    assert op._should_generate_model_uris is False
+
+
+def test_producer_stores_manifest_filepath():
+    """``manifest_filepath`` (threaded from ProjectConfig.manifest_path) is stored so
+    execute() can read the manifest on the scheduler."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        manifest_filepath="/some/target/manifest.json",
+    )
+    assert op.manifest_filepath == "/some/target/manifest.json"
+
+
+@patch("cosmos.operators._k8s_common.CosmosKubernetesPodManager")
+def test_producer_pod_manager_forwards_outlet_state(mock_manager_cls):
+    """pod_manager forwards the (by-reference) outlet map and the generation flag so the
+    log-parsing callback can attach outlet URIs to each model's status XCom."""
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+    )
+    op.client = MagicMock()
+
+    op.pod_manager  # noqa: B018 — access triggers cached_property creation
+
+    extra = mock_manager_cls.call_args.kwargs["callback_extra_kwargs"]
+    assert extra["model_outlet_uris"] is op._model_outlet_uris
+    assert extra["should_generate_model_uris"] is op._should_generate_model_uris
+
+
+@patch("cosmos.dataset.compute_model_outlet_uris", return_value={"model.jaffle.a": ["postgres://h:5432/db.schema.a"]})
+@patch("cosmos.dataset.get_dataset_namespace", return_value="postgres://h:5432")
+def test_populate_model_outlet_uris_from_manifest(mock_namespace, mock_compute, tmp_path):
+    """When enabled with a profile and an existing manifest, the producer resolves the
+    namespace and fills the (same) outlet map in place from the manifest."""
+    from cosmos.operators import _k8s_common
+
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text("{}")
+
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=profile_config,
+        image="dbt-image:latest",
+        manifest_filepath=str(manifest),
+    )
+    outlet_map = op._model_outlet_uris  # capture the reference shared with the callback
+
+    _k8s_common._populate_producer_model_outlet_uris(op)
+
+    assert op._dataset_namespace == "postgres://h:5432"
+    assert op._model_outlet_uris is outlet_map  # mutated in place, not reassigned
+    assert op._model_outlet_uris == {"model.jaffle.a": ["postgres://h:5432/db.schema.a"]}
+    # The manifest path is forwarded verbatim (never wrapped in Path) so remote schemes survive.
+    mock_compute.assert_called_once_with(str(manifest), "postgres://h:5432")
+
+
+@patch("cosmos.dataset.compute_model_outlet_uris")
+def test_populate_model_outlet_uris_skips_when_disabled(mock_compute):
+    """With ``_should_generate_model_uris=False`` the producer does no dataset work."""
+    from cosmos.operators import _k8s_common
+
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=profile_config,
+        image="dbt-image:latest",
+        _should_generate_model_uris=False,
+    )
+
+    _k8s_common._populate_producer_model_outlet_uris(op)
+
+    assert op._model_outlet_uris == {}
+    assert op._dataset_namespace is None
+    mock_compute.assert_not_called()
+
+
+@patch("cosmos.dataset.compute_model_outlet_uris")
+@patch("cosmos.dataset.get_dataset_namespace", return_value="postgres://h:5432")
+def test_populate_model_outlet_uris_noop_without_manifest(mock_namespace, mock_compute):
+    """A missing/empty manifest_filepath degrades to a no-op (dbt still runs; no datasets)."""
+    from cosmos.operators import _k8s_common
+
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=profile_config,
+        image="dbt-image:latest",
+        manifest_filepath="",
+    )
+
+    _k8s_common._populate_producer_model_outlet_uris(op)
+
+    assert op._model_outlet_uris == {}
+    mock_compute.assert_not_called()
+
+
+@patch("cosmos.dataset.get_dataset_namespace")
+def test_populate_model_outlet_uris_noop_without_profile(mock_namespace):
+    """Without a ProfileConfig the namespace can't be resolved, so emission is a no-op."""
+    from cosmos.operators import _k8s_common
+
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        manifest_filepath="/some/manifest.json",
+    )
+
+    _k8s_common._populate_producer_model_outlet_uris(op)
+
+    assert op._model_outlet_uris == {}
+    assert op._dataset_namespace is None
+    mock_namespace.assert_not_called()
+
+
+@patch("cosmos.dataset.compute_model_outlet_uris", return_value={"model.jaffle.a": ["s3-uri"]})
+@patch("cosmos.dataset.get_dataset_namespace", return_value="postgres://h:5432")
+def test_populate_model_outlet_uris_forwards_remote_manifest_unchanged(mock_namespace, mock_compute):
+    """A remote ``ObjectStoragePath`` manifest (e.g. ``s3://``) is passed to
+    ``compute_model_outlet_uris`` unchanged, so its scheme is preserved (regression guard for
+    wrapping it in ``Path`` which would mangle ``s3://b/m.json`` into ``s3:/b/m.json``)."""
+    try:
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        from airflow.io.path import ObjectStoragePath
+
+    from cosmos.operators import _k8s_common
+
+    remote_manifest = ObjectStoragePath("s3://my-bucket/target/manifest.json")
+    op = DbtProducerWatcherKubernetesOperator(
+        project_dir=".",
+        profile_config=profile_config,
+        image="dbt-image:latest",
+        manifest_filepath=remote_manifest,
+    )
+
+    _k8s_common._populate_producer_model_outlet_uris(op)
+
+    mock_compute.assert_called_once_with(remote_manifest, "postgres://h:5432")
+    assert op._model_outlet_uris == {"model.jaffle.a": ["s3-uri"]}
+
+
+@patch("cosmos.dataset.register_dataset_on_task")
+def test_consumer_emits_datasets_on_success(mock_register):
+    """Smoke test that the K8s consumer inherits BaseConsumerSensor dataset emission and that
+    register_dataset_on_task works for this multiple-inheritance sensor (which does not inherit
+    from the local operator). Full emit behaviour is covered in tests/operators/_watcher."""
+    sensor = make_sensor()
+    sensor.emit_datasets = True
+    # Slash-delimited form so the URI is valid on both Airflow 2 and Airflow 3 (AIP-60).
+    sensor._outlet_uris = ["postgres://h:5432/db/schema/stg_orders"]
+
+    context = {"ti": MagicMock()}
+    sensor._emit_datasets(context)
+
+    mock_register.assert_called_once()
+    args, _ = mock_register.call_args
+    task_arg, inlets, outlets, ctx = args
+    assert task_arg is sensor
+    assert inlets == []
+    assert [o.uri for o in outlets] == ["postgres://h:5432/db/schema/stg_orders"]
+    assert ctx is context

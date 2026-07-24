@@ -379,6 +379,23 @@ class TestComputeModelOutletUris:
         result = compute_model_outlet_uris("/nonexistent/manifest.json", "postgres://host:5432")
         assert result == {}
 
+    def test_reads_manifest_via_object_storage_path(self, tmp_path):
+        """A manifest given as an Airflow ``ObjectStoragePath`` is read via ``.open()`` -- the same
+        path type ``ProjectConfig.manifest_path`` stores for remote manifests (``s3://``, ...)."""
+        try:
+            from airflow.sdk import ObjectStoragePath
+        except ImportError:
+            from airflow.io.path import ObjectStoragePath
+
+        manifest_path = tmp_path / "manifest.json"
+        manifest_path.write_text(json.dumps(self._manifest_with_two_emitting_nodes()))
+        object_storage_path = ObjectStoragePath(manifest_path.as_uri())
+
+        result = compute_model_outlet_uris(object_storage_path, "postgres://host:5432")
+
+        assert "model.jaffle_shop.customers" in result
+        assert "seed.jaffle_shop.raw_orders" in result
+
     def test_skips_nodes_with_missing_fields(self, tmp_path):
         manifest = {
             "nodes": {

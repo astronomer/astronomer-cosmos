@@ -61,7 +61,7 @@ from cosmos.dbt.project import (
     has_non_empty_dependencies_file,
     remove_dags_folder_from_pythonpath,
 )
-from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
+from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
     remote_target_path,
     remote_target_path_conn_id,
@@ -848,67 +848,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """
         Register a list of datasets as outlets of the current task, when possible.
 
-        Until Airflow 2.7, there was not a better interface to associate outlets to a task during execution.
-        This works in Cosmos with versions before Airflow 2.10 with a few limitations, as described in the ticket:
-        https://github.com/astronomer/astronomer-cosmos/issues/522
-
-        Since Airflow 2.10, Cosmos uses DatasetAlias by default, to generate datasets. This resolved the limitations
-        described before.
-
-        The only limitation is that with Airflow 2.10.0 and 2.10.1, the `airflow dags test` command will not work
-        with DatasetAlias:
-        https://github.com/apache/airflow/issues/42495
+        Thin wrapper around ``cosmos.dataset.register_dataset_on_task`` so other
+        execution modes (e.g. ``WATCHER_KUBERNETES``) can reuse the same logic
+        without inheriting from this operator.
         """
-        try:
-            from airflow.sdk import DAG
-        except ImportError:
-            from airflow.models.dag import DAG  # type: ignore[assignment]
+        from cosmos.dataset import register_dataset_on_task
 
-        if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
-            self.log.error(
-                "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
-            )
-            raise AirflowCompatibilityError(
-                "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
-            )
-        elif AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
-            from airflow.utils.session import create_session
-
-            self.log.info("Assigning inlets/outlets without DatasetAlias")
-            with create_session() as session:
-                self.outlets.extend(new_outlets)  # type: ignore[attr-defined]
-                self.inlets.extend(new_inlets)  # type: ignore[attr-defined]
-                for task in self.dag.tasks:  # type: ignore[attr-defined]
-                    if task.task_id == self.task_id:
-                        task.outlets.extend(new_outlets)
-                        task.inlets.extend(new_inlets)
-                DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined]
-                session.commit()
-        else:
-            dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
-
-            if AIRFLOW_VERSION.major == 2:
-                self.log.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
-                from airflow.datasets import DatasetAlias
-
-                alias_names = {dataset_alias_name} | {
-                    outlet.name
-                    for outlet in self.outlets  # type: ignore[attr-defined]
-                    if isinstance(outlet, DatasetAlias) and outlet.name != dataset_alias_name
-                }
-
-                for alias_name in alias_names:
-                    for outlet in new_outlets:
-                        context["outlet_events"][alias_name].add(outlet)  # type: ignore[index]
-
-            else:  # AIRFLOW_VERSION.major == 3
-                self.log.info("Assigning outlets with DatasetAlias in Airflow 3")
-                from airflow.sdk.definitions.asset import AssetAlias
-
-                # This line was necessary in Airflow 3.0.0, but this may become automatic in newer versions
-                self.outlets.append(AssetAlias(dataset_alias_name))  # type: ignore[attr-defined]
-                for outlet in new_outlets:
-                    context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)
+        register_dataset_on_task(self, list(new_inlets), list(new_outlets), context)
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """

@@ -600,8 +600,50 @@ class BaseConsumerSensor(BaseSensorOperator):
                 stop_memory_tracking(context)
         else:
             self._execute_core(context)
+        # Reaching here means the sensor resolved without deferring (the deferred path emits in
+        # execute_complete) and the model succeeded, so emit its datasets. _emit_datasets no-ops
+        # when the sensor has no outlets or dataset emission is disabled.
+        self._emit_datasets(context)
+
+    def _emit_datasets(self, context: Context) -> None:
+        """Emit one Airflow Asset per outlet URI resolved for this consumer's model.
+
+        Shared by every ``ExecutionMode.WATCHER*`` consumer (SUBPROCESS, Kubernetes, GCP GKE).
+        Delegates to ``cosmos.dataset.register_dataset_on_task`` rather than the local operator's
+        ``register_dataset``, so it works for consumers that don't inherit from the local operator.
+
+        No-ops when ``emit_datasets`` is False (user disabled emission) or when no outlet URIs were
+        resolved for this model (e.g. no manifest available or the adapter has no OL namespace).
+        """
+        if not getattr(self, "emit_datasets", False):
+            return
+        outlet_uris = getattr(self, "_outlet_uris", [])
+        if not outlet_uris:
+            return
+
+        from cosmos.constants import AIRFLOW_VERSION
+        from cosmos.dataset import register_dataset_on_task
+
+        if AIRFLOW_VERSION.major >= 3:
+            from airflow.sdk.definitions.asset import Asset
+        else:
+            from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
+
+        outlets = [Asset(uri=uri) for uri in outlet_uris]
+        logger.info("Emitting %d dataset(s) for model '%s': %s", len(outlets), self.model_unique_id, outlet_uris)
+        register_dataset_on_task(self, [], outlets, context)
+
+        if settings.enable_uri_xcom:
+            context["ti"].xcom_push(key="uri", value=outlet_uris)
 
     def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
+        # Extract outlet URIs from the trigger event before handling status.
+        self._outlet_uris = event.get("outlet_uris", [])
+        self._process_completion_event(context, event)
+        # Reaching here without raising means the model succeeded, so emit its datasets.
+        self._emit_datasets(context)
+
+    def _process_completion_event(self, context: Context, event: dict[str, Any]) -> None:
         status = event.get("status")
         reason = event.get("reason")
 

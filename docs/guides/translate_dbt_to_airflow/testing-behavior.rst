@@ -112,6 +112,25 @@ When at least one WARN message is present, the function passed to ``on_warning_c
     ``on_warning_callback`` method above. However, these warnings will not be included in the ``test_names`` and
     ``test_results`` context variables, which are specific to test-related warnings.
 
+Failure notifications
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Tests configured with ``severity: error`` fail the task when they fail. To send notifications on failure, use
+Airflow's standard ``on_failure_callback``. Cosmos includes the failing dbt nodes (test names and messages) in the
+raised exception, which Airflow exposes to the callback as ``context["exception"]``:
+
+.. code-block:: python
+
+    def failure_callback_func(context):
+        exception = context.get("exception")
+        slack_hook = SlackWebhookHook(slack_webhook_conn_id="slack_conn_id")
+        slack_hook.send(text=f":red_circle: dbt failed:\n{exception}")
+
+
+    my_dag = DbtDag(
+        # ...
+        default_args={"on_failure_callback": failure_callback_func},
+    )
 
 Tests with multiple parents
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

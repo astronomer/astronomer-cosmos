@@ -181,7 +181,13 @@ from 1.5.1 to 1.15.0 was ``pip install``-ed into the official Astronomer
 Runtime Docker image for each Runtime series, then checked by running
 ``airflow plugins`` — the same plugin-loading path Airflow itself uses at
 startup — rather than a bare ``import cosmos``. Verified 2026-07-23 against
-Runtime images 11.20.0, 12.12.0, 13.8.0, 3.0-16, 3.1-17, 3.2-6, and 3.3-2.
+Runtime images 11.20.0 (default and ``python-3.9`` variant), 12.12.0, 13.8.0,
+3.0-16, 3.1-17, 3.2-6, and 3.3-2.
+
+Because this checks plugin *registration* specifically, it is not the same
+question as "does Cosmos work." The Runtime 3.0 row below is the clearest
+example: no tested Cosmos release registers a plugin there, but that is
+expected — it does not mean Cosmos itself is unsupported on Airflow 3.0.
 
 The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
 1.9.2, 1.10.3, 1.11.3, 1.12.1, 1.13.1, 1.14.0, 1.14.1, 1.14.2, 1.15.0.
@@ -191,24 +197,43 @@ The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
 
    * - Runtime series
      - Airflow
+     - Python (bundled)
      - Cosmos versions confirmed working
      - Cosmos versions confirmed failing
-   * - 11, 12, 13
-     - 2.9, 2.10, 2.11
+   * - 11
+     - 2.9
+     - 3.9 – 3.11 (default 3.11)
+     - All 13 tested releases, on the default (Python >= 3.10) image
+     - Cosmos >= 1.12.0, but only on the ``python-3.9`` variant — see below.
+   * - 12, 13
+     - 2.10, 2.11
+     - 3.10 – 3.12
      - All 13 tested releases (1.5.1 – 1.15.0)
-     - None, except on Runtime 11's ``python-3.9`` variant — see below.
+     - None
    * - 3.0
      - 3.0
-     - None
-     - All 13 tested releases (1.5.1 – 1.15.0). The Cosmos AF3 plugin requires Airflow >= 3.1 — see :doc:`Airflow 3 compatibility notes </policy/airflow3-compatibility>`.
+     - 3.11 – 3.12
+     - N/A — no plugin registration is expected here; see below
+     - N/A — no plugin registration is expected here; see below
    * - 3.1
      - 3.1
+     - 3.11 – 3.12
      - 1.11.3, 1.12.1, 1.13.1, 1.14.0, 1.14.1, 1.14.2, 1.15.0
      - 1.5.1, 1.6.0, 1.7.1, 1.8.2, 1.9.2, 1.10.3 — see below.
    * - 3.2, 3.3
      - 3.2, 3.3
+     - 3.12 – 3.14
      - 1.14.0, 1.14.1, 1.14.2, 1.15.0
      - 1.5.1, 1.6.0, 1.7.1, 1.8.2, 1.9.2, 1.10.3, 1.11.3, 1.12.1, 1.13.1 — see below.
+
+- **Runtime 3.0 (Airflow 3.0), all tested Cosmos releases**: no ``cosmos``
+  entry appears in ``airflow plugins`` output, including the newest releases
+  tested (1.14.x, 1.15.0). This is expected, not a Cosmos defect: Cosmos's
+  core DAG/task functionality has been supported on Airflow 3 since Cosmos
+  1.10.0, but the FastAPI-based Cosmos plugin (dbt docs UI, external views)
+  requires Airflow >= 3.1 by design and simply does not register on 3.0. See
+  :doc:`Airflow 3 compatibility notes </policy/airflow3-compatibility>` for
+  what Cosmos supports on Airflow 3.0 versus 3.1+.
 
 - **Runtime 3.1, Cosmos 1.5.1–1.9.2** fail with an explicit plugin-import
   error:
@@ -247,9 +272,13 @@ The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
   specific to plugins or to the ``airflow`` CLI — any process that imports
   Airflow with one of these Cosmos versions installed fails to start.
 
-- **Cosmos >= 1.12.0 requires Python >= 3.10.** On Python 3.9 (e.g. Runtime
-  11's ``python-3.9`` variant), ``pip install`` itself refuses to resolve —
-  a plain dependency-version error, not a circular import.
+- **Cosmos >= 1.12.0 requires Python >= 3.10.** Runtime 11's default image
+  bundles Python 3.11 and is unaffected, but on its ``python-3.9`` variant,
+  ``pip install`` itself refuses to resolve Cosmos >= 1.12.0 — a plain
+  dependency-version error, not a circular import or plugin-loading
+  failure. This is a Python-version constraint, not an Airflow-version one:
+  the same failure would occur on any Airflow version paired with Python
+  3.9.
 
 Version removal policy
 ~~~~~~~~~~~~~~~~~~~~~~

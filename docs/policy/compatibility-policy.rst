@@ -175,17 +175,10 @@ policy pages directly for the current state.
 Cosmos and Astronomer Runtime compatibility
 +++++++++++++++++++++++++++++++++++++++++++
 
-The table below comes from installing each Cosmos release (1.5.1 to 1.15.0)
-into the official Astronomer Runtime Docker image for every Runtime series,
-then running ``airflow plugins`` to check if the Cosmos plugin loads.
-Verified 2026-07-23 against Runtime images 11.20.0 (default and
-``python-3.9`` variant), 12.12.0, 13.8.0, 3.0-16, 3.1-17, 3.2-6, and 3.3-2.
-
-This only tells you if the plugin loads, not if Cosmos works. Cosmos itself
-has been supported on Airflow 3.0 since Cosmos 1.10.0, but the dbt docs UI
-plugin needs Airflow >= 3.1, so it never loads on Runtime 3.0. See
-:doc:`Airflow 3 compatibility notes </policy/airflow3-compatibility>` for
-what's supported on Airflow 3.0 versus 3.1+.
+The table below shows which Cosmos releases (1.5.1 to 1.15.0) work on each
+Astronomer Runtime series, verified 2026-07-23. See :doc:`Airflow 3
+compatibility notes </policy/airflow3-compatibility>` for details on
+Cosmos's Airflow 3 support.
 
 The 13 Cosmos releases tested, oldest to newest: 1.5.1, 1.6.0, 1.7.1, 1.8.2,
 1.9.2, 1.10.3, 1.11.3, 1.12.1, 1.13.1, 1.14.0, 1.14.1, 1.14.2, 1.15.0.

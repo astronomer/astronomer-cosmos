@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import Mock, PropertyMock, call, patch
 
 import pytest
+from packaging.version import Version
 
 from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, InvocationMode, SeedRenderingBehavior, SourceRenderingBehavior, TestBehavior
@@ -106,6 +107,25 @@ def test_validate_project_missing_fails():
     project_config = ProjectConfig(dbt_project_path=Path("/tmp"))
     with pytest.raises(CosmosValueError) as err_info:
         assert project_config.validate_project() is None
+    # On Airflow 3 an absolute path also gets an appended DAG-bundle hint, so match only the prefix.
+    assert err_info.value.args[0].startswith("Could not find dbt_project.yml at /tmp/dbt_project.yml")
+
+
+def test_validate_project_missing_appends_bundle_hint_on_airflow3():
+    """On Airflow 3, a missing absolute dbt_project_path error carries the DAG-bundle relocation hint."""
+    project_config = ProjectConfig(dbt_project_path=Path("/tmp"))
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("3.0.0")):
+        with pytest.raises(CosmosValueError) as err_info:
+            project_config.validate_project()
+    assert "versioned Airflow 3 DAG bundle" in err_info.value.args[0]
+
+
+def test_validate_project_missing_no_bundle_hint_on_airflow2():
+    """On Airflow 2 the DAG-bundle hint is not appended -- bundles do not exist there."""
+    project_config = ProjectConfig(dbt_project_path=Path("/tmp"))
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("2.10.0")):
+        with pytest.raises(CosmosValueError) as err_info:
+            project_config.validate_project()
     assert err_info.value.args[0] == "Could not find dbt_project.yml at /tmp/dbt_project.yml"
 
 

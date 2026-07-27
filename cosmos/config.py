@@ -33,6 +33,7 @@ from cosmos.constants import (
     TestIndirectSelection,
 )
 from cosmos.dbt.executable import get_system_dbt
+from cosmos.dbt.project import dbt_project_path_bundle_hint
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
@@ -296,7 +297,9 @@ class ProjectConfig:
 
         for name, path in mandatory_paths.items():
             if path is None or not path.exists():
-                raise CosmosValueError(f"Could not find {name} at {path}")
+                raise CosmosValueError(
+                    f"Could not find {name} at {path}" + dbt_project_path_bundle_hint(self.dbt_project_path)
+                )
 
     def is_manifest_available(self) -> bool:
         """

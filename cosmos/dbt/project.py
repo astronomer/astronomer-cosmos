@@ -12,6 +12,8 @@ from jinja2 import Template
 
 from cosmos import settings
 from cosmos.constants import (
+    _AIRFLOW3_MAJOR_VERSION,
+    AIRFLOW_VERSION,
     DBT_DEFAULT_PACKAGES_FOLDER,
     DBT_DEPENDENCIES_FILE_NAMES,
     DBT_LOG_DIR_NAME,
@@ -21,6 +23,7 @@ from cosmos.constants import (
     DBT_TARGET_DIR_NAME,
     PACKAGE_LOCKFILE_YML,
 )
+from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -135,6 +138,29 @@ def copy_manifest_file_if_exists(source_manifest: str | Path, dbt_project_folder
         shutil.copy(source_manifest, tmp_manifest_filepath)
 
 
+def dbt_project_path_bundle_hint(project_path: Path | str | None) -> str:
+    """Return an actionable hint for a missing dbt project path, or an empty string when not applicable.
+
+    On Airflow 3, an absolute ``dbt_project_path`` that resolves during DAG parsing can be missing at
+    task execution time when the DAG runs from a *versioned* DAG bundle (e.g. an Astronomer deployment
+    or a git-based bundle), because each bundle version is checked out to a different filesystem path.
+    The default ``dags-folder`` bundle is not versioned, so we only surface the hint on Airflow 3 for an
+    absolute path, and word it conditionally so it stays accurate on non-versioned bundles.
+    """
+    if project_path is None:
+        return ""
+    if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION or not Path(project_path).is_absolute():
+        return ""
+    return (
+        " If you are using a versioned Airflow 3 DAG bundle (for example, an Astronomer deployment or a "
+        "git-based bundle), the bundle is deployed to a versioned filesystem path that can differ between "
+        "DAG parsing and task execution, so a hardcoded absolute `dbt_project_path` may not exist on the "
+        "worker. Set `dbt_project_path` relative to your DAG file, e.g. "
+        '`ProjectConfig(dbt_project_path=(Path(__file__).parent / "dbt/my_dbt_project").absolute().as_posix())`. '
+        "See https://astronomer.github.io/astronomer-cosmos/getting_started/astro.html"
+    )
+
+
 def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool) -> None:
     """Helper function to create symlinks to the dbt project files."""
     ignore_paths = [DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, PACKAGE_LOCKFILE_YML, "profiles.yml"]
@@ -142,7 +168,13 @@ def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool
         dbt_packages_subpath = get_dbt_packages_subpath(project_path)
         # this is linked to dbt deps so if dbt deps is true then ignore existing dbt_packages folder
         ignore_paths.append(dbt_packages_subpath)
-    for child_name in os.listdir(project_path):
+    try:
+        child_names = os.listdir(project_path)
+    except FileNotFoundError:
+        raise CosmosValueError(
+            f"Could not find the dbt project at {project_path}." + dbt_project_path_bundle_hint(project_path)
+        )
+    for child_name in child_names:
         if child_name not in ignore_paths:
             os.symlink(project_path / child_name, tmp_dir / child_name)
 

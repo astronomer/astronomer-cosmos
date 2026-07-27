@@ -34,6 +34,14 @@ enable_cache_package_lockfile = conf.getboolean("cosmos", "enable_cache_package_
 enable_cache_dbt_ls = conf.getboolean("cosmos", "enable_cache_dbt_ls", fallback=True)
 enable_cache_dbt_yaml_selectors = conf.getboolean("cosmos", "enable_cache_dbt_yaml_selectors", fallback=True)
 enable_lax_selector_parsing = conf.getboolean("cosmos", "enable_lax_selector_parsing", fallback=False)
+# dbt-core discovers plugins by importing every top-level ``dbt_*`` module on ``sys.path``/``PYTHONPATH``.
+# Airflow puts its DAGs folder there, so a DAG file named ``dbt_*.py`` gets imported as a side effect of
+# Cosmos running dbt (see #1673). Enabled by default, Cosmos strips the DAGs folder from dbt's import path
+# for the duration of each dbt invocation. Disabling this restores the previous behaviour -- useful if a
+# genuine dbt plugin lives inside the DAGs folder and must stay discoverable.
+enable_dags_folder_exclusion_from_dbt = conf.getboolean(
+    "cosmos", "enable_dags_folder_exclusion_from_dbt", fallback=True
+)
 # When RenderConfig.group_nodes_by_folder is enabled, key folder task groups by their full path so
 # that folders sharing a leaf name under different parents render as distinct task groups. Defaults
 # to False to preserve existing task-group ids (enabling it is a breaking change for DAGs that

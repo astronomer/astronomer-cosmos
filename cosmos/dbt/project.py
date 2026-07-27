@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -9,6 +10,7 @@ from pathlib import Path
 import yaml
 from jinja2 import Template
 
+from cosmos import settings
 from cosmos.constants import (
     DBT_DEFAULT_PACKAGES_FOLDER,
     DBT_DEPENDENCIES_FILE_NAMES,
@@ -180,3 +182,80 @@ def change_working_directory(path: str) -> Generator[None, None, None]:
         yield
     finally:
         os.chdir(previous_cwd)
+
+
+def _resolve_dags_folder() -> str | None:
+    """Return the realpath of the Airflow DAGs folder, or ``None`` if it cannot be determined.
+
+    ``airflow.settings.DAGS_FOLDER`` is the path Airflow appends to ``sys.path`` on Airflow 2 (and the
+    default local DAG bundle's path on Airflow 3). It is not guaranteed absolute (Airflow only
+    ``expanduser``s it), so we ``realpath`` it here -- callers compare against ``realpath``ed path
+    entries, keeping relative and absolute forms consistent. Airflow 3 custom DAG bundles that live
+    outside ``DAGS_FOLDER`` are not covered.
+    """
+    try:
+        from airflow.settings import DAGS_FOLDER
+    except ImportError:
+        return None
+    return os.path.realpath(DAGS_FOLDER) if DAGS_FOLDER else None
+
+
+# The two helpers below keep the Airflow DAGs folder out of dbt-core's plugin discovery, which imports
+# every top-level ``dbt_*`` module reachable from ``sys.path``/``PYTHONPATH`` -- including DAG files named
+# ``dbt_*.py`` -- as a side effect of Cosmos running dbt. See the helper docstrings and
+# https://github.com/astronomer/astronomer-cosmos/issues/1673 for details. Both no-op when
+# ``enable_dags_folder_exclusion_from_dbt`` is disabled.
+@contextmanager
+def exclude_dags_folder_from_sys_path() -> Generator[None, None, None]:
+    """Temporarily remove the Airflow DAGs folder from ``sys.path`` while dbt runs in-process.
+
+    Used around in-process ``dbtRunner`` invocations (``InvocationMode.DBT_RUNNER``) so dbt's ``dbt_*``
+    plugin discovery does not import DAG files, while leaving genuinely installed dbt plugins (which live
+    in site-packages, not the DAGs folder) untouched. Companion to
+    :func:`remove_dags_folder_from_pythonpath`, which covers the subprocess path.
+    """
+    if not settings.enable_dags_folder_exclusion_from_dbt:
+        yield
+        return
+
+    target = _resolve_dags_folder()
+
+    # (original index, path) for each matching entry, so removal can't disturb the recorded
+    # positions of entries found later in the scan.
+    removed: list[tuple[int, str]] = []
+    if target:
+        removed = [(index, path) for index, path in enumerate(sys.path) if os.path.realpath(path) == target]
+        for _, path in removed:
+            sys.path.remove(path)
+    try:
+        yield
+    finally:
+        # Restore in ascending original-index order so each insert lands in its original slot:
+        # every entry restored so far already occupies its correct position, and no not-yet-restored
+        # entry sits before this index either.
+        for index, path in removed:
+            sys.path.insert(index, path)
+
+
+def remove_dags_folder_from_pythonpath(env: dict[str, str]) -> dict[str, str]:
+    """Return a copy of ``env`` with the Airflow DAGs folder removed from ``PYTHONPATH``.
+
+    Companion to :func:`exclude_dags_folder_from_sys_path` for the subprocess code path
+    (``InvocationMode.SUBPROCESS``): a dbt subprocess derives its ``sys.path`` from the inherited
+    ``PYTHONPATH``, so dbt's ``dbt_*`` plugin discovery would otherwise import DAG files from the DAGs
+    folder -- crashing the dbt command when the DAG file re-imports Airflow, or running DAG-file side
+    effects. Only the DAGs-folder entries are dropped; every other entry (including genuinely installed
+    dbt plugins) is preserved.
+    """
+    if not settings.enable_dags_folder_exclusion_from_dbt:
+        return dict(env)
+
+    pythonpath = env.get("PYTHONPATH")
+    target = _resolve_dags_folder()
+    if not pythonpath or not target:
+        return dict(env)
+
+    kept = [entry for entry in pythonpath.split(os.pathsep) if not (entry and os.path.realpath(entry) == target)]
+    sanitized = dict(env)
+    sanitized["PYTHONPATH"] = os.pathsep.join(kept)
+    return sanitized

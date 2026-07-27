@@ -73,6 +73,23 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING``
 
+.. _enable_dags_folder_exclusion_from_dbt:
+
+`enable_dags_folder_exclusion_from_dbt`_:
+    dbt-core discovers plugins by importing every top-level ``dbt_*`` module reachable from ``sys.path`` /
+    ``PYTHONPATH``. Airflow puts its DAGs folder on that path, so a DAG file named ``dbt_*.py`` gets imported
+    as a side effect of Cosmos running dbt, leaking or duplicating DAGs (in-process) or crashing the dbt
+    command (subprocess). When enabled, Cosmos removes the Airflow DAGs folder from dbt's import path for the
+    duration of each dbt invocation. Genuinely installed dbt plugins (which live in site-packages, not the
+    DAGs folder) are unaffected.
+
+    .. note::
+        Disable this only if you intentionally keep a real dbt plugin named ``dbt_*`` inside the DAGs folder
+        and need dbt to keep discovering it. While this setting is enabled, such a plugin will not be found.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_DAGS_FOLDER_EXCLUSION_FROM_DBT``
+
 .. _enable_hierarchical_naming_for_group_nodes_by_folder:
 
 `enable_hierarchical_naming_for_group_nodes_by_folder`_:

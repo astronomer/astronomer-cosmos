@@ -218,7 +218,11 @@ def create_test_task_metadata(
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     task_args = dict(task_args)
-    task_args["on_warning_callback"] = on_warning_callback
+    # An ``on_warning_callback`` supplied through ``operator_args`` already reached us inside ``task_args``.
+    # Only the top-level argument, when set, should take precedence over it - otherwise an unset top-level
+    # argument (``None``) would silently drop the user's callback. See #2869.
+    if on_warning_callback is not None or "on_warning_callback" not in task_args:
+        task_args["on_warning_callback"] = on_warning_callback
     # Test operators (DbtTest*) do not emit DatasetAlias
     task_args["emit_datasets"] = False
     extra_context = {}

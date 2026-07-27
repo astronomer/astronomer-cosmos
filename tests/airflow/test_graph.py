@@ -1445,6 +1445,60 @@ def test_create_test_task_metadata_forwards_render_config_exclude_to_node_test(e
     assert metadata.arguments["exclude"] == expected_exclude
 
 
+def test_create_test_task_metadata_preserves_operator_args_on_warning_callback():
+    """An unset top-level on_warning_callback must not clobber one supplied through operator/task args."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+
+    def callback(context):  # pragma: no cover - only identity is asserted
+        pass
+
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"on_warning_callback": callback},
+        node=sample_node,
+    )
+    assert metadata.arguments["on_warning_callback"] is callback
+
+
+def test_create_test_task_metadata_top_level_on_warning_callback_takes_precedence():
+    """When both are given, the top-level on_warning_callback wins over the operator/task args one."""
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+
+    def operator_args_callback(context):  # pragma: no cover - only identity is asserted
+        pass
+
+    def top_level_callback(context):  # pragma: no cover - only identity is asserted
+        pass
+
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"on_warning_callback": operator_args_callback},
+        on_warning_callback=top_level_callback,
+        node=sample_node,
+    )
+    assert metadata.arguments["on_warning_callback"] is top_level_callback
+
+
 def test_create_test_task_metadata_without_render_config_exclude_preserves_existing_exclude():
     """An empty RenderConfig.exclude must not clobber an exclude supplied through operator/task args."""
     sample_node = DbtNode(

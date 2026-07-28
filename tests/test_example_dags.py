@@ -39,6 +39,38 @@ if importlib.util.find_spec("dbt_loom") is None:
     IGNORED_DAG_FILES.append("cross_project_dbt_ls_dag.py")
     IGNORED_DAG_FILES.append("cross_project_bidirectional_dag.py")
 
+# Parse only the example DAG under test instead of building the full DagBag up front (which renders
+# every example dbt project). Set TEST_ISOLATE_EXAMPLE_DAGS=false to restore the old full-parse path.
+ISOLATE_EXAMPLE_DAGS = os.getenv("TEST_ISOLATE_EXAMPLE_DAGS", "true").lower() not in ("0", "false", "no")
+
+
+def _ignored_dag_files() -> list[str]:
+    """DAG files unsupported on the current Airflow/dbt versions (what get_dag_bag writes to .airflowignore)."""
+    ignored = list(IGNORED_DAG_FILES)
+    if DBT_VERSION < Version("1.6.0"):
+        ignored += ["example_model_version.py", "example_operators.py"]
+    if DBT_VERSION < Version("1.5.0"):
+        ignored += ["example_source_rendering.py"]
+    if AIRFLOW_VERSION >= Version("3.0.0"):
+        ignored += ["example_cosmos_cleanup_dag.py"]
+    if Version("3.0.0") <= AIRFLOW_VERSION < Version("3.1.0"):
+        # dag.test() on AF 3.0 runs the WatcherTrigger inline and hangs on a missing SUPERVISOR_COMMS
+        # import (added in 3.1); the watcher path itself works in a real triggerer.
+        ignored += ["watcher_with_freshness_check.py"]
+    if AIRFLOW_VERSION == Version("2.9.0"):
+        # aiobotocore can't co-install on AF 2.9; the python-models DAG is too slow in CI.
+        ignored += ["cosmos_example_manifest_dag.py", "example_cosmos_python_models.py"]
+    return ignored
+
+
+def _example_dag_files() -> list[str]:
+    """Example DAG filenames to parametrize over - computed WITHOUT parsing any DAG."""
+    single = os.getenv("TEST_SINGLE_DAG")
+    if single:
+        return [single]
+    ignored = set(_ignored_dag_files())
+    return sorted(f.name for f in EXAMPLE_DAGS_DIR.glob("*.py") if f.name not in ignored)
+
 
 @provide_session
 def get_session(session=None):
@@ -59,36 +91,8 @@ def get_dag_bag() -> DagBag:  # noqa: C901
         return test_utils.make_dag_bag(dag_folder=None, include_examples=False)
 
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:
-        for dagfile in IGNORED_DAG_FILES:
-            print(f"Adding {dagfile} to .airflowignore")
+        for dagfile in _ignored_dag_files():
             file.writelines([f"{dagfile}\n"])
-
-        if DBT_VERSION < Version("1.6.0"):
-            file.writelines(["example_model_version.py\n"])
-            file.writelines(["example_operators.py\n"])
-
-        if DBT_VERSION < Version("1.5.0"):
-            file.writelines(["example_source_rendering.py\n"])
-
-        if AIRFLOW_VERSION >= Version("3.0.0"):
-            file.writelines("example_cosmos_cleanup_dag.py\n")
-
-        if Version("3.0.0") <= AIRFLOW_VERSION < Version("3.1.0"):
-            # `dag.test()` on Airflow 3.0 runs the WatcherTrigger inline. The trigger calls
-            # `airflow.sdk.execution_time.xcom.XCom.get_one`, which imports `SUPERVISOR_COMMS`
-            # from `airflow.sdk.execution_time.task_runner`. That symbol does not exist until
-            # Airflow 3.1, so the import fails, `dag.test()` re-queues the deferred task
-            # forever, and the integration job hangs until GH Actions kills it. The watcher
-            # path works on AF 3.0 in a real triggerer process; this skip only excludes the
-            # `dag.test()` exerciser. Drop once we either depend on AF >= 3.1 or rework the
-            # trigger's XCom fetch to not need `SUPERVISOR_COMMS`.
-            file.writelines("watcher_with_freshness_check.py\n")
-
-        if AIRFLOW_VERSION == Version("2.9.0"):
-            # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9
-            file.writelines("cosmos_example_manifest_dag.py\n")
-            # This DAG is taking too long to run int the CI (https://github.com/astronomer/astronomer-cosmos/actions/runs/21902660682/job/63234728594)
-            file.writelines("example_cosmos_python_models.py\n")
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
@@ -142,11 +146,18 @@ def run_dag(dag_id: str):
     reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
 )
 @pytest.mark.integration
-@pytest.mark.parametrize("dag_id", get_dag_ids())
-def test_example_dag(session, dag_id: str):
-    if dag_id in KUBERNETES_DAGS or dag_id in DAGS_WITH_SEED_DEPENDENCY:
-        return
-    run_dag(dag_id)
+@pytest.mark.parametrize("dag_ref", _example_dag_files() if ISOLATE_EXAMPLE_DAGS else get_dag_ids())
+def test_example_dag(session, dag_ref: str):
+    # Isolate mode parses only dag_ref's file; legacy mode resolves dag_ref in the full DagBag.
+    if ISOLATE_EXAMPLE_DAGS:
+        dags = list(get_dag_bag_single_dag(dag_ref).dags.values())
+    else:
+        dags = [get_dagbag_depending_on_single_dag().get_dag(dag_ref)]
+    for dag in dags:
+        assert dag is not None
+        if dag.dag_id in KUBERNETES_DAGS or dag.dag_id in DAGS_WITH_SEED_DEPENDENCY:
+            continue
+        test_utils.run_dag(dag)
 
 
 @pytest.mark.skipif(

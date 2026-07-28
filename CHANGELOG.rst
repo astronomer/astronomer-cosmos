@@ -393,7 +393,7 @@ Bug fixes
 * Add databricks oauth mock profile by @fjmacagno in #2164
 * Register listeners in Airflow 3 plugin implementation by @pankajastro in #2187
 * Fix resolution of ``packages-install-path`` when it uses ``env_var`` by @tatiana in #2194
-* Fix ``template_fields`` in ``DbtConsumerWatcherSensor`` to include ``DbtRunLocalOperator`` ``template_fields`` by @tiovader and @emanuel-luis in #2201
+* Fix ``DbtConsumerWatcherSensor.template_fields`` to include ``DbtRunLocalOperator.template_fields`` by @tiovader and @emanuel-luis in #2201
 * Emit asset events in ExecutionMode.AIRFLOW_ASYNC mode by @pankajastro in #2184
 * Remove dag_run_id from telemetry tests by @tatiana in #2213
 

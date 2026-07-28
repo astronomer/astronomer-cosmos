@@ -163,10 +163,10 @@ def test_create_symlinks_missing_project_includes_bundle_hint_on_airflow3(tmp_pa
     tmp_dir = tmp_path / "dbt-project"
     tmp_dir.mkdir()
     missing_project = Path("/absolute/does-not-exist")
-    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("3.0.0")):
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("3.0.0")), patch("cosmos.settings.in_astro", False):
         with pytest.raises(CosmosValueError) as err_info:
             create_symlinks(missing_project, tmp_dir, False)
-    assert "versioned Airflow 3 DAG bundle" in str(err_info.value)
+    assert "Path(__file__).parent" in str(err_info.value)
 
 
 @pytest.mark.parametrize(
@@ -179,14 +179,29 @@ def test_create_symlinks_missing_project_includes_bundle_hint_on_airflow3(tmp_pa
         (Version("3.0.0"), None, False),  # no path configured
     ],
 )
-def test_dbt_project_path_bundle_hint(airflow_version, project_path, expect_hint):
+def test_dbt_project_path_bundle_hint_gating(airflow_version, project_path, expect_hint):
     """The hint is emitted only on Airflow 3 for an absolute path, and stays empty otherwise."""
-    with patch("cosmos.dbt.project.AIRFLOW_VERSION", airflow_version):
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", airflow_version), patch("cosmos.settings.in_astro", False):
         hint = dbt_project_path_bundle_hint(project_path)
     assert bool(hint) is expect_hint
     if expect_hint:
-        assert "versioned Airflow 3 DAG bundle" in hint
         assert "Path(__file__).parent" in hint
+
+
+def test_dbt_project_path_bundle_hint_is_incisive_on_astro():
+    """On Astronomer, the hint definitively attributes the failure to the versioned DAG bundle."""
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("3.0.0")), patch("cosmos.settings.in_astro", True):
+        hint = dbt_project_path_bundle_hint("/absolute/dbt/project")
+    assert "running on Astronomer" in hint
+    assert "Path(__file__).parent" in hint
+
+
+def test_dbt_project_path_bundle_hint_is_conditional_off_astro():
+    """Off Astronomer, the hint is worded conditionally so it stays accurate on non-versioned bundles."""
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("3.0.0")), patch("cosmos.settings.in_astro", False):
+        hint = dbt_project_path_bundle_hint("/absolute/dbt/project")
+    assert "If you are using a versioned Airflow 3 DAG bundle" in hint
+    assert "Path(__file__).parent" in hint
 
 
 @patch.dict(os.environ, {"VAR1": "value1", "VAR2": "value2"})

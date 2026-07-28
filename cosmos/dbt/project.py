@@ -145,19 +145,29 @@ def dbt_project_path_bundle_hint(project_path: Path | str | None) -> str:
     task execution time when the DAG runs from a *versioned* DAG bundle (e.g. an Astronomer deployment
     or a git-based bundle), because each bundle version is checked out to a different filesystem path.
     The default ``dags-folder`` bundle is not versioned, so we only surface the hint on Airflow 3 for an
-    absolute path, and word it conditionally so it stays accurate on non-versioned bundles.
+    absolute path. When running on Astronomer (``settings.in_astro``) we can be definitive; otherwise we
+    word it conditionally so it stays accurate on non-versioned bundles.
     """
     if project_path is None:
         return ""
     if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION or not Path(project_path).is_absolute():
         return ""
-    return (
-        " If you are using a versioned Airflow 3 DAG bundle (for example, an Astronomer deployment or a "
-        "git-based bundle), the bundle is deployed to a versioned filesystem path that can differ between "
-        "DAG parsing and task execution, so a hardcoded absolute `dbt_project_path` may not exist on the "
-        "worker. Set `dbt_project_path` relative to your DAG file, e.g. "
+    fix = (
+        "Set `dbt_project_path` relative to your DAG file, e.g. "
         '`ProjectConfig(dbt_project_path=(Path(__file__).parent / "dbt/my_dbt_project").absolute().as_posix())`. '
         "See https://astronomer.github.io/astronomer-cosmos/getting_started/astro.html"
+    )
+    if settings.in_astro:
+        return (
+            ". You are running on Astronomer with Airflow 3, where DAGs are deployed from a versioned DAG "
+            "bundle whose filesystem path differs between DAG parsing and task execution, so a hardcoded "
+            "absolute `dbt_project_path` will not exist on the worker. " + fix
+        )
+    return (
+        ". If you are using a versioned Airflow 3 DAG bundle (for example, an Astronomer deployment or a "
+        "git-based bundle), the bundle is deployed to a versioned filesystem path that can differ between "
+        "DAG parsing and task execution, so a hardcoded absolute `dbt_project_path` may not exist on the "
+        "worker. " + fix
     )
 
 
@@ -172,7 +182,7 @@ def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool
         child_names = os.listdir(project_path)
     except FileNotFoundError:
         raise CosmosValueError(
-            f"Could not find the dbt project at {project_path}." + dbt_project_path_bundle_hint(project_path)
+            f"Could not find the dbt project at {project_path}" + dbt_project_path_bundle_hint(project_path)
         )
     for child_name in child_names:
         if child_name not in ignore_paths:

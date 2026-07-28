@@ -33,7 +33,6 @@ from cosmos.constants import (
     TestIndirectSelection,
 )
 from cosmos.dbt.executable import get_system_dbt
-from cosmos.dbt.project import dbt_project_path_bundle_hint
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
@@ -428,6 +427,11 @@ class ProjectConfig:
                 mandatory_paths[f"models directory[{i}]"] = Path(models_path)
         if self.manifest_path:
             mandatory_paths["manifest"] = self.manifest_path
+
+        # Imported lazily to avoid a circular import at module load: cosmos.dbt.project pulls in
+        # cosmos.settings, and cosmos.config is imported very early (via the plugin/listeners) while
+        # cosmos.settings is still initialising.
+        from cosmos.dbt.project import dbt_project_path_bundle_hint
 
         for name, path in mandatory_paths.items():
             if path is None or not path.exists():

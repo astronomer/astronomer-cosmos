@@ -228,10 +228,10 @@ def test_validate_project_missing_fails():
 def test_validate_project_missing_appends_bundle_hint_on_airflow3():
     """On Airflow 3, a missing absolute dbt_project_path error carries the DAG-bundle relocation hint."""
     project_config = ProjectConfig(dbt_project_path=Path("/tmp"))
-    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("3.0.0")):
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("3.0.0")), patch("cosmos.settings.in_astro", False):
         with pytest.raises(CosmosValueError) as err_info:
             project_config.validate_project()
-    assert "versioned Airflow 3 DAG bundle" in err_info.value.args[0]
+    assert "Path(__file__).parent" in err_info.value.args[0]
 
 
 def test_validate_project_missing_no_bundle_hint_on_airflow2():

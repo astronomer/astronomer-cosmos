@@ -11,7 +11,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 import cosmos.operators._k8s_common as _k8s_common
 from cosmos.airflow._override import CosmosKubernetesPodManager
-from cosmos.constants import PRODUCER_WATCHER_TASK_ID
 from cosmos.dbt.graph import DbtNode
 from cosmos.log import get_logger
 from cosmos.operators._watcher.base import BaseConsumerSensor
@@ -33,24 +32,9 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
     template_fields: tuple[str, ...] = tuple(DbtBuildKubernetesOperator.template_fields) + ("deferrable",)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
-        self._tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
-        self._test_results_per_model: dict[str, dict[str, str]] = {}
-        # Mutable holder shared by reference with pod_manager's callback_extra_kwargs.
-        # execute() sets its "context" entry (the holder itself is never reassigned),
-        # so a pod_manager created before execute() still sees the live context.
-        self._context_holder: dict[str, Context | None] = {_k8s_common.CONTEXT_KEY: None}
-        _k8s_common.inject_watcher_callback(kwargs)
+        task_id = _k8s_common.init_watcher_producer(self, kwargs)
         super().__init__(task_id=task_id, *args, **kwargs)
-        self.dbt_cmd_flags += ["--log-format", "json"]
-        # Flush the in-memory XCom backup to a Variable on failure so the producer retry can restore it.
-        _k8s_common.compose_watcher_backup_callbacks(self)
-        # Mutable set populated by the log parser when dbt emits SkippingDetails
-        # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
-        # for those unique_ids are rewritten to "failed" so the consumer sensor
-        # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
-        # Mirrors DbtProducerWatcherOperator._upstream_failure_skipped_ids; see #2698.
-        self._upstream_failure_skipped_ids: set[str] = set()
+        _k8s_common.finalize_watcher_producer(self)
 
     @cached_property
     def pod_manager(self) -> CosmosKubernetesPodManager:
@@ -63,6 +47,15 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
 
 
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):
+    """Consumer sensor for ``ExecutionMode.WATCHER_KUBERNETES``.
+
+    Polls the producer's per-node status XCom and, on successful model completion, emits one
+    Airflow Asset per outlet URI the producer computed from the manifest -- making dbt model
+    lineage visible to downstream catalogs that read Airflow outlets (OpenLineage, OpenMetadata,
+    etc.). Dataset emission (``_emit_datasets`` plus the ``execute`` / ``execute_complete`` hooks)
+    is inherited from ``BaseConsumerSensor``.
+    """
+
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
 
 

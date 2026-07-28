@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import subprocess
 from functools import cache
 from pathlib import Path
 from unittest.mock import patch
@@ -21,8 +22,8 @@ EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
-# DAGs that require seeds to be loaded first (run via dedicated ordered tests below)
-DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag"]
+# DAGs whose source tables must be seeded first; run via the dedicated tests below.
+DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag", "source_pruning_dag"]
 IGNORED_DAG_FILES = [
     "performance_dag.py",
     "jaffle_shop_kubernetes.py",
@@ -157,6 +158,26 @@ def test_watcher_source_rendering_dag(session):
     """Run source_rendering_dag first to load seeds, then watcher_source_rendering_dag."""
     run_dag("source_rendering_dag")
     run_dag("watcher_source_rendering_dag")
+
+
+@pytest.fixture()
+def seeded_altered_jaffle_shop():
+    """Seed altered_jaffle_shop so source_pruning_dag's raw_orders source-freshness check has its
+    table regardless of task order. dbt deps first: the project depends on dbt_utils."""
+    project_dir = EXAMPLE_DAGS_DIR / "dbt" / "altered_jaffle_shop"
+    dbt_args = ["--project-dir", str(project_dir), "--profiles-dir", str(project_dir)]
+    subprocess.run(["dbt", "deps", *dbt_args], check=True)
+    subprocess.run(["dbt", "seed", "--full-refresh", *dbt_args], check=True)
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
+)
+@pytest.mark.integration
+def test_source_pruning_dag(session, seeded_altered_jaffle_shop):
+    """Seeded by the fixture so the raw_orders source-freshness check is order-independent."""
+    run_dag("source_pruning_dag")
 
 
 @pytest.mark.skipif(

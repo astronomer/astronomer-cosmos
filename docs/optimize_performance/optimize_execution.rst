@@ -143,9 +143,9 @@ The following table provides recommended concurrency ratios based on execution m
    ``LoadMode.DBT_MANIFEST`` to reduce worker-side parsing overhead. See :ref:`optimize-rendering`.
 
 If you are using ``ExecutionMode.WATCHER``, the producer task is CPU and memory intensive while the consumer sensor
-tasks are lightweight. Use the ``watcher_dbt_execution_queue``
-:ref:`configuration <watcher-dbt-execution-queue>`
-to route the producer task and sensor retries to a worker queue with more resources.
+tasks are lightweight. Use the ``watcher_dbt_producer_queue``, ``watcher_dbt_consumer_queue``, and ``watcher_dbt_retry_queue``
+:ref:`configurations <watcher-queue-configuration>`
+to route each task type to the appropriate worker queue.
 
 
 6. Profile memory usage with debug mode

@@ -22,7 +22,7 @@ AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
 # DAGs that require seeds to be loaded first (run via dedicated ordered tests below)
-DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag"]
+DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag", "source_pruning_dag"]
 IGNORED_DAG_FILES = [
     "performance_dag.py",
     "jaffle_shop_kubernetes.py",
@@ -157,6 +157,24 @@ def test_watcher_source_rendering_dag(session):
     """Run source_rendering_dag first to load seeds, then watcher_source_rendering_dag."""
     run_dag("source_rendering_dag")
     run_dag("watcher_source_rendering_dag")
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
+)
+@pytest.mark.integration
+def test_source_pruning_dag(session):
+    """Run source_rendering_dag first to load seeds, then source_pruning_dag.
+
+    source_pruning_dag's ``raw_orders`` source-freshness check queries ``public.raw_orders``, which has
+    no in-DAG dependency on the seed that creates it. On Airflow 3.0's ``dag.test()`` the freshness task
+    can run before the seed, failing with 'relation "public.raw_orders" does not exist'. Seeding first
+    (via source_rendering_dag, same altered_jaffle_shop project) makes the table exist regardless of task
+    execution order - mirroring test_watcher_source_rendering_dag.
+    """
+    run_dag("source_rendering_dag")
+    run_dag("source_pruning_dag")
 
 
 @pytest.mark.skipif(

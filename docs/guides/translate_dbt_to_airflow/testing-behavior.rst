@@ -124,13 +124,23 @@ Failure notifications
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Tests configured with ``severity: error`` fail the task when they fail. To send notifications on failure, use
-Airflow's standard ``on_failure_callback``. Cosmos includes the failing dbt nodes (test names and messages) in the
-raised exception, which Airflow exposes to the callback as ``context["exception"]``:
+Airflow's standard ``on_failure_callback``. Airflow exposes the raised exception to the callback as
+``context["exception"]``.
+
+With ``InvocationMode.DBT_RUNNER`` (the default), Cosmos includes the failing dbt nodes (test names and messages) in
+that exception. With ``InvocationMode.SUBPROCESS``, the exception currently only includes the dbt command's exit
+code.
 
 .. code-block:: python
 
-    def failure_callback_func(context):
-        exception = context.get("exception")
+    from airflow.providers.slack.hooks.slack_webhook import SlackWebhookHook
+    from airflow.utils.context import Context
+
+    from cosmos import DbtDag
+
+
+    def failure_callback_func(context: Context):
+        exception = context["exception"]
         slack_hook = SlackWebhookHook(slack_webhook_conn_id="slack_conn_id")
         slack_hook.send(text=f":red_circle: dbt failed:\n{exception}")
 

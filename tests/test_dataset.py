@@ -170,8 +170,29 @@ my_profile:
         profile_config.target_name = "dev"
         assert get_dataset_namespace(profile_config) == "postgres://db.prod.internal:5433"
 
-    def test_profiles_yml_filepath_other_jinja_untouched(self, tmp_path):
-        """Only the env_var() form is substituted; other Jinja syntax is left as-is (not evaluated)."""
+    def test_profiles_yml_filepath_env_var_with_jinja_filters(self, tmp_path, monkeypatch):
+        """env_var() used inside other Jinja constructs (concatenation, filters) renders correctly,
+        matching dbt's own rendering semantics rather than a bare env_var(...) substitution."""
+        monkeypatch.setenv("DB_HOST", "dbhost")
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST') ~ '.internal' }}"
+      port: 5433
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://dbhost.internal:5433"
+
+    def test_profiles_yml_filepath_undefined_jinja_returns_none(self, tmp_path):
+        """profiles.yml referencing an undefined Jinja name (not env_var) fails to render; the caller's
+        catch-all returns None instead of propagating the Jinja error and breaking DAG parsing."""
         profiles_yml = tmp_path / "profiles.yml"
         profiles_yml.write_text("""
 my_profile:
@@ -186,7 +207,7 @@ my_profile:
         profile_config.profiles_yml_filepath = str(profiles_yml)
         profile_config.profile_name = "my_profile"
         profile_config.target_name = "dev"
-        assert get_dataset_namespace(profile_config) == "postgres://db-{{ this.is_not_env_var }}.prod.internal:5433"
+        assert get_dataset_namespace(profile_config) is None
 
     def test_returns_none_on_error(self):
         profile_config = MagicMock()

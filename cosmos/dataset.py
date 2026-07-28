@@ -416,9 +416,21 @@ def register_dataset_on_task(
         logger.info("Assigning outlets with DatasetAlias in Airflow 3")
         from airflow.sdk.definitions.asset import AssetAlias
 
-        # AssetAlias is registered on the task outlets as well as the
-        # outlet_events. This was required in Airflow 3.0.0; later releases
-        # may make it automatic, at which point this line becomes a no-op.
-        task.outlets.append(AssetAlias(dataset_alias_name))
+        _ensure_asset_alias_outlet(task, dataset_alias_name)
+        asset_alias = AssetAlias(dataset_alias_name)
         for outlet in new_outlets:
-            context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)
+            context["outlet_events"][asset_alias].add(outlet)
+
+
+def _ensure_asset_alias_outlet(task: Any, dataset_alias_name: str) -> None:
+    """Append the AssetAlias outlet at runtime only if it is missing (Airflow 3).
+
+    The alias is normally declared as a static outlet at parse time (see
+    ``DbtLocalBaseOperator.__init__``, issue-2417). This keeps emission working when outlets
+    were not set at parse time, while avoiding a duplicate alias.
+    """
+    from airflow.sdk.definitions.asset import AssetAlias
+
+    existing_alias_names = {outlet.name for outlet in task.outlets if isinstance(outlet, AssetAlias)}
+    if dataset_alias_name not in existing_alias_names:
+        task.outlets.append(AssetAlias(dataset_alias_name))

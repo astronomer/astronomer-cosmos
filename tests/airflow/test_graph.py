@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from airflow.models import DAG
-
 from cosmos.operators.watcher import DbtProducerWatcherOperator, DbtTestWatcherOperator
 
 try:

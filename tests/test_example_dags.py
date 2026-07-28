@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import subprocess
 from functools import cache
 from pathlib import Path
 from unittest.mock import patch
@@ -21,7 +22,9 @@ EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
-# DAGs that require seeds to be loaded first (run via dedicated ordered tests below)
+# DAGs whose source tables must be seeded first (run via dedicated tests below, not the generic
+# unordered parametrization). watcher_source_rendering_dag is seeded by an earlier run_dag();
+# source_pruning_dag is seeded by the seeded_altered_jaffle_shop fixture.
 DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag", "source_pruning_dag"]
 IGNORED_DAG_FILES = [
     "performance_dag.py",
@@ -159,21 +162,36 @@ def test_watcher_source_rendering_dag(session):
     run_dag("watcher_source_rendering_dag")
 
 
+@pytest.fixture()
+def seeded_altered_jaffle_shop():
+    """Seed the altered_jaffle_shop project so its dbt sources have their underlying tables.
+
+    ``source_pruning_dag``'s ``raw_orders`` source has a freshness check that queries the source's
+    table. That table is produced by the ``raw_orders`` seed, but a dbt source has no dependency on a
+    seed, so nothing orders the seed before the freshness task; on Airflow 3.0's ``dag.test()`` the
+    source can run first and fail with 'relation "..." does not exist'. Seeding here - independent of
+    DAG task order or any other test - keeps the test self-contained. ``dbt deps`` runs first because
+    the project depends on ``dbt_utils`` (not vendored). Both the source and the seed resolve their
+    schema from ``POSTGRES_SCHEMA``, so the seeded tables land where the freshness check reads them.
+    """
+    project_dir = EXAMPLE_DAGS_DIR / "dbt" / "altered_jaffle_shop"
+    dbt_args = ["--project-dir", str(project_dir), "--profiles-dir", str(project_dir)]
+    subprocess.run(["dbt", "deps", *dbt_args], check=True)
+    subprocess.run(["dbt", "seed", "--full-refresh", *dbt_args], check=True)
+
+
 @pytest.mark.skipif(
     AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
     reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
 )
 @pytest.mark.integration
-def test_source_pruning_dag(session):
-    """Run source_rendering_dag first to load seeds, then source_pruning_dag.
+def test_source_pruning_dag(session, seeded_altered_jaffle_shop):
+    """source_pruning_dag's raw_orders source-freshness check needs its source table to exist.
 
-    source_pruning_dag's ``raw_orders`` source-freshness check queries ``public.raw_orders``, which has
-    no in-DAG dependency on the seed that creates it. On Airflow 3.0's ``dag.test()`` the freshness task
-    can run before the seed, failing with 'relation "public.raw_orders" does not exist'. Seeding first
-    (via source_rendering_dag, same altered_jaffle_shop project) makes the table exist regardless of task
-    execution order - mirroring test_watcher_source_rendering_dag.
+    The ``seeded_altered_jaffle_shop`` fixture guarantees it, so the test is self-contained and does not
+    depend on task execution order or on another DAG/test seeding the shared DB first - which is why the
+    flake surfaced only on Airflow 3.0's ``dag.test()`` task ordering.
     """
-    run_dag("source_rendering_dag")
     run_dag("source_pruning_dag")
 
 

@@ -192,6 +192,28 @@ def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_over
         task_kwargs["profile_config"] = modified_profile_config
 
 
+_WATCHER_TO_TEST_EXECUTION_MODE = {
+    ExecutionMode.WATCHER: ExecutionMode.LOCAL,
+    ExecutionMode.WATCHER_KUBERNETES: ExecutionMode.KUBERNETES,
+    ExecutionMode.WATCHER_GCP_GKE: ExecutionMode.GCP_GKE,
+}
+
+
+def _calculate_test_operator_class(execution_mode: ExecutionMode, render_config: RenderConfig | None) -> str:
+    """Resolve the operator class path for a dbt test task.
+
+    For an ``AFTER_ALL`` test running under a ``WATCHER*`` execution mode, the test itself runs in the
+    corresponding concrete mode (LOCAL / KUBERNETES / GCP_GKE); otherwise it uses ``execution_mode`` directly.
+    """
+    if (
+        render_config is not None
+        and render_config.test_behavior == TestBehavior.AFTER_ALL
+        and execution_mode in _WATCHER_TO_TEST_EXECUTION_MODE
+    ):
+        execution_mode = _WATCHER_TO_TEST_EXECUTION_MODE[execution_mode]
+    return calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtTest")
+
+
 def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
@@ -255,21 +277,7 @@ def create_test_task_metadata(
     if node:
         args_to_override = node.operator_kwargs_to_override
 
-    dbt_class = "DbtTest"
-    watcher_to_test_execution_mode = {
-        ExecutionMode.WATCHER: ExecutionMode.LOCAL,
-        ExecutionMode.WATCHER_KUBERNETES: ExecutionMode.KUBERNETES,
-        ExecutionMode.WATCHER_GCP_GKE: ExecutionMode.GCP_GKE,
-    }
-    if (
-        render_config is not None
-        and render_config.test_behavior == TestBehavior.AFTER_ALL
-        and execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES, ExecutionMode.WATCHER_GCP_GKE)
-    ):
-        test_execution_mode = watcher_to_test_execution_mode[execution_mode]
-        operator_class = calculate_operator_class(execution_mode=test_execution_mode, dbt_class=dbt_class)
-    else:
-        operator_class = calculate_operator_class(execution_mode=execution_mode, dbt_class=dbt_class)
+    operator_class = _calculate_test_operator_class(execution_mode, render_config)
 
     return TaskMetadata(
         id=test_task_name,

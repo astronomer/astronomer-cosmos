@@ -58,7 +58,7 @@ pytest -vv \
     --cov=cosmos \
     --cov-report=term-missing \
     --cov-report=xml \
-    "tests/test_example_dags.py::test_example_dag[cross_project_manifest_dag]"
+    "tests/test_example_dags.py::test_example_dag[cross_project_manifest_dag.py]"
 
 export TEST_SINGLE_DAG="cross_project_dbt_ls_dag.py"
 pytest -vv \
@@ -66,7 +66,7 @@ pytest -vv \
     --cov-append \
     --cov-report=term-missing \
     --cov-report=xml \
-    "tests/test_example_dags.py::test_example_dag[cross_project_dbt_ls_dag]"
+    "tests/test_example_dags.py::test_example_dag[cross_project_dbt_ls_dag.py]"
 
 export TEST_SINGLE_DAG="cross_project_bidirectional_dag.py"
 pytest -vv \
@@ -74,4 +74,4 @@ pytest -vv \
     --cov-append \
     --cov-report=term-missing \
     --cov-report=xml \
-    "tests/test_example_dags.py::test_example_dag[cross_project_bidirectional_dag]"
+    "tests/test_example_dags.py::test_example_dag[cross_project_bidirectional_dag.py]"

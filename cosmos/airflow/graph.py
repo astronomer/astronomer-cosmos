@@ -192,7 +192,7 @@ def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_over
         task_kwargs["profile_config"] = modified_profile_config
 
 
-_WATCHER_TO_TEST_EXECUTION_MODE = {
+_WATCHER_TO_FALLBACK_EXECUTION_MODE = {
     ExecutionMode.WATCHER: ExecutionMode.LOCAL,
     ExecutionMode.WATCHER_KUBERNETES: ExecutionMode.KUBERNETES,
     ExecutionMode.WATCHER_GCP_GKE: ExecutionMode.GCP_GKE,
@@ -208,9 +208,9 @@ def _calculate_test_operator_class(execution_mode: ExecutionMode, render_config:
     if (
         render_config is not None
         and render_config.test_behavior == TestBehavior.AFTER_ALL
-        and execution_mode in _WATCHER_TO_TEST_EXECUTION_MODE
+        and execution_mode in _WATCHER_TO_FALLBACK_EXECUTION_MODE
     ):
-        execution_mode = _WATCHER_TO_TEST_EXECUTION_MODE[execution_mode]
+        execution_mode = _WATCHER_TO_FALLBACK_EXECUTION_MODE[execution_mode]
     return calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtTest")
 
 

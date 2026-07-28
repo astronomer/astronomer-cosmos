@@ -14,6 +14,7 @@ from typing import Any, ClassVar
 import jinja2
 import yaml
 
+from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
@@ -257,9 +258,9 @@ class LegacyDbtProject:
 
     # optional, user-specified instance variables
     dbt_root_path: str | None = None
-    dbt_models_dir: str | None = None
-    dbt_snapshots_dir: str | None = None
-    dbt_seeds_dir: str | None = None
+    dbt_models_dir: str | list[str] | None = None
+    dbt_snapshots_dir: str | list[str] | None = None
+    dbt_seeds_dir: str | list[str] | None = None
 
     # private instance variables for managing state
     models: dict[str, DbtModel] = field(default_factory=dict)
@@ -267,9 +268,9 @@ class LegacyDbtProject:
     seeds: dict[str, DbtModel] = field(default_factory=dict)
     tests: dict[str, DbtModel] = field(default_factory=dict)
     project_dir: Path = field(init=False)
-    models_dir: Path = field(init=False)
-    snapshots_dir: Path = field(init=False)
-    seeds_dir: Path = field(init=False)
+    models_dir: list[Path] = field(init=False)
+    snapshots_dir: list[Path] = field(init=False)
+    seeds_dir: list[Path] = field(init=False)
 
     dbt_vars: dict[str, str] = field(default_factory=dict)
 
@@ -278,35 +279,62 @@ class LegacyDbtProject:
         Initializes the parser.
         """
         self.dbt_root_path = self.dbt_root_path or "/usr/local/airflow/dags/dbt"
-        self.dbt_models_dir = self.dbt_models_dir or "models"
-        self.dbt_snapshots_dir = self.dbt_snapshots_dir or "snapshots"
-        self.dbt_seeds_dir = self.dbt_seeds_dir or "seeds"
+        # `is None` (not `or`) so an explicitly empty list (crawl nothing) isn't confused with "unset".
+        dbt_models_dirs = ["models"] if self.dbt_models_dir is None else self._as_dir_list(self.dbt_models_dir)
+        dbt_snapshots_dirs = (
+            ["snapshots"] if self.dbt_snapshots_dir is None else self._as_dir_list(self.dbt_snapshots_dir)
+        )
+        dbt_seeds_dirs = ["seeds"] if self.dbt_seeds_dir is None else self._as_dir_list(self.dbt_seeds_dir)
 
         # set the project and model dirs
         self.project_dir = Path(os.path.join(self.dbt_root_path, self.project_name))
-        self.models_dir = self.project_dir / self.dbt_models_dir
-        self.snapshots_dir = self.project_dir / self.dbt_snapshots_dir
-        self.seeds_dir = self.project_dir / self.dbt_seeds_dir
+        self.models_dir = [self.project_dir / dbt_dir for dbt_dir in dbt_models_dirs]
+        self.snapshots_dir = [self.project_dir / dbt_dir for dbt_dir in dbt_snapshots_dirs]
+        self.seeds_dir = [self.project_dir / dbt_dir for dbt_dir in dbt_seeds_dirs]
 
-        # crawl the models in the project
-        for file_name in self.models_dir.rglob("*.sql"):
-            self._handle_sql_file(file_name)
+        for models_dir in self.models_dir:
+            self._crawl_models_dir(models_dir)
 
-        # crawl the models in the project
-        for file_name in self.models_dir.rglob("*.py"):
-            self._handle_sql_file(file_name)
+        # crawl the config files in the project. This runs as its own pass, after every models_dir
+        # has been crawled above, so a schema.yml in one dir can apply config to a model that lives
+        # in another dir — _handle_config_file only affects models that have already been parsed.
+        for models_dir in self.models_dir:
+            for file_name in models_dir.rglob("*.yml"):
+                self._handle_config_file(file_name)
 
         # crawl the snapshots in the project
-        for file_name in self.snapshots_dir.rglob("*.sql"):
-            self._handle_sql_file(file_name)
+        for snapshots_dir in self.snapshots_dir:
+            for file_name in snapshots_dir.rglob("*.sql"):
+                self._handle_sql_file(file_name)
 
         # crawl the seeds in the project
-        for file_name in self.seeds_dir.rglob("*.csv"):
-            self._handle_csv_file(file_name)
+        for seeds_dir in self.seeds_dir:
+            for file_name in seeds_dir.rglob("*.csv"):
+                self._handle_csv_file(file_name)
 
-        # crawl the config files in the project
-        for file_name in self.models_dir.rglob("*.yml"):
-            self._handle_config_file(file_name)
+    def _crawl_models_dir(self, models_dir: Path) -> None:
+        """Crawls a single models directory for .sql and .py model files."""
+        for file_name in models_dir.rglob("*.sql"):
+            if self._classify_dir(file_name) == DbtModelType.DBT_MODEL:
+                self._handle_sql_file(file_name)
+
+        # crawl the models in the project
+        for file_name in models_dir.rglob("*.py"):
+            if self._classify_dir(file_name) == DbtModelType.DBT_MODEL:
+                self._handle_sql_file(file_name)
+
+    @staticmethod
+    def _as_dir_list(value: str | list[str] | None) -> list[str]:
+        """Normalizes a single directory name or a list of directory names into a list."""
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list):
+            return list(value)
+        raise CosmosValueError(
+            f"Expected a directory name (str) or a list of directory names, got {type(value).__name__}: {value!r}."
+        )
 
     def _handle_csv_file(self, path: Path) -> None:
         """
@@ -325,6 +353,16 @@ class LegacyDbtProject:
         # add the model to the project
         self.seeds[model_name] = model
 
+    def _classify_dir(self, path: Path) -> DbtModelType | None:
+        """Returns whether path lives under a configured models or snapshots dir; most specific dir wins."""
+        candidates = [(models_dir, DbtModelType.DBT_MODEL) for models_dir in self.models_dir]
+        candidates += [(snapshots_dir, DbtModelType.DBT_SNAPSHOT) for snapshots_dir in self.snapshots_dir]
+        matches = [(dbt_dir, dbt_type) for dbt_dir, dbt_type in candidates if path.is_relative_to(dbt_dir)]
+        if not matches:
+            return None
+        _, dbt_type = max(matches, key=lambda match: len(match[0].parts))
+        return dbt_type
+
     def _handle_sql_file(self, path: Path) -> None:
         """
         Handles a single sql file.
@@ -333,7 +371,8 @@ class LegacyDbtProject:
         model_name = path.stem
 
         # construct the model object, which we'll use to store metadata
-        if str(self.models_dir) in str(path):
+        resource_type = self._classify_dir(path)
+        if resource_type == DbtModelType.DBT_MODEL:
             model = DbtModel(
                 name=model_name,
                 type=DbtModelType.DBT_MODEL,
@@ -343,7 +382,7 @@ class LegacyDbtProject:
             # add the model to the project
             self.models[model.name] = model
 
-        elif str(self.snapshots_dir) in str(path):
+        elif resource_type == DbtModelType.DBT_SNAPSHOT:
             model = DbtModel(
                 name=model_name,
                 type=DbtModelType.DBT_SNAPSHOT,

@@ -22,12 +22,126 @@ def test_init_with_project_path_only():
     """
     project_config = ProjectConfig(dbt_project_path="path/to/dbt/project")
     assert project_config.dbt_project_path == Path("path/to/dbt/project")
-    assert project_config.models_path == Path("path/to/dbt/project/models")
-    assert project_config.seeds_path == Path("path/to/dbt/project/seeds")
-    assert project_config.snapshots_path == Path("path/to/dbt/project/snapshots")
+    assert project_config.models_paths == [Path("path/to/dbt/project/models")]
+    assert project_config.seeds_paths == [Path("path/to/dbt/project/seeds")]
+    assert project_config.snapshots_paths == [Path("path/to/dbt/project/snapshots")]
     assert project_config.project_name == "project"
     assert project_config.manifest_path is None
     assert project_config.install_dbt_deps is True
+
+
+def test_init_with_project_path_and_list_relative_paths():
+    """
+    Passing a list of paths to models_relative_paths/seeds_relative_paths/snapshots_relative_paths should
+    populate the corresponding *_paths list with one entry per item.
+    """
+    project_config = ProjectConfig(
+        dbt_project_path="path/to/dbt/project",
+        models_relative_paths=["models", "models_v2"],
+        seeds_relative_paths=["seeds"],
+        snapshots_relative_paths=["snapshots", "snapshots_v2"],
+    )
+    assert project_config.models_paths == [
+        Path("path/to/dbt/project/models"),
+        Path("path/to/dbt/project/models_v2"),
+    ]
+    assert project_config.seeds_paths == [Path("path/to/dbt/project/seeds")]
+    assert project_config.snapshots_paths == [
+        Path("path/to/dbt/project/snapshots"),
+        Path("path/to/dbt/project/snapshots_v2"),
+    ]
+
+
+def test_models_paths_not_shared_across_instances():
+    """
+    models_paths/seeds_paths/snapshots_paths must not be a shared mutable default - mutating one
+    ProjectConfig instance's list should not affect another's.
+    """
+    config_a = ProjectConfig(manifest_path="a/manifest.json", project_name="a")
+    config_b = ProjectConfig(manifest_path="b/manifest.json", project_name="b")
+
+    config_a.models_paths.append(Path("unexpected"))
+
+    assert config_b.models_paths == []
+
+
+@pytest.mark.parametrize(
+    "deprecated_kwarg,plural_attr,expected",
+    [
+        ("models_relative_path", "models_paths", [Path("path/to/dbt/project/custom_models")]),
+        ("seeds_relative_path", "seeds_paths", [Path("path/to/dbt/project/custom_seeds")]),
+        ("snapshots_relative_path", "snapshots_paths", [Path("path/to/dbt/project/custom_snapshots")]),
+    ],
+)
+def test_init_with_deprecated_singular_relative_path_still_works(deprecated_kwarg, plural_attr, expected):
+    """
+    The deprecated singular *_relative_path kwargs should still work, but should raise a DeprecationWarning
+    and populate the plural *_paths attribute with a single-item list.
+    """
+    kwargs = {"dbt_project_path": "path/to/dbt/project", deprecated_kwarg: f"custom_{deprecated_kwarg.split('_')[0]}"}
+    with pytest.deprecated_call():
+        project_config = ProjectConfig(**kwargs)
+    assert getattr(project_config, plural_attr) == expected
+
+
+@pytest.mark.parametrize(
+    "deprecated_attr,expected",
+    [
+        ("models_path", Path("path/to/dbt/project/models")),
+        ("seeds_path", Path("path/to/dbt/project/seeds")),
+        ("snapshots_path", Path("path/to/dbt/project/snapshots")),
+    ],
+)
+def test_deprecated_singular_path_property_still_works(deprecated_attr, expected):
+    """
+    Accessing the deprecated singular *_path property should raise a DeprecationWarning and return the
+    first entry of the corresponding plural *_paths list.
+    """
+    project_config = ProjectConfig(dbt_project_path="path/to/dbt/project")
+    with pytest.deprecated_call():
+        assert getattr(project_config, deprecated_attr) == expected
+
+
+@pytest.mark.parametrize(
+    "plural_kwarg,deprecated_kwarg",
+    [
+        ("models_relative_paths", "models_relative_path"),
+        ("seeds_relative_paths", "seeds_relative_path"),
+        ("snapshots_relative_paths", "snapshots_relative_path"),
+    ],
+)
+def test_init_with_both_plural_and_deprecated_singular_relative_path_raises(plural_kwarg, deprecated_kwarg):
+    """
+    Passing both a plural *_relative_paths kwarg and its deprecated singular counterpart is ambiguous -
+    it should raise instead of silently preferring the deprecated one and discarding the plural value.
+    """
+    kwargs = {
+        "dbt_project_path": "path/to/dbt/project",
+        plural_kwarg: ["custom"],
+        deprecated_kwarg: "custom",
+    }
+    with pytest.raises(CosmosValueError, match=deprecated_kwarg):
+        ProjectConfig(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "deprecated_attr,plural_attr",
+    [
+        ("models_path", "models_paths"),
+        ("seeds_path", "seeds_paths"),
+        ("snapshots_path", "snapshots_paths"),
+    ],
+)
+def test_deprecated_singular_path_property_setter_still_works(deprecated_attr, plural_attr):
+    """
+    Setting the deprecated singular *_path property - previously a plain writable attribute - should
+    still work: it must raise a DeprecationWarning and replace the plural *_paths list with a
+    single-item list, rather than raising AttributeError now that *_path is a property.
+    """
+    project_config = ProjectConfig(dbt_project_path="path/to/dbt/project")
+    with pytest.deprecated_call():
+        setattr(project_config, deprecated_attr, Path("elsewhere"))
+    assert getattr(project_config, plural_attr) == [Path("elsewhere")]
 
 
 def test_init_with_project_path_and_install_dbt_deps_succeeds():
@@ -107,6 +221,20 @@ def test_validate_project_missing_fails():
     with pytest.raises(CosmosValueError) as err_info:
         assert project_config.validate_project() is None
     assert err_info.value.args[0] == "Could not find dbt_project.yml at /tmp/dbt_project.yml"
+
+
+def test_validate_project_one_of_multiple_models_paths_missing_fails():
+    """
+    When multiple models_relative_paths are configured, validate_project should fail if any one of them
+    does not exist, naming the specific missing directory.
+    """
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR,
+        models_relative_paths=["models", "does_not_exist"],
+    )
+    with pytest.raises(CosmosValueError) as err_info:
+        project_config.validate_project()
+    assert "does_not_exist" in err_info.value.args[0]
 
 
 def test_is_manifest_available_is_true():

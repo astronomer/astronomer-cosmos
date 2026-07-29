@@ -138,7 +138,7 @@ From Cosmos 1.7 and Airflow 2.10, it is also possible to trigger DAGs be to be r
 Dataset URI Patterns
 ++++++++++++++++++++
 
-Cosmos generates dataset URIs using the `OpenLineage naming convention <https://openlineage.io/docs/spec/naming/>`_.
+Cosmos generates dataset URIs using the `OpenLineage naming convention <https://openlineage.io/docs/spec/naming/>`__.
 Each URI is composed of a **namespace** (derived from the database connection) and a **name** (derived from the dbt model's
 database, schema, and table/alias).
 
@@ -236,7 +236,7 @@ How Dataset Emission Differs by Execution Mode
    **WATCHER mode caveats for dataset emission:**
 
    In ``LOCAL`` and ``VIRTUALENV`` modes, Cosmos delegates namespace resolution entirely to the
-   `OpenLineage dbt integration <https://pypi.org/project/openlineage-integration-common/>`_
+   `OpenLineage dbt integration <https://pypi.org/project/openlineage-integration-common/>`__
    library, which parses dbt artifacts at runtime. This means URIs always reflect the latest
    OL naming conventions.
 

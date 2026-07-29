@@ -25,6 +25,7 @@ Bug Fixes
 * Render ``env_var()`` Jinja when deriving ``ExecutionMode.WATCHER`` dataset namespace by @pankajastro in #2879
 * Avoid deprecated ``airflow.exceptions.AirflowSkipException`` import on Airflow 3.1+ by @pankajastro in #2796
 * Reject output-only template fields on the async ``operator_args`` path by @pankajastro in #2868
+* Credit all parent models in ``ExecutionMode.WATCHER`` multi-parent test aggregation, so test sensors no longer hang by @hellowithchicken in #2901
 
 Docs
 

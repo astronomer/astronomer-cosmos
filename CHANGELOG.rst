@@ -1,6 +1,47 @@
 Changelog
 =========
 
+1.15.1a3 (2026-07-29)
+---------------------
+
+Behaviour Changes
+
+These changes adjust observable behaviour of the Kubernetes-based operators and of argument
+validation in async execution mode. None of them break the public Cosmos API, but users relying
+on the previous behaviour should review before upgrading.
+
+* Kubernetes-based dbt operators no longer override the container image's ``ENTRYPOINT`` by
+  default: the full dbt command is passed via ``arguments`` and any user-supplied ``cmds`` is
+  preserved. Images whose entrypoint is itself ``dbt`` now require an explicit ``cmds=["dbt"]``.
+  This restores the pre-1.15.0 default. See #2891.
+* Passing output-only template fields (``compiled_sql``, ``freshness``) via ``operator_args`` in
+  async execution mode now raises ``CosmosValueError`` at DAG parse time instead of an opaque
+  ``TypeError``. See #2868.
+
+Bug Fixes
+
+* Preserve container ENTRYPOINT by default in Kubernetes-based dbt operators by @pankajkoti in #2891
+* Make partial-parse cache reads resilient to NFS ESTALE races by @mungiyo in #2867
+* Render ``env_var()`` Jinja when deriving ``ExecutionMode.WATCHER`` dataset namespace by @pankajastro in #2879
+* Avoid deprecated ``airflow.exceptions.AirflowSkipException`` import on Airflow 3.1+ by @pankajastro in #2796
+* Reject output-only template fields on the async ``operator_args`` path by @pankajastro in #2868
+
+Docs
+
+* Document container command and image ``ENTRYPOINT`` handling for Kubernetes modes by @pankajkoti in #2906
+* Document verified Cosmos/Runtime/dbt Core compatibility by @pankajastro in #2914
+* Replace redirecting documentation URLs and raise the link-check timeout by @pankajkoti in #2905
+* Reference stable Cosmos 1.11.0 for dbt Fusion instead of the 1.11.0a1 alpha by @pankajastro in #2861
+* Clarify callback support under ``ExecutionMode.WATCHER`` by @pankajastro in #2884
+* Add Airflow 3.3 row to the dbt dependency conflict matrix by @pankajastro in #2886
+* Improve privacy policy by @tatiana in #2910
+* Remove duplicated sections in ``contributing.rst`` by @tatiana in #2859
+
+Others
+
+* Fix flaky ``source_pruning_dag`` integration test by seeding the database first by @tatiana in #2927
+* Fix CI dependency cache by @tatiana in #2931
+
 1.15.0 (2026-07-01)
 -------------------
 

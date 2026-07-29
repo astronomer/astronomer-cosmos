@@ -2896,3 +2896,30 @@ def test_detached_test_node_operator_kwargs_are_not_applied_to_the_parent_test_t
     )
     nodes = {parent.unique_id: parent, detached_test.unique_id: detached_test}
     assert calculate_test_operator_kwargs(nodes, detached_nodes={detached_test.unique_id: detached_test}) == {}
+
+
+def test_test_node_operator_kwargs_do_not_apply_to_after_all_test_task():
+    """The TestBehavior.AFTER_ALL task is not associated with any node, so it keeps the DAG-level arguments."""
+    nodes = _model_and_test_nodes(model_kwargs={"retries": 2}, test_kwargs={"retries": 0})
+    with DAG("test-test-node-kwargs-after-all", start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn", profile_args={"schema": "public"}
+                    ),
+                ),
+                "retries": 3,
+            },
+            render_config=RenderConfig(test_behavior=TestBehavior.AFTER_ALL),
+            dbt_project_name="astro_shop",
+        )
+    assert dag.task_dict["my_model_run"].retries == 2
+    assert dag.task_dict["astro_shop_test"].retries == 3

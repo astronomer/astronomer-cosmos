@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 import yaml
+from packaging.version import Version
 
 from cosmos.constants import DBT_DEFAULT_PACKAGES_FOLDER, DBT_PROJECT_FILENAME, PACKAGE_LOCKFILE_YML
 from cosmos.dbt.project import (
@@ -14,12 +15,14 @@ from cosmos.dbt.project import (
     copy_dbt_packages,
     copy_manifest_file_if_exists,
     create_symlinks,
+    dbt_project_path_bundle_hint,
     environ,
     exclude_dags_folder_from_sys_path,
     get_dbt_packages_subpath,
     has_non_empty_dependencies_file,
     remove_dags_folder_from_pythonpath,
 )
+from cosmos.exceptions import CosmosValueError
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 
@@ -143,6 +146,62 @@ def test_create_symlinks(tmp_path):
     for child in tmp_dir.iterdir():
         assert child.is_symlink()
         assert child.name not in ("logs", "target", "profiles.yml", "dbt_packages")
+
+
+def test_create_symlinks_missing_project_raises_cosmos_value_error(tmp_path):
+    """A missing project path raises an actionable CosmosValueError instead of a bare FileNotFoundError."""
+    tmp_dir = tmp_path / "dbt-project"
+    tmp_dir.mkdir()
+    missing_project = tmp_path / "does-not-exist"
+    with pytest.raises(CosmosValueError) as err_info:
+        create_symlinks(missing_project, tmp_dir, False)
+    assert f"Could not find the dbt project at {missing_project}" in str(err_info.value)
+
+
+def test_create_symlinks_missing_project_includes_bundle_hint_on_airflow3(tmp_path):
+    """On Airflow 3, the missing-project error for an absolute path carries the DAG-bundle relocation hint."""
+    tmp_dir = tmp_path / "dbt-project"
+    tmp_dir.mkdir()
+    missing_project = Path("/absolute/does-not-exist")
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("3.0.0")), patch("cosmos.settings.in_astro", False):
+        with pytest.raises(CosmosValueError) as err_info:
+            create_symlinks(missing_project, tmp_dir, False)
+    assert "Path(__file__).parent" in str(err_info.value)
+
+
+@pytest.mark.parametrize(
+    "airflow_version, project_path, expect_hint",
+    [
+        (Version("3.0.0"), "/absolute/dbt/project", True),
+        (Version("3.1.2"), "/absolute/dbt/project", True),
+        (Version("2.10.0"), "/absolute/dbt/project", False),  # Airflow 2 has no DAG bundles
+        (Version("3.0.0"), "relative/dbt/project", False),  # relative paths are unaffected by bundle relocation
+        (Version("3.0.0"), None, False),  # no path configured
+    ],
+)
+def test_dbt_project_path_bundle_hint_gating(airflow_version, project_path, expect_hint):
+    """The hint is emitted only on Airflow 3 for an absolute path, and stays empty otherwise."""
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", airflow_version), patch("cosmos.settings.in_astro", False):
+        hint = dbt_project_path_bundle_hint(project_path)
+    assert bool(hint) is expect_hint
+    if expect_hint:
+        assert "Path(__file__).parent" in hint
+
+
+def test_dbt_project_path_bundle_hint_is_incisive_on_astro():
+    """On Astronomer, the hint definitively attributes the failure to the versioned DAG bundle."""
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("3.0.0")), patch("cosmos.settings.in_astro", True):
+        hint = dbt_project_path_bundle_hint("/absolute/dbt/project")
+    assert "running on Astronomer" in hint
+    assert "Path(__file__).parent" in hint
+
+
+def test_dbt_project_path_bundle_hint_is_conditional_off_astro():
+    """Off Astronomer, the hint is worded conditionally so it stays accurate on non-versioned bundles."""
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("3.0.0")), patch("cosmos.settings.in_astro", False):
+        hint = dbt_project_path_bundle_hint("/absolute/dbt/project")
+    assert "If you are using a versioned Airflow 3 DAG bundle" in hint
+    assert "Path(__file__).parent" in hint
 
 
 @patch.dict(os.environ, {"VAR1": "value1", "VAR2": "value2"})

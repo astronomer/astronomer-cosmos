@@ -107,6 +107,11 @@ enable_watcher_reliable_retry = conf.getboolean("cosmos", "enable_watcher_reliab
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
 
+# ASTRONOMER_ENVIRONMENT is set by the Astronomer Runtime image on every Astro deployment (e.g. "cloud"
+# on hosted deployments, "local" for local dev). We only key on its presence -- not its value -- so the
+# check keeps working if Astronomer introduces new values; it is an undocumented platform variable.
+in_astro = bool(os.getenv("ASTRONOMER_ENVIRONMENT"))
+
 try:
     from airflow.sdk._shared.configuration.exceptions import AirflowConfigException as SdkConfigException
 except ImportError:

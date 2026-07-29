@@ -428,9 +428,16 @@ class ProjectConfig:
         if self.manifest_path:
             mandatory_paths["manifest"] = self.manifest_path
 
+        # Imported lazily to avoid a circular import at module load: cosmos.dbt.project pulls in
+        # cosmos.settings, and cosmos.config is imported very early (via the plugin/listeners) while
+        # cosmos.settings is still initialising.
+        from cosmos.dbt.project import dbt_project_path_bundle_hint
+
         for name, path in mandatory_paths.items():
             if path is None or not path.exists():
-                raise CosmosValueError(f"Could not find {name} at {path}")
+                raise CosmosValueError(
+                    f"Could not find {name} at {path}" + dbt_project_path_bundle_hint(self.dbt_project_path)
+                )
 
     def is_manifest_available(self) -> bool:
         """

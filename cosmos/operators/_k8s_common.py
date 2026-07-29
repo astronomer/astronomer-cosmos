@@ -145,7 +145,8 @@ def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[
     ``cmds`` is preserved exactly as supplied by the user and never reassigned here. For the
     full behavior (unset ``cmds`` vs. ``["dbt"]`` vs. a custom wrapper, and the ``dbt dbt ...``
     pitfall when the image ``ENTRYPOINT`` is itself ``dbt``), see the "Container command and
-    image ENTRYPOINT" section of the Kubernetes execution mode guide (:ref:`kubernetes`).
+    image ENTRYPOINT" section of the Kubernetes execution mode guide:
+    https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/container/kubernetes.html
     """
     # For the first round, we're going to assume that the command is dbt
     # This means that we don't have openlineage support, but we will create a ticket

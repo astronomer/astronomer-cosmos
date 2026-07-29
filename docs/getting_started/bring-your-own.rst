@@ -18,7 +18,7 @@ Example Demo: Jaffle Shop Project
 
 If you don't have your own project that you want to set up as a demo, you can explore a practical example in the **Bring your own project** guides to see how Cosmos can convert the dbt workflow into an `Apache Airflow® <https://airflow.apache.org/>`_ Dag.
 
-The `jaffle_shop project <https://github.com/dbt-labs/jaffle_shop>`_ is a sample dbt project that simulates an e-commerce store's data.
+The `jaffle_shop project <https://github.com/dbt-labs/jaffle-shop-classic>`_ is a sample dbt project that simulates an e-commerce store's data.
 The project includes a series of dbt models that transform raw data into structured tables, such as sales, customers, and products.
 
 The following diagram shows the original dbt workflow in a lineage graph. This graph illustrates the relationships between different models:

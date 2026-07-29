@@ -4,7 +4,7 @@ dbt Fusion support
 ==================
 
 .. note::
-    Available since Cosmos 1.11.0a1 when using ``ExecutionMode.LOCAL``.
+    Available since Cosmos 1.11.0 when using ``ExecutionMode.LOCAL``.
 
 Context
 ~~~~~~~
@@ -31,18 +31,18 @@ Some reported dbt Fusion features include:
 Support
 ~~~~~~~
 
-Cosmos 1.11.0a1 adds initial support for running dbt Fusion with Cosmos when using ``ExecutionMode.LOCAL``.
+Cosmos 1.11.0 adds initial support for running dbt Fusion with Cosmos when using ``ExecutionMode.LOCAL``.
 
 We do not have a solution for using `ExecutionMode.AIRFLOW_ASYNC <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/async-execution-mode.html>`_.
 
 How to use
 ~~~~~~~~~~
 
-1. Install Cosmos 1.11.0a1 alpha
+1. Install Cosmos 1.11.0 or later
 
    .. code-block:: bash
 
-       pip install astronomer-cosmos --pre
+       pip install "astronomer-cosmos>=1.11.0"
 
 2. Install dbt Fusion in your Airflow deployment
 
@@ -69,7 +69,7 @@ How to use
 Limitations
 ~~~~~~~~~~~
 
-- This feature is in Cosmos 1.11 pre-release versions
+- This feature is available since Cosmos 1.11.0
 - Currently (23 June 2025) dbt Fusion is still in beta
 - dbt Fusion only supports Snowflake
 - Cosmos does not support dbt Fusion when using ``ExecutionMode.AIRFLOW_ASYNC``

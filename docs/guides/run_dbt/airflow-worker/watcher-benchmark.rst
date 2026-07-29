@@ -20,7 +20,7 @@ Cluster setup
 - Producer pool: 1 replica, ``cpu=1`` / ``memory=2Gi``
 - Consumer pool: 9 replicas, ``cpu=1`` / ``memory=2Gi`` with ``worker_concurrency=2`` (18 task slots total)
 - Airflow ``parallelism=16``
-- Cosmos ``watcher_dbt_execution_queue=producer`` routing so the producer ``dbt build`` always lands on the dedicated pool
+- Cosmos ``watcher_dbt_producer_queue=producer`` routing so the producer ``dbt build`` always lands on the dedicated pool
 - 5 repetitions per configuration; wall time below is ``mean ± sample-stdev (n=5)``
 
 Timing and CPU

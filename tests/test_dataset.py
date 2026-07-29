@@ -128,6 +128,87 @@ my_profile:
         profile_config.target_name = "dev"
         assert get_dataset_namespace(profile_config) == "postgres://dbhost:5433"
 
+    def test_profiles_yml_filepath_renders_env_var(self, tmp_path, monkeypatch):
+        """profiles.yml may use dbt's env_var() Jinja; it must be rendered, not passed through literally."""
+        monkeypatch.setenv("DB_HOST", "dbhost")
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST') }}"
+      port: 5433
+      user: user
+      pass: pass
+      dbname: mydb
+      schema: public
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://dbhost:5433"
+
+    def test_profiles_yml_filepath_env_var_default(self, tmp_path, monkeypatch):
+        """env_var()'s dbt-style default argument is honored when the variable is unset."""
+        monkeypatch.delenv("DB_HOST", raising=False)
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST', 'db.prod.internal') }}"
+      port: 5433
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://db.prod.internal:5433"
+
+    def test_profiles_yml_filepath_env_var_with_jinja_filters(self, tmp_path, monkeypatch):
+        """env_var() used inside other Jinja constructs (concatenation, filters) renders correctly,
+        matching dbt's own rendering semantics rather than a bare env_var(...) substitution."""
+        monkeypatch.setenv("DB_HOST", "dbhost")
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST') ~ '.internal' }}"
+      port: 5433
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://dbhost.internal:5433"
+
+    def test_profiles_yml_filepath_undefined_jinja_returns_none(self, tmp_path):
+        """profiles.yml referencing an undefined Jinja name (not env_var) fails to render; the caller's
+        catch-all returns None instead of propagating the Jinja error and breaking DAG parsing."""
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "db-{{ this.is_not_env_var }}.prod.internal"
+      port: 5433
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) is None
+
     def test_returns_none_on_error(self):
         profile_config = MagicMock()
         profile_config.profile_mapping = None
@@ -378,6 +459,23 @@ class TestComputeModelOutletUris:
     def test_missing_manifest_returns_empty(self):
         result = compute_model_outlet_uris("/nonexistent/manifest.json", "postgres://host:5432")
         assert result == {}
+
+    def test_reads_manifest_via_object_storage_path(self, tmp_path):
+        """A manifest given as an Airflow ``ObjectStoragePath`` is read via ``.open()`` -- the same
+        path type ``ProjectConfig.manifest_path`` stores for remote manifests (``s3://``, ...)."""
+        try:
+            from airflow.sdk import ObjectStoragePath
+        except ImportError:
+            from airflow.io.path import ObjectStoragePath
+
+        manifest_path = tmp_path / "manifest.json"
+        manifest_path.write_text(json.dumps(self._manifest_with_two_emitting_nodes()))
+        object_storage_path = ObjectStoragePath(manifest_path.as_uri())
+
+        result = compute_model_outlet_uris(object_storage_path, "postgres://host:5432")
+
+        assert "model.jaffle_shop.customers" in result
+        assert "seed.jaffle_shop.raw_orders" in result
 
     def test_skips_nodes_with_missing_fields(self, tmp_path):
         manifest = {

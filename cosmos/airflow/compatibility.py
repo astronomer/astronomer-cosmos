@@ -65,3 +65,11 @@ def delete_variable(key: str) -> None:
         from airflow.models import Variable
 
         Variable.delete(key)
+
+
+# ``airflow.exceptions.AirflowSkipException`` is deprecated on Airflow 3.2+; the Task SDK path only
+# exposes it from 3.2 onwards, hence the fallback for Airflow 2 / 3.0 / 3.1.
+try:
+    from airflow.sdk.exceptions import AirflowSkipException as AirflowSkipException  # type: ignore[attr-defined]
+except ImportError:
+    from airflow.exceptions import AirflowSkipException as AirflowSkipException

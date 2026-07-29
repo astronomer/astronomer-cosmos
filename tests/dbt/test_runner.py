@@ -130,6 +130,56 @@ def test_run_command_calls_cleanup_dbt_adapters():
     mock_cleanup.assert_called_once()
 
 
+def test_run_command_excludes_dags_folder_from_sys_path():
+    """run_command wraps the dbtRunner invoke with exclude_dags_folder_from_sys_path so dbt's
+    dbt_* plugin discovery does not import DAG files during in-process parsing/execution.
+    See https://github.com/astronomer/astronomer-cosmos/issues/1673"""
+    fake_result = MagicMock()
+    fake_result.success = True
+    fake_result.exception = None
+    fake_result.result = None
+
+    fake_runner = MagicMock()
+    fake_runner.invoke.return_value = fake_result
+
+    call_order = []
+
+    class TrackingContextManager:
+        def __init__(self, label):
+            self.label = label
+
+        def __enter__(self):
+            call_order.append(f"{self.label}_enter")
+
+        def __exit__(self, *args):
+            call_order.append(f"{self.label}_exit")
+
+    def fake_invoke(*args, **kwargs):
+        call_order.append("invoke")
+        return fake_result
+
+    fake_runner.invoke.side_effect = fake_invoke
+
+    with (
+        patch.object(dbt_runner, "get_runner", return_value=fake_runner),
+        patch.object(dbt_runner, "_cleanup_dbt_adapters"),
+        patch.object(dbt_runner, "change_working_directory", return_value=TrackingContextManager("cwd")),
+        patch.object(dbt_runner, "environ"),
+        patch.object(dbt_runner, "exclude_dags_folder_from_sys_path", return_value=TrackingContextManager("exclude")),
+        patch.object(dbt_runner, "logger"),
+    ):
+        dbt_runner.run_command(
+            command=["dbt", "ls"],
+            env={},
+            cwd="/tmp/project",
+        )
+
+    assert call_order == ["exclude_enter", "cwd_enter", "invoke", "cwd_exit", "exclude_exit"]
+    # exclude must enter before the chdir so a relative DAGS_FOLDER resolves against the Airflow
+    # process cwd, not the dbt project dir. See https://github.com/astronomer/astronomer-cosmos/issues/1673
+    assert call_order.index("exclude_enter") < call_order.index("cwd_enter")
+
+
 def test_run_command_calls_cleanup_dbt_adapters_when_invoke_raises():
     """run_command calls _cleanup_dbt_adapters even when runner.invoke raises (try/finally)."""
     fake_runner = MagicMock()
@@ -190,8 +240,21 @@ def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
 
     err_msg = str(exc_info.value)
     expected1 = "dbt invocation did not complete with unhandled error: Compilation Error"
-    expected2 = "dbt found 1 package(s) specified in packages.yml, but only 0 package(s) installed"
     assert expected1 in err_msg
+
+    # dbt 1.12 reworded the missing-package Compilation Error. Pick the expected
+    # text by installed dbt version, comparing on major.minor: a plain
+    # Version("1.11.0")/Version("1.12.0") boundary is unstable here — it would
+    # exclude 1.11.x patches (1.11.11 > 1.11.0) and misclassify 1.12 pre-releases
+    # (PEP 440 sorts 1.12.0b2 < 1.12.0).
+    from dbt.version import get_installed_version
+    from packaging.version import Version
+
+    installed_dbt_version = Version(get_installed_version().to_version_string()[1:])
+    if (installed_dbt_version.major, installed_dbt_version.minor) <= (1, 11):
+        expected2 = "dbt found 1 package(s) specified in packages.yml, but only 0 package(s) installed"
+    else:
+        expected2 = "dbt expects 1 package(s) based on packages specified in packages.yml, but found only 0 package(s) installed in dbt_packages"
     assert expected2 in err_msg
 
 

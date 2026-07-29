@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import warnings
 from pathlib import Path
 
 import airflow
@@ -33,6 +34,14 @@ enable_cache_package_lockfile = conf.getboolean("cosmos", "enable_cache_package_
 enable_cache_dbt_ls = conf.getboolean("cosmos", "enable_cache_dbt_ls", fallback=True)
 enable_cache_dbt_yaml_selectors = conf.getboolean("cosmos", "enable_cache_dbt_yaml_selectors", fallback=True)
 enable_lax_selector_parsing = conf.getboolean("cosmos", "enable_lax_selector_parsing", fallback=False)
+# dbt-core discovers plugins by importing every top-level ``dbt_*`` module on ``sys.path``/``PYTHONPATH``.
+# Airflow puts its DAGs folder there, so a DAG file named ``dbt_*.py`` gets imported as a side effect of
+# Cosmos running dbt (see #1673). Enabled by default, Cosmos strips the DAGs folder from dbt's import path
+# for the duration of each dbt invocation. Disabling this restores the previous behaviour -- useful if a
+# genuine dbt plugin lives inside the DAGs folder and must stay discoverable.
+enable_dags_folder_exclusion_from_dbt = conf.getboolean(
+    "cosmos", "enable_dags_folder_exclusion_from_dbt", fallback=True
+)
 # When RenderConfig.group_nodes_by_folder is enabled, key folder task groups by their full path so
 # that folders sharing a leaf name under different parents render as distinct task groups. Defaults
 # to False to preserve existing task-group ids (enabling it is a breaking change for DAGs that
@@ -69,17 +78,39 @@ enable_memory_optimised_imports = conf.getboolean("cosmos", "enable_memory_optim
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
 enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)
 
-# DBT Watcher Execution Mode Watcher Task Retry Queue
-# in watcher mode, if the producer watcher fails, the consumer tasks run the individual models on retry.
-# since these tasks are sensors that require low memory/cpu on their first try,
-# this setting allows retries to run on a queue with larger resources, which is often necessary for larger dbt projects
-# this would also be used to run the producer task
-watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
+# Deprecated: previously used for both the producer task and consumer retries. Kept for backwards
+# compatibility as a fallback for watcher_dbt_producer_queue and watcher_dbt_retry_queue below.
+watcher_dbt_execution_queue: str | None = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
+if watcher_dbt_execution_queue:
+    warnings.warn(
+        "The `watcher_dbt_execution_queue` config is deprecated since Cosmos 1.16.0 and will be removed in "
+        "Cosmos 2.0.0. Use `watcher_dbt_producer_queue` and/or `watcher_dbt_retry_queue` instead.",
+        DeprecationWarning,
+    )
+
+# Separate queue configuration for each watcher task type:
+# - watcher_dbt_producer_queue: queue for the DbtProducerWatcherOperator task
+# - watcher_dbt_consumer_queue: queue for DbtConsumerWatcherSensor tasks on their initial run
+# - watcher_dbt_retry_queue: queue for DbtConsumerWatcherSensor tasks on retries (typically needs more resources)
+# watcher_dbt_producer_queue and watcher_dbt_retry_queue fall back to the deprecated
+# watcher_dbt_execution_queue if set, preserving pre-1.16.0 behavior for existing users.
+watcher_dbt_producer_queue: str | None = (
+    conf.get("cosmos", "watcher_dbt_producer_queue", fallback=None) or watcher_dbt_execution_queue
+)
+watcher_dbt_consumer_queue: str | None = conf.get("cosmos", "watcher_dbt_consumer_queue", fallback=None)
+watcher_dbt_retry_queue: str | None = (
+    conf.get("cosmos", "watcher_dbt_retry_queue", fallback=None) or watcher_dbt_execution_queue
+)
 
 enable_watcher_reliable_retry = conf.getboolean("cosmos", "enable_watcher_reliable_retry", fallback=True)
 
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
+
+# ASTRONOMER_ENVIRONMENT is set by the Astronomer Runtime image on every Astro deployment (e.g. "cloud"
+# on hosted deployments, "local" for local dev). We only key on its presence -- not its value -- so the
+# check keeps working if Astronomer introduces new values; it is an undocumented platform variable.
+in_astro = bool(os.getenv("ASTRONOMER_ENVIRONMENT"))
 
 try:
     from airflow.sdk._shared.configuration.exceptions import AirflowConfigException as SdkConfigException

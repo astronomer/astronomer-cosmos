@@ -423,3 +423,82 @@ def test_dag_structure_with_watcher_gcp_gke():
 
     expected_downstream_task_ids = {"raw_payments_seed", "raw_orders_seed", "raw_customers_seed"}
     assert dag.task_dict["dbt_producer_watcher"].downstream_task_ids == expected_downstream_task_ids
+
+
+# ---------------------------------------------------------------------------
+# Per-model outlet emission (ExecutionMode.WATCHER_GCP_GKE)
+#
+# Mirrors WATCHER_KUBERNETES: the producer builds an outlet URI map from the
+# scheduler-side manifest and threads it (plus should_generate_model_uris) to the
+# log-parsing callback via the shared cosmos.operators._k8s_common helpers; each
+# consumer sensor emits one Airflow Asset per URI on success.
+# ---------------------------------------------------------------------------
+
+
+def test_producer_initialises_outlet_state():
+    """The producer defaults ``_should_generate_model_uris`` to True and initialises
+    the (empty, mutable) outlet map and unset namespace at construction time."""
+    op = DbtProducerWatcherGcpGkeOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        **GKE_KWARGS,
+    )
+    assert op._should_generate_model_uris is True
+    assert op._model_outlet_uris == {}
+    assert op._dataset_namespace is None
+    assert op.manifest_filepath == ""
+
+
+def test_producer_respects_should_generate_model_uris_flag():
+    """``_should_generate_model_uris`` is wired explicitly by ``_add_watcher_producer_task``
+    and must be honoured over the operator-level ``emit_datasets`` default."""
+    op = DbtProducerWatcherGcpGkeOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        _should_generate_model_uris=False,
+        **GKE_KWARGS,
+    )
+    assert op._should_generate_model_uris is False
+
+
+@patch("cosmos.operators._k8s_common.CosmosKubernetesPodManager")
+def test_producer_pod_manager_forwards_outlet_state(mock_manager_cls):
+    """pod_manager forwards the (by-reference) outlet map and the generation flag so the
+    log-parsing callback can attach outlet URIs to each model's status XCom."""
+    op = DbtProducerWatcherGcpGkeOperator(
+        project_dir=".",
+        profile_config=None,
+        image="dbt-image:latest",
+        **GKE_KWARGS,
+    )
+    op.client = MagicMock()
+
+    op.pod_manager  # noqa: B018 — access triggers cached_property creation
+
+    extra = mock_manager_cls.call_args.kwargs["callback_extra_kwargs"]
+    assert extra["model_outlet_uris"] is op._model_outlet_uris
+    assert extra["should_generate_model_uris"] is op._should_generate_model_uris
+
+
+@patch("cosmos.dataset.register_dataset_on_task")
+def test_consumer_emits_datasets_on_success(mock_register):
+    """Smoke test that the GCP GKE consumer inherits BaseConsumerSensor dataset emission and that
+    register_dataset_on_task works for this multiple-inheritance sensor (which does not inherit
+    from the local operator). Full emit behaviour is covered in tests/operators/_watcher."""
+    sensor = make_sensor()
+    sensor.emit_datasets = True
+    # Slash-delimited form so the URI is valid on both Airflow 2 and Airflow 3 (AIP-60).
+    sensor._outlet_uris = ["postgres://h:5432/db/schema/stg_orders"]
+
+    context = {"ti": MagicMock()}
+    sensor._emit_datasets(context)
+
+    mock_register.assert_called_once()
+    args, _ = mock_register.call_args
+    task_arg, inlets, outlets, ctx = args
+    assert task_arg is sensor
+    assert inlets == []
+    assert [o.uri for o in outlets] == ["postgres://h:5432/db/schema/stg_orders"]
+    assert ctx is context

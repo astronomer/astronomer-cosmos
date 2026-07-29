@@ -7,7 +7,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 
 try:
     # Airflow 3.1 onwards
@@ -15,6 +15,7 @@ try:
 except ImportError:
     from airflow.utils.task_group import TaskGroup
 
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
@@ -53,7 +54,7 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
-from cosmos.settings import watcher_dbt_execution_queue
+from cosmos.settings import watcher_dbt_consumer_queue, watcher_dbt_producer_queue
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -237,7 +238,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
-        kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
+        kwargs["queue"] = watcher_dbt_producer_queue or kwargs.get("queue") or DEFAULT_QUEUE
         # invocation_mode is intentionally NOT forced here; the parent's _discover_invocation_mode()
         # picks DBT_RUNNER when available and falls back to SUBPROCESS otherwise.
         # An explicit invocation_mode passed by the caller is preserved as-is.
@@ -442,7 +443,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             if self._sources_json is None:
                 raise
             self.log.warning(
-                "dbt source freshness completed with non-zero exit code: %s. " "Proceeding with freshness results.",
+                "dbt source freshness completed with non-zero exit code: %s. Proceeding with freshness results.",
                 exc,
             )
 
@@ -529,6 +530,9 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):
         deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
+        # Set the Worker queue for lightweight "watcher" tasks to run on (similar to config for producer tasks)
+        kwargs["queue"] = watcher_dbt_consumer_queue or kwargs.get("queue") or DEFAULT_QUEUE
+
         super().__init__(
             poke_interval=poke_interval,
             profile_config=profile_config,
@@ -538,41 +542,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):
             deferrable=deferrable,
             **kwargs,
         )
-
-    def _emit_datasets(self, context: Context) -> None:
-        """Emit Airflow datasets for this consumer task's model using outlet URIs from the producer."""
-        if not getattr(self, "emit_datasets", False):
-            return
-        outlet_uris = getattr(self, "_outlet_uris", [])
-        if not outlet_uris:
-            return
-
-        from cosmos import settings
-        from cosmos.constants import AIRFLOW_VERSION
-
-        if AIRFLOW_VERSION.major >= 3:
-            from airflow.sdk.definitions.asset import Asset
-        else:
-            from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
-
-        outlets = [Asset(uri=uri) for uri in outlet_uris]
-        logger.info("Emitting %d dataset(s) for model '%s': %s", len(outlets), self.model_unique_id, outlet_uris)
-        self.register_dataset([], outlets, context)
-
-        if settings.enable_uri_xcom:
-            context["ti"].xcom_push(key="uri", value=outlet_uris)
-
-    def execute(self, context: Context, **kwargs: Any) -> None:
-        super().execute(context, **kwargs)
-        # If we reach here without deferring, the model succeeded — emit datasets
-        self._emit_datasets(context)
-
-    def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
-        # Extract outlet URIs from trigger event before parent handles status
-        self._outlet_uris = event.get("outlet_uris", [])
-        super().execute_complete(context, event)
-        # If we reach here without raising, the model succeeded — emit datasets
-        self._emit_datasets(context)
 
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.

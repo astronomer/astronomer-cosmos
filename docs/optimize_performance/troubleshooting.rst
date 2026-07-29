@@ -131,6 +131,6 @@ If tasks are being killed by the OS or reaching a zombie state, they are likely 
   process per model. See :ref:`watcher-execution-mode`.
 
 - Route memory-intensive tasks to workers with more resources using Airflow pools or the
-  ``watcher_dbt_execution_queue`` configuration.
+  ``watcher_dbt_producer_queue`` and ``watcher_dbt_retry_queue`` configurations.
 
 For a comprehensive list of memory optimization options, see :ref:`memory-optimization`.

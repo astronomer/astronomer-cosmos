@@ -274,3 +274,105 @@ class TestHandleNoDbtNodeStatus:
 
         assert result is False
         assert sensor.poke_retry_number == 1
+
+
+class TestBaseConsumerSensorEmitDatasets:
+    """Tests for the dataset-emission logic hoisted into BaseConsumerSensor and shared by every
+    ExecutionMode.WATCHER* consumer (SUBPROCESS, Kubernetes, GCP GKE)."""
+
+    def _make_sensor(self, emit_datasets=True):
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+            deferrable=False,
+        )
+        sensor.emit_datasets = emit_datasets
+        return sensor
+
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_skipped_when_disabled(self, mock_register):
+        sensor = self._make_sensor(emit_datasets=False)
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
+        sensor._emit_datasets({"ti": MagicMock()})
+        mock_register.assert_not_called()
+
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_skipped_when_no_uris(self, mock_register):
+        sensor = self._make_sensor()
+        sensor._outlet_uris = []
+        sensor._emit_datasets({"ti": MagicMock()})
+        mock_register.assert_not_called()
+
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_calls_register_dataset_on_task(self, mock_register):
+        sensor = self._make_sensor()
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
+        context = {"ti": MagicMock()}
+        sensor._emit_datasets(context)
+
+        mock_register.assert_called_once()
+        task_arg, inlets, outlets, ctx = mock_register.call_args[0]
+        assert task_arg is sensor
+        assert inlets == []
+        assert [o.uri for o in outlets] == ["postgres://host:5432/db/schema/table"]
+        assert ctx is context
+
+    @patch("cosmos.settings.enable_uri_xcom", True)
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_pushes_uri_xcom_when_enabled(self, mock_register):
+        sensor = self._make_sensor()
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
+        ti = MagicMock()
+        sensor._emit_datasets({"ti": ti})
+        ti.xcom_push.assert_called_once_with(key="uri", value=["postgres://host:5432/db/schema/table"])
+
+    @patch.object(BaseConsumerSensor, "_emit_datasets")
+    @patch.object(BaseConsumerSensor, "_execute_core")
+    def test_execute_emits_after_core_resolves(self, mock_core, mock_emit):
+        """The non-deferred execute path emits datasets after the sensor loop resolves."""
+        sensor = self._make_sensor()
+        context = {"ti": MagicMock()}
+        sensor.execute(context)
+        mock_core.assert_called_once_with(context)
+        mock_emit.assert_called_once_with(context)
+
+    @patch.object(BaseConsumerSensor, "_emit_datasets")
+    @patch.object(BaseConsumerSensor, "_execute_core")
+    def test_execute_does_not_emit_when_deferred(self, mock_core, mock_emit):
+        """When the sensor defers (TaskDeferred), datasets are emitted later in execute_complete."""
+        from airflow.exceptions import TaskDeferred
+
+        mock_core.side_effect = TaskDeferred(trigger=MagicMock(), method_name="execute_complete")
+        sensor = self._make_sensor()
+        with pytest.raises(TaskDeferred):
+            sensor.execute({"ti": MagicMock()})
+        mock_emit.assert_not_called()
+
+    @patch.object(BaseConsumerSensor, "_emit_datasets")
+    @patch.object(BaseConsumerSensor, "_process_completion_event")
+    def test_execute_complete_extracts_outlets_and_emits(self, mock_process, mock_emit):
+        sensor = self._make_sensor()
+        context = {"ti": MagicMock()}
+        event = {"status": "success", "outlet_uris": ["postgres://host:5432/db/schema/table"]}
+
+        sensor.execute_complete(context, event)
+
+        assert sensor._outlet_uris == ["postgres://host:5432/db/schema/table"]
+        mock_process.assert_called_once_with(context, event)
+        mock_emit.assert_called_once_with(context)
+
+    @patch.object(BaseConsumerSensor, "_emit_datasets")
+    @patch.object(BaseConsumerSensor, "_process_completion_event")
+    def test_execute_complete_does_not_emit_when_status_raises(self, mock_process, mock_emit):
+        """A failed/skipped model raises during status handling, so no datasets are emitted."""
+        mock_process.side_effect = AirflowException("model failed")
+        sensor = self._make_sensor()
+        with pytest.raises(AirflowException):
+            sensor.execute_complete({"ti": MagicMock()}, {"status": "failed", "outlet_uris": ["x"]})
+        mock_emit.assert_not_called()

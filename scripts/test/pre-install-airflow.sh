@@ -6,6 +6,12 @@ set -e
 
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"
+# dbt minor from Hatch's {matrix:dbt}; required, no default.
+DBT_VERSION="$3"
+if [ -z "$DBT_VERSION" ]; then
+  echo "::error::DBT_VERSION (third positional arg) was not provided."
+  exit 1
+fi
 
 # Use this to set the appropriate Python environment in Github Actions,
 # while also not assuming --system when running locally.
@@ -24,20 +30,26 @@ rm -f $AIRFLOW_HOME/airflow.db
 pip install uv
 uv pip install pip --upgrade
 
-if [ "$AIRFLOW_VERSION" = "2.9" ] ; then
-  uv pip install -r requirements/requirements-airflow-2.9-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "2.10" ] ; then
-  uv pip install -r requirements/requirements-airflow-2.10-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "2.11" ] ; then
-  uv pip install -r requirements/requirements-airflow-2.11-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.0" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.0-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.1-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.2-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.3-dbt-1.11.txt
+EFFECTIVE_DBT_VERSION="$DBT_VERSION"
+
+if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRFLOW_VERSION" = "2.11" ] || [ "$AIRFLOW_VERSION" = "3.0" ] || [ "$AIRFLOW_VERSION" = "3.1" ] || [ "$AIRFLOW_VERSION" = "3.2" ] || [ "$AIRFLOW_VERSION" = "3.3" ] ; then
+  # Install from the pinned lockfile matching this (airflow, dbt) pair.
+  REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-${DBT_VERSION}.txt"
+  if [ ! -f "$REQUIREMENTS_FILE" ]; then
+    if [ "$DBT_VERSION" = "1.11" ] || [ "$DBT_VERSION" = "1.12" ]; then
+      # Every Airflow version should have both a 1.11 and 1.12 lockfile; a missing
+      # one is a real gap, not an intentionally-uncovered dbt minor.
+      echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
+      exit 1
+    fi
+    # Other dbt minors (1.5-1.10, 2.0) have no per-Airflow lockfile; jobs needing
+    # them re-pin dbt in their own setup step, so this is just a throwaway baseline.
+    echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline (this job must re-pin dbt itself)."
+    REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"
+    EFFECTIVE_DBT_VERSION="1.11"
+  fi
+  echo "Installing pinned requirements from $REQUIREMENTS_FILE"
+  uv pip install -r "$REQUIREMENTS_FILE"
 else
   # Download Airflow constraints according to the version being used
   if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
@@ -77,13 +89,13 @@ else
     exit 1
 fi
 
-actual_dbt_version=$(dbt --version 2>/dev/null | awk '/Core:/{print $2}' | cut -d. -f1,2)
-desired_dbt_version=$(echo "$DBT_VERSION" | cut -d. -f1,2)
-
-if [ "$actual_dbt_version" = "$desired_dbt_version" ]; then
-    echo "Version is as expected: $desired_dbt_version"
+# EFFECTIVE_DBT_VERSION differs from DBT_VERSION only when the fallback above
+# substituted the dbt-1.11 baseline.
+actual_dbt_version=$(dbt --version 2>/dev/null | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
+if [ "$actual_dbt_version" = "$EFFECTIVE_DBT_VERSION" ]; then
+    echo "dbt version is as expected: $EFFECTIVE_DBT_VERSION"
 else
-    echo "Version does not match. Expected: $desired_dbt_version, but got: $actual_dbt_version"
+    echo "dbt version does not match. Expected: $EFFECTIVE_DBT_VERSION, but got: $actual_dbt_version"
     exit 1
 fi
 

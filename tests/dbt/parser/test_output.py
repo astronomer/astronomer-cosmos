@@ -117,6 +117,22 @@ def test_extract_log_issues() -> None:
     assert test_results_no_warns == []
 
 
+def test_extract_log_issues_dbt_1_12_format() -> None:
+    """dbt 1.12 reworded "Warning in test <name> (<path>)" to "[WARNING]: in test <name>
+    (<path>)", and the result line gained the same "[WARNING]: " prefix. Regression for the
+    dbt-1.12 CI failure where on_warning_callback fired with empty test_names/test_results."""
+    log_list = [
+        "11:17:43  Finished running 1 test in 0 hours 0 minutes and 0.13 seconds (0.13s).",
+        "11:17:43  \x1b[33mCompleted with 1 warning:\x1b[0m",
+        "11:17:43  [\x1b[33mWARNING\x1b[0m]: in test accepted_values_mini_orders_status__placed (models/schema.yml)",
+        "11:17:43  [\x1b[33mWARNING\x1b[0m]: Got 4 results, configured to warn if >1",
+        "11:17:43  Done. PASS=0 WARN=1 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=1",
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["accepted_values_mini_orders_status__placed"]
+    assert test_results == ["Got 4 results, configured to warn if >1"]
+
+
 def test_extract_dbt_runner_issues():
     """Tests that the function extracts the correct node names and messages from a dbt runner result
     for warnings by default.

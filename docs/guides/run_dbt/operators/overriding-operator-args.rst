@@ -65,9 +65,45 @@ retrying tests, which is useful when retrying a slow test would delay subsequent
             operator_kwargs:
               retries: 0
 
-This works for both dbt test types. Generic (schema) tests are configured as above, or individually in the model YAML,
-while singular tests can also declare ``{{ config(meta={"cosmos": {"operator_kwargs": {...}}}) }}`` in their SQL file.
+The ``data_tests`` configuration above applies to both types of dbt data test. Generic (schema) tests can also be
+configured individually in the model YAML, and singular tests can declare
+``{{ config(meta={"cosmos": {"operator_kwargs": {...}}}) }}`` in their SQL file:
+
+.. code-block:: yaml
+
+    # models/schema.yml - a single generic test that should not be retried
+    version: 2
+    models:
+      - name: orders
+        columns:
+          - name: order_id
+            data_tests:
+              - unique:
+                  config:
+                    meta:
+                      cosmos:
+                        operator_kwargs:
+                          retries: 0
 
 Since all the tests of a dbt node run in a single Airflow task, if they declare the same argument with different values,
 the last one wins and Cosmos logs a warning. Tests without a parent resource (e.g. a singular test that does not
 ``ref()`` any model) are not rendered under ``TestBehavior.AFTER_EACH``, so their ``operator_kwargs`` do not apply.
+
+Unit tests
+~~~~~~~~~~
+
+Unit tests (dbt 1.8+) are declared as ``unit_tests`` and are not rendered as Airflow tasks by Cosmos. They still run as
+part of the test task of the resource they test, because ``dbt test --select <resource>`` selects them, so the
+``operator_kwargs`` declared under ``unit_tests`` in ``dbt_project.yml`` (or in the unit test ``config``) have no effect.
+The arguments used are the ones described above: those inherited from the resource being tested, overridden by the ones
+its data tests declare.
+
+.. code-block:: yaml
+
+    # dbt_project.yml - this has no effect, since Cosmos does not create a task for unit tests
+    unit_tests:
+      my_dbt_project:
+        +meta:
+          cosmos:
+            operator_kwargs:
+              retries: 0

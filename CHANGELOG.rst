@@ -41,6 +41,9 @@ Others
 
 * Fix flaky ``source_pruning_dag`` integration test by seeding the database first by @tatiana in #2927
 * Fix CI dependency cache by @tatiana in #2931
+* Add dbt-core 1.12 to the test matrix by @pankajastro in #2773
+* Add Python 3.14 to the test matrix (Airflow 3.2/3.3, dbt 1.12 only) by @pankajastro in #2903
+* Pin Airflow 3.3 requirements and simplify the pre-install script by @pankajkoti in #2881
 
 1.15.0 (2026-07-01)
 -------------------

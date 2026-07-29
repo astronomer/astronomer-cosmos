@@ -1625,6 +1625,39 @@ def test_tests_per_model_populated():
     assert any("unique_customers_customer_id" in t for t in customers_tests)
 
 
+def test_tests_per_model_lists_multi_parent_test_under_every_parent():
+    """A test with multiple parents (e.g. a relationships test) is listed under each parent.
+
+    This is the graph-level fact the watcher test-aggregation logic relies on: a shared
+    test must be recorded/aggregated for every parent model, not just one. Asserting it
+    against a real loaded graph keeps the aggregation unit tests honest — they hand-build
+    ``tests_per_model``, and this guards that the builder actually produces that shape.
+    """
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+    dbt_graph.load()
+
+    # jaffle_shop's relationships test on orders.customer_id depends on both orders and
+    # customers, so it must appear in tests_per_model under BOTH.
+    shared_test_id = "test.jaffle_shop.relationships_orders_customer_id__customer_id__ref_customers_.c6ec7f58f2"
+    orders_id = "model.jaffle_shop.orders"
+    customers_id = "model.jaffle_shop.customers"
+    assert shared_test_id in dbt_graph.tests_per_model[orders_id]
+    assert shared_test_id in dbt_graph.tests_per_model[customers_id]
+
+
 def test_tests_per_model_empty_when_no_tests():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST

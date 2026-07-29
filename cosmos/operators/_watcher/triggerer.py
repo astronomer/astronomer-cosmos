@@ -148,10 +148,16 @@ class WatcherTrigger(BaseTrigger):
         compiled_sql is always read from the canonical per-model ``*_compiled_sql`` key.
         """
         if self.is_test_sensor:
-            from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key
+            from cosmos.operators._watcher.aggregation import TestResultSummary, get_tests_status_xcom_key
 
-            status = await self.get_xcom_val(get_tests_status_xcom_key(self.model_unique_id))
-            return status, None
+            xcom_val = await self.get_xcom_val(get_tests_status_xcom_key(self.model_unique_id))
+            if xcom_val is None:
+                return None, None
+            if isinstance(xcom_val, dict):
+                self._test_result_summary = TestResultSummary.from_dict(xcom_val)
+                return self._test_result_summary.status, None
+            # Backward compatibility: plain string value
+            return xcom_val, None
 
         status = await self._get_node_status()
         compiled_sql = (
@@ -221,6 +227,9 @@ class WatcherTrigger(BaseTrigger):
         outlet_uris = getattr(self, "_outlet_uris", [])
         if outlet_uris:
             event_data["outlet_uris"] = outlet_uris
+        test_summary = getattr(self, "_test_result_summary", None)
+        if test_summary:
+            event_data["test_result_counts"] = test_summary.to_dict()
         return event_data
 
     async def run(self) -> AsyncIterator[TriggerEvent]:
@@ -243,6 +252,9 @@ class WatcherTrigger(BaseTrigger):
                 event_data = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
+                test_summary = getattr(self, "_test_result_summary", None)
+                if test_summary:
+                    event_data["test_result_counts"] = test_summary.to_dict()
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == ProducerTaskState.FAILED:

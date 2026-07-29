@@ -6,7 +6,11 @@ Project config
 The ``cosmos.config.ProjectConfig`` allows you to specify information about where your dbt project is located and project
 variables that should be used for rendering and execution. It takes the following arguments:
 
-- ``dbt_project_path``: The full path to your dbt project. This directory should have a ``dbt_project.yml`` file
+- ``dbt_project_path``: The full path to your dbt project. This directory should have a ``dbt_project.yml`` file.
+  On Airflow 3 (for example, Astronomer deployments) DAGs run from a versioned DAG bundle whose filesystem
+  location can differ between DAG parsing and task execution, so a hardcoded absolute path may not exist on the
+  worker. Derive the path from your DAG file instead, e.g.
+  ``(Path(__file__).parent / "dbt/my_dbt_project").absolute().as_posix()``. See :doc:`/getting_started/astro`.
 - ``models_relative_paths``: (new in v1.16) The path(s) to your models directories, relative to the ``dbt_project_path``. Accepts a
   single path or a list of paths, mirroring dbt's own support for multiple ``model-paths``. This defaults to ``["models"]``.
   Replaces ``models_relative_path``, deprecated since v1.16 and will be removed in Cosmos 2.0.

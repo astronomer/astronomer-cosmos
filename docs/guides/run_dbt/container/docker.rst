@@ -117,7 +117,7 @@ This directory contains a Docker-specific example Dag.
 
 4. Enable and trigger a run of the `jaffle_shop_docker <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_docker.py>`_ Dag. You can see the following successful Dag run example:
 
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_docker_dag_run.png
+.. figure:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_docker_dag_run.png
     :width: 800
 
 Specifying ProfileConfig

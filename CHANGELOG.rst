@@ -36,6 +36,7 @@ Docs
 * Add Airflow 3.3 row to the dbt dependency conflict matrix by @pankajastro in #2886
 * Improve privacy policy by @tatiana in #2910
 * Remove duplicated sections in ``contributing.rst`` by @tatiana in #2859
+* Fix incorrect PR/issue references in the CHANGELOG by @tatiana in #2864
 
 Others
 

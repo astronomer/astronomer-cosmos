@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 from cosmos.dbt.parser.project import DbtModel, DbtModelType, LegacyDbtProject
+from cosmos.exceptions import CosmosValueError
 
 DBT_PROJECT_PATH = Path(__name__).parent.parent.parent.parent.parent / "dev/dags/dbt/"
 SAMPLE_CSV_PATH = DBT_PROJECT_PATH / "jaffle_shop/seeds/raw_customers.csv"
@@ -126,6 +127,189 @@ def test_LegacyDbtProject__handle_config_file_with_selector(input_tags, expected
         sample_config_file_path = Path(tmp_fp.name)
         dbt_project._handle_config_file(sample_config_file_path)
         assert dbt_project.models["orders"].config.config_selectors == expected_config_selectors
+
+
+def test_LegacyDbtProject_crawls_multiple_dirs(tmp_path):
+    """
+    LegacyDbtProject should support a list of directories for dbt_models_dir/dbt_seeds_dir/dbt_snapshots_dir,
+    crawling files from every directory in each list.
+    """
+    project_dir = tmp_path / "multi_dir_project"
+    for relative_dir in ("models", "models_v2", "seeds", "seeds_v2", "snapshots", "snapshots_v2"):
+        (project_dir / relative_dir).mkdir(parents=True)
+
+    (project_dir / "models" / "model_a.sql").write_text("select 1")
+    (project_dir / "models_v2" / "model_b.sql").write_text("select 2")
+    (project_dir / "seeds" / "seed_a.csv").write_text("id\n1")
+    (project_dir / "seeds_v2" / "seed_b.csv").write_text("id\n2")
+    (project_dir / "snapshots" / "snapshot_a.sql").write_text("{% snapshot snapshot_a %}\nselect 1\n{% endsnapshot %}")
+    (project_dir / "snapshots_v2" / "snapshot_b.sql").write_text(
+        "{% snapshot snapshot_b %}\nselect 2\n{% endsnapshot %}"
+    )
+
+    dbt_project = LegacyDbtProject(
+        project_name="multi_dir_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir=["models", "models_v2"],
+        dbt_seeds_dir=["seeds", "seeds_v2"],
+        dbt_snapshots_dir=["snapshots", "snapshots_v2"],
+    )
+
+    assert set(dbt_project.models.keys()) == {"model_a", "model_b"}
+    assert set(dbt_project.seeds.keys()) == {"seed_a", "seed_b"}
+    assert set(dbt_project.snapshots.keys()) == {"snapshot_a", "snapshot_b"}
+
+
+def test_LegacyDbtProject_yml_config_applies_across_dirs(tmp_path):
+    """
+    A schema.yml in one models dir should be able to configure a model that lives in a different
+    models dir, regardless of dbt_models_dir list order. Regression test for a bug where the yml
+    pass ran per-dir (interleaved with the sql/py crawl) instead of once after every models dir was
+    crawled, so a yml processed before the dir holding its target model would silently drop the
+    config - `marts` is listed (and thus crawled) before `staging`, and `model_b` lives in `staging`.
+    """
+    project_dir = tmp_path / "cross_dir_config_project"
+    (project_dir / "marts").mkdir(parents=True)
+    (project_dir / "staging").mkdir(parents=True)
+
+    (project_dir / "marts" / "model_a.sql").write_text("select 1")
+    (project_dir / "staging" / "model_b.sql").write_text("select 2")
+
+    yaml_data = {"models": [{"name": "model_b", "config": {"tags": ["from_marts_yml"]}}]}
+    with open(project_dir / "marts" / "schema.yml", "w") as fp:
+        yaml.dump(yaml_data, fp)
+
+    dbt_project = LegacyDbtProject(
+        project_name="cross_dir_config_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir=["marts", "staging"],
+    )
+
+    assert set(dbt_project.models.keys()) == {"model_a", "model_b"}
+    assert "tags:from_marts_yml" in dbt_project.models["model_b"].config.config_selectors
+
+
+def test_LegacyDbtProject_accepts_single_dir_as_string(tmp_path):
+    """
+    dbt_models_dir/dbt_seeds_dir/dbt_snapshots_dir should still accept a plain string (not just a list),
+    normalizing it into a single-item list.
+    """
+    project_dir = tmp_path / "single_dir_project"
+    for relative_dir in ("models", "seeds", "snapshots"):
+        (project_dir / relative_dir).mkdir(parents=True)
+
+    (project_dir / "models" / "model_a.sql").write_text("select 1")
+    (project_dir / "seeds" / "seed_a.csv").write_text("id\n1")
+    (project_dir / "snapshots" / "snapshot_a.sql").write_text("{% snapshot snapshot_a %}\nselect 1\n{% endsnapshot %}")
+
+    dbt_project = LegacyDbtProject(
+        project_name="single_dir_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir="models",
+        dbt_seeds_dir="seeds",
+        dbt_snapshots_dir="snapshots",
+    )
+
+    assert set(dbt_project.models.keys()) == {"model_a"}
+    assert set(dbt_project.seeds.keys()) == {"seed_a"}
+    assert set(dbt_project.snapshots.keys()) == {"snapshot_a"}
+
+
+def test_LegacyDbtProject_explicit_empty_dir_list_crawls_nothing(tmp_path):
+    """
+    dbt_models_dir=[] means "crawl no model directories" and must not fall back to the "models"
+    default - that default should only apply when dbt_models_dir is left unset (None).
+    """
+    project_dir = tmp_path / "empty_list_project"
+    (project_dir / "models").mkdir(parents=True)
+    (project_dir / "models" / "model_a.sql").write_text("select 1")
+
+    dbt_project = LegacyDbtProject(
+        project_name="empty_list_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir=[],
+    )
+
+    assert dbt_project.models == {}
+
+
+def test_LegacyDbtProject_rejects_invalid_dir_type():
+    """
+    dbt_models_dir/dbt_seeds_dir/dbt_snapshots_dir should raise a clear error for a misconfigured value
+    that is neither a string nor a list of strings, instead of failing obscurely downstream.
+    """
+    with pytest.raises(CosmosValueError, match="Expected a directory name"):
+        LegacyDbtProject(project_name="bad_config_project", dbt_models_dir=123)
+
+
+def test_LegacyDbtProject__as_dir_list_returns_empty_for_none():
+    """
+    _as_dir_list(None) should return [] directly. __post_init__ already substitutes the
+    "models"/"seeds"/"snapshots" default via its own `is None` check before ever calling this method,
+    so this branch is otherwise unreachable through normal usage - covering it directly documents the
+    intended behavior in case _as_dir_list is ever called on its own (it's a @staticmethod).
+    """
+    assert LegacyDbtProject._as_dir_list(None) == []
+
+
+def test_LegacyDbtProject__classify_dir_returns_none_for_unmatched_path(tmp_path):
+    """
+    _classify_dir should return None for a path that isn't under any configured models or snapshots
+    dir. In practice _handle_sql_file only ever receives paths from rglob() over a configured dir, so
+    this branch is otherwise unreachable - covering it directly documents the fallback behavior.
+    """
+    dbt_project = LegacyDbtProject(
+        project_name="jaffle_shop",
+        dbt_root_path=DBT_PROJECT_PATH,
+    )
+    outside_path = tmp_path / "not_a_configured_dir" / "some_file.sql"
+    assert dbt_project._classify_dir(outside_path) is None
+
+
+def test_LegacyDbtProject_py_file_in_nested_snapshots_dir_is_skipped(tmp_path):
+    """
+    A .py file living inside a snapshots dir nested under a models dir must not be picked up by the
+    unfiltered *.py crawl: the nested snapshots dir is more specific than the models dir, so it would
+    be classified as a snapshot and crash in DbtModel.__post_init__, which expects a
+    "{% snapshot ... %}" jinja block - not a bare .py file.
+    """
+    project_dir = tmp_path / "nested_py_project"
+    (project_dir / "models" / "snapshots").mkdir(parents=True)
+    (project_dir / "models" / "model_a.sql").write_text("select 1")
+    (project_dir / "models" / "snapshots" / "__init__.py").write_text("")
+
+    dbt_project = LegacyDbtProject(
+        project_name="nested_py_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir="models",
+        dbt_snapshots_dir="models/snapshots",
+    )
+
+    assert set(dbt_project.models.keys()) == {"model_a"}
+
+
+def test_LegacyDbtProject_classifies_nested_snapshots_dir_correctly(tmp_path):
+    """
+    A snapshots dir nested inside a models dir should still be classified as snapshots, not models -
+    a substring check on the path string would misclassify it since "models" is a substring of
+    ".../models/snapshots/snapshot_a.sql".
+    """
+    project_dir = tmp_path / "nested_dirs_project"
+    (project_dir / "models" / "snapshots").mkdir(parents=True)
+    (project_dir / "models" / "model_a.sql").write_text("select 1")
+    (project_dir / "models" / "snapshots" / "snapshot_a.sql").write_text(
+        "{% snapshot snapshot_a %}\nselect 1\n{% endsnapshot %}"
+    )
+
+    dbt_project = LegacyDbtProject(
+        project_name="nested_dirs_project",
+        dbt_root_path=str(tmp_path),
+        dbt_models_dir="models",
+        dbt_snapshots_dir="models/snapshots",
+    )
+
+    assert set(dbt_project.models.keys()) == {"model_a"}
+    assert set(dbt_project.snapshots.keys()) == {"snapshot_a"}
 
 
 def test_dbtmodelconfig___repr__():

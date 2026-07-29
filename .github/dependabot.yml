@@ -6,6 +6,13 @@ updates:
       interval: "daily"
     cooldown:
       default-days: 7
+    groups:
+      # Keep github/codeql-action/init and github/codeql-action/analyze in a single PR.
+      # CodeQL requires init and analyze to run the same version; bumping them in
+      # separate PRs leaves the pair version-skewed and fails the Analyze job.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
     labels:
       - "dependencies"
     reviewers:

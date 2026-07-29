@@ -20,5 +20,5 @@ This policy currently applies to:
 - GitHub Actions version updates
 - Pre-commit hook updates
 
-These updates are managed via `Dependabot <https://docs.github.com/en/code-security/dependabot/dependabot-version-updates>`_, which is
+These updates are managed via `Dependabot <https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-version-updates>`_, which is
 configured with a 7-day cooldown setting for these updates.

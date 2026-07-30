@@ -1216,7 +1216,11 @@ def build_airflow_graph(
 
     # Operator kwargs declared by the test nodes, so a TestBehavior.AFTER_EACH test task can override the arguments
     # it inherits from the resource being tested
-    test_operator_kwargs = calculate_test_operator_kwargs(nodes, detached_nodes)
+    test_operator_kwargs = (
+        calculate_test_operator_kwargs(nodes, detached_nodes)
+        if render_config.test_behavior == TestBehavior.AFTER_EACH
+        else {}
+    )
 
     virtualenv_dir = None
 

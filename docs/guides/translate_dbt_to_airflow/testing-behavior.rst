@@ -112,6 +112,14 @@ When at least one WARN message is present, the function passed to ``on_warning_c
     ``on_warning_callback`` method above. However, these warnings will not be included in the ``test_names`` and
     ``test_results`` context variables, which are specific to test-related warnings.
 
+.. note::
+
+    ``on_warning_callback`` can be given either as a top-level ``DbtDag`` / ``DbtTaskGroup`` argument, as in the
+    example above, or inside ``operator_args``, since it is also a valid argument of the underlying ``dbt test``,
+    ``dbt build`` and ``dbt source freshness`` operators. When both are given, the top-level argument wins.
+    In Cosmos 1.15.0 and earlier, a callback passed only through ``operator_args`` was silently dropped, so the
+    top-level argument remains the recommended form.
+
 
 Tests with multiple parents
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

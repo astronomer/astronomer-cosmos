@@ -23,6 +23,7 @@ from cosmos.airflow.graph import (
     _add_teardown_task,
     _add_watcher_producer_task,
     _convert_list_to_str,
+    _honor_on_warning_callback,
     _snake_case_to_camelcase,
     build_airflow_graph,
     calculate_detached_node_name,
@@ -926,6 +927,32 @@ def test_create_task_metadata_build_mode_forwards_render_config_exclude():
     assert metadata.arguments["exclude"] == "resource_type:unit_test"
 
 
+def test_create_task_metadata_build_honors_on_warning_callback_from_task_args():
+    """Under TestBehavior.BUILD there is no separate test task, so an ``on_warning_callback`` passed through
+    ``operator_args`` must reach the build task instead of being dropped by the unset top-level argument.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    operator_args_callback = MagicMock()
+    model_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_project.model_a",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("base_path"),
+        original_file_path=Path("models/model_a.sql"),
+        fqn=["my_project", "model_a"],
+    )
+    metadata = create_task_metadata(
+        model_node,
+        execution_mode=ExecutionMode.LOCAL,
+        args={"on_warning_callback": operator_args_callback},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
+    )
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+    assert metadata.arguments["on_warning_callback"] is operator_args_callback
+
+
 def test_create_task_metadata_ephemeral_empty_operator_inherits_owner():
     """The ephemeral EmptyOperator inherits the dbt model owner when owner inheritance is enabled (default)."""
     metadata = create_task_metadata(
@@ -1001,6 +1028,34 @@ def test_create_task_metadata_source_with_rendering_options(
     if metadata:
         assert metadata.id == expected_id
         assert metadata.operator_class == expected_operator_class
+
+
+def test_create_task_metadata_source_honors_on_warning_callback_from_task_args():
+    """``dbt source freshness`` tasks accept ``on_warning_callback``, so one passed through ``operator_args``
+    must not be dropped by the unset top-level argument.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    operator_args_callback = MagicMock()
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+        has_freshness=True,
+    )
+    metadata = create_task_metadata(
+        source_node,
+        execution_mode=ExecutionMode.LOCAL,
+        args={"on_warning_callback": operator_args_callback},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL),
+    )
+    assert metadata.operator_class == "cosmos.operators.local.DbtSourceLocalOperator"
+    assert metadata.arguments["on_warning_callback"] is operator_args_callback
 
 
 @pytest.mark.parametrize("use_task_group", (None, True, False))
@@ -1410,6 +1465,84 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
         **{"task_arg": "value", "on_warning_callback": True, "emit_datasets": False},
         **additional_arguments,
     }
+
+
+def test_create_test_task_metadata_honors_on_warning_callback_from_task_args():
+    """An ``on_warning_callback`` passed through ``operator_args`` (and therefore already inside ``task_args``)
+    must not be dropped by an unset top-level ``on_warning_callback``.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    operator_args_callback = MagicMock()
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"on_warning_callback": operator_args_callback},
+        node=sample_node,
+    )
+    assert metadata.arguments["on_warning_callback"] is operator_args_callback
+
+
+def test_create_test_task_metadata_top_level_on_warning_callback_takes_precedence():
+    """When ``on_warning_callback`` is given both top-level and through ``operator_args``, the top-level
+    DbtDag / DbtTaskGroup argument wins.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    operator_args_callback = MagicMock()
+    top_level_callback = MagicMock()
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"on_warning_callback": operator_args_callback},
+        on_warning_callback=top_level_callback,
+        node=sample_node,
+    )
+    assert metadata.arguments["on_warning_callback"] is top_level_callback
+
+
+@pytest.mark.parametrize(
+    "task_args_callback,top_level_callback,expected_callback",
+    [
+        pytest.param("task_args", None, "task_args", id="only-operator-args"),
+        pytest.param(None, "top_level", "top_level", id="only-top-level"),
+        pytest.param("task_args", "top_level", "top_level", id="top-level-wins"),
+        pytest.param(None, None, None, id="neither-set"),
+    ],
+)
+def test_honor_on_warning_callback(task_args_callback, top_level_callback, expected_callback):
+    """The key is always set, so the operator is handed an explicit ``None`` when neither form is used, but a
+    ``task_args`` value is only overwritten when the top-level argument is set.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    callbacks = {"task_args": MagicMock(), "top_level": MagicMock(), None: None}
+    task_args = {} if task_args_callback is None else {"on_warning_callback": callbacks[task_args_callback]}
+
+    _honor_on_warning_callback(task_args, callbacks[top_level_callback])
+
+    assert "on_warning_callback" in task_args
+    assert task_args["on_warning_callback"] is callbacks[expected_callback]
 
 
 @pytest.mark.parametrize(

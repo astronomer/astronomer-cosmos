@@ -47,7 +47,12 @@ In some cases, Cosmos may continue to support older Airflow versions, depending 
 dbt Core
 ++++++++
 
-- **Supported versions**: 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 2.0 (dbt Fusion)
+- **Minimum required version**: dbt Core 1.8
+- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12, 2.0 (dbt Fusion)
+
+dbt Core 1.5, 1.6, and 1.7 have reached End of Life per the
+`dbt Labs support policy <https://docs.getdbt.com/docs/dbt-versions/core>`_ and are no longer
+supported (see the `version removal criteria <#dbt-core-version-removal-criteria>`_ below).
 
 .. note::
 
@@ -71,12 +76,6 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
      - 3.12
      - 3.13
      - 3.14
-   * - 1.5 – 1.7
-     - OK
-     - OK
-     - fails
-     - fails
-     - fails
    * - 1.8 – 1.11
      - OK
      - OK
@@ -96,8 +95,6 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
      - n/a
      - n/a
 
-- dbt Core 1.5–1.7 fail on Python 3.12+ with ``ModuleNotFoundError: No module named 'distutils'`` —
-  Python 3.12 removed the stdlib ``distutils`` module those releases still import.
 - dbt Core 1.8–1.11 fail on Python 3.14 inside ``dbt_common``'s
   ``mashumaro`` dependency (e.g. ``mashumaro.exceptions.UnserializableField``),
   which hasn't caught up to Python 3.14's typing changes.
@@ -164,7 +161,7 @@ policy pages directly for the current state.
 
 .. note::
 
-   Cosmos's dbt Core test matrix runs the full 1.5–1.12 range across every
+   Cosmos's dbt Core test matrix runs the full 1.8–1.12 range across every
    supported Airflow/Python combination only for dbt 1.12; older dbt minors
    are cross-tested against a narrower subset of Airflow/Python pairs (see
    `.github/workflows/test.yml

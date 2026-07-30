@@ -451,6 +451,12 @@ introduced finer-grained log CLI parameters (see the
 accepts ``--log-format`` in that position; older dbt releases predate this
 change and are not validated by Cosmos's watcher tests.
 
+dbt versions older than 1.8 have all reached end of life and are no longer
+supported by dbt Labs; see the
+`dbt Core versions <https://docs.getdbt.com/docs/dbt-versions>`_ page
+for current dbt-Labs-supported releases. If you must run an older dbt
+release with Cosmos, use ``ExecutionMode.LOCAL`` instead.
+
 Producer task implementation
 ++++++++++++++++++++++++++++
 

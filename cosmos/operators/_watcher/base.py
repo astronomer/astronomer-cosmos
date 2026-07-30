@@ -14,6 +14,7 @@ from cosmos.config import ProfileConfig
 from cosmos.constants import (
     _DATASET_EMITTING_RESOURCE_TYPES,
     _DBT_STARTUP_EVENTS_XCOM_KEY,
+    _PRODUCER_CMD_FLAGS_XCOM_KEY,
     AIRFLOW_VERSION,
     CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
@@ -518,9 +519,12 @@ class BaseConsumerSensor(BaseSensorOperator):
                 self.__class__.__name__,
             )
 
-        # Use self, not the producer task object: dag.get_task() returns it unrendered.
-        add_cmd_flags = getattr(self, "add_cmd_flags", None)
-        raw_flags: list[str] = add_cmd_flags() if callable(add_cmd_flags) else []
+        # Prefer the producer's own rendered flags (published to XCom as it starts) so
+        # setup_operator_args overrides survive; fall back to this consumer's own flags.
+        raw_flags = get_xcom_val(context["ti"], self.producer_task_id, _PRODUCER_CMD_FLAGS_XCOM_KEY)
+        if raw_flags is None:
+            add_cmd_flags = getattr(self, "add_cmd_flags", None)
+            raw_flags = add_cmd_flags() if callable(add_cmd_flags) else []
         extra_flags = self._filter_flags(raw_flags)
 
         model_selector = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)

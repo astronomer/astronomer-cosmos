@@ -42,8 +42,7 @@ To learn how to customise the profile per dbt model or Cosmos task, check :ref:`
 .. _operator-args-test-nodes:
 
 Overriding operator arguments for dbt tests
--------------------------------------------
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When using ``TestBehavior.AFTER_EACH``, the test task inherits the operator arguments of the resource it tests, and then
 applies the ``operator_kwargs`` declared by the tests it runs. This allows, for example, retrying model runs without
 retrying tests, which is useful when retrying a slow test would delay subsequent DAG runs:

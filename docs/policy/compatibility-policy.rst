@@ -50,10 +50,6 @@ dbt Core
 - **Minimum required version**: dbt Core 1.8
 - **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12, 2.0 (dbt Fusion)
 
-dbt Core 1.5, 1.6, and 1.7 have reached End of Life per the
-`dbt Labs support policy <https://docs.getdbt.com/docs/dbt-versions/core>`_ and are no longer
-supported (see the `version removal criteria <#dbt-core-version-removal-criteria>`_ below).
-
 .. note::
 
    Specific dbt adapter versions may have additional compatibility requirements.

@@ -18,6 +18,16 @@ TESTS_PER_MODEL = {
     "model.pkg.customers": ["test.pkg.not_null_customers_id"],
 }
 
+# A shared test (e.g. a relationships test) belongs to more than one model: it is defined
+# on ``orders`` and references ``customers``, so it appears under both. ``products`` does
+# not depend on it — it is the negative case that pins down "credited to only the matching
+# parents", not every model.
+TESTS_PER_MODEL_SHARED = {
+    "model.pkg.orders": ["test.pkg.not_null_orders_id", "test.pkg.rel_orders_customer"],
+    "model.pkg.customers": ["test.pkg.not_null_customers_id", "test.pkg.rel_orders_customer"],
+    "model.pkg.products": ["test.pkg.not_null_products_id"],
+}
+
 
 class TestGetTestsStatusXcomKey:
     """Tests for get_tests_status_xcom_key."""
@@ -34,15 +44,25 @@ class TestAccumulateTestResult:
 
     def test_returns_model_uid_when_test_found(self):
         results: dict[str, dict[str, str]] = {}
-        model_uid = accumulate_test_result("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results)
-        assert model_uid == "model.pkg.orders"
+        model_uids = accumulate_test_result("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL, results)
+        assert model_uids == ["model.pkg.orders"]
         assert results == {"model.pkg.orders": {"test.pkg.not_null_orders_id": "pass"}}
 
-    def test_returns_none_when_test_not_found(self):
+    def test_returns_empty_when_test_not_found(self):
         results: dict[str, dict[str, str]] = {}
-        model_uid = accumulate_test_result("test.pkg.unknown_test", "pass", TESTS_PER_MODEL, results)
-        assert model_uid is None
+        model_uids = accumulate_test_result("test.pkg.unknown_test", "pass", TESTS_PER_MODEL, results)
+        assert model_uids == []
         assert results == {}
+
+    def test_multi_parent_test_recorded_for_every_parent(self):
+        """A test belonging to several models is recorded for all of them, not just the first."""
+        results: dict[str, dict[str, str]] = {}
+        model_uids = accumulate_test_result("test.pkg.rel_orders_customer", "pass", TESTS_PER_MODEL_SHARED, results)
+        assert model_uids == ["model.pkg.orders", "model.pkg.customers"]
+        assert results == {
+            "model.pkg.orders": {"test.pkg.rel_orders_customer": "pass"},
+            "model.pkg.customers": {"test.pkg.rel_orders_customer": "pass"},
+        }
 
     def test_accumulates_multiple_results(self):
         results: dict[str, dict[str, str]] = {}
@@ -149,6 +169,43 @@ class TestPushTestResultOrAggregate:
             task_instance=ti,
             key="model__pkg__orders_tests_status",
             value=DbtTestStatus.FAIL,
+        )
+
+    @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
+    def test_multi_parent_test_pushes_xcom_for_every_parent(self, mock_xcom_push: MagicMock):
+        """A shared (multi-parent) test must complete and push each parent's aggregate.
+
+        Regression: crediting the shared test to only the first parent left the other
+        parent's aggregated XCom unpushed, so its test sensor deferred forever.
+        """
+        results: dict[str, dict[str, str]] = {}
+        ti = MagicMock()
+        # Each model's own test plus the shared test complete both models' expected sets.
+        push_test_result_or_aggregate("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL_SHARED, results, ti)
+        push_test_result_or_aggregate("test.pkg.not_null_customers_id", "pass", TESTS_PER_MODEL_SHARED, results, ti)
+        push_test_result_or_aggregate("test.pkg.rel_orders_customer", "pass", TESTS_PER_MODEL_SHARED, results, ti)
+        assert mock_xcom_push.call_count == 2
+        mock_xcom_push.assert_any_call(
+            task_instance=ti, key="model__pkg__orders_tests_status", value=DbtTestStatus.PASS
+        )
+        mock_xcom_push.assert_any_call(
+            task_instance=ti, key="model__pkg__customers_tests_status", value=DbtTestStatus.PASS
+        )
+
+    @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
+    def test_multi_parent_test_failure_fails_every_parent(self, mock_xcom_push: MagicMock):
+        """A failing shared test fails both parents' aggregates, not just the first."""
+        results: dict[str, dict[str, str]] = {}
+        ti = MagicMock()
+        push_test_result_or_aggregate("test.pkg.not_null_orders_id", "pass", TESTS_PER_MODEL_SHARED, results, ti)
+        push_test_result_or_aggregate("test.pkg.not_null_customers_id", "pass", TESTS_PER_MODEL_SHARED, results, ti)
+        push_test_result_or_aggregate("test.pkg.rel_orders_customer", "fail", TESTS_PER_MODEL_SHARED, results, ti)
+        assert mock_xcom_push.call_count == 2
+        mock_xcom_push.assert_any_call(
+            task_instance=ti, key="model__pkg__orders_tests_status", value=DbtTestStatus.FAIL
+        )
+        mock_xcom_push.assert_any_call(
+            task_instance=ti, key="model__pkg__customers_tests_status", value=DbtTestStatus.FAIL
         )
 
     @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")

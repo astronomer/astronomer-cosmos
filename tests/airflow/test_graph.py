@@ -926,6 +926,58 @@ def test_create_task_metadata_build_mode_forwards_render_config_exclude():
     assert metadata.arguments["exclude"] == "resource_type:unit_test"
 
 
+def test_create_task_metadata_build_mode_preserves_task_args_on_warning_callback():
+    """Under TestBehavior.BUILD there is no separate test task, so an operator_args callback must
+    survive on the build task itself."""
+
+    def callback(context):
+        pass
+
+    model_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_project.model_a",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("base_path"),
+        original_file_path=Path("models/model_a.sql"),
+        fqn=["my_project", "model_a"],
+    )
+    metadata = create_task_metadata(
+        model_node,
+        execution_mode=ExecutionMode.LOCAL,
+        args={"on_warning_callback": callback},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
+    )
+    assert metadata.arguments["on_warning_callback"] is callback
+
+
+def test_create_task_metadata_source_preserves_task_args_on_warning_callback():
+    """Source freshness/test tasks must also keep an operator_args callback."""
+
+    def callback(context):
+        pass
+
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.my_project.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        path_base=Path("base_path"),
+        original_file_path=Path("models/schema.yml"),
+        tags=[],
+        config={},
+        has_freshness=True,
+    )
+    metadata = create_task_metadata(
+        source_node,
+        execution_mode=ExecutionMode.LOCAL,
+        args={"on_warning_callback": callback},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL),
+    )
+    assert metadata is not None
+    assert metadata.arguments["on_warning_callback"] is callback
+
+
 def test_create_task_metadata_ephemeral_empty_operator_inherits_owner():
     """The ephemeral EmptyOperator inherits the dbt model owner when owner inheritance is enabled (default)."""
     metadata = create_task_metadata(

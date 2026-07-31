@@ -214,6 +214,20 @@ def _calculate_test_operator_class(execution_mode: ExecutionMode, render_config:
     return calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtTest")
 
 
+def _honor_on_warning_callback(args: dict[str, Any], on_warning_callback: Callable[..., Any] | None) -> None:
+    """
+    Set ``on_warning_callback`` in ``args`` without discarding a callback supplied via ``operator_args``.
+
+    The top-level ``on_warning_callback`` defaults to ``None``, so assigning it unconditionally silently
+    dropped a callback the user passed through ``operator_args``/``task_args``. An explicit top-level
+    callback still wins.
+    """
+    if on_warning_callback is not None:
+        args["on_warning_callback"] = on_warning_callback
+    elif "on_warning_callback" not in args:
+        args["on_warning_callback"] = None
+
+
 def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
@@ -240,9 +254,7 @@ def create_test_task_metadata(
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     task_args = dict(task_args)
-    # An unset top-level ``on_warning_callback`` must not clobber a callback supplied
-    # through ``operator_args``/``task_args``.
-    task_args["on_warning_callback"] = on_warning_callback or task_args.get("on_warning_callback")
+    _honor_on_warning_callback(task_args, on_warning_callback)
     # Test operators (DbtTest*) do not emit DatasetAlias
     task_args["emit_datasets"] = False
     extra_context = {}
@@ -464,7 +476,7 @@ def create_task_metadata(  # noqa: C901
                 args[models_select_key] = f"{node.resource_name}"
             if test_indirect_selection != TestIndirectSelection.EAGER:
                 args["indirect_selection"] = test_indirect_selection.value
-            args["on_warning_callback"] = on_warning_callback
+            _honor_on_warning_callback(args, on_warning_callback)
             # Under BUILD, tests run inline with ``dbt build`` (there is no separate per-model test task),
             # so forward the render-level exclude here too — otherwise an exclusion such as
             # exclude=["resource_type:unit_test"] would not be honored for BUILD. See #1763.
@@ -482,7 +494,7 @@ def create_task_metadata(  # noqa: C901
             )
         elif node.resource_type == DbtResourceType.SOURCE:
             args["select"] = f"source:{node.resource_name}"
-            args["on_warning_callback"] = on_warning_callback
+            _honor_on_warning_callback(args, on_warning_callback)
 
             if (render_config.source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 render_config.source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS

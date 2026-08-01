@@ -334,6 +334,9 @@ class DbtToAirflowConverter:
         if settings.enable_cache:
             cache_identifier = cache._create_cache_identifier(dag, task_group)
             cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache_identifier)
+            # Surface the resolved cache dir so a silent env var override of the config block
+            # (see #2857) is visible in the parse logs
+            logger.info("Cosmos cache dir resolved to %s", cache_dir)
 
         # Store the initial load method before it gets resolved by dbt_graph.load()
         initial_load_method = render_config.load_method

@@ -84,3 +84,19 @@ def test_watcher_dbt_execution_queue_defaults_to_none_without_warning():
     assert settings.watcher_dbt_producer_queue is None
     assert settings.watcher_dbt_retry_queue is None
     assert not any(issubclass(w.category, DeprecationWarning) for w in caught)
+
+
+@patch.dict(os.environ, {}, clear=True)
+def test_project_hash_excluded_dirs_defaults_to_generated_dirs():
+    reload(settings)
+    assert settings.project_hash_excluded_dirs == frozenset({".git", "target", "dbt_packages", "logs"})
+
+
+@patch.dict(
+    os.environ,
+    {"AIRFLOW__COSMOS__PROJECT_HASH_EXCLUDED_DIRS": "target, dbt_packages , scratch"},
+    clear=True,
+)
+def test_project_hash_excluded_dirs_env_var_replaces_default():
+    reload(settings)
+    assert settings.project_hash_excluded_dirs == frozenset({"target", "dbt_packages", "scratch"})

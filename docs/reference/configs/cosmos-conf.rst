@@ -44,6 +44,18 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_DAG_VERSIONING``
 
+.. _project_hash_excluded_dirs:
+
+`project_hash_excluded_dirs`_:
+    Comma-separated list of directory names that Cosmos skips when hashing the dbt project directory
+    (used by ``enable_dag_versioning`` and the partial-parse/dbt-ls cache keys). Generated folders such
+    as ``target/`` and ``dbt_packages/`` can be large, and reading them on every DAG parse is expensive
+    on network-backed storage. Setting this replaces the default list entirely. A matching directory
+    name is skipped wherever it appears in the project tree.
+
+    - Default: ``.git, target, dbt_packages, logs``
+    - Environment Variable: ``AIRFLOW__COSMOS__PROJECT_HASH_EXCLUDED_DIRS``
+
 .. _enable_cache_dbt_ls:
 
 `enable_cache_dbt_ls`_:

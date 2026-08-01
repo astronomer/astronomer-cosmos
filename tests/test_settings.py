@@ -3,7 +3,17 @@ import warnings
 from importlib import reload
 from unittest.mock import patch
 
+import pytest
+
 from cosmos import settings
+
+
+@pytest.fixture(autouse=True)
+def _restore_settings_after_env_var_test():
+    # Tests here reload the settings module under a patched environment; without a
+    # final reload the patched values leak into later test modules
+    yield
+    reload(settings)
 
 
 @patch.dict(os.environ, {"AIRFLOW__COSMOS__ENABLE_CACHE": "False"}, clear=True)

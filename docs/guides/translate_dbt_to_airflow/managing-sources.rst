@@ -68,6 +68,10 @@ on_warning_callback callback
 
 The ``on_warning_callback`` is a callback parameter available on the ``DbtSourceLocalOperator``. This callback is triggered when a warning occurs during the execution of the ``dbt source freshness`` command. The callback accepts the task context, which includes additional parameters: test_names and test_results
 
+As with test warnings, this callback can be given either as a top-level ``DbtDag`` / ``DbtTaskGroup`` argument or
+inside ``operator_args``, and the top-level argument wins when both are given. See :ref:`testing-behavior` for
+details.
+
 Example:
 
 .. literalinclude:: ../../../dev/dags/example_source_rendering.py

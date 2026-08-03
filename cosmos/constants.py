@@ -32,6 +32,8 @@ DEFAULT_PROFILES_FILE_NAME = "profiles.yml"
 PACKAGE_LOCKFILE_YML = "package-lock.yml"
 DBT_DEFAULT_PACKAGES_FOLDER = "dbt_packages"
 
+DBT_NOTHING_TO_DO = "Nothing to do"
+
 DEFAULT_OPENLINEAGE_NAMESPACE = "cosmos"
 OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
 

@@ -22,6 +22,7 @@ from cosmos.operators.kubernetes import (
     DbtRunKubernetesOperator,
     DbtRunOperationKubernetesOperator,
     DbtSeedKubernetesOperator,
+    DbtSemanticKubernetesOperator,
     DbtSnapshotKubernetesOperator,
     DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
@@ -158,6 +159,19 @@ class DbtRunAwsEksOperator(DbtAwsEksBaseOperator, DbtRunKubernetesOperator):
 
     template_fields: Sequence[str] = (
         DbtAwsEksBaseOperator.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticAwsEksOperator(DbtAwsEksBaseOperator, DbtSemanticKubernetesOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic layer object.
+    """
+
+    template_fields: Sequence[str] = (
+        DbtAwsEksBaseOperator.template_fields + DbtSemanticKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

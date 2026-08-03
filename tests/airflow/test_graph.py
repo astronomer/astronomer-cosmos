@@ -29,6 +29,7 @@ from cosmos.airflow.graph import (
     calculate_detached_node_name,
     calculate_leaves,
     calculate_operator_class,
+    calculate_test_operator_kwargs,
     create_task_groups_based_on_folder,
     create_task_metadata,
     create_test_task_metadata,
@@ -2930,3 +2931,128 @@ def test_create_task_metadata_seed_rendering_always_no_flag():
     )
     assert metadata.operator_class == "cosmos.operators.local.DbtSeedLocalOperator"
     assert "should_run_if_seed_changed" not in metadata.extra_context
+
+
+def _model_and_test_nodes(model_kwargs, test_kwargs, second_test_kwargs=None):
+    model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/my_model.sql"),
+        config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": model_kwargs}}},
+        has_test=True,
+        has_non_detached_test=True,
+    )
+    nodes = {model.unique_id: model}
+    for index, kwargs in enumerate([test_kwargs, second_test_kwargs]):
+        if kwargs is None:
+            continue
+        test = DbtNode(
+            unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.my_test_{index}",
+            resource_type=DbtResourceType.TEST,
+            depends_on=[model.unique_id],
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("models/schema.yml"),
+            config={"meta": {"cosmos": {"operator_kwargs": kwargs}}},
+        )
+        nodes[test.unique_id] = test
+    return nodes
+
+
+def _render_after_each(dag_id, nodes, retries=3):
+    with DAG(dag_id, start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn", profile_args={"schema": "public"}
+                    ),
+                ),
+                "retries": retries,
+            },
+            render_config=RenderConfig(test_behavior=TestBehavior.AFTER_EACH),
+            dbt_project_name="astro_shop",
+        )
+    return dag
+
+
+def test_test_node_operator_kwargs_override_the_ones_inherited_from_the_model():
+    """A test declaring `retries` overrides the value it would inherit from the model it tests (#2130)."""
+    nodes = _model_and_test_nodes(model_kwargs={"retries": 2}, test_kwargs={"retries": 0})
+    dag = _render_after_each("test-test-node-kwargs", nodes)
+    assert dag.task_dict["my_model.run"].retries == 2
+    assert dag.task_dict["my_model.test"].retries == 0
+
+
+def test_test_node_operator_kwargs_are_merged_with_the_ones_inherited_from_the_model():
+    """Arguments the test does not declare are still inherited from the model it tests."""
+    nodes = _model_and_test_nodes(model_kwargs={"retries": 2, "pool": "model_pool"}, test_kwargs={"retries": 0})
+    dag = _render_after_each("test-test-node-kwargs-merge", nodes)
+    assert dag.task_dict["my_model.test"].retries == 0
+    assert dag.task_dict["my_model.test"].pool == "model_pool"
+
+
+def test_conflicting_test_node_operator_kwargs_log_warning(caplog):
+    """Tests of a node run in a single task, so conflicting values are resolved as last-one-wins, with a warning."""
+    nodes = _model_and_test_nodes(model_kwargs={}, test_kwargs={"retries": 1}, second_test_kwargs={"retries": 0})
+    dag = _render_after_each("test-conflicting-test-node-kwargs", nodes)
+    assert dag.task_dict["my_model.test"].retries == 0
+    assert "declare conflicting values for the operator_kwarg <retries>" in caplog.text
+
+
+def test_detached_test_node_operator_kwargs_are_not_applied_to_the_parent_test_task():
+    """Detached tests run in their own task, so their kwargs do not leak into their parents' test tasks."""
+    parent = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/my_model.sql"),
+        config={"materialized": "table"},
+        has_test=True,
+    )
+    detached_test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.my_detached_test",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[parent.unique_id, "model.other"],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/schema.yml"),
+        config={"meta": {"cosmos": {"operator_kwargs": {"retries": 0}}}},
+    )
+    nodes = {parent.unique_id: parent, detached_test.unique_id: detached_test}
+    assert calculate_test_operator_kwargs(nodes, detached_nodes={detached_test.unique_id: detached_test}) == {}
+
+
+def test_test_node_operator_kwargs_do_not_apply_to_after_all_test_task():
+    """The TestBehavior.AFTER_ALL task is not associated with any node, so it keeps the DAG-level arguments."""
+    nodes = _model_and_test_nodes(model_kwargs={"retries": 2}, test_kwargs={"retries": 0})
+    with DAG("test-test-node-kwargs-after-all", start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn", profile_args={"schema": "public"}
+                    ),
+                ),
+                "retries": 3,
+            },
+            render_config=RenderConfig(test_behavior=TestBehavior.AFTER_ALL),
+            dbt_project_name="astro_shop",
+        )
+    assert dag.task_dict["my_model_run"].retries == 2
+    assert dag.task_dict["astro_shop_test"].retries == 3

@@ -26,6 +26,7 @@ Bug Fixes
 * Avoid deprecated ``airflow.exceptions.AirflowSkipException`` import on Airflow 3.1+ by @pankajastro in #2796
 * Reject output-only template fields on the async ``operator_args`` path by @pankajastro in #2868
 * Credit all parent models in ``ExecutionMode.WATCHER`` multi-parent test aggregation, so test sensors no longer hang by @hellowithchicken in #2901
+* Honour dbt test ``operator_kwargs`` under ``TestBehavior.AFTER_EACH`` by @tatiana in #2936
 
 Docs
 
@@ -38,6 +39,7 @@ Docs
 * Improve privacy policy by @tatiana in #2910
 * Remove duplicated sections in ``contributing.rst`` by @tatiana in #2859
 * Fix incorrect PR/issue references in the CHANGELOG by @tatiana in #2864
+* Document retrying models but not tests by @pankajastro in #2835
 
 Others
 

@@ -176,6 +176,22 @@ def forward_render_exclude_to_test(task_args: dict[str, Any], render_config: Ren
     task_args["exclude"] = _convert_list_to_str(merged)
 
 
+def _honor_on_warning_callback(task_args: dict[str, Any], on_warning_callback: Callable[..., Any] | None) -> None:
+    """
+    Resolve the effective ``on_warning_callback`` for a node command that supports it, in-place.
+
+    The top-level ``DbtDag`` / ``DbtTaskGroup`` / ``DbtToAirflowConverter`` argument takes precedence. When it is
+    unset (``None``), a callback the user passed through ``operator_args`` -- which reaches us already inside
+    ``task_args`` -- is preserved instead of being silently dropped.
+
+    The key is always set, so the operator is handed an explicit ``None`` when neither source supplies a callback.
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    if on_warning_callback is None:
+        on_warning_callback = task_args.get("on_warning_callback")
+    task_args["on_warning_callback"] = on_warning_callback
+
+
 def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_override: dict[str, Any]) -> None:
     """
     Changes in-place the profile configuration if it needs to be overridden.
@@ -221,7 +237,7 @@ def create_test_task_metadata(
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     task_args = dict(task_args)
-    task_args["on_warning_callback"] = on_warning_callback
+    _honor_on_warning_callback(task_args, on_warning_callback)
     # Test operators (DbtTest*) do not emit DatasetAlias
     task_args["emit_datasets"] = False
     extra_context = {}
@@ -457,7 +473,7 @@ def create_task_metadata(  # noqa: C901
                 args[models_select_key] = f"{node.resource_name}"
             if test_indirect_selection != TestIndirectSelection.EAGER:
                 args["indirect_selection"] = test_indirect_selection.value
-            args["on_warning_callback"] = on_warning_callback
+            _honor_on_warning_callback(args, on_warning_callback)
             # Under BUILD, tests run inline with ``dbt build`` (there is no separate per-model test task),
             # so forward the render-level exclude here too — otherwise an exclusion such as
             # exclude=["resource_type:unit_test"] would not be honored for BUILD. See #1763.
@@ -475,7 +491,7 @@ def create_task_metadata(  # noqa: C901
             )
         elif node.resource_type == DbtResourceType.SOURCE:
             args["select"] = f"source:{node.resource_name}"
-            args["on_warning_callback"] = on_warning_callback
+            _honor_on_warning_callback(args, on_warning_callback)
 
             if (render_config.source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 render_config.source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS

@@ -20,6 +20,7 @@ from cosmos.constants import (
     InvocationMode,
     LoadMode,
     SeedRenderingBehavior,
+    SourceRenderingBehavior,
     TestBehavior,
 )
 from cosmos.converter import (
@@ -30,7 +31,12 @@ from cosmos.converter import (
 )
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
-from cosmos.operators.local import DbtRunLocalOperator
+from cosmos.operators.local import (
+    DbtBuildLocalOperator,
+    DbtRunLocalOperator,
+    DbtSourceLocalOperator,
+    DbtTestLocalOperator,
+)
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
 from cosmos.telemetry import _decompress_telemetry_metadata
 
@@ -1777,3 +1783,43 @@ def test_dbt_dag_renders_ephemeral_model_as_dbt_run_when_disabled():
     ephemeral_task = dag.tasks_map["model.altered_jaffle_shop.ephemeral_customers"]
     assert isinstance(ephemeral_task, DbtRunLocalOperator)
     assert not isinstance(ephemeral_task, EmptyOperator)
+
+
+@pytest.mark.parametrize(
+    "test_behavior,expected_operator_classes",
+    [
+        pytest.param(TestBehavior.AFTER_EACH, (DbtSourceLocalOperator, DbtTestLocalOperator), id="after-each"),
+        pytest.param(TestBehavior.BUILD, (DbtBuildLocalOperator, DbtSourceLocalOperator), id="build"),
+        pytest.param(TestBehavior.AFTER_ALL, (DbtSourceLocalOperator, DbtTestLocalOperator), id="after-all"),
+    ],
+)
+def test_dbt_dag_honors_on_warning_callback_from_operator_args(test_behavior, expected_operator_classes):
+    """``on_warning_callback`` is a first-class DbtDag argument, but ``operator_args`` is also forwarded to the
+    operators, so passing it there is a reasonable mental model. Every rendered operator that supports the
+    callback (dbt test, dbt source freshness, dbt build) must receive it.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    on_warning_callback = MagicMock()
+    dag = DbtDag(
+        dag_id=f"on_warning_callback_{test_behavior.value}",
+        start_date=datetime(2024, 4, 16),
+        project_config=ProjectConfig(
+            dbt_project_path=ALTERED_JAFFLE_SHOP_DBT_PROJECT,
+            manifest_path=ALTERED_JAFFLE_SHOP_DBT_PROJECT / "target" / "manifest.json",
+        ),
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.LOCAL),
+        render_config=RenderConfig(
+            load_method=LoadMode.DBT_MANIFEST,
+            test_behavior=test_behavior,
+            source_rendering_behavior=SourceRenderingBehavior.ALL,
+            emit_datasets=False,
+        ),
+        profile_config=sample_profile_config,
+        operator_args={"on_warning_callback": on_warning_callback},
+    )
+    tasks = [task for task in dag.tasks if isinstance(task, expected_operator_classes)]
+    # Every operator type that supports the callback is actually present in the rendered DAG.
+    assert {type(task) for task in tasks} == set(expected_operator_classes)
+    for task in tasks:
+        assert task.on_warning_callback is on_warning_callback, task.task_id

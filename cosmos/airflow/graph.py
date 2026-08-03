@@ -202,6 +202,7 @@ def create_test_task_metadata(
     render_config: RenderConfig | None = None,
     detached_from_parent: dict[str, list[DbtNode]] | None = None,
     enable_owner_inheritance: bool | None = None,
+    test_operator_kwargs: dict[str, Any] | None = None,
 ) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
@@ -215,6 +216,8 @@ def create_test_task_metadata(
     :param render_config: The RenderConfig for the dbt project. Its ``exclude`` is forwarded to the test task (for
         every test behavior); its ``select`` / ``selector`` are applied only to the TestBehavior.AFTER_ALL task.
     :param detached_from_parent: Dictionary that maps node ids and their children tests that should be run detached
+    :param test_operator_kwargs: ``operator_kwargs`` declared by the dbt test nodes this task runs. They take
+        precedence over the arguments inherited from ``node``, the resource being tested.
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     task_args = dict(task_args)
@@ -275,7 +278,7 @@ def create_test_task_metadata(
         id=test_task_name,
         owner=task_owner,
         operator_class=operator_class,
-        arguments={**task_args, **args_to_override},
+        arguments={**task_args, **args_to_override, **(test_operator_kwargs or {})},
         extra_context=extra_context,
     )
 
@@ -631,6 +634,7 @@ def generate_task_or_group(
     on_warning_callback: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, list[DbtNode]] | None = None,
     filtered_nodes: dict[str, DbtNode] | None = None,
+    test_operator_kwargs: dict[str, dict[str, Any]] | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
@@ -711,6 +715,7 @@ def generate_task_or_group(
                     on_warning_callback=on_warning_callback,
                     detached_from_parent=detached_from_parent,
                     enable_owner_inheritance=render_config.enable_owner_inheritance,
+                    test_operator_kwargs=(test_operator_kwargs or {}).get(node.unique_id),
                 )
                 test_task_generate_or_convert_task_args = {
                     **generate_or_convert_task_args,
@@ -948,6 +953,38 @@ def identify_detached_nodes(
                     detached_from_parent[parent_id].append(node)
 
 
+def calculate_test_operator_kwargs(
+    nodes: dict[str, DbtNode], detached_nodes: dict[str, DbtNode]
+) -> dict[str, dict[str, Any]]:
+    """
+    Map each tested node ID to the ``operator_kwargs`` declared by the test nodes that run alongside it under
+    TestBehavior.AFTER_EACH. Detached tests are skipped: they run in their own task, using their own kwargs.
+
+    Since a node's tests all run in a single Airflow task, when they declare the same kwarg with different values the
+    last one wins.
+    """
+    test_operator_kwargs: dict[str, dict[str, Any]] = {}
+    for node_id, node in nodes.items():
+        if node.resource_type != DbtResourceType.TEST or node_id in detached_nodes:
+            continue
+        node_kwargs = node.operator_kwargs_to_override
+        if not node_kwargs:
+            continue
+        for parent_id in node.depends_on:
+            parent_kwargs = test_operator_kwargs.setdefault(parent_id, {})
+            for kwarg, value in node_kwargs.items():
+                if kwarg in parent_kwargs and parent_kwargs[kwarg] != value:
+                    logger.warning(
+                        "Tests of <%s> declare conflicting values for the operator_kwarg <%s>. Using <%s>, from <%s>.",
+                        parent_id,
+                        kwarg,
+                        value,
+                        node_id,
+                    )
+                parent_kwargs[kwarg] = value
+    return test_operator_kwargs
+
+
 def create_task_groups_based_on_folder(
     dag: DAG,
     node: DbtNode,
@@ -1169,6 +1206,14 @@ def build_airflow_graph(
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
+    # Operator kwargs declared by the test nodes, so a TestBehavior.AFTER_EACH test task can override the arguments
+    # it inherits from the resource being tested
+    test_operator_kwargs = (
+        calculate_test_operator_kwargs(nodes, detached_nodes)
+        if render_config.test_behavior == TestBehavior.AFTER_EACH
+        else {}
+    )
+
     virtualenv_dir = None
 
     if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
@@ -1211,6 +1256,7 @@ def build_airflow_graph(
             # Calculated in this method:
             "detached_from_parent": detached_from_parent,
             "node_converters": render_config.node_converters or {},
+            "test_operator_kwargs": test_operator_kwargs,
         }
 
         task_or_group = generate_task_or_group(**task_or_group_args, filtered_nodes=nodes)

@@ -2933,6 +2933,54 @@ def test_create_task_metadata_seed_rendering_always_no_flag():
     assert "should_run_if_seed_changed" not in metadata.extra_context
 
 
+def _model_with_node_retries(retries):
+    return DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.proj.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("models/my_model.sql"),
+        tags=[],
+        config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"retries": retries}}}},
+        has_test=True,
+    )
+
+
+def test_retries_after_all_separates_model_and_test():
+    """Per-node ``retries`` reaches the model task, while the AFTER_ALL test task (node=None) keeps the DAG default.
+
+    This is the supported way to retry model runs but not tests (issue #2130).
+    """
+    node = _model_with_node_retries(2)
+    model_meta = create_task_metadata(
+        node, execution_mode=ExecutionMode.LOCAL, args={"retries": 0}, dbt_dag_task_group_identifier="dag"
+    )
+    test_meta = create_test_task_metadata(
+        "proj_test",
+        ExecutionMode.LOCAL,
+        TestIndirectSelection.EAGER,
+        task_args={"retries": 0},
+        render_config=RenderConfig(test_behavior=TestBehavior.AFTER_ALL, select=[], exclude=[]),
+    )
+    assert model_meta.arguments["retries"] == 2
+    assert test_meta.arguments["retries"] == 0
+
+
+def test_retries_after_each_test_inherits_model_operator_kwargs():
+    """AFTER_EACH builds the test task from the model node, so per-node ``retries`` also applies to the test,
+    unless the test itself declares an override (see ``test_test_node_operator_kwargs_override_the_ones_inherited_from_the_model``).
+    """
+    node = _model_with_node_retries(2)
+    test_meta = create_test_task_metadata(
+        "test",
+        ExecutionMode.LOCAL,
+        TestIndirectSelection.EAGER,
+        task_args={"retries": 0},
+        node=node,
+    )
+    assert test_meta.arguments["retries"] == 2
+
+
 def _model_and_test_nodes(model_kwargs, test_kwargs, second_test_kwargs=None):
     model = DbtNode(
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.my_model",

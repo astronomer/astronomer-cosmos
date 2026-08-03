@@ -49,6 +49,41 @@ Finally, an example DAG and how it is rendered in the `Apache Airflow® <https:/
 
 .. image:: ../../_static/test_behavior_build.png
 
+Retrying models but not tests
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A common requirement is to retry failing model runs while never retrying tests, for example when tests are slow and
+retrying them would delay or block subsequent DAG runs.
+
+With the default ``TestBehavior.AFTER_EACH``, this is done by setting ``retries`` on the models and a different
+``retries`` on their dbt tests: see :ref:`operator-args-test-nodes`.
+
+If you use ``TestBehavior.AFTER_ALL`` instead, tests run as a single task at the end of the DAG that is independent
+of any model node, so it keeps the DAG-level ``retries`` default while per-node ``retries`` apply only to the model
+(run) tasks. Set ``retries=0`` as the DAG-wide default and override ``retries`` for the models in your
+``dbt_project.yml``:
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+    from cosmos.constants import TestBehavior
+
+    DbtDag(
+        # ...
+        operator_args={"retries": 0},
+        render_config=RenderConfig(test_behavior=TestBehavior.AFTER_ALL),
+    )
+
+.. code-block:: yaml
+
+    # dbt_project.yml — retry every model run twice, leaving the final test task at retries=0
+    models:
+      my_dbt_project:
+        +meta:
+          cosmos:
+            operator_kwargs:
+              retries: 2
+
 Warning behavior
 ~~~~~~~~~~~~~~~~
 

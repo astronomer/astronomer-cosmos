@@ -28,7 +28,8 @@ except ImportError:
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
-from cosmos.constants import PRODUCER_WATCHER_TASK_ID
+from cosmos.constants import _PRODUCER_CMD_FLAGS_XCOM_KEY, PRODUCER_WATCHER_TASK_ID
+from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
     _delete_xcom_backup_variable,
@@ -635,6 +636,8 @@ def execute_watcher_producer(operator: Any, context: Context, parent_execute: Ca
     # manager's callback_extra_kwargs, so the log-parsing callback sees the live context
     # even if the pod manager (a cached_property) was created before this runs.
     operator._context_holder[CONTEXT_KEY] = context
+
+    safe_xcom_push(task_instance=task_instance, key=_PRODUCER_CMD_FLAGS_XCOM_KEY, value=operator.add_cmd_flags())
 
     # On failure parent_execute() raises and the on-failure callback flushes the backup.
     return_value = parent_execute(context, **kwargs)

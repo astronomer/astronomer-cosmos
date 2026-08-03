@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from cosmos.constants import _PRODUCER_CMD_FLAGS_XCOM_KEY
 from cosmos.operators._k8s_common import (
     CONTEXT_HOLDER_KEY,
     CONTEXT_KEY,
@@ -529,6 +530,23 @@ def test_execute_watcher_producer_sets_context_before_parent_execute(mock_init, 
 
     assert captured["context"] is context
     operator._upstream_failure_skipped_ids.clear.assert_called_once_with()
+
+
+@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._init_xcom_backup")
+def test_execute_watcher_producer_publishes_own_cmd_flags_to_xcom(mock_init, mock_delete):
+    """The producer must publish its own rendered ``add_cmd_flags()`` so consumer fallback runs can
+    reuse it instead of re-deriving flags from a possibly different consumer operator_args.
+    """
+    operator = MagicMock()
+    operator.add_cmd_flags.return_value = ["--full-refresh"]
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti, "run_id": "test_run"}
+
+    execute_watcher_producer(operator, context, MagicMock(return_value="result"))
+
+    ti.xcom_push.assert_any_call(key=_PRODUCER_CMD_FLAGS_XCOM_KEY, value=["--full-refresh"])
 
 
 # ---------------------------------------------------------------------------

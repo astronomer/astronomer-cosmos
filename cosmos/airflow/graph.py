@@ -176,6 +176,22 @@ def forward_render_exclude_to_test(task_args: dict[str, Any], render_config: Ren
     task_args["exclude"] = _convert_list_to_str(merged)
 
 
+def _honor_on_warning_callback(task_args: dict[str, Any], on_warning_callback: Callable[..., Any] | None) -> None:
+    """
+    Resolve the effective ``on_warning_callback`` for a node command that supports it, in-place.
+
+    The top-level ``DbtDag`` / ``DbtTaskGroup`` / ``DbtToAirflowConverter`` argument takes precedence. When it is
+    unset (``None``), a callback the user passed through ``operator_args`` -- which reaches us already inside
+    ``task_args`` -- is preserved instead of being silently dropped.
+
+    The key is always set, so the operator is handed an explicit ``None`` when neither source supplies a callback.
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    if on_warning_callback is None:
+        on_warning_callback = task_args.get("on_warning_callback")
+    task_args["on_warning_callback"] = on_warning_callback
+
+
 def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_override: dict[str, Any]) -> None:
     """
     Changes in-place the profile configuration if it needs to be overridden.
@@ -192,6 +208,28 @@ def _override_profile_if_needed(task_kwargs: dict[str, Any], profile_kwargs_over
         task_kwargs["profile_config"] = modified_profile_config
 
 
+_WATCHER_TO_FALLBACK_EXECUTION_MODE = {
+    ExecutionMode.WATCHER: ExecutionMode.LOCAL,
+    ExecutionMode.WATCHER_KUBERNETES: ExecutionMode.KUBERNETES,
+    ExecutionMode.WATCHER_GCP_GKE: ExecutionMode.GCP_GKE,
+}
+
+
+def _calculate_test_operator_class(execution_mode: ExecutionMode, render_config: RenderConfig | None) -> str:
+    """Resolve the operator class path for a dbt test task.
+
+    For an ``AFTER_ALL`` test running under a ``WATCHER*`` execution mode, the test itself runs in the
+    corresponding concrete mode (LOCAL / KUBERNETES / GCP_GKE); otherwise it uses ``execution_mode`` directly.
+    """
+    if (
+        render_config is not None
+        and render_config.test_behavior == TestBehavior.AFTER_ALL
+        and execution_mode in _WATCHER_TO_FALLBACK_EXECUTION_MODE
+    ):
+        execution_mode = _WATCHER_TO_FALLBACK_EXECUTION_MODE[execution_mode]
+    return calculate_operator_class(execution_mode=execution_mode, dbt_class="DbtTest")
+
+
 def create_test_task_metadata(
     test_task_name: str,
     execution_mode: ExecutionMode,
@@ -202,6 +240,7 @@ def create_test_task_metadata(
     render_config: RenderConfig | None = None,
     detached_from_parent: dict[str, list[DbtNode]] | None = None,
     enable_owner_inheritance: bool | None = None,
+    test_operator_kwargs: dict[str, Any] | None = None,
 ) -> TaskMetadata:
     """
     Create the metadata that will be used to instantiate the Airflow Task that will be used to run the Dbt test node.
@@ -215,10 +254,12 @@ def create_test_task_metadata(
     :param render_config: The RenderConfig for the dbt project. Its ``exclude`` is forwarded to the test task (for
         every test behavior); its ``select`` / ``selector`` are applied only to the TestBehavior.AFTER_ALL task.
     :param detached_from_parent: Dictionary that maps node ids and their children tests that should be run detached
+    :param test_operator_kwargs: ``operator_kwargs`` declared by the dbt test nodes this task runs. They take
+        precedence over the arguments inherited from ``node``, the resource being tested.
     :returns: The metadata necessary to instantiate the source dbt node as an Airflow task.
     """
     task_args = dict(task_args)
-    task_args["on_warning_callback"] = on_warning_callback
+    _honor_on_warning_callback(task_args, on_warning_callback)
     # Test operators (DbtTest*) do not emit DatasetAlias
     task_args["emit_datasets"] = False
     extra_context = {}
@@ -255,27 +296,13 @@ def create_test_task_metadata(
     if node:
         args_to_override = node.operator_kwargs_to_override
 
-    dbt_class = "DbtTest"
-    watcher_to_test_execution_mode = {
-        ExecutionMode.WATCHER: ExecutionMode.LOCAL,
-        ExecutionMode.WATCHER_KUBERNETES: ExecutionMode.KUBERNETES,
-        ExecutionMode.WATCHER_GCP_GKE: ExecutionMode.GCP_GKE,
-    }
-    if (
-        render_config is not None
-        and render_config.test_behavior == TestBehavior.AFTER_ALL
-        and execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES, ExecutionMode.WATCHER_GCP_GKE)
-    ):
-        test_execution_mode = watcher_to_test_execution_mode[execution_mode]
-        operator_class = calculate_operator_class(execution_mode=test_execution_mode, dbt_class=dbt_class)
-    else:
-        operator_class = calculate_operator_class(execution_mode=execution_mode, dbt_class=dbt_class)
+    operator_class = _calculate_test_operator_class(execution_mode, render_config)
 
     return TaskMetadata(
         id=test_task_name,
         owner=task_owner,
         operator_class=operator_class,
-        arguments={**task_args, **args_to_override},
+        arguments={**task_args, **args_to_override, **(test_operator_kwargs or {})},
         extra_context=extra_context,
     )
 
@@ -458,7 +485,7 @@ def create_task_metadata(  # noqa: C901
                 args[models_select_key] = f"{node.resource_name}"
             if test_indirect_selection != TestIndirectSelection.EAGER:
                 args["indirect_selection"] = test_indirect_selection.value
-            args["on_warning_callback"] = on_warning_callback
+            _honor_on_warning_callback(args, on_warning_callback)
             # Under BUILD, tests run inline with ``dbt build`` (there is no separate per-model test task),
             # so forward the render-level exclude here too — otherwise an exclusion such as
             # exclude=["resource_type:unit_test"] would not be honored for BUILD. See #1763.
@@ -476,7 +503,7 @@ def create_task_metadata(  # noqa: C901
             )
         elif node.resource_type == DbtResourceType.SOURCE:
             args["select"] = f"source:{node.resource_name}"
-            args["on_warning_callback"] = on_warning_callback
+            _honor_on_warning_callback(args, on_warning_callback)
 
             if (render_config.source_rendering_behavior == SourceRenderingBehavior.NONE) or (
                 render_config.source_rendering_behavior == SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS
@@ -635,6 +662,7 @@ def generate_task_or_group(
     on_warning_callback: Callable[..., Any] | None = None,
     detached_from_parent: dict[str, list[DbtNode]] | None = None,
     filtered_nodes: dict[str, DbtNode] | None = None,
+    test_operator_kwargs: dict[str, dict[str, Any]] | None = None,
     **kwargs: Any,
 ) -> BaseOperator | TaskGroup | None:
     task_or_group: BaseOperator | TaskGroup | None = None
@@ -715,6 +743,7 @@ def generate_task_or_group(
                     on_warning_callback=on_warning_callback,
                     detached_from_parent=detached_from_parent,
                     enable_owner_inheritance=render_config.enable_owner_inheritance,
+                    test_operator_kwargs=(test_operator_kwargs or {}).get(node.unique_id),
                 )
                 test_task_generate_or_convert_task_args = {
                     **generate_or_convert_task_args,
@@ -952,6 +981,38 @@ def identify_detached_nodes(
                     detached_from_parent[parent_id].append(node)
 
 
+def calculate_test_operator_kwargs(
+    nodes: dict[str, DbtNode], detached_nodes: dict[str, DbtNode]
+) -> dict[str, dict[str, Any]]:
+    """
+    Map each tested node ID to the ``operator_kwargs`` declared by the test nodes that run alongside it under
+    TestBehavior.AFTER_EACH. Detached tests are skipped: they run in their own task, using their own kwargs.
+
+    Since a node's tests all run in a single Airflow task, when they declare the same kwarg with different values the
+    last one wins.
+    """
+    test_operator_kwargs: dict[str, dict[str, Any]] = {}
+    for node_id, node in nodes.items():
+        if node.resource_type != DbtResourceType.TEST or node_id in detached_nodes:
+            continue
+        node_kwargs = node.operator_kwargs_to_override
+        if not node_kwargs:
+            continue
+        for parent_id in node.depends_on:
+            parent_kwargs = test_operator_kwargs.setdefault(parent_id, {})
+            for kwarg, value in node_kwargs.items():
+                if kwarg in parent_kwargs and parent_kwargs[kwarg] != value:
+                    logger.warning(
+                        "Tests of <%s> declare conflicting values for the operator_kwarg <%s>. Using <%s>, from <%s>.",
+                        parent_id,
+                        kwarg,
+                        value,
+                        node_id,
+                    )
+                parent_kwargs[kwarg] = value
+    return test_operator_kwargs
+
+
 def create_task_groups_based_on_folder(
     dag: DAG,
     node: DbtNode,
@@ -1173,6 +1234,14 @@ def build_airflow_graph(
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
+    # Operator kwargs declared by the test nodes, so a TestBehavior.AFTER_EACH test task can override the arguments
+    # it inherits from the resource being tested
+    test_operator_kwargs = (
+        calculate_test_operator_kwargs(nodes, detached_nodes)
+        if render_config.test_behavior == TestBehavior.AFTER_EACH
+        else {}
+    )
+
     virtualenv_dir = None
 
     if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
@@ -1215,6 +1284,7 @@ def build_airflow_graph(
             # Calculated in this method:
             "detached_from_parent": detached_from_parent,
             "node_converters": render_config.node_converters or {},
+            "test_operator_kwargs": test_operator_kwargs,
         }
 
         task_or_group = generate_task_or_group(**task_or_group_args, filtered_nodes=nodes)

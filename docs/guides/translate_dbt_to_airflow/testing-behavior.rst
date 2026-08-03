@@ -49,6 +49,41 @@ Finally, an example DAG and how it is rendered in the `Apache Airflow® <https:/
 
 .. image:: ../../_static/test_behavior_build.png
 
+Retrying models but not tests
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A common requirement is to retry failing model runs while never retrying tests, for example when tests are slow and
+retrying them would delay or block subsequent DAG runs.
+
+With the default ``TestBehavior.AFTER_EACH``, this is done by setting ``retries`` on the models and a different
+``retries`` on their dbt tests: see :ref:`operator-args-test-nodes`.
+
+If you use ``TestBehavior.AFTER_ALL`` instead, tests run as a single task at the end of the DAG that is independent
+of any model node, so it keeps the DAG-level ``retries`` default while per-node ``retries`` apply only to the model
+(run) tasks. Set ``retries=0`` as the DAG-wide default and override ``retries`` for the models in your
+``dbt_project.yml``:
+
+.. code-block:: python
+
+    from cosmos import DbtDag, RenderConfig
+    from cosmos.constants import TestBehavior
+
+    DbtDag(
+        # ...
+        operator_args={"retries": 0},
+        render_config=RenderConfig(test_behavior=TestBehavior.AFTER_ALL),
+    )
+
+.. code-block:: yaml
+
+    # dbt_project.yml — retry every model run twice, leaving the final test task at retries=0
+    models:
+      my_dbt_project:
+        +meta:
+          cosmos:
+            operator_kwargs:
+              retries: 2
+
 Warning behavior
 ~~~~~~~~~~~~~~~~
 
@@ -111,6 +146,14 @@ When at least one WARN message is present, the function passed to ``on_warning_c
     If warnings that are not associated with tests occur (e.g. freshness warnings), they will still trigger the
     ``on_warning_callback`` method above. However, these warnings will not be included in the ``test_names`` and
     ``test_results`` context variables, which are specific to test-related warnings.
+
+.. note::
+
+    ``on_warning_callback`` can be given either as a top-level ``DbtDag`` / ``DbtTaskGroup`` argument, as in the
+    example above, or inside ``operator_args``, since it is also a valid argument of the underlying ``dbt test``,
+    ``dbt build`` and ``dbt source freshness`` operators. When both are given, the top-level argument wins.
+    In Cosmos 1.15.0 and earlier, a callback passed only through ``operator_args`` was silently dropped, so the
+    top-level argument remains the recommended form.
 
 
 Tests with multiple parents

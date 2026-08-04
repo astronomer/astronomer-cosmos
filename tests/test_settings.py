@@ -121,8 +121,7 @@ def test_project_hash_excluded_dirs_env_var_is_additive():
     clear=True,
 )
 def test_project_hash_excluded_dirs_warns_on_dbt_authored_content_dir():
-    """Excluding a dbt-authored content directory (e.g. models) silently breaks change detection,
-    so Cosmos warns -- but still applies the setting, since this might be intentional."""
+    """Cosmos warns but still applies the setting when it includes a dbt-authored content dir."""
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         reload(settings)

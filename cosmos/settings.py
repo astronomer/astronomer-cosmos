@@ -24,9 +24,7 @@ DEFAULT_CACHE_DIR = Path(tempfile.gettempdir(), DEFAULT_COSMOS_CACHE_DIR_NAME)
 cache_dir: Path = Path(conf.get("cosmos", "cache_dir", fallback=DEFAULT_CACHE_DIR) or DEFAULT_CACHE_DIR)
 enable_cache: bool = conf.getboolean("cosmos", "enable_cache", fallback=True)
 enable_dag_versioning = conf.getboolean("cosmos", "enable_dag_versioning", fallback=True)
-# Directory names pruned from the dbt project content hash walk (cosmos/versioning.py). Additive on top
-# of the dbt/VCS-generated folders in DEFAULT_PROJECT_HASH_EXCLUDED_DIRS, which are always pruned so that
-# setting this can't accidentally stop excluding .git/target/dbt_packages/logs. See #2857.
+# Additive on top of DEFAULT_PROJECT_HASH_EXCLUDED_DIRS, which are always pruned. See #2857.
 _project_hash_excluded_dirs_conf = conf.get("cosmos", "project_hash_excluded_dirs", fallback="")
 _project_hash_excluded_dirs_extra = frozenset(
     dirname.strip() for dirname in _project_hash_excluded_dirs_conf.split(",") if dirname.strip()

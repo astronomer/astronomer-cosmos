@@ -54,9 +54,7 @@ def _create_folder_version_hash(dir_path: Path, excluded_dirs: Collection[str] |
     for filepath in sorted(filepaths):
         # Include the path so that renaming a file also changes the hash; dbt derives node
         # names from file names, so a content-preserving rename still changes the project.
-        # A null-byte separator prevents a path/content boundary ambiguity (e.g. path "a" +
-        # content "bc" would otherwise hash the same as path "ab" + content "c"), and .as_posix()
-        # keeps the hash consistent across platforms regardless of the OS path separator.
+        # Null-byte separator avoids a path/content boundary ambiguity; as_posix() is OS-independent.
         hasher.update(Path(filepath).relative_to(dir_path).as_posix().encode())
         hasher.update(b"\0")
         try:

@@ -444,10 +444,7 @@ class DbtToAirflowConverter:
 
             manifest_path = self.dbt_graph.project.manifest_path
             if self.dbt_graph.load_method == LoadMode.DBT_MANIFEST and manifest_path is not None:
-                # ``target/`` (where manifest_path conventionally lives) is pruned from the folder walk
-                # above, so a manifest regenerated with no other file changes wouldn't otherwise change
-                # this hash. Fold in a cheap metadata checksum of the manifest itself -- not a full
-                # content read -- so DAG versioning still reacts to manifest-only changes.
+                # target/ is pruned from the folder walk above, so fold in the manifest's own checksum.
                 manifest_checksum = manifest_path.checksum()
                 dbt_project_hash = hashlib.md5(f"{dbt_project_hash}{manifest_checksum}".encode()).hexdigest()
 

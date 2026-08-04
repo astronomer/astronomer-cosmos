@@ -38,9 +38,7 @@ DEFAULT_PROJECT_HASH_EXCLUDED_DIRS = frozenset(
     {".git", DBT_TARGET_DIR_NAME, DBT_DEFAULT_PACKAGES_FOLDER, DBT_LOG_DIR_NAME}
 )
 
-# Conventional dbt resource-content directory names. cosmos.settings warns (but does not block) if a
-# user adds any of these to project_hash_excluded_dirs, since excluding them would silently stop DAG
-# versioning / the partial-parse and dbt-ls caches from reacting to real project changes.
+# Conventional dbt resource-content directory names; see cosmos.settings for how these are used.
 DBT_AUTHORED_CONTENT_DIRS = frozenset({"models", "seeds", "snapshots", "analyses", "macros", "tests"})
 
 DEFAULT_OPENLINEAGE_NAMESPACE = "cosmos"

@@ -170,8 +170,7 @@ def test__create_folder_version_hash_reads_large_files_in_chunks(tmp_path):
 
 
 def test__create_folder_version_hash_no_path_content_boundary_ambiguity(tmp_path):
-    """A path/content split that would collide without a separator (path "a" + content "bc" vs.
-    path "ab" + content "c") must hash differently, since the two describe different projects."""
+    """path='a',content='bc' and path='ab',content='c' must hash differently despite equal concatenation."""
     project_a = tmp_path / "project_a"
     _write_file(project_a, "a", b"bc")
 

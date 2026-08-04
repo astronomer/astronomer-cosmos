@@ -120,7 +120,7 @@ def test_project_hash_excluded_dirs_env_var_is_additive():
     {"AIRFLOW__COSMOS__PROJECT_HASH_EXCLUDED_DIRS": "models, scratch"},
     clear=True,
 )
-def test_project_hash_excluded_dirs_warns_on_dbt_authored_content_dir():
+def test_project_hash_excluded_dirs_warns_on_dbt_project_content_dir():
     """Cosmos warns but still applies the setting when it includes a dbt project content dir."""
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")

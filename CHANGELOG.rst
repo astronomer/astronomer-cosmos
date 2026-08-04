@@ -29,6 +29,8 @@ Bug Fixes
 * Honour dbt test ``operator_kwargs`` under ``TestBehavior.AFTER_EACH`` by @tatiana in #2936
 * Skip generated dirs when hashing the dbt project folder by @goingforstudying-ctrl in #2942
 * Address #2942 review feedback: manifest-mode hashing, additive excluded dirs, hash construction by @pankajastro in #2944
+* Honor ``on_warning_callback`` passed via ``operator_args`` by @tatiana in #2940
+* Fix watcher fallback silently dropping ``--full-refresh`` overrides by @pankajastro in #2917
 
 Docs
 

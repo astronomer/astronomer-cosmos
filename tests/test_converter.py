@@ -1,4 +1,4 @@
-import hashlib
+import json
 import logging
 import tempfile
 from contextlib import nullcontext as does_not_raise
@@ -1443,12 +1443,54 @@ def test_dag_versioning_skipped_when_setting_disabled(mock_load_dbt_graph, mock_
 
 
 def test_calculate_manifest_version_hash_is_content_derived(tmp_path):
-    """The hash reflects the manifest's bytes, not its path or metadata, and reads large files in chunks."""
-    manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_bytes(b"a")
-    manifest_path.write_bytes(b"a" * 3_000_000)  # larger than the read chunk size
+    """The hash reflects the manifest's nodes, not its path, and is stable across key ordering."""
+    manifest_a = tmp_path / "a.json"
+    manifest_a.write_text(json.dumps({"metadata": {"dbt_version": "1.9.0"}, "nodes": {"model.a": {}}}))
 
-    assert _calculate_manifest_version_hash(manifest_path) == hashlib.md5(b"a" * 3_000_000).hexdigest()
+    manifest_b = tmp_path / "b.json"
+    manifest_b.write_text(json.dumps({"nodes": {"model.a": {}}, "metadata": {"dbt_version": "1.9.0"}}))
+
+    manifest_c = tmp_path / "c.json"
+    manifest_c.write_text(json.dumps({"metadata": {"dbt_version": "1.9.0"}, "nodes": {"model.b": {}}}))
+
+    assert _calculate_manifest_version_hash(manifest_a) == _calculate_manifest_version_hash(manifest_b)
+    assert _calculate_manifest_version_hash(manifest_a) != _calculate_manifest_version_hash(manifest_c)
+
+
+def test_calculate_manifest_version_hash_ignores_volatile_metadata(tmp_path):
+    """generated_at/invocation_id/invocation_started_at change on every dbt invocation even when
+    the project doesn't, so two otherwise-identical manifests must hash the same despite them."""
+    manifest_a = tmp_path / "a.json"
+    manifest_a.write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "dbt_version": "1.9.0",
+                    "generated_at": "2026-01-01T00:00:00Z",
+                    "invocation_id": "aaaa",
+                    "invocation_started_at": "2026-01-01T00:00:00Z",
+                },
+                "nodes": {"model.a": {}},
+            }
+        )
+    )
+
+    manifest_b = tmp_path / "b.json"
+    manifest_b.write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "dbt_version": "1.9.0",
+                    "generated_at": "2026-01-02T00:00:00Z",
+                    "invocation_id": "bbbb",
+                    "invocation_started_at": "2026-01-02T00:00:00Z",
+                },
+                "nodes": {"model.a": {}},
+            }
+        )
+    )
+
+    assert _calculate_manifest_version_hash(manifest_a) == _calculate_manifest_version_hash(manifest_b)
 
 
 @skipif_airflow_lt_3_dag_doc_hash
@@ -1478,14 +1520,14 @@ def test_dag_versioning_hash_folds_in_manifest_checksum_for_manifest_mode(
     hash_without_manifest = dag.doc_md
 
     manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_bytes(b"manifest_v1")
+    manifest_path.write_text(json.dumps({"nodes": {"model.a": {}}}))
     converter.dbt_graph.load_method = LoadMode.DBT_MANIFEST
     converter.dbt_graph.project.manifest_path = manifest_path
     dag.doc_md = None
     converter._add_dbt_project_hash_to_dag_docs(dag)
     hash_with_manifest_v1 = dag.doc_md
 
-    manifest_path.write_bytes(b"manifest_v2")
+    manifest_path.write_text(json.dumps({"nodes": {"model.a": {}, "model.b": {}}}))
     dag.doc_md = None
     converter._add_dbt_project_hash_to_dag_docs(dag)
     hash_with_manifest_v2 = dag.doc_md

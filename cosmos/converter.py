@@ -6,6 +6,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import inspect
+import json
 import os
 import platform
 import time
@@ -61,20 +62,26 @@ from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
 
-_MANIFEST_HASH_READ_CHUNK_SIZE = 1024 * 1024
+# dbt stamps these into every manifest's `metadata` on every invocation, even when nothing else
+# in the project changed, so they must be dropped before hashing or the hash would too.
+_VOLATILE_MANIFEST_METADATA_KEYS = ("generated_at", "invocation_id", "invocation_started_at")
 
 
 def _calculate_manifest_version_hash(manifest_path: Any) -> str:
-    """Content checksum of a dbt manifest file, streamed in chunks.
+    """Content checksum of a dbt manifest file, ignoring metadata fields that change on every
+    dbt invocation even when the project itself hasn't (``generated_at``, ``invocation_id``, ...).
 
     A separate, named call site (mirroring ``_create_folder_version_hash``) rather than inlined
     in the caller, so it can be overridden independently of the folder hash.
     """
-    hasher = hashlib.md5()
     with manifest_path.open("rb") as fp:
-        while chunk := fp.read(_MANIFEST_HASH_READ_CHUNK_SIZE):
-            hasher.update(chunk)
-    return hasher.hexdigest()
+        manifest = json.load(fp)
+    metadata = manifest.get("metadata")
+    if isinstance(metadata, dict):
+        for key in _VOLATILE_MANIFEST_METADATA_KEYS:
+            metadata.pop(key, None)
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.md5(canonical).hexdigest()
 
 
 def migrate_to_new_interface(

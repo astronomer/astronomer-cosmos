@@ -26,7 +26,7 @@ def _create_folder_version_hash(dir_path: Path, excluded_dirs: Collection[str] |
     which defaults to generated folders such as ``target/``, ``dbt_packages/``, ``logs/`` and ``.git/``.
     Pass an explicit collection (including an empty one) to override the setting.
 
-    This method output must be concise and it currently changes based on operating system.
+    This method output must be concise, and is consistent across operating systems.
     """
     # This approach is less efficient than using modified time
     # sum([path.stat().st_mtime for path in dir_path.glob("**/*")])

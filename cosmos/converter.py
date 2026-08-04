@@ -70,9 +70,6 @@ _VOLATILE_MANIFEST_METADATA_KEYS = ("generated_at", "invocation_id", "invocation
 def _calculate_manifest_version_hash(manifest_path: Any) -> str:
     """Content checksum of a dbt manifest file, ignoring metadata fields that change on every
     dbt invocation even when the project itself hasn't (``generated_at``, ``invocation_id``, ...).
-
-    A separate, named call site (mirroring ``_create_folder_version_hash``) rather than inlined
-    in the caller, so it can be overridden independently of the folder hash.
     """
     with manifest_path.open("rb") as fp:
         manifest = json.load(fp)
@@ -466,9 +463,7 @@ class DbtToAirflowConverter:
 
             manifest_path = self.dbt_graph.project.manifest_path
             if self.dbt_graph.load_method == LoadMode.DBT_MANIFEST and manifest_path is not None:
-                # target/ is pruned from the folder walk above, so fold in the manifest's own content
-                # checksum -- not manifest_path.checksum(), whose fsspec-default metadata (mtime/inode
-                # for local files, generation/updated for GCS) changes on a byte-identical re-sync.
+                # target/ is pruned from the folder walk above, so fold in the manifest's own checksum.
                 try:
                     manifest_checksum = _calculate_manifest_version_hash(manifest_path)
                     dbt_project_hash = hashlib.md5(f"{dbt_project_hash}\0{manifest_checksum}".encode()).hexdigest()

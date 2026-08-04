@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from collections.abc import Collection
 from pathlib import Path
+from typing import Any
 
 from cosmos import settings
 from cosmos.log import get_logger
@@ -14,8 +16,17 @@ logger = get_logger(__name__)
 # (e.g. a misplaced manifest.json) don't get loaded into memory whole
 _HASH_READ_CHUNK_SIZE = 1024 * 1024
 
+# dbt stamps these into every manifest's `metadata` on every invocation, even when nothing else
+# in the project changed, so they must be dropped before hashing or the hash would too.
+_VOLATILE_MANIFEST_METADATA_KEYS = ("generated_at", "invocation_id", "invocation_started_at")
 
-def _create_folder_version_hash(dir_path: Path, excluded_dirs: Collection[str] | None = None) -> str:
+
+def _create_folder_version_hash(
+    dir_path: Path,
+    excluded_dirs: Collection[str] | None = None,
+    manifest_path: Any | None = None,
+    **kwargs: Any,
+) -> str:
     """
     Given a directory, iterate through its content and create a hash that will change in case the
     contents of the directory change. The value should not change if the values of the directory do not change, even if
@@ -25,6 +36,13 @@ def _create_folder_version_hash(dir_path: Path, excluded_dirs: Collection[str] |
     tree. When ``excluded_dirs`` is None, the ``[cosmos] project_hash_excluded_dirs`` setting is used,
     which defaults to generated folders such as ``target/``, ``dbt_packages/``, ``logs/`` and ``.git/``.
     Pass an explicit collection (including an empty one) to override the setting.
+
+    ``manifest_path``, when given, folds the dbt manifest's own content checksum into the result --
+    needed under ``LoadMode.DBT_MANIFEST``, since the manifest conventionally lives under ``target/``
+    (excluded above) and may not even live under ``dir_path`` at all. Metadata fields that dbt stamps on
+    every invocation (``generated_at``, ``invocation_id``, ...) are ignored, so a manifest regenerated
+    from an unchanged project still hashes the same. A read/parse failure is caught and logged, falling
+    back to the folder hash alone. ``**kwargs`` absorbs future extensions without another signature bump.
 
     This method output must be concise and it currently changes based on operating system.
     """
@@ -66,4 +84,28 @@ def _create_folder_version_hash(dir_path: Path, excluded_dirs: Collection[str] |
         except FileNotFoundError:
             logger.warning("The dbt project folder contains a symbolic link to a non-existent file: %s", filepath)
 
-    return hasher.hexdigest()
+    folder_hash = hasher.hexdigest()
+
+    if manifest_path is None:
+        return folder_hash
+
+    try:
+        manifest_checksum = _manifest_content_checksum(manifest_path)
+    except Exception as e:
+        logger.warning("Failed to fold dbt manifest checksum into the project version hash: %s", e)
+        return folder_hash
+
+    return hashlib.md5(f"{folder_hash}\0{manifest_checksum}".encode()).hexdigest()
+
+
+def _manifest_content_checksum(manifest_path: Any) -> str:
+    """MD5 of a dbt manifest's content, ignoring metadata fields dbt stamps on every invocation
+    (``generated_at``, ``invocation_id``, ...) even when the project itself hasn't changed."""
+    with manifest_path.open("rb") as fp:
+        manifest = json.load(fp)
+    metadata = manifest.get("metadata")
+    if isinstance(metadata, dict):
+        for key in _VOLATILE_MANIFEST_METADATA_KEYS:
+            metadata.pop(key, None)
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.md5(canonical).hexdigest()

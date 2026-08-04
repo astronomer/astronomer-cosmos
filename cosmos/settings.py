@@ -14,6 +14,7 @@ except ImportError:
 from cosmos.constants import (
     DEFAULT_COSMOS_CACHE_DIR_NAME,
     DEFAULT_OPENLINEAGE_NAMESPACE,
+    DEFAULT_PROJECT_HASH_EXCLUDED_DIRS,
 )
 
 # In MacOS users may want to set the envvar `TMPDIR` if they do not want the value of the temp directory to change
@@ -21,6 +22,14 @@ DEFAULT_CACHE_DIR = Path(tempfile.gettempdir(), DEFAULT_COSMOS_CACHE_DIR_NAME)
 cache_dir: Path = Path(conf.get("cosmos", "cache_dir", fallback=DEFAULT_CACHE_DIR) or DEFAULT_CACHE_DIR)
 enable_cache: bool = conf.getboolean("cosmos", "enable_cache", fallback=True)
 enable_dag_versioning = conf.getboolean("cosmos", "enable_dag_versioning", fallback=True)
+# Directory names pruned from the dbt project content hash walk (cosmos/versioning.py). Defaults to
+# dbt/VCS-generated folders; setting this replaces the default entirely. See #2857.
+_dag_versioning_excluded_dirs_conf = conf.get("cosmos", "project_hash_excluded_dirs", fallback="")
+project_hash_excluded_dirs: frozenset[str] = (
+    frozenset(dirname.strip() for dirname in _dag_versioning_excluded_dirs_conf.split(",") if dirname.strip())
+    if _dag_versioning_excluded_dirs_conf.strip()
+    else DEFAULT_PROJECT_HASH_EXCLUDED_DIRS
+)
 enable_dataset_alias = conf.getboolean("cosmos", "enable_dataset_alias", fallback=True)
 enable_uri_xcom = conf.getboolean("cosmos", "enable_uri_xcom", fallback=False)
 use_dataset_airflow3_uri_standard = conf.getboolean(

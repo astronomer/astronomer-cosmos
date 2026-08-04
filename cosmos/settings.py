@@ -13,6 +13,7 @@ except ImportError:
     from airflow.configuration import conf
 
 from cosmos.constants import (
+    DBT_AUTHORED_CONTENT_DIRS,
     DEFAULT_COSMOS_CACHE_DIR_NAME,
     DEFAULT_OPENLINEAGE_NAMESPACE,
     DEFAULT_PROJECT_HASH_EXCLUDED_DIRS,
@@ -23,14 +24,22 @@ DEFAULT_CACHE_DIR = Path(tempfile.gettempdir(), DEFAULT_COSMOS_CACHE_DIR_NAME)
 cache_dir: Path = Path(conf.get("cosmos", "cache_dir", fallback=DEFAULT_CACHE_DIR) or DEFAULT_CACHE_DIR)
 enable_cache: bool = conf.getboolean("cosmos", "enable_cache", fallback=True)
 enable_dag_versioning = conf.getboolean("cosmos", "enable_dag_versioning", fallback=True)
-# Directory names pruned from the dbt project content hash walk (cosmos/versioning.py). Defaults to
-# dbt/VCS-generated folders; setting this replaces the default entirely. See #2857.
-_dag_versioning_excluded_dirs_conf = conf.get("cosmos", "project_hash_excluded_dirs", fallback="")
-project_hash_excluded_dirs: frozenset[str] = (
-    frozenset(dirname.strip() for dirname in _dag_versioning_excluded_dirs_conf.split(",") if dirname.strip())
-    if _dag_versioning_excluded_dirs_conf.strip()
-    else DEFAULT_PROJECT_HASH_EXCLUDED_DIRS
+# Directory names pruned from the dbt project content hash walk (cosmos/versioning.py). Additive on top
+# of the dbt/VCS-generated folders in DEFAULT_PROJECT_HASH_EXCLUDED_DIRS, which are always pruned so that
+# setting this can't accidentally stop excluding .git/target/dbt_packages/logs. See #2857.
+_project_hash_excluded_dirs_conf = conf.get("cosmos", "project_hash_excluded_dirs", fallback="")
+_project_hash_excluded_dirs_extra = frozenset(
+    dirname.strip() for dirname in _project_hash_excluded_dirs_conf.split(",") if dirname.strip()
 )
+_suspicious_project_hash_excluded_dirs = _project_hash_excluded_dirs_extra & DBT_AUTHORED_CONTENT_DIRS
+if _suspicious_project_hash_excluded_dirs:
+    warnings.warn(
+        f"`project_hash_excluded_dirs` includes {sorted(_suspicious_project_hash_excluded_dirs)}, which look like "
+        "dbt-authored content directories. Excluding them means real project changes there won't be detected by "
+        "DAG versioning or the partial-parse/dbt-ls caches.",
+        UserWarning,
+    )
+project_hash_excluded_dirs: frozenset[str] = DEFAULT_PROJECT_HASH_EXCLUDED_DIRS | _project_hash_excluded_dirs_extra
 enable_dataset_alias = conf.getboolean("cosmos", "enable_dataset_alias", fallback=True)
 enable_uri_xcom = conf.getboolean("cosmos", "enable_uri_xcom", fallback=False)
 use_dataset_airflow3_uri_standard = conf.getboolean(

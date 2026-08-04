@@ -164,6 +164,18 @@ def test__create_folder_version_hash_reads_large_files_in_chunks(tmp_path):
     payload = b"select 1\n" * 300_000  # ~2.7MB, larger than the 1MB read chunk
     _write_file(project_dir, "models/big_model.sql", payload)
 
-    expected = hashlib.md5(b"models/big_model.sql" + payload).hexdigest()
+    expected = hashlib.md5(b"models/big_model.sql\x00" + payload).hexdigest()
 
     assert _create_folder_version_hash(project_dir) == expected
+
+
+def test__create_folder_version_hash_no_path_content_boundary_ambiguity(tmp_path):
+    """A path/content split that would collide without a separator (path "a" + content "bc" vs.
+    path "ab" + content "c") must hash differently, since the two describe different projects."""
+    project_a = tmp_path / "project_a"
+    _write_file(project_a, "a", b"bc")
+
+    project_b = tmp_path / "project_b"
+    _write_file(project_b, "ab", b"c")
+
+    assert _create_folder_version_hash(project_a) != _create_folder_version_hash(project_b)

@@ -1436,6 +1436,51 @@ def test_dag_versioning_skipped_when_setting_disabled(mock_load_dbt_graph, mock_
     mock_hash_func.assert_not_called()
 
 
+@skipif_airflow_lt_3_dag_doc_hash
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_hash_folds_in_manifest_checksum_for_manifest_mode(mock_load_dbt_graph, mock_hash_func):
+    """``target/`` (where ``manifest_path`` conventionally lives) is pruned from the folder hash walk, so
+    a manifest regenerated with no local source changes (e.g. by a separate CI compile step) wouldn't
+    otherwise change the DAG-versioning hash under ``LoadMode.DBT_MANIFEST``. The manifest's own checksum
+    must be folded in so DAG versioning still reacts to it."""
+    mock_hash_func.return_value = "folder_hash"
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    converter = DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+    hash_without_manifest = dag.doc_md
+
+    # Simulate LoadMode.DBT_MANIFEST having resolved, with a manifest living under the pruned target/
+    converter.dbt_graph.load_method = LoadMode.DBT_MANIFEST
+    converter.dbt_graph.project.manifest_path = MagicMock(checksum=MagicMock(return_value="manifest_v1"))
+    dag.doc_md = None
+    converter._add_dbt_project_hash_to_dag_docs(dag)
+    hash_with_manifest_v1 = dag.doc_md
+
+    # Folder hash is unchanged (still mocked to "folder_hash"), but the manifest checksum changed -- the
+    # combined hash must change too, since the manifest is the sole source of truth in this mode.
+    converter.dbt_graph.project.manifest_path.checksum.return_value = "manifest_v2"
+    dag.doc_md = None
+    converter._add_dbt_project_hash_to_dag_docs(dag)
+    hash_with_manifest_v2 = dag.doc_md
+
+    assert hash_without_manifest != hash_with_manifest_v1
+    assert hash_with_manifest_v1 != hash_with_manifest_v2
+
+
 @pytest.mark.skipif(
     AIRFLOW_VERSION >= Version("3.0.0"),
     reason="Airflow 2.x skips dbt project hash; behavior asserted only on Airflow 2",

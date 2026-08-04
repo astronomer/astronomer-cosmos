@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import inspect
+import json
 import os
 import platform
 import time
@@ -59,6 +61,27 @@ from cosmos.telemetry import _compress_telemetry_metadata, should_emit
 from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
+
+# dbt stamps these into every manifest's `metadata` on every invocation, even when nothing else
+# in the project changed, so they must be dropped before hashing or the hash would too.
+_VOLATILE_MANIFEST_METADATA_KEYS = ("generated_at", "invocation_id", "invocation_started_at")
+
+
+def _calculate_manifest_version_hash(manifest_path: Any) -> str:
+    """Content checksum of a dbt manifest file, ignoring metadata fields that change on every
+    dbt invocation even when the project itself hasn't (``generated_at``, ``invocation_id``, ...).
+
+    A separate, named call site (mirroring ``_create_folder_version_hash``) rather than inlined
+    in the caller, so it can be overridden independently of the folder hash.
+    """
+    with manifest_path.open("rb") as fp:
+        manifest = json.load(fp)
+    metadata = manifest.get("metadata")
+    if isinstance(metadata, dict):
+        for key in _VOLATILE_MANIFEST_METADATA_KEYS:
+            metadata.pop(key, None)
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.md5(canonical).hexdigest()
 
 
 def migrate_to_new_interface(
@@ -439,12 +462,18 @@ class DbtToAirflowConverter:
             return
 
         try:
+            dbt_project_hash = _create_folder_version_hash(self.dbt_graph.project_path)
+
             manifest_path = self.dbt_graph.project.manifest_path
-            is_manifest_mode = self.dbt_graph.load_method == LoadMode.DBT_MANIFEST and manifest_path is not None
-            dbt_project_hash = _create_folder_version_hash(
-                self.dbt_graph.project_path,
-                manifest_path=manifest_path if is_manifest_mode else None,
-            )
+            if self.dbt_graph.load_method == LoadMode.DBT_MANIFEST and manifest_path is not None:
+                # target/ is pruned from the folder walk above, so fold in the manifest's own content
+                # checksum -- not manifest_path.checksum(), whose fsspec-default metadata (mtime/inode
+                # for local files, generation/updated for GCS) changes on a byte-identical re-sync.
+                try:
+                    manifest_checksum = _calculate_manifest_version_hash(manifest_path)
+                    dbt_project_hash = hashlib.md5(f"{dbt_project_hash}\0{manifest_checksum}".encode()).hexdigest()
+                except Exception as e:
+                    logger.warning("Failed to fold dbt manifest checksum into the DAG version hash: %s", e)
 
             hash_suffix = f"\n\n**dbt project hash:** `{dbt_project_hash}`"
 

@@ -1,8 +1,6 @@
 import hashlib
-import json
 import logging
 from pathlib import Path
-from unittest.mock import MagicMock
 
 from cosmos import settings
 from cosmos.versioning import _create_folder_version_hash
@@ -180,74 +178,3 @@ def test__create_folder_version_hash_no_path_content_boundary_ambiguity(tmp_path
     _write_file(project_b, "ab", b"c")
 
     assert _create_folder_version_hash(project_a) != _create_folder_version_hash(project_b)
-
-
-def test__create_folder_version_hash_folds_in_manifest_path(tmp_path):
-    """manifest_path need not live under dir_path at all (e.g. target/ is pruned from the walk, or the
-    manifest is deployed standalone), and its content must still affect the result."""
-    project_dir = tmp_path / "project"
-    _write_file(project_dir, "models/stg_orders.sql", b"select * from orders")
-
-    manifest_path = tmp_path / "elsewhere" / "manifest.json"
-    manifest_path.parent.mkdir(parents=True)
-    manifest_path.write_text(json.dumps({"nodes": {"model.a": {}}}))
-
-    without_manifest = _create_folder_version_hash(project_dir)
-    with_manifest_v1 = _create_folder_version_hash(project_dir, manifest_path=manifest_path)
-
-    manifest_path.write_text(json.dumps({"nodes": {"model.a": {}, "model.b": {}}}))
-    with_manifest_v2 = _create_folder_version_hash(project_dir, manifest_path=manifest_path)
-
-    assert without_manifest != with_manifest_v1
-    assert with_manifest_v1 != with_manifest_v2
-
-
-def test__create_folder_version_hash_manifest_ignores_volatile_metadata(tmp_path):
-    """generated_at/invocation_id/invocation_started_at change on every dbt invocation even when
-    the project doesn't, so two otherwise-identical manifests must hash the same despite them."""
-    project_dir = tmp_path / "project"
-    _write_file(project_dir, "models/stg_orders.sql", b"select * from orders")
-
-    manifest_a = tmp_path / "a.json"
-    manifest_a.write_text(
-        json.dumps(
-            {
-                "metadata": {
-                    "generated_at": "2026-01-01T00:00:00Z",
-                    "invocation_id": "aaaa",
-                    "invocation_started_at": "2026-01-01T00:00:00Z",
-                },
-                "nodes": {"model.a": {}},
-            }
-        )
-    )
-
-    manifest_b = tmp_path / "b.json"
-    manifest_b.write_text(
-        json.dumps(
-            {
-                "metadata": {
-                    "generated_at": "2026-01-02T00:00:00Z",
-                    "invocation_id": "bbbb",
-                    "invocation_started_at": "2026-01-02T00:00:00Z",
-                },
-                "nodes": {"model.a": {}},
-            }
-        )
-    )
-
-    assert _create_folder_version_hash(project_dir, manifest_path=manifest_a) == _create_folder_version_hash(
-        project_dir, manifest_path=manifest_b
-    )
-
-
-def test__create_folder_version_hash_survives_manifest_read_failure(tmp_path):
-    """A manifest read/parse failure must not drop the folder hash that was already computed."""
-    project_dir = tmp_path / "project"
-    _write_file(project_dir, "models/stg_orders.sql", b"select * from orders")
-
-    broken_manifest_path = MagicMock(open=MagicMock(side_effect=OSError("boom")))
-
-    assert _create_folder_version_hash(project_dir, manifest_path=broken_manifest_path) == _create_folder_version_hash(
-        project_dir
-    )

@@ -1439,7 +1439,9 @@ def test_dag_versioning_skipped_when_setting_disabled(mock_load_dbt_graph, mock_
 @skipif_airflow_lt_3_dag_doc_hash
 @patch("cosmos.converter._create_folder_version_hash")
 @patch("cosmos.converter.DbtGraph.load")
-def test_dag_versioning_hash_folds_in_manifest_checksum_for_manifest_mode(mock_load_dbt_graph, mock_hash_func):
+def test_dag_versioning_hash_folds_in_manifest_checksum_for_manifest_mode(
+    mock_load_dbt_graph, mock_hash_func, tmp_path
+):
     """Under LoadMode.DBT_MANIFEST, the manifest's checksum must be folded into the DAG-versioning hash."""
     mock_hash_func.return_value = "folder_hash"
     dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
@@ -1460,19 +1462,53 @@ def test_dag_versioning_hash_folds_in_manifest_checksum_for_manifest_mode(mock_l
     )
     hash_without_manifest = dag.doc_md
 
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_bytes(b"manifest_v1")
     converter.dbt_graph.load_method = LoadMode.DBT_MANIFEST
-    converter.dbt_graph.project.manifest_path = MagicMock(checksum=MagicMock(return_value="manifest_v1"))
+    converter.dbt_graph.project.manifest_path = manifest_path
     dag.doc_md = None
     converter._add_dbt_project_hash_to_dag_docs(dag)
     hash_with_manifest_v1 = dag.doc_md
 
-    converter.dbt_graph.project.manifest_path.checksum.return_value = "manifest_v2"
+    manifest_path.write_bytes(b"manifest_v2")
     dag.doc_md = None
     converter._add_dbt_project_hash_to_dag_docs(dag)
     hash_with_manifest_v2 = dag.doc_md
 
     assert hash_without_manifest != hash_with_manifest_v1
     assert hash_with_manifest_v1 != hash_with_manifest_v2
+
+
+@skipif_airflow_lt_3_dag_doc_hash
+@patch("cosmos.converter._create_folder_version_hash")
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_versioning_hash_survives_manifest_checksum_failure(mock_load_dbt_graph, mock_hash_func):
+    """A manifest read failure must not drop the folder hash that was already computed."""
+    mock_hash_func.return_value = "folder_hash"
+    dag = DAG("test_dag", start_date=datetime(2024, 1, 1))
+
+    project_config = ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+    )
+    execution_config = ExecutionConfig(execution_mode=ExecutionMode.LOCAL)
+
+    converter = DbtToAirflowConverter(
+        dag=dag,
+        project_config=project_config,
+        profile_config=profile_config,
+        execution_config=execution_config,
+    )
+
+    converter.dbt_graph.load_method = LoadMode.DBT_MANIFEST
+    converter.dbt_graph.project.manifest_path = MagicMock(open=MagicMock(side_effect=OSError("boom")))
+    dag.doc_md = None
+    converter._add_dbt_project_hash_to_dag_docs(dag)
+
+    assert dag.doc_md is not None
+    assert "folder_hash" in dag.doc_md
 
 
 @pytest.mark.skipif(

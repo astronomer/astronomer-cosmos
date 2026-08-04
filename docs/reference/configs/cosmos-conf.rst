@@ -37,6 +37,8 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 `enable_dag_versioning`_:
     **Airflow 3+ only:** when enabled (default), Cosmos computes a hash of the dbt project directory and appends
     it to the DAG's ``doc_md`` so that Airflow 3's DAG versioning can detect when dbt project files change.
+    Under ``LoadMode.DBT_MANIFEST``, the manifest file's own content checksum is folded into this hash as well,
+    since the manifest conventionally lives under ``target/``, which is excluded from the directory walk.
     On Airflow 2.x, ``doc_md`` is not modified for this purpose (the setting has no effect there).
     When disabled on Airflow 3+, the hash is not computed (faster DAG parsing) and DAG versioning will not
     reflect dbt project content changes from this mechanism.

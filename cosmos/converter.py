@@ -57,7 +57,7 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
 from cosmos.log import get_logger
 from cosmos.telemetry import _compress_telemetry_metadata, should_emit
-from cosmos.versioning import _create_folder_version_hash
+from cosmos.versioning import _HASH_READ_CHUNK_SIZE, _create_folder_version_hash
 
 logger = get_logger(__name__)
 
@@ -444,10 +444,19 @@ class DbtToAirflowConverter:
 
             manifest_path = self.dbt_graph.project.manifest_path
             if self.dbt_graph.load_method == LoadMode.DBT_MANIFEST and manifest_path is not None:
-                # target/ is pruned from the folder walk above, so fold in the manifest's own checksum.
-                manifest_checksum = manifest_path.checksum()
-                if manifest_checksum:
-                    dbt_project_hash = hashlib.md5(f"{dbt_project_hash}\0{manifest_checksum}".encode()).hexdigest()
+                # target/ is pruned from the folder walk above, so fold in the manifest's own content
+                # checksum -- not manifest_path.checksum(), whose fsspec-default metadata (mtime/inode
+                # for local files, generation/updated for GCS) changes on a byte-identical re-sync.
+                try:
+                    manifest_hasher = hashlib.md5()
+                    with manifest_path.open("rb") as fp:
+                        while chunk := fp.read(_HASH_READ_CHUNK_SIZE):
+                            manifest_hasher.update(chunk)
+                    dbt_project_hash = hashlib.md5(
+                        f"{dbt_project_hash}\0{manifest_hasher.hexdigest()}".encode()
+                    ).hexdigest()
+                except Exception as e:
+                    logger.warning("Failed to fold dbt manifest checksum into the DAG version hash: %s", e)
 
             hash_suffix = f"\n\n**dbt project hash:** `{dbt_project_hash}`"
 

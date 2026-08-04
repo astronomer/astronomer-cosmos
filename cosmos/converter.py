@@ -57,9 +57,11 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.listeners.task_instance_listener import _get_profile_config_attribute
 from cosmos.log import get_logger
 from cosmos.telemetry import _compress_telemetry_metadata, should_emit
-from cosmos.versioning import _HASH_READ_CHUNK_SIZE, _create_folder_version_hash
+from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
+
+_MANIFEST_HASH_READ_CHUNK_SIZE = 1024 * 1024
 
 
 def migrate_to_new_interface(
@@ -450,7 +452,7 @@ class DbtToAirflowConverter:
                 try:
                     manifest_hasher = hashlib.md5()
                     with manifest_path.open("rb") as fp:
-                        while chunk := fp.read(_HASH_READ_CHUNK_SIZE):
+                        while chunk := fp.read(_MANIFEST_HASH_READ_CHUNK_SIZE):
                             manifest_hasher.update(chunk)
                     dbt_project_hash = hashlib.md5(
                         f"{dbt_project_hash}\0{manifest_hasher.hexdigest()}".encode()

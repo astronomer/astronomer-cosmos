@@ -13,7 +13,7 @@ except ImportError:
     from airflow.configuration import conf
 
 from cosmos.constants import (
-    DBT_AUTHORED_CONTENT_DIRS,
+    DBT_PROJECT_CONTENT_DIRS,
     DEFAULT_COSMOS_CACHE_DIR_NAME,
     DEFAULT_OPENLINEAGE_NAMESPACE,
     DEFAULT_PROJECT_HASH_EXCLUDED_DIRS,
@@ -29,11 +29,11 @@ _project_hash_excluded_dirs_conf = conf.get("cosmos", "project_hash_excluded_dir
 _project_hash_excluded_dirs_extra = frozenset(
     dirname.strip() for dirname in _project_hash_excluded_dirs_conf.split(",") if dirname.strip()
 )
-_suspicious_project_hash_excluded_dirs = _project_hash_excluded_dirs_extra & DBT_AUTHORED_CONTENT_DIRS
+_suspicious_project_hash_excluded_dirs = _project_hash_excluded_dirs_extra & DBT_PROJECT_CONTENT_DIRS
 if _suspicious_project_hash_excluded_dirs:
     warnings.warn(
         f"`project_hash_excluded_dirs` includes {sorted(_suspicious_project_hash_excluded_dirs)}, which look like "
-        "dbt-authored content directories. Excluding them means real project changes there won't be detected by "
+        "dbt project content directories. Excluding them means real project changes there won't be detected by "
         "DAG versioning or the partial-parse/dbt-ls caches.",
         UserWarning,
     )

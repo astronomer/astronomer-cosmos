@@ -55,7 +55,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     is expensive on network-backed storage. This setting is additive: ``.git``, ``target``,
     ``dbt_packages`` and ``logs`` are always excluded, regardless of this value. A matching directory
     name is skipped wherever it appears in the project tree. Cosmos emits a ``UserWarning`` (but does not
-    block) if this includes a dbt-authored content directory, such as ``models`` or ``macros``, since
+    block) if this includes a dbt project content directory, such as ``models`` or ``macros``, since
     excluding one means real changes there won't be detected.
 
     - Default: unset (only the always-excluded ``.git, target, dbt_packages, logs`` apply)

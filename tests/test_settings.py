@@ -1,4 +1,5 @@
 import os
+import warnings
 from importlib import reload
 from unittest.mock import patch
 
@@ -61,9 +62,29 @@ def test_project_hash_excluded_dirs_defaults_to_generated_dirs():
 
 @patch.dict(
     os.environ,
-    {"AIRFLOW__COSMOS__PROJECT_HASH_EXCLUDED_DIRS": "target, dbt_packages , scratch"},
+    {"AIRFLOW__COSMOS__PROJECT_HASH_EXCLUDED_DIRS": "scratch, build"},
     clear=True,
 )
-def test_project_hash_excluded_dirs_env_var_replaces_default():
+def test_project_hash_excluded_dirs_env_var_is_additive():
+    """The env var adds to the defaults; it cannot un-exclude .git/target/dbt_packages/logs."""
     reload(settings)
-    assert settings.project_hash_excluded_dirs == frozenset({"target", "dbt_packages", "scratch"})
+    assert settings.project_hash_excluded_dirs == frozenset(
+        {".git", "target", "dbt_packages", "logs", "scratch", "build"}
+    )
+
+
+@patch.dict(
+    os.environ,
+    {"AIRFLOW__COSMOS__PROJECT_HASH_EXCLUDED_DIRS": "models, scratch"},
+    clear=True,
+)
+def test_project_hash_excluded_dirs_warns_on_dbt_project_content_dir():
+    """Cosmos warns but still applies the setting when it includes a dbt project content dir."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        reload(settings)
+
+    assert any(issubclass(w.category, UserWarning) and "models" in str(w.message) for w in caught)
+    assert settings.project_hash_excluded_dirs == frozenset(
+        {".git", "target", "dbt_packages", "logs", "models", "scratch"}
+    )

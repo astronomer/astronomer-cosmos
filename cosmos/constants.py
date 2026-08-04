@@ -38,6 +38,9 @@ DEFAULT_PROJECT_HASH_EXCLUDED_DIRS = frozenset(
     {".git", DBT_TARGET_DIR_NAME, DBT_DEFAULT_PACKAGES_FOLDER, DBT_LOG_DIR_NAME}
 )
 
+# Conventional dbt project content directory names; see cosmos.settings for how these are used.
+DBT_PROJECT_CONTENT_DIRS = frozenset({"models", "seeds", "snapshots", "analyses", "macros", "tests"})
+
 DEFAULT_OPENLINEAGE_NAMESPACE = "cosmos"
 OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
 

@@ -446,7 +446,8 @@ class DbtToAirflowConverter:
             if self.dbt_graph.load_method == LoadMode.DBT_MANIFEST and manifest_path is not None:
                 # target/ is pruned from the folder walk above, so fold in the manifest's own checksum.
                 manifest_checksum = manifest_path.checksum()
-                dbt_project_hash = hashlib.md5(f"{dbt_project_hash}{manifest_checksum}".encode()).hexdigest()
+                if manifest_checksum:
+                    dbt_project_hash = hashlib.md5(f"{dbt_project_hash}\0{manifest_checksum}".encode()).hexdigest()
 
             hash_suffix = f"\n\n**dbt project hash:** `{dbt_project_hash}`"
 

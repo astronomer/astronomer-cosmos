@@ -52,9 +52,9 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     folders such as ``target/`` and ``dbt_packages/`` can be large, and reading them on every DAG parse
     is expensive on network-backed storage. This setting is additive: ``.git``, ``target``,
     ``dbt_packages`` and ``logs`` are always excluded, regardless of this value. A matching directory
-    name is skipped wherever it appears in the project tree. Cosmos logs a warning (but does not block)
-    if this includes a dbt-authored content directory, such as ``models`` or ``macros``, since excluding
-    one means real changes there won't be detected.
+    name is skipped wherever it appears in the project tree. Cosmos emits a ``UserWarning`` (but does not
+    block) if this includes a dbt-authored content directory, such as ``models`` or ``macros``, since
+    excluding one means real changes there won't be detected.
 
     - Default: unset (only the always-excluded ``.git, target, dbt_packages, logs`` apply)
     - Environment Variable: ``AIRFLOW__COSMOS__PROJECT_HASH_EXCLUDED_DIRS``

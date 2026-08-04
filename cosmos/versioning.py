@@ -51,11 +51,13 @@ def _create_folder_version_hash(dir_path: Path, excluded_dirs: Collection[str] |
     if pruned_dirs:
         logger.debug("Pruned %s excluded directories while hashing the dbt project folder %s", pruned_dirs, dir_path)
 
-    for filepath in sorted(filepaths):
+    relative_posix_paths = {filepath: Path(filepath).relative_to(dir_path).as_posix() for filepath in filepaths}
+    for filepath in sorted(filepaths, key=lambda fp: relative_posix_paths[fp]):
         # Include the path so that renaming a file also changes the hash; dbt derives node
         # names from file names, so a content-preserving rename still changes the project.
-        # Null-byte separator avoids a path/content boundary ambiguity; as_posix() is OS-independent.
-        hasher.update(Path(filepath).relative_to(dir_path).as_posix().encode())
+        # Null-byte separator avoids a path/content boundary ambiguity; as_posix() is OS-independent,
+        # and sorting by it (not the OS-native filepath) keeps iteration order OS-independent too.
+        hasher.update(relative_posix_paths[filepath].encode())
         hasher.update(b"\0")
         try:
             with open(str(filepath), "rb") as fp:

@@ -28,6 +28,7 @@ Bug Fixes
 * Credit all parent models in ``ExecutionMode.WATCHER`` multi-parent test aggregation, so test sensors no longer hang by @hellowithchicken in #2901
 * Honour dbt test ``operator_kwargs`` under ``TestBehavior.AFTER_EACH`` by @tatiana in #2936
 * Skip generated dirs when hashing the dbt project folder by @goingforstudying-ctrl in #2942
+* Address #2942 review feedback: manifest-mode hashing, additive excluded dirs, hash construction by @pankajastro in #2944
 
 Docs
 

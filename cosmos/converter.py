@@ -6,7 +6,6 @@ from __future__ import annotations
 import copy
 import hashlib
 import inspect
-import json
 import os
 import platform
 import time
@@ -62,23 +61,11 @@ from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
 
-# dbt stamps these into every manifest's `metadata` on every invocation, even when nothing else
-# in the project changed, so they must be dropped before hashing or the hash would too.
-_VOLATILE_MANIFEST_METADATA_KEYS = ("generated_at", "invocation_id", "invocation_started_at")
-
 
 def _calculate_manifest_version_hash(manifest_path: Any) -> str:
-    """Content checksum of a dbt manifest file, ignoring metadata fields that change on every
-    dbt invocation even when the project itself hasn't (``generated_at``, ``invocation_id``, ...).
-    """
+    """Content checksum of a dbt manifest file."""
     with manifest_path.open("rb") as fp:
-        manifest = json.load(fp)
-    metadata = manifest.get("metadata")
-    if isinstance(metadata, dict):
-        for key in _VOLATILE_MANIFEST_METADATA_KEYS:
-            metadata.pop(key, None)
-    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.md5(canonical).hexdigest()
+        return hashlib.md5(fp.read()).hexdigest()
 
 
 def migrate_to_new_interface(

@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import tempfile
 from contextlib import nullcontext as does_not_raise
@@ -23,7 +24,12 @@ from cosmos.constants import (
     SourceRenderingBehavior,
     TestBehavior,
 )
-from cosmos.converter import DbtToAirflowConverter, validate_arguments, validate_initial_user_config
+from cosmos.converter import (
+    DbtToAirflowConverter,
+    _calculate_manifest_version_hash,
+    validate_arguments,
+    validate_initial_user_config,
+)
 from cosmos.dbt.graph import DbtGraph, DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import (
@@ -1434,6 +1440,15 @@ def test_dag_versioning_skipped_when_setting_disabled(mock_load_dbt_graph, mock_
 
     assert dag.doc_md is None
     mock_hash_func.assert_not_called()
+
+
+def test_calculate_manifest_version_hash_is_content_derived(tmp_path):
+    """The hash reflects the manifest's bytes, not its path or metadata, and reads large files in chunks."""
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_bytes(b"a")
+    manifest_path.write_bytes(b"a" * 3_000_000)  # larger than the read chunk size
+
+    assert _calculate_manifest_version_hash(manifest_path) == hashlib.md5(b"a" * 3_000_000).hexdigest()
 
 
 @skipif_airflow_lt_3_dag_doc_hash

@@ -64,6 +64,19 @@ logger = get_logger(__name__)
 _MANIFEST_HASH_READ_CHUNK_SIZE = 1024 * 1024
 
 
+def _calculate_manifest_version_hash(manifest_path: Any) -> str:
+    """Content checksum of a dbt manifest file, streamed in chunks.
+
+    A separate, named call site (mirroring ``_create_folder_version_hash``) rather than inlined
+    in the caller, so it can be overridden independently of the folder hash.
+    """
+    hasher = hashlib.md5()
+    with manifest_path.open("rb") as fp:
+        while chunk := fp.read(_MANIFEST_HASH_READ_CHUNK_SIZE):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 def migrate_to_new_interface(
     execution_config: ExecutionConfig, project_config: ProjectConfig, render_config: RenderConfig
 ):
@@ -450,13 +463,8 @@ class DbtToAirflowConverter:
                 # checksum -- not manifest_path.checksum(), whose fsspec-default metadata (mtime/inode
                 # for local files, generation/updated for GCS) changes on a byte-identical re-sync.
                 try:
-                    manifest_hasher = hashlib.md5()
-                    with manifest_path.open("rb") as fp:
-                        while chunk := fp.read(_MANIFEST_HASH_READ_CHUNK_SIZE):
-                            manifest_hasher.update(chunk)
-                    dbt_project_hash = hashlib.md5(
-                        f"{dbt_project_hash}\0{manifest_hasher.hexdigest()}".encode()
-                    ).hexdigest()
+                    manifest_checksum = _calculate_manifest_version_hash(manifest_path)
+                    dbt_project_hash = hashlib.md5(f"{dbt_project_hash}\0{manifest_checksum}".encode()).hexdigest()
                 except Exception as e:
                     logger.warning("Failed to fold dbt manifest checksum into the DAG version hash: %s", e)
 

@@ -27,6 +27,7 @@ Bug Fixes
 * Reject output-only template fields on the async ``operator_args`` path by @pankajastro in #2868
 * Credit all parent models in ``ExecutionMode.WATCHER`` multi-parent test aggregation, so test sensors no longer hang by @hellowithchicken in #2901
 * Honour dbt test ``operator_kwargs`` under ``TestBehavior.AFTER_EACH`` by @tatiana in #2936
+* Skip generated dirs when hashing the dbt project folder by @goingforstudying-ctrl in #2942
 
 Docs
 

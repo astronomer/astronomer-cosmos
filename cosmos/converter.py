@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import inspect
 import os
 import platform
@@ -59,6 +60,12 @@ from cosmos.telemetry import _compress_telemetry_metadata, should_emit
 from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
+
+
+def _calculate_manifest_version_hash(manifest_path: Any) -> str:
+    """Content checksum of a dbt manifest file."""
+    with manifest_path.open("rb") as fp:
+        return hashlib.md5(fp.read()).hexdigest()
 
 
 def migrate_to_new_interface(
@@ -334,6 +341,9 @@ class DbtToAirflowConverter:
         if settings.enable_cache:
             cache_identifier = cache._create_cache_identifier(dag, task_group)
             cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache_identifier)
+            # Surface the resolved cache dir so a silent env var override of the config block
+            # (see #2857) is visible in the parse logs
+            logger.info("Cosmos cache dir resolved to %s", cache_dir)
 
         # Store the initial load method before it gets resolved by dbt_graph.load()
         initial_load_method = render_config.load_method
@@ -437,6 +447,16 @@ class DbtToAirflowConverter:
 
         try:
             dbt_project_hash = _create_folder_version_hash(self.dbt_graph.project_path)
+
+            manifest_path = self.dbt_graph.project.manifest_path
+            if self.dbt_graph.load_method == LoadMode.DBT_MANIFEST and manifest_path is not None:
+                # target/ is pruned from the folder walk above, so fold in the manifest's own checksum.
+                try:
+                    manifest_checksum = _calculate_manifest_version_hash(manifest_path)
+                    dbt_project_hash = hashlib.md5(f"{dbt_project_hash}\0{manifest_checksum}".encode()).hexdigest()
+                except Exception as e:
+                    logger.warning("Failed to fold dbt manifest checksum into the DAG version hash: %s", e)
+
             hash_suffix = f"\n\n**dbt project hash:** `{dbt_project_hash}`"
 
             if dag.doc_md:

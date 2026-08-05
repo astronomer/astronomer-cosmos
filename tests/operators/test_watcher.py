@@ -23,6 +23,7 @@ from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, Render
 from cosmos.config import InvocationMode
 from cosmos.constants import (
     _DBT_STARTUP_EVENTS_XCOM_KEY,
+    _PRODUCER_CMD_FLAGS_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     ExecutionMode,
     SourceRenderingBehavior,
@@ -233,6 +234,25 @@ def test_dbt_producer_watcher_operator_pushes_completion_status_on_failure(
 
     assert mock_ti.store.get("task_status") == "completed"
     mock_execute.assert_called_once()
+
+
+@patch("cosmos.operators._watcher.xcom.delete_variable")
+@patch("cosmos.operators._watcher.xcom._persist_backup")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_publishes_own_cmd_flags_to_xcom(
+    mock_execute, mock_persist, mock_delete_variable
+):
+    """The producer must publish its own rendered ``add_cmd_flags()`` so consumer fallback runs can
+    reuse it (see BaseConsumerSensor._fallback_to_non_watcher_run) instead of re-deriving flags from
+    a possibly different consumer operator_args -- e.g. a full_refresh set only via setup_operator_args.
+    """
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, full_refresh=True)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "test_run"}
+
+    op.execute(context=context)
+
+    assert mock_ti.store.get(_PRODUCER_CMD_FLAGS_XCOM_KEY) == ["--full-refresh", "--log-format", "json"]
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
@@ -1413,9 +1433,11 @@ class TestDbtConsumerWatcherSensor:
         assert sensor.poke_retry_number == 1
 
     def test_fallback_to_non_watcher_run(self):
+        """When the producer hasn't published its flags to XCom, fall back to this consumer's own."""
         sensor = self.make_sensor()
+        sensor.add_cmd_flags = MagicMock(return_value=["--full-refresh"])
         ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--select", "some_model", "--threads", "2"]
+        ti.xcom_pull.return_value = None
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
@@ -1424,8 +1446,43 @@ class TestDbtConsumerWatcherSensor:
         assert result is True
         sensor.build_and_run_cmd.assert_called_once()
         args, kwargs = sensor.build_and_run_cmd.call_args
-        assert "--select" in kwargs["cmd_flags"]
+        assert "--full-refresh" in kwargs["cmd_flags"]
         assert DbtNode.get_resource_name_from_unique_id(MODEL_UNIQUE_ID) in kwargs["cmd_flags"]
+
+    @patch("cosmos.operators._watcher.base.get_xcom_val")
+    def test_fallback_prefers_producer_published_flags(self, mock_get_xcom_val):
+        """Regression for #2908 / setup_operator_args: the producer's own rendered flags (published to
+        XCom as it starts) must win over this consumer's own ``add_cmd_flags()`` -- e.g. when the
+        producer is given ``full_refresh=True`` only via ``ExecutionConfig.setup_operator_args`` while
+        the consumer's own ``full_refresh`` is left at its default of ``False``.
+        """
+        sensor = self.make_sensor(full_refresh=False)
+        sensor.add_cmd_flags = MagicMock(return_value=[])
+        mock_get_xcom_val.return_value = ["--full-refresh"]
+        context = self.make_context(MagicMock())
+        sensor.build_and_run_cmd = MagicMock()
+
+        sensor._fallback_to_non_watcher_run(2, context)
+
+        cmd_flags = sensor.build_and_run_cmd.call_args.kwargs["cmd_flags"]
+        assert "--full-refresh" in cmd_flags
+        mock_get_xcom_val.assert_called_once_with(context["ti"], sensor.producer_task_id, _PRODUCER_CMD_FLAGS_XCOM_KEY)
+
+    def test_fallback_uses_own_rendered_full_refresh_when_producer_xcom_missing(self):
+        """Regression for #2908: when the producer never published its flags (e.g. it errored before
+        reaching that point), fall back to this consumer's own (already-rendered) ``add_cmd_flags()``
+        instead of silently dropping a templated ``full_refresh`` (e.g. ``"{{ params.full_refresh }}"``).
+        """
+        sensor = self.make_sensor(full_refresh=True)
+        ti = MagicMock()
+        ti.xcom_pull.return_value = None
+        context = self.make_context(ti)
+        sensor.build_and_run_cmd = MagicMock()
+
+        sensor._fallback_to_non_watcher_run(2, context)
+
+        cmd_flags = sensor.build_and_run_cmd.call_args.kwargs["cmd_flags"]
+        assert "--full-refresh" in cmd_flags
 
     def test_fallback_strips_producer_log_format_by_default(self):
         """Producer's ``--log-format json`` (internal, used for event-stream parsing) must not leak into
@@ -1433,7 +1490,7 @@ class TestDbtConsumerWatcherSensor:
         """
         sensor = self.make_sensor()
         ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--log-format", "json", "--threads", "2"]
+        ti.xcom_pull.return_value = ["--log-format", "json"]
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
@@ -1453,7 +1510,7 @@ class TestDbtConsumerWatcherSensor:
         """
         sensor = self.make_sensor(dbt_cmd_flags=["--log-format", "json"])
         ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--log-format", "json", "--threads", "2"]
+        ti.xcom_pull.return_value = ["--log-format", "json"]
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
@@ -1468,7 +1525,7 @@ class TestDbtConsumerWatcherSensor:
         sensor = self.make_sensor()
         sensor.model_unique_id = "model.jaffle_shop.stg_orders.v1"
         ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = []
+        ti.xcom_pull.return_value = []
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 

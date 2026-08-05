@@ -15,7 +15,7 @@ from os import PathLike
 from typing import TYPE_CHECKING, Any, Protocol
 
 import kubernetes.client as k8s
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import convert_env_vars
 from airflow.providers.cncf.kubernetes.callbacks import client_type
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
@@ -26,7 +26,10 @@ except ImportError:
     from airflow.utils.context import context_merge
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
+from cosmos.constants import _PRODUCER_CMD_FLAGS_XCOM_KEY
+from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
     _delete_xcom_backup_variable,
@@ -138,10 +141,13 @@ def _build_env_vars(env: dict[str, str | bytes | PathLike[Any]], existing_env_va
 
 
 def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[str] | None = None) -> None:
-    """Build the dbt command, set env vars, and assign ``cmds``/``arguments`` on the operator.
+    """Build the dbt command, set env vars, and assign the dbt ``arguments`` on the operator.
 
-    Always splits the executable from arguments (``self.cmds = ["dbt"]``, ``self.arguments = [...]``)
-    to handle container images with or without ``ENTRYPOINT ["dbt"]``.
+    ``cmds`` is preserved exactly as supplied by the user and never reassigned here. For the
+    full behavior (unset ``cmds`` vs. ``["dbt"]`` vs. a custom wrapper, and the ``dbt dbt ...``
+    pitfall when the image ``ENTRYPOINT`` is itself ``dbt``), see the "Container command and
+    image ENTRYPOINT" section of the Kubernetes execution mode guide:
+    https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/container/kubernetes.html
     """
     # For the first round, we're going to assume that the command is dbt
     # This means that we don't have openlineage support, but we will create a ticket
@@ -161,11 +167,13 @@ def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[
 
     operator.env_vars = _build_env_vars(env_vars, operator.env_vars)
 
-    # Split the executable from arguments to avoid double invocation when the
-    # container image has ENTRYPOINT ["dbt"]. Setting self.cmds overrides the
-    # image's ENTRYPOINT, so this works regardless of image configuration.
-    operator.cmds = [dbt_cmd[0]]
-    operator.arguments = dbt_cmd[1:]
+    if operator.cmds == [dbt_cmd[0]]:
+        # cmds already matches the dbt executable; strip it from arguments to avoid duplication.
+        operator.arguments = dbt_cmd[1:]
+    else:
+        # Preserve any user-supplied cmds (a custom entrypoint/wrapper) verbatim, or leave cmds
+        # unset so the image ENTRYPOINT runs; pass the full dbt command (incl. executable) as arguments.
+        operator.arguments = dbt_cmd
 
 
 def build_and_run_cmd(
@@ -388,6 +396,8 @@ class K8sWatcherProducerProtocol(Protocol):
     client: Any
     callbacks: Any
 
+    def add_cmd_flags(self) -> list[str]: ...
+
 
 class WatcherK8sCallback(KubernetesPodOperatorCallback):  # type: ignore[misc]
     """K8s pod log callback that parses dbt JSON output and pushes per-model XCom status.
@@ -525,6 +535,8 @@ def execute_watcher_producer(
     # manager's callback_extra_kwargs, so the log-parsing callback sees the live context
     # even if the pod manager (a cached_property) was created before this runs.
     operator._context_holder[CONTEXT_KEY] = context
+
+    safe_xcom_push(task_instance=task_instance, key=_PRODUCER_CMD_FLAGS_XCOM_KEY, value=operator.add_cmd_flags())
 
     # On failure parent_execute() raises and the on-failure callback flushes the backup.
     return_value = parent_execute(context, **kwargs)

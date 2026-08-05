@@ -6,6 +6,12 @@ set -e
 
 AIRFLOW_VERSION="$1"
 PYTHON_VERSION="$2"
+# dbt minor from Hatch's {matrix:dbt}; required, no default.
+DBT_VERSION="$3"
+if [ -z "$DBT_VERSION" ]; then
+  echo "::error::DBT_VERSION (third positional arg) was not provided."
+  exit 1
+fi
 
 # Use this to set the appropriate Python environment in Github Actions,
 # while also not assuming --system when running locally.
@@ -24,69 +30,26 @@ rm -f $AIRFLOW_HOME/airflow.db
 pip install uv
 uv pip install pip --upgrade
 
-if [ "$AIRFLOW_VERSION" = "2.9" ] ; then
-  uv pip install -r requirements/requirements-airflow-2.9-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "2.10" ] ; then
-  uv pip install -r requirements/requirements-airflow-2.10-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "2.11" ] ; then
-  uv pip install -r requirements/requirements-airflow-2.11-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.0" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.0-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.1" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.1-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.2" ] ; then
-  uv pip install -r requirements/requirements-airflow-3.2-dbt-1.11.txt
-elif [ "$AIRFLOW_VERSION" = "3.3" ] ; then
-  # TEMPORARY (Airflow 3.3.0 has not GA'd yet): track the 3.3 line live instead
-  # of a pinned requirements file, so CI follows the latest 3.3 pre-release
-  # (b1, b2, ... rc1, ...) and switches to 3.3.0 the moment it is released,
-  # without another code change:
-  #   * constraints come from the moving `constraints-3-3` branch -- CI keeps it
-  #     at the HEAD of the 3.3 line; it pins the providers/transitive deps but
-  #     intentionally NOT apache-airflow itself, and
-  #   * `apache-airflow>=3.3.0b1,<3.4.0` with --prerelease=allow resolves to the
-  #     highest available 3.3 version: the latest pre-release today, the GA
-  #     release once it ships (a final release outranks its release candidates).
-  # TODO (Airflow 3.3.0 GA, BOSS-524): pin the resolved environment by copying a
-  # CI `pip freeze` into requirements/requirements-airflow-3.3-dbt-1.11.txt, then
-  # replace this whole elif branch (including the gcsfs<2026 curation below) with
-  # the single `uv pip install -r requirements/...` line used by the 3.0-3.2
-  # branches above, so 3.3 is handled consistently with the other versions.
-  # https://linear.app/astronomer/issue/BOSS-524
-  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-3-3/constraints-$PYTHON_VERSION.txt"
-  curl -fsSL "$CONSTRAINT_URL" -o /tmp/constraint.txt
-  sed '/PyYAML==/d' /tmp/constraint.txt > /tmp/constraint.txt.tmp
-  mv /tmp/constraint.txt.tmp /tmp/constraint.txt
-  # Install the core up front (only line needing --prerelease) so the GA
-  # providers below resolve against the already-pinned 3.3 core.
-  uv pip install --prerelease=allow "apache-airflow>=3.3.0b1,<3.4.0" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-devel-common"
-  uv pip install "apache-airflow-providers-amazon[s3fs]" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-cncf-kubernetes" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-google" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-microsoft-azure" --constraint /tmp/constraint.txt
-  uv pip install "apache-airflow-providers-docker" --constraint /tmp/constraint.txt
-  # DBT_VERSION isn't exported on this path; install from a separate var so the
-  # dbt version assertion below (which reads $DBT_VERSION) keeps its behaviour.
-  # Do NOT set DBT_VERSION here: on this live 3.3 path `dbt --version` yields no
-  # parseable "Core:" version, so the assertion compares empty==empty and passes
-  # (the intended skip). Setting DBT_VERSION makes desired=1.11 != actual="" and
-  # fails the whole 3.3 matrix, so keep it unset.
-  DBT_INSTALL_VERSION="${DBT_VERSION:-1.11}"
-  uv pip install -U "dbt-core~=$DBT_INSTALL_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark
-  uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
-  # TEMP curation: gcsfs 2026.x requires google-cloud-storage>=3.9 (it imports the
-  # google.cloud.storage.asyncio client added in 3.9). The Airflow 3.3 constraints
-  # actually install a *compatible* pair (gcsfs 2026.x + google-cloud-storage 3.x),
-  # but the unconstrained `dbt-bigquery` install above caps google-cloud-storage<3.2
-  # (dbt-bigquery requires "google-cloud-storage<3.2,>=2.4"), downgrading gcs to
-  # 3.1.1 (the same version the curated 3.2 requirements file lands on). gcsfs 2026.x
-  # then fails against that 3.1.1 ("Please install gcsfs to access Google Storage").
-  # gcsfs 2025.x has no such floor, so hold it to the 2025 line the 3.2 env uses. Run
-  # without --constraint so it isn't pinned back to the constraints' 2026.x. Goes away
-  # with the pinned requirements-airflow-3.3-dbt-1.11.txt.
-  uv pip install "gcsfs<2026"
-  rm /tmp/constraint.txt
+EFFECTIVE_DBT_VERSION="$DBT_VERSION"
+
+if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRFLOW_VERSION" = "2.11" ] || [ "$AIRFLOW_VERSION" = "3.0" ] || [ "$AIRFLOW_VERSION" = "3.1" ] || [ "$AIRFLOW_VERSION" = "3.2" ] || [ "$AIRFLOW_VERSION" = "3.3" ] ; then
+  # Install from the pinned lockfile matching this (airflow, dbt) pair.
+  REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-${DBT_VERSION}.txt"
+  if [ ! -f "$REQUIREMENTS_FILE" ]; then
+    if [ "$DBT_VERSION" = "1.11" ] || [ "$DBT_VERSION" = "1.12" ]; then
+      # Every Airflow version should have both a 1.11 and 1.12 lockfile; a missing
+      # one is a real gap, not an intentionally-uncovered dbt minor.
+      echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
+      exit 1
+    fi
+    # Other dbt minors (1.5-1.10, 2.0) have no per-Airflow lockfile; jobs needing
+    # them re-pin dbt in their own setup step, so this is just a throwaway baseline.
+    echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline (this job must re-pin dbt itself)."
+    REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"
+    EFFECTIVE_DBT_VERSION="1.11"
+  fi
+  echo "Installing pinned requirements from $REQUIREMENTS_FILE"
+  uv pip install -r "$REQUIREMENTS_FILE"
 else
   # Download Airflow constraints according to the version being used
   if [ "$AIRFLOW_VERSION" = "3.0" ] ; then
@@ -126,13 +89,13 @@ else
     exit 1
 fi
 
-actual_dbt_version=$(dbt --version 2>/dev/null | awk '/Core:/{print $2}' | cut -d. -f1,2)
-desired_dbt_version=$(echo "$DBT_VERSION" | cut -d. -f1,2)
-
-if [ "$actual_dbt_version" = "$desired_dbt_version" ]; then
-    echo "Version is as expected: $desired_dbt_version"
+# EFFECTIVE_DBT_VERSION differs from DBT_VERSION only when the fallback above
+# substituted the dbt-1.11 baseline.
+actual_dbt_version=$(dbt --version 2>/dev/null | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
+if [ "$actual_dbt_version" = "$EFFECTIVE_DBT_VERSION" ]; then
+    echo "dbt version is as expected: $EFFECTIVE_DBT_VERSION"
 else
-    echo "Version does not match. Expected: $desired_dbt_version, but got: $actual_dbt_version"
+    echo "dbt version does not match. Expected: $EFFECTIVE_DBT_VERSION, but got: $actual_dbt_version"
     exit 1
 fi
 

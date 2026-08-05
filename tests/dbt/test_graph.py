@@ -1625,6 +1625,39 @@ def test_tests_per_model_populated():
     assert any("unique_customers_customer_id" in t for t in customers_tests)
 
 
+def test_tests_per_model_lists_multi_parent_test_under_every_parent():
+    """A test with multiple parents (e.g. a relationships test) is listed under each parent.
+
+    This is the graph-level fact the watcher test-aggregation logic relies on: a shared
+    test must be recorded/aggregated for every parent model, not just one. Asserting it
+    against a real loaded graph keeps the aggregation unit tests honest — they hand-build
+    ``tests_per_model``, and this guards that the builder actually produces that shape.
+    """
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+    dbt_graph.load()
+
+    # jaffle_shop's relationships test on orders.customer_id depends on both orders and
+    # customers, so it must appear in tests_per_model under BOTH.
+    shared_test_id = "test.jaffle_shop.relationships_orders_customer_id__customer_id__ref_customers_.c6ec7f58f2"
+    orders_id = "model.jaffle_shop.orders"
+    customers_id = "model.jaffle_shop.customers"
+    assert shared_test_id in dbt_graph.tests_per_model[orders_id]
+    assert shared_test_id in dbt_graph.tests_per_model[customers_id]
+
+
 def test_tests_per_model_empty_when_no_tests():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
@@ -2495,12 +2528,11 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        # Different macOS versions have produced different hashes for this directory. The first value below is a
-        # historical macOS-specific hash, while the second matches the Linux hash asserted in the else-branch. We
-        # allow both here so that the test is stable across macOS versions and when macOS hashing matches Linux.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "39a5f27ad840d837ca9f86515e605ed6")
+        # macOS has historically produced a different directory hash than Linux; the hash below is the
+        # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
+        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
     else:
-        assert hash_dir == "39a5f27ad840d837ca9f86515e605ed6"
+        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2537,12 +2569,11 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     assert hash_impl == "86424c8b70c2e9b6d1f595c7ec9a8291"
 
     if sys.platform == "darwin":
-        # Some macOS versions compute a different directory hash than Linux, while others match the Linux behavior.
-        # The first value is the macOS-specific hash; the second value is the Linux hash, which certain macOS versions also produce.
-        # We allow both here to keep the test stable across macOS releases, while non-macOS platforms assert only the Linux hash.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "39a5f27ad840d837ca9f86515e605ed6")
+        # macOS has historically produced a different directory hash than Linux; the hash below is the
+        # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
+        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
     else:
-        assert hash_dir == "39a5f27ad840d837ca9f86515e605ed6"
+        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")

@@ -1,8 +1,19 @@
 import os
+import warnings
 from importlib import reload
 from unittest.mock import patch
 
+import pytest
+
 from cosmos import settings
+
+
+@pytest.fixture(autouse=True)
+def _restore_settings_after_env_var_test():
+    # Tests here reload the settings module under a patched environment; without a
+    # final reload the patched values leak into later test modules
+    yield
+    reload(settings)
 
 
 @patch.dict(os.environ, {"AIRFLOW__COSMOS__ENABLE_CACHE": "False"}, clear=True)
@@ -41,3 +52,39 @@ def test_enable_debug_mode_env_var():
 def test_debug_memory_poll_interval_env_var():
     reload(settings)
     assert settings.debug_memory_poll_interval_seconds == 0.25
+
+
+@patch.dict(os.environ, {}, clear=True)
+def test_project_hash_excluded_dirs_defaults_to_generated_dirs():
+    reload(settings)
+    assert settings.project_hash_excluded_dirs == frozenset({".git", "target", "dbt_packages", "logs"})
+
+
+@patch.dict(
+    os.environ,
+    {"AIRFLOW__COSMOS__PROJECT_HASH_EXCLUDED_DIRS": "scratch, build"},
+    clear=True,
+)
+def test_project_hash_excluded_dirs_env_var_is_additive():
+    """The env var adds to the defaults; it cannot un-exclude .git/target/dbt_packages/logs."""
+    reload(settings)
+    assert settings.project_hash_excluded_dirs == frozenset(
+        {".git", "target", "dbt_packages", "logs", "scratch", "build"}
+    )
+
+
+@patch.dict(
+    os.environ,
+    {"AIRFLOW__COSMOS__PROJECT_HASH_EXCLUDED_DIRS": "models, scratch"},
+    clear=True,
+)
+def test_project_hash_excluded_dirs_warns_on_dbt_project_content_dir():
+    """Cosmos warns but still applies the setting when it includes a dbt project content dir."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        reload(settings)
+
+    assert any(issubclass(w.category, UserWarning) and "models" in str(w.message) for w in caught)
+    assert settings.project_hash_excluded_dirs == frozenset(
+        {".git", "target", "dbt_packages", "logs", "models", "scratch"}
+    )

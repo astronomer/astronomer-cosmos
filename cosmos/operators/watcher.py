@@ -7,7 +7,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 
 try:
     # Airflow 3.1 onwards
@@ -15,8 +15,10 @@ try:
 except ImportError:
     from airflow.utils.task_group import TaskGroup
 
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
+    _PRODUCER_CMD_FLAGS_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
@@ -494,6 +496,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         if self._check_source_freshness:
             self._apply_source_freshness(context)
+
+        safe_xcom_push(task_instance=task_instance, key=_PRODUCER_CMD_FLAGS_XCOM_KEY, value=self.add_cmd_flags())
 
         try:
             return_value = super().execute(context=context, **kwargs)

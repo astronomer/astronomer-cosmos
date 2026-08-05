@@ -9,6 +9,58 @@ Behaviour Changes
 * Cosmos now removes the Airflow DAGs folder from dbt's plugin discovery path for the duration of each dbt invocation, in both ``InvocationMode.DBT_RUNNER`` (in-process, via ``sys.path``) and ``InvocationMode.SUBPROCESS`` (via ``PYTHONPATH``). Previously dbt-core imported DAG files named ``dbt_*.py`` as a side effect of plugin discovery, which leaked or duplicated DAGs across unrelated Cosmos DAGs when running in-process and could crash the dbt command in subprocess mode. This is enabled by default. As a result, a genuine dbt plugin named ``dbt_*`` placed inside the DAGs folder will no longer be discovered; set ``enable_dags_folder_exclusion_from_dbt=False`` (env var ``AIRFLOW__COSMOS__ENABLE_DAGS_FOLDER_EXCLUSION_FROM_DBT``) to restore the previous behaviour. See #1673 and #2893.
 * When a dbt project cannot be found, Cosmos now raises a clearer error, and on Airflow 3 with an absolute ``dbt_project_path`` it appends guidance to set the path relative to the DAG file (e.g. ``(Path(__file__).parent / "dbt/my_dbt_project").absolute().as_posix()``). This makes failures caused by versioned DAG bundles (e.g. on Astronomer) relocating the project between DAG parsing and task execution self-explanatory in the logs. The missing-project case in ``create_symlinks`` now raises ``CosmosValueError`` instead of a bare ``FileNotFoundError``. See #2921.
 
+1.15.1 (2026-08-04)
+-------------------
+
+Behaviour Changes
+
+These changes adjust observable behaviour of the Kubernetes-based operators and of argument
+validation in async execution mode. None of them break the public Cosmos API, but users relying
+on the previous behaviour should review before upgrading.
+
+* Kubernetes-based dbt operators no longer override the container image's ``ENTRYPOINT`` by
+  default: the full dbt command is passed via ``arguments`` and any user-supplied ``cmds`` is
+  preserved. Images whose entrypoint is itself ``dbt`` now require an explicit ``cmds=["dbt"]``.
+  This restores the pre-1.15.0 default. See #2891.
+* Passing output-only template fields (``compiled_sql``, ``freshness``) via ``operator_args`` in
+  async execution mode now raises ``CosmosValueError`` at DAG parse time instead of an opaque
+  ``TypeError``. See #2868.
+
+Bug Fixes
+
+* Preserve container ENTRYPOINT by default in Kubernetes-based dbt operators by @pankajkoti in #2891
+* Make partial-parse cache reads resilient to NFS ESTALE races by @mungiyo in #2867
+* Render ``env_var()`` Jinja when deriving ``ExecutionMode.WATCHER`` dataset namespace by @pankajastro in #2879
+* Avoid deprecated ``airflow.exceptions.AirflowSkipException`` import on Airflow 3.1+ by @pankajastro in #2796
+* Reject output-only template fields on the async ``operator_args`` path by @pankajastro in #2868
+* Credit all parent models in ``ExecutionMode.WATCHER`` multi-parent test aggregation, so test sensors no longer hang by @hellowithchicken in #2901
+* Honour dbt test ``operator_kwargs`` under ``TestBehavior.AFTER_EACH`` by @tatiana in #2936
+* Skip generated dirs when hashing the dbt project folder by @goingforstudying-ctrl in #2942
+* Address #2942 review feedback: manifest-mode hashing, additive excluded dirs, hash construction by @pankajastro in #2944
+* Honor ``on_warning_callback`` passed via ``operator_args`` by @tatiana in #2940
+* Fix watcher fallback silently dropping ``--full-refresh`` overrides by @pankajastro in #2917
+
+Docs
+
+* Document container command and image ``ENTRYPOINT`` handling for Kubernetes modes by @pankajkoti in #2906
+* Document verified Cosmos/Runtime/dbt Core compatibility by @pankajastro in #2914
+* Replace redirecting documentation URLs and raise the link-check timeout by @pankajkoti in #2905
+* Reference stable Cosmos 1.11.0 for dbt Fusion instead of the 1.11.0a1 alpha by @pankajastro in #2861
+* Clarify callback support under ``ExecutionMode.WATCHER`` by @pankajastro in #2884
+* Add Airflow 3.3 row to the dbt dependency conflict matrix by @pankajastro in #2886
+* Improve privacy policy by @tatiana in #2910
+* Remove duplicated sections in ``contributing.rst`` by @tatiana in #2859
+* Fix incorrect PR/issue references in the CHANGELOG by @tatiana in #2864
+* Document retrying models but not tests by @pankajastro in #2835
+
+Others
+
+* Fix flaky ``source_pruning_dag`` integration test by seeding the database first by @tatiana in #2927
+* Fix CI dependency cache by @tatiana in #2931
+* Add dbt-core 1.12 to the test matrix by @pankajastro in #2773
+* Add Python 3.14 to the test matrix (Airflow 3.2/3.3, dbt 1.12 only) by @pankajastro in #2903
+* Pin Airflow 3.3 requirements and simplify the pre-install script by @pankajkoti in #2881
+
 1.15.0 (2026-07-01)
 -------------------
 

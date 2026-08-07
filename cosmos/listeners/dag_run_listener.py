@@ -34,6 +34,44 @@ class EventStatus:
 DAG_RUN = "dag_run"
 
 
+_WATCHER_PRODUCER_TASK_TYPE = "DbtProducerWatcherOperator"
+
+
+def _cleanup_watcher_producer_backups(dag: DAG, dag_id: str, run_id: str) -> None:
+    """Delete any orphaned WATCHER producer XCom-backup Variables left by this DAG run.
+
+    Called from both ``on_dag_run_success`` and ``on_dag_run_failed``: a ``DbtDag``'s root
+    consumer tasks run with ``trigger_rule="always"``, so the run can succeed even if the
+    producer itself failed and never got to clean up after itself. Either way, the DAG run is
+    already terminal by the time either hook fires, so no further producer retries are possible
+    and it's always safe to delete.
+    """
+    from cosmos.operators._watcher.xcom import _delete_xcom_backup_variable_by_ids
+
+    for task in dag.task_dict.values():
+        task_module = getattr(task, "_task_module", None) or task.__class__.__module__
+        # NOT `_task_type`: that attribute doesn't exist on Airflow 3's SerializedBaseOperator.
+        task_type = getattr(task, "task_type", None) or task.__class__.__name__
+        if task_module.startswith("cosmos.") and task_type == _WATCHER_PRODUCER_TASK_TYPE:
+            task_group = getattr(task, "task_group", None)
+            task_group_id = task_group.group_id if task_group else None
+            try:
+                _delete_xcom_backup_variable_by_ids(dag_id, task_group_id, run_id)
+            except Exception:
+                logger.warning(
+                    "Failed to clean up WATCHER producer XCom-backup Variable for task '%s'",
+                    task.task_id,
+                    exc_info=True,
+                )
+
+
+def _cleanup_watcher_producer_backups_safely(dag: DAG, dag_run: DagRun) -> None:
+    try:
+        _cleanup_watcher_producer_backups(dag, dag_run.dag_id, dag_run.run_id)
+    except Exception:
+        logger.warning("Failed to clean up WATCHER producer XCom-backup Variables", exc_info=True)
+
+
 def total_cosmos_tasks(dag: DAG) -> int:
     """
     Identify if there are any Cosmos DAGs on a given serialized `airflow.serialization.serialized_objects.SerializedDAG`.
@@ -114,6 +152,9 @@ def on_dag_run_success(dag_run: DagRun, msg: str) -> None:
     additional_telemetry_metrics.update(cosmos_metadata)
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
+
+    _cleanup_watcher_producer_backups_safely(serialized_dag, dag_run)
+
     logger.debug("Completed on_dag_run_success")
 
 
@@ -147,4 +188,7 @@ def on_dag_run_failed(dag_run: DagRun, msg: str) -> None:
     additional_telemetry_metrics.update(cosmos_metadata)
 
     telemetry.emit_usage_metrics_if_enabled(DAG_RUN, additional_telemetry_metrics)
+
+    _cleanup_watcher_producer_backups_safely(serialized_dag, dag_run)
+
     logger.debug("Completed on_dag_run_failed")

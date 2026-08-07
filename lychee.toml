@@ -45,6 +45,6 @@ exclude = [
     'https://github\.com/your-org/',
     # Bot-blocked — Stack Exchange / Stack Overflow return 403 to automated
     # clients (even with a browser UA); pages resolve fine in a real browser.
-    'https://[a-z]+\.stackexchange\.com',
-    'https://stackoverflow\.com',
+    'https://[a-z0-9-]+\.stackexchange\.com',
+    'https://([a-z0-9-]+\.)?stackoverflow\.com',
 ]

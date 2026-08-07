@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import yaml
-from jinja2 import Template
+from jinja2 import Environment
 
 from cosmos import settings
 from cosmos.constants import (
@@ -27,6 +27,12 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
 logger = get_logger(__name__)
+
+# dbt renders profiles.yml values through a Jinja environment that registers its custom filters
+# (as_number, as_bool, as_text, as_native). In dbt's text-mode environment these filters are
+# identity functions; register the same no-ops so templates using them render here too.
+_JINJA_ENV = Environment()
+_JINJA_ENV.filters.update({name: lambda x: x for name in ("as_number", "as_bool", "as_text", "as_native")})
 
 
 def has_non_empty_dependencies_file(project_path: Path) -> bool:
@@ -62,7 +68,7 @@ def _resolve_env_var(template_str: str) -> str:
     def env_var(name: str, default: str = "") -> str:
         return os.getenv(name, default)
 
-    template = Template(template_str)
+    template = _JINJA_ENV.from_string(template_str)
     rendered: str = template.render(env_var=env_var)
     return rendered
 

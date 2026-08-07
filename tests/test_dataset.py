@@ -190,9 +190,9 @@ my_profile:
         profile_config.target_name = "dev"
         assert get_dataset_namespace(profile_config) == "postgres://dbhost.internal:5433"
 
-    def test_profiles_yml_filepath_undefined_jinja_returns_none(self, tmp_path):
-        """profiles.yml referencing an undefined Jinja name (not env_var) fails to render; the caller's
-        catch-all returns None instead of propagating the Jinja error and breaking DAG parsing."""
+    def test_profiles_yml_filepath_unrenderable_field_keeps_raw_value(self, tmp_path):
+        """A field whose Jinja cannot be rendered degrades to its raw value instead of aborting
+        namespace derivation for the whole profile (#2948)."""
         profiles_yml = tmp_path / "profiles.yml"
         profiles_yml.write_text("""
 my_profile:
@@ -207,13 +207,70 @@ my_profile:
         profile_config.profiles_yml_filepath = str(profiles_yml)
         profile_config.profile_name = "my_profile"
         profile_config.target_name = "dev"
-        assert get_dataset_namespace(profile_config) is None
+        assert get_dataset_namespace(profile_config) == "postgres://db-{{ this.is_not_env_var }}.prod.internal:5433"
+
+    def test_profiles_yml_filepath_with_dbt_jinja_filters(self, tmp_path, monkeypatch):
+        """Regression test for #2948: dbt's documented profiles.yml filters (as_number, as_bool)
+        on fields the namespace resolvers never read must not disable dataset emission."""
+        monkeypatch.setenv("DB_HOST", "dbhost")
+        monkeypatch.setenv("DBT_THREADS", "8")
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST') }}"
+      port: 5433
+      user: user
+      pass: pass
+      dbname: mydb
+      schema: public
+      threads: "{{ env_var('DBT_THREADS', 4) | as_number }}"
+      connect_timeout: "{{ env_var('DBT_CONNECT_TIMEOUT', 10) | as_number }}"
+      use_ssl: "{{ env_var('DBT_USE_SSL', 'true') | as_bool }}"
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://dbhost:5433"
+
+    def test_profiles_yml_filepath_unknown_filter_on_irrelevant_field(self, tmp_path):
+        """A field using a Jinja filter this renderer does not know keeps its raw value; the
+        namespace is still derived from the remaining fields (#2948)."""
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: dbhost
+      port: 5433
+      threads: "{{ env_var('DBT_THREADS', 4) | no_such_filter }}"
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://dbhost:5433"
 
     def test_returns_none_on_error(self):
         profile_config = MagicMock()
         profile_config.profile_mapping = None
         profile_config.profiles_yml_filepath = "/nonexistent/path.yml"
         assert get_dataset_namespace(profile_config) is None
+
+    def test_returns_none_on_error_logs_warning(self, caplog):
+        """A profile that cannot be read at all must surface as a WARNING, not a DEBUG line (#2948)."""
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = "/nonexistent/path.yml"
+        with caplog.at_level(logging.WARNING):
+            assert get_dataset_namespace(profile_config) is None
+        assert "Unable to extract profile info for dataset namespace derivation" in caplog.text
 
     def test_returns_none_when_no_profile_info(self):
         """When neither profile_mapping nor profiles_yml_filepath is set, returns None."""

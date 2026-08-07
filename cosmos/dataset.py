@@ -130,6 +130,19 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
     return "__".join(identifiers_list)
 
 
+def _render_profile_field(field: str, value: str) -> str:
+    """Render one profiles.yml field, keeping the raw value when its Jinja cannot be rendered.
+
+    Fields the namespace resolvers never read (e.g. ``threads``) may use Jinja that this
+    renderer does not support; one such field must not abort derivation for the whole profile.
+    """
+    try:
+        return _resolve_env_var(value)
+    except TemplateError:
+        logger.debug("Could not render Jinja in profiles.yml field '%s'; using the raw value", field, exc_info=True)
+        return value
+
+
 def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any]]:
     """
     Extract the adapter type and profile dict from a ProfileConfig.
@@ -148,7 +161,10 @@ def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any
             profiles = yaml.safe_load(f)
         target = profiles[profile_config.profile_name]["outputs"][profile_config.target_name]
         # dbt renders env_var() Jinja in profiles.yml; replicate that since we read the file directly.
-        target = {key: _resolve_env_var(value) if isinstance(value, str) else value for key, value in target.items()}
+        # Render per field so one unrenderable field cannot abort the whole profile (#2948).
+        target = {
+            key: _render_profile_field(key, value) if isinstance(value, str) else value for key, value in target.items()
+        }
         adapter_type = target.get("type", "")
         return adapter_type, target
 
@@ -173,7 +189,10 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     try:
         adapter_type, profile_dict = _get_profile_dict(profile_config)
     except (AttributeError, KeyError, TypeError, OSError, yaml.YAMLError, TemplateError):
-        logger.debug("Unable to extract profile info for dataset namespace derivation", exc_info=True)
+        logger.warning(
+            "Unable to extract profile info for dataset namespace derivation; dataset emission will be skipped.",
+            exc_info=True,
+        )
         return None
 
     if not adapter_type:

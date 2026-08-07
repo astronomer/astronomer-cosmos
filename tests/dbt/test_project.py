@@ -129,6 +129,17 @@ def test_resolve_env_var_with_complex_template_unset_var():
     assert result == "dbt_packages"
 
 
+@patch.dict(os.environ, {"DBT_THREADS": "8"})
+def test_resolve_env_var_with_dbt_filters():
+    """dbt's documented profiles.yml filters (as_number, as_bool, as_text, as_native) are
+    registered as identity no-ops, matching dbt's text-mode Jinja environment (#2948)."""
+    assert _resolve_env_var("{{ env_var('DBT_THREADS', 4) | as_number }}") == "8"
+    assert _resolve_env_var("{{ env_var('UNSET_DBT_THREADS', 4) | as_number }}") == "4"
+    assert _resolve_env_var("{{ env_var('UNSET_DBT_SSL', 'true') | as_bool }}") == "true"
+    assert _resolve_env_var("{{ 'raw' | as_text }}") == "raw"
+    assert _resolve_env_var("{{ '[1, 2]' | as_native }}") == "[1, 2]"
+
+
 @patch.dict(os.environ, {"ENV_SUFFIX": "prod"})
 def test_get_dbt_packages_subpath_with_env_var_template(tmpdir):
     """Test get_dbt_packages_subpath with env_var in packages-install-path."""

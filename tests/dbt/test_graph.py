@@ -2715,12 +2715,11 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        # Different macOS versions have produced different hashes for this directory. The first value below is a
-        # historical macOS-specific hash, while the second matches the Linux hash asserted in the else-branch. We
-        # allow both here so that the test is stable across macOS versions and when macOS hashing matches Linux.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "ca429cd71158bcd8542251c968cf5f16")
+        # macOS has historically produced a different directory hash than Linux; the hash below is the
+        # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
+        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
     else:
-        assert hash_dir == "ca429cd71158bcd8542251c968cf5f16"
+        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2757,12 +2756,11 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     assert hash_impl == "86424c8b70c2e9b6d1f595c7ec9a8291"
 
     if sys.platform == "darwin":
-        # Some macOS versions compute a different directory hash than Linux, while others match the Linux behavior.
-        # The first value is the macOS-specific hash; the second value is the Linux hash, which certain macOS versions also produce.
-        # We allow both here to keep the test stable across macOS releases, while non-macOS platforms assert only the Linux hash.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "ca429cd71158bcd8542251c968cf5f16")
+        # macOS has historically produced a different directory hash than Linux; the hash below is the
+        # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
+        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
     else:
-        assert hash_dir == "ca429cd71158bcd8542251c968cf5f16"
+        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")

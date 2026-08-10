@@ -14,7 +14,7 @@ Contributors
 
 A contributor is anyone who wants to contribute code, documentation, tests, ideas, or anything to the Astronomer Cosmos project.
 
-Cosmos contributors can be found in the Astronomer Cosmos Github `insights page <https://github.com/astronomer/astronomer-cosmos/graphs/contributors>`_ and in the `#airflow-dbt <https://apache-airflow.slack.com/archives/C059CC42E9W>`_ Slack channel.
+Cosmos contributors can be found in the Astronomer Cosmos GitHub `insights page <https://github.com/astronomer/astronomer-cosmos/graphs/contributors>`_ and in the `#airflow-dbt <https://apache-airflow.slack.com/archives/C059CC42E9W>`_ Slack channel.
 
 Contributors are responsible for:
 

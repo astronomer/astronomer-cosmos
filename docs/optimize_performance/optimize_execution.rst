@@ -26,7 +26,7 @@ See :ref:`watcher-execution-mode` for setup instructions and detailed benchmarks
 .. note::
 
    ``ExecutionMode.WATCHER`` is stable starting with Cosmos 1.15.0. Review its
-   :ref:`known limitations <known-limitations>`
+   :ref:`known limitations <watcher-known-limitations>`
    before adopting it in production.
 
 .. code-block:: python

@@ -435,7 +435,7 @@ Starting with Cosmos 1.12.0, the ``DbtConsumerWatcherSensor`` supports
 which increases overall task throughput. By default, the sensor now runs in deferrable mode.
 
 
-.. _known-limitations:
+.. _watcher-known-limitations:
 
 Known limitations
 ~~~~~~~~~~~~~~~~~

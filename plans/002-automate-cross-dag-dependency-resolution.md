@@ -143,8 +143,9 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
   (`cosmos/airflow/dag.py`) calls `DAG.__init__` first, which normalizes `schedule`, and only then
   calls `DbtToAirflowConverter.__init__`; the converter parses the dbt graph and builds the Airflow
   graph later in its own `__init__` (`cosmos/converter.py`, `self.dbt_graph.load(...)` followed by
-  `build_airflow_graph(...)`). A converter-stage mutation of `schedule`/`timetable` is therefore too
-  late - confirmed still true against Cosmos 1.15.1.
+  `build_airflow_graph(...)`). A converter-stage mutation of `schedule` itself is therefore too late -
+  confirmed still true against Cosmos 1.15.1. `timetable` is a different field with different mutability,
+  and version-dependent - see constraint 8, which is where this is actually resolved.
 - **F3 - non-emitting boundary nodes silently break scheduling.** `external = parents-of-selected -
   selected` is too shallow. An **ephemeral** model (`resource_type=model` but
   `materialized=ephemeral`, inlined as a CTE, never written -
@@ -275,8 +276,19 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
    dynamically, so `attrs.validate()` re-runs them against the patched value and correctly raises
    (confirmed empirically for the `catchup` case above). The one thing `attrs.validate()` won't catch is
    `max_active_runs` vs `active_runs_limit`, since that check lives inline in `__attrs_post_init__`, not
-   a field validator - check that one explicitly. This also needs confirming on Airflow 2 and on later
-   Airflow 3 versions, since Airflow could add more such checks over time.
+   a field validator - check that one explicitly. This also needs confirming on later Airflow 3 versions,
+   since Airflow could add more such checks over time.
+
+   **This whole approach does not work on Airflow 2 - `auto_schedule` (S2) is Airflow 3 only.** Checked
+   directly against Airflow 2.10.5: `DAG` is a plain class (`class DAG(LoggingMixin)`), not `attrs`-based,
+   so `attrs.validate(self)` raises `NotAnAttrsClassError` outright. Worse, patching only `timetable`
+   leaves `schedule_interval` describing the old schedule, and Airflow 2's own `DAG.validate()` - called
+   before the DAG is bagged - explicitly checks the two match and raises `AirflowDagInconsistent` if not.
+   The constructor-only checks (start-date-when-scheduled, etc.) would also need their own,
+   version-specific re-implementation. Airflow 2.9-2.11 are still in the supported test matrix
+   (`pyproject.toml`), but Airflow 2 is close to EOL, so `auto_schedule` (S2) targets Airflow 3 only;
+   Airflow 2 support is not planned unless a concrete mechanism turns up later. `DbtDependencyCoordinator`
+   (S3) is unaffected - it doesn't touch `schedule` or `timetable` at all.
 9. **Fail closed, never silently no-op (F5) - the ownership half splits by consumer.** Both
    `auto_schedule` and `DbtDependencyCoordinator` are opt-in: a user who asks for one is explicitly
    asking Cosmos to guarantee an ordering or a schedule gate. For the **coordinator**, "exactly one
@@ -303,6 +315,10 @@ class GraphBoundary:
     # (external_parent_unique_id, owned_child_unique_id) - already traversed
     # past ephemeral/non-emitting nodes (F3)
     external_edges: set[tuple[str, str]]
+    # (owned_ancestor_unique_id, owned_child_unique_id) - traversal landed back
+    # inside `owned` (F3 re-entry); not external, and not wired by current
+    # Cosmos rendering either
+    internal_edges: set[tuple[str, str]]
     external_sources: set[str]  # external parent unique_ids that are dbt sources
 
 
@@ -363,6 +379,21 @@ schedulable or wireable ones - see the fail-closed exemption discussion in Edge 
 `resolve_external_uris` must never assign them a URI. The resolver fails fast with an
 unsupported-topology error rather than silently dropping a dependency.
 
+**Traversal can land back inside `owned` - that's `internal_edges`, never `external_edges`.** Consider
+`a` (owned) -> `e` (excluded from selection, ephemeral) -> `c` (owned): `c` depends on `e`, `e` depends
+on `a`, and `e` itself isn't selected. Naively traversing past `e` would reach `a` and record it as an
+*external* parent of `c` - but `a` is owned by this same unit, so that's wrong on two counts: `auto_schedule`
+would end up waiting on an Asset its own DAG is supposed to produce, and treating it as external hides
+the real problem, which is that `a >> c` needs a direct task edge that current Cosmos won't create.
+`create_airflow_task_dependencies` (`cosmos/airflow/graph.py`) only wires an edge when the *immediate*
+`depends_on` parent is in `tasks_map`; since `e` is excluded, it never is, and `a >> c` is silently missing
+today regardless of this proposal. So after every traversal hop, the resolver must check whether the
+newly-reached ancestor is itself in `owned`: if yes, stop and record `(ancestor, original_child)` in
+`internal_edges` instead of `external_edges`; only continue traversing while the ancestor stays outside
+`owned`. This proposal computes `internal_edges` so it doesn't misclassify them - it does not fix the
+underlying missing-edge gap in `create_airflow_task_dependencies`, which is a pre-existing Cosmos issue
+independent of any cross-DAG split and arguably belongs in its own ticket.
+
 **Whether test nodes contribute edges is a resolver decision, not an afterthought.** A dbt test with
 multiple parents can be pulled into `filtered_nodes` purely because one of its parents is selected
 (`DbtGraph.update_node_dependency` in `cosmos/dbt/graph.py`), even when the test itself was not
@@ -408,12 +439,12 @@ condition.** Sources are exempt from the ownership check, but that means a sourc
 nothing to schedule on. Silently applying `schedule=None` here would look like `auto_schedule` worked
 when it did nothing; raise instead.
 
-**Where injection happens (F2, resolved, constraint 8):** `DbtToAirflowConverter.__init__` already runs
-after `DAG.__init__` and already loads the graph - no change needed there. At the end of its `__init__`,
-after computing `external_uris`, it builds the combined timetable and sets `self.timetable` directly.
-Confirmed safe on Airflow 3 (`schedule` is frozen, but `timetable` isn't, and the patched value survives
-serialization). Airflow 2's `DAG` isn't `attrs`-based, so the same kind of patch should be even simpler
-there, but that still needs its own check before shipping.
+**Where injection happens (F2, resolved, constraint 8, Airflow 3 only):** `DbtToAirflowConverter.__init__`
+already runs after `DAG.__init__` and already loads the graph - no change needed there. At the end of its
+`__init__`, after computing `external_uris`, it builds the combined timetable and sets `self.timetable`
+directly. Confirmed safe on Airflow 3 (`schedule` is frozen, but `timetable` isn't, and the patched value
+survives serialization) and confirmed **not** to work on Airflow 2 (constraint 8) - `auto_schedule`
+requires Airflow 3.
 
 ### `DbtTaskGroup`s in one DAG: direct task edges (additive)
 
@@ -464,7 +495,7 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
 
 | Module | Change |
 |---|---|
-| `cosmos/dataset.py` (or a new `cosmos/dependencies.py`) | `resolve_graph_boundary` (structural, `owned`/`external_edges`/`external_sources`, no manifest needed) and a separate `resolve_external_uris` (needs relation identity, F1). Includes the F3 ephemeral traversal, the test-node exclusion rule, and fail-fast behavior. |
+| `cosmos/dataset.py` (or a new `cosmos/dependencies.py`) | `resolve_graph_boundary` (structural, `owned`/`external_edges`/`internal_edges`/`external_sources`, no manifest needed) and a separate `resolve_external_uris` (needs relation identity, F1). Includes the F3 ephemeral traversal with the owned-re-entry check, the test-node exclusion rule, and fail-fast behavior. |
 | `cosmos/config.py` | New `RenderConfig.auto_schedule: DbtUpstreamUpdated \| None = None`; new `DbtUpstreamUpdated` enum (`AND`/`OR`) exported from `cosmos`. Reject `auto_schedule` on a `DbtTaskGroup`'s `RenderConfig` (it mutates a DAG's `schedule`; a `TaskGroup` isn't one). |
 | `cosmos/converter.py` (F2, constraint 8) | At the end of `DbtToAirflowConverter.__init__`, for `auto_schedule`: build the combined timetable, set `self.timetable`, call `attrs.validate(self)` to re-run `catchup`/`allowed_run_types`/`params` validation, and separately re-check `max_active_runs` vs `active_runs_limit`. No change needed to `cosmos/airflow/dag.py`. |
 | New `cosmos/airflow/dependencies.py` | `DbtDependencyCoordinator`: cross-`DbtTaskGroup` wiring, `granularity`, cycle/ambiguous-producer detection using its own peer list (no registry), and the WATCHER-family producer-level gating strategy. Uses only the structural resolver. |
@@ -480,11 +511,19 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   data may still be unavailable under `DBT_LS` - see open question 1. If some dbt-core-version/dbt-Fusion
   combination genuinely cannot supply the needed `--output-keys` at all, the resolver must raise a clear
   error for that specific combination (constraint 9 - never a silent no-op).
-- **F2 - schedule-injection timing, resolved.** `schedule` itself can't be reassigned after `DAG.__init__`
-  (frozen), but `timetable` can - patch it inside the converter (constraint 8).
+- **F2 - schedule-injection timing, resolved for Airflow 3 only.** `schedule` itself can't be reassigned
+  after `DAG.__init__` (frozen), but `timetable` can - patch it inside the converter (constraint 8). On
+  Airflow 2, the same patch breaks `DAG.validate()`'s own consistency check, so `auto_schedule` (S2) is
+  limited to Airflow 3; not a planned gap to close given Airflow 2's approaching EOL.
 - **F3 - non-emitting boundary nodes.** Ephemeral parents pass the type filter but never emit, which
   would make the downstream DAG never trigger; sources are genuinely external. The resolver must
   traverse past them or fail fast - never silently drop the dependency.
+- **F3 - traversal can re-enter `owned`.** An owned node reached by traversing past an excluded
+  ephemeral node is not external - it's `internal_edges`. Misclassifying it as external would make
+  `auto_schedule` wait on an Asset its own DAG produces. This also surfaces a pre-existing Cosmos gap,
+  independent of this proposal: `create_airflow_task_dependencies` only wires direct `depends_on`
+  parents present in `tasks_map`, so the real `a >> c` edge is silently missing today whenever an
+  ephemeral intermediate is excluded from selection - worth its own ticket.
 - **F4/constraint 5 - non-WATCHER emission is unreliable or missing.** LOCAL/VIRTUALENV emit
   conditionally; AIRFLOW_ASYNC emits the wrong scheme - `auto_schedule` depends on #2959 fixing both
   before it's built for those modes. The seven modes that don't emit at all are separate - #2959 doesn't
@@ -526,12 +565,13 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
 ## Testing
 
 - `resolve_graph_boundary` (structural, no manifest fixture needed - test under `DBT_LS` too): `owned`/
-  `external_edges`/`external_sources` are correct on a partitioned project; an ephemeral parent's edge
-  is rewritten to the nearest real upstream when its `DbtNode` is available, or the resolver raises
-  unsupported-topology when it isn't (e.g. a `DBT_LS`-loaded external ephemeral ancestor with no peer
-  union supplying it); a multi-parent test's non-selected parent does *not* appear as an external
-  dependency; the coordinator's peer-union `nodes` map correctly resolves an ephemeral ancestor owned by
-  one peer and referenced by another.
+  `external_edges`/`internal_edges`/`external_sources` are correct on a partitioned project; an ephemeral
+  parent's edge is rewritten to the nearest real upstream when its `DbtNode` is available, or the
+  resolver raises unsupported-topology when it isn't (e.g. a `DBT_LS`-loaded external ephemeral ancestor
+  with no peer union supplying it); a multi-parent test's non-selected parent does *not* appear as an
+  external dependency; the coordinator's peer-union `nodes` map correctly resolves an ephemeral ancestor
+  owned by one peer and referenced by another; the `a` (owned) -> `e` (excluded, ephemeral) -> `c`
+  (owned) topology produces `internal_edges={(a, c)}` and *not* an external edge back onto `a`.
 - `resolve_external_uris` (takes a node map, not a manifest - run the same contract test against a
   manifest-loaded node map today and a `DBT_LS`-loaded one once #2959/#2960 land): resolves each
   non-source external parent to a URI; a source never gets one; missing relation identity raises with a
@@ -541,15 +581,18 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   sources); a `DbtDag` using `auto_schedule` whose external dependencies are *only* sources raises,
   since there is nothing left to schedule on. Test both at the consumer level, not just as resolver
   output.
-- F2/constraint 8: the DAG's `timetable` reflects the dbt-derived datasets and extends a user-set
-  schedule; a serialize/deserialize round-trip confirms the patched timetable survives; a DAG that would
-  now fail any of the checks Airflow normally runs at construction - `catchup`/`start_date`,
+- F2/constraint 8 (Airflow 3 only): the DAG's `timetable` reflects the dbt-derived datasets and extends
+  a user-set schedule; a serialize/deserialize round-trip confirms the patched timetable survives; a DAG
+  that would now fail any of the checks Airflow normally runs at construction - `catchup`/`start_date`,
   `allowed_run_types`, required-params-without-defaults, `max_active_runs`/`active_runs_limit` - raises
-  instead of shipping an invalid DAG. Run this across the supported Airflow 2 and Airflow 3 versions.
-- `auto_schedule`: `AND`/`OR` combine correctly; Airflow 2 vs Airflow 3 URI parity; each row of the
-  schedule-compatibility matrix behaves as specified (cron + `auto_schedule` raises); set on a
-  `DbtTaskGroup`'s `RenderConfig` raises; each of the seven non-emitting execution modes raises with a
-  mode-specific message (constraint 5); an unsupported adapter raises.
+  instead of shipping an invalid DAG. Run this across the supported Airflow 3 versions. `auto_schedule`
+  on Airflow 2 raises a clear "not supported" error - test that directly rather than trying to make the
+  patch work there.
+- `auto_schedule`: `AND`/`OR` combine correctly; each row of the schedule-compatibility matrix behaves
+  as specified (cron + `auto_schedule` raises); set on a `DbtTaskGroup`'s `RenderConfig` raises; each of
+  the seven non-emitting execution modes raises with a mode-specific message (constraint 5); an
+  unsupported adapter raises; on Airflow 2, `auto_schedule` raises "not supported" rather than attempting
+  the patch.
 - F5: `auto_schedule` raises when ownership, emission, or namespace can't be verified (once the
   peer-visibility mechanism from open question 5 exists to make that check possible at all).
 - End-to-end: WATCHER/WATCHER_KUBERNETES/WATCHER_GCP_GKE producer emits and the consumer triggers
@@ -565,9 +608,11 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
 Listed in build order, not by slice number - S9 must land before S2, since S2 can't honestly ship
 without it:
 
-- **S1 - `resolve_graph_boundary`**: structural only (`owned`/`external_edges`/`external_sources`), the
-  F3 ephemeral traversal, the test-node exclusion rule, the source exemption from ownership checks, and
-  fail-fast behavior. No manifest dependency, but ephemeral traversal needs the caller to supply a
+- **S1 - `resolve_graph_boundary`**: structural only (`owned`/`external_edges`/`internal_edges`/
+  `external_sources`), the F3 ephemeral traversal with the owned-re-entry check (traversal landing back
+  on an owned node produces `internal_edges`, never `external_edges`), the test-node exclusion rule, the
+  source exemption from ownership checks, and fail-fast behavior. No manifest dependency, but ephemeral
+  traversal needs the caller to supply a
   `nodes` map wide enough to cover external ancestors (full graph under `DBT_MANIFEST`; under `DBT_LS`,
   whatever the caller can assemble - see open question 1). Test under both.
 - **S3 - `DbtDependencyCoordinator`**: cross-`DbtTaskGroup` wiring, `granularity`, and its own scoped
@@ -583,10 +628,11 @@ without it:
   [astronomer-cosmos#2959](https://github.com/astronomer/astronomer-cosmos/issues/2959) and
   [astronomer-cosmos#2960](https://github.com/astronomer/astronomer-cosmos/issues/2960), not owned by
   this proposal.
-- **S2 - `auto_schedule` and `DbtUpstreamUpdated`** for `DbtDag`. Depends on S9 (ownership/emission/
-  namespace verification), S4 (`DBT_LS` relation identity, constraint 7), and constraint 5 (#2959
-  unifying emission across modes) all landing first. Implementation: the `timetable` patch in the
-  converter (constraint 8) and the extend-an-existing-schedule compatibility matrix.
+- **S2 - `auto_schedule` and `DbtUpstreamUpdated`** for `DbtDag`, **Airflow 3 only** (constraint 8 - the
+  `timetable` patch doesn't work on Airflow 2, and Airflow 2 support isn't planned). Depends on S9
+  (ownership/emission/namespace verification), S4 (`DBT_LS` relation identity, constraint 7), and
+  constraint 5 (#2959 unifying emission across modes) all landing first. Implementation: the `timetable`
+  patch in the converter (constraint 8) and the extend-an-existing-schedule compatibility matrix.
 - **S5 - ASYNC reconciliation**: part of #2959 (constraint 5), not owned by this proposal.
 - **S6 - a `DbtDagGroup` container** (ticket alternative b.iii): the leading candidate for S9.
 - **S7 - Docs and refitting the `cross_project_*` examples**, including the WATCHER-family

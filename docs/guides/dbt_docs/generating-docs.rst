@@ -139,7 +139,7 @@ Requirements specific to Kubernetes:
 
 - The container image must include your dbt project files.
 - The container image or mounted files must include a ``profiles.yml`` file, because Kubernetes execution mode does not support :ref:`use-profile-mapping`.
-- The container image must have the AWS CLI available because Cosmos uploads the generated docs with ``aws s3 sync``.
+- The container image must have ``boto3`` available because Cosmos uploads the generated docs from inside the Pod with a small Python uploader.
 - The Pod still needs the database credentials and any other secrets required to run ``dbt docs generate``.
 
 The following example extends the Kubernetes example DAG and uploads the generated docs to S3:
@@ -149,7 +149,7 @@ The following example extends the Kubernetes example DAG and uploads the generat
    :start-after: [START kubernetes_docs_to_s3_example]
    :end-before: [END kubernetes_docs_to_s3_example]
 
-The ``connection_id`` is resolved from Airflow and translated into AWS environment variables that are injected into the Pod before ``aws s3 sync`` runs.
+The ``connection_id`` is resolved from Airflow with ``AwsBaseHook`` and translated into AWS environment variables that are injected into the Pod before the ``boto3`` uploader runs.
 
 .. note::
     This Kubernetes integration currently supports S3 only. If you need another storage backend, use one of the local operators or extend Cosmos with another Kubernetes docs operator.

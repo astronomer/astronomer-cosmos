@@ -503,6 +503,7 @@ jobs:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
     strategy:

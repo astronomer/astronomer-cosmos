@@ -5,12 +5,14 @@ from unittest.mock import patch
 
 import pytest
 import yaml
+from jinja2 import TemplateAssertionError
 from packaging.version import Version
 
 from cosmos.constants import DBT_DEFAULT_PACKAGES_FOLDER, DBT_PROJECT_FILENAME, PACKAGE_LOCKFILE_YML
 from cosmos.dbt.project import (
     _resolve_dags_folder,
     _resolve_env_var,
+    _resolve_profiles_yml_env_var,
     change_working_directory,
     copy_dbt_packages,
     copy_manifest_file_if_exists,
@@ -130,14 +132,20 @@ def test_resolve_env_var_with_complex_template_unset_var():
 
 
 @patch.dict(os.environ, {"DBT_THREADS": "8"})
-def test_resolve_env_var_with_dbt_filters():
+def test_resolve_profiles_yml_env_var_with_dbt_filters():
     """dbt's documented profiles.yml filters (as_number, as_bool, as_text, as_native) are
     registered as identity no-ops, matching dbt's text-mode Jinja environment (#2948)."""
-    assert _resolve_env_var("{{ env_var('DBT_THREADS', 4) | as_number }}") == "8"
-    assert _resolve_env_var("{{ env_var('UNSET_DBT_THREADS', 4) | as_number }}") == "4"
-    assert _resolve_env_var("{{ env_var('UNSET_DBT_SSL', 'true') | as_bool }}") == "true"
-    assert _resolve_env_var("{{ 'raw' | as_text }}") == "raw"
-    assert _resolve_env_var("{{ '[1, 2]' | as_native }}") == "[1, 2]"
+    assert _resolve_profiles_yml_env_var("{{ env_var('DBT_THREADS', 4) | as_number }}") == "8"
+    assert _resolve_profiles_yml_env_var("{{ env_var('UNSET_DBT_THREADS', 4) | as_number }}") == "4"
+    assert _resolve_profiles_yml_env_var("{{ env_var('UNSET_DBT_SSL', 'true') | as_bool }}") == "true"
+    assert _resolve_profiles_yml_env_var("{{ 'raw' | as_text }}") == "raw"
+    assert _resolve_profiles_yml_env_var("{{ '[1, 2]' | as_native }}") == "[1, 2]"
+
+
+def test_resolve_env_var_does_not_use_profiles_yml_filters():
+    """Profiles-only filters must not change rendering of dbt_project.yml values."""
+    with pytest.raises(TemplateAssertionError, match="No filter named 'as_number'"):
+        _resolve_env_var("{{ env_var('DBT_THREADS', 4) | as_number }}")
 
 
 @patch.dict(os.environ, {"ENV_SUFFIX": "prod"})

@@ -190,9 +190,8 @@ my_profile:
         profile_config.target_name = "dev"
         assert get_dataset_namespace(profile_config) == "postgres://dbhost.internal:5433"
 
-    def test_profiles_yml_filepath_unrenderable_field_keeps_raw_value(self, tmp_path):
-        """A field whose Jinja cannot be rendered degrades to its raw value instead of aborting
-        namespace derivation for the whole profile (#2948)."""
+    def test_profiles_yml_filepath_unrenderable_namespace_field_returns_none(self, tmp_path, caplog):
+        """An unrenderable resolver-read field must not leak literal Jinja into the namespace."""
         profiles_yml = tmp_path / "profiles.yml"
         profiles_yml.write_text("""
 my_profile:
@@ -207,7 +206,9 @@ my_profile:
         profile_config.profiles_yml_filepath = str(profiles_yml)
         profile_config.profile_name = "my_profile"
         profile_config.target_name = "dev"
-        assert get_dataset_namespace(profile_config) == "postgres://db-{{ this.is_not_env_var }}.prod.internal:5433"
+        with caplog.at_level(logging.WARNING):
+            assert get_dataset_namespace(profile_config) is None
+        assert "namespace field 'host'" in caplog.text
 
     def test_profiles_yml_filepath_with_dbt_jinja_filters(self, tmp_path, monkeypatch):
         """Regression test for #2948: dbt's documented profiles.yml filters (as_number, as_bool)

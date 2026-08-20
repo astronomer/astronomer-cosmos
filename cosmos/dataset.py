@@ -156,12 +156,15 @@ def _render_profile_field(field: str, value: str, namespace_field: bool = False)
     Resolver-read fields fail instead so literal Jinja cannot enter an emitted namespace.
     """
     try:
-        return _resolve_profiles_yml_env_var(value)
+        rendered = _resolve_profiles_yml_env_var(value)
     except TemplateError as error:
         if namespace_field:
             raise TemplateError(f"Could not render Jinja in namespace field '{field}'") from error
         logger.debug("Could not render Jinja in profiles.yml field '%s'; using the raw value", field, exc_info=True)
         return value
+    if namespace_field and not rendered.strip():
+        raise TemplateError(f"Namespace field '{field}' rendered to an empty value")
+    return rendered
 
 
 def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any]]:

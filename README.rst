@@ -29,7 +29,7 @@
     :alt: Commit activity
 
 .. |slack| image:: https://img.shields.io/badge/slack-%23airflow--dbt-white.svg?logo=slack&style=social
-    :target: https://join.slack.com/t/apache-airflow/shared_invite/zt-1zy8e8h85-es~fn19iMzUmkhPwnyRT6Q
+    :target: https://apache-airflow.slack.com/archives/C059CC42E9W
     :alt: Slack #airflow-dbt
 
 .. |health| image:: https://insights.linuxfoundation.org/api/badge/health-score?project=astronomer-astronomer-cosmos
@@ -88,7 +88,7 @@ This will generate an Airflow DAG that looks like this:
 
 Community
 _________
-- Join us on the Airflow `Slack <https://join.slack.com/t/apache-airflow/shared_invite/zt-1zy8e8h85-es~fn19iMzUmkhPwnyRT6Q>`_ at #airflow-dbt
+- Join us on the Airflow `Slack <https://apache-airflow.slack.com/archives/C059CC42E9W>`_ at #airflow-dbt
 
 
 Changelog

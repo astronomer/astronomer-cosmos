@@ -38,7 +38,7 @@ At the moment, the user is expected to add to the Docker image both:
 - The dbt Profile, which contains the information for dbt to access the database while parsing the project from Apache Airflow nodes
 - Handle secrets
 
-If you plan to generate dbt docs and upload them to S3 from Kubernetes, the image also needs the AWS CLI because Cosmos performs the upload from inside the Pod.
+If you plan to generate dbt docs and upload them to S3 from Kubernetes, the Pod image must have ``boto3`` available, either installed directly or provided by packages such as ``apache-airflow-providers-amazon``.
 
 Additional KubernetesPodOperator parameters can be added to the ``operator_args`` parameter of the ``DbtKubernetesOperator``.
 
@@ -50,7 +50,7 @@ For instance,
    :end-before: [END kubernetes_tg_example]
 
 To generate dbt docs and upload them to S3 from the same Pod, use :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator` and Cosmos 1.15.0 or higher.
-See :doc:`../../dbt_docs/generating-docs` for an end-to-end example and the extra requirements for this workflow.
+See :ref:`generating-docs` for an end-to-end example and the extra requirements for this workflow.
 
 Container command and image ENTRYPOINT
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -212,8 +212,8 @@ The Kubernetes execution mode has the following limitations:
 - Does not emit OpenLineage events (there is an `open ticket #496 <https://github.com/astronomer/astronomer-cosmos/issues/496>`__ to address this)
 - Does not emit Airflow datasets, assets, and dataset aliases (there is an `open ticket #2329 <https://github.com/astronomer/astronomer-cosmos/issues/2329>`__ to address this)
 - Does not handle installing dbt deps for users (there is an `open ticket #679 <https://github.com/astronomer/astronomer-cosmos/issues/679>`__ to address this)
-- Does not support `ProfileMapping <https://astronomer.github.io/astronomer-cosmos/guides/connect_database/use-profile-mapping.html>`_ (there is an `open ticket #749 <https://github.com/astronomer/astronomer-cosmos/issues/749>`__ to address this)
-- Does not support :doc:`../callbacks/callbacks` (there is an `open ticket #1575 <https://github.com/astronomer/astronomer-cosmos/issues/1575>`__ to address this)
-- Does not expose Compiled SQL as a `templated field <https://astronomer.github.io/astronomer-cosmos/guides/cosmos_devex/compiled-sql.html>`_
-- Does not benefit from `Cosmos caching mechanisms <https://astronomer.github.io/astronomer-cosmos/optimize_performance/caching.html>`_
+- Does not support :ref:`ProfileMapping <use-profile-mapping>` (there is an `open ticket #749 <https://github.com/astronomer/astronomer-cosmos/issues/749>`__ to address this)
+- Does not support :ref:`callbacks` (there is an `open ticket #1575 <https://github.com/astronomer/astronomer-cosmos/issues/1575>`__ to address this)
+- Does not expose Compiled SQL as a :ref:`templated field <compiled-sql>`
+- Does not benefit from :ref:`Cosmos caching mechanisms <caching>`
 - Since 1.15.0, supports generating dbt docs and uploading them to S3 with :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator`; other object stores and callback-based uploads remain unsupported in Kubernetes execution mode

@@ -333,7 +333,7 @@ jobs:
       AIRFLOW_CONN_DATABRICKS_DEFAULT: ${{ secrets.AIRFLOW_CONN_DATABRICKS_DEFAULT }}
       DATABRICKS_CLUSTER_ID: ${{ secrets.DATABRICKS_CLUSTER_ID }}
 
-  Run-Integration-Tests-DBT-1-5-4:
+  Run-Integration-Tests-DBT-1-8:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
@@ -344,7 +344,7 @@ jobs:
       matrix:
         python-version: [ "3.11" ]
         airflow-version: [ "2.10", "3.0" ]
-        dbt-version: [ "1.5" ]
+        dbt-version: [ "1.8" ]
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
@@ -372,7 +372,7 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.cache/uv
-          key: integration-dbt-1-5-4-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
+          key: integration-dbt-1-8-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -385,9 +385,9 @@ jobs:
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
-      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.5.4
+      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.8 (min supported)
         run: |
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-1-5-4
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-1-8
         env:
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
@@ -410,7 +410,7 @@ jobs:
           POSTGRES_PORT: 5432
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
-          DBT_PROJECT_NAME: "altered_jaffle_shop"  # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
+          DBT_PROJECT_NAME: "altered_jaffle_shop"  # The syntax of jaffle_shop is not supported in dbt 1.8, only in dbt >= 1.10
           TEST_SINGLE_DAG: "basic_cosmos_task_group.py"  # There are circumstances when we only need to run a single DAG, but we were parsing all the DAGs. This change is to avoid parsing all the DAGs.
 
   Run-Integration-Tests-DBT-Async:
@@ -424,7 +424,7 @@ jobs:
       matrix:
         python-version: [ "3.11" ]
         airflow-version: [ "2.11", "3.0" ]
-        dbt-version: ["1.6", "1.7", "1.8", "1.9", "1.10", "1.11"]
+        dbt-version: ["1.8", "1.9", "1.10", "1.11"]
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
@@ -480,7 +480,7 @@ jobs:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
-      DBT_PROJECT_NAME: "altered_jaffle_shop" # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
+      DBT_PROJECT_NAME: "altered_jaffle_shop" # The syntax of jaffle_shop is not supported in dbt < 1.10
       AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS: 0 # The altered_jaffle_shop project has non-ASCII characters which raise an exception in earlier versions of Airflow, as documented in https://github.com/astronomer/astronomer-cosmos/issues/1802
       AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
       AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
@@ -503,6 +503,7 @@ jobs:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
     strategy:

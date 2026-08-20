@@ -210,6 +210,27 @@ my_profile:
             assert get_dataset_namespace(profile_config) is None
         assert "namespace field 'host'" in caplog.text
 
+    def test_profiles_yml_filepath_empty_namespace_field_returns_none(self, tmp_path, caplog, monkeypatch):
+        """A missing env_var without a default must not emit an empty namespace component."""
+        monkeypatch.delenv("COSMOS_MISSING_NAMESPACE_HOST", raising=False)
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('COSMOS_MISSING_NAMESPACE_HOST') }}"
+      port: 5433
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        with caplog.at_level(logging.WARNING):
+            assert get_dataset_namespace(profile_config) is None
+        assert "Namespace field 'host' rendered to an empty value" in caplog.text
+
     def test_profiles_yml_filepath_with_dbt_jinja_filters(self, tmp_path, monkeypatch):
         """Regression test for #2948: dbt's documented profiles.yml filters (as_number, as_bool)
         on fields the namespace resolvers never read must not disable dataset emission."""

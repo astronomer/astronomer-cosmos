@@ -642,6 +642,44 @@ def test_load_from_dbt_manifest_resolves_package_path(tmp_path):
     assert node.file_path.name == "foo.sql"
 
 
+@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
+def test_load_from_dbt_manifest_reclassifies_semantic_layer_materializations(tmp_path, materialization):
+    """Model nodes materialized as an adapter-native semantic layer object (Databricks metric views,
+    Snowflake semantic views) are reclassified to DbtResourceType.SEMANTIC_LAYER, since dbt itself
+    models them as plain `model` nodes distinguished only by `config.materialized`."""
+    manifest = {
+        "metadata": {"project_name": "my_project"},
+        "nodes": {
+            "model.my_project.foo": {
+                "original_file_path": "models/foo.sql",
+                "package_name": "my_project",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": materialization},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_file = tmp_path / "manifest.json"
+    manifest_file.write_text(json.dumps(manifest))
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="my_project")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+    assert dbt_graph.nodes["model.my_project.foo"].resource_type == DbtResourceType.SEMANTIC_LAYER
+
+
 def test_load_via_manifest_with_selectors_and_missing_definitions():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST_MODEL_VERSION
@@ -2154,6 +2192,46 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
     assert expected_nodes == nodes
 
 
+@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
+def test_parse_dbt_ls_output_reclassifies_semantic_layer_materializations(materialization):
+    """Model nodes materialized as an adapter-native semantic layer object (Databricks metric views,
+    Snowflake semantic views) are reclassified to DbtResourceType.SEMANTIC_LAYER, since dbt itself
+    models them as plain `model` nodes distinguished only by `config.materialized`."""
+    fake_ls_stdout = json.dumps(
+        {
+            "resource_type": "model",
+            "name": "fake-name",
+            "package_name": "fake-project",
+            "original_file_path": "fake-file-path.sql",
+            "unique_id": "fake-unique-id",
+            "tags": [],
+            "config": {"materialized": materialization},
+        }
+    )
+
+    nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert nodes["fake-unique-id"].resource_type == DbtResourceType.SEMANTIC_LAYER
+
+
+def test_parse_dbt_ls_output_does_not_reclassify_regular_materializations():
+    fake_ls_stdout = json.dumps(
+        {
+            "resource_type": "model",
+            "name": "fake-name",
+            "package_name": "fake-project",
+            "original_file_path": "fake-file-path.sql",
+            "unique_id": "fake-unique-id",
+            "tags": [],
+            "config": {"materialized": "view"},
+        }
+    )
+
+    nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert nodes["fake-unique-id"].resource_type == DbtResourceType.MODEL
+
+
 def test_parse_dbt_ls_output_skips_dbt_loom_external_nodes(caplog):
     """Test that parse_dbt_ls_output skips external nodes (e.g., from dbt-loom) that have no file path."""
     # Simulates dbt ls output with:
@@ -2639,9 +2717,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
+        assert hash_dir in ("0a59399170adcad187aa33f77eadd195",)
     else:
-        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
+        assert hash_dir == "0a59399170adcad187aa33f77eadd195"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2680,9 +2758,9 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
+        assert hash_dir in ("0a59399170adcad187aa33f77eadd195",)
     else:
-        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
+        assert hash_dir == "0a59399170adcad187aa33f77eadd195"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")

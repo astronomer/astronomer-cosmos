@@ -12,7 +12,7 @@ from packaging.version import Version
 
 from cosmos import settings
 from cosmos.constants import _DATASET_EMITTING_RESOURCE_TYPES, AIRFLOW_VERSION
-from cosmos.dbt.project import _resolve_env_var
+from cosmos.dbt.project import _resolve_profiles_yml_env_var
 from cosmos.log import get_logger
 
 if TYPE_CHECKING:
@@ -100,6 +100,24 @@ _ADAPTER_NAMESPACE_RESOLVERS: dict[str, Any] = {
     "duckdb": lambda p: f"duckdb://{p.get('path', '')}",
 }
 
+# Profile fields read by each resolver. An unrenderable value in one of these fields must abort
+# namespace derivation instead of allowing literal Jinja syntax into the emitted URI.
+_ADAPTER_NAMESPACE_FIELDS: dict[str, set[str]] = {
+    "postgres": {"host", "port"},
+    "redshift": {"host", "port"},
+    "bigquery": set(),
+    "snowflake": {"account"},
+    "databricks": {"host"},
+    "spark": {"host", "port", "method"},
+    "trino": {"host", "port"},
+    "clickhouse": {"host", "port"},
+    "sqlserver": {"server", "port"},
+    "dremio": {"software_host", "port"},
+    "athena": {"region_name"},
+    "glue": {"region", "account_id", "role_arn"},
+    "duckdb": {"path"},
+}
+
 
 def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_id: str) -> str:
     """
@@ -130,6 +148,25 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
     return "__".join(identifiers_list)
 
 
+def _render_profile_field(field: str, value: str, namespace_field: bool = False) -> str:
+    """Render one profiles.yml field, keeping irrelevant raw values when necessary.
+
+    Fields the namespace resolvers never read (e.g. ``threads``) may use Jinja that this
+    renderer does not support; one such field must not abort derivation for the whole profile.
+    Resolver-read fields fail instead so literal Jinja cannot enter an emitted namespace.
+    """
+    try:
+        rendered = _resolve_profiles_yml_env_var(value)
+    except TemplateError as error:
+        if namespace_field:
+            raise TemplateError(f"Could not render Jinja in namespace field '{field}'") from error
+        logger.debug("Could not render Jinja in profiles.yml field '%s'; using the raw value", field, exc_info=True)
+        return value
+    if namespace_field and not rendered.strip():
+        raise TemplateError(f"Namespace field '{field}' rendered to an empty value")
+    return rendered
+
+
 def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any]]:
     """
     Extract the adapter type and profile dict from a ProfileConfig.
@@ -147,9 +184,27 @@ def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any
         with open(profile_config.profiles_yml_filepath) as f:
             profiles = yaml.safe_load(f)
         target = profiles[profile_config.profile_name]["outputs"][profile_config.target_name]
+        raw_adapter_type = target.get("type", "")
+        adapter_type = (
+            _render_profile_field("type", raw_adapter_type, namespace_field=True)
+            if isinstance(raw_adapter_type, str)
+            else raw_adapter_type
+        )
+        namespace_fields = _ADAPTER_NAMESPACE_FIELDS.get(adapter_type, set())
         # dbt renders env_var() Jinja in profiles.yml; replicate that since we read the file directly.
-        target = {key: _resolve_env_var(value) if isinstance(value, str) else value for key, value in target.items()}
-        adapter_type = target.get("type", "")
+        # Render per field so one unrenderable field cannot abort the whole profile (#2948).
+        target = {
+            key: (
+                (
+                    adapter_type
+                    if key == "type"
+                    else _render_profile_field(key, value, namespace_field=key in namespace_fields)
+                )
+                if isinstance(value, str)
+                else value
+            )
+            for key, value in target.items()
+        }
         return adapter_type, target
 
     return "", {}
@@ -172,8 +227,12 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     """
     try:
         adapter_type, profile_dict = _get_profile_dict(profile_config)
-    except (AttributeError, KeyError, TypeError, OSError, yaml.YAMLError, TemplateError):
-        logger.debug("Unable to extract profile info for dataset namespace derivation", exc_info=True)
+    except (AttributeError, KeyError, TypeError, OSError, yaml.YAMLError, TemplateError) as error:
+        logger.warning(
+            "Unable to extract profile info for dataset namespace derivation (%s); dataset emission will be skipped.",
+            error,
+            exc_info=True,
+        )
         return None
 
     if not adapter_type:

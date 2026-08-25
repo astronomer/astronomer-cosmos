@@ -59,10 +59,19 @@ def _fqn_matches(node_fqn: str, fqn_selector_value: str) -> bool:
 
 
 def _bare_identifier_matches(node: DbtNode, identifier: str) -> bool:
-    """True if a bare token matches the node by package name, node name, or folder (path segment)."""
-    if (node.package_name or "") == identifier or node.name == identifier:
-        return True
-    return identifier in node.file_path.parts
+    """
+    True if a bare token matches the node the dbt way: as an element of the node's fqn
+    (package name, a folder under the model paths, or the node name).
+    Falls back to package name, node name, or project-relative folder segment when fqn is
+    absent (e.g. LoadMode.CUSTOM does not populate it).
+    """
+    if node.fqn:
+        return identifier in node.fqn
+    return (
+        (node.package_name or "") == identifier
+        or node.name == identifier
+        or identifier in node.original_file_path.parts
+    )
 
 
 def _check_nested_value_in_dict(dict_: dict[Any, Any], pattern: str) -> bool:
@@ -331,23 +340,19 @@ class GraphSelector:
             else:
                 logger.warning("Unsupported config key selector: %s", config_selection_key)
         else:
-            node_by_name = {}
-            for node_id, node in nodes.items():
-                node_by_name[node.name] = node_id
-
+            # Resolve the bare token the dbt way: union node-name, folder, and package matches.
+            # The exact-name lookup additionally handles dotted/versioned names (node.name is
+            # dot-to-underscore patched), which _bare_identifier_matches does not, so keep both.
+            root_nodes.update(
+                node_id for node_id, node in nodes.items() if _bare_identifier_matches(node, self.node_name)
+            )
+            node_by_name = {node.name: node_id for node_id, node in nodes.items()}
             node_name_patched = self.node_name.replace(".", "_")
-
             if node_name_patched in node_by_name:
                 root_nodes.add(node_by_name[node_name_patched])
-            else:
-                # Bare token isn't an exact node name: fall back to folder/package
-                # resolution, matching non-graph bare identifiers and `dbt ls`.
-                root_nodes.update(
-                    node_id for node_id, node in nodes.items() if _bare_identifier_matches(node, self.node_name)
-                )
-                if not root_nodes:
-                    logger.warning("Selector %s not found.", self.node_name)
-                    return selected_nodes
+            if not root_nodes:
+                logger.warning("Selector %s not found.", self.node_name)
+                return selected_nodes
 
         selected_nodes.update(root_nodes)
 
@@ -745,7 +750,7 @@ class NodeSelector:
         return (node.package_name or "") in self.config.packages
 
     def _is_bare_identifier_matching(self, node: DbtNode) -> bool:
-        """Bare identifiers match by package_name, node name, or path segment (e.g. folder name)."""
+        """Bare identifiers match the dbt way, against the node's fqn (package, folder, or node name)."""
         return any(_bare_identifier_matches(node, bare) for bare in self.config.bare_identifiers)
 
     def _is_tags_subset(self, node: DbtNode) -> bool:

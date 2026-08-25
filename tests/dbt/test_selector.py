@@ -1319,6 +1319,57 @@ def test_select_nodes_by_bare_package_name_with_descendants():
     assert selected_bare.keys() == selected_explicit.keys() == {pkg_node.unique_id, downstream.unique_id}
 
 
+def _fqn_node(name, folder, deps=()):
+    """A manifest-style model node carrying an fqn (package, folder segments, name), as dbt records it."""
+    fqn = ["proj", folder, name] if folder else ["proj", name]
+    return DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.proj.{name}",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[f"{DbtResourceType.MODEL.value}.proj.{d}" for d in deps],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path(f"models/{folder}/{name}.sql" if folder else f"models/{name}.sql"),
+        tags=[],
+        config={},
+        package_name="proj",
+        fqn=fqn,
+    )
+
+
+def test_graph_operator_bare_root_unions_node_name_and_folder():
+    """A bare root that is both a node name and a folder name resolves to both, plus descendants (BOSS-615).
+
+    Mirrors dbt: model 'shared' (models/misc) and folder models/shared/ (alpha, beta) both match 'shared',
+    so 'shared+' expands from every one of them.
+    """
+    # 'shared' is a model in models/misc; 'shared' is also a folder holding alpha and beta; down uses the model.
+    nodes = {
+        n.unique_id: n
+        for n in [
+            _fqn_node("shared", "misc"),
+            _fqn_node("alpha", "shared"),
+            _fqn_node("beta", "shared", deps=["alpha"]),
+            _fqn_node("down", "", deps=["shared"]),
+        ]
+    }
+    without_operator = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["shared"])
+    with_descendants = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["shared+"])
+    resource_names = lambda selected: {uid.split(".")[-1] for uid in selected}
+    assert resource_names(without_operator) == {"shared", "alpha", "beta"}
+    assert resource_names(with_descendants) == {"shared", "alpha", "beta", "down"}
+
+
+def test_bare_root_resolves_via_fqn_not_absolute_path():
+    """Bare roots resolve against the node's fqn, so the model-paths root and filesystem ancestors do not match.
+
+    dbt never selects on the 'models' directory or an absolute path segment. The package name (fqn root) does.
+    """
+    nodes = {n.unique_id: n for n in [_fqn_node("alpha", "staging"), _fqn_node("beta", "staging", deps=["alpha"])]}
+    # 'models' is the model-paths root and is stripped from the fqn, so it matches nothing (matching dbt).
+    assert select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["models+"]) == {}
+    # The package name is the fqn root, so it matches every node.
+    assert set(select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["proj"]).keys()) == set(nodes.keys())
+
+
 def test_select_exposure_nodes_by_graph_ancestry():
     """
     Test selecting an exposure node and its directs ancestors using the syntax '+exposure:exposure_name'.

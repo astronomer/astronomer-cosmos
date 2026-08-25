@@ -58,7 +58,7 @@ def _fqn_matches(node_fqn: str, fqn_selector_value: str) -> bool:
     return node_fqn == fqn_selector_value
 
 
-def _bare_identifier_matches(node: DbtNode, identifier: str) -> bool:
+def _node_matches_bare_identifier(node: DbtNode, identifier: str) -> bool:
     """
     True if a bare token matches the node the dbt way: as an element of the node's fqn
     (package name, a folder under the model paths, or the node name).
@@ -342,9 +342,9 @@ class GraphSelector:
         else:
             # Resolve the bare token the dbt way: union node-name, folder, and package matches.
             # The exact-name lookup additionally handles dotted/versioned names (node.name is
-            # dot-to-underscore patched), which _bare_identifier_matches does not, so keep both.
+            # dot-to-underscore patched), which _node_matches_bare_identifier does not, so keep both.
             root_nodes.update(
-                node_id for node_id, node in nodes.items() if _bare_identifier_matches(node, self.node_name)
+                node_id for node_id, node in nodes.items() if _node_matches_bare_identifier(node, self.node_name)
             )
             node_by_name = {node.name: node_id for node_id, node in nodes.items()}
             node_name_patched = self.node_name.replace(".", "_")
@@ -751,7 +751,7 @@ class NodeSelector:
 
     def _is_bare_identifier_matching(self, node: DbtNode) -> bool:
         """Bare identifiers match the dbt way, against the node's fqn (package, folder, or node name)."""
-        return any(_bare_identifier_matches(node, bare) for bare in self.config.bare_identifiers)
+        return any(_node_matches_bare_identifier(node, bare) for bare in self.config.bare_identifiers)
 
     def _is_tags_subset(self, node: DbtNode) -> bool:
         """Checks if the node's tags are a subset of the config's tags."""

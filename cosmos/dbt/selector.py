@@ -58,6 +58,13 @@ def _fqn_matches(node_fqn: str, fqn_selector_value: str) -> bool:
     return node_fqn == fqn_selector_value
 
 
+def _bare_identifier_matches(node: DbtNode, identifier: str) -> bool:
+    """True if a bare token matches the node by package name, node name, or folder (path segment)."""
+    if (node.package_name or "") == identifier or node.name == identifier:
+        return True
+    return identifier in node.file_path.parts
+
+
 def _check_nested_value_in_dict(dict_: dict[Any, Any], pattern: str) -> bool:
     """
     Given a dictionary dict_, identify if the pattern defined in pattern happens on the dictionary.
@@ -331,11 +338,16 @@ class GraphSelector:
             node_name_patched = self.node_name.replace(".", "_")
 
             if node_name_patched in node_by_name:
-                root_id = node_by_name[node_name_patched]
-                root_nodes.add(root_id)
+                root_nodes.add(node_by_name[node_name_patched])
             else:
-                logger.warning("Selector %s not found.", self.node_name)
-                return selected_nodes
+                # Bare token isn't an exact node name: fall back to folder/package
+                # resolution, matching non-graph bare identifiers and `dbt ls`.
+                root_nodes.update(
+                    node_id for node_id, node in nodes.items() if _bare_identifier_matches(node, self.node_name)
+                )
+                if not root_nodes:
+                    logger.warning("Selector %s not found.", self.node_name)
+                    return selected_nodes
 
         selected_nodes.update(root_nodes)
 
@@ -734,11 +746,7 @@ class NodeSelector:
 
     def _is_bare_identifier_matching(self, node: DbtNode) -> bool:
         """Bare identifiers match by package_name, node name, or path segment (e.g. folder name)."""
-        if (node.package_name or "") in self.config.bare_identifiers or node.name in self.config.bare_identifiers:
-            return True
-        # Match by path segment (folder name): e.g. "folder_a" matches nodes under .../folder_a/...
-        path_parts = node.file_path.parts
-        return any(bare in path_parts for bare in self.config.bare_identifiers)
+        return any(_bare_identifier_matches(node, bare) for bare in self.config.bare_identifiers)
 
     def _is_tags_subset(self, node: DbtNode) -> bool:
         """Checks if the node's tags are a subset of the config's tags."""

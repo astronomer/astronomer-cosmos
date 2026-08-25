@@ -1267,6 +1267,58 @@ def test_exclude_nodes_by_bare_folder_name():
     assert parent_node.unique_id in excluded
 
 
+def test_select_nodes_by_bare_folder_name_with_descendants():
+    """Bare folder name + graph operator ('gen1+') resolves the folder's nodes and their descendants (BOSS-615)."""
+    # gen1 roots (grandparent, another_grandparent) -> parent (gen2) -> child/sibling1/2/3 (gen3). orphaned is separate.
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["gen1+"])
+    expected = {
+        grandparent_node.unique_id,
+        another_grandparent_node.unique_id,
+        parent_node.unique_id,
+        child_node.unique_id,
+        sibling1_node.unique_id,
+        sibling2_node.unique_id,
+        sibling3_node.unique_id,
+    }
+    assert set(selected.keys()) == expected
+    # The graph operator must expand beyond the bare folder match, which is only the two gen1 nodes.
+    bare = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["gen1"])
+    assert set(bare.keys()) < set(selected.keys())
+
+
+def test_exclude_nodes_by_bare_folder_name_with_descendants():
+    """Exclude by bare folder + operator ('gen1+') removes the folder's nodes and descendants, leaving only orphaned."""
+    remaining = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, exclude=["gen1+"])
+    assert set(remaining.keys()) == {orphaned_node.unique_id}
+
+
+def test_select_nodes_by_bare_package_name_with_descendants():
+    """Bare package name + operator ('dbt_utils+') resolves like 'package:dbt_utils+' (BOSS-615)."""
+    pkg_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.dbt_utils.uppercase",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("dbt_packages/dbt_utils/macros/uppercase.sql"),
+        tags=[],
+        config={},
+        package_name="dbt_utils",
+    )
+    downstream = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.uses_utils",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[pkg_node.unique_id],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/uses_utils.sql"),
+        tags=[],
+        config={},
+    )
+    local_nodes = {pkg_node.unique_id: pkg_node, downstream.unique_id: downstream}
+    selected_bare = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=local_nodes, select=["dbt_utils+"])
+    selected_explicit = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=local_nodes, select=["package:dbt_utils+"])
+    assert selected_bare.keys() == selected_explicit.keys() == {pkg_node.unique_id, downstream.unique_id}
+
+
 def test_select_exposure_nodes_by_graph_ancestry():
     """
     Test selecting an exposure node and its directs ancestors using the syntax '+exposure:exposure_name'.

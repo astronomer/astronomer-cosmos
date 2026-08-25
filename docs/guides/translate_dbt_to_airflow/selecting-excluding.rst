@@ -37,7 +37,7 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``package:package_name``: include/exclude all nodes that belong to the given package (e.g. ``package:dbt_artifacts``). The package name must be non-empty (use ``package:dbt_artifacts``, not ``package:``).
 - ``package:package_name+``: include/exclude all nodes in the package and their descendants (children).
 - ``+package:package_name``: include/exclude all nodes in the package and their ancestors (parents).
-- A bare name without a method prefix (e.g. ``dbt_artifacts`` or ``child``) is resolved like dbt: it matches nodes by package name, node name, or path segment (folder name). So ``select=['folder_a']`` or ``exclude=['folder_a']`` includes or excludes all models under a folder named ``folder_a``, including when using ``LoadMode.DBT_MANIFEST``.
+- A bare name without a method prefix (e.g. ``dbt_artifacts`` or ``child``) is resolved like dbt: it matches nodes by package name, node name, or path segment (folder name). So ``select=['folder_a']`` or ``exclude=['folder_a']`` includes or excludes all models under a folder named ``folder_a``, including when using ``LoadMode.DBT_MANIFEST``. Graph operators work on bare folder and package roots too, so ``select=['folder_a+']`` or ``select=['package_name+']`` selects the folder or package nodes and their descendants under ``LoadMode.DBT_MANIFEST``.
 
 .. note::
 

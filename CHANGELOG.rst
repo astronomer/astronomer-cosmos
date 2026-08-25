@@ -17,6 +17,11 @@ Behaviour Changes
   ``operator_args={"emit_datasets": False}`` now takes effect.
 * Cosmos now removes the Airflow DAGs folder from dbt's plugin discovery path for the duration of each dbt invocation, in both ``InvocationMode.DBT_RUNNER`` (in-process, via ``sys.path``) and ``InvocationMode.SUBPROCESS`` (via ``PYTHONPATH``). Previously dbt-core imported DAG files named ``dbt_*.py`` as a side effect of plugin discovery, which leaked or duplicated DAGs across unrelated Cosmos DAGs when running in-process and could crash the dbt command in subprocess mode. This is enabled by default. As a result, a genuine dbt plugin named ``dbt_*`` placed inside the DAGs folder will no longer be discovered; set ``enable_dags_folder_exclusion_from_dbt=False`` (env var ``AIRFLOW__COSMOS__ENABLE_DAGS_FOLDER_EXCLUSION_FROM_DBT``) to restore the previous behaviour. See #1673 and #2893.
 * When a dbt project cannot be found, Cosmos now raises a clearer error, and on Airflow 3 with an absolute ``dbt_project_path`` it appends guidance to set the path relative to the DAG file (e.g. ``(Path(__file__).parent / "dbt/my_dbt_project").absolute().as_posix()``). This makes failures caused by versioned DAG bundles (e.g. on Astronomer) relocating the project between DAG parsing and task execution self-explanatory in the logs. The missing-project case in ``create_symlinks`` now raises ``CosmosValueError`` instead of a bare ``FileNotFoundError``. See #2921.
+* Selectors combining a graph operator with a bare folder or package root (e.g. ``post_processing+`` or ``fhir_dbt_utils+``) now resolve nodes under ``LoadMode.DBT_MANIFEST`` where they previously matched nothing. This mainly affects ``exclude``: a bare ``<folder>+`` or ``<package>+`` exclude that was silently a no-op now removes those nodes and their descendants from the rendered DAG, so review such excludes before upgrading. See #2962.
+
+Bug Fixes
+
+* Resolve bare folder and package roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST``, so ``<folder>+`` and ``<package>+`` behave like their ``path:`` and ``package:`` equivalents and like ``dbt ls``. Previously the graph selector resolved its root by exact node name only. See #2962.
 
 1.15.1 (2026-08-04)
 -------------------

@@ -16,7 +16,7 @@ Using ``select`` and ``exclude``
 The ``select`` and ``exclude`` parameters are lists, with values like the following:
 
 - ``tag:my_tag``: include/exclude models with the tag ``my_tag``
-- ``config.meta.some_key:some_value``: include/exclude models with ``config.meta_some_key: some_value``
+- ``config.meta.some_key:some_value``: include/exclude models with the config ``meta: {some_key: some_value}``
 - ``config.materialized:table``: include/exclude models with the config ``materialized: table``
 - ``config.group:customer_mart``: include/exclude models with the config ``group: customer_mart``
 - ``group:customer_mart``: include/exclude nodes that belong to the dbt group ``customer_mart``. This is dbt's shorthand for ``config.group:customer_mart`` and selects the same nodes. The group name must be non-empty (use ``group:customer_mart``, not ``group:``).

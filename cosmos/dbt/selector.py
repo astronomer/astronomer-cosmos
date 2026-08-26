@@ -696,7 +696,11 @@ class NodeSelector:
         return True
 
     def _passes_selector_filters(self, node: DbtNode) -> bool:
-        """Return True if node matches all configured selector filters (path, fqn, resource_type, source, exposure)."""
+        """Return True if node matches all configured selector filters.
+
+        Filters: path, fqn, resource_type, exclude_resource_type, source, exposure, package, group,
+        bare identifier.
+        """
         if self.config.paths and not self._is_path_matching(node):
             return False
         if self.config.fqns and not self._is_fqn_matching(node):

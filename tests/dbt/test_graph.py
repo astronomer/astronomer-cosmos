@@ -449,8 +449,9 @@ def test_load_via_manifest_skips_dbt_loom_external_nodes(tmp_path, caplog):
     assert "Skipping node `model.upstream_project.external_model` because it has no file path" in caplog.text
 
 
-def test_load_via_manifest_with_select_config_group(tmp_path):
-    """``config.group`` selectors filter manifest nodes, as reported in issue #1784."""
+@pytest.mark.parametrize("statement", ["config.group:customer_mart", "group:customer_mart"])
+def test_load_via_manifest_with_group_selectors(tmp_path, statement):
+    """Both group selector spellings filter manifest nodes, as reported in issue #1784."""
     manifest_content = {
         "nodes": {
             "model.my_project.customer_mart_model": {
@@ -499,7 +500,7 @@ def test_load_via_manifest_with_select_config_group(tmp_path):
         project=project_config,
         execution_config=execution_config,
         profile_config=profile_config,
-        render_config=RenderConfig(select=["config.group:customer_mart"]),
+        render_config=RenderConfig(select=[statement]),
     )
 
     dbt_graph.load_from_dbt_manifest()

@@ -19,6 +19,7 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``config.meta.some_key:some_value``: include/exclude models with ``config.meta_some_key: some_value``
 - ``config.materialized:table``: include/exclude models with the config ``materialized: table``
 - ``config.group:customer_mart``: include/exclude models with the config ``group: customer_mart``
+- ``group:customer_mart``: include/exclude nodes that belong to the dbt group ``customer_mart``. This is dbt's shorthand for ``config.group:customer_mart`` and selects the same nodes. The group name must be non-empty (use ``group:customer_mart``, not ``group:``).
 - ``path:analytics/tables``: include/exclude models in the ``analytics/tables`` directory. In this example, ``analytics/table`` is a relative path, but absolute paths are also supported.
 - ``+node_name+1`` (graph operators): include/exclude the node with name ``node_name``, all its parents, and its first generation of children (`dbt graph selector docs <https://docs.getdbt.com/reference/node-selection/graph-operators>`_)
 - ``+/path/to/model_g+`` (graph operators): include/exclude all the nodes in the absolute path ``/path/to/model_g``, their parents and children. Relative paths are also supported.

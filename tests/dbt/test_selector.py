@@ -2254,3 +2254,72 @@ def test_select_nodes_raises_on_empty_group_selector():
         with pytest.raises(CosmosValueError) as err_info:
             select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, **filters)
         assert "group: selector requires a non-empty group name" in err_info.value.args[0]
+
+
+# A group with more than one member, used for the union/intersection group tests above.
+finance_alpha_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.finance_alpha",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/finance_alpha.sql"),
+    tags=["nightly"],
+    config={"materialized": "view", "group": "finance", "tags": ["nightly"]},
+)
+
+finance_beta_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.finance_beta",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/finance_beta.sql"),
+    tags=[],
+    config={"materialized": "view", "group": "finance"},
+)
+
+marketing_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.marketing",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/marketing.sql"),
+    tags=["nightly"],
+    config={"materialized": "view", "group": "marketing", "tags": ["nightly"]},
+)
+
+multi_member_group_nodes = {node.unique_id: node for node in (finance_alpha_node, finance_beta_node, marketing_node)}
+
+
+@pytest.mark.parametrize(
+    "select,expected_nodes",
+    [
+        # Every member of the group is selected, not just the first match.
+        (["group:finance"], [finance_alpha_node, finance_beta_node]),
+        # Separate list entries are a union.
+        (["group:finance", "group:marketing"], [finance_alpha_node, finance_beta_node, marketing_node]),
+        # A comma is an intersection, and it composes with non-config selectors.
+        (["group:finance,tag:nightly"], [finance_alpha_node]),
+        (["group:finance,tag:unknown_tag"], []),
+    ],
+)
+def test_select_nodes_by_group_union_and_intersection(select, expected_nodes):
+    """``group:`` unions across list entries and intersects within a comma-separated entry."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=multi_member_group_nodes, select=select)
+    assert selected == {node.unique_id: node for node in expected_nodes}
+
+
+@pytest.mark.parametrize("statement", ["group:+", "+group:"])
+def test_select_nodes_by_empty_group_with_graph_operator(statement):
+    """An empty group name combined with a graph operator matches nothing.
+
+    ``GraphSelector`` never validates its selector values, so this matches the existing behaviour of
+    ``package:+``, ``tag:+`` and ``source:+`` rather than the ``CosmosValueError`` raised by a bare ``group:``.
+    """
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=multi_member_group_nodes, select=[statement])
+    assert selected == {}
+
+
+def test_is_empty_config_with_only_groups(selector_config):
+    """``groups`` alone must keep a selector config from being treated as empty."""
+    selector_config.groups = ["finance"]
+    assert selector_config.is_empty is False

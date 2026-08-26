@@ -1481,6 +1481,11 @@ def test_exposure_selector():
             {"select": ["config.meta.allow_pii:true"], "exclude": None},
         ),
         (
+            "config_method_group",
+            {"name": "config_method_group", "definition": {"method": "config.group", "value": "customer_mart"}},
+            {"select": ["config.group:customer_mart"], "exclude": None},
+        ),
+        (
             "source_method",
             {"name": "source_method", "definition": {"method": "source", "value": "raw_*"}},
             {"select": ["source:raw_*"], "exclude": None},
@@ -2105,3 +2110,102 @@ def test_selector_reference_resolves_from_cache():
 
     assert base_result == {"select": ["tag:nightly"], "exclude": None}
     assert reference_result == base_result
+
+
+# Nodes used by the ``config.group`` selector tests
+# https://github.com/astronomer/astronomer-cosmos/issues/1784
+finance_base_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.finance_base",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/finance_base.sql"),
+    tags=[],
+    config={"materialized": "view"},
+)
+
+finance_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.finance",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[finance_base_node.unique_id],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen2/models/finance.sql"),
+    tags=[],
+    config={"materialized": "view", "group": "finance"},
+)
+
+finance_child_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.finance_child",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[finance_node.unique_id],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen3/models/finance_child.sql"),
+    tags=[],
+    config={"materialized": "table"},
+)
+
+customer_mart_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.customer_mart",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/customer_mart.sql"),
+    tags=[],
+    config={"materialized": "table", "group": "customer_mart"},
+)
+
+ungrouped_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.ungrouped",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/ungrouped.sql"),
+    tags=[],
+    config={"materialized": "view"},
+)
+
+grouped_sample_nodes = {
+    node.unique_id: node
+    for node in (finance_base_node, finance_node, finance_child_node, customer_mart_node, ungrouped_node)
+}
+
+
+@pytest.mark.parametrize(
+    "statement,expected_nodes",
+    [
+        ("config.group:finance", [finance_node]),
+        ("config.group:customer_mart", [customer_mart_node]),
+        ("config.group:finance+", [finance_node, finance_child_node]),
+        ("+config.group:finance", [finance_base_node, finance_node]),
+        ("config.group:unknown_group", []),
+    ],
+)
+def test_select_nodes_by_select_config_group(statement, expected_nodes):
+    """``config.group:<name>`` selects the nodes whose dbt config declares that group, and supports graph operators."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, select=[statement])
+    assert selected == {node.unique_id: node for node in expected_nodes}
+
+
+def test_select_nodes_by_exclude_config_group():
+    """``config.group:<name>`` removes the grouped nodes and leaves every other node untouched."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, exclude=["config.group:finance"])
+    expected = {
+        finance_base_node.unique_id: finance_base_node,
+        finance_child_node.unique_id: finance_child_node,
+        customer_mart_node.unique_id: customer_mart_node,
+        ungrouped_node.unique_id: ungrouped_node,
+    }
+    assert selected == expected
+
+
+@pytest.mark.parametrize(
+    "statement,expected_nodes",
+    [
+        ("config.group:finance,config.materialized:view", [finance_node]),
+        ("config.group:finance,config.materialized:table", []),
+    ],
+)
+def test_select_nodes_by_config_group_intersection(statement, expected_nodes):
+    """``config.group`` intersects with the other config selectors instead of overriding them."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, select=[statement])
+    assert selected == {node.unique_id: node for node in expected_nodes}

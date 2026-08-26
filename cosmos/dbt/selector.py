@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 CONFIG_META_PATH = "meta"
-SUPPORTED_CONFIG = ["materialized", "schema", "tags", CONFIG_META_PATH]
+SUPPORTED_CONFIG = ["materialized", "schema", "tags", "group", CONFIG_META_PATH]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 FQN_SELECTOR = "fqn:"
@@ -291,9 +291,10 @@ class GraphSelector:
 
         elif CONFIG_SELECTOR in self.node_name:
             config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
-            # currently tags, materialized, schema and meta are the only supported config keys
+            # currently tags, materialized, schema, group and meta are the only supported config keys
             # logic is separated into two conditions because the config 'tags' contains a
-            # list of tags, the config 'materialized' & 'schema' contain strings and meta contains dictionaries
+            # list of tags, the configs 'materialized', 'schema' & 'group' contain strings and meta contains
+            # dictionaries
             if config_selection_key == "tags":
                 root_nodes.update(
                     {
@@ -305,6 +306,7 @@ class GraphSelector:
             elif config_selection_key in (
                 "materialized",
                 "schema",
+                "group",
             ):
                 root_nodes.update(
                     {

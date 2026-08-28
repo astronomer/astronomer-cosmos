@@ -100,6 +100,7 @@ _ADAPTER_NAMESPACE_RESOLVERS: dict[str, Any] = {
     "duckdb": lambda p: f"duckdb://{p.get('path', '')}",
 }
 
+
 def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_id: str) -> str:
     """
     Given the Airflow DAG, Airflow TaskGroup and the Airflow Task ID, return the name of the
@@ -163,20 +164,16 @@ def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any
         target = profiles[profile_config.profile_name]["outputs"][profile_config.target_name]
         raw_adapter_type = target.get("type", "")
         adapter_type = (
-            _render_profile_field("type", raw_adapter_type)
-            if isinstance(raw_adapter_type, str)
-            else raw_adapter_type
+            _render_profile_field("type", raw_adapter_type) if isinstance(raw_adapter_type, str) else raw_adapter_type
         )
         # dbt renders env_var() Jinja in profiles.yml; replicate that since we read the file directly.
         # Render per field so one unrenderable field cannot abort the whole profile (#2948).
         target = {
             key: (
-                adapter_type
-                if key == "type"
-                else _render_profile_field(key, value)
+                (adapter_type if key == "type" else _render_profile_field(key, value))
+                if isinstance(value, str)
+                else value
             )
-            if isinstance(value, str)
-            else value
             for key, value in target.items()
         }
         return adapter_type, target

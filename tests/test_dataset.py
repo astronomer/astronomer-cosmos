@@ -208,7 +208,7 @@ my_profile:
         profile_config.target_name = "dev"
         with caplog.at_level(logging.WARNING):
             assert get_dataset_namespace(profile_config) is None
-        assert "namespace field 'host'" in caplog.text
+        assert "unrendered Jinja" in caplog.text
 
     def test_profiles_yml_filepath_empty_namespace_field_returns_none(self, tmp_path, caplog, monkeypatch):
         """A missing env_var without a default must not emit an empty namespace component."""
@@ -229,7 +229,66 @@ my_profile:
         profile_config.target_name = "dev"
         with caplog.at_level(logging.WARNING):
             assert get_dataset_namespace(profile_config) is None
-        assert "Namespace field 'host' rendered to an empty value" in caplog.text
+        assert "empty host" in caplog.text
+
+    def test_profiles_yml_filepath_glue_empty_role_arn_with_account_id(self, tmp_path):
+        """role_arn is never read when account_id is set, so an empty role_arn is irrelevant
+        to the namespace and must not disable dataset emission."""
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: glue
+      region: us-east-1
+      account_id: "123456789012"
+      role_arn: "{{ env_var('GLUE_ROLE_ARN', '') }}"
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "arn:aws:glue:us-east-1:123456789012"
+
+    def test_profiles_yml_filepath_glue_empty_account_id_falls_through_to_role_arn(self, tmp_path):
+        """An empty account_id falls through to the role_arn fallback in the glue resolver."""
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: glue
+      region: us-east-1
+      account_id: "{{ env_var('GLUE_ACCOUNT_ID', '') }}"
+      role_arn: "arn:aws:iam::999888777666:role/my-role"
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "arn:aws:glue:us-east-1:999888777666"
+
+    def test_profiles_yml_filepath_spark_empty_method_with_port(self, tmp_path):
+        """method is only used for the default port; an empty method must not disable emission
+        when port is explicitly set."""
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: spark
+      host: sparkhost
+      port: 10000
+      method: "{{ env_var('SPARK_METHOD', '') }}"
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "spark://sparkhost:10000"
 
     def test_profiles_yml_filepath_with_dbt_jinja_filters(self, tmp_path, monkeypatch):
         """Regression test for #2948: dbt's documented profiles.yml filters (as_number, as_bool)

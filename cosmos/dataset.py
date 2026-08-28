@@ -100,25 +100,6 @@ _ADAPTER_NAMESPACE_RESOLVERS: dict[str, Any] = {
     "duckdb": lambda p: f"duckdb://{p.get('path', '')}",
 }
 
-# Profile fields read by each resolver. An unrenderable value in one of these fields must abort
-# namespace derivation instead of allowing literal Jinja syntax into the emitted URI.
-_ADAPTER_NAMESPACE_FIELDS: dict[str, set[str]] = {
-    "postgres": {"host", "port"},
-    "redshift": {"host", "port"},
-    "bigquery": set(),
-    "snowflake": {"account"},
-    "databricks": {"host"},
-    "spark": {"host", "port", "method"},
-    "trino": {"host", "port"},
-    "clickhouse": {"host", "port"},
-    "sqlserver": {"server", "port"},
-    "dremio": {"software_host", "port"},
-    "athena": {"region_name"},
-    "glue": {"region", "account_id", "role_arn"},
-    "duckdb": {"path"},
-}
-
-
 def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_id: str) -> str:
     """
     Given the Airflow DAG, Airflow TaskGroup and the Airflow Task ID, return the name of the
@@ -148,23 +129,19 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
     return "__".join(identifiers_list)
 
 
-def _render_profile_field(field: str, value: str, namespace_field: bool = False) -> str:
-    """Render one profiles.yml field, keeping irrelevant raw values when necessary.
+def _render_profile_field(field: str, value: str) -> str:
+    """Render one profiles.yml field, falling back to the raw value on unsupported Jinja.
 
-    Fields the namespace resolvers never read (e.g. ``threads``) may use Jinja that this
-    renderer does not support; one such field must not abort derivation for the whole profile.
-    Resolver-read fields fail instead so literal Jinja cannot enter an emitted namespace.
+    Every field gets the raw-value fallback so that one unrenderable field cannot
+    abort derivation for the whole profile.  Validation of the final namespace
+    string in ``get_dataset_namespace`` catches any residual problems (unrendered
+    Jinja, empty components) in a single place.
     """
     try:
-        rendered = _resolve_profiles_yml_env_var(value)
-    except TemplateError as error:
-        if namespace_field:
-            raise TemplateError(f"Could not render Jinja in namespace field '{field}'") from error
+        return _resolve_profiles_yml_env_var(value)
+    except TemplateError:
         logger.debug("Could not render Jinja in profiles.yml field '%s'; using the raw value", field, exc_info=True)
         return value
-    if namespace_field and not rendered.strip():
-        raise TemplateError(f"Namespace field '{field}' rendered to an empty value")
-    return rendered
 
 
 def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any]]:
@@ -186,23 +163,20 @@ def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any
         target = profiles[profile_config.profile_name]["outputs"][profile_config.target_name]
         raw_adapter_type = target.get("type", "")
         adapter_type = (
-            _render_profile_field("type", raw_adapter_type, namespace_field=True)
+            _render_profile_field("type", raw_adapter_type)
             if isinstance(raw_adapter_type, str)
             else raw_adapter_type
         )
-        namespace_fields = _ADAPTER_NAMESPACE_FIELDS.get(adapter_type, set())
         # dbt renders env_var() Jinja in profiles.yml; replicate that since we read the file directly.
         # Render per field so one unrenderable field cannot abort the whole profile (#2948).
         target = {
             key: (
-                (
-                    adapter_type
-                    if key == "type"
-                    else _render_profile_field(key, value, namespace_field=key in namespace_fields)
-                )
-                if isinstance(value, str)
-                else value
+                adapter_type
+                if key == "type"
+                else _render_profile_field(key, value)
             )
+            if isinstance(value, str)
+            else value
             for key, value in target.items()
         }
         return adapter_type, target
@@ -250,6 +224,27 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
                 adapter_type,
             )
             return None
+        # Reject namespaces that still contain unrendered Jinja syntax.  Individual
+        # fields fall back to their raw value when the renderer does not support the
+        # Jinja they use, so the final namespace is the single place to catch this.
+        if "{{" in namespace or "{%" in namespace:
+            logger.warning(
+                "Resolved namespace '%s' for adapter '%s' contains unrendered Jinja; skipping dataset emission.",
+                namespace,
+                adapter_type,
+            )
+            return None
+        # Reject namespaces with an empty host component (e.g. "postgres://:5432"
+        # from a missing or empty host field).
+        if "://" in namespace:
+            authority = namespace.split("://", 1)[1].split("/")[0]
+            if authority and ":" in authority and not authority.rsplit(":", 1)[0]:
+                logger.debug(
+                    "Resolved namespace '%s' for adapter '%s' has an empty host; skipping dataset emission.",
+                    namespace,
+                    adapter_type,
+                )
+                return None
         return namespace
 
     # Unknown adapters: return None so dataset emission is skipped.

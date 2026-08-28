@@ -236,7 +236,7 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
         if "://" in namespace:
             authority = namespace.split("://", 1)[1].split("/")[0]
             if authority and ":" in authority and not authority.rsplit(":", 1)[0]:
-                logger.debug(
+                logger.warning(
                     "Resolved namespace '%s' for adapter '%s' has an empty host; skipping dataset emission.",
                     namespace,
                     adapter_type,

@@ -133,8 +133,9 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     selectors stop matching the node in favor of ``resource_type:semantic_layer``.
 
     .. note::
-        Disabling this is a breaking change for DAGs that already reference an affected model's
-        pre-reclassification task_id. See :doc:`Managing semantic layer
+        Disabling this restores the pre-reclassification task_id and ``resource_type:model`` matching,
+        which is a breaking change for DAGs that have already adopted the new ``_semantic_layer`` task_id
+        or the ``resource_type:semantic_layer`` selector. See :doc:`Managing semantic layer
         </guides/translate_dbt_to_airflow/managing-semantic-layer>`.
 
     - Default: ``True``

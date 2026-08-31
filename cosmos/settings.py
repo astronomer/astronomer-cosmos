@@ -65,6 +65,13 @@ enable_dags_folder_exclusion_from_dbt = conf.getboolean(
 enable_hierarchical_naming_for_group_nodes_by_folder = conf.getboolean(
     "cosmos", "enable_hierarchical_naming_for_group_nodes_by_folder", fallback=False
 )
+# Reclassifies adapter-native semantic layer models (materialized as metric_view or semantic_view)
+# as DbtResourceType.SEMANTIC_LAYER instead of a plain model. Enabled by default; disabling it is a
+# breaking change for DAGs that already reference the affected models' pre-reclassification task_ids
+# or select on resource_type:model. See the "Managing semantic layer" guide.
+enable_semantic_layer_reclassification = conf.getboolean(
+    "cosmos", "enable_semantic_layer_reclassification", fallback=True
+)
 rich_logging = conf.getboolean("cosmos", "rich_logging", fallback=False)
 dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)

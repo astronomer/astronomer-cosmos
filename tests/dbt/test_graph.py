@@ -680,6 +680,43 @@ def test_load_from_dbt_manifest_reclassifies_semantic_layer_materializations(tmp
     assert dbt_graph.nodes["model.my_project.foo"].resource_type == DbtResourceType.SEMANTIC_LAYER
 
 
+def test_load_from_dbt_manifest_reclassification_disabled_by_setting(tmp_path, monkeypatch):
+    """Setting `enable_semantic_layer_reclassification=False` restores the pre-reclassification
+    behaviour: adapter-native semantic layer models stay plain MODEL nodes."""
+    monkeypatch.setattr("cosmos.settings.enable_semantic_layer_reclassification", False)
+    manifest = {
+        "metadata": {"project_name": "my_project"},
+        "nodes": {
+            "model.my_project.foo": {
+                "original_file_path": "models/foo.sql",
+                "package_name": "my_project",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "metric_view"},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_file = tmp_path / "manifest.json"
+    manifest_file.write_text(json.dumps(manifest))
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="my_project")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+    assert dbt_graph.nodes["model.my_project.foo"].resource_type == DbtResourceType.MODEL
+
+
 def test_load_via_manifest_with_selectors_and_missing_definitions():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST_MODEL_VERSION
@@ -2717,9 +2754,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("0a59399170adcad187aa33f77eadd195",)
+        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
     else:
-        assert hash_dir == "0a59399170adcad187aa33f77eadd195"
+        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2758,9 +2795,9 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("0a59399170adcad187aa33f77eadd195",)
+        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
     else:
-        assert hash_dir == "0a59399170adcad187aa33f77eadd195"
+        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")

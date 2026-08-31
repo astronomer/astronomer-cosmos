@@ -916,13 +916,14 @@ def _semantic_layer_node(materialization="metric_view"):
     )
 
 
-@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
-def test_create_task_metadata_semantic_layer_model_renders_with_semantic_layer_suffix(materialization):
+def test_create_task_metadata_semantic_layer_model_renders_with_semantic_layer_suffix():
     """Semantic layer nodes (Databricks metric views, Snowflake semantic views) are rendered via a
     dedicated DbtSemantic operator (still just running `dbt run` underneath), with a
-    `_semantic_layer` suffix distinguishing them from plain models."""
+    `_semantic_layer` suffix distinguishing them from plain models. The reclassification tests in
+    tests/dbt/test_graph.py already cover both the metric_view and semantic_view materializations;
+    create_task_metadata itself doesn't branch on materialized, so a single case suffices here."""
     metadata = create_task_metadata(
-        _semantic_layer_node(materialization),
+        _semantic_layer_node(),
         execution_mode=ExecutionMode.LOCAL,
         args={},
         dbt_dag_task_group_identifier="",
@@ -932,12 +933,11 @@ def test_create_task_metadata_semantic_layer_model_renders_with_semantic_layer_s
     assert metadata.arguments == {"select": "my_model"}
 
 
-@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
-def test_create_task_metadata_semantic_layer_model_under_build_mode(materialization):
+def test_create_task_metadata_semantic_layer_model_under_build_mode():
     """Under TestBehavior.BUILD, semantic layer nodes get full BUILD treatment (like MODEL/SEED/SNAPSHOT),
     rendering as dbt build tasks rather than falling through to the generic model branch."""
     metadata = create_task_metadata(
-        _semantic_layer_node(materialization),
+        _semantic_layer_node(),
         execution_mode=ExecutionMode.LOCAL,
         args={},
         dbt_dag_task_group_identifier="",

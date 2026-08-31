@@ -24,10 +24,10 @@ that materialization at parse time and reclassifies the node as ``semantic_layer
 
 - **Task identity:** a ``_semantic_layer`` task name suffix and a ``DbtSemantic*`` operator instead of ``DbtRun*``. The underlying dbt command is still ``dbt run``.
 - **TestBehavior.BUILD:** collapses into ``DbtBuild``, same as any other buildable resource.
-- **Selectors:** ``resource_type:model`` no longer matches it — use ``resource_type:semantic_layer`` instead. This
-  reclassification, and therefore this selector, is only applied when Cosmos itself performs node selection (e.g.
-  ``LoadMode.DBT_MANIFEST``). Under ``LoadMode.DBT_LS``, ``select``/``exclude`` are passed directly to the ``dbt ls``
-  command, dbt has no ``semantic_layer`` resource type, and these nodes remain plain ``model`` nodes to dbt — use
+- **Selectors:** ``resource_type:model`` no longer matches it — use ``resource_type:semantic_layer`` instead. The
+  reclassification itself happens regardless of load mode, but this selector only works when Cosmos itself performs
+  node selection (e.g. ``LoadMode.DBT_MANIFEST``). Under ``LoadMode.DBT_LS``, ``select``/``exclude`` are passed
+  directly to the ``dbt ls`` command, dbt has no ``semantic_layer`` resource type, so use
   ``config.materialized:metric_view`` or ``config.materialized:semantic_view`` instead.
 
 Example

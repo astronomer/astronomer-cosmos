@@ -304,6 +304,8 @@ def is_freshness_effective(freshness: dict[str, Any] | None) -> bool:
 
 def _classify_resource_type(resource_type: DbtResourceType, config: dict[str, Any]) -> DbtResourceType:
     """Reclassify adapter-native semantic layer materializations as DbtResourceType.SEMANTIC_LAYER."""
+    if not settings.enable_semantic_layer_reclassification:
+        return resource_type
     materialization = str(config.get("materialized") or "").lower()
     if resource_type == DbtResourceType.MODEL and materialization in DBT_SEMANTIC_LAYER_MATERIALIZATIONS:
         return DbtResourceType.SEMANTIC_LAYER  # type: ignore[return-value]

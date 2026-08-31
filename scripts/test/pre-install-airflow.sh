@@ -42,7 +42,7 @@ if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRF
       echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
       exit 1
     fi
-    # Other dbt minors (1.5-1.10, 2.0) have no per-Airflow lockfile; jobs needing
+    # Other dbt minors (1.8-1.10, 2.0) have no per-Airflow lockfile; jobs needing
     # them re-pin dbt in their own setup step, so this is just a throwaway baseline.
     echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline (this job must re-pin dbt itself)."
     REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"

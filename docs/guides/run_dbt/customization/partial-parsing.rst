@@ -65,7 +65,7 @@ Or environment variable:
     AIRFLOW__COSMOS__CACHE_DIR="path/to/docs/here"  # to override default caching directory (by default, uses the system temporary directory)
     AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE="False"  # to disable caching (enabled by default)
 
-Learn more about :doc:`caching </optimize_performance/caching>` and :doc:`Cosmos Airflow configurations </reference/configs/cosmos-conf>`.
+Learn more about :ref:`caching <caching>` and :ref:`Cosmos Airflow configurations <cosmos-config>`.
 
 Disabling
 ~~~~~~~~~

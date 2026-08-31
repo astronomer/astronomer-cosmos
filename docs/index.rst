@@ -65,7 +65,7 @@ with Airflow effortlessly, saving you time and letting you focus on what truly m
 Ready to get started?
 ~~~~~~~~~~~~~~~~~~~~~
 
-Check out the Cosmos Fundamentals, get started locally with the Quickstart Guides, or find instructions for how to bring your own dbt project to Cosmos in `Get started with Cosmos <https://astronomer.github.io/astronomer-cosmos/getting_started/index.html>`_.
+Check out the Cosmos Fundamentals, get started locally with the Quickstart Guides, or find instructions for how to bring your own dbt project to Cosmos in :ref:`Get started with Cosmos <getting_started>`.
 
 You can also explore more examples in `/dev/dags <https://github.com/astronomer/astronomer-cosmos/tree/main/dev/dags>`_
 or in the `cosmos-demo repo <https://github.com/astronomer/cosmos-demo>`_.
@@ -77,8 +77,8 @@ Have questions, need help, or interested in contributing? We welcome all contrib
 
 - Join the community on Slack! You can find us in the Airflow Slack workspace `#airflow-dbt <https://apache-airflow.slack.com/archives/C059CC42E9W>`_ channel. If you don't have an account, click `here <https://apache-airflow-slack.herokuapp.com/>`_ to sign up.
 - Report bugs, request features, or ask questions by creating an issue in the `GitHub repository <https://github.com/astronomer/astronomer-cosmos/issues/new/choose>`_.
-- Want to contribute new features, bug fixes or documentation enhancements? Please refer to our `Contributing Guide <https://astronomer.github.io/astronomer-cosmos/policy/contributing>`_.
-- Check out our `Current Contributors <https://astronomer.github.io/astronomer-cosmos/policy/contributors>`_.
+- Want to contribute new features, bug fixes or documentation enhancements? Please refer to our :ref:`Contributing Guide <contributing>`.
+- Check out our :ref:`Current Contributors <contributors>`.
 
 Note that contributors and maintainers are expected to abide by the
 `Contributor Code of Conduct <https://github.com/astronomer/astronomer-cosmos/blob/main/CODE_OF_CONDUCT.md>`_.

@@ -8,7 +8,7 @@ This page explains the caching strategies in ``astronomer-cosmos`` Astronomer Co
 All Cosmos caching mechanisms can be enabled or turned off in the ``airflow.cfg`` file or using environment variables.
 
 .. note::
-    For more information, see :doc:`configuring a Cosmos project </reference/configs/project-config>`.
+    For more information, see :ref:`configuring a Cosmos project <project-config>`.
 
 Depending on the Cosmos version, it creates a cache for three types of data:
 
@@ -127,7 +127,7 @@ Caching the YAML selectors
 
 (Introduced in Cosmos 1.13)
 
-While parsing a dbt project using :ref:`LoadMode.DBT_MANIFEST <parsing-methods-dbt-manifest>`, if a ``selector`` argument is provided to the :doc:`RenderConfig </guides/translate_dbt_to_airflow/render-config>` instance passed to the ``DbtDag`` or ``DbtTaskGroup``,
+While parsing a dbt project using :ref:`LoadMode.DBT_MANIFEST <parsing-methods-dbt-manifest>`, if a ``selector`` argument is provided to the :ref:`RenderConfig <render-config>` instance passed to the ``DbtDag`` or ``DbtTaskGroup``,
 Cosmos will parse the preprocessed YAML selectors found in the manifest. The YAML selectors will be parsed into selection criteria that Cosmos will use to filter the dbt nodes to include in the Airflow DAG. The parsed selectors will be cached to improve performance during DAG parsing.
 
 This feature is on by default. To turn it off, export the following environment variable: ``AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS=0``.
@@ -219,7 +219,7 @@ The cache values contain a few properties:
 **Shared Cache Behavior**
 
 When using Airflow variables as the backend to store cached cosmos artifacts, both the dbt ls output and the YAML selectors cache will use the same variable. It should not be possible
-to have both artifacts occupy the cache at the same time due to their distinct :doc:`RenderConfig.load_mode </guides/translate_dbt_to_airflow/render-config>` and switching from using one cache to the other will invalidate the cache on the next version check.
+to have both artifacts occupy the cache at the same time due to their distinct :ref:`RenderConfig.load_mode <render-config>` and switching from using one cache to the other will invalidate the cache on the next version check.
 
 Caching the partial parse file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -237,7 +237,7 @@ Users can customize where to store the cache using the setting ``AIRFLOW__COSMOS
 
 It is possible to switch off this feature by exporting the environment variable ``AIRFLOW__COSMOS__ENABLE_CACHE_PARTIAL_PARSE=0``.
 
-For more information, read the :doc:`Cosmos partial parsing documentation </guides/run_dbt/customization/partial-parsing>`
+For more information, read the :ref:`Cosmos partial parsing documentation <partial-parsing>`
 
 
 Caching the profiles

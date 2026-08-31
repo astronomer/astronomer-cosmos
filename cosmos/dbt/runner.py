@@ -25,6 +25,9 @@ else:  # pragma: no cover
 
 logger = get_logger(__name__)
 
+# dbt events carrying the macro error text of a failed ``run-operation``.
+MACRO_ERROR_EVENTS = ("RunningOperationCaughtError", "RunningOperationUncaughtError")
+
 if TYPE_CHECKING:  # pragma: no cover
     from dbt.cli.main import dbtRunner, dbtRunnerResult
 
@@ -103,6 +106,33 @@ def _cleanup_dbt_adapters() -> None:
     gc.collect()
 
 
+def _collect_macro_errors(collected: list[str]) -> Callable[[Any], None]:
+    def collect(event: Any) -> None:
+        # dbt wraps a raising callback as GenericExceptionOnRun, so never raise from here.
+        try:
+            info = getattr(event, "info", None)
+            if getattr(info, "name", None) not in MACRO_ERROR_EVENTS:
+                return
+            msg = getattr(info, "msg", None)
+            if msg:
+                collected.append(str(msg))
+        except Exception:  # pragma: no cover
+            logger.debug("Unable to read a dbt event while collecting macro errors", exc_info=True)
+
+    return collect
+
+
+def _fill_missing_messages(result: dbtRunnerResult, macro_errors: list[str]) -> None:
+    """dbt < 1.12 hardcodes ``message=None`` on run-operation results (dbt-labs/dbt-core#12730)."""
+    if not macro_errors:
+        return
+
+    message = "\n".join(macro_errors)
+    for node_result in getattr(result.result, "results", None) or []:
+        if getattr(node_result, "message", None) is None:
+            node_result.message = message
+
+
 def run_command(
     command: list[str], env: dict[str, str], cwd: str, callbacks: list[Callable] | None = None, **kwargs: Any  # type: ignore[type-arg]
 ) -> dbtRunnerResult:
@@ -113,6 +143,10 @@ def run_command(
     # command that is used by `InvocationMode.SUBPROCESS`, and in that scenario the first command is necessarily the path
     # to the dbt executable.
     cli_args = command[1:]
+    macro_errors: list[str] = []
+    # Global flags precede the subcommand (see ``build_cmd``), so match anywhere.
+    if "run-operation" in cli_args:
+        callbacks = [*(callbacks or []), _collect_macro_errors(macro_errors)]
     # ``exclude_dags_folder_from_sys_path`` must enter *before* ``change_working_directory`` so it
     # resolves ``DAGS_FOLDER`` against the Airflow process cwd. A relative ``DAGS_FOLDER`` resolved
     # after the chdir would point at the dbt project dir and fail to strip the real DAGs folder.
@@ -125,6 +159,8 @@ def run_command(
             # Reset dbt adapters to release semaphores (run on all exit paths)
             # See: https://github.com/astronomer/astronomer-cosmos/issues/2334
             _cleanup_dbt_adapters()
+
+    _fill_missing_messages(result, macro_errors)
 
     return result
 

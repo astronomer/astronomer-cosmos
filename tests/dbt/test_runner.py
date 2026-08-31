@@ -436,3 +436,89 @@ def test_extract_message_by_status_still_prefers_node_name():
 
     assert names == ["my_model"]
     assert messages == ["boom"]
+
+
+def _run_operation_runner(event, fake_result, seen):
+    def fake_get_runner(callbacks=None):
+        seen.append(callbacks)
+        runner = MagicMock()
+
+        def invoke(cli_args):
+            for callback in callbacks or []:
+                callback(event)
+            return fake_result
+
+        runner.invoke.side_effect = invoke
+        return runner
+
+    return fake_get_runner
+
+
+def _patched_run_command(fake_get_runner, command):
+    with (
+        patch.object(dbt_runner, "get_runner", side_effect=fake_get_runner),
+        patch.object(dbt_runner, "_cleanup_dbt_adapters"),
+        patch.object(dbt_runner, "change_working_directory"),
+        patch.object(dbt_runner, "environ"),
+        patch.object(dbt_runner, "logger"),
+    ):
+        return dbt_runner.run_command(command=command, env={}, cwd="/tmp/project")
+
+
+def test_run_command_fills_run_operation_message_from_macro_error_event():
+    """dbt < 1.12 leaves message unset, so the macro error is only available as an event."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = SimpleNamespace(info=SimpleNamespace(name="RunningOperationCaughtError", msg="Database Error in boom"))
+
+    _patched_run_command(_run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"])
+
+    assert entry.message == "Database Error in boom"
+
+
+def test_run_command_keeps_run_operation_message_set_by_dbt():
+    """On dbt >= 1.12 the message is already populated and must not be overwritten."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message="Database Error in boom")
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = SimpleNamespace(info=SimpleNamespace(name="RunningOperationCaughtError", msg="event text"))
+
+    _patched_run_command(_run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"])
+
+    assert entry.message == "Database Error in boom"
+
+
+def test_run_command_ignores_unrelated_events():
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = SimpleNamespace(info=SimpleNamespace(name="LogStartLine", msg="starting"))
+
+    _patched_run_command(_run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"])
+
+    assert entry.message is None
+
+
+def test_run_command_registers_macro_collector_only_for_run_operation():
+    fake_result = SimpleNamespace(success=True, exception=None, result=None)
+    seen = []
+    event = SimpleNamespace(info=SimpleNamespace(name="LogStartLine", msg="starting"))
+    fake_get_runner = _run_operation_runner(event, fake_result, seen)
+
+    _patched_run_command(fake_get_runner, ["dbt", "run"])
+    _patched_run_command(fake_get_runner, ["dbt", "run-operation", "boom"])
+
+    assert seen[0] is None
+    assert len(seen[1]) == 1
+
+
+def test_run_command_fills_message_when_global_flags_precede_run_operation():
+    """build_cmd puts dbt global flags before the subcommand."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = SimpleNamespace(info=SimpleNamespace(name="RunningOperationCaughtError", msg="Database Error in boom"))
+
+    _patched_run_command(
+        _run_operation_runner(event, fake_result, []),
+        ["dbt", "--log-level", "debug", "--no-partial-parse", "run-operation", "boom"],
+    )
+
+    assert entry.message == "Database Error in boom"

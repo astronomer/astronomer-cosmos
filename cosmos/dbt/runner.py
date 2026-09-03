@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import json
 import sys
 from collections.abc import Callable
 from functools import cache as functools_cache
@@ -106,17 +107,31 @@ def _cleanup_dbt_adapters() -> None:
     gc.collect()
 
 
+def dbt_event_to_json(event: Any) -> str:
+    """Serialise a dbt ``EventMsg`` to JSON so DBT_RUNNER consumers read the SUBPROCESS field names.
+
+    Not byte-identical to a ``--log-format json`` line, so read the payload with ``.get()``.
+
+    ``google.protobuf.json_format`` is a transitive dependency of dbt-core and is always available
+    when ``InvocationMode.DBT_RUNNER`` is in use.
+    """
+    from google.protobuf.json_format import MessageToJson
+
+    return str(MessageToJson(event, preserving_proto_field_name=True))
+
+
 def _collect_macro_errors(collected: list[str]) -> Callable[[Any], None]:
     def collect(event: Any) -> None:
-        # dbt wraps a raising callback as GenericExceptionOnRun, so never raise from here.
+        # Never raise: dbt wraps a raising callback as GenericExceptionOnRun, which would replace
+        # the dbt error this callback exists to surface with the callback's own failure.
         try:
-            info = getattr(event, "info", None)
-            if getattr(info, "name", None) not in MACRO_ERROR_EVENTS:
+            info = json.loads(dbt_event_to_json(event)).get("info", {})
+            if info.get("name") not in MACRO_ERROR_EVENTS:
                 return
-            msg = getattr(info, "msg", None)
+            msg = info.get("msg")
             if msg:
                 collected.append(str(msg))
-        except Exception:  # pragma: no cover
+        except Exception:
             logger.debug("Unable to read a dbt event while collecting macro errors", exc_info=True)
 
     return collect

@@ -15,6 +15,8 @@ from cosmos.operators.watcher import DbtProducerWatcherOperator
 
 sys.modules.pop("dbt.cli.main", None)
 
+from types import SimpleNamespace
+
 import pytest
 
 import cosmos.dbt.runner as dbt_runner
@@ -377,3 +379,23 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
             assert not instances[0].callbacks
             # 3. Second instance has one callback
             assert len(instances[1].callbacks) == 1
+
+
+def test_extract_message_by_status_falls_back_to_unique_id_without_node():
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    result = SimpleNamespace(result=SimpleNamespace(results=[entry]))
+
+    names, messages = dbt_runner.extract_message_by_status(result, ["error"])
+
+    assert names == ["macro.probe.boom"]
+    assert messages == ["None"]
+
+
+def test_extract_message_by_status_still_prefers_node_name():
+    entry = SimpleNamespace(status="error", node=SimpleNamespace(name="my_model"), message="boom")
+    result = SimpleNamespace(result=SimpleNamespace(results=[entry]))
+
+    names, messages = dbt_runner.extract_message_by_status(result, ["error"])
+
+    assert names == ["my_model"]
+    assert messages == ["boom"]

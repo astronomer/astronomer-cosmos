@@ -107,6 +107,12 @@ def run_command(
     return result
 
 
+def _node_label(node_result: Any) -> str:
+    """``run-operation`` yields ``RunResultOutput``, which has no ``node`` (#2982)."""
+    node = getattr(node_result, "node", None)
+    return str(getattr(node, "name", None) or getattr(node_result, "unique_id", None) or "unknown")
+
+
 def extract_message_by_status(
     result: dbtRunnerResult, status_levels: list[str] | None = None
 ) -> tuple[list[str], list[str]]:
@@ -128,7 +134,7 @@ def extract_message_by_status(
 
     for node_result in result.result.results:
         if node_result.status in status_levels:
-            node_names.append(str(node_result.node.name))
+            node_names.append(_node_label(node_result))
             node_results.append(str(node_result.message))
 
     return node_names, node_results

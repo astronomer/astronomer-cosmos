@@ -532,15 +532,15 @@ def test_run_command_registers_macro_collector_only_for_run_operation():
     assert len(seen[1]) == 1
 
 
-def test_run_command_fills_message_when_global_flags_precede_run_operation():
-    """build_cmd puts dbt global flags before the subcommand."""
+def test_run_command_fills_message_when_flags_surround_run_operation():
+    """build_cmd puts flags on both sides of the subcommand, so position tells nothing."""
     entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
     fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
     event = _dbt_event("RunningOperationCaughtError", exc="Database Error in boom")
 
     _patched_run_command(
         _run_operation_runner(event, fake_result, []),
-        ["dbt", "--log-level", "debug", "--no-partial-parse", "run-operation", "boom"],
+        ["dbt", "--log-level", "debug", "run-operation", "boom", "--vars", "{}", "--quiet"],
     )
 
     assert "Database Error in boom" in entry.message

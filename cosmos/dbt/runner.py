@@ -170,7 +170,8 @@ def run_command(
     # to the dbt executable.
     cli_args = command[1:]
     macro_errors: list[str] = []
-    # Global flags precede the subcommand (see ``build_cmd``), so match anywhere.
+    # ``build_cmd`` puts flags on both sides of the subcommand — dbt global flags before it,
+    # ``add_global_flags()``/``dbt_cmd_flags`` after it — so a positional check is not safe here.
     if "run-operation" in cli_args:
         callbacks = [*(callbacks or []), _collect_macro_errors(macro_errors)]
     # ``exclude_dags_folder_from_sys_path`` must enter *before* ``change_working_directory`` so it

@@ -142,8 +142,19 @@ def _fill_missing_messages(result: dbtRunnerResult, macro_errors: list[str]) -> 
     if not macro_errors:
         return
 
+    node_results = getattr(result.result, "results", None) or []
+    if not node_results:
+        # Debug log rather than an exception: a Cosmos-side complaint about the result shape would
+        # hide the run-operation failure the user came for. It still surfaces the contract change.
+        logger.debug(
+            "Collected %d dbt macro error event(s) but no run-operation result to attach them to "
+            "(result.result.results is missing or empty)",
+            len(macro_errors),
+        )
+        return
+
     message = "\n".join(macro_errors)
-    for node_result in getattr(result.result, "results", None) or []:
+    for node_result in node_results:
         if getattr(node_result, "message", None) is None:
             node_result.message = message
 

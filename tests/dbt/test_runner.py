@@ -556,6 +556,16 @@ def test_dbt_event_to_json_exposes_the_event_info_fields():
     assert "Database Error in boom" in info["msg"]
 
 
+def test_fill_missing_messages_logs_when_there_is_nowhere_to_attach():
+    """A dbt result without ``results`` must surface as a debug log, never as an exception."""
+    result = SimpleNamespace(result=SimpleNamespace())
+
+    with patch.object(dbt_runner, "logger") as mock_logger:
+        dbt_runner._fill_missing_messages(result, ["Database Error in boom"])
+
+    assert mock_logger.debug.call_count == 1
+
+
 def test_run_command_swallows_a_failure_to_read_a_dbt_event():
     """A collector that raises would reach dbt as GenericExceptionOnRun, hiding the real error."""
     entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)

@@ -409,7 +409,7 @@ supported-or-raise decision rather than being folded into a `DBT_MANIFEST`-vs-`D
 | `DBT_LS` | No - `dbt ls --select <x>` returns only selected nodes, so an external parent's `unique_id` is visible via `depends_on` but its own `DbtNode` is not | Yes - Cosmos requests `config` explicitly in `--output-keys` (`cosmos/dbt/graph.py:848`) | Structural resolver supported; ephemeral traversal needs a wider `nodes` map (the coordinator's peer union, below). `auto_schedule` raises - open question 1. |
 | `DBT_LS_CACHE` | Same as `DBT_LS` | Same as `DBT_LS`, but subject to #2960's cache-key bug serving pre-upgrade node data | Same as `DBT_LS`, and only once #2960 has landed. |
 | `DBT_LS_FILE` | Same as `DBT_LS` | **Not guaranteed.** The file is user-supplied and parsed by the same `parse_dbt_ls_output`, which does `config=node_dict.get("config") or {}` (`cosmos/dbt/graph.py:439`), so a file produced without `--output-keys config` yields `{}` for every node. | Raise unless `config` is actually present. `{}` is indistinguishable from "declared non-ephemeral", so reading it as the latter is exactly the silent wrong boundary constraint 9 forbids. |
-| `CUSTOM` (deprecated) | No | **Unreliable in a worse way.** `config` is rebuilt from `config_selectors` (`cosmos/dbt/graph.py:1136`), which only ever carry `materialized`/`schema`/`tags` (`cosmos/dbt/parser/project.py:45`) from Cosmos's own partial jinja/yml parsing - and where that parsing sees no materialization, `materialized:view` is **substituted** (`cosmos/dbt/parser/project.py:427-428`). | Unsupported - raise. A genuinely ephemeral model reports as a view: a false negative that looks like a confident positive, which no downstream check can catch. |
+| `CUSTOM` | No | Not investigated - see decision | **Out of scope - raise.** `CUSTOM` is deprecated and slated for removal in Cosmos 2.0 (`cosmos/dbt/graph.py:1106-1110`), so it gets no support here rather than a best-effort path. It still needs an explicit raise because `AUTOMATIC` can land on it silently - see the row below. |
 | `AUTOMATIC` (the default) | Whichever it resolved to | Whichever it resolved to | Resolves at runtime to `DBT_MANIFEST` when a manifest is available, else `DBT_LS`, else - including when `dbt ls` raises `FileNotFoundError` - `CUSTOM` (`cosmos/dbt/graph.py:803-813`). Decide against `DbtGraph.load_method` **after** `load()`, never against the mode the user requested. |
 
 One further path bypasses `--output-keys` entirely: when `settings.pre_dbt_fusion` is set *and*
@@ -767,9 +767,9 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   "no owner" rather than being confused with a placeholder.
 - `LoadMode` coverage - one case per row of the support matrix: `DBT_MANIFEST` and `DBT_LS` resolve a
   boundary; a `DBT_LS_FILE` fixture produced *without* `--output-keys config` raises rather than
-  reporting every node as non-ephemeral; `LoadMode.CUSTOM` raises; and `AUTOMATIC` is decided from
-  `DbtGraph.load_method` after `load()`, including the `FileNotFoundError` fallback to `CUSTOM`, which
-  must raise even though the user requested `AUTOMATIC`.
+  reporting every node as non-ephemeral; `LoadMode.CUSTOM` raises as out of scope; and `AUTOMATIC` is
+  decided from `DbtGraph.load_method` after `load()`, including the `FileNotFoundError` fallback to
+  `CUSTOM`, which must raise even though the user requested `AUTOMATIC`.
 - Sources - one case per row of the source-rendering table, since the S2 and S3 answers differ: a
   `DbtDag`/`DbtTaskGroup` with a source dependency *alongside* other, resolvable external dependencies
   renders and runs without raising (S2's ownership check exempts sources); a `DbtDag` using

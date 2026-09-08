@@ -114,7 +114,9 @@ jobs:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run integration tests (split ${{ matrix.split-group }}/3)
         run: |
-          bash scripts/test/integration-setup.sh "$DBT_VERSION"
+          # Scope ERROR log level to setup only: the Runtime image prints plugin warnings to stdout
+          # on `airflow version`, which the setup script parses to choose db migrate vs init.
+          AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR bash scripts/test/integration-setup.sh "$DBT_VERSION"
           bash scripts/test/integration.sh
         env:
           DBT_VERSION: ${{ matrix.dbt-version }}
@@ -211,7 +213,9 @@ jobs:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run performance tests (${{ matrix.num-models }} models)
         run: |
-          bash scripts/test/performance-setup.sh "$DBT_VERSION"
+          # ERROR log level scoped to setup: keep the image's plugin warnings out of the
+          # `airflow version` output the setup script parses (db migrate vs init routing).
+          AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR bash scripts/test/performance-setup.sh "$DBT_VERSION"
           bash scripts/test/performance.sh
         env:
           DBT_VERSION: ${{ matrix.dbt-version }}
@@ -260,6 +264,10 @@ jobs:
       - name: Run dbt-loom integration tests
         run: bash scripts/test/integration-dbt-loom.sh "$DBT_VERSION"
         env:
+          # This suite runs setup + tests in one script, so ERROR log level applies to the whole
+          # run. It keeps the Runtime image's plugin warnings out of the `airflow version` output
+          # the script parses to choose db migrate vs init (AF3 has no `db init`).
+          AIRFLOW__LOGGING__LOGGING_LEVEL: ERROR
           DBT_VERSION: ${{ matrix.dbt-version }}
           AIRFLOW_HOME: ${{ github.workspace }}
           PYTHONPATH: ${{ github.workspace }}
@@ -307,6 +315,9 @@ jobs:
       - name: Run dbt 1.8 integration tests
         run: bash scripts/test/integration-dbt-1-8.sh
         env:
+          # Setup + tests in one script (see dbt-loom job): ERROR log level keeps plugin warnings
+          # out of the `airflow version` output the script parses for db routing.
+          AIRFLOW__LOGGING__LOGGING_LEVEL: ERROR
           AIRFLOW_HOME: ${{ github.workspace }}
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@postgres:5432/postgres
           AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
@@ -364,6 +375,9 @@ jobs:
       - name: Run dbt async integration tests (dbt ${{ matrix.dbt-version }})
         run: bash scripts/test/integration-dbt-async.sh "$DBT_VERSION"
         env:
+          # Setup + tests in one script (see dbt-loom job): ERROR log level keeps plugin warnings
+          # out of the `airflow version` output the script parses for db routing.
+          AIRFLOW__LOGGING__LOGGING_LEVEL: ERROR
           DBT_VERSION: ${{ matrix.dbt-version }}
           AIRFLOW_HOME: ${{ github.workspace }}
           PYTHONPATH: ${{ github.workspace }}
@@ -417,7 +431,8 @@ jobs:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run expensive (Databricks) integration tests
         run: |
-          bash scripts/test/integration-setup.sh "$DBT_VERSION"
+          # ERROR log level scoped to setup (see integration job for why).
+          AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR bash scripts/test/integration-setup.sh "$DBT_VERSION"
           DATABRICKS_UNIQUE_ID="$GITHUB_RUN_ID" bash scripts/test/integration-expensive.sh
         env:
           DBT_VERSION: ${{ matrix.dbt-version }}
@@ -477,6 +492,9 @@ jobs:
           bash scripts/test/integration-dbtf-setup.sh
           bash scripts/test/integration-dbtf.sh
         env:
+          # Setup + tests in one flow (see dbt-loom job): ERROR log level keeps plugin warnings
+          # out of the `airflow version` output the setup script parses for db routing.
+          AIRFLOW__LOGGING__LOGGING_LEVEL: ERROR
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS: 0
           AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING: 0

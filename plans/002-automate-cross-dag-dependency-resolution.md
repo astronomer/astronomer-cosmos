@@ -346,18 +346,23 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
 @dataclass
 class GraphBoundary:
     owned: set[str]  # unique_ids owned by this unit
-    # (external_parent_unique_id, owned_child_unique_id) - already traversed
-    # past ephemeral/non-emitting nodes (F3)
+    # (external_parent_unique_id, owned_child_unique_id); traversed past
+    # non-emitting nodes only when traverse_non_emitting=True (F3)
     external_edges: set[tuple[str, str]]
     # (owned_ancestor_unique_id, owned_child_unique_id) - traversal landed back
     # inside `owned` (F3 re-entry); not external, and not wired by current
     # Cosmos rendering either
     internal_edges: set[tuple[str, str]]
     external_sources: set[str]  # external parent unique_ids that are dbt sources
+    # external parents that are ephemeral models: reported either way, so a
+    # consumer that can wire a task edge through them need not traverse
+    ephemeral_external_parents: set[str]
 
 
 def resolve_graph_boundary(
-    nodes: dict[str, DbtNode], selected_unique_ids: set[str]
+    nodes: dict[str, DbtNode],
+    selected_unique_ids: set[str],
+    traverse_non_emitting: bool = False,
 ) -> GraphBoundary: ...
 
 
@@ -420,22 +425,63 @@ land. That's not the same as resolving an *external* parent's relation identity 
 still be written against relation identity as a `DbtNode` property, not `LoadMode.DBT_MANIFEST`
 specifically, so it works unchanged whenever that identity is actually available, from whatever source.
 
-**Non-emitting-boundary rule (F3, mandatory, structural):** when an external parent cannot itself be
-rendered as a task that does real work - ephemeral models (excluded explicitly via
-`has_ephemeral_materialization`, not via the resource-type filter) - the resolver must traverse through
-it to the nearest such upstream node, updating `external_edges` to point there directly rather than at
-the non-emitting node. This traversal needs no relation identity, only `config`/`resource_type`/
-`depends_on` - but it does need that ancestor's `DbtNode` to be present in the `nodes` map passed in
-(see above). For **S3**, the coordinator already has every peer's own loaded `nodes` map (not just their
-`filtered_nodes`), so it passes the union of all peers' `nodes` into `resolve_graph_boundary` - covering
-any ephemeral ancestor that at least one peer happens to have loaded, at no extra cost. For **S2**
-(a standalone `DbtDag`, `DBT_LS`), there's no such union available; an ephemeral external ancestor whose
-`DbtNode` isn't in this unit's own `nodes` can't be traversed, and the resolver must fail with an
-unsupported-topology error rather than guess it isn't ephemeral - see open question 1. Sources go into
-`external_sources`, keep their `external_edges` entry (they are still real graph parents, just never
-schedulable or wireable ones - see the fail-closed exemption discussion in Edge cases), and
-`resolve_external_uris` must never assign them a URI. The resolver fails fast with an
-unsupported-topology error rather than silently dropping a dependency.
+**Non-emitting-boundary rule (F3): an Asset-emission rule, not a structural one - so traversal is
+opt-in per consumer, not mandatory.** An ephemeral model (identified via `has_ephemeral_materialization`,
+not via the resource-type filter) is inlined as a CTE and never written, so **no task ever emits its
+Asset**. For `auto_schedule` (S2) that is fatal: an Asset condition naming an ephemeral node's URI would
+never fire, so S2 must traverse through the ephemeral parent to the nearest emitting ancestor and point
+`external_edges` there. It calls `resolve_graph_boundary(..., traverse_non_emitting=True)`.
+
+**S3 does not need that traversal, and forcing it on S3 would reject working topologies.** The
+coordinator wires Airflow task edges and never touches an Asset. Ephemeral models are still *rendered as
+tasks*, precisely so the chain through them survives: by default
+(`RenderConfig.ephemeral_models_as_empty_operator=True`) as an `EmptyOperator`, and with the flag off as
+an ordinary dbt task (`cosmos/airflow/graph.py:449-475`). So when the ephemeral parent `e` is selected by
+some peer, `task(e) >> task(c)` is a *real* ordering edge: `e`'s own upstream `a` is wired to it by
+normal Cosmos rendering inside that peer, so `a >> e >> c` transitively gates `c` on `a`. Making
+traversal mandatory would instead have S1 raise unsupported-topology whenever `e`'s `DbtNode` is missing
+from a `DBT_LS` peer union - rejecting a `DbtTaskGroup` split that works fine, which is exactly the
+outcome the resolver/URI split above exists to avoid.
+
+**This is not in tension with the placeholder screen in F5.** The producer check asks "does this task do
+the work the dependency needs", and an ephemeral placeholder answers yes *by inheritance*: the work is
+its upstream chain, which is intact inside its own group. A `RENDER_ONLY` seed placeholder answers no -
+the work is loading a CSV, and nothing upstream substitutes for it. A freshness-less source placeholder
+also answers no - a source has no dbt upstreams at all, so the placeholder gates nothing. Ephemeral is
+the one placeholder kind the coordinator may legitimately wire *through*; it is still an invalid
+*terminal* producer, and still unusable for S2 either way.
+
+So the boundary reports ephemeral external parents in `ephemeral_external_parents` regardless of the
+flag, and each consumer decides:
+
+| Consumer | `traverse_non_emitting` | Ephemeral external parent with a task in some peer | Ephemeral external parent with no task and no `DbtNode` |
+|---|---|---|---|
+| S3 (`DbtDependencyCoordinator`) | `False` | Wire `task(e) >> task(c)` directly - no traversal needed | Raise: nothing to wire and nothing to traverse through |
+| S2 (`auto_schedule`) | `True` | Traverse past it - the task exists but emits no Asset | Raise unsupported topology - see open question 1 |
+
+Traversal itself needs no relation identity, only `config`/`resource_type`/`depends_on`, but it does need
+the ancestor's `DbtNode` in the `nodes` map (see the `LoadMode` matrix above). For **S3** the coordinator
+already has every peer's own loaded `nodes` map (not just their `filtered_nodes`), so it passes the union
+of all peers' `nodes` in - which is what lets it satisfy the "has a task in some peer" column at no extra
+cost. For **S2** (a standalone `DbtDag`, `DBT_LS`) there is no such union, so it raises rather than
+guessing a parent isn't ephemeral. Either way the resolver fails fast instead of silently dropping a
+dependency.
+
+**Sources are not uniformly unwireable either - the exemption is right for S2 and wrong for S3.** A
+source always goes into `external_sources`, keeps its `external_edges` entry, and never gets a URI from
+`resolve_external_uris`. But whether it is *wireable* depends on how it renders
+(`cosmos/airflow/graph.py:500-537`):
+
+| Source rendering | Task | S2 (`auto_schedule`) | S3 (coordinator) |
+|---|---|---|---|
+| `SourceRenderingBehavior.ALL` or `WITH_TESTS_OR_FRESHNESS` with `has_freshness` (or `has_test`) | A real `DbtSource*Operator` freshness/test task | Still exempt - a freshness check emits no model Asset | **Wire it.** `task(source) >> task(consumer)` is a real ordering edge, and dbt itself would enforce it within one run |
+| `SourceRenderingBehavior.ALL` with `has_freshness is False` | `EmptyOperator` placeholder (`cosmos/airflow/graph.py:526-537`) | Exempt | Not a gate - a source has no dbt upstreams, so the placeholder succeeds immediately. Treat as unwireable |
+| `SourceRenderingBehavior.NONE`, or `WITH_TESTS_OR_FRESHNESS` with neither, or dropped by `source_pruning` | No task | Exempt | Genuinely unwireable - exempt |
+
+So routing every source to `external_sources` *and stopping there* would drop a real ordering edge
+whenever one group owns a source's freshness task and another group's models read that source. The
+coordinator must check for a rendered, real (non-`EmptyOperator`) source task among its peers and wire
+it like any other external parent; only the bottom two rows are exempt from its ownership check.
 
 **Traversal can land back inside `owned` - that's `internal_edges`, never `external_edges`.** Consider
 `a` (owned) -> `e` (excluded from selection, ephemeral) -> `c` (owned): `c` depends on `e`, `e` depends
@@ -533,8 +579,11 @@ is not `None`, or when the converter was constructed with a `dag` it does not ex
 ### `DbtTaskGroup`s in one DAG: direct task edges (additive)
 
 A `DbtDependencyCoordinator([tg_a, tg_b, ...]).wire()` builds a map from each owned node's Airflow task
-to its `external_edges` parents (structural `GraphBoundary`, above) and adds
-`producer_task >> consumer_task` edges across groups, with `granularity="model"` or `"group"`. It also
+to its `external_edges` parents (structural `GraphBoundary`, above, resolved with
+`traverse_non_emitting=False` - see the F3 rule) and adds `producer_task >> consumer_task` edges across
+groups, with `granularity="model"` or `"group"`. Ephemeral external parents are wired *through* rather
+than traversed past, and a source that renders a real freshness/test task is wired like any other
+external parent. It also
 wires each group's own `internal_edges` the same way, closing the gap `create_airflow_task_dependencies`
 would otherwise leave open for that group. It uses
 only the structural resolver - no manifest, no relation identity, no URI, no F1/#2959/#2960 dependency -
@@ -584,7 +633,7 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
 
 | Module | Change |
 |---|---|
-| `cosmos/dataset.py` (or a new `cosmos/dependencies.py`) | `resolve_graph_boundary` (structural, `owned`/`external_edges`/`internal_edges`/`external_sources`, no manifest needed) and a separate `resolve_external_uris` (needs relation identity, F1). Includes the F3 ephemeral traversal with the owned-re-entry check, the test-node exclusion rule, and fail-fast behavior. |
+| `cosmos/dataset.py` (or a new `cosmos/dependencies.py`) | `resolve_graph_boundary` (structural, `owned`/`external_edges`/`internal_edges`/`external_sources`/`ephemeral_external_parents`, no manifest needed) and a separate `resolve_external_uris` (needs relation identity, F1). Includes the F3 ephemeral traversal behind `traverse_non_emitting` with the owned-re-entry check, the per-`LoadMode` supported-or-raise decisions, the test-node exclusion rule, and fail-fast behavior. |
 | `cosmos/config.py` | New `RenderConfig.auto_schedule: DbtUpstreamUpdated \| None = None`; new `DbtUpstreamUpdated` enum (`AND`/`OR`) exported from `cosmos`. The `DbtDag`-only rejection cannot live here - `RenderConfig` is a plain dataclass with no knowledge of its consumer (see the injection section); it belongs in the converter row below. |
 | `cosmos/converter.py` (F2, constraint 8) | At the end of `DbtToAirflowConverter.__init__`, for `auto_schedule`: raise `CosmosValueError` unless this converter is building a `DbtDag` (`task_group is None` and the converter owns `dag`), wire any `internal_edges` into `self.tasks_map`, build the combined timetable, assign `dag.timetable` on the DAG resolved at `cosmos/converter.py:408`, call `attrs.validate(dag)` to re-run `catchup`/`allowed_run_types`/`params` validation, and separately re-check `max_active_runs` vs `active_runs_limit`. No change needed to `cosmos/airflow/dag.py`. |
 | New `cosmos/airflow/dependencies.py` | `DbtDependencyCoordinator`: cross-`DbtTaskGroup` wiring, wiring each group's own `internal_edges`, `granularity`, cycle/ambiguous-producer detection using its own peer list (no registry), and the WATCHER-family producer-level gating strategy. Uses only the structural resolver. |
@@ -605,9 +654,13 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   after `DAG.__init__` (frozen), but `timetable` can - patch it inside the converter (constraint 8). On
   Airflow 2, the same patch breaks `DAG.validate()`'s own consistency check, so `auto_schedule` (S2) is
   limited to Airflow 3; not a planned gap to close given Airflow 2's approaching EOL.
-- **F3 - non-emitting boundary nodes.** Ephemeral parents pass the type filter but never emit, which
-  would make the downstream DAG never trigger; sources are genuinely external. The resolver must
-  traverse past them or fail fast - never silently drop the dependency.
+- **F3 - non-emitting boundary nodes, and traversal is per consumer.** Ephemeral parents pass the
+  resource-type filter but never emit an Asset, which would make an `auto_schedule` DAG never trigger -
+  so S2 traverses past them. S3 does not need to: an ephemeral model is still rendered as a task
+  (`EmptyOperator` by default), so a task edge through it transitively gates on its own upstreams.
+  Forcing traversal on S3 would make it raise unsupported-topology on `DBT_LS` splits that work, so
+  traversal is a `traverse_non_emitting` flag, not a fixed rule. Either way the resolver raises rather
+  than silently dropping the dependency.
 - **F3 - traversal can re-enter `owned`.** An owned node reached by traversing past an excluded
   ephemeral node is not external - it's `internal_edges`, and both consumers must wire it
   (`tasks_map[ancestor] >> tasks_map[child]`), not just record it. Misclassifying it as external would
@@ -638,12 +691,16 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   see its siblings at all, so it can't check ownership, `emit_datasets`, mode capability, or namespace
   match without the peer-visibility mechanism open question 5 is about. Both must raise, never silently
   omit the dependency, once the applicable check is in place.
-- **A source is legitimately ownerless - don't fail-closed on it.** Constraint 9 raises on an "ownerless"
-  external parent, but a source has no Cosmos owner by definition (it's external data, e.g. loaded by
-  Fivetran). The ownership check must exempt `external_sources` explicitly, not just happen to skip them
-  because they have no URI. This proposal doesn't cover source freshness as part of its ordering
-  guarantee - test this at the consumer level (a `DbtDag`/`DbtTaskGroup` with a source dependency renders
-  and runs without raising), not only via the resolver's internal representation.
+- **A source is legitimately ownerless for `auto_schedule` - but not always unwireable for the
+  coordinator.** Constraint 9 raises on an "ownerless" external parent, and a source has no Cosmos owner
+  by definition (it's external data, e.g. loaded by Fivetran), so S2's ownership check must exempt
+  `external_sources` explicitly rather than just happening to skip them for having no URI. S3 is
+  different: under `SourceRenderingBehavior.ALL` or `WITH_TESTS_OR_FRESHNESS` a source with freshness or
+  tests renders a real `DbtSource*Operator` task (`cosmos/airflow/graph.py:500-537`), so if one group
+  owns that task and another group's models read the source, exempting it drops a genuine ordering edge.
+  The coordinator wires those; only the `EmptyOperator` placeholder and no-task cases are exempt. See the
+  source-rendering table in Proposed design. Test at the consumer level, not only via the resolver's
+  internal representation.
 - **WATCHER/WATCHER_KUBERNETES/WATCHER_GCP_GKE's single producer breaks model-level
   `DbtDependencyCoordinator` wiring.** A per-model `producer_task >> consumer_task` edge only delays when
   a downstream *sensor* starts watching; the downstream group's actual `dbt build` runs inside one shared
@@ -658,10 +715,13 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
 ## Testing
 
 - `resolve_graph_boundary` (structural, no manifest fixture needed - test under `DBT_LS` too): `owned`/
-  `external_edges`/`internal_edges`/`external_sources` are correct on a partitioned project; an ephemeral
-  parent's edge is rewritten to the nearest real upstream when its `DbtNode` is available, or the
-  resolver raises unsupported-topology when it isn't (e.g. a `DBT_LS`-loaded external ephemeral ancestor
-  with no peer union supplying it); a multi-parent test's non-selected parent does *not* appear as an
+  `external_edges`/`internal_edges`/`external_sources`/`ephemeral_external_parents` are correct on a
+  partitioned project; with `traverse_non_emitting=True` an ephemeral parent's edge is rewritten to the
+  nearest real upstream when its `DbtNode` is available, or the resolver raises unsupported-topology when
+  it isn't (e.g. a `DBT_LS`-loaded external ephemeral ancestor with no peer union supplying it); with the
+  default `traverse_non_emitting=False` the same topology does **not** raise and the ephemeral parent
+  stays in `external_edges`, and the coordinator wires `task(e) >> task(c)` through it - the case that
+  would regress if traversal were mandatory; a multi-parent test's non-selected parent does *not* appear as an
   external dependency; the coordinator's peer-union `nodes` map correctly resolves an ephemeral ancestor
   owned by one peer and referenced by another; the `a` (owned) -> `e` (excluded, ephemeral) -> `c`
   (owned) topology produces `internal_edges={(a, c)}` and *not* an external edge back onto `a` - and an
@@ -684,11 +744,14 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   reporting every node as non-ephemeral; `LoadMode.CUSTOM` raises; and `AUTOMATIC` is decided from
   `DbtGraph.load_method` after `load()`, including the `FileNotFoundError` fallback to `CUSTOM`, which
   must raise even though the user requested `AUTOMATIC`.
-- Sources - two distinct cases, not one: a `DbtDag`/`DbtTaskGroup` with a source dependency *alongside*
-  other, resolvable external dependencies renders and runs without raising (the ownership check exempts
-  sources); a `DbtDag` using `auto_schedule` whose external dependencies are *only* sources raises,
-  since there is nothing left to schedule on. Test both at the consumer level, not just as resolver
-  output.
+- Sources - one case per row of the source-rendering table, since the S2 and S3 answers differ: a
+  `DbtDag`/`DbtTaskGroup` with a source dependency *alongside* other, resolvable external dependencies
+  renders and runs without raising (S2's ownership check exempts sources); a `DbtDag` using
+  `auto_schedule` whose external dependencies are *only* sources raises, since there is nothing left to
+  schedule on; and, for the coordinator, a source with freshness owned by `tg_a` and read by `tg_b`'s
+  models produces a real `task(source) >> task(consumer)` edge, while the freshness-less
+  `SourceRenderingBehavior.ALL` placeholder and the no-task cases produce no edge and no raise. Test all
+  of these at the consumer level, not just as resolver output.
 - Empty `external_uris`, generally - not just the source-only case: a `DbtDag` using `auto_schedule`
   with no external dependency at all raises before constructing `AssetAll`/`AssetAny`, rather than
   building one with zero assets and deferring the failure to evaluation time.
@@ -723,8 +786,9 @@ Listed in build order, not by slice number - S9 must land before S2, since S2 ca
 without it:
 
 - **S1 - `resolve_graph_boundary`**: structural only (`owned`/`external_edges`/`internal_edges`/
-  `external_sources`), the F3 ephemeral traversal with the owned-re-entry check (traversal landing back
-  on an owned node produces `internal_edges`, never `external_edges`), the test-node exclusion rule, the
+  `external_sources`/`ephemeral_external_parents`), the F3 ephemeral traversal behind
+  `traverse_non_emitting` (off by default, so S3 is not gated on it) with the owned-re-entry check
+  (traversal landing back on an owned node produces `internal_edges`, never `external_edges`), the
   source exemption from ownership checks, and fail-fast behavior. No manifest dependency, but ephemeral
   traversal needs the caller to supply a
   `nodes` map wide enough to cover external ancestors (full graph under `DBT_MANIFEST`; under `DBT_LS`,
@@ -732,8 +796,10 @@ without it:
   supported-or-raise decisions from the support matrix, keyed off `DbtGraph.load_method` after `load()`
   rather than the requested mode, and the `EmptyOperator`-placeholder screen covering all three
   placeholder cases. Test one case per matrix row.
-- **S3 - `DbtDependencyCoordinator`**: cross-`DbtTaskGroup` wiring, `granularity`, and its own scoped
-  ownership check (zero/multiple owners among the peers it's given). Uses only S1's output. No
+- **S3 - `DbtDependencyCoordinator`**: cross-`DbtTaskGroup` wiring (including wiring *through* an
+  ephemeral external parent and wiring a source's real freshness/test task), `granularity`, and its own
+  scoped ownership check (zero/multiple owners among the peers it's given, with the three-case
+  placeholder screen). Uses only S1's output with `traverse_non_emitting=False`. No
   dependency on S4/#2959/#2960. WATCHER-family groups get the producer-level gating strategy and are
   capped at group-level granularity (open question 4).
 - **S9 - peer-visibility mechanism for `auto_schedule`:** resolve open question 5 - a `DbtDagGroup`

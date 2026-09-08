@@ -1,0 +1,23 @@
+# Pytest tooling for running the Cosmos test suite against a prebuilt Astronomer Runtime
+# image (see scripts/test/runtime-alpha-setup.sh and .github/workflows/test-runtime-alpha.yml).
+#
+# This is the runtime subset of `[tool.hatch.envs.tests].dependencies` in pyproject.toml -- only
+# what pytest needs to collect and run. It deliberately DROPS:
+#   * Werkzeug<3.0.0 and other version-pinned entries -- the Runtime image already pins its own
+#     Airflow-compatible versions, and forcing the Hatch env's pins on top would fight the image
+#     (e.g. Werkzeug<3 conflicts with an Airflow 3 image). Letting the image's pins stand is the
+#     whole point: surfacing real cosmos-on-Runtime compatibility.
+#   * type-check-only deps (types-*, sqlalchemy-stubs, pre-commit) -- not needed to run tests.
+# Keep this in sync with the pytest tooling listed in the Hatch `tests` env.
+packaging>=22.0
+pytest>=6.0
+pytest-split
+pytest-dotenv
+pytest-rerunfailures
+pytest-timeout
+pytest-cov
+pytest-describe
+pytest-asyncio
+requests-mock
+orjson
+sentry-sdk

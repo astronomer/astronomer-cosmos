@@ -234,6 +234,19 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
    these three: it routes them through `construct_dataset_uri`. `auto_schedule` for these modes should be
    built after #2959 lands, not against today's fragmented behavior.
 
+   **Unifying the URI construction is not enough on its own: the producer side silently skips nodes,
+   and that has to be fixed too.** Even for the WATCHER family, which builds its URIs straight from the
+   manifest, `compute_model_outlet_uris` drops any node where `database`/`schema`/`alias` is falsy - a
+   bare `continue` with no log line (`cosmos/dataset.py:317-322`) - and returns `{}` outright, at
+   warning level, when the manifest can't be read or parsed (`cosmos/dataset.py:297-308`). The producer
+   reads its run's `target/manifest.json` while the consumer resolves URIs from the project manifest at
+   parse time, so the two can disagree. A consumer that has correctly resolved a URI can therefore gate
+   on an Asset the producer decided, silently, not to emit - and the schedule waits forever. Requiring
+   the *consumer* to raise (constraint 9) cannot detect this, because from the consumer's side nothing
+   looks wrong. So either #2959 covers making the producer raise (or at minimum log per skipped node)
+   instead of `continue`-ing, or this proposal owns that change; it is a prerequisite for S2 either way,
+   not an edge case S2 can work around.
+
    `DOCKER`/`KUBERNETES`/`AWS_EKS`/`AWS_ECS`/`AZURE_CONTAINER_INSTANCE`/`GCP_CLOUD_RUN_JOB`/`GCP_GKE`
    don't emit at all, and **#2959 does not cover them** - it's not a universal fix. `KUBERNETES` has its
    own ticket, [astronomer-cosmos#2329](https://github.com/astronomer/astronomer-cosmos/issues/2329); the
@@ -674,6 +687,12 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   conditionally; AIRFLOW_ASYNC emits the wrong scheme - `auto_schedule` depends on #2959 fixing both
   before it's built for those modes. The seven modes that don't emit at all are separate - #2959 doesn't
   cover them, and `auto_schedule` stays gated there regardless (constraint 5).
+- **The producer can silently decline to emit a URI the consumer correctly resolved.**
+  `compute_model_outlet_uris` `continue`s past any node with a falsy `database`/`schema`/`alias`
+  (`cosmos/dataset.py:317-322`) and returns `{}` when the manifest is unreadable
+  (`cosmos/dataset.py:297-308`). Neither is visible to the consuming `DbtDag`, so its schedule waits
+  forever on an Asset that will never arrive. Consumer-side fail-closed checks cannot catch this; the
+  producer has to stop skipping silently (constraint 5).
 - **The Airflow 2-vs-3 URI standard** must match on both sides of a dependency, or the schedule
   silently never fires.
 - **Unsupported adapter** - `get_dataset_namespace` returns `None`, so there is no dataset to schedule
@@ -684,8 +703,10 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   dataset" workaround and let users control how Cosmos's dependency condition combines (`AND`/`OR`)
   with their own datasets. This is not blocked solely on Airflow shipping a native schedule type -
   Cosmos could emulate one (see the roadmap's follow-up slice below).
-- **Source freshness** is not handled by this proposal. **Cycles or ambiguous producers** (overlapping
-  selections claiming the same node) must be detected and raised, not silently resolved one way.
+- **Source freshness** is not handled by this proposal. Cycles and ambiguous producers are only
+  detectable where peers are visible in one parse, so they are the coordinator's job for `DbtTaskGroup`s
+  and part of open question 5 for standalone `DbtDag`s - not a general edge case either consumer can
+  handle today.
 - **F5, split by consumer.** For the **coordinator**, ownership (does exactly one peer own this node) is
   checkable today from its own peer list - no gap. For **`auto_schedule`**, a standalone `DbtDag` can't
   see its siblings at all, so it can't check ownership, `emit_datasets`, mode capability, or namespace
@@ -772,6 +793,10 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   the patch.
 - F5: `auto_schedule` raises when ownership, emission, or namespace can't be verified (once the
   peer-visibility mechanism from open question 5 exists to make that check possible at all).
+- Producer/consumer URI agreement: a node the producer skips - a manifest entry with a falsy
+  `database`/`schema`/`alias`, and an unreadable `target/manifest.json` - surfaces as a loud failure on
+  the producer rather than as a consumer that waits forever. This tests the constraint 5 producer
+  change, not `resolve_external_uris`.
 - End-to-end: WATCHER/WATCHER_KUBERNETES/WATCHER_GCP_GKE producer emits and the consumer triggers
   (seeds-to-models example); ASYNC and LOCAL/VIRTUALENV get the same test once #2959 lands.
 - `DbtDependencyCoordinator`: cross-group edges at model and group granularity for
@@ -817,8 +842,8 @@ without it:
 - **S2 - `auto_schedule` and `DbtUpstreamUpdated`** for `DbtDag`, **Airflow 3 only** (constraint 8 - the
   `timetable` patch doesn't work on Airflow 2, and Airflow 2 support isn't planned). Depends on S9
   (ownership/emission/namespace/URI verification - the actual unlock for `DBT_LS`), S4 (needed on the
-  producer side, constraint 7), and constraint 5 (#2959 unifying emission across modes) all landing
-  first. Implementation: the `timetable` patch in the converter (constraint 8) and the
+  producer side, constraint 7), and constraint 5 (#2959 unifying emission across modes **and** making
+  the producer stop silently skipping nodes in `compute_model_outlet_uris`) all landing first. Implementation: the `timetable` patch in the converter (constraint 8) and the
   extend-an-existing-schedule compatibility matrix.
 - **S5 - ASYNC reconciliation**: part of #2959 (constraint 5), not owned by this proposal.
 - **S6 - a `DbtDagGroup` container** (ticket alternative b.iii): the leading candidate for S9.
@@ -871,3 +896,12 @@ without it:
    external node won't be caught - is not on the table**: constraint 9 requires fail-closed, not a
    documented weaker guarantee, so this question resolves to one of the two real mechanisms above, not a
    third "ship it anyway" option. This gates S2's release.
+
+   **Cycle and ambiguous-producer detection belongs here too, not in Edge cases.** The coordinator
+   detects both from its own peer list, so for `DbtTaskGroup`s this is solved (see the coordinator
+   section). For standalone `DbtDag`s it is not detectable at all today: two `DbtDag`s whose selections
+   are each other's external parents would each gate on the other's Assets, and neither would ever run -
+   a mutual deadlock with no error at parse time, because neither parse can see the other DAG. Whichever
+   mechanism answers this question therefore has to make the peer set inspectable enough to reject that
+   configuration, not just to confirm single ownership of one node at a time. The same applies to
+   overlapping selections claiming the same node across `DbtDag`s.

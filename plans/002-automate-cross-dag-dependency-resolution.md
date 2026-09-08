@@ -8,7 +8,12 @@
 
 **Discussion:** [astronomer-cosmos#1321](https://github.com/astronomer/astronomer-cosmos/issues/1321)
 
-**Tracking ticket:** BOSS-269 (internal Linear ticket, "Automate the dependency resolution between DbtDags that represent sub-parts of a dbt project")
+**Code references:** every `path:line` citation below is pinned to `main` at
+[6dd07a74](https://github.com/astronomer/astronomer-cosmos/blob/6dd07a74889ef021ff7036de40adfb4b6a5356ed/),
+the commit this proposal was written against. Line numbers in `main` drift, so each citation also names
+the symbol it refers to - use the symbol if the line has moved. The *behaviour* described holds for the
+released 1.15.1 as well (the tag and `main` had diverged when this was written, so the same code sits at
+different line numbers there).
 
 **Depends on:** [astronomer-cosmos#2959](https://github.com/astronomer/astronomer-cosmos/issues/2959) (unify Asset/Dataset URI construction across execution modes, including making relation identity available independent of `LoadMode`) and [astronomer-cosmos#2960](https://github.com/astronomer/astronomer-cosmos/issues/2960) (fix the `dbt ls` cache key so it doesn't silently serve stale node data once #2959 changes what Cosmos requests). This proposal is not scoped as manifest-only - see constraint 7.
 
@@ -74,7 +79,7 @@ hand-written `schedule=` drifts whenever `RenderConfig.select` or the dbt projec
 dataset URIs are environment-specific (they embed Airflow-connection / dbt-profile properties the
 user has to reconstruct by hand).
 
-## Current state (verified against the last released version of Cosmos, 1.15.1)
+## Current state
 
 ### Every dbt model already has a deterministic, derivable identity
 
@@ -134,7 +139,8 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
 
 - **F1 - relation identity exists only via a manifest.** The `dbt ls` command Cosmos builds requests
   `--output-keys name unique_id resource_type depends_on original_file_path tags config freshness fqn`
-  (`cosmos/dbt/graph.py`, around line 831) - **never** `database`/`schema`/`alias`/`relation_name`.
+  (`DbtGraph.run_dbt_ls`, `cosmos/dbt/graph.py:835-851`) - **never**
+  `database`/`schema`/`alias`/`relation_name`.
   `DbtNode` (`cosmos/dbt/graph.py:110`) stores no relation identity, and neither the dbt-ls parser nor
   the manifest-graph parser populates one. `LoadMode` defaults to `AUTOMATIC`, which resolves to
   `DBT_LS` whenever no manifest is available but a project path and profile are - so the ticket's own

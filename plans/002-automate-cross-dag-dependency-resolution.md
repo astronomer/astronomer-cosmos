@@ -107,7 +107,7 @@ distinct, worse category than "conditional emission":
 
 | Mode | Emitted URI source | Matches the manifest URI? |
 |---|---|---|
-| WATCHER / WATCHER_KUBERNETES / WATCHER_GCP_GKE | Producer parser calls `compute_model_outlet_uris(target/manifest.json, namespace)` (`cosmos/operators/_watcher/base.py`, shared by the Kubernetes/GKE variants via `_k8s_common.py`) and pushes it via XCom; the consumer sensor emits `Asset(uri)` via `register_dataset` (`cosmos/operators/watcher.py`). No runtime OpenLineage events involved. All three share the single-producer architecture discussed in the `DbtTaskGroup` coordinator section below. | Yes - built straight from the manifest. |
+| WATCHER / WATCHER_KUBERNETES / WATCHER_GCP_GKE | The producer resolves its namespace and per-model outlet URIs (`DbtWatcherProducerOperator`, `cosmos/operators/watcher.py`, which overrides `_handle_datasets` to a no-op because emission is the consumer's job) via `compute_model_outlet_uris(target/manifest.json, namespace)` and pushes them over XCom. Each consumer sensor then emits its own model's Assets in `DbtWatcherConsumerBaseOperator._emit_datasets` (`cosmos/operators/_watcher/base.py`, shared by the Kubernetes/GKE variants via `_k8s_common.py`), which builds `Asset(uri=...)` per URI and delegates to `cosmos.dataset.register_dataset_on_task` - not the local operator's `LocalDbtBaseOperator.register_dataset`, so it works for consumers that don't inherit from it. No runtime OpenLineage events involved. All three share the single-producer architecture discussed in the `DbtTaskGroup` coordinator section below. | Yes - built straight from the manifest. |
 | LOCAL / VIRTUALENV | After the run, `get_datasets()` builds URIs via `construct_dataset_uri(output.namespace, output.name)` from `openlineage_events_completes` (`cosmos/operators/local.py`), gated by `emit_datasets`. | In practice yes (same OpenLineage standard the ticket's Cosmos-1.7 venv example relies on), **but emission is conditional** - see F4. |
 | AIRFLOW_ASYNC (BigQuery) | `_register_event` hardcodes `f"bigquery://{gcp_project}/{dataset}/{table_name}"` (`cosmos/operators/_asynchronous/bigquery.py`). | No - a divergent scheme that bypasses `construct_dataset_uri` and won't match. |
 | `DOCKER`, `KUBERNETES`, `AWS_EKS`, `AWS_ECS`, `AZURE_CONTAINER_INSTANCE`, `GCP_CLOUD_RUN_JOB`, `GCP_GKE` | None. `cosmos/operators/docker.py`, `kubernetes.py`, `aws_eks.py`, `aws_ecs.py`, `azure_container_instance.py`, `gcp_cloud_run_job.py`, and `gcp_gke.py` contain no `emit_datasets`/`get_datasets`/dataset-URI code at all - confirmed by grepping each file. `KUBERNETES` specifically is tracked in [astronomer-cosmos#2329](https://github.com/astronomer/astronomer-cosmos/issues/2329); the other six share the same gap without an existing tracked ticket. | N/A - there is nothing to match. This is a capability gap, not a conditional-emission or wrong-scheme problem, and it cannot be fixed by `emit_datasets=True` or by #2959 alone. |
@@ -552,11 +552,17 @@ regardless of which owned node needs which. It also wires any `internal_edges` t
 section above. Cosmos injects the corresponding `Dataset`/`Asset` condition
 into `schedule` (`AND` -> `AssetAll`/a list; `OR` -> `AssetAny`, on the Airflow versions that support
 it), **extending** rather than replacing a user-set schedule, per this compatibility matrix
-(constraint 3):
+(constraint 3).
+
+`resolve_external_uris` returns URI *strings*, and the schedule expressions take `Asset`/`Dataset`
+objects, so every row below wraps them first - `assets = [Asset(uri=u) for u in external_uris.values()]`,
+the same construction the watcher consumer uses when it emits
+(`DbtWatcherConsumerBaseOperator._emit_datasets`, `cosmos/operators/_watcher/base.py`). Nothing here
+consumes raw strings.
 
 | User's existing `schedule` | `auto_schedule=AND` / `OR` |
 |---|---|
-| Not set (`None`) | Use `AssetAll(*uris)` / `AssetAny(*uris)` directly. |
+| Not set (`None`) | Use `AssetAll(*assets)` / `AssetAny(*assets)` directly. |
 | Already a Dataset/Asset list or expression | Combine into one `AssetAll`/`AssetAny` that wraps both the user's own assets and the dbt-derived ones. Open question 2 covers whether the user's own assets AND or OR against the new set by default. |
 | A cron string, interval, or custom `Timetable` | **Unsupported in v1.** Airflow has no native time-AND-asset schedule - `DatasetOrTimeSchedule`/`AssetOrTimeSchedule` are OR-only, and this remains true on Airflow `main` (see Edge cases). Raise a clear `CosmosValueError` pointing at the S8 follow-up (an emulated AND) rather than silently dropping either the time or the asset condition. |
 

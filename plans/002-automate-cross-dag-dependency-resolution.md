@@ -76,10 +76,13 @@ user has to reconstruct by hand).
 
 ## Current state (verified against the last released version of Cosmos, 1.15.1)
 
-### Every dbt model already has a location-independent identity
+### Every dbt model already has a deterministic, derivable identity
 
-A model, seed, or snapshot maps to a stable Asset/Dataset URI built from its warehouse relation - the
-`postgres://0.0.0.0:5432/postgres.public.raw_customers` shape the ticket shows:
+A model, seed, or snapshot maps to an Asset/Dataset URI that Cosmos can derive rather than have the user
+hand-write - the `postgres://0.0.0.0:5432/postgres.public.raw_customers` shape the ticket shows. It is
+stable for a given deployment, not location-independent: the `namespace` half is derived from the
+`ProfileConfig`, so the same model resolves to a different URI against a different warehouse
+connection - which is what makes the namespace-mismatch hazard in F5 possible.
 
 - `construct_dataset_uri(namespace, "database.schema.alias")` (`cosmos/dataset.py:206`).
 - `compute_model_outlet_uris(manifest_path, namespace)` (`cosmos/dataset.py:279`) reads

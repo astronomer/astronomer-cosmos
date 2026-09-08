@@ -1,0 +1,24 @@
+name: Setup cosmos on Runtime image
+description: >-
+  Install OS build deps and cosmos + dbt adapters + pytest tooling into an Astronomer Runtime
+  image's own Python environment (keeping the image's pinned Airflow). Used by the container jobs
+  in test-runtime-alpha.yml. Requires the job to run inside the Runtime image as root.
+
+inputs:
+  extras:
+    description: Comma-separated cosmos optional-dependency extras to install.
+    required: false
+    default: dbt-postgres
+
+runs:
+  using: composite
+  steps:
+    - name: Install OS build deps for dbt adapters
+      shell: bash
+      run: |
+        apt-get update
+        apt-get install -y --no-install-recommends build-essential libpq-dev
+
+    - name: Install cosmos + test tooling into the Runtime image
+      shell: bash
+      run: bash scripts/test/runtime-alpha-setup.sh "${{ inputs.extras }}"

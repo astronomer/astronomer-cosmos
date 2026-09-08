@@ -531,7 +531,7 @@ jobs:
   # cluster. This suite could not be validated locally like the others and is expected to need
   # iteration on its first live run.
   Run-Kubernetes-Tests:
-    if: ${{ github.event_name == 'workflow_dispatch' }} # TEMP: skip experimental KinD suite on the pre-PR push run
+    # TEMP: enabled on push to iterate on this experimental suite in CI.
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:

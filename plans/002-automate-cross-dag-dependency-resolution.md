@@ -11,7 +11,7 @@
 **Code references:** every `path:line` citation below is pinned to `main` at
 [6dd07a74](https://github.com/astronomer/astronomer-cosmos/blob/6dd07a74889ef021ff7036de40adfb4b6a5356ed/),
 the commit this proposal was written against. Line numbers in `main` drift, so each citation also names
-the symbol it refers to - use the symbol if the line has moved. The *behaviour* described holds for the
+the symbol it refers to - use the symbol if the line has moved. The *behavior* described holds for the
 released 1.15.1 as well (the tag and `main` had diverged when this was written, so the same code sits at
 different line numbers there).
 

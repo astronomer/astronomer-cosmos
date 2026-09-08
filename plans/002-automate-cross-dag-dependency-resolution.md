@@ -249,12 +249,15 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
    permanently gated behind manifest availability. S4 in the roadmap below is this dependency, not a
    slice this proposal owns.
 
-   **#2959/#2960 do not fully close the `DBT_LS` gap on their own.** They add fields to nodes `dbt ls`
-   already returns; they don't change *which* nodes it returns. `dbt ls --select <x>` only returns
-   selected nodes - an external ephemeral ancestor's own `DbtNode` (needed to traverse past it, F3) is
-   never in the result. `DBT_MANIFEST` doesn't have this problem (the full project graph is always
-   loaded). So even after #2959/#2960 land, `auto_schedule` on a standalone `DbtDag` under `DBT_LS` may
-   still need to fail-fast on an external ephemeral ancestor it can't see - see open question 1.
+   **#2959/#2960 do not close the `DBT_LS` gap for `resolve_external_uris` at all - and this isn't
+   limited to ephemeral ancestors.** They add fields to nodes `dbt ls` already returns; they don't
+   change *which* nodes it returns. `dbt ls --select <x>` only returns *selected* nodes - and an
+   external parent is, by definition, not selected by this unit. So under `DBT_LS`, a standalone
+   `DbtDag` has no `DbtNode` at all for *any* external parent - materialized or ephemeral - regardless
+   of what `--output-keys` request. `#2959` only helps a unit resolve relation identity for the nodes it
+   selects itself; it can't give a consumer visibility into a producer's nodes. `DBT_MANIFEST` doesn't
+   have this problem (the full project graph is always loaded). So `auto_schedule` under `DBT_LS` cannot
+   resolve *any* external URI on its own - see open question 1 for what closes this.
 8. **Schedule injection (F2) - resolved: patch `timetable` inside the converter, don't move loading
    before `DAG.__init__`.** Tested directly against Airflow 3.2.0rc1: `dag.schedule = X` after
    construction raises `FrozenAttributeError` (schedule is frozen). `dag.timetable = X` after
@@ -358,9 +361,12 @@ things: `DbtDependencyCoordinator` (S3, below) only ever needs `owned`/`external
 `external_sources` - it wires Airflow tasks directly and never touches a URI, so gating it on F1 would
 have rejected valid `DBT_LS`-based `DbtTaskGroup` splits for no reason. `auto_schedule` (S2, below) needs
 the structural boundary *and* `resolve_external_uris`'s output, since it schedules on Assets. Only the
-latter function needs relation identity (F1) - via the manifest today, or via `dbt ls` once
-[astronomer-cosmos#2959](https://github.com/astronomer/astronomer-cosmos/issues/2959)/[astronomer-cosmos#2960](https://github.com/astronomer/astronomer-cosmos/issues/2960)
-land (constraint 7); it should not be written against `LoadMode.DBT_MANIFEST` specifically.
+latter function needs relation identity (F1) - via the manifest today, or, for a unit's *own* nodes, via
+`dbt ls` once [astronomer-cosmos#2959](https://github.com/astronomer/astronomer-cosmos/issues/2959)/[astronomer-cosmos#2960](https://github.com/astronomer/astronomer-cosmos/issues/2960)
+land. That's not the same as resolving an *external* parent's relation identity under `DBT_LS`, which
+#2959/#2960 don't provide at all (see constraint 7 and open question 1) - `resolve_external_uris` should
+still be written against relation identity as a `DbtNode` property, not `LoadMode.DBT_MANIFEST`
+specifically, so it works unchanged whenever that identity is actually available, from whatever source.
 
 **Non-emitting-boundary rule (F3, mandatory, structural):** when an external parent cannot itself be
 rendered as a task that does real work - ephemeral models (excluded explicitly via
@@ -390,9 +396,18 @@ the real problem, which is that `a >> c` needs a direct task edge that current C
 today regardless of this proposal. So after every traversal hop, the resolver must check whether the
 newly-reached ancestor is itself in `owned`: if yes, stop and record `(ancestor, original_child)` in
 `internal_edges` instead of `external_edges`; only continue traversing while the ancestor stays outside
-`owned`. This proposal computes `internal_edges` so it doesn't misclassify them - it does not fix the
-underlying missing-edge gap in `create_airflow_task_dependencies`, which is a pre-existing Cosmos issue
-independent of any cross-DAG split and arguably belongs in its own ticket.
+`owned`.
+
+Detecting `internal_edges` and then not doing anything with them would leave `a` and `c` able to run in
+either order - exactly the kind of silent, weaker guarantee constraint 9 forbids. Since the fix is
+simple (`tasks_map[ancestor] >> tasks_map[child]`, the same direct-wiring call the coordinator already
+makes for cross-group edges), whichever consumer calls `resolve_graph_boundary` must wire every
+`internal_edges` pair itself once both ends are in `tasks_map`, or raise if either end isn't. This also
+happens to fix `create_airflow_task_dependencies`'s pre-existing gap (`cosmos/airflow/graph.py`, which
+only wires an edge when the *immediate* `depends_on` parent is in `tasks_map` - so `a >> c` is silently
+missing today, independent of any cross-DAG split) for any unit that goes through this resolver. The
+same gap for ordinary Cosmos usage that never calls `resolve_graph_boundary` remains, and is worth its
+own ticket to fix at the source.
 
 **Whether test nodes contribute edges is a resolver decision, not an afterthought.** A dbt test with
 multiple parents can be pulled into `filtered_nodes` purely because one of its parents is selected
@@ -416,7 +431,9 @@ RenderConfig(
 
 `auto_schedule` calls `resolve_graph_boundary` and then `resolve_external_uris`, and only needs
 `set(external_uris.values())` - the `DbtDag` schedule gates on the *union* of resolvable external URIs
-regardless of which owned node needs which. Cosmos injects the corresponding `Dataset`/`Asset` condition
+regardless of which owned node needs which. It also wires any `internal_edges` the resolver returns
+(`tasks_map[ancestor] >> tasks_map[child]`), the same as the coordinator does - see the core resolver
+section above. Cosmos injects the corresponding `Dataset`/`Asset` condition
 into `schedule` (`AND` -> `AssetAll`/a list; `OR` -> `AssetAny`, on the Airflow versions that support
 it), **extending** rather than replacing a user-set schedule, per this compatibility matrix
 (constraint 3):
@@ -434,10 +451,12 @@ Per constraint 9, an external parent that resolves to no confirmed, emitting own
 parse has access to - this is open question 5, and it gates `auto_schedule`'s release, not something S2
 can work around per-call.
 
-**If every external parent is a source, `external_uris` is empty - raise, don't build an empty
-condition.** Sources are exempt from the ownership check, but that means a source-only boundary leaves
-nothing to schedule on. Silently applying `schedule=None` here would look like `auto_schedule` worked
-when it did nothing; raise instead.
+**Any time `external_uris` ends up empty, raise - don't build an empty condition.** This isn't only a
+source-only boundary (above); it's just as possible for a selection to have no external dependency at
+all. Either way, `AssetAll()`/`AssetAny()` with no arguments constructs without error - confirmed
+directly against Airflow 3.2 - but is reported to fail only when evaluated later, a much worse failure
+mode than a clear parse-time error. Guard on an empty `external_uris` generally, not just the
+source-only case, and raise before ever constructing the condition.
 
 **Where injection happens (F2, resolved, constraint 8, Airflow 3 only):** `DbtToAirflowConverter.__init__`
 already runs after `DAG.__init__` and already loads the graph - no change needed there. At the end of its
@@ -450,7 +469,9 @@ requires Airflow 3.
 
 A `DbtDependencyCoordinator([tg_a, tg_b, ...]).wire()` builds a map from each owned node's Airflow task
 to its `external_edges` parents (structural `GraphBoundary`, above) and adds
-`producer_task >> consumer_task` edges across groups, with `granularity="model"` or `"group"`. It uses
+`producer_task >> consumer_task` edges across groups, with `granularity="model"` or `"group"`. It also
+wires each group's own `internal_edges` the same way, closing the gap `create_airflow_task_dependencies`
+would otherwise leave open for that group. It uses
 only the structural resolver - no manifest, no relation identity, no URI, no F1/#2959/#2960 dependency -
 and works under any `LoadMode` for which the supplied `nodes` union covers every boundary ancestor -
 `DBT_MANIFEST` always does; `DBT_LS` does only if the peer union happens to include the relevant
@@ -497,20 +518,21 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
 |---|---|
 | `cosmos/dataset.py` (or a new `cosmos/dependencies.py`) | `resolve_graph_boundary` (structural, `owned`/`external_edges`/`internal_edges`/`external_sources`, no manifest needed) and a separate `resolve_external_uris` (needs relation identity, F1). Includes the F3 ephemeral traversal with the owned-re-entry check, the test-node exclusion rule, and fail-fast behavior. |
 | `cosmos/config.py` | New `RenderConfig.auto_schedule: DbtUpstreamUpdated \| None = None`; new `DbtUpstreamUpdated` enum (`AND`/`OR`) exported from `cosmos`. Reject `auto_schedule` on a `DbtTaskGroup`'s `RenderConfig` (it mutates a DAG's `schedule`; a `TaskGroup` isn't one). |
-| `cosmos/converter.py` (F2, constraint 8) | At the end of `DbtToAirflowConverter.__init__`, for `auto_schedule`: build the combined timetable, set `self.timetable`, call `attrs.validate(self)` to re-run `catchup`/`allowed_run_types`/`params` validation, and separately re-check `max_active_runs` vs `active_runs_limit`. No change needed to `cosmos/airflow/dag.py`. |
-| New `cosmos/airflow/dependencies.py` | `DbtDependencyCoordinator`: cross-`DbtTaskGroup` wiring, `granularity`, cycle/ambiguous-producer detection using its own peer list (no registry), and the WATCHER-family producer-level gating strategy. Uses only the structural resolver. |
+| `cosmos/converter.py` (F2, constraint 8) | At the end of `DbtToAirflowConverter.__init__`, for `auto_schedule`: wire any `internal_edges` into `tasks_map`, build the combined timetable, set `self.timetable`, call `attrs.validate(self)` to re-run `catchup`/`allowed_run_types`/`params` validation, and separately re-check `max_active_runs` vs `active_runs_limit`. No change needed to `cosmos/airflow/dag.py`. |
+| New `cosmos/airflow/dependencies.py` | `DbtDependencyCoordinator`: cross-`DbtTaskGroup` wiring, wiring each group's own `internal_edges`, `granularity`, cycle/ambiguous-producer detection using its own peer list (no registry), and the WATCHER-family producer-level gating strategy. Uses only the structural resolver. |
 | `cosmos/dbt/graph.py` (F1, dependency - not owned by this proposal) | DBT_LS relation metadata: extend `--output-keys` with `database`/`schema`/`alias`, and add the fields to `DbtNode`, the dbt-ls parser, and the ls cache; plus the cache-key fix. Scoped in [astronomer-cosmos#2959](https://github.com/astronomer/astronomer-cosmos/issues/2959) and [astronomer-cosmos#2960](https://github.com/astronomer/astronomer-cosmos/issues/2960) - `auto_schedule` (S2) is sequenced after both land, per constraint 7. |
 | Docs | `docs/guides/multi_project/`, the scheduling guide; refit `dev/dags/cross_project_*` examples; document the WATCHER-family group-level-only granularity limitation. |
 
 ## Edge cases and risks
 
-- **F1 - relation identity depends on [astronomer-cosmos#2959](https://github.com/astronomer/astronomer-cosmos/issues/2959)/[astronomer-cosmos#2960](https://github.com/astronomer/astronomer-cosmos/issues/2960) landing first.**
-  `DBT_LS` has no relation identity today, and this proposal does not scope around that gap with a
-  manifest-only carve-out (constraint 7) - it sequences after those two land instead. Even after they
-  land, `dbt ls --select <x>` still only returns selected nodes, so an external ephemeral ancestor's own
-  data may still be unavailable under `DBT_LS` - see open question 1. If some dbt-core-version/dbt-Fusion
-  combination genuinely cannot supply the needed `--output-keys` at all, the resolver must raise a clear
-  error for that specific combination (constraint 9 - never a silent no-op).
+- **F1 - `DBT_LS` cannot resolve any external parent's URI, and #2959/#2960 don't fix that.** Those two
+  tickets add relation-identity fields to nodes `dbt ls` already returns for *this unit's own selection* -
+  they don't make `dbt ls` return external, unselected nodes at all, ephemeral or not. So
+  `resolve_external_uris` needs one of the three mechanisms in open question 1 (expanded listing,
+  producer/registry-published URIs, or requiring `DBT_MANIFEST`) before `auto_schedule` can support
+  `DBT_LS` for any `DbtDag` with an external dependency. If some dbt-core-version/dbt-Fusion combination
+  genuinely cannot supply the needed `--output-keys` at all even for a unit's own nodes, the resolver
+  must raise a clear error for that specific combination (constraint 9 - never a silent no-op).
 - **F2 - schedule-injection timing, resolved for Airflow 3 only.** `schedule` itself can't be reassigned
   after `DAG.__init__` (frozen), but `timetable` can - patch it inside the converter (constraint 8). On
   Airflow 2, the same patch breaks `DAG.validate()`'s own consistency check, so `auto_schedule` (S2) is
@@ -519,11 +541,14 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   would make the downstream DAG never trigger; sources are genuinely external. The resolver must
   traverse past them or fail fast - never silently drop the dependency.
 - **F3 - traversal can re-enter `owned`.** An owned node reached by traversing past an excluded
-  ephemeral node is not external - it's `internal_edges`. Misclassifying it as external would make
-  `auto_schedule` wait on an Asset its own DAG produces. This also surfaces a pre-existing Cosmos gap,
-  independent of this proposal: `create_airflow_task_dependencies` only wires direct `depends_on`
-  parents present in `tasks_map`, so the real `a >> c` edge is silently missing today whenever an
-  ephemeral intermediate is excluded from selection - worth its own ticket.
+  ephemeral node is not external - it's `internal_edges`, and both consumers must wire it
+  (`tasks_map[ancestor] >> tasks_map[child]`), not just record it. Misclassifying it as external would
+  make `auto_schedule` wait on an Asset its own DAG produces; leaving it undirected would let `a` and `c`
+  run in either order. This also surfaces a pre-existing Cosmos gap, independent of this proposal:
+  `create_airflow_task_dependencies` only wires direct `depends_on` parents present in `tasks_map`, so
+  the real `a >> c` edge is silently missing today whenever an ephemeral intermediate is excluded from
+  selection - fixed by this proposal for any unit that calls `resolve_graph_boundary`, but the general
+  case is worth its own ticket.
 - **F4/constraint 5 - non-WATCHER emission is unreliable or missing.** LOCAL/VIRTUALENV emit
   conditionally; AIRFLOW_ASYNC emits the wrong scheme - `auto_schedule` depends on #2959 fixing both
   before it's built for those modes. The seven modes that don't emit at all are separate - #2959 doesn't
@@ -571,16 +596,23 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   with no peer union supplying it); a multi-parent test's non-selected parent does *not* appear as an
   external dependency; the coordinator's peer-union `nodes` map correctly resolves an ephemeral ancestor
   owned by one peer and referenced by another; the `a` (owned) -> `e` (excluded, ephemeral) -> `c`
-  (owned) topology produces `internal_edges={(a, c)}` and *not* an external edge back onto `a`.
-- `resolve_external_uris` (takes a node map, not a manifest - run the same contract test against a
-  manifest-loaded node map today and a `DBT_LS`-loaded one once #2959/#2960 land): resolves each
-  non-source external parent to a URI; a source never gets one; missing relation identity raises with a
-  clear error.
+  (owned) topology produces `internal_edges={(a, c)}` and *not* an external edge back onto `a` - and an
+  end-to-end test confirms both `auto_schedule` and the coordinator actually wire that edge
+  (`a >> c` present in the rendered DAG), not just that the resolver reports it.
+- `resolve_external_uris` (takes a node map, not a manifest): against a manifest-loaded node map,
+  resolves each non-source external parent to a URI, a source never gets one, and missing relation
+  identity raises with a clear error. Against a `DBT_LS`-loaded node map with a genuinely external
+  parent (not in `nodes`), it raises "not resolvable under `DBT_LS`" rather than silently omitting the
+  dependency - it does not just work once #2959/#2960 land (open question 1); a separate test covers
+  whichever of the three mechanisms in open question 1 gets built.
 - Sources - two distinct cases, not one: a `DbtDag`/`DbtTaskGroup` with a source dependency *alongside*
   other, resolvable external dependencies renders and runs without raising (the ownership check exempts
   sources); a `DbtDag` using `auto_schedule` whose external dependencies are *only* sources raises,
   since there is nothing left to schedule on. Test both at the consumer level, not just as resolver
   output.
+- Empty `external_uris`, generally - not just the source-only case: a `DbtDag` using `auto_schedule`
+  with no external dependency at all raises before constructing `AssetAll`/`AssetAny`, rather than
+  building one with zero assets and deferring the failure to evaluation time.
 - F2/constraint 8 (Airflow 3 only): the DAG's `timetable` reflects the dbt-derived datasets and extends
   a user-set schedule; a serialize/deserialize round-trip confirms the patched timetable survives; a DAG
   that would now fail any of the checks Airflow normally runs at construction - `catchup`/`start_date`,
@@ -619,20 +651,24 @@ without it:
   ownership check (zero/multiple owners among the peers it's given). Uses only S1's output. No
   dependency on S4/#2959/#2960. WATCHER-family groups get the producer-level gating strategy and are
   capped at group-level granularity (open question 4).
-- **S9 - peer-visibility mechanism for `auto_schedule`:** resolve open question 5 - can a standalone
-  `DbtDag` verify ownership/emission/namespace some other way, or does it need a `DbtDagGroup`
-  (candidate: S6) or a registry? **This must land before S2**, not after - `auto_schedule` cannot honor
-  constraint 9's fail-closed guarantee without it.
+- **S9 - peer-visibility mechanism for `auto_schedule`:** resolve open question 5 - a `DbtDagGroup`
+  (candidate: S6) or a registry that lets a standalone `DbtDag` verify ownership/emission/namespace *and*
+  read a producer's already-resolved URI, since a consumer can never recompute an external parent's URI
+  under `DBT_LS` on its own (open question 1). **This must land before S2**, not after -
+  `auto_schedule` cannot honor constraint 9's fail-closed guarantee, or support `DBT_LS` at all, without
+  it.
 - **S4 (external dependency, blocking) - relation metadata for `DBT_LS`**: extend `--output-keys`,
   `DbtNode`, the parser, and the cache. Tracked in
   [astronomer-cosmos#2959](https://github.com/astronomer/astronomer-cosmos/issues/2959) and
   [astronomer-cosmos#2960](https://github.com/astronomer/astronomer-cosmos/issues/2960), not owned by
-  this proposal.
+  this proposal. Needed only so a `DBT_LS`-based *producer* can compute its own nodes' relation identity
+  to publish via S9 - it does not, by itself, let a consumer resolve an external parent.
 - **S2 - `auto_schedule` and `DbtUpstreamUpdated`** for `DbtDag`, **Airflow 3 only** (constraint 8 - the
   `timetable` patch doesn't work on Airflow 2, and Airflow 2 support isn't planned). Depends on S9
-  (ownership/emission/namespace verification), S4 (`DBT_LS` relation identity, constraint 7), and
-  constraint 5 (#2959 unifying emission across modes) all landing first. Implementation: the `timetable`
-  patch in the converter (constraint 8) and the extend-an-existing-schedule compatibility matrix.
+  (ownership/emission/namespace/URI verification - the actual unlock for `DBT_LS`), S4 (needed on the
+  producer side, constraint 7), and constraint 5 (#2959 unifying emission across modes) all landing
+  first. Implementation: the `timetable` patch in the converter (constraint 8) and the
+  extend-an-existing-schedule compatibility matrix.
 - **S5 - ASYNC reconciliation**: part of #2959 (constraint 5), not owned by this proposal.
 - **S6 - a `DbtDagGroup` container** (ticket alternative b.iii): the leading candidate for S9.
 - **S7 - Docs and refitting the `cross_project_*` examples**, including the WATCHER-family
@@ -645,16 +681,23 @@ without it:
 
 ## Open questions
 
-1. **Residual `DBT_LS` gaps for `auto_schedule`, after #2959/#2960 land (F1, constraint 7).** Two
-   specific items remain, both about `auto_schedule` on a standalone `DbtDag` under `DBT_LS`:
-   - If `database`/`schema`/`alias`/`relation_name` turn out not to be valid `--output-keys` for some
-     specific dbt-core-version/dbt-Fusion combination, does `auto_schedule` raise only for that
-     combination, or does the whole feature need a documented minimum-version floor?
-   - `dbt ls --select <x>` only ever returns selected nodes - #2959/#2960 don't change that. An external
-     ephemeral ancestor's own data may still be invisible to a standalone `DbtDag` (the coordinator
-     doesn't have this problem - it unions its peers' `nodes`). Does `auto_schedule` need an expanded
-     `dbt ls` listing to cover this, or does it just fail-fast on that topology under `DBT_LS`
-     permanently?
+1. **`DBT_LS` support for `auto_schedule` is not just an edge case - it needs one of three mechanisms,
+   converging with open question 5.** `dbt ls --select <x>` only ever returns selected nodes. An
+   external parent is by definition not selected, so a standalone `DbtDag` under `DBT_LS` has no
+   `DbtNode` - and so no relation identity - for *any* external parent, materialized or ephemeral.
+   #2959/#2960 don't change this: they add fields to nodes `dbt ls` already returns, not which nodes it
+   returns. So resolving an external URI under `DBT_LS` needs one of:
+   - an expanded `dbt ls` listing that also fetches external parents (extra invocation cost, and still
+     needs #2959/#2960-style relation-identity fields on top);
+   - the producer publishing its own already-resolved URI somewhere the consumer can read at parse time -
+     the same peer-visibility mechanism (`DbtDagGroup` or a registry) that open question 5 needs for
+     ownership verification, extended to also carry each node's URI; or
+   - `auto_schedule` simply requires `DBT_MANIFEST` for any `DbtDag` with an external dependency, and
+     raises for `DBT_LS` - the safe default until one of the above is built.
+
+   Separately, if `database`/`schema`/`alias`/`relation_name` turn out not to be valid `--output-keys`
+   for some specific dbt-core-version/dbt-Fusion combination, does `auto_schedule` raise only for that
+   combination, or does the whole feature need a documented minimum-version floor?
 2. **`DbtUpstreamUpdated` semantics:** confirm the intended meaning of `AND`/`OR`, and how the
    dbt-derived condition should combine with a user's own datasets or timetable.
 3. **`DbtDagGroup` (S6) internal design:** a Python grouper, a tag-driven mechanism, or per-model Cosmos
@@ -664,13 +707,16 @@ without it:
    specifically for the WATCHER family, where only group-level execution gating is achievable
    (see the coordinator section above): should requesting `granularity="model"` raise outright, or
    degrade to group-level with a logged warning?
-5. **Peer visibility for `auto_schedule` (F5, S9) - the biggest open question.** The coordinator (S3)
-   already solves this for `DbtTaskGroup`s: its constructor takes the exact list of peers, so ownership
-   is directly checkable, no registry needed. A standalone `DbtDag` has no such list - it's parsed
-   independently, with zero visibility into sibling `DbtDag`s. So: does `auto_schedule` need a
-   `DbtDagGroup`-style construct that takes multiple `DbtDag` configs together (pulling S6 forward as a
-   prerequisite, not a follow-up), or a persistent registry (e.g. an Airflow Variable)? **A weaker,
-   best-effort guarantee - validate whatever a lone `DbtDag`'s own parse can see, but accept that a
-   genuinely unowned or double-owned external node won't be caught - is not on the table**: constraint 9
-   requires fail-closed, not a documented weaker guarantee, so this question resolves to one of the two
-   real mechanisms above, not a third "ship it anyway" option. This gates S2's release.
+5. **Peer visibility for `auto_schedule` (F5, S9) - the biggest open question, and it now also carries
+   URI resolution (open question 1).** The coordinator (S3) already solves this for `DbtTaskGroup`s: its
+   constructor takes the exact list of peers, so ownership is directly checkable, no registry needed. A
+   standalone `DbtDag` has no such list - it's parsed independently, with zero visibility into sibling
+   `DbtDag`s. So: does `auto_schedule` need a `DbtDagGroup`-style construct that takes multiple `DbtDag`
+   configs together (pulling S6 forward as a prerequisite, not a follow-up), or a persistent registry
+   (e.g. an Airflow Variable)? Whichever it is, it should carry each unit's already-resolved node URIs,
+   not just an ownership flag - that's the same mechanism `DBT_LS` support needs anyway, so building it
+   once answers both questions instead of two separate ones. **A weaker, best-effort guarantee - validate
+   whatever a lone `DbtDag`'s own parse can see, but accept that a genuinely unowned or double-owned
+   external node won't be caught - is not on the table**: constraint 9 requires fail-closed, not a
+   documented weaker guarantee, so this question resolves to one of the two real mechanisms above, not a
+   third "ship it anyway" option. This gates S2's release.

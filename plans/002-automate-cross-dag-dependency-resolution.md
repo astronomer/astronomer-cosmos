@@ -84,18 +84,31 @@ user has to reconstruct by hand).
 ### Every dbt model already has a deterministic, derivable identity
 
 A model, seed, or snapshot maps to an Asset/Dataset URI that Cosmos can derive rather than have the user
-hand-write - the `postgres://0.0.0.0:5432/postgres.public.raw_customers` shape the ticket shows. It is
-stable for a given deployment, not location-independent: the `namespace` half is derived from the
-`ProfileConfig`, so the same model resolves to a different URI against a different warehouse
-connection - which is what makes the namespace-mismatch hazard in F5 possible.
+hand-write - the `postgres://0.0.0.0:5432/postgres.public.raw_customers` shape the ticket shows (which is
+the Airflow 2 form; see the delimiter note below). It is stable for a given deployment, not
+location-independent: the `namespace` half is derived from the `ProfileConfig`, so the same model
+resolves to a different URI against a different warehouse connection - which is what makes the
+namespace-mismatch hazard in F5 possible.
 
-- `construct_dataset_uri(namespace, "database.schema.alias")` (`cosmos/dataset.py:206`).
+- `construct_dataset_uri(namespace, name)` (`cosmos/dataset.py:206`) is the single place the shape is
+  decided, and the shape is **not** a plain f-string: the name is `urllib.parse.quote`d, and the
+  dot delimiters become slashes on Airflow 3, or on Airflow 2 with
+  `settings.use_dataset_airflow3_uri_standard` set. So `database.schema.alias` renders as
+  `<namespace>/database.schema.alias` on Airflow 2 and `<namespace>/database/schema/alias` on Airflow 3
+  (`cosmos/dataset.py:221-222`).
 - `compute_model_outlet_uris(manifest_path, namespace)` (`cosmos/dataset.py:279`) reads
-  `manifest.json`, filters to model/seed/snapshot, and returns
-  `{unique_id: [f"{namespace}/{database}.{schema}.{alias}"]}`.
+  `manifest.json`, filters to model/seed/snapshot, and returns `{unique_id: [uri]}` where each `uri`
+  comes from `make_dataset_uri_builder()` (`cosmos/dataset.py:254`) - a `construct_dataset_uri` wrapper -
+  never a hand-built string.
 - `namespace` comes from `get_dataset_namespace(profile_config)` (`cosmos/dataset.py:158`); it is
   `None` for unsupported adapters.
 - The dependency graph (`depends_on.nodes`) lives in the same manifest.
+
+Both consumers of this proposal must therefore build every URI through `construct_dataset_uri` rather
+than formatting one directly. That is not a style preference: this design uses URI equality as its join
+key, so a parse-time URI assembled by hand would differ from the emitted one by quoting or by delimiter
+on exactly the Airflow version where it matters most. It is the same hazard as the Airflow 2-vs-3
+mismatch in Edge cases, reached from the consumer's side instead of the producer's.
 
 A consumer can therefore compute, at parse time, the URIs of its external upstream models - exactly
 what `auto_schedule` needs to inject into the DAG's `schedule`. **But only from a manifest** - see F1.

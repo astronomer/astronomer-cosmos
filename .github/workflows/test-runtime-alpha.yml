@@ -586,6 +586,8 @@ jobs:
             -e AIRFLOW_CONN_EXAMPLE_CONN="postgres://postgres:postgres@localhost:5432/postgres" \
             -e AIRFLOW_CONN_AWS_S3_CONN \
             -e AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT=90.0 \
+            -e AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR \
+            -e PYTEST_TIMEOUT=600 \
             -e COSMOS_CONN_POSTGRES_PASSWORD \
             -e DATABRICKS_CLUSTER_ID=mock -e DATABRICKS_HOST=mock \
             -e DATABRICKS_WAREHOUSE_ID=mock -e DATABRICKS_TOKEN=mock \

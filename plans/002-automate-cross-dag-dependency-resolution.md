@@ -154,7 +154,9 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
   `DbtNode.has_ephemeral_materialization`, `cosmos/dbt/graph.py:150`) passes
   `compute_model_outlet_uris`'s resource-type filter yet **no task ever emits its Asset**, so injecting
   that URI would make the downstream DAG never trigger. **Sources** live in `manifest["sources"]` and
-  never get URIs - they are genuinely external inputs, not a dependency to wait on. Silently tolerating
+  never get URIs - so there is nothing for `auto_schedule` to wait on. That is a statement about Assets
+  only: a source can still render a real freshness/test task, which *is* a genuine ordering dependency
+  for the coordinator - see the source-rendering table in Proposed design. Silently tolerating
   "missing keys" either drops the dependency (downstream runs too early) or waits forever.
 - **F4 - LOCAL/VIRTUALENV emission is conditional, not equivalent to WATCHER.** It depends entirely on
   OpenLineage artifact parsing (`openlineage-integration-common` /

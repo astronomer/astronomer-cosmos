@@ -43,6 +43,10 @@ on:
   # and Snowflake suites are gated to workflow_dispatch only, so they do not run on the PR.
   pull_request:
     branches: [main]
+  # Also run on every push to the PR branch (in addition to pull_request), so each commit runs.
+  push:
+    branches:
+      - pankajkoti/boss-610-integration-of-cosmos-tests-with-runtime-alpha-release
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.runtime_version }}

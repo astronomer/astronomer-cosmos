@@ -263,9 +263,18 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
    construction raises `FrozenAttributeError` (schedule is frozen). `dag.timetable = X` after
    construction works fine, and a serialize/deserialize round-trip confirms the patched timetable is
    what the scheduler actually sees (`schedule` isn't even serialized). So `auto_schedule` can just set
-   `self.timetable` at the end of `DbtToAirflowConverter.__init__`, after computing the boundary and
-   URIs as usual - no need to load anything before `DAG.__init__`, and no risk of loading the graph
-   twice.
+   the **DAG object's** `timetable` at the end of `DbtToAirflowConverter.__init__`, after computing the
+   boundary and URIs as usual - no need to load anything before `DAG.__init__`, and no risk of loading
+   the graph twice.
+
+   **The object to patch is `dag`, never `self`.** `DbtToAirflowConverter` is a mixin, not a `DAG`
+   subclass, and which object `self` is depends entirely on the consumer: `DbtDag(DAG, DbtToAirflowConverter)`
+   (`cosmos/airflow/dag.py:14`) means `self` *is* the DAG there, but `DbtTaskGroup(TaskGroup, DbtToAirflowConverter)`
+   (`cosmos/airflow/task_group.py:18`) means `self` is a `TaskGroup`, and the converter can also be
+   instantiated directly with a `dag=` argument and no subclassing at all. So `self.timetable = ...` is
+   correct only by accident in one of three cases and, on a `TaskGroup`, silently creates an unused
+   attribute with no error. Use the DAG the converter already resolves for `build_airflow_graph` -
+   `dag or (task_group and task_group.dag)` (`cosmos/converter.py:408`) - and patch `dag.timetable`.
 
    Airflow validates several things against the timetable once, at construction, and none of it re-runs
    automatically when `timetable` is patched afterward: `catchup`/`start_date`, `allowed_run_types`,
@@ -274,17 +283,19 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
    `start_date` raises; constructing with `schedule=None` (so the check doesn't fire) and then patching
    `timetable` to the same asset condition does not, silently accepting an invalid combination.
 
-   Don't reimplement each check by hand - call `attrs.validate(self)` after patching. `catchup`,
-   `allowed_run_types`, and `params` are all `attrs` field validators that read `self.timetable`
-   dynamically, so `attrs.validate()` re-runs them against the patched value and correctly raises
-   (confirmed empirically for the `catchup` case above). The one thing `attrs.validate()` won't catch is
+   Don't reimplement each check by hand - call `attrs.validate(dag)` after patching (again the DAG
+   object, not the converter - `attrs.validate` on a `DbtTaskGroup` or a bare converter raises
+   `NotAnAttrsClassError`). `catchup`, `allowed_run_types`, and `params` are all `attrs` field validators
+   that read the DAG's own `timetable` dynamically, so `attrs.validate()` re-runs them against the
+   patched value and correctly raises (confirmed empirically for the `catchup` case above). The one
+   thing `attrs.validate()` won't catch is
    `max_active_runs` vs `active_runs_limit`, since that check lives inline in `__attrs_post_init__`, not
    a field validator - check that one explicitly. This also needs confirming on later Airflow 3 versions,
    since Airflow could add more such checks over time.
 
    **This whole approach does not work on Airflow 2 - `auto_schedule` (S2) is Airflow 3 only.** Checked
    directly against Airflow 2.10.5: `DAG` is a plain class (`class DAG(LoggingMixin)`), not `attrs`-based,
-   so `attrs.validate(self)` raises `NotAnAttrsClassError` outright. Worse, patching only `timetable`
+   so `attrs.validate(dag)` raises `NotAnAttrsClassError` outright. Worse, patching only `timetable`
    leaves `schedule_interval` describing the old schedule, and Airflow 2's own `DAG.validate()` - called
    before the DAG is bagged - explicitly checks the two match and raises `AirflowDagInconsistent` if not.
    The constructor-only checks (start-date-when-scheduled, etc.) would also need their own,
@@ -460,10 +471,23 @@ source-only case, and raise before ever constructing the condition.
 
 **Where injection happens (F2, resolved, constraint 8, Airflow 3 only):** `DbtToAirflowConverter.__init__`
 already runs after `DAG.__init__` and already loads the graph - no change needed there. At the end of its
-`__init__`, after computing `external_uris`, it builds the combined timetable and sets `self.timetable`
-directly. Confirmed safe on Airflow 3 (`schedule` is frozen, but `timetable` isn't, and the patched value
-survives serialization) and confirmed **not** to work on Airflow 2 (constraint 8) - `auto_schedule`
-requires Airflow 3.
+`__init__`, after computing `external_uris`, it builds the combined timetable and assigns it to
+**`dag.timetable`** - the DAG object, resolved the same way the converter already resolves it for
+`build_airflow_graph` (`dag or (task_group and task_group.dag)`, `cosmos/converter.py:408`), never
+`self.timetable` (constraint 8 explains why `self` is the wrong object in two of the three ways the
+converter is used). Confirmed safe on Airflow 3 (`schedule` is frozen, but `timetable` isn't, and the
+patched value survives serialization) and confirmed **not** to work on Airflow 2 (constraint 8) -
+`auto_schedule` requires Airflow 3.
+
+**The `DbtDag`-only guard has to live in the converter, not in `RenderConfig`.** `RenderConfig` is a
+plain dataclass with no knowledge of which consumer will use it, so it cannot tell a `DbtDag`'s config
+from a `DbtTaskGroup`'s and cannot reject `auto_schedule` on its own. The check must therefore run in
+`DbtToAirflowConverter.__init__`, where both `dag` and `task_group` are in scope, and it must **raise**
+rather than skip: on a `DbtTaskGroup`, `self.timetable = ...` would silently no-op, while patching the
+*resolved* `dag` (which for a `DbtTaskGroup` is the enclosing user DAG, via `task_group.dag`) would
+silently rewrite the schedule of a DAG the user never asked Cosmos to own - a worse outcome than either
+a no-op or an error. Concretely: raise `CosmosValueError` when `auto_schedule` is set and `task_group`
+is not `None`, or when the converter was constructed with a `dag` it does not exclusively own.
 
 ### `DbtTaskGroup`s in one DAG: direct task edges (additive)
 
@@ -517,8 +541,8 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
 | Module | Change |
 |---|---|
 | `cosmos/dataset.py` (or a new `cosmos/dependencies.py`) | `resolve_graph_boundary` (structural, `owned`/`external_edges`/`internal_edges`/`external_sources`, no manifest needed) and a separate `resolve_external_uris` (needs relation identity, F1). Includes the F3 ephemeral traversal with the owned-re-entry check, the test-node exclusion rule, and fail-fast behavior. |
-| `cosmos/config.py` | New `RenderConfig.auto_schedule: DbtUpstreamUpdated \| None = None`; new `DbtUpstreamUpdated` enum (`AND`/`OR`) exported from `cosmos`. Reject `auto_schedule` on a `DbtTaskGroup`'s `RenderConfig` (it mutates a DAG's `schedule`; a `TaskGroup` isn't one). |
-| `cosmos/converter.py` (F2, constraint 8) | At the end of `DbtToAirflowConverter.__init__`, for `auto_schedule`: wire any `internal_edges` into `tasks_map`, build the combined timetable, set `self.timetable`, call `attrs.validate(self)` to re-run `catchup`/`allowed_run_types`/`params` validation, and separately re-check `max_active_runs` vs `active_runs_limit`. No change needed to `cosmos/airflow/dag.py`. |
+| `cosmos/config.py` | New `RenderConfig.auto_schedule: DbtUpstreamUpdated \| None = None`; new `DbtUpstreamUpdated` enum (`AND`/`OR`) exported from `cosmos`. The `DbtDag`-only rejection cannot live here - `RenderConfig` is a plain dataclass with no knowledge of its consumer (see the injection section); it belongs in the converter row below. |
+| `cosmos/converter.py` (F2, constraint 8) | At the end of `DbtToAirflowConverter.__init__`, for `auto_schedule`: raise `CosmosValueError` unless this converter is building a `DbtDag` (`task_group is None` and the converter owns `dag`), wire any `internal_edges` into `self.tasks_map`, build the combined timetable, assign `dag.timetable` on the DAG resolved at `cosmos/converter.py:408`, call `attrs.validate(dag)` to re-run `catchup`/`allowed_run_types`/`params` validation, and separately re-check `max_active_runs` vs `active_runs_limit`. No change needed to `cosmos/airflow/dag.py`. |
 | New `cosmos/airflow/dependencies.py` | `DbtDependencyCoordinator`: cross-`DbtTaskGroup` wiring, wiring each group's own `internal_edges`, `granularity`, cycle/ambiguous-producer detection using its own peer list (no registry), and the WATCHER-family producer-level gating strategy. Uses only the structural resolver. |
 | `cosmos/dbt/graph.py` (F1, dependency - not owned by this proposal) | DBT_LS relation metadata: extend `--output-keys` with `database`/`schema`/`alias`, and add the fields to `DbtNode`, the dbt-ls parser, and the ls cache; plus the cache-key fix. Scoped in [astronomer-cosmos#2959](https://github.com/astronomer/astronomer-cosmos/issues/2959) and [astronomer-cosmos#2960](https://github.com/astronomer/astronomer-cosmos/issues/2960) - `auto_schedule` (S2) is sequenced after both land, per constraint 7. |
 | Docs | `docs/guides/multi_project/`, the scheduling guide; refit `dev/dags/cross_project_*` examples; document the WATCHER-family group-level-only granularity limitation. |
@@ -621,7 +645,10 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   on Airflow 2 raises a clear "not supported" error - test that directly rather than trying to make the
   patch work there.
 - `auto_schedule`: `AND`/`OR` combine correctly; each row of the schedule-compatibility matrix behaves
-  as specified (cron + `auto_schedule` raises); set on a `DbtTaskGroup`'s `RenderConfig` raises; each of
+  as specified (cron + `auto_schedule` raises); the patched `timetable` lands on the `DbtDag` object
+  itself and not on a converter attribute (assert via `dag.timetable`, and assert the enclosing DAG of a
+  `DbtTaskGroup` is left untouched); set on a `DbtTaskGroup`'s `RenderConfig` raises from the converter
+  rather than silently no-opping, and the same applies to a bare `DbtToAirflowConverter(dag=...)`; each of
   the seven non-emitting execution modes raises with a mode-specific message (constraint 5); an
   unsupported adapter raises; on Airflow 2, `auto_schedule` raises "not supported" rather than attempting
   the patch.

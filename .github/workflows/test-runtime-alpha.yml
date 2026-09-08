@@ -37,12 +37,6 @@ on:
         default: '["1.12"]'
         type: string
 
-  # TEMP (remove before merge): run in cosmos CI on pushes to this branch. workflow_dispatch only
-  # works once the workflow is on the default branch, so we use push + input fallbacks to validate.
-  push:
-    branches:
-      - pankajkoti/boss-610-integration-of-cosmos-tests-with-runtime-alpha-release
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.runtime_version }}
   cancel-in-progress: true
@@ -63,10 +57,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
-        dbt-version: ${{ fromJSON(inputs.dbt_versions || '["1.12"]') }}
+        python-version: ${{ fromJSON(inputs.python_versions) }}
+        dbt-version: ${{ fromJSON(inputs.dbt_versions) }}
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      image: ${{ inputs.registry }}:${{ inputs.runtime_version }}-python-${{ matrix.python-version }}
       options: --user root
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -89,11 +83,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
-        dbt-version: ${{ fromJSON(inputs.dbt_versions || '["1.12"]') }}
+        python-version: ${{ fromJSON(inputs.python_versions) }}
+        dbt-version: ${{ fromJSON(inputs.dbt_versions) }}
         split-group: [1, 2, 3]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      image: ${{ inputs.registry }}:${{ inputs.runtime_version }}-python-${{ matrix.python-version }}
       options: --user root
     services:
       postgres:
@@ -159,10 +153,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
+        python-version: ${{ fromJSON(inputs.python_versions) }}
         dbt-version: ["1.9"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      image: ${{ inputs.registry }}:${{ inputs.runtime_version }}-python-${{ matrix.python-version }}
       options: --user root
     env:
       # The telemetry test asserts Scarf analytics IS on, so override the workflow-global value.
@@ -188,11 +182,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
+        python-version: ${{ fromJSON(inputs.python_versions) }}
         dbt-version: ["1.9"]
         num-models: [1, 10, 50, 100, 500]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      image: ${{ inputs.registry }}:${{ inputs.runtime_version }}-python-${{ matrix.python-version }}
       options: --user root
     services:
       postgres:
@@ -239,10 +233,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
+        python-version: ${{ fromJSON(inputs.python_versions) }}
         dbt-version: ["1.11"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      image: ${{ inputs.registry }}:${{ inputs.runtime_version }}-python-${{ matrix.python-version }}
       options: --user root
     services:
       postgres:
@@ -290,10 +284,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
+        python-version: ${{ fromJSON(inputs.python_versions) }}
         dbt-version: ["1.8"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      image: ${{ inputs.registry }}:${{ inputs.runtime_version }}-python-${{ matrix.python-version }}
       options: --user root
     services:
       postgres:
@@ -350,10 +344,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
+        python-version: ${{ fromJSON(inputs.python_versions) }}
         dbt-version: ["1.8", "1.9", "1.10", "1.11"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      image: ${{ inputs.registry }}:${{ inputs.runtime_version }}-python-${{ matrix.python-version }}
       options: --user root
     services:
       postgres:
@@ -399,7 +393,6 @@ jobs:
           POSTGRES_PORT: 5432
 
   Run-Integration-Tests-Expensive:
-    if: ${{ github.event_name == 'workflow_dispatch' }} # TEMP: skip real Databricks on the pre-PR push run
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -407,10 +400,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
+        python-version: ${{ fromJSON(inputs.python_versions) }}
         dbt-version: ["1.9"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      image: ${{ inputs.registry }}:${{ inputs.runtime_version }}-python-${{ matrix.python-version }}
       options: --user root
     services:
       postgres:
@@ -456,7 +449,6 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
   Run-Integration-dbt-Fusion-Tests:
-    if: ${{ github.event_name == 'workflow_dispatch' }} # TEMP: skip real Snowflake on the pre-PR push run
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -464,10 +456,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
+        python-version: ${{ fromJSON(inputs.python_versions) }}
         dbt-version: ["2.0"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      image: ${{ inputs.registry }}:${{ inputs.runtime_version }}-python-${{ matrix.python-version }}
       options: --user root
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -531,7 +523,6 @@ jobs:
   # cluster. This suite could not be validated locally like the others and is expected to need
   # iteration on its first live run.
   Run-Kubernetes-Tests:
-    # TEMP: enabled on push to iterate on this experimental suite in CI.
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -539,7 +530,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
+        python-version: ${{ fromJSON(inputs.python_versions) }}
         dbt-version: ["1.11"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -571,7 +562,7 @@ jobs:
         env:
           # Secrets/contexts pass through the environment (never interpolated into the command line)
           # and are forwarded into the container with `docker run -e NAME` (value-from-environment).
-          RUNTIME_IMAGE: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+          RUNTIME_IMAGE: ${{ inputs.registry }}:${{ inputs.runtime_version }}-python-${{ matrix.python-version }}
           AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
           COSMOS_CONN_POSTGRES_PASSWORD: ${{ secrets.COSMOS_CONN_POSTGRES_PASSWORD }}
         run: |

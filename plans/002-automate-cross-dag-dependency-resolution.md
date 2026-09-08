@@ -22,7 +22,9 @@ manual pattern).
 
 This proposal adds a mode-independent, parse-time **structural boundary resolver** that computes, for
 any selected subset of a dbt project, which of its parent nodes live outside the subset - using only
-`unique_id`/`depends_on`/`resource_type`/`config`, fields available under every `LoadMode` today. A
+`unique_id`/`depends_on`/`resource_type`/`config`, none of which is relation identity. Three of the six
+`LoadMode`s supply all four reliably; the other three need an explicit raise (see the `LoadMode` support
+matrix in Proposed design). A
 separate, optional **URI-enrichment step** resolves those external parents to Asset/Dataset URIs, which
 needs relation identity (manifest today, `dbt ls` once a dependency lands - see F1/constraint 7). Two
 consumers build on the structural resolver, only one of which needs URI enrichment:
@@ -169,13 +171,31 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
   this `unique_id`, and does that task do real work - is answerable today with no manifest and no
   registry *when the peer units are all visible in one place*, which is exactly how
   `DbtDependencyCoordinator` is constructed (`DbtDependencyCoordinator([tg_a, tg_b, ...])` - see the
-  coordinator section below). "Does real work" matters because `SeedRenderingBehavior.RENDER_ONLY`
-  (`cosmos/airflow/graph.py`) renders an `EmptyOperator` placeholder for the seed instead of a real
-  `dbt seed` task - a task exists, so a naive "is there a task" check would treat it as a valid producer,
-  but it never actually loads the seed. The structural check must exclude `RENDER_ONLY` placeholders
-  specifically, not just confirm a task exists. Ownership is **not** answerable at all for a standalone
-  `DbtDag`, which is parsed with zero visibility into sibling `DbtDag`s - that's the harder problem open
-  question 5 is about.
+  coordinator section below).
+
+  "Does real work" matters because Cosmos renders an `EmptyOperator` placeholder in **three** distinct
+  cases, not one, and a naive "is there a task for this `unique_id`" check would accept all three as
+  valid producers:
+
+  | Placeholder | Rendered when | Reference |
+  |---|---|---|
+  | Seed placeholder | `SeedRenderingBehavior.RENDER_ONLY` - keeps the seed visible in the topology but never runs `dbt seed` | `cosmos/airflow/graph.py:429-443` |
+  | Ephemeral-model placeholder | `RenderConfig.ephemeral_models_as_empty_operator` is True, **which is the default** - the node is kept so the chain through it is preserved, but nothing runs | `cosmos/config.py:113`, `cosmos/airflow/graph.py:449-475` |
+  | Source placeholder | a source with `has_freshness is False` under `SourceRenderingBehavior.ALL` | `cosmos/airflow/graph.py:526-537` |
+
+  The ephemeral row is the one that matters most: it is on by default, so the *most common*
+  configuration is also the one where a `RENDER_ONLY`-only check is wrong. The structural check must
+  treat all three as non-producers - `EMPTY_OPERATOR_CLASS_PATH` appearing in `tasks_map` is the single
+  signal that covers them - rather than special-casing seeds.
+
+  Two further cases render **no** task at all, so the check must distinguish "placeholder" from
+  "absent" instead of lumping them together: `SeedRenderingBehavior.NONE`
+  (`cosmos/airflow/graph.py:426-428`), and a source dropped by `SourceRenderingBehavior.NONE`, by
+  `WITH_TESTS_OR_FRESHNESS` with neither freshness nor tests (`cosmos/airflow/graph.py:504-509`), or by
+  `RenderConfig.source_pruning` (`cosmos/airflow/graph.py:511-516`).
+
+  Ownership is **not** answerable at all for a standalone `DbtDag`, which is parsed with zero visibility
+  into sibling `DbtDag`s - that's the harder problem open question 5 is about.
 
   On top of ownership, `auto_schedule` specifically (not the coordinator - see below) also needs the
   owner to actually **emit an Asset**, which fails several ways: the owner's `ExecutionMode` may be
@@ -351,21 +371,42 @@ def resolve_external_uris(
 ```
 
 `resolve_graph_boundary` only needs `DbtNode.unique_id`/`depends_on`/`resource_type`/`config` - none of
-that is relation identity, so this function has no F1 dependency. But it also needs the `nodes` map
-passed in to actually *contain* an entry for each external parent it has to inspect, and that isn't
-true under `DBT_LS` today: `dbt ls --select <x>` returns only the selected nodes
-(`DbtGraph.run_dbt_ls`/`load_via_dbt_ls`, `cosmos/dbt/graph.py`) - an external parent's `unique_id` is
-visible via `depends_on`, but that parent's own `DbtNode` (its `config`, so whether it's ephemeral) is
-not, because it was never selected. `DBT_MANIFEST` doesn't have this problem: `_apply_manifest_node_selection`
-(`cosmos/dbt/graph.py:1336`) keeps `self.nodes` as the *full, unfiltered* project graph and only
-`self.filtered_nodes` as the selection - so every node's `config` is available regardless of selection.
+that is relation identity, so this function has no F1 dependency. But two separate things have to be
+true of the `nodes` map it is handed, and neither holds under every `LoadMode`: the map must
+**contain an entry** for each external parent it has to inspect, and each such entry's `config` must
+actually **carry `materialized`**, since `DbtNode.has_ephemeral_materialization`
+(`cosmos/dbt/graph.py:150-152`) reads `self.config.get("materialized")`.
+
+`LoadMode` has six values, not two (`cosmos/constants.py:84-94`), and each needs an explicit
+supported-or-raise decision rather than being folded into a `DBT_MANIFEST`-vs-`DBT_LS` split:
+
+| `LoadMode` | `nodes` covers external parents? | `config` carries `materialized`? | Decision |
+|---|---|---|---|
+| `DBT_MANIFEST` | Yes - `_apply_manifest_node_selection` (`cosmos/dbt/graph.py:1336`) keeps `self.nodes` as the *full, unfiltered* project graph and only `self.filtered_nodes` as the selection | Yes, always | Supported for both consumers. Pass `self.nodes`. |
+| `DBT_LS` | No - `dbt ls --select <x>` returns only selected nodes, so an external parent's `unique_id` is visible via `depends_on` but its own `DbtNode` is not | Yes - Cosmos requests `config` explicitly in `--output-keys` (`cosmos/dbt/graph.py:848`) | Structural resolver supported; ephemeral traversal needs a wider `nodes` map (the coordinator's peer union, below). `auto_schedule` raises - open question 1. |
+| `DBT_LS_CACHE` | Same as `DBT_LS` | Same as `DBT_LS`, but subject to #2960's cache-key bug serving pre-upgrade node data | Same as `DBT_LS`, and only once #2960 has landed. |
+| `DBT_LS_FILE` | Same as `DBT_LS` | **Not guaranteed.** The file is user-supplied and parsed by the same `parse_dbt_ls_output`, which does `config=node_dict.get("config") or {}` (`cosmos/dbt/graph.py:439`), so a file produced without `--output-keys config` yields `{}` for every node. | Raise unless `config` is actually present. `{}` is indistinguishable from "declared non-ephemeral", so reading it as the latter is exactly the silent wrong boundary constraint 9 forbids. |
+| `CUSTOM` (deprecated) | No | **Unreliable in a worse way.** `config` is rebuilt from `config_selectors` (`cosmos/dbt/graph.py:1136`), which only ever carry `materialized`/`schema`/`tags` (`cosmos/dbt/parser/project.py:45`) from Cosmos's own partial jinja/yml parsing - and where that parsing sees no materialization, `materialized:view` is **substituted** (`cosmos/dbt/parser/project.py:427-428`). | Unsupported - raise. A genuinely ephemeral model reports as a view: a false negative that looks like a confident positive, which no downstream check can catch. |
+| `AUTOMATIC` (the default) | Whichever it resolved to | Whichever it resolved to | Resolves at runtime to `DBT_MANIFEST` when a manifest is available, else `DBT_LS`, else - including when `dbt ls` raises `FileNotFoundError` - `CUSTOM` (`cosmos/dbt/graph.py:803-813`). Decide against `DbtGraph.load_method` **after** `load()`, never against the mode the user requested. |
+
+One further path bypasses `--output-keys` entirely: when `settings.pre_dbt_fusion` is set *and*
+`RenderConfig.source_rendering_behavior` is `NONE`, Cosmos runs a bare `dbt ls --output json`
+(`cosmos/dbt/graph.py:831-858`). dbt Fusion's default key set is
+`name`/`package_name`/`path`/`resource_type`/`unique_id` - no `config` (the comment at
+`cosmos/dbt/graph.py:827-830` records this) - so every node again arrives with `config={}`.
+
+The consequence for implementation: because an absent `config` becomes `{}` rather than `None`, a
+per-node check cannot distinguish "this model declares no ephemeral materialization" from "`config` was
+never requested". So the ephemeral decision has to be gated on the resolved `load_method` plus a
+positive check that the selection's model nodes actually carry a `materialized` key, and raise when they
+don't - never read silence as "not ephemeral".
 
 So: under `DBT_MANIFEST`, pass `self.nodes` (full graph) and ephemeral traversal (F3, below) works today.
-Under `DBT_LS`, `self.nodes` is selection-scoped, so the caller must supply a `nodes` map wide enough to
-cover every external parent up to the nearest non-ephemeral one - source detection alone doesn't need
-this (a `unique_id` prefix check works with no data), but ephemeral traversal does. S3 gets this for free
-(see below); S2 (`auto_schedule` on a standalone `DbtDag`) does not, and needs a decision - see
-constraint 7 and open question 1.
+Under the `DBT_LS` family, `self.nodes` is selection-scoped, so the caller must supply a `nodes` map wide
+enough to cover every external parent up to the nearest non-ephemeral one - source detection alone
+doesn't need this (a `unique_id` prefix check works with no data), but ephemeral traversal does. S3 gets
+this for free (see below); S2 (`auto_schedule` on a standalone `DbtDag`) does not, and needs a decision -
+see constraint 7 and open question 1.
 
 Structural edges and Asset URIs are deliberately kept separate, because the two consumers need different
 things: `DbtDependencyCoordinator` (S3, below) only ever needs `owned`/`external_edges`/
@@ -508,9 +549,12 @@ and a task edge genuinely gates execution.
 Its ownership check is scoped, not the full F5 check: since the constructor is handed the exact list of
 peer `DbtTaskGroup`s, the coordinator can directly confirm that exactly one of them owns a given external
 `unique_id` and raise otherwise (zero or multiple owners) - no registry needed. That check must exclude
-`SeedRenderingBehavior.RENDER_ONLY` placeholders (an `EmptyOperator` that never runs `dbt seed` - F5), or
-the coordinator would wire downstream tasks to a producer that trivially succeeds without loading
-anything. It does not need to check
+all three `EmptyOperator` placeholder cases from F5 - `SeedRenderingBehavior.RENDER_ONLY`, ephemeral
+models under the default `ephemeral_models_as_empty_operator=True`, and freshness-less sources under
+`SourceRenderingBehavior.ALL` - not just the seed one, or the coordinator would wire downstream tasks to
+a producer that trivially succeeds without doing anything. Because the ephemeral case is the default
+configuration, screening only `RENDER_ONLY` would leave the most common setup broken. It does not need
+to check
 Asset emission or namespace (constraint 9); those only matter for schedules, not direct task wiring.
 
 **WATCHER, WATCHER_KUBERNETES, and WATCHER_GCP_GKE need their own strategy - they are not
@@ -629,6 +673,17 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   parent (not in `nodes`), it raises "not resolvable under `DBT_LS`" rather than silently omitting the
   dependency - it does not just work once #2959/#2960 land (open question 1); a separate test covers
   whichever of the three mechanisms in open question 1 gets built.
+- Placeholder producers - one case each, since screening only `RENDER_ONLY` would let a partial
+  implementation pass: a `RENDER_ONLY` seed, an ephemeral model under the default
+  `ephemeral_models_as_empty_operator=True`, and a freshness-less source under
+  `SourceRenderingBehavior.ALL` are each rejected as producers by the coordinator's ownership check; and
+  the two no-task cases (`SeedRenderingBehavior.NONE`, a source dropped by `source_pruning`) raise as
+  "no owner" rather than being confused with a placeholder.
+- `LoadMode` coverage - one case per row of the support matrix: `DBT_MANIFEST` and `DBT_LS` resolve a
+  boundary; a `DBT_LS_FILE` fixture produced *without* `--output-keys config` raises rather than
+  reporting every node as non-ephemeral; `LoadMode.CUSTOM` raises; and `AUTOMATIC` is decided from
+  `DbtGraph.load_method` after `load()`, including the `FileNotFoundError` fallback to `CUSTOM`, which
+  must raise even though the user requested `AUTOMATIC`.
 - Sources - two distinct cases, not one: a `DbtDag`/`DbtTaskGroup` with a source dependency *alongside*
   other, resolvable external dependencies renders and runs without raising (the ownership check exempts
   sources); a `DbtDag` using `auto_schedule` whose external dependencies are *only* sources raises,
@@ -673,7 +728,10 @@ without it:
   source exemption from ownership checks, and fail-fast behavior. No manifest dependency, but ephemeral
   traversal needs the caller to supply a
   `nodes` map wide enough to cover external ancestors (full graph under `DBT_MANIFEST`; under `DBT_LS`,
-  whatever the caller can assemble - see open question 1). Test under both.
+  whatever the caller can assemble - see open question 1). Also implements the per-`LoadMode`
+  supported-or-raise decisions from the support matrix, keyed off `DbtGraph.load_method` after `load()`
+  rather than the requested mode, and the `EmptyOperator`-placeholder screen covering all three
+  placeholder cases. Test one case per matrix row.
 - **S3 - `DbtDependencyCoordinator`**: cross-`DbtTaskGroup` wiring, `granularity`, and its own scoped
   ownership check (zero/multiple owners among the peers it's given). Uses only S1's output. No
   dependency on S4/#2959/#2960. WATCHER-family groups get the producer-level gating strategy and are

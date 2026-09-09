@@ -36,6 +36,7 @@ basic_cosmos_dag = DbtDag(
     operator_args={
         "install_deps": True,  # install any necessary dependencies before running any dbt command
         "full_refresh": True,  # used only in dbt commands that support this flag
+        "emit_datasets": "{{ dag_run.run_type != 'backfill' }}",  # do not emit assets on backfills
     },
     # normal dag parameters
     schedule="@daily",

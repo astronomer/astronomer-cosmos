@@ -529,6 +529,58 @@ class TestConsumerEmitDatasets:
         # Should not raise
         sensor._emit_datasets(ctx)
 
+    @pytest.mark.parametrize(
+        "emit_datasets, expected_emission",
+        [
+            (True, True),
+            ("True", True),
+            (" true ", True),
+            (False, False),
+            ("False", False),
+            ("false", False),
+            ("0", False),
+            (" false ", False),
+        ],
+    )
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_resolves_rendered_template_value(self, mock_register, emit_datasets, expected_emission):
+        sensor = self._make_sensor(emit_datasets=emit_datasets)
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
+        sensor._emit_datasets({"ti": _MockTI()})
+        assert mock_register.called is expected_emission
+
+    @pytest.mark.parametrize("rendered_value, expected_emission", [("True", True), ("False", False)])
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_honours_rendering_on_deferred_resume(
+        self, mock_register, mock_fallback, rendered_value, expected_emission
+    ):
+        """Goes through execute_complete so the URIs come from the trigger event, as on a real resume."""
+        from airflow import DAG
+
+        sensor = self._make_sensor(emit_datasets="{{ params.emit }}")
+        sensor.dag = DAG("test_emit_datasets_render", start_date=datetime(2024, 1, 1))
+        sensor.render_template_fields({"params": {"emit": rendered_value}})
+        assert sensor.emit_datasets == rendered_value
+
+        ti = MagicMock()
+        ti.xcom_pull.return_value = None
+        event = {"status": "success", "outlet_uris": ["postgres://host:5432/db/schema/table"]}
+        sensor.execute_complete({"dag_run": MagicMock(), "ti": ti}, event)
+
+        assert mock_register.called is expected_emission
+
+    def test_emit_datasets_is_a_template_field_on_every_consumer(self):
+        from cosmos.operators.watcher_gcp_gke import DbtConsumerWatcherGcpGkeSensor
+        from cosmos.operators.watcher_kubernetes import DbtConsumerWatcherKubernetesSensor
+
+        for consumer in (
+            DbtConsumerWatcherSensor,
+            DbtConsumerWatcherKubernetesSensor,
+            DbtConsumerWatcherGcpGkeSensor,
+        ):
+            assert "emit_datasets" in consumer.template_fields
+
     def test_emit_datasets_skipped_when_no_uris(self):
         sensor = self._make_sensor()
         sensor._outlet_uris = []

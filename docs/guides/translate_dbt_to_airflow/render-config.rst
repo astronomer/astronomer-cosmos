@@ -9,7 +9,7 @@ It does this by exposing a ``cosmos.config.RenderConfig`` class that you can use
 
 The ``RenderConfig`` class takes the following arguments:
 
-- ``emit_datasets``: whether or not to emit Airflow datasets to be used for data-aware scheduling. Defaults to True. This feature is only available for ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV``, ``ExecutionMode.WATCHER`` and ``ExecutionMode.AIRFLOW_ASYNC``.
+- ``emit_datasets``: whether or not to emit Airflow datasets to be used for data-aware scheduling. Defaults to True. This feature is only available for ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV``, ``ExecutionMode.WATCHER``, ``ExecutionMode.WATCHER_KUBERNETES``, ``ExecutionMode.WATCHER_GCP_GKE`` and ``ExecutionMode.AIRFLOW_ASYNC``. This is the parse-time default; to decide per DAG run, pass a templated ``emit_datasets`` via ``operator_args`` instead (see :ref:`operator-args`).
 - ``test_behavior``: how to run tests. Defaults to running a model's tests immediately after the model is run. For more information, see the :ref:`Testing Behavior <testing-behavior>` section.
 - ``load_method``: how to load your dbt project. See :ref:`Parsing Methods <parsing-methods>` for more information.
 - ``invocation_mode``: (new in v1.9) how to run ``dbt ls``, when using ``LoadMode.DBT_LS``. Learn more about this below.

@@ -158,3 +158,28 @@ def test_airflow_async_operator_args_rejects_output_only_template_fields(mock_bi
             dag_id="simple_dag_async",
             operator_args={field: "value-the-user-tried-to-set"},
         )
+
+
+def test_dbt_run_airflow_async_operator_renders_emit_datasets():
+    """The public async operator reassigns its own ``__bases__`` at construction, so check that
+    ``emit_datasets`` survives in ``template_fields`` and is rendered on that concrete class."""
+    from airflow import DAG
+
+    from cosmos.operators._asynchronous.bigquery import DbtRunAirflowAsyncBigqueryOperator
+
+    profile_config = MagicMock(spec=ProfileConfig)
+    profile_config.get_profile_type.return_value = "bigquery"
+
+    with DAG("test_async_emit_datasets", start_date=datetime(2024, 1, 1)):
+        operator = DbtRunAirflowAsyncOperator(
+            task_id="run_model",
+            project_dir="/tmp/project",
+            profile_config=profile_config,
+            emit_datasets="{{ params.emit }}",
+        )
+
+    assert "emit_datasets" in operator.template_fields
+    assert isinstance(operator, DbtRunAirflowAsyncBigqueryOperator)
+
+    operator.render_template_fields({"params": {"emit": "False"}})
+    assert operator.emit_datasets == "False"

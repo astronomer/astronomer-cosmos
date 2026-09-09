@@ -18,7 +18,6 @@ from urllib.parse import urlparse
 import jinja2
 from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
-from airflow.utils.strings import to_boolean
 from packaging.version import Version
 
 from cosmos.airflow.compatibility import AirflowSkipException
@@ -118,6 +117,7 @@ from cosmos.operators.base import (
     DbtSourceMixin,
     DbtTestMixin,
     _sanitize_xcom_key,
+    resolve_templated_bool,
 )
 
 logger = get_logger(__name__)
@@ -257,11 +257,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """Resolve the effective ``install_deps`` flag, normalizing a rendered template string to a bool."""
         if not self._has_dependencies_file:
             return False
-        value = self.install_deps
-        if isinstance(value, str):
-            # ``to_boolean`` does not strip whitespace, so a rendered " true " would otherwise be False.
-            return bool(to_boolean(value.strip()))
-        return bool(value)
+        return resolve_templated_bool(self.install_deps)
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -738,7 +734,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     # in that case we're storing as self.openlineage_events_completes
                     context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
 
-                if self.emit_datasets:
+                if resolve_templated_bool(self.emit_datasets):
                     self._handle_datasets(context)
 
                 if self.partial_parse:
@@ -1112,10 +1108,7 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
 
     def _is_full_refresh(self) -> bool:
         """Return whether --full-refresh is requested, mirroring DbtSeedMixin.add_cmd_flags handling."""
-        if isinstance(self.full_refresh, str):
-            # `to_boolean` does not strip whitespace, so a rendered " true " would otherwise be False.
-            return bool(to_boolean(self.full_refresh.strip()))
-        return bool(self.full_refresh)
+        return resolve_templated_bool(self.full_refresh)
 
 
 class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):

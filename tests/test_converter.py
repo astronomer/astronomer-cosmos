@@ -1823,3 +1823,37 @@ def test_dbt_dag_honors_on_warning_callback_from_operator_args(test_behavior, ex
     assert {type(task) for task in tasks} == set(expected_operator_classes)
     for task in tasks:
         assert task.on_warning_callback is on_warning_callback, task.task_id
+
+
+@pytest.mark.parametrize(
+    "operator_args, expected_emit_datasets",
+    [
+        ({}, True),
+        ({"emit_datasets": False}, False),
+        ({"emit_datasets": "{{ dag_run.run_type != 'backfill' }}"}, "{{ dag_run.run_type != 'backfill' }}"),
+    ],
+)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+@patch("cosmos.converter.build_airflow_graph")
+def test_operator_args_emit_datasets_overrides_render_config(
+    mock_build_airflow_graph, mock_load_dbt_graph, operator_args, expected_emit_datasets
+):
+    """``emit_datasets`` is resolved at task execution, so ``operator_args`` must win over the
+    parse-time ``RenderConfig`` default."""
+    DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
+        nodes=nodes,
+        project_config=ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="my_profile_name",
+            target_name="my_target_name",
+            profiles_yml_filepath=SAMPLE_PROFILE_YML,
+        ),
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.LOCAL),
+        render_config=RenderConfig(emit_datasets=True),
+        operator_args=operator_args,
+    )
+
+    task_args = mock_build_airflow_graph.call_args.kwargs["task_args"]
+    assert task_args["emit_datasets"] == expected_emit_datasets

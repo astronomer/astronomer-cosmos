@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from cosmos.operators.base import _sanitize_xcom_key
+from cosmos.operators.base import _sanitize_xcom_key, resolve_templated_bool
 
 try:
     from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
@@ -23,7 +23,7 @@ except (ModuleNotFoundError, ImportError):  # Airflow 2
     from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
 
 try:
-    from airflow.sdk.definitions.context import Context  # type: ignore[attr-defined]
+    from airflow.sdk.definitions.context import Context
 except ImportError:
     from airflow.utils.context import Context  # type: ignore[attr-defined]
 from packaging.version import Version
@@ -72,7 +72,14 @@ def _configure_bigquery_async_op_args(async_op_obj: Any, **kwargs: Any) -> Any:
 
 class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtLocalBase):  # type: ignore[misc]
 
-    template_fields: Sequence[str] = ("gcp_project", "dataset", "location", "compiled_sql", "full_refresh")
+    template_fields: Sequence[str] = (
+        "gcp_project",
+        "dataset",
+        "location",
+        "compiled_sql",
+        "full_refresh",
+        "emit_datasets",
+    )
     template_fields_renderers = {
         "compiled_sql": "sql",
     }
@@ -214,7 +221,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         else:
             self.build_and_run_cmd(context=context, run_as_async=True, async_context=self.async_context)
         self._store_template_fields(context=context)
-        if self.emit_datasets:
+        if resolve_templated_bool(self.emit_datasets):
             self._register_event(context)
 
     def _store_template_fields(self, context: Context) -> None:
@@ -252,7 +259,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         job_id = super().execute_complete(context=context, event=event)
         self.log.info("Configuration is %s", str(self.configuration))
         self._store_template_fields(context=context)
-        if self.emit_datasets:
+        if resolve_templated_bool(self.emit_datasets):
             self._register_event(context)
         return job_id
 

@@ -21,4 +21,7 @@ runs:
 
     - name: Install cosmos + test tooling into the Runtime image
       shell: bash
-      run: bash scripts/test/runtime-alpha-setup.sh "${{ inputs.extras }}"
+      # Pass the input through env (not interpolated into the command) to avoid template injection.
+      env:
+        COSMOS_EXTRAS: ${{ inputs.extras }}
+      run: bash scripts/test/runtime-alpha-setup.sh "$COSMOS_EXTRAS"

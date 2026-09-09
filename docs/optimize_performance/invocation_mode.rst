@@ -10,11 +10,11 @@ For ``ExecutionMode.LOCAL`` execution mode, Cosmos supports two invocation modes
 
 2. ``InvocationMode.DBT_RUNNER``: In this mode, Cosmos uses the ``dbtRunner`` available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__ to run dbt commands. \
    In order to use this mode, dbt must be installed in the same local environment. This mode does not have the overhead of spawning new subprocesses or parsing the output of dbt commands and is faster than ``InvocationMode.SUBPROCESS``. \
-   This mode requires dbt version 1.5.0 or higher. It is up to the user to resolve :ref:`execution-modes-local-conflicts` when using this mode.
+   It is up to the user to resolve :ref:`execution-modes-local-conflicts` when using this mode.
 
 .. note::
 
-   When ``InvocationMode.DBT_RUNNER`` is used with dbt-core 1.5.6 or later,
+   When ``InvocationMode.DBT_RUNNER`` is used,
    Cosmos automatically appends ``--no-static-parser`` to every dbt command
    it invokes. Cosmos copies the dbt project into a temporary directory at
    both DAG parse time and task execution time, and the differing temp paths

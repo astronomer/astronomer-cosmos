@@ -71,7 +71,9 @@ jobs:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
         dbt-version: ${{ fromJSON(inputs.dbt_versions || '["1.12"]') }}
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
+      # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
+      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }} # zizmor: ignore[unpinned-images]
       options: --user root
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -98,7 +100,9 @@ jobs:
         dbt-version: ${{ fromJSON(inputs.dbt_versions || '["1.12"]') }}
         split-group: [1, 2, 3]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
+      # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
+      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }} # zizmor: ignore[unpinned-images]
       options: --user root
     services:
       postgres:
@@ -167,7 +171,9 @@ jobs:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
         dbt-version: ["1.9"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
+      # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
+      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }} # zizmor: ignore[unpinned-images]
       options: --user root
     env:
       # The telemetry test asserts Scarf analytics IS on, so override the workflow-global value.
@@ -197,7 +203,9 @@ jobs:
         dbt-version: ["1.9"]
         num-models: [1, 10, 50, 100, 500]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
+      # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
+      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }} # zizmor: ignore[unpinned-images]
       options: --user root
     services:
       postgres:
@@ -247,7 +255,9 @@ jobs:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
         dbt-version: ["1.11"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
+      # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
+      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }} # zizmor: ignore[unpinned-images]
       options: --user root
     services:
       postgres:
@@ -298,7 +308,9 @@ jobs:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
         dbt-version: ["1.8"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
+      # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
+      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }} # zizmor: ignore[unpinned-images]
       options: --user root
     services:
       postgres:
@@ -358,7 +370,9 @@ jobs:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
         dbt-version: ["1.8", "1.9", "1.10", "1.11"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
+      # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
+      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }} # zizmor: ignore[unpinned-images]
       options: --user root
     services:
       postgres:
@@ -415,7 +429,9 @@ jobs:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
         dbt-version: ["1.9"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
+      # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
+      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }} # zizmor: ignore[unpinned-images]
       options: --user root
     services:
       postgres:
@@ -472,7 +488,9 @@ jobs:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
         dbt-version: ["2.0"]
     container:
-      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }}
+      # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
+      # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
+      image: ${{ inputs.registry || 'astrocrpublic.azurecr.io/runtime-dev' }}:${{ inputs.runtime_version || '3.3-7-alpha2' }}-python-${{ matrix.python-version }} # zizmor: ignore[unpinned-images]
       options: --user root
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

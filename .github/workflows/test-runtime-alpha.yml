@@ -79,7 +79,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-cosmos-runtime
+      - uses: $/.github/actions/setup-cosmos-runtime
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run unit tests
@@ -118,7 +118,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-cosmos-runtime
+      - uses: $/.github/actions/setup-cosmos-runtime
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run integration tests (split ${{ matrix.split-group }}/3)
@@ -182,7 +182,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-cosmos-runtime
+      - uses: $/.github/actions/setup-cosmos-runtime
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run telemetry tests
@@ -221,7 +221,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-cosmos-runtime
+      - uses: $/.github/actions/setup-cosmos-runtime
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run performance tests (${{ matrix.num-models }} models)
@@ -273,7 +273,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-cosmos-runtime
+      - uses: $/.github/actions/setup-cosmos-runtime
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run dbt-loom integration tests
@@ -326,7 +326,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-cosmos-runtime
+      - uses: $/.github/actions/setup-cosmos-runtime
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run dbt 1.8 integration tests
@@ -388,7 +388,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-cosmos-runtime
+      - uses: $/.github/actions/setup-cosmos-runtime
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run dbt async integration tests (dbt ${{ matrix.dbt-version }})
@@ -447,7 +447,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-cosmos-runtime
+      - uses: $/.github/actions/setup-cosmos-runtime
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run expensive (Databricks) integration tests
@@ -496,7 +496,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-cosmos-runtime
+      - uses: $/.github/actions/setup-cosmos-runtime
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Set RESOURCE_PREFIX (Snowflake-safe, no periods or dashes)

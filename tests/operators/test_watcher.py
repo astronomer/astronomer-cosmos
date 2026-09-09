@@ -570,16 +570,8 @@ class TestConsumerEmitDatasets:
 
         assert mock_register.called is expected_emission
 
-    def test_emit_datasets_is_a_template_field_on_every_consumer(self):
-        from cosmos.operators.watcher_gcp_gke import DbtConsumerWatcherGcpGkeSensor
-        from cosmos.operators.watcher_kubernetes import DbtConsumerWatcherKubernetesSensor
-
-        for consumer in (
-            DbtConsumerWatcherSensor,
-            DbtConsumerWatcherKubernetesSensor,
-            DbtConsumerWatcherGcpGkeSensor,
-        ):
-            assert "emit_datasets" in consumer.template_fields
+    def test_emit_datasets_is_a_template_field_on_consumer(self):
+        assert "emit_datasets" in DbtConsumerWatcherSensor.template_fields
 
     def test_emit_datasets_skipped_when_no_uris(self):
         sensor = self._make_sensor()

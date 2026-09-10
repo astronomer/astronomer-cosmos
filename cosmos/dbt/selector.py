@@ -775,7 +775,8 @@ class NodeSelector:
         return (node.package_name or "") in self.config.packages
 
     def _is_bare_identifier_matching(self, node: DbtNode) -> bool:
-        """Bare identifiers match the dbt way, against the node's fqn (package, folder, or node name)."""
+        """Match bare identifiers via :func:`_node_matches_bare_identifier` (dbt fqn selector, with a
+        package/name/folder fallback when the node has no fqn)."""
         return any(_node_matches_bare_identifier(node, bare) for bare in self.config.bare_identifiers)
 
     def _is_tags_subset(self, node: DbtNode) -> bool:

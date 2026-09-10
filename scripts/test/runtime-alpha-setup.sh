@@ -32,9 +32,26 @@ fi
 
 pip install -U uv
 
+# Pin apache-airflow-providers-* to the versions cosmos tests against (from its per-Airflow
+# lockfile), so provider operators match what cosmos supports. The async BigQuery operator, for
+# example, reassigns __bases__ to the google provider's operator and breaks when the image resolves
+# a newer google provider than cosmos supports. Keyed off the image's Airflow minor. Providers are
+# dbt-agnostic, so the dbt-1.12 lockfile is used regardless of the suite's dbt version. Only
+# providers are constrained, so the image's Airflow and the per-suite dbt re-pins are left untouched.
+AF_MINOR="$(AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR airflow version 2>/dev/null | grep -oE '^[0-9]+\.[0-9]+' | head -1 || true)"
+LOCKFILE="${REPO_ROOT}/requirements/requirements-airflow-${AF_MINOR}-dbt-1.12.txt"
+PROVIDER_CONSTRAINT_ARGS=()
+if [ -n "$AF_MINOR" ] && [ -f "$LOCKFILE" ]; then
+  grep -E '^apache-airflow-providers-' "$LOCKFILE" > /tmp/cosmos-provider-pins.txt
+  PROVIDER_CONSTRAINT_ARGS=(-c /tmp/cosmos-provider-pins.txt)
+  echo "Pinning providers to cosmos's tested set from ${LOCKFILE}."
+else
+  echo "No cosmos lockfile for Airflow '${AF_MINOR}'; installing providers unpinned."
+fi
+
 # Install cosmos (editable, from this checkout) + requested dbt adapters, letting the image's
 # pinned Airflow stand (cosmos only floors apache-airflow>=2.9.0, so uv won't reinstall Airflow).
-uv pip install --system -e "${REPO_ROOT}[${COSMOS_EXTRAS}]"
+uv pip install --system "${PROVIDER_CONSTRAINT_ARGS[@]}" -e "${REPO_ROOT}[${COSMOS_EXTRAS}]"
 
 # Pytest tooling needed to collect and run the suite.
 uv pip install --system -r "${SCRIPT_DIR}/requirements-test-tools.txt"

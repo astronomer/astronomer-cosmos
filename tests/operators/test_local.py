@@ -375,10 +375,33 @@ def test_dbt_base_operator_run_dbt_runner_cannot_import():
         project_dir="my/dir",
         invocation_mode=InvocationMode.DBT_RUNNER,
     )
-    expected_error_message = "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
+    expected_error_message = "Could not import dbt core. Ensure that dbt-core >= v1.5 and < 2.0 is installed"
     with patch.dict(sys.modules, {"dbt.cli.main": None}):
         with pytest.raises(CosmosDbtRunError, match=expected_error_message):
             dbt_base_operator.run_dbt_runner(command=["cmd"], env={}, cwd="some-project")
+
+
+def test_dbt_base_operator_discover_invocation_mode_without_dbt_version():
+    """dbt-core 2.x exposes dbtRunner but not dbt.version; discovery falls back to subprocess (#2993)."""
+    with patch.dict(sys.modules, {"dbt.cli.main": MagicMock(), "dbt.version": None}):
+        dbt_base_operator = ConcreteDbtLocalBaseOperator(
+            profile_config=profile_config, task_id="my-task", project_dir="my/dir"
+        )
+        dbt_base_operator._discover_invocation_mode()
+    assert dbt_base_operator.invocation_mode == InvocationMode.SUBPROCESS
+
+
+def test_generate_dbt_flags_raises_when_dbt_runner_is_unavailable(tmp_path):
+    """An explicit InvocationMode.DBT_RUNNER on dbt-core 2.x fails before importing dbt.version (#2993)."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir=tmp_path,
+        invocation_mode=InvocationMode.DBT_RUNNER,
+    )
+    with patch.dict(sys.modules, {"dbt.cli.main": MagicMock(), "dbt.version": None}):
+        with pytest.raises(CosmosDbtRunError, match="InvocationMode.SUBPROCESS"):
+            operator._generate_dbt_flags(str(tmp_path), tmp_path / "profiles.yml")
 
 
 @patch("cosmos.dbt.project.os.environ")

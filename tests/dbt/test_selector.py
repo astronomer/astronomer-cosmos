@@ -1395,6 +1395,39 @@ def test_bare_root_uses_dbt_fqn_prefix_semantics():
     assert selected("dim_users") == {dim_users.unique_id}  # leaf model name at any depth
 
 
+def test_bare_dotted_root_does_not_match_underscore_model_name():
+    """A dotted selector is an fqn prefix, not the underscore task name.
+
+    Verified against `dbt ls`: `marts.core` selects only the nested model, never a model literally
+    named ``marts_core`` (fqn ["proj", "marts_core"]).
+    """
+    nested = DbtNode(
+        unique_id="model.proj.dim_users",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/marts/core/dim_users.sql"),
+        tags=[],
+        config={},
+        package_name="proj",
+        fqn=["proj", "marts", "core", "dim_users"],
+    )
+    underscore_named = DbtNode(
+        unique_id="model.proj.marts_core",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/marts_core.sql"),
+        tags=[],
+        config={},
+        package_name="proj",
+        fqn=["proj", "marts_core"],
+    )
+    nodes = {nested.unique_id: nested, underscore_named.unique_id: underscore_named}
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["marts.core"])
+    assert set(selected.keys()) == {nested.unique_id}
+
+
 def test_bare_identifier_matches_versioned_model_name():
     """Bare select/exclude must still match a versioned model by its patched task name (BOSS-615 regression).
 

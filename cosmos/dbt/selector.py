@@ -84,8 +84,8 @@ def _node_matches_bare_identifier(node: DbtNode, identifier: str) -> bool:
     True if a bare token matches the node the dbt way. With an fqn (DBT_MANIFEST, DBT_LS), apply dbt's
     fqn selector against both the fqn and the package-less fqn (so package, an fqn-prefix folder, the
     model name, and versioned names all match, but a middle folder segment does not). Without an fqn
-    (e.g. LoadMode.CUSTOM), match package name, node name, or a project-relative folder segment
-    (directories only, not the file name).
+    (e.g. LoadMode.CUSTOM), match package name, the patched task name (a dotted token maps to the
+    dot-to-underscore node name), or a project-relative folder segment (directories only, not the file name).
     """
     if node.fqn:
         is_versioned = node.resource_type == DbtResourceType.MODEL and "." in node.resource_name
@@ -94,7 +94,7 @@ def _node_matches_bare_identifier(node: DbtNode, identifier: str) -> bool:
         )
     return (
         (node.package_name or "") == identifier
-        or node.name == identifier
+        or node.name == identifier.replace(".", "_")
         or identifier in node.original_file_path.parent.parts
     )
 
@@ -365,15 +365,11 @@ class GraphSelector:
             else:
                 logger.warning("Unsupported config key selector: %s", config_selection_key)
         else:
-            # Resolve the bare token the dbt way: union node-name, folder, and package matches.
-            # node.name is dot-to-underscore patched, so also match a dotted selector (e.g. a
-            # versioned "customers.v1") against the patched name. Scan every node rather than a
-            # name-keyed dict so duplicate node names across packages all contribute roots.
-            node_name_patched = self.node_name.replace(".", "_")
+            # Resolve the bare token the dbt way (package, fqn-prefix folder, or model name). Scan
+            # every node rather than a name-keyed dict so duplicate node names across packages all
+            # contribute roots.
             root_nodes.update(
-                node_id
-                for node_id, node in nodes.items()
-                if _node_matches_bare_identifier(node, self.node_name) or node.name == node_name_patched
+                node_id for node_id, node in nodes.items() if _node_matches_bare_identifier(node, self.node_name)
             )
             if not root_nodes:
                 logger.warning("Selector %s not found.", self.node_name)

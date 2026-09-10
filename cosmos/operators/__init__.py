@@ -8,12 +8,14 @@ from .local import DbtLSLocalOperator as DbtLSOperator
 from .local import DbtRunLocalOperator as DbtRunOperator
 from .local import DbtRunOperationLocalOperator as DbtRunOperationOperator
 from .local import DbtSeedLocalOperator as DbtSeedOperator
+from .local import DbtSemanticLocalOperator as DbtSemanticOperator
 from .local import DbtSnapshotLocalOperator as DbtSnapshotOperator
 from .local import DbtTestLocalOperator as DbtTestOperator
 
 __all__ = [
     "DbtLSOperator",
     "DbtSeedOperator",
+    "DbtSemanticOperator",
     "DbtSnapshotOperator",
     "DbtRunOperator",
     "DbtTestOperator",

@@ -40,6 +40,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "DbtRunLocalOperator": "cosmos.operators.local",
     "DbtRunOperationLocalOperator": "cosmos.operators.local",
     "DbtSeedLocalOperator": "cosmos.operators.local",
+    "DbtSemanticLocalOperator": "cosmos.operators.local",
     "DbtSnapshotLocalOperator": "cosmos.operators.local",
     "DbtTestLocalOperator": "cosmos.operators.local",
     # Docker
@@ -49,6 +50,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "DbtRunDockerOperator": "cosmos.operators.docker",
     "DbtRunOperationDockerOperator": "cosmos.operators.docker",
     "DbtSeedDockerOperator": "cosmos.operators.docker",
+    "DbtSemanticDockerOperator": "cosmos.operators.docker",
     "DbtSnapshotDockerOperator": "cosmos.operators.docker",
     "DbtTestDockerOperator": "cosmos.operators.docker",
     # Kubernetes
@@ -58,6 +60,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "DbtRunKubernetesOperator": "cosmos.operators.kubernetes",
     "DbtRunOperationKubernetesOperator": "cosmos.operators.kubernetes",
     "DbtSeedKubernetesOperator": "cosmos.operators.kubernetes",
+    "DbtSemanticKubernetesOperator": "cosmos.operators.kubernetes",
     "DbtSnapshotKubernetesOperator": "cosmos.operators.kubernetes",
     "DbtTestKubernetesOperator": "cosmos.operators.kubernetes",
     # Azure Container Instance
@@ -67,6 +70,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "DbtRunAzureContainerInstanceOperator": "cosmos.operators.azure_container_instance",
     "DbtRunOperationAzureContainerInstanceOperator": "cosmos.operators.azure_container_instance",
     "DbtSeedAzureContainerInstanceOperator": "cosmos.operators.azure_container_instance",
+    "DbtSemanticAzureContainerInstanceOperator": "cosmos.operators.azure_container_instance",
     "DbtSnapshotAzureContainerInstanceOperator": "cosmos.operators.azure_container_instance",
     "DbtTestAzureContainerInstanceOperator": "cosmos.operators.azure_container_instance",
     # AWS EKS
@@ -76,6 +80,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "DbtRunAwsEksOperator": "cosmos.operators.aws_eks",
     "DbtRunOperationAwsEksOperator": "cosmos.operators.aws_eks",
     "DbtSeedAwsEksOperator": "cosmos.operators.aws_eks",
+    "DbtSemanticAwsEksOperator": "cosmos.operators.aws_eks",
     "DbtSnapshotAwsEksOperator": "cosmos.operators.aws_eks",
     "DbtTestAwsEksOperator": "cosmos.operators.aws_eks",
     # AWS ECS
@@ -84,6 +89,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "DbtRunAwsEcsOperator": "cosmos.operators.aws_ecs",
     "DbtRunOperationAwsEcsOperator": "cosmos.operators.aws_ecs",
     "DbtSeedAwsEcsOperator": "cosmos.operators.aws_ecs",
+    "DbtSemanticAwsEcsOperator": "cosmos.operators.aws_ecs",
     "DbtSnapshotAwsEcsOperator": "cosmos.operators.aws_ecs",
     "DbtTestAwsEcsOperator": "cosmos.operators.aws_ecs",
     "DbtSourceAwsEcsOperator": "cosmos.operators.aws_ecs",
@@ -94,6 +100,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "DbtRunGcpCloudRunJobOperator": "cosmos.operators.gcp_cloud_run_job",
     "DbtRunOperationGcpCloudRunJobOperator": "cosmos.operators.gcp_cloud_run_job",
     "DbtSeedGcpCloudRunJobOperator": "cosmos.operators.gcp_cloud_run_job",
+    "DbtSemanticGcpCloudRunJobOperator": "cosmos.operators.gcp_cloud_run_job",
     "DbtSnapshotGcpCloudRunJobOperator": "cosmos.operators.gcp_cloud_run_job",
     "DbtTestGcpCloudRunJobOperator": "cosmos.operators.gcp_cloud_run_job",
 }
@@ -135,6 +142,7 @@ if TYPE_CHECKING:
         DbtRunOperationAwsEcsOperator as DbtRunOperationAwsEcsOperator,
     )
     from cosmos.operators.aws_ecs import DbtSeedAwsEcsOperator as DbtSeedAwsEcsOperator
+    from cosmos.operators.aws_ecs import DbtSemanticAwsEcsOperator as DbtSemanticAwsEcsOperator
     from cosmos.operators.aws_ecs import DbtSnapshotAwsEcsOperator as DbtSnapshotAwsEcsOperator
     from cosmos.operators.aws_ecs import DbtSourceAwsEcsOperator as DbtSourceAwsEcsOperator
     from cosmos.operators.aws_ecs import DbtTestAwsEcsOperator as DbtTestAwsEcsOperator
@@ -146,6 +154,7 @@ if TYPE_CHECKING:
         DbtRunOperationAwsEksOperator as DbtRunOperationAwsEksOperator,
     )
     from cosmos.operators.aws_eks import DbtSeedAwsEksOperator as DbtSeedAwsEksOperator
+    from cosmos.operators.aws_eks import DbtSemanticAwsEksOperator as DbtSemanticAwsEksOperator
     from cosmos.operators.aws_eks import DbtSnapshotAwsEksOperator as DbtSnapshotAwsEksOperator
     from cosmos.operators.aws_eks import DbtTestAwsEksOperator as DbtTestAwsEksOperator
     from cosmos.operators.azure_container_instance import (
@@ -167,6 +176,9 @@ if TYPE_CHECKING:
         DbtSeedAzureContainerInstanceOperator as DbtSeedAzureContainerInstanceOperator,
     )
     from cosmos.operators.azure_container_instance import (
+        DbtSemanticAzureContainerInstanceOperator as DbtSemanticAzureContainerInstanceOperator,
+    )
+    from cosmos.operators.azure_container_instance import (
         DbtSnapshotAzureContainerInstanceOperator as DbtSnapshotAzureContainerInstanceOperator,
     )
     from cosmos.operators.azure_container_instance import (
@@ -180,6 +192,7 @@ if TYPE_CHECKING:
         DbtRunOperationDockerOperator as DbtRunOperationDockerOperator,
     )
     from cosmos.operators.docker import DbtSeedDockerOperator as DbtSeedDockerOperator
+    from cosmos.operators.docker import DbtSemanticDockerOperator as DbtSemanticDockerOperator
     from cosmos.operators.docker import DbtSnapshotDockerOperator as DbtSnapshotDockerOperator
     from cosmos.operators.docker import DbtTestDockerOperator as DbtTestDockerOperator
     from cosmos.operators.gcp_cloud_run_job import (
@@ -199,6 +212,9 @@ if TYPE_CHECKING:
     )
     from cosmos.operators.gcp_cloud_run_job import (
         DbtSeedGcpCloudRunJobOperator as DbtSeedGcpCloudRunJobOperator,
+    )
+    from cosmos.operators.gcp_cloud_run_job import (
+        DbtSemanticGcpCloudRunJobOperator as DbtSemanticGcpCloudRunJobOperator,
     )
     from cosmos.operators.gcp_cloud_run_job import (
         DbtSnapshotGcpCloudRunJobOperator as DbtSnapshotGcpCloudRunJobOperator,
@@ -221,6 +237,9 @@ if TYPE_CHECKING:
         DbtSeedKubernetesOperator as DbtSeedKubernetesOperator,
     )
     from cosmos.operators.kubernetes import (
+        DbtSemanticKubernetesOperator as DbtSemanticKubernetesOperator,
+    )
+    from cosmos.operators.kubernetes import (
         DbtSnapshotKubernetesOperator as DbtSnapshotKubernetesOperator,
     )
     from cosmos.operators.kubernetes import (
@@ -234,6 +253,7 @@ if TYPE_CHECKING:
     from cosmos.operators.local import DbtRunLocalOperator as DbtRunLocalOperator
     from cosmos.operators.local import DbtRunOperationLocalOperator as DbtRunOperationLocalOperator
     from cosmos.operators.local import DbtSeedLocalOperator as DbtSeedLocalOperator
+    from cosmos.operators.local import DbtSemanticLocalOperator as DbtSemanticLocalOperator
     from cosmos.operators.local import DbtSnapshotLocalOperator as DbtSnapshotLocalOperator
     from cosmos.operators.local import DbtTestLocalOperator as DbtTestLocalOperator
 

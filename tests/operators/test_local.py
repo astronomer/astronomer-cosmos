@@ -9,6 +9,7 @@ import tempfile
 import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, call, mock_open, patch
+from urllib.parse import urlparse
 
 import pytest
 from airflow import DAG
@@ -818,10 +819,12 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
 
     new_test_dag(dag)
     assert "Assigning outlets with DatasetAlias in Airflow 3" in caplog.text
-    assert (
-        "Outlets: [Asset(name='postgres://0.0.0.0:5432/postgres/public/stg_customers', uri='postgres://0.0.0.0:5432/postgres/public/stg_customers'"
-        in caplog.text
-    )
+    # The Asset URI host:port comes from the example_conn connection, which differs between setups
+    # (0.0.0.0 on a runner, the service hostname inside a container). Derive it so the assertion is
+    # host-agnostic.
+    conn = urlparse(os.environ.get("AIRFLOW_CONN_EXAMPLE_CONN", "postgres://user:pass@0.0.0.0:5432/postgres"))
+    expected_asset = f"postgres://{conn.hostname}:{conn.port or 5432}/postgres/public/stg_customers"
+    assert f"Outlets: [Asset(name='{expected_asset}', uri='{expected_asset}'" in caplog.text
 
 
 @pytest.mark.integration

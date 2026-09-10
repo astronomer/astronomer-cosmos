@@ -64,30 +64,37 @@ def check_dag_state(dag_run: DagRun | None, expected_dag_state: DagRunState = Da
     return True
 
 
+def serialize_dag_to_db(dag: DAG) -> None:
+    """Serialize ``dag`` to the metadata DB.
+
+    Airflow 3.1+ requires a DAG to be serialized before ``dag.test()`` / ``create_dagrun()``,
+    which check for DagVersion and DagModel records. No-op on older Airflow.
+    """
+    if AIRFLOW_VERSION < version.Version("3.1"):
+        return
+
+    try:
+        from airflow.dag_processing.dagbag import sync_bag_to_db
+    except ImportError:
+        from airflow.models.dagbag import sync_bag_to_db
+
+    from airflow.models.dagbundle import DagBundleModel
+    from airflow.utils.session import create_session
+
+    # Create the DagBundle the DagModel foreign key needs (mimics manager.sync_bundles_to_db()),
+    # then bag + sync to create the DagModel and DagVersion records.
+    with create_session() as session:
+        session.merge(DagBundleModel(name="test_bundle"))
+        session.commit()
+
+    dagbag = make_dag_bag(include_examples=False)
+    dagbag.bag_dag(dag)
+    sync_bag_to_db(dagbag, bundle_name="test_bundle", bundle_version="1")
+
+
 def new_test_dag(dag: DAG, expected_dag_state: DagRunState = DagRunState.SUCCESS) -> DagRun:
     if AIRFLOW_VERSION >= version.Version("3.1"):
-        # Airflow 3.1+ requires DAG to be serialized to database before calling dag.test()
-        # because create_dagrun() checks for DagVersion and DagModel records
-
-        try:
-            from airflow.dag_processing.dagbag import sync_bag_to_db
-        except ImportError:
-            from airflow.models.dagbag import sync_bag_to_db
-
-        from airflow.models.dagbundle import DagBundleModel
-        from airflow.utils.session import create_session
-
-        # Create DagBundle if it doesn't exist (required for DagModel foreign key)
-        # This mimics what get_bagged_dag does via manager.sync_bundles_to_db()
-        with create_session() as session:
-            dag_bundle = DagBundleModel(name="test_bundle")
-            session.merge(dag_bundle)
-            session.commit()
-
-        # This creates both DagModel and DagVersion records
-        dagbag = make_dag_bag(include_examples=False)
-        dagbag.bag_dag(dag)
-        sync_bag_to_db(dagbag, bundle_name="test_bundle", bundle_version="1")
+        serialize_dag_to_db(dag)
         dr = dag.test(logical_date=timezone.utcnow())
     elif AIRFLOW_VERSION >= version.Version("3.0"):
         # In Airflow 3.0, dag.test() does not properly register Assets as active, must be registered manually

@@ -1341,7 +1341,7 @@ def test_graph_operator_bare_root_unions_node_name_and_folder():
     Mirrors dbt: model 'shared' (models/misc) and folder models/shared/ (alpha, beta) both match 'shared',
     so 'shared+' expands from every one of them.
     """
-    # 'shared' is a model in models/misc; 'shared' is also a folder holding alpha and beta; down uses the model.
+    # 'shared' is a model in models/misc. 'shared' is also a folder holding alpha and beta. 'down' uses the model.
     nodes = {
         n.unique_id: n
         for n in [
@@ -1368,6 +1368,63 @@ def test_bare_root_resolves_via_fqn_not_absolute_path():
     assert select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["models+"]) == {}
     # The package name is the fqn root, so it matches every node.
     assert set(select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["proj"]).keys()) == set(nodes.keys())
+
+
+def test_bare_root_uses_dbt_fqn_prefix_semantics():
+    """Bare roots follow dbt's fqn selector: the leaf name or an ordered fqn prefix, not a middle folder.
+
+    Verified against `dbt ls` for models/marts/core/dim_users.sql: `core` (a middle segment) selects
+    nothing, while `marts`, `marts.core`, and `dim_users` all select the model.
+    """
+    dim_users = DbtNode(
+        unique_id="model.proj.dim_users",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/marts/core/dim_users.sql"),
+        tags=[],
+        config={},
+        package_name="proj",
+        fqn=["proj", "marts", "core", "dim_users"],
+    )
+    nodes = {dim_users.unique_id: dim_users}
+    selected = lambda token: set(select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=[token]).keys())
+    assert selected("core") == set()  # middle folder segment is not an fqn prefix, so no match (like dbt)
+    assert selected("marts") == {dim_users.unique_id}  # top folder is an fqn prefix
+    assert selected("marts.core") == {dim_users.unique_id}  # dotted fqn prefix
+    assert selected("dim_users") == {dim_users.unique_id}  # leaf model name at any depth
+
+
+def test_bare_identifier_matches_versioned_model_name():
+    """Bare select/exclude must still match a versioned model by its patched task name (BOSS-615 regression).
+
+    dbt keeps a versioned model's version as a separate trailing fqn element
+    (e.g. ["proj", "customers", "v1"]), never joined into "customers_v1". A bare
+    identifier lookup that only checks `identifier in node.fqn` therefore never
+    matches the model's actual (dot-to-underscore patched) task name, silently
+    breaking both `select=["customers_v1"]` and `exclude=["customers_v1"]`.
+    """
+    versioned = DbtNode(
+        unique_id="model.proj.customers.v1",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/customers.sql"),
+        tags=[],
+        config={},
+        package_name="proj",
+        fqn=["proj", "customers", "v1"],
+    )
+    other = _fqn_node("orders", "")
+    nodes = {n.unique_id: n for n in [versioned, other]}
+
+    assert versioned.name == "customers_v1"  # sanity check on the patched task name
+
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["customers_v1"])
+    assert set(selected.keys()) == {versioned.unique_id}
+
+    excluded = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, exclude=["customers_v1"])
+    assert set(excluded.keys()) == {other.unique_id}
 
 
 def test_select_exposure_nodes_by_graph_ancestry():

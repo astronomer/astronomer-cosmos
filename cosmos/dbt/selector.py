@@ -58,19 +58,44 @@ def _fqn_matches(node_fqn: str, fqn_selector_value: str) -> bool:
     return node_fqn == fqn_selector_value
 
 
+def _fqn_selector_matches(fqn: list[str], selector: str, is_versioned: bool) -> bool:
+    """
+    Port of dbt's ``is_selected_node`` (``dbt.graph.selector_methods``) without wildcard support:
+    a bare selector matches the leaf (model name) or an ordered prefix of the fqn. A dotted selector
+    (e.g. "marts.core") matches consecutive fqn segments from the start. Versioned models keep the
+    version as a separate trailing fqn element, so the model name is fqn[-2] and "name_version" also
+    matches (dbt joins the last two segments on "_").
+    """
+    selector_parts = selector.split(".")
+    if is_versioned:
+        if len(fqn) >= 2 and (fqn[-2] == selector or "_".join(fqn[-2:]) == "_".join(selector_parts[-2:])):
+            return True
+    elif fqn and fqn[-1] == selector:
+        return True
+    # Dots in a model name act as namespace separators, so flatten before the prefix comparison.
+    flat_fqn = [segment for item in fqn for segment in item.split(".")]
+    if len(flat_fqn) < len(selector_parts):
+        return False
+    return all(flat_fqn[index] == part for index, part in enumerate(selector_parts))
+
+
 def _node_matches_bare_identifier(node: DbtNode, identifier: str) -> bool:
     """
-    True if a bare token matches the node the dbt way: as an element of the node's fqn
-    (package name, a folder under the model paths, or the node name).
-    Falls back to package name, node name, or project-relative folder segment when fqn is
-    absent (e.g. LoadMode.CUSTOM does not populate it).
+    True if a bare token matches the node the dbt way. With an fqn (DBT_MANIFEST, DBT_LS), apply dbt's
+    fqn selector against both the fqn and the package-less fqn (so package, an fqn-prefix folder, the
+    model name, and versioned names all match, but a middle folder segment does not). Without an fqn
+    (e.g. LoadMode.CUSTOM), match package name, node name, or a project-relative folder segment
+    (directories only, not the file name).
     """
     if node.fqn:
-        return identifier in node.fqn
+        is_versioned = node.resource_type == DbtResourceType.MODEL and "." in node.resource_name
+        return _fqn_selector_matches(node.fqn, identifier, is_versioned) or _fqn_selector_matches(
+            node.fqn[1:], identifier, is_versioned
+        )
     return (
         (node.package_name or "") == identifier
         or node.name == identifier
-        or identifier in node.original_file_path.parts
+        or identifier in node.original_file_path.parent.parts
     )
 
 
@@ -341,15 +366,15 @@ class GraphSelector:
                 logger.warning("Unsupported config key selector: %s", config_selection_key)
         else:
             # Resolve the bare token the dbt way: union node-name, folder, and package matches.
-            # The exact-name lookup additionally handles dotted/versioned names (node.name is
-            # dot-to-underscore patched), which _node_matches_bare_identifier does not, so keep both.
-            root_nodes.update(
-                node_id for node_id, node in nodes.items() if _node_matches_bare_identifier(node, self.node_name)
-            )
-            node_by_name = {node.name: node_id for node_id, node in nodes.items()}
+            # node.name is dot-to-underscore patched, so also match a dotted selector (e.g. a
+            # versioned "customers.v1") against the patched name. Scan every node rather than a
+            # name-keyed dict so duplicate node names across packages all contribute roots.
             node_name_patched = self.node_name.replace(".", "_")
-            if node_name_patched in node_by_name:
-                root_nodes.add(node_by_name[node_name_patched])
+            root_nodes.update(
+                node_id
+                for node_id, node in nodes.items()
+                if _node_matches_bare_identifier(node, self.node_name) or node.name == node_name_patched
+            )
             if not root_nodes:
                 logger.warning("Selector %s not found.", self.node_name)
                 return selected_nodes

@@ -58,6 +58,47 @@ def _fqn_matches(node_fqn: str, fqn_selector_value: str) -> bool:
     return node_fqn == fqn_selector_value
 
 
+def _fqn_selector_matches(fqn: list[str], selector: str, is_versioned: bool) -> bool:
+    """
+    Port of dbt's ``is_selected_node`` (``dbt.graph.selector_methods``) without wildcard support:
+    a bare selector matches the leaf (model name) or an ordered prefix of the fqn. A dotted selector
+    (e.g. "marts.core") matches consecutive fqn segments from the start. Versioned models keep the
+    version as a separate trailing fqn element, so the model name is fqn[-2] and "name_version" also
+    matches (dbt joins the last two segments on "_").
+    """
+    selector_parts = selector.split(".")
+    if is_versioned:
+        if len(fqn) >= 2 and (fqn[-2] == selector or "_".join(fqn[-2:]) == "_".join(selector_parts[-2:])):
+            return True
+    elif fqn and fqn[-1] == selector:
+        return True
+    # Dots in a model name act as namespace separators, so flatten before the prefix comparison.
+    flat_fqn = [segment for item in fqn for segment in item.split(".")]
+    if len(flat_fqn) < len(selector_parts):
+        return False
+    return all(flat_fqn[index] == part for index, part in enumerate(selector_parts))
+
+
+def _node_matches_bare_identifier(node: DbtNode, identifier: str) -> bool:
+    """
+    True if a bare token matches the node the dbt way. With an fqn (DBT_MANIFEST, DBT_LS), apply dbt's
+    fqn selector against both the fqn and the package-less fqn (so package, an fqn-prefix folder, the
+    model name, and versioned names all match, but a middle folder segment does not). Without an fqn
+    (e.g. LoadMode.CUSTOM), match package name, the patched task name (a dotted token maps to the
+    dot-to-underscore node name), or a project-relative folder segment (directories only, not the file name).
+    """
+    if node.fqn:
+        is_versioned = node.resource_type == DbtResourceType.MODEL and "." in node.resource_name
+        return _fqn_selector_matches(node.fqn, identifier, is_versioned) or _fqn_selector_matches(
+            node.fqn[1:], identifier, is_versioned
+        )
+    return (
+        (node.package_name or "") == identifier
+        or node.name == identifier.replace(".", "_")
+        or identifier in node.original_file_path.parent.parts
+    )
+
+
 def _check_nested_value_in_dict(dict_: dict[Any, Any], pattern: str) -> bool:
     """
     Given a dictionary dict_, identify if the pattern defined in pattern happens on the dictionary.
@@ -324,16 +365,13 @@ class GraphSelector:
             else:
                 logger.warning("Unsupported config key selector: %s", config_selection_key)
         else:
-            node_by_name = {}
-            for node_id, node in nodes.items():
-                node_by_name[node.name] = node_id
-
-            node_name_patched = self.node_name.replace(".", "_")
-
-            if node_name_patched in node_by_name:
-                root_id = node_by_name[node_name_patched]
-                root_nodes.add(root_id)
-            else:
+            # Resolve the bare token the dbt way (package, fqn-prefix folder, or model name). Scan
+            # every node rather than a name-keyed dict so duplicate node names across packages all
+            # contribute roots.
+            root_nodes.update(
+                node_id for node_id, node in nodes.items() if _node_matches_bare_identifier(node, self.node_name)
+            )
+            if not root_nodes:
                 logger.warning("Selector %s not found.", self.node_name)
                 return selected_nodes
 
@@ -733,12 +771,9 @@ class NodeSelector:
         return (node.package_name or "") in self.config.packages
 
     def _is_bare_identifier_matching(self, node: DbtNode) -> bool:
-        """Bare identifiers match by package_name, node name, or path segment (e.g. folder name)."""
-        if (node.package_name or "") in self.config.bare_identifiers or node.name in self.config.bare_identifiers:
-            return True
-        # Match by path segment (folder name): e.g. "folder_a" matches nodes under .../folder_a/...
-        path_parts = node.file_path.parts
-        return any(bare in path_parts for bare in self.config.bare_identifiers)
+        """Match bare identifiers via :func:`_node_matches_bare_identifier` (dbt fqn selector, with a
+        package/name/folder fallback when the node has no fqn)."""
+        return any(_node_matches_bare_identifier(node, bare) for bare in self.config.bare_identifiers)
 
     def _is_tags_subset(self, node: DbtNode) -> bool:
         """Checks if the node's tags are a subset of the config's tags."""

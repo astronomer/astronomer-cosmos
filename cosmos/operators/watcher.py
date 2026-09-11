@@ -26,6 +26,7 @@ from cosmos.constants import (
 )
 from cosmos.dataset import get_dataset_namespace
 from cosmos.dbt.graph import DbtNode
+from cosmos.dbt.runner import dbt_event_to_json
 from cosmos.log import get_logger
 from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.base import (
@@ -196,8 +197,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     Both modes feed the same parser (``store_dbt_resource_status_from_log``):
     - SUBPROCESS: each JSON log line from stdout is parsed directly.
     - DBT_RUNNER: each ``EventMsg`` from the dbt callback is serialised to JSON via
-      ``google.protobuf.json_format.MessageToJson`` — a transitive dbt-core dependency — and then
-      passed through the same parser.
+      ``cosmos.dbt.runner.dbt_event_to_json`` and then passed through the same parser.
 
     As each ``NodeFinished`` event arrives the operator pushes the per-model status to XCom under
     key ``<unique_id>_status`` so downstream sensors can react without waiting for the full build
@@ -286,9 +286,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         captured via closure so the unified ``store_dbt_resource_status_from_log`` parser can be
         reused identically to the SUBPROCESS path.
 
-        ``google.protobuf.json_format`` is a transitive dependency of dbt-core and is always
-        available when ``InvocationMode.DBT_RUNNER`` is in use.
-
         The callback is only registered when ``context`` is present (i.e. during task execution,
         not during auxiliary calls such as ``dbt deps``). Without a context there is no XCom
         backend to push to, so registering a callback would cause it to raise and dbt would emit
@@ -327,10 +324,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
             def _event_callback(event: Any) -> None:
                 try:
-                    from google.protobuf.json_format import MessageToJson
-
-                    json_str = MessageToJson(event, preserving_proto_field_name=True)
-                    parse(json_str, extra_kwargs)
+                    parse(dbt_event_to_json(event), extra_kwargs)
                 except Exception as e:
                     self.log.exception("Error in dbt event callback: %s", e)
                     if not callback_error:

@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import sys
@@ -399,3 +400,145 @@ def test_extract_message_by_status_still_prefers_node_name():
 
     assert names == ["my_model"]
     assert messages == ["boom"]
+
+
+def _dbt_event(event_class: str, **kwargs):
+    """Build a real dbt ``EventMsg``.
+
+    The collector goes through dbt's protobuf event shape, so a hand-rolled stand-in would not
+    exercise the path that actually breaks when dbt changes its event fields.
+    """
+    from dbt.events import types as dbt_event_types
+    from dbt_common.events.base_types import msg_from_base_event
+
+    return msg_from_base_event(getattr(dbt_event_types, event_class)(**kwargs))
+
+
+def _run_operation_runner(event, fake_result, seen):
+    def fake_get_runner(callbacks=None):
+        seen.append(callbacks)
+        runner = MagicMock()
+
+        def invoke(cli_args):
+            for callback in callbacks or []:
+                callback(event)
+            return fake_result
+
+        runner.invoke.side_effect = invoke
+        return runner
+
+    return fake_get_runner
+
+
+def _patched_run_command(fake_get_runner, command):
+    with (
+        patch.object(dbt_runner, "get_runner", side_effect=fake_get_runner),
+        patch.object(dbt_runner, "_cleanup_dbt_adapters"),
+        patch.object(dbt_runner, "change_working_directory"),
+        patch.object(dbt_runner, "environ"),
+        patch.object(dbt_runner, "logger") as mock_logger,
+    ):
+        return dbt_runner.run_command(command=command, env={}, cwd="/tmp/project"), mock_logger
+
+
+def test_run_command_fills_run_operation_message_from_macro_error_event():
+    """dbt < 1.12 leaves message unset, so the macro error is only available as an event."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = _dbt_event("RunningOperationCaughtError", exc="Database Error in boom")
+
+    _patched_run_command(_run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"])
+
+    # dbt < 1.12 prefixes the event text ("Encountered an error while running operation: ..."),
+    # so assert the macro error is carried rather than pinning dbt's own wording.
+    assert "Database Error in boom" in entry.message
+
+
+def test_run_command_keeps_run_operation_message_set_by_dbt():
+    """On dbt >= 1.12 the message is already populated and must not be overwritten."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message="Database Error in boom")
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = _dbt_event("RunningOperationUncaughtError", exc="event text")
+
+    _, mock_logger = _patched_run_command(
+        _run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"]
+    )
+
+    assert entry.message == "Database Error in boom"
+    assert mock_logger.debug.call_count == 0
+
+
+def test_run_command_ignores_unrelated_events():
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = _dbt_event("MainReportVersion", version="1.9.0", log_version=3)
+
+    _, mock_logger = _patched_run_command(
+        _run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"]
+    )
+
+    assert entry.message is None
+    # Without this the test also passes when the event was never read at all.
+    assert mock_logger.debug.call_count == 0
+
+
+def test_run_command_registers_macro_collector_only_for_run_operation():
+    fake_result = SimpleNamespace(success=True, exception=None, result=None)
+    seen = []
+    event = _dbt_event("MainReportVersion", version="1.9.0", log_version=3)
+    fake_get_runner = _run_operation_runner(event, fake_result, seen)
+
+    _patched_run_command(fake_get_runner, ["dbt", "run"])
+    _patched_run_command(fake_get_runner, ["dbt", "run-operation", "boom"])
+
+    assert seen[0] is None
+    assert len(seen[1]) == 1
+
+
+def test_run_command_fills_message_when_flags_surround_run_operation():
+    """build_cmd puts flags on both sides of the subcommand, so position tells nothing."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = _dbt_event("RunningOperationCaughtError", exc="Database Error in boom")
+
+    _patched_run_command(
+        _run_operation_runner(event, fake_result, []),
+        ["dbt", "--log-level", "debug", "run-operation", "boom", "--vars", "{}", "--quiet"],
+    )
+
+    assert "Database Error in boom" in entry.message
+
+
+def test_dbt_event_to_json_exposes_the_event_info_fields():
+    """Both invocation modes read ``info.name``/``info.msg``, so keep those names locked."""
+    event = _dbt_event("RunningOperationCaughtError", exc="Database Error in boom")
+
+    info = json.loads(dbt_runner.dbt_event_to_json(event))["info"]
+
+    assert info["name"] == "RunningOperationCaughtError"
+    assert "Database Error in boom" in info["msg"]
+
+
+def test_fill_missing_messages_logs_when_there_is_nowhere_to_attach():
+    """A dbt result without ``results`` must surface as a debug log, never as an exception."""
+    result = SimpleNamespace(result=SimpleNamespace())
+
+    with patch.object(dbt_runner, "logger") as mock_logger:
+        dbt_runner._fill_missing_messages(result, ["Database Error in boom"])
+
+    assert mock_logger.debug.call_count == 1
+
+
+def test_run_command_swallows_a_failure_to_read_a_dbt_event():
+    """A collector that raises would reach dbt as GenericExceptionOnRun, hiding the real error."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = _dbt_event("RunningOperationCaughtError", exc="Database Error in boom")
+
+    with patch.object(dbt_runner, "dbt_event_to_json", side_effect=RuntimeError("unreadable event")):
+        _, mock_logger = _patched_run_command(
+            _run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"]
+        )
+
+    assert entry.message is None
+    assert mock_logger.debug.call_count == 1

@@ -14,7 +14,7 @@ import re
 import zlib
 from typing import Any
 
-from cosmos.airflow.compatibility import delete_variable, get_variable, set_variable
+from cosmos.airflow.compatibility import delete_variable, delete_variable_isolated_session, get_variable, set_variable
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import safe_xcom_push
 
@@ -132,6 +132,20 @@ def _delete_xcom_backup_variable(context: Any) -> None:
     try:
         delete_variable(var_key)
         logger.debug("Deleted XCom backup Variable '%s'", var_key)
+    except KeyError:
+        pass
+
+
+def _delete_xcom_backup_variable_by_ids(dag_id: str, task_group_id: str | None, run_id: str) -> None:
+    """Delete a producer's XCom backup Variable given its identifying DAG/task-group/run ids.
+
+    Unlike ``_delete_xcom_backup_variable``, this doesn't require a live task execution
+    context, so it can be used to clean up orphaned backups from a DAG-run-level listener.
+    """
+    var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
+    try:
+        delete_variable_isolated_session(var_key)
+        logger.debug("Deleted orphaned XCom backup Variable '%s'", var_key)
     except KeyError:
         pass
 

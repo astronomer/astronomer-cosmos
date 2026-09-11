@@ -547,6 +547,21 @@ def test_select_nodes_by_child_and_precursors_exclude_tags():
     assert sorted(selected.keys()) == expected
 
 
+def test_select_nodes_exclude_graph_selector_resolves_against_full_graph():
+    """
+    Graph operators in ``exclude`` must be resolved against the full project graph,
+    not against the subset already narrowed by ``select``.
+
+    ``+child`` selects child and its ancestors. ``+tag:test`` should exclude sibling1
+    (the only node tagged ``test``) together with its ancestors, which are shared with
+    child. sibling1 itself is not part of the ``select`` result, so resolving the
+    exclude against the narrowed subset finds no root node to traverse from and
+    silently leaves those shared ancestors in.
+    """
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+child"], exclude=["+tag:test"])
+    assert sorted(selected.keys()) == [child_node.unique_id]
+
+
 def test_select_node_by_child_and_precursors_partial_tree():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+parent"])
     expected = [another_grandparent_node.unique_id, grandparent_node.unique_id, parent_node.unique_id]

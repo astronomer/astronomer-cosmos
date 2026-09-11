@@ -1477,13 +1477,21 @@ def select_nodes(
     if not select and not exclude:
         return nodes
     validate_filters(exclude, select)
-    subset_ids = apply_select_filter(nodes, project_dir, select)
-    if select:
-        nodes = get_nodes_from_subset(nodes, subset_ids)
-    exclude_ids = apply_exclude_filter(nodes, project_dir, exclude)
-    subset_ids = set(nodes.keys()) - exclude_ids
 
-    return get_nodes_from_subset(nodes, subset_ids)
+    # Resolve `exclude` against the full project graph, before `select` narrows it.
+    # Graph operators (`+tag:x`, `tag:x+`, `+model_name`, ...) traverse outwards from
+    # the nodes matching the selector, so if those root nodes were dropped by `select`
+    # the traversal has nothing to start from and shared ancestors or descendants are
+    # silently kept. dbt evaluates both filters against the whole graph and subtracts
+    # afterwards; this does the same.
+    exclude_ids = apply_exclude_filter(nodes, project_dir, exclude)
+
+    if select:
+        subset_ids = apply_select_filter(nodes, project_dir, select)
+    else:
+        subset_ids = set(nodes.keys())
+
+    return get_nodes_from_subset(nodes, subset_ids - exclude_ids)
 
 
 def get_nodes_from_subset(nodes: dict[str, DbtNode], subset_ids: set[str]) -> dict[str, DbtNode]:

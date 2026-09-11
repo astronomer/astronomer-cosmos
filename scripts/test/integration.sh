@@ -27,7 +27,7 @@ pytest -vv \
     --durations=0 \
     --timeout=300 \
     --timeout-method=thread \
-    -m 'integration and not dbtfusion' \
+    -m 'integration and not dbtfusion and not dbtcore2' \
     --ignore=tests/perf \
     --ignore=tests/test_async_example_dag.py \
     --ignore=tests/test_example_k8s_dags.py \

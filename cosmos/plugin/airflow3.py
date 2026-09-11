@@ -18,7 +18,7 @@ except ImportError:
     from airflow.configuration import conf
 from airflow.plugins_manager import AirflowPlugin
 from airflow.sdk import ObjectStoragePath
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from packaging.version import Version
 
@@ -130,9 +130,32 @@ def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
     return projects
 
 
+def cosmos_auth_dependencies() -> list[Any]:
+    """
+    Build the authentication/authorization dependencies applied to every Cosmos route.
+
+    Airflow 3 attaches authentication to its own routers, so a plugin sub-app mounted with
+    ``app.mount()`` does not inherit it. This is the AF3 equivalent of the ``@has_access`` guard used
+    by the Airflow 2 plugin: the caller must be authenticated and allowed to read plugin views.
+    If the Airflow security helpers cannot be imported, the routes fail closed.
+    """
+    try:
+        from airflow.api_fastapi.auth.managers.models.resource_details import AccessView
+        from airflow.api_fastapi.core_api.security import requires_access_view
+    except ImportError:
+        logger.warning("Airflow API auth helpers are unavailable: denying access to the Cosmos dbt docs routes.")
+
+        def deny_all() -> None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+        return [Depends(deny_all)]
+
+    return [Depends(requires_access_view(AccessView.PLUGINS))]
+
+
 def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     ensure_airflow_version_supported()
-    app = FastAPI()
+    app = FastAPI(dependencies=cosmos_auth_dependencies())
 
     projects = _load_projects_from_conf()
 

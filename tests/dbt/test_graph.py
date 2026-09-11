@@ -1517,6 +1517,59 @@ def test_load_via_custom_parser_with_nested_model_dir(tmp_path):
     assert dbt_graph.nodes["my_model"].unique_id == "model.nested_project.my_model"
 
 
+def test_load_via_custom_parser_with_nested_model_dir_and_split_project_path(tmp_path):
+    """
+    The project root may come from RenderConfig/ExecutionConfig rather than ProjectConfig. In that case
+    ProjectConfig cannot build absolute models_paths, and the relative dirs the user configured must
+    still be honoured instead of falling back to LegacyDbtProject's default "models" directory.
+    """
+    project_dir = tmp_path / "split_project"
+    (project_dir / "custom" / "models").mkdir(parents=True)
+    (project_dir / "custom" / "models" / "my_model.sql").write_text("select 1")
+    (project_dir / "profiles.yml").write_text(
+        "test:\n"
+        "  target: test\n"
+        "  outputs:\n"
+        "    test:\n"
+        "      type: postgres\n"
+        "      host: localhost\n"
+        "      user: user\n"
+        "      password: pass\n"
+        "      port: 5432\n"
+        "      dbname: db\n"
+        "      schema: public\n"
+        "      threads: 1\n"
+    )
+
+    # No dbt_project_path here: the project root is supplied by RenderConfig/ExecutionConfig below,
+    # so ProjectConfig has no root to build absolute paths from.
+    project_config = ProjectConfig(
+        manifest_path=project_dir / "target" / "manifest.json",
+        project_name="split_project",
+        models_relative_paths="custom/models",
+    )
+    assert project_config.models_paths == []
+
+    execution_config = ExecutionConfig(dbt_project_path=project_dir)
+    render_config = RenderConfig(dbt_project_path=project_dir, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=project_dir / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_via_custom_parser()
+
+    assert "my_model" in dbt_graph.nodes
+    assert dbt_graph.nodes["my_model"].unique_id == "model.split_project.my_model"
+
+
 def test_load_via_custom_parser_with_explicit_empty_models_relative_paths(tmp_path):
     """
     models_relative_paths=[] means "no model directories" and must not fall back to crawling the

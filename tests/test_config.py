@@ -53,6 +53,38 @@ def test_init_with_project_path_and_list_relative_paths():
     ]
 
 
+def test_relative_paths_kept_without_project_path():
+    """
+    The configured relative paths must survive even when ProjectConfig.dbt_project_path is not set,
+    because the project root may instead come from RenderConfig/ExecutionConfig. Previously they were
+    silently discarded and rendering fell back to the default `models`/`seeds`/`snapshots` folders.
+    """
+    project_config = ProjectConfig(
+        manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json",
+        project_name="split_path_project",
+        models_relative_paths=["custom/models"],
+        seeds_relative_paths=["custom/seeds"],
+        snapshots_relative_paths=["custom/snapshots"],
+    )
+
+    assert project_config.dbt_project_path is None
+    assert project_config.models_paths == []
+    assert project_config.models_relative_paths == [Path("custom/models")]
+    assert project_config.seeds_relative_paths == [Path("custom/seeds")]
+    assert project_config.snapshots_relative_paths == [Path("custom/snapshots")]
+
+
+def test_relative_paths_default_when_not_configured():
+    """An omitted relative path falls back to the dbt default, an explicitly empty list stays empty."""
+    defaulted = ProjectConfig(manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json", project_name="p")
+    assert defaulted.models_relative_paths == [Path("models")]
+
+    emptied = ProjectConfig(
+        manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json", project_name="p", models_relative_paths=[]
+    )
+    assert emptied.models_relative_paths == []
+
+
 def test_models_paths_not_shared_across_instances():
     """
     models_paths/seeds_paths/snapshots_paths must not be a shared mutable default - mutating one

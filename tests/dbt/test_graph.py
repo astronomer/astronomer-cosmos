@@ -449,6 +449,66 @@ def test_load_via_manifest_skips_dbt_loom_external_nodes(tmp_path, caplog):
     assert "Skipping node `model.upstream_project.external_model` because it has no file path" in caplog.text
 
 
+@pytest.mark.parametrize("statement", ["config.group:customer_mart", "group:customer_mart"])
+def test_load_via_manifest_with_group_selectors(tmp_path, statement):
+    """Both group selector spellings filter manifest nodes, as reported in issue #1784."""
+    manifest_content = {
+        "nodes": {
+            "model.my_project.customer_mart_model": {
+                "resource_type": "model",
+                "original_file_path": "models/customer_mart_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "table", "group": "customer_mart"},
+            },
+            "model.my_project.finance_model": {
+                "resource_type": "model",
+                "original_file_path": "models/finance_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "table", "group": "finance"},
+            },
+            "model.my_project.ungrouped_model": {
+                "resource_type": "model",
+                "original_file_path": "models/ungrouped_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "table"},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_content))
+
+    project_path = tmp_path / "my_project"
+    project_path.mkdir()
+
+    project_config = ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=RenderConfig(select=[statement]),
+    )
+
+    dbt_graph.load_from_dbt_manifest()
+
+    assert len(dbt_graph.nodes) == 3
+    assert set(dbt_graph.filtered_nodes) == {"model.my_project.customer_mart_model"}
+
+
 @pytest.mark.parametrize(
     "project_name,manifest_filepath,model_filepath",
     [(DBT_PROJECT_NAME, SAMPLE_MANIFEST, "customers.sql"), ("jaffle_shop_python", SAMPLE_MANIFEST_PY, "customers.py")],
@@ -2675,7 +2735,7 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     hash_dir, hash_selectors, hash_impl = version.split(",")
 
     assert hash_selectors == "43303af03e84e3b51fbfcf598261fae4"
-    assert hash_impl == "86424c8b70c2e9b6d1f595c7ec9a8291"
+    assert hash_impl == "f5bbb2a96eaa08e94514faabb78c5ed3"
 
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the

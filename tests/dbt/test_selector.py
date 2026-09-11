@@ -1481,6 +1481,16 @@ def test_exposure_selector():
             {"select": ["config.meta.allow_pii:true"], "exclude": None},
         ),
         (
+            "config_method_group",
+            {"name": "config_method_group", "definition": {"method": "config.group", "value": "customer_mart"}},
+            {"select": ["config.group:customer_mart"], "exclude": None},
+        ),
+        (
+            "group_method",
+            {"name": "group_method", "definition": {"method": "group", "value": "customer_mart"}},
+            {"select": ["group:customer_mart"], "exclude": None},
+        ),
+        (
             "source_method",
             {"name": "source_method", "definition": {"method": "source", "value": "raw_*"}},
             {"select": ["source:raw_*"], "exclude": None},
@@ -1671,11 +1681,6 @@ def test_valid_graph_operator_yaml_selectors(selector_name, selector_definition,
             "file_method",
             {"name": "file_method", "definition": {"method": "file", "value": "my_model.sql"}},
             "Unsupported selector method: 'file'",
-        ),
-        (
-            "group_method",
-            {"name": "group_method", "definition": {"method": "group", "value": "finance"}},
-            "Unsupported selector method: 'group'",
         ),
         (
             "metric_method",
@@ -2105,3 +2110,216 @@ def test_selector_reference_resolves_from_cache():
 
     assert base_result == {"select": ["tag:nightly"], "exclude": None}
     assert reference_result == base_result
+
+
+# Nodes used by the ``config.group`` selector tests
+# https://github.com/astronomer/astronomer-cosmos/issues/1784
+finance_base_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.finance_base",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/finance_base.sql"),
+    tags=[],
+    config={"materialized": "view"},
+)
+
+finance_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.finance",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[finance_base_node.unique_id],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen2/models/finance.sql"),
+    tags=[],
+    config={"materialized": "view", "group": "finance"},
+)
+
+finance_child_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.finance_child",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[finance_node.unique_id],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen3/models/finance_child.sql"),
+    tags=[],
+    config={"materialized": "table"},
+)
+
+customer_mart_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.customer_mart",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/customer_mart.sql"),
+    tags=[],
+    config={"materialized": "table", "group": "customer_mart"},
+)
+
+ungrouped_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.ungrouped",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/ungrouped.sql"),
+    tags=[],
+    config={"materialized": "view"},
+)
+
+grouped_sample_nodes = {
+    node.unique_id: node
+    for node in (finance_base_node, finance_node, finance_child_node, customer_mart_node, ungrouped_node)
+}
+
+
+@pytest.mark.parametrize(
+    "statement,expected_nodes",
+    [
+        ("config.group:finance", [finance_node]),
+        ("config.group:customer_mart", [customer_mart_node]),
+        ("config.group:finance+", [finance_node, finance_child_node]),
+        ("+config.group:finance", [finance_base_node, finance_node]),
+        ("config.group:unknown_group", []),
+    ],
+)
+def test_select_nodes_by_select_config_group(statement, expected_nodes):
+    """``config.group:<name>`` selects the nodes whose dbt config declares that group, and supports graph operators."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, select=[statement])
+    assert selected == {node.unique_id: node for node in expected_nodes}
+
+
+def test_select_nodes_by_exclude_config_group():
+    """``config.group:<name>`` removes the grouped nodes and leaves every other node untouched."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, exclude=["config.group:finance"])
+    expected = {
+        finance_base_node.unique_id: finance_base_node,
+        finance_child_node.unique_id: finance_child_node,
+        customer_mart_node.unique_id: customer_mart_node,
+        ungrouped_node.unique_id: ungrouped_node,
+    }
+    assert selected == expected
+
+
+@pytest.mark.parametrize(
+    "statement,expected_nodes",
+    [
+        ("config.group:finance,config.materialized:view", [finance_node]),
+        ("config.group:finance,config.materialized:table", []),
+    ],
+)
+def test_select_nodes_by_config_group_intersection(statement, expected_nodes):
+    """``config.group`` intersects with the other config selectors instead of overriding them."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, select=[statement])
+    assert selected == {node.unique_id: node for node in expected_nodes}
+
+
+@pytest.mark.parametrize(
+    "statement,expected_nodes",
+    [
+        ("group:finance", [finance_node]),
+        ("group:customer_mart", [customer_mart_node]),
+        ("group:finance+", [finance_node, finance_child_node]),
+        ("+group:finance", [finance_base_node, finance_node]),
+        ("group:unknown_group", []),
+    ],
+)
+def test_select_nodes_by_select_group(statement, expected_nodes):
+    """``group:<name>`` is dbt's shorthand for ``config.group:<name>`` and supports the same graph operators."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, select=[statement])
+    assert selected == {node.unique_id: node for node in expected_nodes}
+
+
+def test_select_nodes_by_exclude_group():
+    """``group:<name>`` removes the grouped nodes and leaves every other node untouched."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, exclude=["group:finance"])
+    expected = {
+        finance_base_node.unique_id: finance_base_node,
+        finance_child_node.unique_id: finance_child_node,
+        customer_mart_node.unique_id: customer_mart_node,
+        ungrouped_node.unique_id: ungrouped_node,
+    }
+    assert selected == expected
+
+
+def test_select_nodes_by_group_is_equivalent_to_config_group():
+    """Both spellings read the same dbt config key, so they must select the same nodes."""
+    by_group = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, select=["group:finance"])
+    by_config_group = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, select=["config.group:finance"]
+    )
+    assert by_group == by_config_group == {finance_node.unique_id: finance_node}
+
+
+def test_select_nodes_raises_on_empty_group_selector():
+    """An empty ``group:`` would silently match nothing; fail loudly instead, as ``package:`` does."""
+    for filters in ({"select": ["group:"]}, {"exclude": ["group:"]}):
+        with pytest.raises(CosmosValueError) as err_info:
+            select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, **filters)
+        assert "group: selector requires a non-empty group name" in err_info.value.args[0]
+
+
+# A group with more than one member, used for the union/intersection group tests above.
+finance_alpha_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.finance_alpha",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/finance_alpha.sql"),
+    tags=["nightly"],
+    config={"materialized": "view", "group": "finance", "tags": ["nightly"]},
+)
+
+finance_beta_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.finance_beta",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/finance_beta.sql"),
+    tags=[],
+    config={"materialized": "view", "group": "finance"},
+)
+
+marketing_node = DbtNode(
+    unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.marketing",
+    resource_type=DbtResourceType.MODEL,
+    depends_on=[],
+    path_base=SAMPLE_PROJ_PATH,
+    original_file_path=Path("gen1/models/marketing.sql"),
+    tags=["nightly"],
+    config={"materialized": "view", "group": "marketing", "tags": ["nightly"]},
+)
+
+multi_member_group_nodes = {node.unique_id: node for node in (finance_alpha_node, finance_beta_node, marketing_node)}
+
+
+@pytest.mark.parametrize(
+    "select,expected_nodes",
+    [
+        # Every member of the group is selected, not just the first match.
+        (["group:finance"], [finance_alpha_node, finance_beta_node]),
+        # Separate list entries are a union.
+        (["group:finance", "group:marketing"], [finance_alpha_node, finance_beta_node, marketing_node]),
+        # A comma is an intersection, and it composes with non-config selectors.
+        (["group:finance,tag:nightly"], [finance_alpha_node]),
+        (["group:finance,tag:unknown_tag"], []),
+    ],
+)
+def test_select_nodes_by_group_union_and_intersection(select, expected_nodes):
+    """``group:`` unions across list entries and intersects within a comma-separated entry."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=multi_member_group_nodes, select=select)
+    assert selected == {node.unique_id: node for node in expected_nodes}
+
+
+@pytest.mark.parametrize("statement", ["group:+", "+group:"])
+def test_select_nodes_by_empty_group_with_graph_operator(statement):
+    """An empty group name combined with a graph operator matches nothing.
+
+    ``GraphSelector`` never validates its selector values, so this matches the existing behaviour of
+    ``package:+``, ``tag:+`` and ``source:+`` rather than the ``CosmosValueError`` raised by a bare ``group:``.
+    """
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=multi_member_group_nodes, select=[statement])
+    assert selected == {}
+
+
+def test_is_empty_config_with_only_groups(selector_config):
+    """``groups`` alone must keep a selector config from being treated as empty."""
+    selector_config.groups = ["finance"]
+    assert selector_config.is_empty is False

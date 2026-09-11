@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 CONFIG_META_PATH = "meta"
-SUPPORTED_CONFIG = ["materialized", "schema", "tags", CONFIG_META_PATH]
+SUPPORTED_CONFIG = ["materialized", "schema", "tags", "group", CONFIG_META_PATH]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 FQN_SELECTOR = "fqn:"
@@ -29,6 +29,7 @@ CONFIG_SELECTOR = "config."
 SOURCE_SELECTOR = "source:"
 EXPOSURE_SELECTOR = "exposure:"
 PACKAGE_SELECTOR = "package:"
+GROUP_SELECTOR = "group:"
 RESOURCE_TYPE_SELECTOR = "resource_type:"
 EXCLUDE_RESOURCE_TYPE_SELECTOR = "exclude_resource_type:"
 PLUS_SELECTOR = "+"
@@ -289,11 +290,19 @@ class GraphSelector:
                     {node_id for node_id, node in nodes.items() if node.package_name == package_selection}
                 )
 
+        elif self.node_name.startswith(GROUP_SELECTOR):
+            group_selection = self.node_name[len(GROUP_SELECTOR) :].strip()
+            if group_selection:
+                root_nodes.update(
+                    {node_id for node_id, node in nodes.items() if node.config.get("group") == group_selection}
+                )
+
         elif CONFIG_SELECTOR in self.node_name:
             config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
-            # currently tags, materialized, schema and meta are the only supported config keys
+            # currently tags, materialized, schema, group and meta are the only supported config keys
             # logic is separated into two conditions because the config 'tags' contains a
-            # list of tags, the config 'materialized' & 'schema' contain strings and meta contains dictionaries
+            # list of tags, the configs 'materialized', 'schema' & 'group' contain strings and meta contains
+            # dictionaries
             if config_selection_key == "tags":
                 root_nodes.update(
                     {
@@ -305,6 +314,7 @@ class GraphSelector:
             elif config_selection_key in (
                 "materialized",
                 "schema",
+                "group",
             ):
                 root_nodes.update(
                     {
@@ -395,6 +405,7 @@ class SelectorConfig:
         self.sources: list[str] = []
         self.exposures: list[str] = []
         self.packages: list[str] = []
+        self.groups: list[str] = []
         self.bare_identifiers: list[str] = (
             []
         )  # bare strings: match by package_name, node name or folder name (dbt ls-like)
@@ -414,6 +425,7 @@ class SelectorConfig:
             or self.sources
             or self.exposures
             or self.packages
+            or self.groups
             or self.bare_identifiers
             or self.resource_types
             or self.exclude_resource_types
@@ -451,6 +463,7 @@ class SelectorConfig:
             SOURCE_SELECTOR: self._parse_source_selector,
             EXPOSURE_SELECTOR: self._parse_exposure_selector,
             PACKAGE_SELECTOR: self._parse_package_selector,
+            GROUP_SELECTOR: self._parse_group_selector,
             RESOURCE_TYPE_SELECTOR: self._parse_resource_type_selector,
             EXCLUDE_RESOURCE_TYPE_SELECTOR: self._parse_exclude_resource_type_selector,
             FQN_SELECTOR: self._parse_fqn_selector,
@@ -538,6 +551,15 @@ class SelectorConfig:
             )
         self.packages.append(package_name)
 
+    def _parse_group_selector(self, item: str) -> None:
+        index = len(GROUP_SELECTOR)
+        group_name = item[index:].strip()
+        if not group_name:
+            raise CosmosValueError(
+                "group: selector requires a non-empty group name (e.g. select=['group:customer_mart'])"
+            )
+        self.groups.append(group_name)
+
     def __repr__(self) -> str:
         return (
             "SelectorConfig("
@@ -549,6 +571,7 @@ class SelectorConfig:
             + f"resource={self.resource_types}, "
             + f"exposures={self.exposures}, "
             + f"packages={self.packages}, "
+            + f"groups={self.groups}, "
             + f"bare_identifiers={self.bare_identifiers}, "
             + f"exclude_resource={self.exclude_resource_types}, "
             + f"other={self.other}, "
@@ -673,7 +696,11 @@ class NodeSelector:
         return True
 
     def _passes_selector_filters(self, node: DbtNode) -> bool:
-        """Return True if node matches all configured selector filters (path, fqn, resource_type, source, exposure)."""
+        """Return True if node matches all configured selector filters.
+
+        Filters: path, fqn, resource_type, exclude_resource_type, source, exposure, package, group,
+        bare identifier.
+        """
         if self.config.paths and not self._is_path_matching(node):
             return False
         if self.config.fqns and not self._is_fqn_matching(node):
@@ -688,6 +715,9 @@ class NodeSelector:
             return False
 
         if self.config.packages and not self._is_package_matching(node):
+            return False
+
+        if self.config.groups and not self._is_group_matching(node):
             return False
 
         if self.config.bare_identifiers and not self._is_bare_identifier_matching(node):
@@ -731,6 +761,10 @@ class NodeSelector:
     def _is_package_matching(self, node: DbtNode) -> bool:
         """Checks if the node's package is in the config's package list."""
         return (node.package_name or "") in self.config.packages
+
+    def _is_group_matching(self, node: DbtNode) -> bool:
+        """Checks if the node's dbt group is in the config's group list. Ungrouped nodes never match."""
+        return node.config.get("group") in self.config.groups
 
     def _is_bare_identifier_matching(self, node: DbtNode) -> bool:
         """Bare identifiers match by package_name, node name, or path segment (e.g. folder name)."""
@@ -1012,6 +1046,7 @@ class YamlSelectors:
             PATH_SELECTOR[:-1]: PATH_SELECTOR,
             SOURCE_SELECTOR[:-1]: SOURCE_SELECTOR,
             EXPOSURE_SELECTOR[:-1]: EXPOSURE_SELECTOR,
+            GROUP_SELECTOR[:-1]: GROUP_SELECTOR,
             RESOURCE_TYPE_SELECTOR[:-1]: RESOURCE_TYPE_SELECTOR,
             EXCLUDE_RESOURCE_TYPE_SELECTOR[:-1]: EXCLUDE_RESOURCE_TYPE_SELECTOR,
         }
@@ -1491,6 +1526,7 @@ def validate_filters(exclude: list[str], select: list[str]) -> None:
                 or filter_parameter.startswith(SOURCE_SELECTOR)
                 or filter_parameter.startswith(EXPOSURE_SELECTOR)
                 or filter_parameter.startswith(PACKAGE_SELECTOR)
+                or filter_parameter.startswith(GROUP_SELECTOR)
                 or PLUS_SELECTOR in filter_parameter
                 or any([filter_parameter.startswith(CONFIG_SELECTOR + config) for config in SUPPORTED_CONFIG])
             ):

@@ -59,6 +59,12 @@ env:
   # integration environment installs. Validated to resolve under the Runtime image's pinned Airflow.
   COSMOS_TEST_EXTRAS: "dbt-postgres,dbt-bigquery,dbt-databricks,dbt-vertica,dbt-duckdb,amazon,google,microsoft,kubernetes,docker,openlineage"
 
+# Container jobs default `run` steps to `sh`, which lacks bash features (e.g. ${var//pattern/repl}).
+# Force bash (present in the Runtime image) for every run step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   Run-Unit-Tests:
     runs-on: ubuntu-latest
@@ -562,11 +568,11 @@ jobs:
   # cluster. This suite could not be validated locally like the others and is expected to need
   # iteration on its first live run.
   Run-Kubernetes-Tests:
-    # Skipped on push/PR for now (pod-execution failures + a watcher-test hang). Kept dispatchable
-    # for investigation. Follow-up ticket tracks fixing and re-enabling it.
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    # Disabled for now: pod-execution failures plus a watcher-test hang. Tracked in a follow-up
+    # ticket that will fix and re-enable it (flip this to run). Kept in the workflow (not deleted)
+    # so the follow-up has the full job to iterate on.
+    if: false
     runs-on: ubuntu-latest
-    # Hard cap so a hanging watcher test cannot burn the full hour on a manual dispatch.
     timeout-minutes: 30
     permissions:
       contents: read

@@ -85,7 +85,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: $/.github/actions/setup-cosmos-runtime
+      - uses: ./.github/actions/setup-cosmos-runtime # zizmor: ignore[self-repository]
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run unit tests
@@ -124,7 +124,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: $/.github/actions/setup-cosmos-runtime
+      - uses: ./.github/actions/setup-cosmos-runtime # zizmor: ignore[self-repository]
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run integration tests (split ${{ matrix.split-group }}/3)
@@ -188,7 +188,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: $/.github/actions/setup-cosmos-runtime
+      - uses: ./.github/actions/setup-cosmos-runtime # zizmor: ignore[self-repository]
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run telemetry tests
@@ -227,7 +227,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: $/.github/actions/setup-cosmos-runtime
+      - uses: ./.github/actions/setup-cosmos-runtime # zizmor: ignore[self-repository]
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run performance tests (${{ matrix.num-models }} models)
@@ -279,7 +279,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: $/.github/actions/setup-cosmos-runtime
+      - uses: ./.github/actions/setup-cosmos-runtime # zizmor: ignore[self-repository]
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Point the runner path the dbt-loom config hardcodes at the container workspace
@@ -340,7 +340,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: $/.github/actions/setup-cosmos-runtime
+      - uses: ./.github/actions/setup-cosmos-runtime # zizmor: ignore[self-repository]
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run dbt 1.8 integration tests
@@ -402,7 +402,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: $/.github/actions/setup-cosmos-runtime
+      - uses: ./.github/actions/setup-cosmos-runtime # zizmor: ignore[self-repository]
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run dbt async integration tests (dbt ${{ matrix.dbt-version }})
@@ -432,7 +432,7 @@ jobs:
           POSTGRES_PORT: 5432
 
   Run-Integration-Tests-Expensive:
-    if: ${{ github.event_name != 'pull_request' }} # TEMP: paid Databricks, run on push (once per commit) not on the PR event
+    if: ${{ github.event_name == 'workflow_dispatch' }} # TEMP: paid Databricks, dispatch-only (validated once, remaining failure tracked in BOSS-662)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -461,7 +461,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: $/.github/actions/setup-cosmos-runtime
+      - uses: ./.github/actions/setup-cosmos-runtime # zizmor: ignore[self-repository]
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Run expensive (Databricks) integration tests
@@ -491,7 +491,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
   Run-Integration-dbt-Fusion-Tests:
-    if: ${{ github.event_name != 'pull_request' }} # TEMP: paid Snowflake, run on push (once per commit) not on the PR event
+    if: ${{ github.event_name == 'workflow_dispatch' }} # TEMP: paid Snowflake, dispatch-only (serialization + cloud validation tracked in BOSS-662)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -510,7 +510,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: $/.github/actions/setup-cosmos-runtime
+      - uses: ./.github/actions/setup-cosmos-runtime # zizmor: ignore[self-repository]
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
       - name: Set RESOURCE_PREFIX (Snowflake-safe, no periods or dashes)
@@ -568,10 +568,10 @@ jobs:
   # cluster. This suite could not be validated locally like the others and is expected to need
   # iteration on its first live run.
   Run-Kubernetes-Tests:
-    # Disabled for now: pod-execution failures plus a watcher-test hang. Tracked in a follow-up
-    # ticket that will fix and re-enable it (flip this to run). Kept in the workflow (not deleted)
-    # so the follow-up has the full job to iterate on.
-    if: false
+    # Disabled: pod-execution failures plus a watcher-test hang, tracked in BOSS-662. Kept in the
+    # workflow (not deleted) so the follow-up has the full job to iterate on. Re-enable by setting
+    # the RUN_KUBERNETES_SUITE repo variable to 'true' (a plain `if: false` trips actionlint).
+    if: ${{ vars.RUN_KUBERNETES_SUITE == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

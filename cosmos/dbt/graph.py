@@ -1462,9 +1462,7 @@ class DbtGraph:
         tests_per_model: dict[str, list[str]] = {}
         excluded_ids: set[str] = set()
         if self.exclude:
-            excluded_ids = apply_exclude_filter(
-                self.nodes, self.execution_config.project_path, self.exclude
-            )
+            excluded_ids = apply_exclude_filter(self.nodes, self.execution_config.project_path, self.exclude)
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
                 if node.unique_id in excluded_ids:

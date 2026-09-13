@@ -338,4 +338,3 @@ def override_sys_argv(command: list[str]) -> Generator[None, None, None]:
         yield
     finally:
         sys.argv = original_argv
-

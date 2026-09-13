@@ -411,4 +411,3 @@ def test_override_sys_argv_restores_original_argv():
         assert sys.argv == test_command
 
     assert sys.argv == original_argv
-

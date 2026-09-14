@@ -1468,9 +1468,7 @@ class DbtGraph:
             if _n.resource_type == DbtResourceType.TEST:
                 _original_test_tags[_nid] = list(_n.tags or [])
         if self.exclude:
-            excluded_ids = apply_exclude_filter(
-                self.nodes, self.execution_config.project_path, self.exclude
-            )
+            excluded_ids = apply_exclude_filter(self.nodes, self.execution_config.project_path, self.exclude)
             # Restore original tags that NodeSelector may have overwritten
             for _nid, _tags in _original_test_tags.items():
                 _node = self.nodes.get(_nid)

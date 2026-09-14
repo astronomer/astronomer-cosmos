@@ -1779,7 +1779,9 @@ def test_update_node_dependency_skips_yaml_selector_excluded_tests():
     # Ensure the model and its tests are treated as excluded.
     for _tid in list(dbt_graph.filtered_nodes.keys()):
         _n = dbt_graph.filtered_nodes[_tid]
-        if _tid == "model.jaffle_shop.stg_customers" or "model.jaffle_shop.stg_customers" in getattr(_n, "depends_on", []):
+        if _tid == "model.jaffle_shop.stg_customers" or "model.jaffle_shop.stg_customers" in getattr(
+            _n, "depends_on", []
+        ):
             dbt_graph.filtered_nodes.pop(_tid, None)
     # Also add a raw tag marker so apply_exclude_filter's tag branch (and graph.py raw-tag bypass) covers this test
     if "exclude_me" not in dbt_graph.nodes[test_id].tags:

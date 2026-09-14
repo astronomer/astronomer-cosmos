@@ -203,6 +203,7 @@ def test_run_command_calls_cleanup_dbt_adapters_when_invoke_raises():
     fake_runner.invoke.assert_called_once()
     mock_cleanup.assert_called_once()
 
+
 def test_run_command_sets_and_restores_sys_argv():
     """run_command sets sys.argv to the dbt command during invoke and restores it after.
     See https://github.com/astronomer/astronomer-cosmos/issues/2969"""
@@ -231,6 +232,7 @@ def test_run_command_sets_and_restores_sys_argv():
 
     assert seen_argv["during"] == ["dbt", "build", "-s", "tag:X"]
     assert restored_inside == worker_argv
+
 
 def test_run_command_restores_sys_argv_when_invoke_raises():
     """sys.argv is restored even when runner.invoke raises."""

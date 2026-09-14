@@ -203,6 +203,55 @@ def test_run_command_calls_cleanup_dbt_adapters_when_invoke_raises():
     fake_runner.invoke.assert_called_once()
     mock_cleanup.assert_called_once()
 
+def test_run_command_sets_and_restores_sys_argv():
+    """run_command sets sys.argv to the dbt command during invoke and restores it after.
+    See https://github.com/astronomer/astronomer-cosmos/issues/2969"""
+    fake_result = MagicMock()
+    fake_runner = MagicMock()
+    fake_runner.invoke.return_value = fake_result
+    seen_argv = {}
+
+    def fake_invoke(cli_args):
+        seen_argv["during"] = list(sys.argv)
+        return fake_result
+
+    fake_runner.invoke.side_effect = fake_invoke
+    worker_argv = ["celery", "worker", "--queues", "default"]
+
+    with (
+        patch.object(dbt_runner, "get_runner", return_value=fake_runner),
+        patch.object(dbt_runner, "_cleanup_dbt_adapters"),
+        patch.object(dbt_runner, "change_working_directory"),
+        patch.object(dbt_runner, "environ"),
+        patch.object(dbt_runner, "logger"),
+        patch.object(sys, "argv", worker_argv),
+    ):
+        dbt_runner.run_command(command=["dbt", "build", "-s", "tag:X"], env={}, cwd="/tmp/project")
+        restored_inside = list(sys.argv)
+
+    assert seen_argv["during"] == ["dbt", "build", "-s", "tag:X"]
+    assert restored_inside == worker_argv
+
+def test_run_command_restores_sys_argv_when_invoke_raises():
+    """sys.argv is restored even when runner.invoke raises."""
+    fake_runner = MagicMock()
+    fake_runner.invoke.side_effect = RuntimeError("invoke failed")
+    worker_argv = ["celery", "worker"]
+
+    with (
+        patch.object(dbt_runner, "get_runner", return_value=fake_runner),
+        patch.object(dbt_runner, "_cleanup_dbt_adapters"),
+        patch.object(dbt_runner, "change_working_directory"),
+        patch.object(dbt_runner, "environ"),
+        patch.object(dbt_runner, "logger"),
+        patch.object(sys, "argv", worker_argv),
+    ):
+        with pytest.raises(RuntimeError, match="invoke failed"):
+            dbt_runner.run_command(command=["dbt", "deps"], env={}, cwd="/tmp/project")
+        restored_inside = list(sys.argv)
+
+    assert restored_inside == worker_argv
+
 
 @pytest.mark.integration
 def test_is_available_is_true():

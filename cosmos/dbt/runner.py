@@ -100,7 +100,7 @@ def run_command(
         # dbt-core builds INVOCATION_COMMAND from sys.argv unconditionally,
         # so without this the worker's argv (e.g. celery) leaks into audit
         # metadata. See https://github.com/astronomer/astronomer-cosmos/issues/2969
-        original_argv = sys.argv
+        original_argv = list(sys.argv)
         sys.argv = ["dbt", *cli_args]
         try:
             result = runner.invoke(cli_args)

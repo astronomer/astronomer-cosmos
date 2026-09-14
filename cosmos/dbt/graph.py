@@ -1461,8 +1461,27 @@ class DbtGraph:
         """
         tests_per_model: dict[str, list[str]] = {}
         excluded_ids: set[str] = set()
+        # Snapshot original tags of TEST nodes before NodeSelector mutates them (selector.py:685-686)
+        # so tag:* excludes on the test itself are not lost when tags are overwritten with parent tags.
+        _original_test_tags: dict[str, list[str]] = {}
+        for _nid, _n in self.nodes.items():
+            if _n.resource_type == DbtResourceType.TEST:
+                _original_test_tags[_nid] = list(_n.tags or [])
         if self.exclude:
-            excluded_ids = apply_exclude_filter(self.nodes, self.execution_config.project_path, self.exclude)
+            excluded_ids = apply_exclude_filter(
+                self.nodes, self.execution_config.project_path, self.exclude
+            )
+            # Restore original tags that NodeSelector may have overwritten
+            for _nid, _tags in _original_test_tags.items():
+                _node = self.nodes.get(_nid)
+                if _node is not None:
+                    _node.tags = _tags
+            # Minimal bypass: raw tag check so tag:exclude_me on a test is honored even if parent is untagged
+            _exclude_tags = {s.split("tag:", 1)[1] for s in self.exclude if s.startswith("tag:")}
+            if _exclude_tags:
+                for _nid, _tags in _original_test_tags.items():
+                    if _exclude_tags.intersection(_tags):
+                        excluded_ids.add(_nid)
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
                 if node.unique_id in excluded_ids:

@@ -1683,6 +1683,34 @@ def test_update_node_dependency_test_not_exist():
         assert nodes.has_non_detached_test is False
 
 
+def test_update_node_dependency_skips_excluded_tests():
+    """Verify that update_node_dependency honors RenderConfig.exclude and does not re-add excluded tests."""
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(
+        exclude=["tag:exclude_me"],
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load_from_dbt_manifest()
+
+    for node_id, node in dbt_graph.filtered_nodes.items():
+        if node.resource_type == DbtResourceType.TEST:
+            assert "exclude_me" not in node.tags
+
+
 def test_tests_per_model_populated():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST

@@ -65,7 +65,7 @@ from cosmos.dbt.project import (
     has_non_empty_dependencies_file,
     remove_dags_folder_from_pythonpath,
 )
-from cosmos.dbt.selector import YamlSelectors, select_nodes
+from cosmos.dbt.selector import YamlSelectors, apply_exclude_filter, select_nodes
 from cosmos.fs import _calculate_file_checksum
 from cosmos.log import get_logger
 
@@ -1455,8 +1455,15 @@ class DbtGraph:
         * self.tests_per_model
         """
         tests_per_model: dict[str, list[str]] = {}
+        excluded_ids: set[str] = set()
+        if self.render_config.exclude:
+            excluded_ids = apply_exclude_filter(
+                self.nodes, self.execution_config.project_path, self.render_config.exclude
+            )
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
+                if node.unique_id in excluded_ids:
+                    continue
                 for node_id in node.depends_on:
                     if node_id in self.filtered_nodes:
                         self.filtered_nodes[node_id].has_test = True

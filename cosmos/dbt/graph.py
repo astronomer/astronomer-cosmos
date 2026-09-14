@@ -514,6 +514,7 @@ class DbtGraph:
 
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
+    exclude: list[str] = list()
     tests_per_model: dict[str, list[str]] = dict()
     load_method: LoadMode = LoadMode.AUTOMATIC
 
@@ -541,6 +542,7 @@ class DbtGraph:
             self.cache_key = ""
         self.dbt_vars = dbt_vars or {}
         self.operator_args = operator_args or {}
+        self.exclude = list(self.render_config.exclude)
         self.log_dir: Path | None = None
         self.should_install_dbt_deps = (
             self.render_config.dbt_deps if isinstance(self.render_config.dbt_deps, bool) else True
@@ -1352,6 +1354,8 @@ class DbtGraph:
                 raise CosmosLoadDbtException(error_message)
 
             self.nodes = nodes
+            manifest_exclude = selections["exclude"] or []
+            self.exclude = list(self.render_config.exclude) + list(manifest_exclude)
             self.filtered_nodes = select_nodes(
                 project_dir=project_dir,
                 nodes=nodes,
@@ -1360,6 +1364,7 @@ class DbtGraph:
             )
         else:
             self.nodes = nodes
+            self.exclude = list(self.render_config.exclude)
             self.filtered_nodes = select_nodes(
                 project_dir=project_dir,
                 nodes=nodes,
@@ -1456,9 +1461,9 @@ class DbtGraph:
         """
         tests_per_model: dict[str, list[str]] = {}
         excluded_ids: set[str] = set()
-        if self.render_config.exclude:
+        if self.exclude:
             excluded_ids = apply_exclude_filter(
-                self.nodes, self.execution_config.project_path, self.render_config.exclude
+                self.nodes, self.execution_config.project_path, self.exclude
             )
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:

@@ -1684,7 +1684,7 @@ def test_update_node_dependency_test_not_exist():
 
 
 def test_update_node_dependency_skips_excluded_tests():
-    """Verify that update_node_dependency honors RenderConfig.exclude and does not re-add excluded tests."""
+    """Verify that update_node_dependency honors exclude filters and does not re-add excluded tests."""
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
     )
@@ -1706,9 +1706,52 @@ def test_update_node_dependency_skips_excluded_tests():
     )
     dbt_graph.load_from_dbt_manifest()
 
-    for node_id, node in dbt_graph.filtered_nodes.items():
-        if node.resource_type == DbtResourceType.TEST:
-            assert "exclude_me" not in node.tags
+    # Tag a test node whose parent model is in filtered_nodes
+    test_id = "test.jaffle_shop.accepted_values_orders_status__placed__shipped__completed__return_pending__returned.be6b5b5ec3"
+    dbt_graph.nodes[test_id].tags.append("exclude_me")
+    dbt_graph.filtered_nodes.pop(test_id, None)
+
+    dbt_graph.update_node_dependency()
+
+    assert test_id in dbt_graph.nodes
+    assert test_id not in dbt_graph.filtered_nodes
+
+
+def test_update_node_dependency_skips_yaml_selector_excluded_tests():
+    """Verify that update_node_dependency honors YAML selector exclude filters and does not re-add excluded tests."""
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST_SELECTORS
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(
+        load_method=LoadMode.DBT_MANIFEST,
+        selector="exclude_staging_except_customers",
+        source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load_from_dbt_manifest()
+
+    test_id = "test.jaffle_shop.accepted_values_stg_orders_status__placed__shipped__completed__return_pending__returned.080fb20aad"
+    # Tag test node to match selector exclude
+    dbt_graph.nodes[test_id].tags.append("exclude_tag")
+    dbt_graph.exclude.append("tag:exclude_tag")
+    dbt_graph.filtered_nodes.pop(test_id, None)
+
+    # Parent stg_orders is in filtered_nodes for staging_models, ensure parent is present
+    dbt_graph.update_node_dependency()
+
+    assert test_id in dbt_graph.nodes
+    assert test_id not in dbt_graph.filtered_nodes
 
 
 def test_tests_per_model_populated():

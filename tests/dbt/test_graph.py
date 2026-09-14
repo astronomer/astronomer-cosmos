@@ -1762,12 +1762,10 @@ def test_update_node_dependency_skips_yaml_selector_excluded_tests():
             unique_id=test_id,
             resource_type=DbtResourceType.TEST,
             depends_on=["model.jaffle_shop.stg_customers"],
-            file_path=model_node.file_path,
+            path_base=model_node.path_base,
+            original_file_path=model_node.original_file_path,
             tags=[],
             config={},
-            has_test=False,
-            fqn=["jaffle_shop", "staging", "not_null_stg_customers_customer_id"],
-            resource_name="not_null_stg_customers_customer_id",
         )
         if test_id in dbt_graph.filtered_nodes:
             dbt_graph.filtered_nodes.pop(test_id)

@@ -543,6 +543,9 @@ class DbtGraph:
         self.dbt_vars = dbt_vars or {}
         self.operator_args = operator_args or {}
         self.exclude = list(self.render_config.exclude)
+        # Test tags as loaded, before any NodeSelector run overwrites them
+        # with parent tags (selector.py::_should_include_node).
+        self._pre_selection_test_tags: dict[str, list[str]] = {}
         self.log_dir: Path | None = None
         self.should_install_dbt_deps = (
             self.render_config.dbt_deps if isinstance(self.render_config.dbt_deps, bool) else True
@@ -1354,8 +1357,14 @@ class DbtGraph:
                 raise CosmosLoadDbtException(error_message)
 
             self.nodes = nodes
+            for _nid, _n in nodes.items():
+                if _n.resource_type == DbtResourceType.TEST:
+                    self._pre_selection_test_tags[_nid] = list(_n.tags or [])
             manifest_exclude = selections["exclude"] or []
-            self.exclude = list(self.render_config.exclude) + list(manifest_exclude)
+            # When a YAML selector is set, the producer runs dbt with the selector
+            # and dbt ignores --exclude in that combination, so render_config.exclude
+            # must not suppress consumers either (else producer/consumer mismatch).
+            self.exclude = list(manifest_exclude)
             self.filtered_nodes = select_nodes(
                 project_dir=project_dir,
                 nodes=nodes,
@@ -1364,6 +1373,9 @@ class DbtGraph:
             )
         else:
             self.nodes = nodes
+            for _nid, _n in nodes.items():
+                if _n.resource_type == DbtResourceType.TEST:
+                    self._pre_selection_test_tags[_nid] = list(_n.tags or [])
             self.exclude = list(self.render_config.exclude)
             self.filtered_nodes = select_nodes(
                 project_dir=project_dir,
@@ -1449,6 +1461,30 @@ class DbtGraph:
         nodes = self._load_nodes_from_manifest_data(manifest, project_path)
         self._apply_manifest_node_selection(nodes, manifest)
 
+    def _excluded_test_ids(self) -> set[str]:
+        """Keys/IDs of TEST nodes matching self.exclude. Uses pre-selection tags."""
+        if not self.exclude:
+            return set()
+        excluded_ids = apply_exclude_filter(self.nodes, self.execution_config.project_path, self.exclude)
+        # Restore pre-selection tags that NodeSelector overwrote with parent tags.
+        original_tags = getattr(self, "_pre_selection_test_tags", {}) or {}
+        for _nid, _tags in original_tags.items():
+            _node = self.nodes.get(_nid)
+            if _node is not None:
+                _node.tags = _tags
+        _exclude_tags = {s.split("tag:", 1)[1] for s in self.exclude if s.startswith("tag:")}
+        if _exclude_tags:
+            for _nid, _node in self.nodes.items():
+                if _node.resource_type == DbtResourceType.TEST and _exclude_tags.intersection(_node.tags or []):
+                    excluded_ids.add(_nid)
+                    excluded_ids.add(_node.unique_id)
+        # LoadMode.CUSTOM keys self.nodes by model_name, not unique_id:
+        # map excluded unique_ids back to mapping keys so the skip matches.
+        for _key, _node in self.nodes.items():
+            if _node.unique_id in excluded_ids:
+                excluded_ids.add(_key)
+        return excluded_ids
+
     def update_node_dependency(self) -> None:
         """
         This will update the property `has_test` if node has `dbt` test and update the property
@@ -1460,26 +1496,9 @@ class DbtGraph:
         * self.tests_per_model
         """
         tests_per_model: dict[str, list[str]] = {}
-        excluded_ids: set[str] = set()
-        # Snapshot original tags of TEST nodes before NodeSelector mutates them (selector.py:685-686)
-        # so tag:* excludes on the test itself are not lost when tags are overwritten with parent tags.
-        _original_test_tags: dict[str, list[str]] = {}
-        for _nid, _n in self.nodes.items():
-            if _n.resource_type == DbtResourceType.TEST:
-                _original_test_tags[_nid] = list(_n.tags or [])
-        if self.exclude:
-            excluded_ids = apply_exclude_filter(self.nodes, self.execution_config.project_path, self.exclude)
-            # Restore original tags that NodeSelector may have overwritten
-            for _nid, _tags in _original_test_tags.items():
-                _node = self.nodes.get(_nid)
-                if _node is not None:
-                    _node.tags = _tags
-            # Minimal bypass: raw tag check so tag:exclude_me on a test is honored even if parent is untagged
-            _exclude_tags = {s.split("tag:", 1)[1] for s in self.exclude if s.startswith("tag:")}
-            if _exclude_tags:
-                for _nid, _tags in _original_test_tags.items():
-                    if _exclude_tags.intersection(_tags):
-                        excluded_ids.add(_nid)
+        excluded_ids = self._excluded_test_ids()
+        for excluded_id in excluded_ids:
+            self.filtered_nodes.pop(excluded_id, None)
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
                 if node.unique_id in excluded_ids:

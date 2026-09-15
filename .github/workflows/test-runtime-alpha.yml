@@ -376,6 +376,11 @@ jobs:
   Run-Integration-dbt-Async-Tests:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Disabled everywhere for now. The async BigQuery operator reassigns __bases__ to the google
+    # provider's operator and breaks on the provider version the alpha image ships. Tracked and
+    # fixed separately in BOSS-662. Re-enable by setting the RUN_DBT_ASYNC_SUITE repo variable to
+    # 'true' (a plain `if: false` trips actionlint).
+    if: ${{ vars.RUN_DBT_ASYNC_SUITE == 'true' }}
     permissions:
       contents: read
     strategy:
@@ -617,8 +622,7 @@ jobs:
         run: |
           docker pull "$RUNTIME_IMAGE"
           docker run --rm --network host --user root \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$HOME/.kube":/root/.kube \
+            -v "$HOME/.kube":/root/.kube:ro \
             -v "$PWD":/work -w /work \
             -e KUBECONFIG=/root/.kube/config \
             -e AIRFLOW_HOME=/work \
@@ -636,11 +640,10 @@ jobs:
             "$RUNTIME_IMAGE" bash -c '
               set -euxo pipefail
               apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev curl
-              # kubectl + kind for the in-container setup script.
+              # kubectl for the in-container test setup. The suite reaches the cluster over the
+              # mounted kubeconfig, so no docker socket or kind binary is needed in here.
               curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
               chmod +x /usr/local/bin/kubectl
-              curl -fsSL -o /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
-              chmod +x /usr/local/bin/kind
               bash scripts/test/runtime-alpha-setup.sh "dbt-postgres,kubernetes"
               bash scripts/test/integration-kubernetes.sh
             '

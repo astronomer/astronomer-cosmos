@@ -65,7 +65,7 @@ from cosmos.dbt.project import (
     has_non_empty_dependencies_file,
     remove_dags_folder_from_pythonpath,
 )
-from cosmos.dbt.selector import YamlSelectors, apply_exclude_filter, select_nodes
+from cosmos.dbt.selector import YamlSelectors, apply_exclude_filter, retrieve_by_label, select_nodes
 from cosmos.fs import _calculate_file_checksum
 from cosmos.log import get_logger
 
@@ -1472,7 +1472,7 @@ class DbtGraph:
             _node = self.nodes.get(_nid)
             if _node is not None:
                 _node.tags = _tags
-        _exclude_tags = {s.split("tag:", 1)[1] for s in self.exclude if s.startswith("tag:")}
+        _exclude_tags = retrieve_by_label(self.exclude, "tags")
         if _exclude_tags:
             for _nid, _node in self.nodes.items():
                 if _node.resource_type == DbtResourceType.TEST and _exclude_tags.intersection(_node.tags or []):
@@ -1499,9 +1499,9 @@ class DbtGraph:
         excluded_ids = self._excluded_test_ids()
         for excluded_id in excluded_ids:
             self.filtered_nodes.pop(excluded_id, None)
-        for _, node in list(self.nodes.items()):
+        for _key, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
-                if node.unique_id in excluded_ids:
+                if node.unique_id in excluded_ids or _key in excluded_ids:
                     continue
                 for node_id in node.depends_on:
                     if node_id in self.filtered_nodes:

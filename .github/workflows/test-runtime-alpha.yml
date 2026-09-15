@@ -22,25 +22,31 @@ on:
         required: true
         type: string
       registry:
+        # Constrained to a choice so a dispatcher cannot point the secret-bearing container jobs at
+        # an arbitrary image. A free-form registry would let anyone with actions:write run their own
+        # image as root with the repo secrets in scope.
         description: "Runtime image repository (without tag)"
         required: false
         default: "astrocrpublic.azurecr.io/runtime-dev"
-        type: string
+        type: choice
+        options:
+          - "astrocrpublic.azurecr.io/runtime-dev"
       python_versions:
         description: 'JSON list of Python versions the alpha publishes, e.g. ["3.12","3.13"]'
         required: false
         default: '["3.12"]'
         type: string
-      dbt_versions:
-        description: 'JSON list of dbt minor versions for the unit + integration suites, e.g. ["1.12"]'
+      run_paid_suites:
+        description: "Also run the paid Databricks + Snowflake suites (real cloud resources, off by default)."
         required: false
-        default: '["1.12"]'
-        type: string
+        default: false
+        type: boolean
 
   # TEMP (remove before merge): run this workflow on the PR itself with a default image, so
   # reviewers can see it execute. pull_request events do not populate workflow_dispatch inputs,
   # so the jobs fall back to the defaults in the `|| '...'` expressions below. The paid Databricks
-  # and Snowflake suites are gated to workflow_dispatch only, so they do not run on the PR.
+  # and Snowflake suites are gated behind the run_paid_suites input (off by default), so they do not
+  # run on the PR or on a default dispatch.
   pull_request:
     branches: [main]
   # Also run on every push to the PR branch (in addition to pull_request), so each commit runs.
@@ -75,7 +81,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
-        dbt-version: ${{ fromJSON(inputs.dbt_versions || '["1.12"]') }}
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
       # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
@@ -103,7 +108,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
-        dbt-version: ${{ fromJSON(inputs.dbt_versions || '["1.12"]') }}
         split-group: [1, 2, 3]
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
@@ -134,7 +138,9 @@ jobs:
           AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR bash scripts/test/integration-setup.sh "$DBT_VERSION"
           bash scripts/test/integration.sh
         env:
-          DBT_VERSION: ${{ matrix.dbt-version }}
+          # The integration suite installs whatever dbt resolves under the image constraints. This
+          # value only satisfies integration-setup.sh's positional arg (it does not pin dbt).
+          DBT_VERSION: "1.12"
           PYTEST_SPLITS: 3
           PYTEST_SPLIT_GROUP: ${{ matrix.split-group }}
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
@@ -175,7 +181,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
-        dbt-version: ["1.9"]
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
       # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
@@ -206,7 +211,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
-        dbt-version: ["1.9"]
         num-models: [1, 10, 50, 100, 500]
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
@@ -237,7 +241,9 @@ jobs:
           AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR bash scripts/test/performance-setup.sh "$DBT_VERSION"
           bash scripts/test/performance.sh
         env:
-          DBT_VERSION: ${{ matrix.dbt-version }}
+          # Performance installs the resolved dbt. This value only satisfies performance-setup.sh's
+          # positional arg (it does not pin dbt).
+          DBT_VERSION: "1.9"
           AIRFLOW_HOME: ${{ github.workspace }}
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@postgres:5432/postgres
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 180.0
@@ -260,6 +266,11 @@ jobs:
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
         dbt-version: ["1.11"]
+        # dbt-core 1.11 has no Python 3.14 classifier, so this suite's forced-old dbt cannot install
+        # on 3.14. Mirrors test-unprivileged.yml's exclude. Drop when this suite moves to a
+        # 3.14-supporting dbt.
+        exclude:
+          - python-version: "3.14"
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
       # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
@@ -321,6 +332,10 @@ jobs:
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
         dbt-version: ["1.8"]
+        # dbt 1.8 has no Python 3.14 wheels, so this suite's forced-old dbt cannot install on 3.14.
+        # Mirrors test-unprivileged.yml's exclude.
+        exclude:
+          - python-version: "3.14"
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
       # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
@@ -388,6 +403,10 @@ jobs:
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
         dbt-version: ["1.8", "1.9", "1.10", "1.11"]
+        # None of these dbt minors have Python 3.14 support, so exclude 3.14 (latent until this suite
+        # is re-enabled). Mirrors test-unprivileged.yml's exclude.
+        exclude:
+          - python-version: "3.14"
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
       # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
@@ -437,7 +456,9 @@ jobs:
           POSTGRES_PORT: 5432
 
   Run-Integration-Tests-Expensive:
-    if: ${{ github.event_name == 'workflow_dispatch' }} # TEMP: paid Databricks, dispatch-only (validated once, remaining failure tracked in BOSS-662)
+    # Paid Databricks: off unless run_paid_suites is set. A durable gate that survives removing the
+    # TEMP triggers, where an event_name check would become always-true. Remaining failure: BOSS-662.
+    if: ${{ inputs.run_paid_suites }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -446,7 +467,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions || '["3.12"]') }}
-        dbt-version: ["1.9"]
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
       # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
@@ -475,7 +495,9 @@ jobs:
           AIRFLOW__LOGGING__LOGGING_LEVEL=ERROR bash scripts/test/integration-setup.sh "$DBT_VERSION"
           DATABRICKS_UNIQUE_ID="$GITHUB_RUN_ID" bash scripts/test/integration-expensive.sh
         env:
-          DBT_VERSION: ${{ matrix.dbt-version }}
+          # Expensive installs the resolved dbt. This value only satisfies integration-setup.sh's
+          # positional arg (it does not pin dbt).
+          DBT_VERSION: "1.9"
           AIRFLOW_HOME: ${{ github.workspace }}
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@postgres:5432/postgres
           AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
@@ -496,7 +518,9 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
   Run-Integration-dbt-Fusion-Tests:
-    if: ${{ github.event_name == 'workflow_dispatch' }} # TEMP: paid Snowflake, dispatch-only (serialization + cloud validation tracked in BOSS-662)
+    # Paid Snowflake: off unless run_paid_suites is set. Durable gate (see the Databricks suite).
+    # Serialization + cloud validation tracked in BOSS-662.
+    if: ${{ inputs.run_paid_suites }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -647,3 +671,58 @@ jobs:
               bash scripts/test/runtime-alpha-setup.sh "dbt-postgres,kubernetes"
               bash scripts/test/integration-kubernetes.sh
             '
+
+  Report-Suite-Coverage:
+    # Always runs, even when suites fail or are skipped, so a green check never hides an inert suite.
+    # Writes a ran-vs-skipped manifest to the run summary. Informational only (it does not fail the
+    # run), because async and kubernetes are intentionally disabled until BOSS-662.
+    if: always()
+    needs:
+      - Run-Unit-Tests
+      - Run-Integration-Tests
+      - Run-Telemetry-Tests
+      - Run-Performance-Tests
+      - Run-Integration-dbt-Loom-Tests
+      - Run-Integration-dbt-1-8-Tests
+      - Run-Integration-dbt-Async-Tests
+      - Run-Integration-Tests-Expensive
+      - Run-Integration-dbt-Fusion-Tests
+      - Run-Kubernetes-Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Write suite coverage manifest to the run summary
+        # Job results arrive via env (never interpolated into the run body) so the summary cannot be
+        # shell-injected. A `skipped` result means the suite did not run on this dispatch.
+        env:
+          UNIT: ${{ needs.Run-Unit-Tests.result }}
+          INTEGRATION: ${{ needs.Run-Integration-Tests.result }}
+          TELEMETRY: ${{ needs.Run-Telemetry-Tests.result }}
+          PERFORMANCE: ${{ needs.Run-Performance-Tests.result }}
+          LOOM: ${{ needs.Run-Integration-dbt-Loom-Tests.result }}
+          DBT18: ${{ needs.Run-Integration-dbt-1-8-Tests.result }}
+          ASYNC: ${{ needs.Run-Integration-dbt-Async-Tests.result }}
+          EXPENSIVE: ${{ needs.Run-Integration-Tests-Expensive.result }}
+          FUSION: ${{ needs.Run-Integration-dbt-Fusion-Tests.result }}
+          KUBERNETES: ${{ needs.Run-Kubernetes-Tests.result }}
+        run: |
+          {
+            echo "## Runtime alpha suite coverage"
+            echo ""
+            echo "A result of \`skipped\` means the suite did not run on this dispatch (disabled, or paid and not opted in), so a green check does not cover it."
+            echo ""
+            echo "| Suite | Result |"
+            echo "| --- | --- |"
+            echo "| Unit | $UNIT |"
+            echo "| Integration | $INTEGRATION |"
+            echo "| Telemetry | $TELEMETRY |"
+            echo "| Performance | $PERFORMANCE |"
+            echo "| dbt-loom | $LOOM |"
+            echo "| dbt-1.8 | $DBT18 |"
+            echo "| dbt-async | $ASYNC |"
+            echo "| Expensive (Databricks) | $EXPENSIVE |"
+            echo "| dbt-Fusion (Snowflake) | $FUSION |"
+            echo "| Kubernetes | $KUBERNETES |"
+          } >> "$GITHUB_STEP_SUMMARY"

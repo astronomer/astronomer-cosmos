@@ -22,12 +22,13 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # walking up from the install directory. Some alpha images write an invalid PEP440
 # [project].version there (e.g. "3.3-7-alpha2" -- valid TOML, but not a valid version), which
 # makes uv abort parsing the file and therefore abort EVERY install run under it. We never use
-# that version, so neutralise just that line to a valid placeholder; the constraint-dependencies
-# below it are left untouched and still applied. Guarded on existence so older images are a no-op.
+# that version, so neutralise it to a valid placeholder, scoped to the [project] table so only that
+# key is touched and the constraint-dependencies below stay intact. Guarded on existence so older
+# images are a no-op.
 RUNTIME_UV_PYPROJECT="${RUNTIME_UV_PYPROJECT:-/pyproject.toml}"
 if [ -f "$RUNTIME_UV_PYPROJECT" ]; then
   echo "Neutralising [project].version in ${RUNTIME_UV_PYPROJECT} (Runtime image ships an invalid PEP440 version that breaks uv)."
-  sed -i -E '0,/^version = /{s/^version = .*/version = "0.0.0"/}' "$RUNTIME_UV_PYPROJECT"
+  sed -i -E '/^\[project\]/,/^\[/{s/^version = .*/version = "0.0.0"/}' "$RUNTIME_UV_PYPROJECT"
 fi
 
 pip install -U uv

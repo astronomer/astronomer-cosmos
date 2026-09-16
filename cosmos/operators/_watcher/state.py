@@ -224,7 +224,10 @@ def build_producer_state_fetcher(
                     .one_or_none()
                 )
                 if ti is not None:
-                    return str(ti.state)
+                    # Normalise a null state to None (not the string "None") so callers such as
+                    # is_producer_task_still_running treat an unknown producer state consistently
+                    # with Airflow 3, where the fetcher already returns None. See #2947.
+                    return str(ti.state) if ti.state is not None else None
                 return None
 
         return fetch_state_airflow2

@@ -9,9 +9,11 @@ import zlib
 from unittest.mock import MagicMock, patch
 
 import pytest
+from packaging.version import Version
 
 from cosmos.operators._watcher.state import (
     _log_dbt_event,
+    build_producer_state_fetcher,
     get_compiled_sql_xcom_key,
     get_dbt_event_xcom_key,
     get_status_xcom_key,
@@ -118,6 +120,27 @@ class TestProducerTaskStillRunning:
     def test_terminated_or_unknown_states(self, state: str | None):
         # Terminal states and an unknown/unfetchable state (None or empty) are both "not still running".
         assert is_producer_task_still_running(state) is False
+
+
+class TestBuildProducerStateFetcherAirflow2:
+    """The Airflow 2 fetcher normalises a null TaskInstance.state to None, not the string "None" (#2947)."""
+
+    @pytest.mark.parametrize("ti_state, expected", [("running", "running"), (None, None)])
+    def test_null_state_normalised_to_none(self, ti_state, expected):
+        mock_ti = MagicMock(state=ti_state)
+        session = MagicMock()
+        session.query.return_value.filter_by.return_value.one_or_none.return_value = mock_ti
+        session_cm = MagicMock()
+        session_cm.__enter__.return_value = session
+        with patch("airflow.utils.session.create_session", return_value=session_cm):
+            fetch_state = build_producer_state_fetcher(
+                airflow_version=Version("2.9.0"),
+                dag_id="d",
+                run_id="r",
+                producer_task_id="p",
+                logger=logging.getLogger(__name__),
+            )
+            assert fetch_state() == expected
 
 
 @pytest.mark.parametrize(

@@ -34,6 +34,7 @@ from cosmos.operators._watcher.state import (
     get_dbt_event_xcom_key,
     get_status_xcom_key,
     get_xcom_val,
+    is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
@@ -817,6 +818,13 @@ class BaseConsumerSensor(BaseSensorOperator):
         if status is None:
             return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
 
+        # A failed node while the producer is still building is not terminal for the sensor yet: keep
+        # polling (in deferrable mode this defers back to the trigger) so the retry path can fall back
+        # once the producer terminates, instead of burning a retry on an instant re-raise. Return before
+        # logging so the ERROR dbt event is not repeated on every poke. See #2947.
+        if is_dbt_node_status_failed(status) and is_producer_task_still_running(producer_task_state):
+            return False
+
         # Log the dbt event only once the node is terminal; poke runs every interval, so logging before
         # this point would repeat the line on each poke.
         dbt_events = get_xcom_val(
@@ -832,11 +840,6 @@ class BaseConsumerSensor(BaseSensorOperator):
             )
         if is_dbt_node_status_success(status):
             return True
-        # Node status is a failure. While the producer is still building, keep polling (in deferrable
-        # mode this defers back to the trigger) so the retry path can fall back once the producer
-        # terminates, instead of burning a retry on an instant re-raise. See #2947.
-        if is_producer_task_still_running(producer_task_state):
-            return False
         raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
 
 

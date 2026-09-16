@@ -1505,6 +1505,22 @@ class TestDbtConsumerWatcherSensor:
         assert result is False
         assert sensor.poke_retry_number == 1
 
+    def test_poke_keeps_polling_when_node_failed_but_producer_running(self):
+        """#2947: a failed node must not raise (burning a retry) while the producer is still
+        running. poke returns False to keep polling instead of falling back yet."""
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "running"
+        sensor._fallback_to_non_watcher_run = MagicMock()
+        ti = MagicMock()
+        ti.try_number = 2
+        # xcom_pull: _log_startup_events=None, _get_node_status=error dict, compiled_sql=None, _dbt_event=None
+        ti.xcom_pull.side_effect = [None, {"status": "error", "outlet_uris": []}, None, None]
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+        assert result is False
+        sensor._fallback_to_non_watcher_run.assert_not_called()
+
     def test_fallback_to_non_watcher_run(self):
         """When the producer hasn't published its flags to XCom, fall back to this consumer's own."""
         sensor = self.make_sensor()

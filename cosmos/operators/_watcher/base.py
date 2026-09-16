@@ -38,6 +38,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
     is_dbt_upstream_failure_skip_event,
+    is_producer_task_still_running,
     is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
@@ -829,10 +830,14 @@ class BaseConsumerSensor(BaseSensorOperator):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
-        elif is_dbt_node_status_success(status):
+        if is_dbt_node_status_success(status):
             return True
-        else:
-            raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
+        # Node status is a failure. While the producer is still building, keep polling (in deferrable
+        # mode this defers back to the trigger) so the retry path can fall back once the producer
+        # terminates, instead of burning a retry on an instant re-raise. See #2947.
+        if is_producer_task_still_running(producer_task_state):
+            return False
+        raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
 
 
 def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> EmptyOperator:

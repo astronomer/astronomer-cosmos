@@ -19,6 +19,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_producer_task_still_running,
     is_producer_task_terminated,
     safe_xcom_push,
 )
@@ -104,6 +105,19 @@ class TestProducerTaskTerminated:
     @pytest.mark.parametrize("state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule", None, ""])
     def test_non_terminal_states(self, state: str | None):
         assert is_producer_task_terminated(state) is False
+
+
+class TestProducerTaskStillRunning:
+    """Tests for is_producer_task_still_running helper (#2947)."""
+
+    @pytest.mark.parametrize("state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule"])
+    def test_running_states(self, state: str):
+        assert is_producer_task_still_running(state) is True
+
+    @pytest.mark.parametrize("state", ["success", "failed", "skipped", "upstream_failed", "removed", None, ""])
+    def test_terminated_or_unknown_states(self, state: str | None):
+        # Terminal states and an unknown/unfetchable state (None or empty) are both "not still running".
+        assert is_producer_task_still_running(state) is False
 
 
 @pytest.mark.parametrize(

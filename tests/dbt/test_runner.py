@@ -399,3 +399,15 @@ def test_extract_message_by_status_still_prefers_node_name():
 
     assert names == ["my_model"]
     assert messages == ["boom"]
+
+
+def test_override_sys_argv_restores_original_argv():
+    from cosmos.dbt.project import override_sys_argv
+
+    original_argv = sys.argv.copy()
+    test_command = ["dbt", "run", "--select", "my_model"]
+
+    with override_sys_argv(test_command):
+        assert sys.argv == test_command
+
+    assert sys.argv == original_argv

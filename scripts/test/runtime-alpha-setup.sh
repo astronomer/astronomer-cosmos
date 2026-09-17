@@ -29,6 +29,25 @@ RUNTIME_UV_PYPROJECT="${RUNTIME_UV_PYPROJECT:-/pyproject.toml}"
 if [ -f "$RUNTIME_UV_PYPROJECT" ]; then
   echo "Neutralising [project].version in ${RUNTIME_UV_PYPROJECT} (Runtime image ships an invalid PEP440 version that breaks uv)."
   sed -i -E '/^\[project\]/,/^\[/{s/^version = .*/version = "0.0.0"/}' "$RUNTIME_UV_PYPROJECT"
+  # Confirm the neutralisation took. tomllib reads the version regardless of how the line is
+  # formatted, so this catches a future image whose version line the sed did not match, which would
+  # otherwise leave an invalid PEP440 version for uv to reject later with a confusing error.
+  python - "$RUNTIME_UV_PYPROJECT" <<'PY'
+import sys, tomllib
+from packaging.version import InvalidVersion, Version
+
+path = sys.argv[1]
+version = tomllib.load(open(path, "rb")).get("project", {}).get("version")
+if version is not None:
+    try:
+        Version(version)
+    except InvalidVersion:
+        raise SystemExit(
+            f"ERROR: {path} still has an invalid PEP440 [project].version ({version!r}) after "
+            "neutralisation. The version-line format likely changed. Update the sed in "
+            "runtime-alpha-setup.sh."
+        )
+PY
 fi
 
 pip install -U uv

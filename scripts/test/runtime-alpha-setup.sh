@@ -37,7 +37,8 @@ import sys, tomllib
 from packaging.version import InvalidVersion, Version
 
 path = sys.argv[1]
-version = tomllib.load(open(path, "rb")).get("project", {}).get("version")
+with open(path, "rb") as f:
+    version = tomllib.load(f).get("project", {}).get("version")
 if version is not None:
     try:
         Version(version)

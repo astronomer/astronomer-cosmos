@@ -17,7 +17,6 @@ from airflow.utils import timezone
 from airflow.utils.session import NEW_SESSION, provide_session
 from airflow.utils.state import DagRunState, State
 from airflow.utils.types import DagRunType
-from packaging import version
 from packaging.version import Version
 from sqlalchemy.orm.session import Session
 
@@ -93,10 +92,10 @@ def serialize_dag_to_db(dag: DAG) -> None:
 
 
 def new_test_dag(dag: DAG, expected_dag_state: DagRunState = DagRunState.SUCCESS) -> DagRun:
-    if AIRFLOW_VERSION >= version.Version("3.1"):
+    if AIRFLOW_VERSION.release[:2] >= (3, 1):
         serialize_dag_to_db(dag)
         dr = dag.test(logical_date=timezone.utcnow())
-    elif AIRFLOW_VERSION >= version.Version("3.0"):
+    elif AIRFLOW_VERSION.release[:2] >= (3, 0):
         # In Airflow 3.0, dag.test() does not properly register Assets as active, must be registered manually
         from airflow.models.asset import AssetActive, AssetModel
         from airflow.utils.session import create_session

@@ -101,7 +101,9 @@ class TestProducerTaskTerminated:
     def test_terminal_states(self, state: str):
         assert is_producer_task_terminated(state) is True
 
-    @pytest.mark.parametrize("state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule", None, ""])
+    @pytest.mark.parametrize(
+        "state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule", "up_for_retry", None, ""]
+    )
     def test_non_terminal_states(self, state: str | None):
         assert is_producer_task_terminated(state) is False
 

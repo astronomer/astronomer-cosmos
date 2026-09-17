@@ -737,11 +737,19 @@ class BaseConsumerSensor(BaseSensorOperator):
                 self._override_rtif(context)
 
     def _handle_retry(self, try_number: int, producer_task_state: str | None, context: Context) -> bool | None:
-        """Handle sensor retry by checking whether the producer is still active.
+        """Handle sensor retry by checking whether the producer can still deliver a node result.
 
-        Returns the fallback result if the producer has terminated, or None if
-        the sensor should continue polling (producer still active).
+        Returns the fallback result if the producer has terminated or is only
+        waiting on its own retry, or None if the sensor should continue polling
+        (producer still active on its current attempt).
         """
+        if producer_task_state == ProducerTaskState.UP_FOR_RETRY:
+            # The producer self-skips on any retry attempt (see
+            # DbtProducerWatcherOperator.execute), so its next attempt can
+            # never publish a new node result. Fall back now instead of
+            # re-poking the producer's stale XCom until this sensor's own
+            # retries are exhausted.
+            return self._fallback_to_non_watcher_run(try_number, context)
         if is_producer_task_terminated(producer_task_state):
             # Producer finished — this is either an automatic retry after
             # the producer completed or a manual task clear from the UI.

@@ -10,7 +10,7 @@ An Apache Airflow provider library that orchestrates dbt projects as Airflow DAG
 
 ### Running Tests
 
-Unit tests (excluding integration/perf/dbtfusion):
+Unit tests (excluding integration/perf/dbtfusion/dbtcore2):
 ```bash
 hatch run tests.py3.11-2.10-1.9:test
 hatch run tests.py3.11-2.10-1.9:test-cov   # with coverage
@@ -227,4 +227,4 @@ Controlled by `TestBehavior` enum:
 - Python minimum: **3.10**
 - mypy: strict mode
 - Ruff rules: C901 (complexity), D300, I (imports), F (pyflakes); max complexity 10
-- pytest markers: `integration`, `perf`, `dbtfusion`
+- pytest markers: `integration`, `perf`, `dbtfusion`, `dbtcore2`

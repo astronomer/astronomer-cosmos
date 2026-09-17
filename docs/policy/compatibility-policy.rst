@@ -48,7 +48,7 @@ dbt Core
 ++++++++
 
 - **Minimum required version**: dbt Core 1.8
-- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12, 2.0 (dbt Fusion)
+- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12, 2.0 (dbt Core, ``InvocationMode.SUBPROCESS`` only; see :ref:`dbt_core_2`), 2.0 (dbt Fusion)
 
 .. note::
 
@@ -84,6 +84,12 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
      - OK
      - OK
      - OK
+   * - 2.0 (Core, ``2.0.0rc2``, checked 2026-09-10)
+     - fails
+     - OK
+     - OK
+     - OK
+     - not checked
    * - 2.0 (Fusion)
      - n/a
      - n/a
@@ -94,9 +100,12 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
 - dbt Core 1.8–1.11 fail on Python 3.14 inside ``dbt_common``'s
   ``mashumaro`` dependency (e.g. ``mashumaro.exceptions.UnserializableField``),
   which hasn't caught up to Python 3.14's typing changes.
-- dbt Fusion (``2.0``) is **not** installed via ``pip install dbt-core==2.0``
-  — there is no such release on PyPI. Fusion ships as a separate
-  binary/installer; this table's pip-based check does not apply to it.
+- dbt Core 2.0 declares ``requires-python >= 3.11``, so the 3.10 install is
+  refused by pip. Its wheels are ``cp311-abi3``; 3.14 was not part of the
+  check.
+- dbt Fusion (``2.0``) is **not** installed via ``pip install dbt-core==2.0``;
+  Fusion ships as a separate binary/installer, and this table's pip-based
+  check does not apply to it.
 
 .. note::
 

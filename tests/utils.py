@@ -70,7 +70,7 @@ def serialize_dag_to_db(dag: DAG) -> None:
     Airflow 3.1+ requires a DAG to be serialized before ``dag.test()`` / ``create_dagrun()``,
     which check for DagVersion and DagModel records. No-op on older Airflow.
     """
-    if AIRFLOW_VERSION < version.Version("3.1"):
+    if AIRFLOW_VERSION.release[:2] < (3, 1):
         return
 
     try:

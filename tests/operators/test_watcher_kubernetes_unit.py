@@ -83,6 +83,10 @@ project_config = ProjectConfig(
 render_config = RenderConfig(load_method=LoadMode.DBT_MANIFEST, test_behavior=TestBehavior.NONE)
 
 
+def test_emit_datasets_is_a_template_field_on_consumer():
+    assert "emit_datasets" in DbtConsumerWatcherKubernetesSensor.template_fields
+
+
 def test_producer_default_task_id_matches_watcher_task_id():
     """The Kubernetes producer must default its ``task_id`` to ``PRODUCER_WATCHER_TASK_ID``.
 

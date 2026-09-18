@@ -12,7 +12,7 @@ from packaging.version import Version
 
 from cosmos import settings
 from cosmos.constants import _DATASET_EMITTING_RESOURCE_TYPES, AIRFLOW_VERSION
-from cosmos.dbt.project import _resolve_env_var
+from cosmos.dbt.project import _resolve_profiles_yml_env_var
 from cosmos.log import get_logger
 
 if TYPE_CHECKING:
@@ -130,6 +130,21 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
     return "__".join(identifiers_list)
 
 
+def _render_profile_field(field: str, value: str) -> str:
+    """Render one profiles.yml field, falling back to the raw value on unsupported Jinja.
+
+    Every field gets the raw-value fallback so that one unrenderable field cannot
+    abort derivation for the whole profile.  Validation of the final namespace
+    string in ``get_dataset_namespace`` catches any residual problems (unrendered
+    Jinja, empty components) in a single place.
+    """
+    try:
+        return _resolve_profiles_yml_env_var(value)
+    except TemplateError:
+        logger.debug("Could not render Jinja in profiles.yml field '%s'; using the raw value", field, exc_info=True)
+        return value
+
+
 def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any]]:
     """
     Extract the adapter type and profile dict from a ProfileConfig.
@@ -147,9 +162,20 @@ def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any
         with open(profile_config.profiles_yml_filepath) as f:
             profiles = yaml.safe_load(f)
         target = profiles[profile_config.profile_name]["outputs"][profile_config.target_name]
+        raw_adapter_type = target.get("type", "")
+        adapter_type = (
+            _render_profile_field("type", raw_adapter_type) if isinstance(raw_adapter_type, str) else raw_adapter_type
+        )
         # dbt renders env_var() Jinja in profiles.yml; replicate that since we read the file directly.
-        target = {key: _resolve_env_var(value) if isinstance(value, str) else value for key, value in target.items()}
-        adapter_type = target.get("type", "")
+        # Render per field so one unrenderable field cannot abort the whole profile (#2948).
+        target = {
+            key: (
+                (adapter_type if key == "type" else _render_profile_field(key, value))
+                if isinstance(value, str)
+                else value
+            )
+            for key, value in target.items()
+        }
         return adapter_type, target
 
     return "", {}
@@ -172,8 +198,12 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     """
     try:
         adapter_type, profile_dict = _get_profile_dict(profile_config)
-    except (AttributeError, KeyError, TypeError, OSError, yaml.YAMLError, TemplateError):
-        logger.debug("Unable to extract profile info for dataset namespace derivation", exc_info=True)
+    except (AttributeError, KeyError, TypeError, OSError, yaml.YAMLError, TemplateError) as error:
+        logger.warning(
+            "Unable to extract profile info for dataset namespace derivation (%s); dataset emission will be skipped.",
+            error,
+            exc_info=True,
+        )
         return None
 
     if not adapter_type:
@@ -191,6 +221,27 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
                 adapter_type,
             )
             return None
+        # Reject namespaces that still contain unrendered Jinja syntax.  Individual
+        # fields fall back to their raw value when the renderer does not support the
+        # Jinja they use, so the final namespace is the single place to catch this.
+        if "{{" in namespace or "{%" in namespace:
+            logger.warning(
+                "Resolved namespace '%s' for adapter '%s' contains unrendered Jinja; skipping dataset emission.",
+                namespace,
+                adapter_type,
+            )
+            return None
+        # Reject namespaces with an empty host component (e.g. "postgres://:5432"
+        # from a missing or empty host field).
+        if "://" in namespace:
+            authority = namespace.split("://", 1)[1].split("/")[0]
+            if authority and ":" in authority and not authority.rsplit(":", 1)[0]:
+                logger.warning(
+                    "Resolved namespace '%s' for adapter '%s' has an empty host; skipping dataset emission.",
+                    namespace,
+                    adapter_type,
+                )
+                return None
         return namespace
 
     # Unknown adapters: return None so dataset emission is skipped.

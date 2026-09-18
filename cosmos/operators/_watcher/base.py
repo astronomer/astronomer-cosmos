@@ -43,6 +43,7 @@ from cosmos.operators._watcher.state import (
     xcom_set_lock,
 )
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
+from cosmos.operators.base import resolve_templated_bool
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
@@ -617,7 +618,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         No-ops when ``emit_datasets`` is False (user disabled emission) or when no outlet URIs were
         resolved for this model (e.g. no manifest available or the adapter has no OL namespace).
         """
-        if not getattr(self, "emit_datasets", False):
+        if not resolve_templated_bool(getattr(self, "emit_datasets", False)):
             return
         outlet_uris = getattr(self, "_outlet_uris", [])
         if not outlet_uris:

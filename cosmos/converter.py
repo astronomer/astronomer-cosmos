@@ -385,7 +385,7 @@ class DbtToAirflowConverter:
             "project_dir": execution_config.project_path,
             "partial_parse": project_config.partial_parse,
             "profile_config": profile_config,
-            "emit_datasets": render_config.emit_datasets,
+            "emit_datasets": operator_args.get("emit_datasets", render_config.emit_datasets),
             "env": env_vars,
             "vars": dbt_vars,
             "cache_dir": cache_dir,

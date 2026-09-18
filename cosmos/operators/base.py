@@ -37,6 +37,19 @@ def _sanitize_xcom_key(file_path: str) -> str:
     return file_path.replace("/", "_").replace("\\", "_")
 
 
+def resolve_templated_bool(value: bool | str | None) -> bool:
+    """Resolve an operator flag that may still be a rendered Jinja string into a bool.
+
+    Airflow renders a template field to a string unless the DAG sets
+    ``render_template_as_native_obj``, so a flag can arrive as ``"False"`` - which is truthy.
+    """
+    if isinstance(value, str):
+        # Airflow 2.9-2.11's to_boolean does not strip whitespace (Airflow 3 does), so a
+        # rendered " true " would otherwise resolve to False on the Airflow 2 matrix.
+        return to_boolean(value.strip())
+    return bool(value)
+
+
 class AbstractDbtBase(metaclass=ABCMeta):
     """
     Executes a dbt core cli command.
@@ -54,7 +67,8 @@ class AbstractDbtBase(metaclass=ABCMeta):
     :param cache_selected_only:
     :param no_version_check: dbt optional argument - If set, skip ensuring dbt's version matches the one specified in
         the dbt_project.yml file ('require-dbt-version')
-    :param emit_datasets: Enable emitting inlets and outlets during task execution
+    :param emit_datasets: Enable emitting inlets and outlets during task execution. Accepts an Airflow
+        Jinja-templated string (e.g. ``"{{ dag_run.run_type != 'backfill' }}"``) to decide per DAG run.
     :param fail_fast: dbt optional argument to make dbt exit immediately if a single resource fails to build.
     :param quiet: dbt optional argument to show only error logs in stdout
     :param warn_error: dbt optional argument to convert dbt warnings into errors
@@ -88,7 +102,16 @@ class AbstractDbtBase(metaclass=ABCMeta):
         receives (context, operator) and may modify operator.vars and operator.env.
     """
 
-    template_fields: Sequence[str] = ("env", "select", "exclude", "selector", "vars", "models", "dbt_cmd_flags")
+    template_fields: Sequence[str] = (
+        "env",
+        "select",
+        "exclude",
+        "selector",
+        "vars",
+        "models",
+        "dbt_cmd_flags",
+        "emit_datasets",
+    )
     global_flags = (
         "project_dir",
         "select",
@@ -115,7 +138,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         selector: str | None = None,
         vars: dict[str, str] | None = None,
         models: str | None = None,
-        emit_datasets: bool = True,
+        emit_datasets: bool | str = True,
         indirect_selection: str | None = None,
         cache_selected_only: bool = False,
         no_version_check: bool = False,
@@ -367,13 +390,7 @@ class DbtBuildMixin:
     def add_cmd_flags(self) -> list[str]:
         flags = []
 
-        if isinstance(self.full_refresh, str):
-            # Handle template fields when render_template_as_native_obj=False
-            full_refresh = to_boolean(self.full_refresh)
-        else:
-            full_refresh = self.full_refresh
-
-        if full_refresh is True:
+        if resolve_templated_bool(self.full_refresh):
             flags.append("--full-refresh")
 
         if self.log_format:
@@ -411,13 +428,7 @@ class DbtSeedMixin:
     def add_cmd_flags(self) -> list[str]:
         flags = []
 
-        if isinstance(self.full_refresh, str):
-            # Handle template fields when render_template_as_native_obj=False
-            full_refresh = to_boolean(self.full_refresh)
-        else:
-            full_refresh = self.full_refresh
-
-        if full_refresh is True:
+        if resolve_templated_bool(self.full_refresh):
             flags.append("--full-refresh")
 
         return flags
@@ -459,13 +470,7 @@ class DbtRunMixin:
     def add_cmd_flags(self) -> list[str]:
         flags = []
 
-        if isinstance(self.full_refresh, str):
-            # Handle template fields when render_template_as_native_obj=False
-            full_refresh = to_boolean(self.full_refresh)
-        else:
-            full_refresh = self.full_refresh
-
-        if full_refresh is True:
+        if resolve_templated_bool(self.full_refresh):
             flags.append("--full-refresh")
 
         return flags
@@ -541,13 +546,7 @@ class DbtCloneMixin:
     def add_cmd_flags(self) -> list[str]:
         flags = []
 
-        if isinstance(self.full_refresh, str):
-            # Handle template fields when render_template_as_native_obj=False
-            full_refresh = to_boolean(self.full_refresh)
-        else:
-            full_refresh = self.full_refresh
-
-        if full_refresh is True:
+        if resolve_templated_bool(self.full_refresh):
             flags.append("--full-refresh")
 
         return flags

@@ -212,6 +212,7 @@ _WATCHER_TO_FALLBACK_EXECUTION_MODE = {
     ExecutionMode.WATCHER: ExecutionMode.LOCAL,
     ExecutionMode.WATCHER_KUBERNETES: ExecutionMode.KUBERNETES,
     ExecutionMode.WATCHER_GCP_GKE: ExecutionMode.GCP_GKE,
+    ExecutionMode.WATCHER_AWS_ECS: ExecutionMode.AWS_ECS,
 }
 
 
@@ -1243,7 +1244,7 @@ def build_airflow_graph(
     if execution_mode == ExecutionMode.AIRFLOW_ASYNC:
         # This property is only relevant for the setup task, not the other tasks:
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
-    elif execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES, ExecutionMode.WATCHER_GCP_GKE):
+    elif execution_mode in _WATCHER_TO_FALLBACK_EXECUTION_MODE:
         setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
         # We are intentionally creating the producer task ahead of the consumer tasks
         # Airflow priority weight is not being respected in multiple versions of the library, including 3.1

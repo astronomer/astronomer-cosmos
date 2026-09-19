@@ -57,6 +57,8 @@ Users of ``ExecutionMode.AWS_ECS`` replace the ``execution_mode`` and add the Cl
 - The producer task runs the entire ``dbt build`` command in a single ECS task
 - Consumer tasks (sensors) watch for the completion of their corresponding dbt models
 - ``awslogs_group`` and ``awslogs_stream_prefix`` are mandatory: node statuses are read from that log stream
+- ``awslogs_stream_prefix`` follows the Amazon provider's convention: the log stream name is ``<awslogs_stream_prefix>/<ECS task id>``, and the ``awslogs`` driver names streams ``<awslogs-stream-prefix option>/<container name>/<task id>``, so the argument is the task definition's prefix option followed by the container name (``ecs/dbt`` for the example task definition of :ref:`aws-container-run-job`, whose prefix is ``ecs`` and whose container is ``dbt``)
+- As in ``ExecutionMode.AWS_ECS``, the command runs without ``--project-dir`` or ``--profiles-dir``: the container's working directory must be the dbt project, with ``profiles.yml`` inside it or ``DBT_PROFILES_DIR`` set in the image
 
 For the ECS task definition, IAM permissions and profile setup, refer to :ref:`aws-container-run-job`.
 

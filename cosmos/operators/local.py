@@ -5,6 +5,7 @@ import inspect
 import json
 import os
 import tempfile
+import textwrap
 import time
 import warnings
 import zlib
@@ -28,6 +29,8 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.sdk.definitions.context import Context
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
+
+    from pydantic import BaseModel
 
 from attrs import define
 
@@ -89,7 +92,7 @@ if TYPE_CHECKING:  # pragma: no cover
 from sqlalchemy.orm import Session
 
 import cosmos.dbt.runner as dbt_runner
-from cosmos.config import ProfileConfig
+from cosmos.config import AiConfig, ProfileConfig
 from cosmos.constants import (
     OPENLINEAGE_PRODUCER,
 )
@@ -218,12 +221,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
         dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]
+        ai_config: AiConfig | None = None,
         **kwargs: Any,
     ) -> None:
         self.task_id = task_id
         self.profile_config = profile_config
         self.callback = callback
         self.callback_args = callback_args or {}
+        self.ai_config = ai_config
         self.compiled_sql = ""
         self.freshness = ""
         self._sources_json: dict[str, Any] | None = None
@@ -299,11 +304,82 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
             self.log.error("\n".join(result.full_output))
-            raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
+            raise self._build_failure_exception(
+                f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.",
+                "\n".join(result.full_output),
+            )
 
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
         """dbtRunnerResult has an attribute `success` that is False if the command failed."""
-        return dbt_runner.handle_exception_if_needed(result)
+        try:
+            dbt_runner.handle_exception_if_needed(result)
+        except CosmosDbtRunError as exc:
+            # `from None` suppresses chaining: the new exception's message already embeds
+            # str(exc) in full, so chaining would print the same text twice in the traceback.
+            raise self._build_failure_exception(str(exc), str(exc), CosmosDbtRunError) from None
+
+    def _build_failure_exception(
+        self, base_message: str, raw_output: str, exception_cls: type[Exception] = AirflowException
+    ) -> Exception:
+        """Optionally enrich a dbt failure message with an LLM-generated diagnosis.
+
+        A failure anywhere in the diagnosis path (missing optional dependency, LLM/timeout/API
+        error) must never mask the original dbt failure -- it is logged and swallowed here.
+        """
+        if self.ai_config and self.ai_config.diagnose_on_failure:
+            from cosmos.ai.diagnostics import diagnose_dbt_failure
+
+            diagnosis = diagnose_dbt_failure(
+                ai_config=self.ai_config,
+                profile_config=self.profile_config,
+                compiled_sql=self.compiled_sql,
+                raw_output=raw_output,
+            )
+            if diagnosis:
+                base_message = f"{base_message}\n\n{self._format_diagnosis(diagnosis)}"
+        return exception_cls(base_message)
+
+    @staticmethod
+    def _format_diagnosis(diagnosis: BaseModel) -> str:
+        """Render a diagnosis as a wrapped, clearly delimited block.
+
+        Long unwrapped paragraphs force horizontal scrolling in log viewers, so each field is
+        wrapped to a fixed width rather than left as a single long line. ``diagnosis`` may be
+        Cosmos's built-in ``DbtFailureDiagnosis`` or a user-supplied model set via
+        ``AiConfig.diagnosis_output_type``, so formatting is driven generically off the model's
+        fields rather than hardcoded attribute names -- a ``confidence`` field, if present, is
+        surfaced in the header; every other field is rendered as its own wrapped section.
+        """
+        divider = "-" * 80
+        fields = diagnosis.model_dump()
+        confidence = fields.pop("confidence", None)
+        header = "AI diagnosis" if confidence is None else f"AI diagnosis (confidence: {confidence})"
+
+        sections = [divider, header, divider]
+        for field_name, value in fields.items():
+            label = field_name.replace("_", " ").capitalize()
+            sections.append(f"{label}:\n{AbstractDbtLocalBase._render_diagnosis_value(value)}\n")
+        sections.append(divider)
+        return "\n".join(sections)
+
+    @staticmethod
+    def _render_diagnosis_value(value: Any) -> str:
+        """Render a single diagnosis field value, wrapped to a fixed width.
+
+        A custom ``AiConfig.diagnosis_output_type`` may use list or nested-model fields, which
+        ``str(value)`` would render as an unreadable Python repr (e.g. ``"['a', 'b']"``); list items
+        and dict/nested-model key-value pairs are rendered one per line instead.
+        """
+        if isinstance(value, list):
+            if not value:
+                return "  (none)"
+            return "\n".join(textwrap.fill(f"- {item}", width=88, subsequent_indent="  ") for item in value)
+        if isinstance(value, dict):
+            return "\n".join(
+                textwrap.fill(f"{k}: {v}", width=88, initial_indent="  ", subsequent_indent="    ")
+                for k, v in value.items()
+            )
+        return textwrap.fill(str(value), width=88, initial_indent="  ", subsequent_indent="  ")
 
     def store_compiled_sql(self, tmp_project_dir: str, context: Context) -> None:
         """

@@ -33,7 +33,7 @@ from pendulum import datetime
 
 import cosmos.dbt.runner as dbt_runner
 from cosmos import DbtDag, DbtTaskGroup, ProjectConfig, RenderConfig, cache
-from cosmos.config import ProfileConfig
+from cosmos.config import AiConfig, ProfileConfig
 from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
 from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
@@ -1894,6 +1894,91 @@ def test_handle_exception_subprocess(caplog):
 
     assert len(str(err_context.value)) < 100  # Ensure the error message is not too long
     assert "\n".join(full_output) in caplog.text
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
+def test_handle_exception_subprocess_with_ai_diagnosis(mock_diagnose):
+    """When ai_config.diagnose_on_failure is set, a successful diagnosis is appended to the exception message."""
+    from cosmos.ai.diagnostics import DbtFailureDiagnosis
+
+    mock_diagnose.return_value = DbtFailureDiagnosis(
+        root_cause="Column foo does not exist upstream.",
+        suggested_fix="Rename the reference to bar.",
+        confidence="high",
+    )
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=None,
+        task_id="my-task",
+        project_dir="my/dir",
+        invocation_mode=InvocationMode.SUBPROCESS,
+        ai_config=AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True),
+    )
+    result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=["boom"])
+
+    with pytest.raises(AirflowException) as err_context:
+        operator.handle_exception_subprocess(result)
+
+    message = str(err_context.value)
+    assert "AI diagnosis" in message
+    assert "Column foo does not exist upstream." in message
+    assert "Rename the reference to bar." in message
+    assert "confidence: high" in message
+    mock_diagnose.assert_called_once()
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
+def test_handle_exception_subprocess_with_ai_diagnosis_failure_falls_back(mock_diagnose):
+    """If diagnose_dbt_failure itself fails/returns None, the original short failure message is preserved."""
+    mock_diagnose.return_value = None
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=None,
+        task_id="my-task",
+        project_dir="my/dir",
+        invocation_mode=InvocationMode.SUBPROCESS,
+        ai_config=AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True),
+    )
+    result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=["boom"])
+
+    with pytest.raises(AirflowException) as err_context:
+        operator.handle_exception_subprocess(result)
+
+    assert len(str(err_context.value)) < 100
+    assert "AI diagnosis" not in str(err_context.value)
+
+
+def test_handle_exception_dbt_runner_with_ai_diagnosis_preserves_exception_type():
+    """AI-enriched failures raised from the dbt-runner path must stay CosmosDbtRunError, not AirflowException."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=MagicMock(),
+        task_id="my-task",
+        project_dir="my/dir",
+        ai_config=AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True),
+    )
+    result = MagicMock()
+    result.success = False
+    result.exception = "some exception"
+
+    with patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=None):
+        with pytest.raises(CosmosDbtRunError):
+            operator.handle_exception_dbt_runner(result)
+
+
+def test_format_diagnosis_generic_custom_model():
+    """_format_diagnosis must render arbitrary pydantic models generically, not just DbtFailureDiagnosis."""
+    from pydantic import BaseModel
+
+    class CustomDiagnosis(BaseModel):
+        summary: str
+        next_steps: str
+
+    diagnosis = CustomDiagnosis(summary="Something broke.", next_steps="Fix it.")
+    rendered = AbstractDbtLocalBase._format_diagnosis(diagnosis)
+
+    assert "AI diagnosis" in rendered
+    assert "Summary:" in rendered
+    assert "Something broke." in rendered
+    assert "Next steps:" in rendered
+    assert "Fix it." in rendered
 
 
 @pytest.fixture

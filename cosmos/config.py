@@ -626,3 +626,39 @@ class ExecutionConfig:
                 )
                 self.invocation_mode = InvocationMode.SUBPROCESS
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
+
+
+@dataclass
+class AiConfig:
+    """
+    Configuration for optional AI-assisted features in Cosmos (requires
+    ``apache-airflow-providers-common-ai`` to be installed).
+
+    :param llm_conn_id: Airflow connection ID for the LLM provider (a ``pydanticai`` /
+        ``pydanticai-azure`` / ``pydanticai-bedrock`` / ``pydanticai-vertex`` connection),
+        as defined by apache-airflow-providers-common-ai.
+    :param diagnose_on_failure: When True, diagnose dbt task failures with an LLM call and
+        surface a structured root-cause summary. Defaults to False.
+    :param introspect_schema: When True and ProfileConfig.profile_mapping is set, give the
+        diagnosis agent read-only access to the live warehouse schema via SQLToolset to confirm
+        hypotheses (e.g. "does this column actually exist"). Defaults to False.
+    :param timeout_seconds: Wall-clock budget for the diagnosis LLM call. Exceeding it aborts
+        the diagnosis (not the task) and falls back to the standard exception. Defaults to 30.
+    :param diagnosis_output_type: Optional custom pydantic model class describing the structured
+        output the diagnosis agent should produce, passed through to
+        ``PydanticAIHook.create_agent(output_type=...)``. Defaults to Cosmos's built-in
+        ``cosmos.ai.diagnostics.DbtFailureDiagnosis`` (fields ``root_cause``, ``suggested_fix``,
+        ``confidence``). Field descriptions on a custom model are used to guide the LLM, so prefer
+        ``pydantic.Field(description=...)`` on each field.
+    :param diagnosis_instructions: Optional custom system instructions for the diagnosis agent,
+        passed through to ``PydanticAIHook.create_agent(instructions=...)``. Defaults to Cosmos's
+        built-in prompt for ``DbtFailureDiagnosis`` (or a generic one if ``diagnosis_output_type``
+        is also set).
+    """
+
+    llm_conn_id: str
+    diagnose_on_failure: bool = False
+    introspect_schema: bool = False
+    timeout_seconds: float = 30.0
+    diagnosis_output_type: type[Any] | None = None
+    diagnosis_instructions: str | None = None

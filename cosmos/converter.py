@@ -37,7 +37,7 @@ except ImportError:
 
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AiConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
     AIRFLOW_VERSION,
@@ -315,6 +315,7 @@ class DbtToAirflowConverter:
         task_group: TaskGroup | None = None,
         operator_args: dict[str, Any] | None = None,
         on_warning_callback: Callable[..., Any] | None = None,
+        ai_config: AiConfig | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -390,6 +391,7 @@ class DbtToAirflowConverter:
             "vars": dbt_vars,
             "cache_dir": cache_dir,
             "manifest_filepath": project_config.manifest_path,
+            "ai_config": ai_config,
         }
 
         validate_arguments(

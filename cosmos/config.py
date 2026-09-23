@@ -639,9 +639,9 @@ class AiConfig:
         as defined by apache-airflow-providers-common-ai.
     :param diagnose_on_failure: When True, diagnose dbt task failures with an LLM call and
         surface a structured root-cause summary. Defaults to False.
-    :param introspect_schema: When True and ProfileConfig.profile_mapping is set, give the
-        diagnosis agent read-only access to the live warehouse schema via SQLToolset to confirm
-        hypotheses (e.g. "does this column actually exist"). Defaults to False.
+    :param introspect_schema: When True and ProfileConfig.profile_mapping is set, let the
+        diagnosis agent list tables and read column definitions (never row data) via SQLToolset to
+        confirm hypotheses (e.g. "does this column actually exist"). Defaults to False.
     :param timeout_seconds: Wall-clock budget for the diagnosis LLM call. Exceeding it aborts
         the diagnosis (not the task) and falls back to the standard exception. Defaults to 30.
     :param diagnosis_output_type: Optional custom pydantic model class describing the structured

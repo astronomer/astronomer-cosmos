@@ -8,7 +8,8 @@ root-cause summary in the task logs, instead of just the raw dbt error. This req
 `apache-airflow-providers-common-ai <https://pypi.org/project/apache-airflow-providers-common-ai/>`_
 to be installed; if it isn't, diagnosis is skipped with a warning and the task fails as usual.
 It is configured via the ``cosmos.config.AiConfig`` class, currently supported for
-``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``.
+``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``. The failing model's compiled SQL and the
+dbt output (both truncated) are sent to the configured LLM provider.
 
 The ``AiConfig`` class takes the following arguments:
 
@@ -18,8 +19,9 @@ The ``AiConfig`` class takes the following arguments:
 - ``diagnose_on_failure``: When ``True``, diagnose dbt task failures with an LLM call and append a
   structured root-cause summary to the exception message. Defaults to ``False``.
 - ``introspect_schema``: When ``True`` and ``ProfileConfig.profile_mapping`` is set, give the
-  diagnosis agent read-only access to the live warehouse schema (via ``SQLToolset``) to confirm
-  hypotheses, e.g. whether a column actually exists. Defaults to ``False``.
+  diagnosis agent access to the live warehouse schema (via ``SQLToolset``, limited to listing tables
+  and reading column definitions, never row data) to confirm hypotheses, e.g. whether a column
+  actually exists. Defaults to ``False``.
 - ``timeout_seconds``: Wall-clock budget for the diagnosis LLM call. Exceeding it aborts the
   diagnosis, not the task, and falls back to the standard exception. Defaults to ``30``.
 - ``diagnosis_output_type``: Optional custom pydantic model describing the structured output the

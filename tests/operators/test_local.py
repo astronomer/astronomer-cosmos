@@ -1981,6 +1981,27 @@ def test_format_diagnosis_generic_custom_model():
     assert "Fix it." in rendered
 
 
+def test_format_diagnosis_renders_list_and_dict_fields_readably():
+    from pydantic import BaseModel
+
+    class Location(BaseModel):
+        file: str
+        line: int
+
+    class CustomDiagnosis(BaseModel):
+        steps: list[str]
+        no_steps: list[str]
+        location: Location
+
+    diagnosis = CustomDiagnosis(steps=["Rename it.", "Re-run."], no_steps=[], location=Location(file="a.sql", line=3))
+    rendered = AbstractDbtLocalBase._format_diagnosis(diagnosis)
+
+    assert "- Rename it.\n- Re-run." in rendered
+    assert "No steps:\n  (none)" in rendered
+    assert "  file: a.sql\n  line: 3" in rendered
+    assert "[" not in rendered and "{" not in rendered
+
+
 @pytest.fixture
 def mock_context():
     return MagicMock()

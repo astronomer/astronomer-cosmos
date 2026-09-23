@@ -151,6 +151,18 @@ def validate_arguments(
             "SeedRenderingBehavior.ALWAYS, or switch to a supported execution mode."
         )
 
+    ai_config = task_args.get("ai_config")
+    if (
+        ai_config
+        and ai_config.diagnose_on_failure
+        and execution_config.execution_mode not in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV)
+    ):
+        logger.warning(
+            "AiConfig.diagnose_on_failure is only supported with ExecutionMode.LOCAL and ExecutionMode.VIRTUALENV; "
+            "it may have no effect with %s.",
+            execution_config.execution_mode,
+        )
+
     if execution_config.execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV]:
         profile_config.validate_profiles_yml()
         has_non_empty_dependencies = execution_config.project_path and has_non_empty_dependencies_file(

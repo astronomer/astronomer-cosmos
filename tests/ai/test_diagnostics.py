@@ -1,9 +1,10 @@
 import time
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from pydantic import BaseModel, Field
 
-from cosmos.ai.diagnostics import DbtFailureDiagnosis, diagnose_dbt_failure
+from cosmos.ai.diagnostics import DbtFailureDiagnosis, _build_prompt, diagnose_dbt_failure
 from cosmos.config import AiConfig, ProfileConfig
 
 
@@ -104,6 +105,22 @@ def test_diagnose_dbt_failure_introspect_schema_adds_sql_toolset(mock_hook_cls, 
     )
 
     mock_sql_toolset_cls.assert_called_once_with(db_conn_id="my_warehouse_conn")
+    _, kwargs = mock_hook_cls.return_value.create_agent.call_args
+    assert kwargs["toolsets"] == [mock_sql_toolset_cls.return_value.filtered.return_value]
+    (filter_func,) = mock_sql_toolset_cls.return_value.filtered.call_args.args
+    all_tools = ("list_tables", "get_schema", "query", "check_query")
+    exposed = {name for name in all_tools if filter_func(None, SimpleNamespace(name=name))}
+    assert exposed == {"list_tables", "get_schema"}
+
+
+def test_build_prompt_truncates_large_compiled_sql_keeping_head_and_tail():
+    compiled_sql = "HEAD" + "x" * 50_000 + "TAIL"
+
+    prompt = _build_prompt(compiled_sql, "boom")
+
+    assert "HEAD" in prompt and "TAIL" in prompt
+    assert "[truncated" in prompt
+    assert len(prompt) < 10_000
 
 
 @patch("cosmos.ai.diagnostics.CancellationToken", MagicMock())

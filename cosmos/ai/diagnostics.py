@@ -25,8 +25,12 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-# dbt output for wide/verbose projects can be huge; bound what we send to the LLM.
+# dbt output and compiled SQL (all models, in WATCHER mode) can be huge; bound what we send to the LLM.
 _MAX_RAW_OUTPUT_CHARS = 8000
+_MAX_COMPILED_SQL_CHARS = 8000
+
+# SQLToolset's `query` tool can read arbitrary rows and hand them to the LLM; introspection only needs metadata.
+_SCHEMA_ONLY_TOOLS = frozenset({"list_tables", "get_schema"})
 
 # After timing out, how long to wait for agent.run_sync to unwind once cancelled before giving up
 # and leaking the thread. CancellationToken.cancel() is thread-safe and interrupts the run almost
@@ -58,11 +62,19 @@ class DbtFailureDiagnosis(BaseModel):
     confidence: Literal["low", "medium", "high"]
 
 
+def _truncate_middle(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    half = max_chars // 2
+    return f"{text[:half]}\n... [truncated {len(text) - 2 * half} characters] ...\n{text[-half:]}"
+
+
 def _build_prompt(compiled_sql: str, raw_output: str) -> str:
     truncated_output = raw_output[-_MAX_RAW_OUTPUT_CHARS:]
+    truncated_sql = _truncate_middle(compiled_sql, _MAX_COMPILED_SQL_CHARS)
     return (
         "A dbt task failed to run. Diagnose the root cause and suggest a fix.\n\n"
-        f"Compiled SQL:\n{compiled_sql or '<not available>'}\n\n"
+        f"Compiled SQL:\n{truncated_sql or '<not available>'}\n\n"
         f"dbt output (tail):\n{truncated_output}\n"
     )
 
@@ -94,7 +106,8 @@ def diagnose_dbt_failure(
     try:
         toolsets = []
         if ai_config.introspect_schema and profile_config and profile_config.profile_mapping:
-            toolsets.append(SQLToolset(db_conn_id=profile_config.profile_mapping.conn_id))
+            sql_toolset = SQLToolset(db_conn_id=profile_config.profile_mapping.conn_id)
+            toolsets.append(sql_toolset.filtered(lambda _ctx, tool_def: tool_def.name in _SCHEMA_ONLY_TOOLS))
 
         output_type = ai_config.diagnosis_output_type or DbtFailureDiagnosis
         default_instructions = (

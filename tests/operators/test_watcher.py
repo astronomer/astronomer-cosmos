@@ -529,6 +529,50 @@ class TestConsumerEmitDatasets:
         # Should not raise
         sensor._emit_datasets(ctx)
 
+    @pytest.mark.parametrize(
+        "emit_datasets, expected_emission",
+        [
+            (True, True),
+            ("True", True),
+            (" true ", True),
+            (False, False),
+            ("False", False),
+            ("false", False),
+            ("0", False),
+            (" false ", False),
+        ],
+    )
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_resolves_rendered_template_value(self, mock_register, emit_datasets, expected_emission):
+        sensor = self._make_sensor(emit_datasets=emit_datasets)
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
+        sensor._emit_datasets({"ti": _MockTI()})
+        assert mock_register.called is expected_emission
+
+    @pytest.mark.parametrize("rendered_value, expected_emission", [("True", True), ("False", False)])
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_honours_rendering_on_deferred_resume(
+        self, mock_register, mock_fallback, rendered_value, expected_emission
+    ):
+        """Goes through execute_complete so the URIs come from the trigger event, as on a real resume."""
+        from airflow import DAG
+
+        sensor = self._make_sensor(emit_datasets="{{ params.emit }}")
+        sensor.dag = DAG("test_emit_datasets_render", start_date=datetime(2024, 1, 1))
+        sensor.render_template_fields({"params": {"emit": rendered_value}})
+        assert sensor.emit_datasets == rendered_value
+
+        ti = MagicMock()
+        ti.xcom_pull.return_value = None
+        event = {"status": "success", "outlet_uris": ["postgres://host:5432/db/schema/table"]}
+        sensor.execute_complete({"dag_run": MagicMock(), "ti": ti}, event)
+
+        assert mock_register.called is expected_emission
+
+    def test_emit_datasets_is_a_template_field_on_consumer(self):
+        assert "emit_datasets" in DbtConsumerWatcherSensor.template_fields
+
     def test_emit_datasets_skipped_when_no_uris(self):
         sensor = self._make_sensor()
         sensor._outlet_uris = []
@@ -1460,6 +1504,25 @@ class TestDbtConsumerWatcherSensor:
         result = sensor.poke(context)
         assert result is False
         assert sensor.poke_retry_number == 1
+
+    @patch("cosmos.operators._watcher.base._log_dbt_event")
+    def test_poke_keeps_polling_when_node_failed_but_producer_running(self, mock_log_dbt_event):
+        """#2947: a failed node must not raise (burning a retry) while the producer is still running.
+        poke returns False to keep polling, does not fall back yet, and does not re-log the failure
+        event (poke runs every interval, so logging here would repeat the ERROR line on each poke)."""
+        sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "running"
+        sensor._fallback_to_non_watcher_run = MagicMock()
+        ti = MagicMock()
+        ti.try_number = 2
+        # xcom_pull: _log_startup_events=None, _get_node_status=error dict, compiled_sql=None
+        ti.xcom_pull.side_effect = [None, {"status": "error", "outlet_uris": []}, None]
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+        assert result is False
+        sensor._fallback_to_non_watcher_run.assert_not_called()
+        mock_log_dbt_event.assert_not_called()
 
     def test_fallback_to_non_watcher_run(self):
         """When the producer hasn't published its flags to XCom, fall back to this consumer's own."""

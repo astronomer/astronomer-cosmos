@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import yaml
-from jinja2 import Template
+from jinja2 import Environment
 
 from cosmos import settings
 from cosmos.constants import (
@@ -28,6 +28,14 @@ from cosmos.log import get_logger
 
 logger = get_logger(__name__)
 
+_JINJA_ENV = Environment()
+
+# dbt renders profiles.yml values through a Jinja environment that registers its custom filters
+# (as_number, as_bool, as_text, as_native). In dbt's text-mode environment these filters are
+# identity functions. Keep them scoped to profiles.yml so they cannot affect dbt_project.yml.
+_PROFILES_JINJA_ENV = Environment()
+_PROFILES_JINJA_ENV.filters.update({name: lambda x: x for name in ("as_number", "as_bool", "as_text", "as_native")})
+
 
 def has_non_empty_dependencies_file(project_path: Path) -> bool:
     """
@@ -46,6 +54,17 @@ def has_non_empty_dependencies_file(project_path: Path) -> bool:
     return False
 
 
+def _render_env_var(template_str: str, environment: Environment) -> str:
+    """Render a Jinja string with dbt's ``env_var`` function."""
+
+    def env_var(name: str, default: str = "") -> str:
+        return os.getenv(name, default)
+
+    template = environment.from_string(template_str)
+    rendered: str = template.render(env_var=env_var)
+    return rendered
+
+
 def _resolve_env_var(template_str: str) -> str:
     """
     Given a Jinja template string, resolve the environment variables, declared using the dbt syntax,
@@ -59,12 +78,13 @@ def _resolve_env_var(template_str: str) -> str:
     '/usr/local/airflow/dags/dbt/dbt_packages_test'
     """
 
-    def env_var(name: str, default: str = "") -> str:
-        return os.getenv(name, default)
+    return _render_env_var(template_str, _JINJA_ENV)
 
-    template = Template(template_str)
-    rendered: str = template.render(env_var=env_var)
-    return rendered
+
+def _resolve_profiles_yml_env_var(template_str: str) -> str:
+    """Render a profiles.yml value with dbt's text-only filters available."""
+
+    return _render_env_var(template_str, _PROFILES_JINJA_ENV)
 
 
 def get_dbt_packages_subpath(source_folder: Path) -> str:

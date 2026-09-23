@@ -34,15 +34,18 @@ from cosmos.operators._watcher.state import (
     get_dbt_event_xcom_key,
     get_status_xcom_key,
     get_xcom_val,
+    is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
     is_dbt_upstream_failure_skip_event,
+    is_producer_task_still_running,
     is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
 )
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
+from cosmos.operators.base import resolve_templated_bool
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
@@ -617,7 +620,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         No-ops when ``emit_datasets`` is False (user disabled emission) or when no outlet URIs were
         resolved for this model (e.g. no manifest available or the adapter has no OL namespace).
         """
-        if not getattr(self, "emit_datasets", False):
+        if not resolve_templated_bool(getattr(self, "emit_datasets", False)):
             return
         outlet_uris = getattr(self, "_outlet_uris", [])
         if not outlet_uris:
@@ -815,6 +818,13 @@ class BaseConsumerSensor(BaseSensorOperator):
         if status is None:
             return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
 
+        # A failed node while the producer is still building is not terminal for the sensor yet: keep
+        # polling (in deferrable mode this defers back to the trigger) so the retry path can fall back
+        # once the producer terminates, instead of burning a retry on an instant re-raise. Return before
+        # logging so the ERROR dbt event is not repeated on every poke. See #2947.
+        if is_dbt_node_status_failed(status) and is_producer_task_still_running(producer_task_state):
+            return False
+
         # Log the dbt event only once the node is terminal; poke runs every interval, so logging before
         # this point would repeat the line on each poke.
         dbt_events = get_xcom_val(
@@ -828,10 +838,9 @@ class BaseConsumerSensor(BaseSensorOperator):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
-        elif is_dbt_node_status_success(status):
+        if is_dbt_node_status_success(status):
             return True
-        else:
-            raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
+        raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
 
 
 def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> EmptyOperator:

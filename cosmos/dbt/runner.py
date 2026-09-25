@@ -94,7 +94,7 @@ def run_command(
     # ``exclude_dags_folder_from_sys_path`` must enter *before* ``change_working_directory`` so it
     # resolves ``DAGS_FOLDER`` against the Airflow process cwd. A relative ``DAGS_FOLDER`` resolved
     # after the chdir would point at the dbt project dir and fail to strip the real DAGs folder.
-    with exclude_dags_folder_from_sys_path(), change_working_directory(cwd), environ(env):
+    with exclude_dags_folder_from_sys_path(), change_working_directory(cwd), environ(env), override_sys_argv(command):
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
         runner = get_runner(callbacks=callbacks)
         try:

@@ -16,6 +16,7 @@ Reference
    configs/execution-config
    configs/cosmos-conf
    configs/profile-config
+   configs/ai-config
 
 .. toctree::
    :maxdepth: 1
@@ -41,6 +42,7 @@ There are different configurations and profiles that you can use to configure ho
 - :ref:`ExecutionConfig <execution-config>`: The ``ExecutionConfig`` determines where and how the dbt commands are run within Cosmos.
 - :ref:`CosmosConfig <cosmos-config>`: This page lists available `Apache Airflow® <https://airflow.apache.org/>`_ configurations that affect ``astronomer-cosmos`` behavior. You can set them in the ``airflow.cfg`` file or using environment variables.
 - :ref:`ProfileConfig <profile-config>`: The ``ProfileConfig`` class determines which data warehouse Cosmos connects to when it executes the dbt SQL. These docs include reference documentation for connecting to popular data warehouses you might use in your dbt code.
+- :ref:`AiConfig <ai-config>`: The ``AiConfig`` class enables optional LLM-assisted diagnosis of dbt task failures.
 
 Profiles
 ~~~~~~~~

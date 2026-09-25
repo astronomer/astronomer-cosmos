@@ -37,7 +37,7 @@ except ImportError:
 
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AiConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
     AIRFLOW_VERSION,
@@ -149,6 +149,18 @@ def validate_arguments(
             "ExecutionMode.VIRTUALENV or ExecutionMode.AIRFLOW_ASYNC, which run dbt directly on the "
             f"Airflow worker. The configured execution_mode is {execution_config.execution_mode}. Use "
             "SeedRenderingBehavior.ALWAYS, or switch to a supported execution mode."
+        )
+
+    ai_config = task_args.get("ai_config")
+    if (
+        ai_config
+        and ai_config.diagnose_on_failure
+        and execution_config.execution_mode not in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV)
+    ):
+        logger.warning(
+            "AiConfig.diagnose_on_failure is only supported with ExecutionMode.LOCAL and ExecutionMode.VIRTUALENV; "
+            "it may have no effect with %s.",
+            execution_config.execution_mode,
         )
 
     if execution_config.execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV]:
@@ -315,6 +327,7 @@ class DbtToAirflowConverter:
         task_group: TaskGroup | None = None,
         operator_args: dict[str, Any] | None = None,
         on_warning_callback: Callable[..., Any] | None = None,
+        ai_config: AiConfig | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -390,6 +403,7 @@ class DbtToAirflowConverter:
             "vars": dbt_vars,
             "cache_dir": cache_dir,
             "manifest_filepath": project_config.manifest_path,
+            "ai_config": ai_config,
         }
 
         validate_arguments(

@@ -28,6 +28,8 @@ else:
         DbtBuildWatcherAwsEcsOperator,
         DbtConsumerWatcherAwsEcsSensor,
         DbtProducerWatcherAwsEcsOperator,
+        DbtRunWatcherAwsEcsOperator,
+        DbtSeedWatcherAwsEcsOperator,
         DbtTestWatcherAwsEcsOperator,
         WatcherEcsLogFetcher,
     )
@@ -337,6 +339,13 @@ def make_sensor(sensor_class=DbtConsumerWatcherAwsEcsSensor, **kwargs):
 
 def make_context(ti_mock, *, run_id: str = "test-run"):
     return {"ti": ti_mock, "run_id": run_id, "task_instance": MagicMock(map_index=0)}
+
+
+@pytest.mark.parametrize(
+    "sensor_class, base_cmd", [(DbtSeedWatcherAwsEcsOperator, ["seed"]), (DbtRunWatcherAwsEcsOperator, ["run"])]
+)
+def test_seed_and_run_consumers_are_created(sensor_class, base_cmd):
+    assert make_sensor(sensor_class).base_cmd == base_cmd
 
 
 @patch("cosmos.operators._watcher.base.BaseConsumerSensor._log_startup_events")

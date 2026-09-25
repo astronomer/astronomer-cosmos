@@ -97,9 +97,15 @@ def run_command(
     with exclude_dags_folder_from_sys_path(), change_working_directory(cwd), environ(env):
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
         runner = get_runner(callbacks=callbacks)
+        # dbt-core builds INVOCATION_COMMAND from sys.argv unconditionally,
+        # so without this the worker's argv (e.g. celery) leaks into audit
+        # metadata. See https://github.com/astronomer/astronomer-cosmos/issues/2969
+        original_argv = list(sys.argv)
+        sys.argv = ["dbt", *cli_args]
         try:
             result = runner.invoke(cli_args)
         finally:
+            sys.argv = original_argv
             # Reset dbt adapters to release semaphores (run on all exit paths)
             # See: https://github.com/astronomer/astronomer-cosmos/issues/2334
             _cleanup_dbt_adapters()

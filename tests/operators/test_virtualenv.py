@@ -469,7 +469,7 @@ def test_build_and_run_cmd_invokes_interceptors(mock_run_command):
         project_dir="my/dir",
         vars=None,
         env=None,
-        py_requirements=["dbt-postgres==1.5.0"],
+        py_requirements=["dbt-postgres==1.8.0"],
         interceptors=[interceptor_modify_vars_and_env],
     )
 

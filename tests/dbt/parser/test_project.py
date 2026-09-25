@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from cosmos.dbt.parser.project import DbtModel, DbtModelType, LegacyDbtProject
+from cosmos.dbt.parser.project import DbtModel, DbtModelConfig, DbtModelType, LegacyDbtProject
 from cosmos.exceptions import CosmosValueError
 
 DBT_PROJECT_PATH = Path(__name__).parent.parent.parent.parent.parent / "dev/dags/dbt/"
@@ -400,6 +400,17 @@ def test_dbtmodelconfig_extract_config_with_kwarg_non_list_non_str():
     config_name = "some_conf"
     computed = dbt_model._extract_config(kwarg, config_name)
     assert computed == 5
+
+
+def test_dbtmodelconfig_sql_group_overrides_properties_group(tmp_path):
+    """The custom parser reads ``group`` so ``group:`` selectors work, and the model SQL wins over properties.yml."""
+    model_path = tmp_path / "orders.sql"
+    model_path.write_text("{{ config(group='finance') }}\nselect 1")
+    dbt_model = DbtModel(name="orders", type=DbtModelType.DBT_MODEL, path=model_path)
+
+    merged = dbt_model.config + DbtModelConfig(config_selectors={"group:marketing"})
+
+    assert {s for s in merged.config_selectors if s.startswith("group:")} == {"group:finance"}
 
 
 def test_dbtmodelconfig_with_sources(tmp_path):

@@ -39,6 +39,14 @@ GRAPH_SELECTOR_REGEX = r"^(@|[0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
 logger = get_logger(__name__)
 
 
+def _is_supported_config_selector(selector: str) -> bool:
+    """True if ``selector`` is ``config.<key>[:value]`` with an exact supported key or a ``meta.<path>`` key."""
+    if not selector.startswith(CONFIG_SELECTOR):
+        return False
+    key = selector[len(CONFIG_SELECTOR) :].split(":")[0]
+    return key in SUPPORTED_CONFIG or key.startswith(f"{CONFIG_META_PATH}.")
+
+
 def _node_fqn_str(node: DbtNode) -> str | None:
     """
     Return the node's fully qualified name as a string (e.g. 'jaffle_shop.marts.customers').
@@ -361,7 +369,7 @@ class GraphSelector:
                     {
                         node_id
                         for node_id, node in nodes.items()
-                        if config_selection_value == node.config.get(config_selection_key, "")
+                        if config_selection_value == node.config.get(config_selection_key)
                     }
                 )
             elif config_selection_key.startswith(CONFIG_META_PATH):
@@ -1090,7 +1098,7 @@ class YamlSelectors:
             if method == method_prefix:
                 return (f"{selector_prefix}{value}", None)
 
-        if any(method.startswith(f"{CONFIG_SELECTOR}{config}") for config in SUPPORTED_CONFIG):
+        if _is_supported_config_selector(method):
             return (f"{method}:{value}", None)
 
         return (None, f"Unsupported selector method: '{method}'")
@@ -1563,7 +1571,7 @@ def validate_filters(exclude: list[str], select: list[str]) -> None:
                 or filter_parameter.startswith(PACKAGE_SELECTOR)
                 or filter_parameter.startswith(GROUP_SELECTOR)
                 or PLUS_SELECTOR in filter_parameter
-                or any([filter_parameter.startswith(CONFIG_SELECTOR + config) for config in SUPPORTED_CONFIG])
+                or _is_supported_config_selector(filter_parameter)
             ):
                 continue
             elif ":" in filter_parameter:

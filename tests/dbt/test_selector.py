@@ -1930,6 +1930,11 @@ def test_valid_graph_operator_yaml_selectors(selector_name, selector_definition,
             {"name": "version_method", "definition": {"method": "version", "value": "latest"}},
             "Unsupported selector method: 'version'",
         ),
+        (
+            "config_grouping_method",
+            {"name": "config_grouping_method", "definition": {"method": "config.grouping", "value": "finance"}},
+            "Unsupported selector method: 'config.grouping'",
+        ),
     ],
 )
 def test_invalid_cosmos_method_yaml_selectors(selector_name, selector_definition, exception_msg):
@@ -2501,15 +2506,22 @@ def test_select_nodes_by_group_union_and_intersection(select, expected_nodes):
     assert selected == {node.unique_id: node for node in expected_nodes}
 
 
-@pytest.mark.parametrize("statement", ["group:+", "+group:"])
+@pytest.mark.parametrize("statement", ["group:+", "+group:", "config.group:+", "+config.group:"])
 def test_select_nodes_by_empty_group_with_graph_operator(statement):
-    """An empty group name combined with a graph operator matches nothing.
+    """An empty group name combined with a graph operator matches nothing, not the ungrouped nodes.
 
     ``GraphSelector`` never validates its selector values, so this matches the existing behaviour of
     ``package:+``, ``tag:+`` and ``source:+`` rather than the ``CosmosValueError`` raised by a bare ``group:``.
     """
-    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=multi_member_group_nodes, select=[statement])
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, select=[statement])
     assert selected == {}
+
+
+@pytest.mark.parametrize("statement", ["config.grouping:finance", "config.group_typo:finance"])
+def test_select_nodes_raises_on_config_key_that_only_prefixes_a_supported_key(statement):
+    """``config.grouping`` is not ``config.group``: reject it instead of silently selecting every node."""
+    with pytest.raises(CosmosValueError, match=f"Invalid select filter: {statement}"):
+        select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=grouped_sample_nodes, select=[statement])
 
 
 def test_is_empty_config_with_only_groups(selector_config):

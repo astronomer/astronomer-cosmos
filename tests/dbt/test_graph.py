@@ -36,6 +36,7 @@ from cosmos.dbt.graph import (
     _relative_dirs,
     parse_dbt_ls_output,
     run_command,
+    run_command_with_dbt_runner,
     run_command_with_subprocess,
 )
 from cosmos.dbt.selector import YamlSelectors
@@ -1977,6 +1978,40 @@ def test_run_command_forcing_dbt_runner(mock_dbt_runner, mock_subprocess, tmp_db
     assert mock_dbt_runner.called
 
 
+@patch("cosmos.dbt.graph.dbt_runner.run_command")
+def test_run_command_with_dbt_runner_raises_when_ls_result_is_not_json(mock_run_command):
+    # dbt-core 2.0 dbtRunner returns node names instead of the `--output json` records (#2992)
+    mock_run_command.return_value = MagicMock(success=True, result=["probe.a", "probe.b"], exception=None)
+
+    with pytest.raises(CosmosLoadDbtException) as err_info:
+        run_command_with_dbt_runner(["dbt", "ls", "--output", "json"], Path("/tmp/project"), {})
+
+    assert "2 entries that are not JSON records" in str(err_info.value)
+    assert "InvocationMode.SUBPROCESS" in str(err_info.value)
+
+
+@patch("cosmos.dbt.graph.dbt_runner.run_command")
+def test_run_command_with_dbt_runner_joins_json_records(mock_run_command):
+    as_object = MagicMock()
+    as_object.to_dict.return_value = {"unique_id": "model.probe.b"}
+    mock_run_command.return_value = MagicMock(
+        success=True, result=['{"unique_id": "model.probe.a"}', as_object], exception=None
+    )
+
+    stdout = run_command_with_dbt_runner(["dbt", "ls", "--output", "json"], Path("/tmp/project"), {})
+
+    assert stdout.split("\n") == ['{"unique_id": "model.probe.a"}', '{"unique_id": "model.probe.b"}']
+
+
+@patch("cosmos.dbt.graph.dbt_runner.run_command")
+def test_run_command_with_dbt_runner_only_checks_ls_results(mock_run_command):
+    mock_run_command.return_value = MagicMock(success=True, result=["Installing dbt-labs/dbt_utils"], exception=None)
+
+    stdout = run_command_with_dbt_runner(["dbt", "deps"], Path("/tmp/project"), {})
+
+    assert stdout == "Installing dbt-labs/dbt_utils"
+
+
 @pytest.mark.integration
 def test_run_command_with_dbt_runner_exception(tmp_dbt_project_dir):
     with pytest.raises(CosmosLoadDbtException) as err_info:
@@ -2132,6 +2167,23 @@ def test_parse_dbt_ls_output():
     nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
 
     assert expected_nodes == nodes
+
+
+def test_parse_dbt_ls_output_warns_when_no_line_is_a_json_record(caplog):
+    with caplog.at_level(logging.WARNING):
+        nodes = parse_dbt_ls_output(Path("fake-project"), "probe.a\nprobe.b\n")
+
+    assert nodes == {}
+    assert "2 non-empty line(s) and none parsed as a JSON record" in caplog.text
+    assert "First skipped line: probe.a" in caplog.text
+
+
+def test_parse_dbt_ls_output_does_not_warn_on_empty_stdout(caplog):
+    with caplog.at_level(logging.WARNING):
+        nodes = parse_dbt_ls_output(Path("fake-project"), "\n")
+
+    assert nodes == {}
+    assert "none parsed as a JSON record" not in caplog.text
 
 
 def test_parse_dbt_ls_output_with_json_without_tags_or_config():

@@ -493,9 +493,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     def run_dbt_runner(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> dbtRunnerResult:
         """Invokes the dbt command programmatically."""
         if not dbt_runner.is_available():
-            raise CosmosDbtRunError(
-                "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
-            )
+            raise CosmosDbtRunError(dbt_runner.UNAVAILABLE_MESSAGE)
 
         return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks, **kwargs)
 
@@ -552,6 +550,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.profile_config.target_name,
         ]
         if self.invocation_mode == InvocationMode.DBT_RUNNER:
+            if not dbt_runner.is_available():
+                raise CosmosDbtRunError(dbt_runner.UNAVAILABLE_MESSAGE)
             from dbt.version import __version__ as dbt_version
 
             if Version(dbt_version) >= Version("1.5.6"):

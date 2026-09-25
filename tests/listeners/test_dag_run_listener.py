@@ -2,6 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -9,17 +10,34 @@ from airflow.models import DAG, DagRun
 from airflow.utils.state import State
 from packaging.version import Version
 
+try:
+    # Airflow 3.1 onwards
+    from airflow.sdk import TaskGroup
+except ImportError:
+    from airflow.utils.task_group import TaskGroup
+
 from cosmos import DbtRunLocalOperator, ProfileConfig, ProjectConfig
 from cosmos.airflow.dag import DbtDag
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.config import ExecutionConfig, RenderConfig
-from cosmos.constants import AIRFLOW_VERSION, InvocationMode, LoadMode, SourceRenderingBehavior, TestBehavior
+from cosmos.constants import (
+    AIRFLOW_VERSION,
+    ExecutionMode,
+    InvocationMode,
+    LoadMode,
+    SourceRenderingBehavior,
+    TestBehavior,
+)
 from cosmos.listeners.dag_run_listener import (
+    _cleanup_watcher_producer_backups,
+    _cleanup_watcher_producer_backups_safely,
     get_cosmos_telemetry_metadata,
     on_dag_run_failed,
     on_dag_run_success,
     total_cosmos_tasks,
 )
+from cosmos.operators._watcher.xcom import _xcom_backup_variable_key
+from cosmos.operators.watcher import DbtProducerWatcherOperator
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 from tests.utils import new_test_dag
 
@@ -128,6 +146,27 @@ def create_dag_run(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
         )
     else:
         dag_run = new_test_dag(dag)
+    return dag_run
+
+
+def create_dag_run_without_execution(dag: DAG, run_id: str, run_after: datetime) -> DagRun:
+    """Build a DagRun for ``dag`` without persisting it or running any of its tasks.
+
+    ``on_dag_run_failed``/``on_dag_run_success`` only ever read ``dag_run.dag_id``,
+    ``dag_run.run_id`` and ``dag_run.get_dag()`` (the latter just returns the plain ``.dag``
+    attribute, not a DB lookup), so a bare, unpersisted DagRun is enough -- no need to run the
+    DAG's tasks via ``create_dag_run``'s ``dag.test()`` path, which for a WATCHER DAG with
+    deferrable consumer tasks doesn't complete inside Airflow 3.1+'s in-process trigger runner (a
+    pre-existing issue unrelated to this cleanup logic). Airflow 3.1+'s Task SDK ``DAG`` also has
+    no ``create_dagrun()`` method to fall back on, unlike earlier versions.
+    """
+    if AIRFLOW_VERSION < Version("3.1"):
+        return create_dag_run(dag, run_id, run_after)
+
+    from airflow.utils.types import DagRunType
+
+    dag_run = DagRun(dag_id=dag.dag_id, run_id=run_id, run_after=run_after, run_type=DagRunType.MANUAL)
+    dag_run.dag = dag
     return dag_run
 
 
@@ -290,3 +329,110 @@ def test_on_dag_run_failed_with_telemetry_metadata(mock_emit_usage_metrics_if_en
     assert metrics["uses_node_converter"] is False
     assert metrics["test_behavior"] == "none"
     assert metrics["source_behavior"] == "all"
+
+
+class TestCleanupWatcherProducerBackups:
+    """Covers cleanup of orphaned WATCHER producer XCom-backup Variables on DAG-run failure (#2823)."""
+
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_deletes_variable_for_producer_in_task_group(self, mock_delete_variable_isolated_session):
+        with DAG("watcher_dag", start_date=datetime(2022, 1, 1)) as dag:
+            with TaskGroup(group_id="my_group"):
+                DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+        _cleanup_watcher_producer_backups(dag, "watcher_dag", "run123")
+
+        expected_key = _xcom_backup_variable_key("watcher_dag", "my_group", "run123")
+        mock_delete_variable_isolated_session.assert_called_once_with(expected_key)
+
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_deletes_variable_for_producer_without_task_group(self, mock_delete_variable_isolated_session):
+        with DAG("watcher_dag", start_date=datetime(2022, 1, 1)) as dag:
+            DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+        _cleanup_watcher_producer_backups(dag, "watcher_dag", "run123")
+
+        expected_key = _xcom_backup_variable_key("watcher_dag", None, "run123")
+        mock_delete_variable_isolated_session.assert_called_once_with(expected_key)
+
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_noop_for_non_watcher_dag(self, mock_delete_variable_isolated_session):
+        with DAG("plain_dag", start_date=datetime(2022, 1, 1)) as dag:
+            DbtRunLocalOperator(
+                profile_config=profile_config,
+                project_dir=DBT_ROOT_PATH / "jaffle_shop",
+                task_id="run",
+            )
+
+        _cleanup_watcher_producer_backups(dag, "plain_dag", "run123")
+
+        mock_delete_variable_isolated_session.assert_not_called()
+
+    @patch("cosmos.operators._watcher.xcom._delete_xcom_backup_variable_by_ids", side_effect=RuntimeError("boom"))
+    def test_swallows_per_task_errors(self, mock_delete_by_ids):
+        with DAG("watcher_dag", start_date=datetime(2022, 1, 1)) as dag:
+            DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+        _cleanup_watcher_producer_backups(dag, "watcher_dag", "run123")  # should not raise
+
+        mock_delete_by_ids.assert_called_once()
+
+    @patch("cosmos.listeners.dag_run_listener._cleanup_watcher_producer_backups", side_effect=RuntimeError("boom"))
+    def test_safely_swallows_errors_from_cleanup(self, mock_cleanup):
+        """Covers ``_cleanup_watcher_producer_backups_safely``'s own try/except, distinct from
+        ``_cleanup_watcher_producer_backups``'s per-task one covered by ``test_swallows_per_task_errors``."""
+        dag_run = SimpleNamespace(dag_id="watcher_dag", run_id="run123")
+
+        _cleanup_watcher_producer_backups_safely(SimpleNamespace(), dag_run)  # should not raise
+
+        mock_cleanup.assert_called_once()
+
+    @patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+    def test_deletes_variable_for_producer_in_serialized_dag(self, mock_delete_variable_isolated_session):
+        """Airflow 3's SerializedBaseOperator has no ``_task_type`` attribute at all (#2880) --
+        only ``task_type`` -- so the class name lookup must use that, not fall through to the
+        generic ``SerializedBaseOperator`` class name. Uses a bare stand-in rather than a real
+        ``SerializedDAG`` round-trip, which needs a fully migrated metadata DB."""
+        fake_task = SimpleNamespace(
+            task_id="dbt_producer_watcher",
+            _task_module="cosmos.operators.watcher",
+            task_type="DbtProducerWatcherOperator",
+            task_group=None,
+        )
+        fake_dag = SimpleNamespace(task_dict={"dbt_producer_watcher": fake_task})
+
+        _cleanup_watcher_producer_backups(fake_dag, "watcher_dag_serialized", "run123")
+
+        expected_key = _xcom_backup_variable_key("watcher_dag_serialized", None, "run123")
+        mock_delete_variable_isolated_session.assert_called_once_with(expected_key)
+
+
+@pytest.mark.integration
+@patch("cosmos.operators._watcher.xcom.delete_variable_isolated_session")
+@patch("cosmos.listeners.dag_run_listener.telemetry.emit_usage_metrics_if_enabled")
+def test_on_dag_run_hooks_clean_up_watcher_backup_variable(
+    mock_emit_usage_metrics_if_enabled, mock_delete_variable_isolated_session
+):
+    """Covers both terminal-state hooks against a single real DAG run."""
+    with DbtDag(
+        project_config=ProjectConfig(
+            DBT_ROOT_PATH / "jaffle_shop",
+        ),
+        profile_config=profile_config,
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+        start_date=datetime(2023, 1, 1),
+        dag_id="watcher_dag_with_backup",
+    ) as dag:
+        pass
+
+    run_id = str(uuid.uuid1())
+    run_after = datetime.now(timezone.utc) - timedelta(seconds=1)
+    dag_run = create_dag_run_without_execution(dag, run_id, run_after)
+
+    on_dag_run_failed(dag_run, msg="test failed")
+    mock_delete_variable_isolated_session.assert_called()
+
+    mock_delete_variable_isolated_session.reset_mock()
+
+    on_dag_run_success(dag_run, msg="test success")
+    mock_delete_variable_isolated_session.assert_called()

@@ -997,6 +997,39 @@ def test_select_nodes_by_resource_type_source():
     assert selected == expected
 
 
+def test_select_nodes_by_resource_type_semantic_layer():
+    """
+    Test that 'resource_type:semantic_layer' picks up only nodes with resource_type == SEMANTIC_LAYER,
+    and that 'resource_type:model' no longer matches them (they are reclassified out of MODEL upstream,
+    in cosmos.dbt.graph._classify_resource_type).
+    """
+    local_nodes = dict(sample_nodes)
+    semantic_layer_node = DbtNode(
+        unique_id=f"{DbtResourceType.SEMANTIC_LAYER.value}.{SAMPLE_PROJ_PATH.stem}.my_metric_view",
+        resource_type=DbtResourceType.SEMANTIC_LAYER,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/my_metric_view.sql"),
+        tags=[],
+        config={"materialized": "metric_view"},
+    )
+
+    local_nodes[semantic_layer_node.unique_id] = semantic_layer_node
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["resource_type:semantic_layer"],
+    )
+    assert selected == {semantic_layer_node.unique_id: semantic_layer_node}
+
+    not_selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH,
+        nodes=local_nodes,
+        select=["resource_type:model"],
+    )
+    assert semantic_layer_node.unique_id not in not_selected
+
+
 def test_select_nodes_by_exclude_resource_type_model():
     """
     Test that 'exclude_resource_type:model' picks up only nodes with resource_type != MODEL,

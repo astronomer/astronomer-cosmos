@@ -28,6 +28,7 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
+    DbtSemanticLocalOperator,
     DbtSnapshotLocalOperator,
     DbtSourceLocalOperator,
     DbtTestLocalOperator,
@@ -286,6 +287,17 @@ class DbtRunVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunLocalOperator):
     """
     Executes a dbt core run command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSemanticLocalOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic layer object within a
+    Python Virtual Environment, that is created before running the dbt command and deleted just
+    after.
     """
 
     def __init__(self, *args: Any, **kwargs: Any):

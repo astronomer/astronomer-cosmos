@@ -259,6 +259,9 @@ class DbtSeedWatcherAwsEcsOperator(DbtSeedMixin, DbtConsumerWatcherAwsEcsSensor)
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherAwsEcsSensor.template_fields + DbtSeedMixin.template_fields  # type: ignore[operator]
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
 
 class DbtSnapshotWatcherAwsEcsOperator(DbtSnapshotMixin, DbtConsumerWatcherAwsEcsSensor):
     """
@@ -282,6 +285,9 @@ class DbtRunWatcherAwsEcsOperator(DbtConsumerWatcherAwsEcsSensor):
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherAwsEcsSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
 
 
 class DbtTestWatcherAwsEcsOperator(DbtConsumerWatcherAwsEcsSensor):

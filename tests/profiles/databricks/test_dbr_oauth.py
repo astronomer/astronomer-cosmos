@@ -77,3 +77,10 @@ def test_mock_profile() -> None:
     """
     profile_mapping = DatabricksOauthProfileMapping("conn_id", {"schema": "my_schema"})
     assert profile_mapping.mock_profile.get("auth_type") == "oauth"
+
+
+def test_profile_strips_https_from_host(mock_databricks_conn: Connection) -> None:
+    """Tests that the OAuth profile removes the host's https:// prefix."""
+    profile_mapping = DatabricksOauthProfileMapping(mock_databricks_conn.conn_id, {"schema": "my_schema"})
+
+    assert profile_mapping.profile["host"] == "my_host"

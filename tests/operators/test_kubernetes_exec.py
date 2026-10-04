@@ -148,9 +148,15 @@ def test_render_pod_and_dbt_parameters():
     assert (operator.pod_name, operator.select, operator.add_cmd_flags()) == ("warm", "orders", ["--full-refresh"])
 
 
-@pytest.mark.parametrize("executable", [None, "/opt/dbt/bin/dbt"])
+@pytest.mark.parametrize("executable", [None, "/opt/dbt/bin/dbt", Path("/opt/dbt/bin/dbt")])
+@patch.object(
+    kubernetes_exec.KubernetesPodExecOperator,
+    "execute",
+    autospec=True,
+    side_effect=lambda operator, context: operator._validate_command(),
+)
 @patch("cosmos.dbt.executable.shutil.which", return_value="/scheduler/venv/bin/dbt", autospec=True)
-def test_manifest_generates_tasks_for_existing_pod(mock_which, executable):
+def test_manifest_generates_tasks_for_existing_pod(mock_which, mock_execute, executable):
     dag = DbtDag(
         dag_id="existing_pod",
         project_config=ProjectConfig(
@@ -168,7 +174,10 @@ def test_manifest_generates_tasks_for_existing_pod(mock_which, executable):
     for task in dag.tasks:
         assert isinstance(task, kubernetes_exec.DbtKubernetesExecBaseOperator)
         assert task.pod_name == "warm-dbt"
-        assert task.dbt_executable_path == (executable or "dbt")
+        assert task.dbt_executable_path == str(executable or "dbt")
+        task.execute({})
+        assert str(executable or "dbt") in task.command
+    assert mock_execute.call_count == len(dag.tasks)
     assert any(task.upstream_task_ids for task in dag.tasks)
 
 

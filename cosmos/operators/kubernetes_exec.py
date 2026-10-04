@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 import os
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -63,7 +64,7 @@ class DbtKubernetesExecBaseOperator(AbstractDbtBase, KubernetesPodExecOperator):
     def __init__(
         self,
         profile_config: ProfileConfig | None = None,
-        dbt_executable_path: str = "dbt",
+        dbt_executable_path: str | Path = "dbt",
         on_warning_callback: Callable[..., Any] | None = None,
         **kwargs: Any,
     ) -> None:
@@ -85,7 +86,7 @@ class DbtKubernetesExecBaseOperator(AbstractDbtBase, KubernetesPodExecOperator):
             and name not in ("self", "dbt_executable_path")
             and (name in kwargs or name in defaults)
         }
-        AbstractDbtBase.__init__(self, dbt_executable_path=dbt_executable_path, **dbt_kwargs)
+        AbstractDbtBase.__init__(self, dbt_executable_path=str(dbt_executable_path), **dbt_kwargs)
         KubernetesPodExecOperator.__init__(self, command=[], **kwargs)
         self.profile_config = profile_config
 

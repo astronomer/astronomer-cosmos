@@ -10,7 +10,7 @@ pytest.importorskip("airflow.providers.cncf.kubernetes.operators.pod_exec")
 from cosmos import DbtDag
 from cosmos.airflow.graph import calculate_operator_class
 from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, LoadMode
+from cosmos.constants import ExecutionMode, InvocationMode, LoadMode
 from cosmos.operators import kubernetes_exec
 from cosmos.operators.kubernetes_exec import DbtRunKubernetesExecOperator
 
@@ -148,20 +148,64 @@ def test_render_pod_and_dbt_parameters():
     assert (operator.pod_name, operator.select, operator.add_cmd_flags()) == ("warm", "orders", ["--full-refresh"])
 
 
-def test_manifest_generates_tasks_for_existing_pod():
+@pytest.mark.parametrize("executable", [None, "/opt/dbt/bin/dbt"])
+@patch("cosmos.dbt.executable.shutil.which", return_value="/scheduler/venv/bin/dbt", autospec=True)
+def test_manifest_generates_tasks_for_existing_pod(mock_which, executable):
     dag = DbtDag(
         dag_id="existing_pod",
         project_config=ProjectConfig(
             manifest_path=Path(__file__).parents[1] / "sample/manifest.json", project_name="example"
         ),
         execution_config=ExecutionConfig(
-            execution_mode=ExecutionMode.KUBERNETES_EXEC, dbt_project_path="/dbt/project", dbt_executable_path="dbt"
+            execution_mode=ExecutionMode.KUBERNETES_EXEC,
+            dbt_project_path="/dbt/project",
+            dbt_executable_path=executable,
         ),
-        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, invocation_mode=InvocationMode.SUBPROCESS),
         operator_args={"pod_name": "warm-dbt", "namespace": "analytics"},
     )
     assert dag.tasks
     for task in dag.tasks:
         assert isinstance(task, kubernetes_exec.DbtKubernetesExecBaseOperator)
         assert task.pod_name == "warm-dbt"
+        assert task.dbt_executable_path == (executable or "dbt")
     assert any(task.upstream_task_ids for task in dag.tasks)
+
+
+@pytest.mark.parametrize("debug", [False, True])
+@pytest.mark.parametrize("output", [None, "model.example.orders\n"])
+@patch("cosmos.debug.stop_memory_tracking", autospec=True)
+@patch("cosmos.debug.start_memory_tracking", autospec=True)
+@patch.object(kubernetes_exec.KubernetesPodExecOperator, "execute", autospec=True)
+def test_execute_returns_provider_output(mock_execute, mock_start, mock_stop, debug, output, monkeypatch):
+    monkeypatch.setattr(kubernetes_exec.settings, "enable_debug_mode", debug)
+    mock_execute.return_value = output
+    operator = DbtRunKubernetesExecOperator(
+        task_id="dbt_task",
+        pod_name="warm",
+        project_dir="/dbt",
+        do_xcom_push=output is not None,
+        extra_context={"custom": "value"},
+        full_refresh=True,
+    )
+    context = {"run_id": "test"}
+
+    assert operator.execute(context) == output
+    assert context["custom"] == "value"
+    assert "--full-refresh" in operator.command
+    mock_execute.assert_called_once_with(operator, context)
+    assert mock_start.call_count == mock_stop.call_count == int(debug)
+
+
+@patch("cosmos.debug.stop_memory_tracking", autospec=True)
+@patch("cosmos.debug.start_memory_tracking", autospec=True)
+@patch.object(
+    kubernetes_exec.KubernetesPodExecOperator, "execute", autospec=True, side_effect=RuntimeError("exec failed")
+)
+def test_debug_failure_stops_memory_tracking(mock_execute, mock_start, mock_stop, monkeypatch):
+    monkeypatch.setattr(kubernetes_exec.settings, "enable_debug_mode", True)
+    operator = DbtRunKubernetesExecOperator(task_id="dbt_task", pod_name="warm", project_dir="/dbt")
+    with pytest.raises(RuntimeError, match="exec failed"):
+        operator.execute({})
+    mock_start.assert_called_once_with({})
+    mock_stop.assert_called_once_with({})

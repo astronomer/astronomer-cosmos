@@ -36,6 +36,8 @@ Configure the mode
 
 Keep the manifest available to the Dag parser. ``dbt_project_path`` below is the path
 inside the target container; ``dbt_executable_path`` also refers to that container.
+It defaults to ``dbt`` on the container's ``PATH``, independently of the scheduler's
+dbt installation. Set an explicit path to use a different executable in the container.
 The container's default environment is inherited. ``ProjectConfig.env_vars`` adds or
 overrides variables for each exec process without modifying the Pod configuration.
 
@@ -55,7 +57,6 @@ overrides variables for each exec process without modifying the Pod configuratio
         execution_config=ExecutionConfig(
             execution_mode=ExecutionMode.KUBERNETES_EXEC,
             dbt_project_path="/opt/dbt/analytics",
-            dbt_executable_path="dbt",
         ),
         operator_args={
             "pod_name": "dbt-runner",
@@ -77,6 +78,10 @@ can corrupt their results.
 Supported commands include run, build, seed, snapshot, test, source freshness, ls,
 run-operation and clone. Their operators are available in
 ``cosmos.operators.kubernetes_exec`` for direct use outside ``DbtDag`` and ``DbtTaskGroup``.
+
+Set ``do_xcom_push=True`` in ``operator_args`` to return command stdout through XCom,
+using the provider's output size limit (``max_xcom_output_size``). This does not
+collect dbt artifact files.
 
 Pod lifecycle
 ~~~~~~~~~~~~~

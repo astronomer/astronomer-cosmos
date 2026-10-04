@@ -152,7 +152,7 @@ class RenderConfig:
         else:
             return ""
 
-    def validate_dbt_command(self, fallback_cmd: str | Path = "") -> None:
+    def validate_dbt_command(self, fallback_cmd: str | Path | None = "") -> None:
         """
         When using LoadMode.DBT_LS, the dbt executable path is necessary for rendering.
 
@@ -577,7 +577,8 @@ class ExecutionConfig:
     :param execution_mode: The execution mode for dbt. Defaults to local
     :param invocation_mode: The invocation mode for the dbt command. This is only configurable for ExecutionMode.LOCAL.
     :param test_indirect_selection: The mode to configure the test behavior when performing indirect selection.
-    :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to dbt if available on the path.
+    :param dbt_executable_path: The path to the dbt executable for runtime execution. Defaults to ``dbt`` inside the
+        container for ``ExecutionMode.KUBERNETES_EXEC``; otherwise resolves dbt on the local path.
     :param dbt_project_path: Configures the DBT project location accessible at runtime for dag execution. This is the project path in a docker container for ExecutionMode.DOCKER or ExecutionMode.KUBERNETES. Mutually Exclusive with ProjectConfig.dbt_project_path
     :param install_dbt_deps: Whether to run ``dbt deps`` at task execution time. When set, overrides
         ``ProjectConfig.install_dbt_deps`` for execution only (it does not affect DAG parsing). Accepts a
@@ -596,7 +597,7 @@ class ExecutionConfig:
     execution_mode: ExecutionMode = ExecutionMode.LOCAL
     invocation_mode: InvocationMode | None = None
     test_indirect_selection: TestIndirectSelection = TestIndirectSelection.EAGER
-    dbt_executable_path: str | Path = field(default_factory=get_system_dbt)
+    dbt_executable_path: str | Path | None = None
 
     install_dbt_deps: bool | str | None = None
     dbt_project_path: InitVar[str | Path | None] = None
@@ -607,6 +608,10 @@ class ExecutionConfig:
     setup_operator_args: dict[str, Any] | None = None
 
     def __post_init__(self, dbt_project_path: str | Path | None) -> None:
+        if self.dbt_executable_path is None:
+            self.dbt_executable_path = (
+                "dbt" if self.execution_mode == ExecutionMode.KUBERNETES_EXEC else get_system_dbt()
+            )
         if self.invocation_mode and self.execution_mode not in (
             ExecutionMode.WATCHER,
             ExecutionMode.LOCAL,

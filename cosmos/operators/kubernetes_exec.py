@@ -15,6 +15,7 @@ except ImportError as exc:
         "Install astronomer-cosmos[kubernetes-exec]."
     ) from exc
 
+from cosmos import settings
 from cosmos.config import ProfileConfig
 from cosmos.operators.base import (
     AbstractDbtBase,
@@ -28,6 +29,11 @@ from cosmos.operators.base import (
     DbtSourceMixin,
     DbtTestMixin,
 )
+
+try:
+    from airflow.sdk.definitions.context import context_merge  # type: ignore[attr-defined]
+except ImportError:
+    from airflow.utils.context import context_merge
 
 if TYPE_CHECKING:
     try:
@@ -82,6 +88,20 @@ class DbtKubernetesExecBaseOperator(AbstractDbtBase, KubernetesPodExecOperator):
         AbstractDbtBase.__init__(self, dbt_executable_path=dbt_executable_path, **dbt_kwargs)
         KubernetesPodExecOperator.__init__(self, command=[], **kwargs)
         self.profile_config = profile_config
+
+    def execute(self, context: Context, **kwargs: Any) -> Any:
+        # AbstractDbtBase.execute discards the return value; exec uses it for XCom.
+        if self.extra_context:
+            context_merge(context, self.extra_context)
+        if settings.enable_debug_mode:
+            from cosmos.debug import start_memory_tracking, stop_memory_tracking
+
+            start_memory_tracking(context)
+            try:
+                return self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
+            finally:
+                stop_memory_tracking(context)
+        return self.build_and_run_cmd(context=context, cmd_flags=self.add_cmd_flags(), **kwargs)
 
     def build_and_run_cmd(
         self,

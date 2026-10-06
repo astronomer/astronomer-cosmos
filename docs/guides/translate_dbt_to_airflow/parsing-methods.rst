@@ -126,7 +126,7 @@ To use this:
 Starting in Cosmos 1.5, Cosmos will cache the output of the ``dbt ls`` command, to improve the performance of this
 parsing method. Learn more :ref:`here <caching>`.
 
-Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__. This mode requires dbt version 1.5.0 or higher.
+Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__.
 This mode,  named ``InvocationMode.DBT_RUNNER``, also depends on dbt being installed in the same Python virtual environment as Airflow.
 In previous Cosmos versions, Cosmos would always run ``dbt ls`` using the  Python ``subprocess`` module, which can lead to significant CPU and memory usage.
 

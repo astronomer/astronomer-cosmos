@@ -107,6 +107,9 @@ docker = [
 kubernetes = [
     "apache-airflow-providers-cncf-kubernetes>=7.14.0",
 ]
+kubernetes-exec = [
+    "apache-airflow-providers-cncf-kubernetes>=10.22.0",
+]
 aws_eks = [
     "apache-airflow-providers-amazon>=8.0.0",
 ]

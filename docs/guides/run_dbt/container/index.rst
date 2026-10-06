@@ -7,6 +7,7 @@ Run dbt in a container
 
    docker
    kubernetes
+   kubernetes-exec
    watcher-kubernetes-execution-mode
    aws-container-run-job
    aws-eks

@@ -54,3 +54,7 @@ class DatabricksOauthProfileMapping(BaseProfileMapping):
             "client_secret": self.get_env_var_format("client_secret"),
             "client_id": self.get_env_var_format("client_id"),
         }
+
+    def transform_host(self, host: str) -> str:
+        """Removes the https:// prefix."""
+        return host.replace("https://", "")

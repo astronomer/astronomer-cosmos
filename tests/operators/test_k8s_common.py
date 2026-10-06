@@ -50,10 +50,13 @@ def _make_handler(**overrides: Any) -> DbtTestWarningHandler:
 # ---------------------------------------------------------------------------
 
 
-def test_build_env_vars_merges_env_and_existing():
+@pytest.mark.parametrize("existing_as_dict", [True, False])
+def test_build_env_vars_merges_env_and_existing(existing_as_dict):
     from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import convert_env_vars
 
-    existing = convert_env_vars({"EXISTING_KEY": "existing_value"})
+    existing = {"EXISTING_KEY": "existing_value"}
+    if not existing_as_dict:
+        existing = convert_env_vars(existing)
     result = _build_env_vars({"NEW_KEY": "new_value"}, existing)
 
     env_names = {ev.name for ev in result}

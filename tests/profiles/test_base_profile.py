@@ -56,6 +56,22 @@ def test_disable_event_tracking(disable_event_tracking: bool):
         assert test_profile.env_vars["DBT_SEND_ANONYMOUS_USAGE_STATS"] == "False"
 
 
+def test_missing_secret_error_includes_profile_mapping_context(monkeypatch: pytest.MonkeyPatch):
+    test_profile = TestProfileMapping(conn_id="fake_conn_id")
+    test_profile.secret_fields = ["password"]
+    test_profile.airflow_param_mapping = {"password": ["password", "extra.password"]}
+    monkeypatch.setattr(test_profile, "get_dbt_value", lambda _: None)
+
+    with pytest.raises(CosmosValueError) as error:
+        test_profile.env_vars
+
+    assert str(error.value) == (
+        "TestProfileMapping could not resolve required dbt profile field 'password' from profile_args or Airflow "
+        "connection 'fake_conn_id' (connection fields: 'password', 'extra.password'). Check that the connection uses "
+        "the authentication method expected by this profile mapping."
+    )
+
+
 def test_disable_event_tracking_and_send_anonymous_usage_stats():
     expected_cosmos_error = (
         "Cannot set both disable_event_tracking and "

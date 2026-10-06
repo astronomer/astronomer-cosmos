@@ -332,6 +332,13 @@ def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dic
     return stdout
 
 
+def _is_json_record(line: str) -> bool:
+    try:
+        return isinstance(json.loads(line), dict)
+    except (json.decoder.JSONDecodeError, TypeError):
+        return False
+
+
 def run_command_with_dbt_runner(command: list[str], tmp_dir: Path | None, env_vars: dict[str, str]) -> str:
     """Run a command with dbtRunner, returning the stdout."""
     response = dbt_runner.run_command(command=command, env=env_vars, cwd=str(tmp_dir))
@@ -345,6 +352,21 @@ def run_command_with_dbt_runner(command: list[str], tmp_dir: Path | None, env_va
     )
     if response.result:
         stdout = "\n".join(result_list)
+
+    # dbt-core 1.x returns one JSON record per node for `dbt ls --output json`; dbt-core 2.0's dbtRunner
+    # returns bare node names instead, which `parse_dbt_ls_output` would skip one by one, leaving an
+    # empty Dag with no error. See https://github.com/astronomer/astronomer-cosmos/issues/2992
+    if (
+        response.success
+        and result_list
+        and command[1] == "ls"
+        and not any(_is_json_record(item) for item in result_list)
+    ):
+        raise CosmosLoadDbtException(
+            f"dbt ls run through dbtRunner returned {len(result_list)} entries that are not JSON records "
+            f"(first: {result_list[0]!r}). The installed dbt does not return `--output json` records through "
+            "its Python API; set RenderConfig.invocation_mode=InvocationMode.SUBPROCESS."
+        )
 
     if not response.success:
         if response.exception:
@@ -402,11 +424,14 @@ def run_command(
 def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, DbtNode]:
     """Parses the output of `dbt ls` into a dictionary of `DbtNode` instances."""
     nodes = {}
+    skipped_lines: list[str] = []
     for line in ls_stdout.split("\n"):
         try:
             node_dict = json.loads(line.strip())
         except json.decoder.JSONDecodeError:
             logger.debug("Skipped dbt ls line: %s", line)
+            if line.strip():
+                skipped_lines.append(line)
         else:
             if project_path is None:
                 continue
@@ -449,6 +474,13 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
             else:
                 nodes[node.unique_id] = node
                 logger.debug("Parsed dbt resource `%s` of type `%s`", node.unique_id, node.resource_type)
+    if not nodes and skipped_lines:
+        logger.warning(
+            "dbt ls output had %d non-empty line(s) and none parsed as a JSON record, so no dbt nodes were "
+            "loaded. First skipped line: %s",
+            len(skipped_lines),
+            skipped_lines[0],
+        )
     return nodes
 
 

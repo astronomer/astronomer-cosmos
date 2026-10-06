@@ -57,7 +57,7 @@ def test_retries_not_forced_to_zero():
     assert op.retries == 5
 
 
-@patch("cosmos.operators._k8s_common._restore_xcom_from_variable")
+@patch("cosmos.operators._watcher.producer._restore_xcom_from_variable")
 @patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.execute")
 def test_skips_retry_attempt(mock_execute, mock_restore):
     """Smoke-test that the GCP GKE producer delegates to ``execute_watcher_producer``.
@@ -232,8 +232,8 @@ def test_producer_pod_manager_wires_callback_extra_kwargs(mock_manager_cls):
     assert extra[CONTEXT_HOLDER_KEY] is op._context_holder
 
 
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
-@patch("cosmos.operators._k8s_common._init_xcom_backup")
+@patch("cosmos.operators._watcher.producer._delete_xcom_backup_variable")
+@patch("cosmos.operators._watcher.producer._init_xcom_backup")
 @patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.execute")
 def test_pod_manager_created_before_execute_sees_execution_context(mock_execute, mock_init, mock_delete):
     """pod_manager accessed before execute() must not hold a stale context=None (#2543 follow-up).

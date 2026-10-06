@@ -12,7 +12,7 @@ from packaging.version import Version
 
 from cosmos import DbtDag
 from cosmos.airflow.compatibility import EmptyOperator
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AiConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     AIRFLOW_VERSION,
     DbtResourceType,
@@ -287,6 +287,21 @@ def test_validate_arguments_schema_in_task_args():
         project_config=project_config,
     )
     assert profile_config.profile_mapping.profile_args["schema"] == "abcd"
+
+
+@pytest.mark.parametrize(
+    "execution_mode,should_warn",
+    [(ExecutionMode.LOCAL, False), (ExecutionMode.VIRTUALENV, False), (ExecutionMode.KUBERNETES, True)],
+)
+def test_validate_arguments_ai_config_unsupported_execution_mode_warns(execution_mode, should_warn, caplog):
+    validate_arguments(
+        execution_config=ExecutionConfig(execution_mode=execution_mode),
+        profile_config=MagicMock(),
+        render_config=RenderConfig(),
+        task_args={"ai_config": AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)},
+        project_config=ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST, project_name="something"),
+    )
+    assert ("AiConfig.diagnose_on_failure is only supported" in caplog.text) == should_warn
 
 
 parent_seed = DbtNode(

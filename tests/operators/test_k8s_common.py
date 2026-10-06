@@ -50,14 +50,20 @@ def _make_handler(**overrides: Any) -> DbtTestWarningHandler:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("existing_as_dict", [True, False])
-def test_build_env_vars_merges_env_and_existing(existing_as_dict):
+def test_build_env_vars_merges_env_and_existing():
     from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import convert_env_vars
 
-    existing = {"EXISTING_KEY": "existing_value"}
-    if not existing_as_dict:
-        existing = convert_env_vars(existing)
+    existing = convert_env_vars({"EXISTING_KEY": "existing_value"})
     result = _build_env_vars({"NEW_KEY": "new_value"}, existing)
+
+    env_names = {ev.name for ev in result}
+    assert "NEW_KEY" in env_names
+    assert "EXISTING_KEY" in env_names
+
+
+def test_build_env_vars_merges_env_and_existing_dict():
+    """cncf-kubernetes >= 10.23.0 leaves ``operator.env_vars`` as a raw dict after construction."""
+    result = _build_env_vars({"NEW_KEY": "new_value"}, {"EXISTING_KEY": "existing_value"})
 
     env_names = {ev.name for ev in result}
     assert "NEW_KEY" in env_names

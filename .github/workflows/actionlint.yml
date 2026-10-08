@@ -22,7 +22,7 @@ jobs:
           persist-credentials: false
 
       - name: Validate workflow files
-        uses: reviewdog/action-actionlint@8b682e1e7e512151d73a6b9449cbff173846226e # v1.74.0
+        uses: reviewdog/action-actionlint@1129829fb3230509a1c9aa4e93cec2b234746a68 # v1.78.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-check

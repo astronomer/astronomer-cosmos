@@ -7,7 +7,12 @@ from functools import cache as functools_cache
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
-from cosmos.dbt.project import change_working_directory, environ, exclude_dags_folder_from_sys_path
+from cosmos.dbt.project import (
+    change_working_directory,
+    environ,
+    exclude_dags_folder_from_sys_path,
+    override_sys_argv,
+)
 from cosmos.exceptions import CosmosDbtRunError
 from cosmos.log import get_logger
 

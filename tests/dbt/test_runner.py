@@ -113,7 +113,13 @@ def test_run_command_calls_cleanup_dbt_adapters():
     fake_result.result = None
 
     fake_runner = MagicMock()
-    fake_runner.invoke.return_value = fake_result
+    original_argv = sys.argv
+
+    def invoke(cli_args):
+        assert sys.argv == ["dbt", "deps"]
+        return fake_result
+
+    fake_runner.invoke.side_effect = invoke
 
     with (
         patch.object(dbt_runner, "get_runner", return_value=fake_runner),
@@ -128,7 +134,8 @@ def test_run_command_calls_cleanup_dbt_adapters():
             cwd="/tmp/project",
         )
     assert result is fake_result
-    fake_runner.invoke.assert_called_once()
+    assert sys.argv is original_argv
+    fake_runner.invoke.assert_called_once_with(["deps"])
     mock_cleanup.assert_called_once()
 
 
@@ -185,7 +192,13 @@ def test_run_command_excludes_dags_folder_from_sys_path():
 def test_run_command_calls_cleanup_dbt_adapters_when_invoke_raises():
     """run_command calls _cleanup_dbt_adapters even when runner.invoke raises (try/finally)."""
     fake_runner = MagicMock()
-    fake_runner.invoke.side_effect = RuntimeError("invoke failed")
+    original_argv = sys.argv
+
+    def invoke(cli_args):
+        assert sys.argv == ["dbt", "deps"]
+        raise RuntimeError("invoke failed")
+
+    fake_runner.invoke.side_effect = invoke
 
     with (
         patch.object(dbt_runner, "get_runner", return_value=fake_runner),
@@ -200,7 +213,8 @@ def test_run_command_calls_cleanup_dbt_adapters_when_invoke_raises():
                 env={},
                 cwd="/tmp/project",
             )
-    fake_runner.invoke.assert_called_once()
+    assert sys.argv is original_argv
+    fake_runner.invoke.assert_called_once_with(["deps"])
     mock_cleanup.assert_called_once()
 
 

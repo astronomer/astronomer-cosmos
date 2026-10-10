@@ -18,6 +18,6 @@ pytest -vv \
     --cov=cosmos \
     --cov-report=term-missing \
     --cov-report=xml \
-    -m 'integration and not dbtfusion' \
+    -m 'integration and not dbtfusion and not dbtcore2' \
     tests/test_example_k8s_dags.py \
     tests/operators/test_watcher_kubernetes_integration.py

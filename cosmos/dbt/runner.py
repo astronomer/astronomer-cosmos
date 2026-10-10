@@ -25,14 +25,34 @@ if TYPE_CHECKING:  # pragma: no cover
     from dbt.cli.main import dbtRunner, dbtRunnerResult
 
 
+UNAVAILABLE_MESSAGE = (
+    "Could not import dbt core. Ensure that dbt-core >= v1.5 and < 2.0 is installed and available in the "
+    "environment where the operator is running, or set InvocationMode.SUBPROCESS, the only mode supported "
+    "with dbt-core 2.x."
+)
+
+
 @cache
 def is_available() -> bool:
     """
-    Checks if the dbt runner is available (if dbt-core is installed in the same Python virtualenv as Airflow)."
+    Checks if the dbt runner is available: dbt-core is installed in the same Python virtualenv as Airflow and
+    exposes the Python API Cosmos drives, ``dbt.cli.main.dbtRunner`` together with ``dbt.version``.
+
+    dbt-core 2.x ships ``dbtRunner`` without event callbacks or ``dbt.version`` and returns bare node names from
+    ``ls``; Cosmos runs it through ``InvocationMode.SUBPROCESS`` instead.
+    See https://github.com/astronomer/astronomer-cosmos/issues/2993
     """
     try:
         from dbt.cli.main import dbtRunner  # noqa
     except ImportError:
+        return False
+    try:
+        from dbt.version import __version__  # noqa
+    except ImportError:
+        logger.info(
+            "dbt is importable but does not expose the dbt-core 1.x Python API (dbt.version), as in dbt-core 2.x. "
+            "Cosmos will invoke dbt as a subprocess."
+        )
         return False
     return True
 

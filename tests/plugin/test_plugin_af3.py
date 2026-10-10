@@ -35,6 +35,16 @@ def _isolate_env():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _bypass_plugin_auth(request):
+    """Bypass the routes' auth guard, except for tests marked with ``plugin_auth``."""
+    if "plugin_auth" in request.keywords:
+        yield
+        return
+    with patch("airflow.api_fastapi.core_api.security.requires_access_view", return_value=lambda: None):
+        yield
+
+
 def _reload_af3_module(api_base: str | None = None):
     # Reload module to recompute API_BASE_PATH under patched env
     with patch.dict(os.environ, {"AIRFLOW__API__BASE_URL": api_base or ""}, clear=False):
@@ -525,6 +535,71 @@ def test_dbt_docs_emits_telemetry_local_storage(mock_emit, tmp_path: Path):
             "has_custom_name": False,
         },
     )
+
+
+@skip_pre_airflow_31
+@pytest.mark.plugin_auth
+def test_routes_require_authentication(tmp_path: Path):
+    """Unauthenticated requests must not reach the dbt docs, manifest or catalog."""
+    docs_dir = tmp_path / "target"
+    docs_dir.mkdir(parents=True)
+    (docs_dir / "index.html").write_text("<head></head><body>dbt</body>")
+    (docs_dir / "manifest.json").write_text(json.dumps({"nodes": {"model.a": {"raw_code": "select 1"}}}))
+    (docs_dir / "catalog.json").write_text(json.dumps({"sources": {}}))
+
+    af3, app = _app_with_projects({"core": {"dir": str(docs_dir), "index": "index.html"}})
+    client = TestClient(app)
+
+    for route in ("/core/dbt_docs", "/core/dbt_docs_index.html", "/core/manifest.json", "/core/catalog.json"):
+        response = client.get(route)
+        assert response.status_code == 401
+        assert "raw_code" not in response.text
+
+
+@skip_pre_airflow_31
+@pytest.mark.plugin_auth
+def test_routes_forbidden_for_unauthorized_user(tmp_path: Path):
+    """An authenticated user without plugin view access gets a 403."""
+    from airflow.api_fastapi.core_api import security
+
+    docs_dir = tmp_path / "target"
+    docs_dir.mkdir(parents=True)
+    (docs_dir / "manifest.json").write_text(json.dumps({"nodes": {}}))
+
+    af3, app = _app_with_projects({"core": {"dir": str(docs_dir), "index": "index.html"}})
+    app.dependency_overrides[security.get_user] = lambda: "some-user"
+    client = TestClient(app)
+
+    with patch.object(security, "get_auth_manager") as mock_get_auth_manager:
+        mock_get_auth_manager.return_value.is_authorized_view.return_value = False
+        assert client.get("/core/manifest.json").status_code == 403
+
+        mock_get_auth_manager.return_value.is_authorized_view.return_value = True
+        response = client.get("/core/manifest.json")
+
+    assert response.status_code == 200
+    assert response.json() == {"nodes": {}}
+
+
+@skip_pre_airflow_31
+@pytest.mark.plugin_auth
+def test_auth_dependencies_fail_closed_without_airflow_security():
+    """If the Airflow security helpers cannot be imported, the routes deny every request."""
+    import sys
+
+    from fastapi import FastAPI
+
+    af3 = _reload_af3_module()
+    with patch.dict(sys.modules, {"airflow.api_fastapi.core_api.security": None}):
+        dependencies = af3.cosmos_auth_dependencies()
+
+    app = FastAPI(dependencies=dependencies)
+
+    @app.get("/ping")
+    def ping() -> str:
+        return "pong"
+
+    assert TestClient(app).get("/ping").status_code == 403
 
 
 @pytest.mark.parametrize(

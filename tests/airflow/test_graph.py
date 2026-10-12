@@ -266,6 +266,112 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
     assert list(output.children.keys()) == [f"dbt_node.{task_suffix}", "dbt_node.test"]
 
 
+@pytest.mark.parametrize("test_behavior", [TestBehavior.AFTER_EACH, TestBehavior.BUILD])
+def test_create_task_group_for_source_node(test_behavior):
+    """
+    Sources are rendered as ``dbt source freshness`` tasks, which do not run the tests defined on the
+    source, and ``dbt build`` does not evaluate sources. So a source with non-detached tests should be
+    rendered as a task group with a dedicated test task under TestBehavior.BUILD as well as under
+    TestBehavior.AFTER_EACH.
+    https://github.com/astronomer/astronomer-cosmos/issues/1683
+    """
+    with DAG("test-task-group-source", start_date=datetime(2022, 1, 1)) as dag:
+        node = DbtNode(
+            unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.dbt_node",
+            resource_type=DbtResourceType.SOURCE,
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/sources.yml"),
+            tags=[],
+            config={},
+            depends_on=[],
+            has_freshness=True,
+            has_test=True,
+            has_non_detached_test=True,
+        )
+    output = generate_task_or_group(
+        dag=dag,
+        task_group=None,
+        node=node,
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={
+            "project_dir": SAMPLE_PROJ_PATH,
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        },
+        dbt_project_name="astro_shop",
+        node_converters={},
+        render_config=RenderConfig(
+            test_behavior=test_behavior,
+            source_rendering_behavior=SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
+        ),
+        on_warning_callback=None,
+    )
+    assert isinstance(output, TaskGroup)
+    assert list(output.children.keys()) == ["dbt_node.source", "dbt_node.test"]
+
+
+def test_build_airflow_graph_renders_source_tests_with_build_test_behavior():
+    """
+    End-to-end check for https://github.com/astronomer/astronomer-cosmos/issues/1683: with
+    SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS and TestBehavior.BUILD, the tests defined on a
+    source must be rendered as a test task, not silently dropped.
+    """
+    source_node = DbtNode(
+        unique_id="source.astro_shop.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/sources.yml"),
+        tags=[],
+        config={},
+        depends_on=[],
+        has_freshness=True,
+        has_test=True,
+        has_non_detached_test=True,
+    )
+    test_node = DbtNode(
+        unique_id="test.astro_shop.not_null_my_source_id",
+        resource_type=DbtResourceType.TEST,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/sources.yml"),
+        tags=[],
+        config={},
+        depends_on=[source_node.unique_id],
+    )
+    nodes = {node.unique_id: node for node in (source_node, test_node)}
+    with DAG("test-source-tests-build", start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn",
+                        profile_args={"schema": "public"},
+                    ),
+                ),
+            },
+            dbt_project_name="astro_shop",
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.BUILD,
+                source_rendering_behavior=SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
+            ),
+        )
+    assert sorted(task.task_id for task in dag.tasks) == ["my_source.source", "my_source.test"]
+    assert dag.get_task("my_source.test").__class__.__name__ == "DbtTestLocalOperator"
+
+
 def test_generate_task_or_group_with_dynamic_node_type_and_converter():
     """A node whose resource_type is not in dbt_resource_to_class should be rendered via a user-supplied converter."""
 

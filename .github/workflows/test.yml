@@ -135,27 +135,6 @@ jobs:
         airflow-version: ["3.1"] # TEMPORARY: restore the full matrix before merge
         dbt-version: [ "1.12" ]
         split-group: [1, 2, 3]
-        exclude:
-          # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
-          - python-version: "3.13"
-            airflow-version: "2.9"
-          - python-version: "3.13"
-            airflow-version: "2.10"
-          - python-version: "3.13"
-            airflow-version: "2.11"
-          - python-version: "3.13"
-            airflow-version: "3.0"
-          # Python 3.14 is only pinned in the Airflow 3.2/3.3 dbt-1.12 lockfiles.
-          - python-version: "3.14"
-            airflow-version: "2.9"
-          - python-version: "3.14"
-            airflow-version: "2.10"
-          - python-version: "3.14"
-            airflow-version: "2.11"
-          - python-version: "3.14"
-            airflow-version: "3.0"
-          - python-version: "3.14"
-            airflow-version: "3.1"
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18

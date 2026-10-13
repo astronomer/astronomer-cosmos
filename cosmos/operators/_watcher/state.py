@@ -143,6 +143,11 @@ def get_status_xcom_key(unique_id: str) -> str:
     return f"{unique_id.replace('.', '__')}_status"
 
 
+def get_upstream_failure_skip_xcom_key(unique_id: str) -> str:
+    """Build the XCom key that marks a node dbt skipped for an upstream failure, sanitising dots to ``__``."""
+    return f"{unique_id.replace('.', '__')}_upstream_failure_skip"
+
+
 def get_dbt_event_xcom_key(unique_id: str) -> str:
     """Build the XCom key used to publish a dbt node's structured event, sanitising dots in ``unique_id`` to ``__``."""
     return f"{unique_id.replace('.', '__')}_dbt_event"

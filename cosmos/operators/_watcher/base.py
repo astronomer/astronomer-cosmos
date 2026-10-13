@@ -33,6 +33,7 @@ from cosmos.operators._watcher.state import (
     get_compiled_sql_xcom_key,
     get_dbt_event_xcom_key,
     get_status_xcom_key,
+    get_upstream_failure_skip_xcom_key,
     get_xcom_val,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
@@ -339,7 +340,8 @@ def store_dbt_resource_status_from_log(
         function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event; later
         ``NodeFinished`` events with ``node_status="skipped"`` for these unique_ids
         are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
-        retry it) rather than going SKIPPED. See #2698.
+        retry it) rather than going SKIPPED. See #2698. Each such node also gets an
+        ``<unique_id>_upstream_failure_skip`` XCom. See #3023.
     """
     try:
         log_line = json.loads(line)
@@ -396,6 +398,10 @@ def store_dbt_resource_status_from_log(
                     "status": dbt_node_status,
                     "outlet_uris": outlet_uris,
                 }
+                if upstream_failure_skipped_ids and unique_id in upstream_failure_skipped_ids:
+                    safe_xcom_push(
+                        task_instance=context["ti"], key=get_upstream_failure_skip_xcom_key(unique_id), value=True
+                    )
                 safe_xcom_push(
                     task_instance=context["ti"],
                     key=get_status_xcom_key(unique_id),

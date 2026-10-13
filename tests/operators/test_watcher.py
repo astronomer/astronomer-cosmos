@@ -676,6 +676,22 @@ class TestStoreDbtStatusFromLog:
 
         assert upstream_failure_skipped_ids == {"model.pkg.downstream_model"}
         assert ti.store.get("model__pkg__downstream_model_status") == {"status": "failed", "outlet_uris": []}
+        assert ti.store.get("model__pkg__downstream_model_upstream_failure_skip") is True
+
+    def test_store_dbt_resource_status_from_log_does_not_mark_real_failures(self):
+        """A node that dbt ran and failed carries no upstream-failure-skip mark (#3023)."""
+        ti = _MockTI()
+
+        store_dbt_resource_status_from_log(
+            self._node_log_line("model.pkg.failed_model", "error"),
+            {"context": {"ti": ti}},
+            tests_per_model={},
+            test_results_per_model={},
+            upstream_failure_skipped_ids=set(),
+        )
+
+        assert ti.store.get("model__pkg__failed_model_status") == {"status": "error", "outlet_uris": []}
+        assert "model__pkg__failed_model_upstream_failure_skip" not in ti.store
 
     def test_store_dbt_resource_status_from_log_keeps_plain_skips_as_skipped(self):
         """Plain skips are unchanged, including when no rewrite accumulator is passed."""
@@ -699,6 +715,8 @@ class TestStoreDbtStatusFromLog:
 
         assert ti.store.get("model__pkg__with_accumulator_status") == {"status": "skipped", "outlet_uris": []}
         assert ti.store.get("model__pkg__without_accumulator_status") == {"status": "skipped", "outlet_uris": []}
+        assert "model__pkg__with_accumulator_upstream_failure_skip" not in ti.store
+        assert "model__pkg__without_accumulator_upstream_failure_skip" not in ti.store
 
     def test_store_dbt_resource_status_from_log_ignores_other_statuses(self):
         """Test that statuses other than success/failed are ignored."""

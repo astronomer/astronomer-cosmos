@@ -511,7 +511,7 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11"]
         airflow-version: ["2.10", "3.0"]
-        dbt-version: ["2.0"]  # dbt Fusion
+        dbt-version: ["v2"]  # dbt v2 default distribution (`dbt`, formerly "dbt Fusion")
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

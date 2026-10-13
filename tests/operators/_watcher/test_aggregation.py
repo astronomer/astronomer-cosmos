@@ -237,7 +237,12 @@ class TestPushTestResultOrAggregate:
             "test.pkg.not_null_orders_id", "failed", TESTS_PER_MODEL, results, ti, upstream_failure_skipped_ids
         )
         push_test_result_or_aggregate(
-            "test.pkg.unique_orders_id", unique_orders_status, TESTS_PER_MODEL, results, ti, upstream_failure_skipped_ids
+            "test.pkg.unique_orders_id",
+            unique_orders_status,
+            TESTS_PER_MODEL,
+            results,
+            ti,
+            upstream_failure_skipped_ids,
         )
         assert mock_xcom_push.call_args_list == [
             call(task_instance=ti, key="model__pkg__orders_tests_upstream_failure_skip", value=True),
@@ -265,7 +270,12 @@ class TestPushTestResultOrAggregate:
             "test.pkg.not_null_orders_id", "failed", TESTS_PER_MODEL, results, ti, upstream_failure_skipped_ids
         )
         push_test_result_or_aggregate(
-            "test.pkg.unique_orders_id", unique_orders_status, TESTS_PER_MODEL, results, ti, upstream_failure_skipped_ids
+            "test.pkg.unique_orders_id",
+            unique_orders_status,
+            TESTS_PER_MODEL,
+            results,
+            ti,
+            upstream_failure_skipped_ids,
         )
         mock_xcom_push.assert_called_once_with(
             task_instance=ti, key="model__pkg__orders_tests_status", value=DbtTestStatus.FAIL

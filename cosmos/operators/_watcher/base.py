@@ -293,6 +293,23 @@ def _rewrite_upstream_failure_skip_status(
     return dbt_node_status
 
 
+def _push_node_status(
+    task_instance: Any,
+    unique_id: str,
+    dbt_node_status: Any,
+    outlet_uris: list[str],
+    upstream_failure_skipped_ids: set[str] | None,
+) -> None:
+    """Push a node's status XCom, preceded by its upstream-failure-skip mark when dbt skipped it for that reason."""
+    if upstream_failure_skipped_ids and unique_id in upstream_failure_skipped_ids:
+        safe_xcom_push(task_instance=task_instance, key=get_upstream_failure_skip_xcom_key(unique_id), value=True)
+    safe_xcom_push(
+        task_instance=task_instance,
+        key=get_status_xcom_key(unique_id),
+        value={"status": dbt_node_status, "outlet_uris": outlet_uris},
+    )
+
+
 def _surface_non_json_stdout(line: str) -> None:
     """Forward non-JSON stdout (e.g. Snowflake connector's "Going to open: <URL>" prompt
     during externalbrowser auth) to the task log instead of silently dropping it.
@@ -399,19 +416,7 @@ def store_dbt_resource_status_from_log(
                     _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
                     outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
 
-                status_value: dict[str, Any] | str = {
-                    "status": dbt_node_status,
-                    "outlet_uris": outlet_uris,
-                }
-                if upstream_failure_skipped_ids and unique_id in upstream_failure_skipped_ids:
-                    safe_xcom_push(
-                        task_instance=context["ti"], key=get_upstream_failure_skip_xcom_key(unique_id), value=True
-                    )
-                safe_xcom_push(
-                    task_instance=context["ti"],
-                    key=get_status_xcom_key(unique_id),
-                    value=status_value,
-                )
+                _push_node_status(context["ti"], unique_id, dbt_node_status, outlet_uris, upstream_failure_skipped_ids)
 
             # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
             # compiled_sql is available for both success and failed models - it's compiled before execution

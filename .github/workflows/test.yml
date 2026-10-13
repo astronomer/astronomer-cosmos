@@ -181,8 +181,8 @@ jobs:
           # Apache Airflow 3.4 requires Python >=3.11.
           - python-version: "3.10"
             airflow-version: "3.4"
-          # dbt v2 (dbt-oss) runs only the duckdb tests (see scripts/test/integration-dbt-v2.sh), so a
-          # small subset of the matrix is enough: one split group, Python 3.11/3.12, Airflow 2.10/3.0/3.1.
+          # dbt v2 (dbt-oss) runs a small subset of the matrix: one split group, Python 3.11/3.12,
+          # Airflow 2.10/3.0/3.1.
           - dbt-version: "v2.0-oss"
             split-group: 2
           - dbt-version: "v2.0-oss"
@@ -253,11 +253,10 @@ jobs:
           HATCH_ENV="tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}"
           if [[ "${{ matrix.dbt-version }}" == v* ]]; then
             hatch run "$HATCH_ENV:test-integration-dbt-v2-setup"
-            hatch run "$HATCH_ENV:test-integration-dbt-v2"
           else
             hatch run "$HATCH_ENV:test-integration-setup"
-            hatch run "$HATCH_ENV:test-integration"
           fi
+          hatch run "$HATCH_ENV:test-integration"
         env:
           PYTEST_SPLITS: 3
           PYTEST_SPLIT_GROUP: ${{ matrix.split-group }}

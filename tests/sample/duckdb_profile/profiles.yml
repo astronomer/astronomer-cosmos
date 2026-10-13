@@ -1,0 +1,7 @@
+duckdb_profile:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '/tmp/cosmos_jaffle_shop.duckdb') }}"
+      threads: 1

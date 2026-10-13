@@ -42,7 +42,7 @@ from cosmos.operators.watcher import (
     _StdoutFilter,
     store_dbt_resource_status_from_log,
 )
-from cosmos.profiles import PostgresUserPasswordProfileMapping, get_automatic_profile_mapping
+from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping, get_automatic_profile_mapping
 from tests.utils import AIRFLOW_VERSION, new_test_dag
 
 DBT_PROJECT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
@@ -68,9 +68,8 @@ project_config = ProjectConfig(
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
-    profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="example_conn",
-        profile_args={"schema": "public"},
+    profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+        conn_id="gcp_gs_conn",
         disable_event_tracking=True,
     ),
 )
@@ -93,34 +92,10 @@ class _MockContext(dict):
 
 @pytest.fixture
 def reset_fail_once_sequence():
-    """Drop a fail-once Postgres sequence on ``example_conn`` so a watcher
-    retry-recovery integration test starts from a clean state.
-
-    The watcher integration tests use a per-project Postgres sequence
-    (created in the dbt project's ``on-run-start``) plus a model ``pre_hook``
-    that ``nextval``s into it and raises if the value is <= 1. That makes the
-    first run of the flaky model fail and any subsequent run succeed -- the
-    minimal recipe for exercising the consumer-fallback retry path. Each test
-    drops its sequence before running so re-runs and CI parallelism don't
-    leak sequence state.
-    """
-    import psycopg2
-    from airflow.hooks.base import BaseHook
-
-    def _drop(sequence_name: str) -> None:
-        airflow_conn = BaseHook.get_connection("example_conn")
-        with psycopg2.connect(
-            host=airflow_conn.host,
-            port=airflow_conn.port or 5432,
-            dbname=airflow_conn.schema or "postgres",
-            user=airflow_conn.login,
-            password=airflow_conn.password,
-        ) as conn:
-            conn.autocommit = True
-            with conn.cursor() as cur:
-                cur.execute(f"DROP SEQUENCE IF EXISTS public.{sequence_name}")
-
-    return _drop
+    """The watcher retry-recovery integration tests rely on a per-project Postgres sequence (created in the dbt
+    project's ``on-run-start``) and a model ``pre_hook`` written in PL/pgSQL, which BigQuery does not support.
+    The tests are skipped until they are rewritten for BigQuery."""
+    pytest.skip("Requires Postgres sequences and PL/pgSQL, which BigQuery does not support")
 
 
 def test_dbt_producer_watcher_operator_priority_weight_default():

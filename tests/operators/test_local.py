@@ -59,7 +59,7 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
     _read_target_sources_json,
 )
-from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 from tests.conftest import make_task_instance
 from tests.utils import new_test_dag
 from tests.utils import test_dag as run_test_dag
@@ -79,9 +79,8 @@ profile_config = ProfileConfig(
 real_profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
-    profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="example_conn",
-        profile_args={"schema": "public"},
+    profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+        conn_id="gcp_gs_conn",
     ),
 )
 
@@ -90,9 +89,8 @@ mini_profile_config = ProfileConfig(profile_name="mini", target_name="dev", prof
 multi_folder_profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
-    profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="example_conn",
-        profile_args={"schema": "public"},
+    profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+        conn_id="gcp_gs_conn",
         disable_event_tracking=True,
     ),
 )

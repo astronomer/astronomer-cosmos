@@ -39,7 +39,7 @@ from cosmos.dbt.graph import (
     run_command_with_subprocess,
 )
 from cosmos.dbt.selector import YamlSelectors
-from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping, PostgresUserPasswordProfileMapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
@@ -113,9 +113,8 @@ def postgres_profile_config() -> ProfileConfig:
     return ProfileConfig(
         profile_name="default",
         target_name="default",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="gcp_gs_conn",
         ),
     )
 
@@ -880,9 +879,8 @@ def test_load_automatic_without_manifest_with_profile_mapping(mock_load_via_dbt_
     profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="gcp_gs_conn",
         ),
     )
     dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)

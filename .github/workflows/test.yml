@@ -201,6 +201,21 @@ jobs:
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
+      - name: Configure BigQuery connection
+        # The tests write to a BigQuery dataset that is specific to this matrix cell; the following steps get the
+        # updated gcp_gs_conn connection through GITHUB_ENV.
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+          AIRFLOW_VERSION: ${{ matrix.airflow-version }}
+          DBT_VERSION: ${{ matrix.dbt-version }}
+          SPLIT_GROUP: ${{ matrix.split-group }}
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+        run: |
+          DATASET="cosmos_ci_${GITHUB_RUN_ID}_py${PYTHON_VERSION}_af${AIRFLOW_VERSION}_dbt${DBT_VERSION}_g${SPLIT_GROUP}"
+          DATASET="${DATASET//[^A-Za-z0-9_]/_}"
+          echo "COSMOS_TEST_BIGQUERY_DATASET=${DATASET}" >> "$GITHUB_ENV"
+          COSMOS_TEST_BIGQUERY_DATASET="${DATASET}" hatch run "tests.py${PYTHON_VERSION}-${AIRFLOW_VERSION}-${DBT_VERSION}:python" scripts/test/set_bigquery_ci_connection.py
+
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-setup
@@ -218,7 +233,6 @@ jobs:
           AIRFLOW__DAG_PROCESSOR__DAG_FILE_PROCESSOR_TIMEOUT: 120
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
           AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
-          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
           AIRFLOW_CONN_AZURE_ABFS_CONN: ${{ secrets.AIRFLOW_CONN_AZURE_ABFS_CONN }}
           DATABRICKS_HOST: mock
           DATABRICKS_WAREHOUSE_ID: mock
@@ -235,6 +249,10 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
+
+      - name: Delete BigQuery dataset
+        if: always()
+        run: hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" scripts/test/delete_bigquery_ci_dataset.py
 
       - name: Upload coverage to GitHub
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

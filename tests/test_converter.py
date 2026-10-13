@@ -37,6 +37,7 @@ from cosmos.operators.local import (
     DbtSourceLocalOperator,
     DbtTestLocalOperator,
 )
+from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 from cosmos.profiles.postgres import PostgresUserPasswordProfileMapping
 from cosmos.telemetry import _decompress_telemetry_metadata
 
@@ -344,9 +345,8 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
     profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="gcp_gs_conn",
             disable_event_tracking=True,
         ),
     )
@@ -404,9 +404,8 @@ def test_converter_passes_render_config_exclude_to_test_tasks():
     profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="gcp_gs_conn",
             disable_event_tracking=True,
         ),
     )
@@ -468,9 +467,8 @@ def test_converter_creates_dag_with_test_with_multiple_parents_with_should_detac
     profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="gcp_gs_conn",
             disable_event_tracking=True,
         ),
     )
@@ -509,9 +507,8 @@ def test_converter_creates_dag_with_test_with_multiple_parents_test_afterall():
     profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="gcp_gs_conn",
             disable_event_tracking=True,
         ),
     )
@@ -592,9 +589,8 @@ def test_converter_creates_dag_with_test_with_multiple_parents_test_none():
     profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="gcp_gs_conn",
             disable_event_tracking=True,
         ),
     )
@@ -629,9 +625,8 @@ def test_converter_creates_dag_with_test_with_multiple_parents_and_build():
     profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="gcp_gs_conn",
             disable_event_tracking=True,
         ),
     )
@@ -1746,9 +1741,8 @@ def _build_altered_jaffle_shop_dag(dag_id, ephemeral_models_as_empty_operator):
         profile_config=ProfileConfig(
             profile_name="default",
             target_name="dev",
-            profile_mapping=PostgresUserPasswordProfileMapping(
-                conn_id="example_conn",
-                profile_args={"schema": "public"},
+            profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+                conn_id="gcp_gs_conn",
                 disable_event_tracking=True,
             ),
         ),

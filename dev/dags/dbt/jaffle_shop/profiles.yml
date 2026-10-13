@@ -24,3 +24,11 @@ snowflake_profile:
       database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
   config:
     send_anonymous_usage_stats: false
+
+duckdb_profile:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '/tmp/cosmos_jaffle_shop.duckdb') }}"
+      threads: 1

@@ -1570,6 +1570,59 @@ class TestDbtConsumerWatcherSensor:
         sensor._fallback_to_non_watcher_run.assert_not_called()
         mock_log_dbt_event.assert_not_called()
 
+    UPSTREAM_SKIP_XCOMS = {
+        "model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []},
+        "model__jaffle_shop__stg_orders_upstream_failure_skip": True,
+    }
+
+    @staticmethod
+    def make_xcom_ti(xcoms: dict, try_number: int = 1) -> MagicMock:
+        ti = MagicMock()
+        ti.try_number = try_number
+        ti.xcom_pull.side_effect = lambda *args, key=None, **kwargs: xcoms.get(key)
+        return ti
+
+    def test_poke_falls_back_on_first_try_for_upstream_failure_skip(self):
+        """#3023: dbt never ran a node it skipped for an upstream failure, so build it on try 1 instead of
+        raising and waiting one retry_delay for try 2 to fall back."""
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+
+        assert sensor.poke(context) is True
+        sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
+
+    @pytest.mark.parametrize(
+        "retries, xcoms, producer_state",
+        [
+            # A retry would not fall back either, so the outcome stays a failure.
+            (0, UPSTREAM_SKIP_XCOMS, "success"),
+            # dbt ran the node and it failed.
+            (1, {"model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []}}, "success"),
+            # The producer state is unknown, so it may still write XComs.
+            (1, UPSTREAM_SKIP_XCOMS, None),
+        ],
+    )
+    def test_poke_raises_on_first_try_without_upstream_failure_skip_fallback(self, retries, xcoms, producer_state):
+        sensor = self.make_sensor(retries=retries)
+        sensor._get_producer_task_status.return_value = producer_state
+        sensor._fallback_to_non_watcher_run = MagicMock()
+        context = self.make_context(self.make_xcom_ti(xcoms))
+
+        with pytest.raises(AirflowException, match="finished with status 'failed'"):
+            sensor.poke(context)
+        sensor._fallback_to_non_watcher_run.assert_not_called()
+
+    def test_poke_keeps_polling_upstream_failure_skip_while_producer_running(self):
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "running"
+        sensor._fallback_to_non_watcher_run = MagicMock()
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+
+        assert sensor.poke(context) is False
+        sensor._fallback_to_non_watcher_run.assert_not_called()
+
     def test_fallback_to_non_watcher_run(self):
         """When the producer hasn't published its flags to XCom, fall back to this consumer's own."""
         sensor = self.make_sensor()
@@ -3132,6 +3185,24 @@ class TestDbtTestWatcherOperator:
         assert result is True
         mock_fallback_to_non_watcher_run.assert_called_once()
         sensor.build_and_run_cmd.assert_called_once()
+        _, kwargs = sensor.build_and_run_cmd.call_args
+        assert kwargs["cmd_flags"] == ["--select", DbtNode.get_resource_name_from_unique_id(self.MODEL_UID)]
+
+    def test_poke_runs_tests_on_first_try_when_fail_came_from_upstream_failure_skips(self):
+        """#3023: tests that dbt skipped for an upstream failure never ran, so run them on try 1."""
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor.build_and_run_cmd = MagicMock()
+        xcoms = {
+            self.TESTS_STATUS_XCOM_KEY: "fail",
+            "model__jaffle_shop__stg_orders_tests_upstream_failure_skip": True,
+        }
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.side_effect = lambda *args, key=None, **kwargs: xcoms.get(key)
+        context = self.make_context(ti)
+
+        assert sensor.poke(context) is True
         _, kwargs = sensor.build_and_run_cmd.call_args
         assert kwargs["cmd_flags"] == ["--select", DbtNode.get_resource_name_from_unique_id(self.MODEL_UID)]
 

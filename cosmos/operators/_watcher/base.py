@@ -23,7 +23,11 @@ from cosmos.constants import (
 from cosmos.dbt.graph import DbtNode
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
-from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
+from cosmos.operators._watcher.aggregation import (
+    get_tests_status_xcom_key,
+    get_tests_upstream_failure_skip_xcom_key,
+    push_test_result_or_aggregate,
+)
 from cosmos.operators._watcher.state import (
     DbtNodeStatus,
     ProducerTaskState,
@@ -776,6 +780,28 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         return None
 
+    def _fall_back_for_upstream_failure_skip(self, context: Context, producer_task_state: str | None) -> bool:
+        """Build the node now if dbt skipped it for an upstream failure, and return whether it did.
+
+        Only when a retry would fall back anyway (retries left, producer terminated), so this saves the retry_delay
+        without changing the outcome. See #3023.
+        """
+        if not self.retries or not is_producer_task_terminated(producer_task_state):
+            return False
+        mark_key = (
+            get_tests_upstream_failure_skip_xcom_key(self.model_unique_id)
+            if self.is_test_sensor
+            else get_upstream_failure_skip_xcom_key(self.model_unique_id)
+        )
+        if not get_xcom_val(context["ti"], self.producer_task_id, mark_key):
+            return False
+        logger.info(
+            "dbt skipped %s '%s' for an upstream failure, so it never ran. Running it now instead of on a retry.",
+            self._resource_label.lower(),
+            self.model_unique_id,
+        )
+        return self._fallback_to_non_watcher_run(context["ti"].try_number, context)
+
     def _handle_no_dbt_node_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
         """Handle the case where no dbt node status has been reported yet."""
         if producer_task_state == ProducerTaskState.FAILED:
@@ -850,6 +876,10 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         _log_dbt_event(dbt_events)
 
+        if is_dbt_node_status_failed(status) and self._fall_back_for_upstream_failure_skip(
+            context, producer_task_state
+        ):
+            return True
         if is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."

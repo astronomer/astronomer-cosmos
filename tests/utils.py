@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.metadata
 import logging
 import sys
 import warnings
@@ -319,3 +320,13 @@ def _get_or_create_dagrun(
     log.info("created dagrun %s", str(dr))
 
     return dr
+
+
+def get_dbt_version() -> Version:
+    """Return the installed dbt version, for dbt-core 1.x and dbt-oss (dbt v2 has no ``dbt.version`` module)."""
+    for distribution in ("dbt-core", "dbt-oss"):
+        try:
+            return Version(importlib.metadata.version(distribution))
+        except importlib.metadata.PackageNotFoundError:
+            continue
+    raise RuntimeError("Neither dbt-core nor dbt-oss is installed.")

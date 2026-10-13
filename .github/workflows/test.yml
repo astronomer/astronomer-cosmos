@@ -248,6 +248,18 @@ jobs:
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
+      - name: Use BigQuery in place of Postgres for dbt v2
+        # dbt v2 does not support the Postgres adapter, so the tests write to a BigQuery dataset
+        # that is specific to this matrix cell (see tests/conftest.py).
+        if: startsWith(matrix.dbt-version, 'v')
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+          AIRFLOW_VERSION: ${{ matrix.airflow-version }}
+          SPLIT_GROUP: ${{ matrix.split-group }}
+        run: |
+          echo "COSMOS_TEST_ADAPTER=bigquery" >> "$GITHUB_ENV"
+          echo "COSMOS_TEST_BIGQUERY_DATASET=cosmos_ci_${GITHUB_RUN_ID}_py${PYTHON_VERSION//./}_af${AIRFLOW_VERSION//./}_g${SPLIT_GROUP}" >> "$GITHUB_ENV"
+
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
           HATCH_ENV="tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}"
@@ -287,6 +299,12 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
+
+      - name: Delete BigQuery dataset
+        if: always() && startsWith(matrix.dbt-version, 'v')
+        run: hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" scripts/ci_delete_bigquery_dataset.py
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
 
       - name: Upload coverage to GitHub
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

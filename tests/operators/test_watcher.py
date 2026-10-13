@@ -2945,9 +2945,10 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
     ``SkippingDetails``/``LogSkipBecauseError``, since both come from
     ``on_skip()`` which is only reached via ``do_skip(cause=...)``). Subsequent
     "skipped" terminal events for those unique_ids are rewritten to "failed" so
-    the consumer fails on attempt 1, Airflow retries it, and the existing
-    ``_fallback_to_non_watcher_run`` path runs the model locally once its
-    upstream has recovered.
+    the consumer does not end SKIPPED. Since #3023 the producer also marks those
+    nodes, so their consumers run the existing ``_fallback_to_non_watcher_run``
+    path on attempt 1 once the upstream has recovered, instead of raising and
+    waiting one ``retry_delay`` for attempt 2.
     """
     from airflow import DAG
 
@@ -2993,15 +2994,14 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
 
     tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
 
-    # Core #2698 assertion: the parametrized downstream model must end SUCCESS,
-    # not SKIPPED, and must have actually been retried (try_number > 1 proves
-    # the consumer-fallback path fired rather than the task happening to succeed
-    # on the first attempt).
+    # Core #2698 assertion: the parametrized downstream model must end SUCCESS, not SKIPPED.
     assert tis[downstream_task_id].state == "success"
-    assert tis[downstream_task_id].try_number > 1
+    # #3023: dbt never ran the downstream model, so its consumer builds it on attempt 1.
+    assert tis[downstream_task_id].try_number == 1
 
-    # The flaky upstream itself also recovers via the consumer-retry fallback.
+    # The flaky upstream failed for real, so it still recovers through an Airflow retry.
     assert tis["watcher_upstream_failure_recovery.model_flaky_run"].state == "success"
+    assert tis["watcher_upstream_failure_recovery.model_flaky_run"].try_number > 1
     assert tis["watcher_upstream_failure_recovery.model_a_run"].state == "success"
 
     # Producer/gateway/post_dbt sanity (matches the gateway-prevents-skip test).

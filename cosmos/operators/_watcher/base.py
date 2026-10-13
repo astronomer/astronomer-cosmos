@@ -382,7 +382,12 @@ def store_dbt_resource_status_from_log(
             if dbt_node_resource_type == "test" and tests_per_model and test_results_per_model is not None:
                 logger.debug("Test '%s' finished with status '%s'", unique_id, dbt_node_status)
                 push_test_result_or_aggregate(
-                    unique_id, dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
+                    unique_id,
+                    dbt_node_status,
+                    tests_per_model,
+                    test_results_per_model,
+                    context["ti"],
+                    upstream_failure_skipped_ids,
                 )
             else:
                 # Lazily populate per-model outlet URIs from the manifest, but only when the

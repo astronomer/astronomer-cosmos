@@ -678,6 +678,34 @@ class TestStoreDbtStatusFromLog:
         assert ti.store.get("model__pkg__downstream_model_status") == {"status": "failed", "outlet_uris": []}
         assert ti.store.get("model__pkg__downstream_model_upstream_failure_skip") is True
 
+    def test_store_dbt_resource_status_from_log_marks_upstream_failure_skipped_tests(self):
+        """#3023: tests dbt skipped for an upstream failure mark the model's aggregated test status."""
+        ti = _MockTI()
+        upstream_failure_skipped_ids: set[str] = set()
+        test_log_line = json.dumps(
+            {
+                "info": {"name": "SkippingDetails"},
+                "data": {
+                    "node_info": {
+                        "node_status": "skipped",
+                        "unique_id": "test.pkg.not_null_orders_id",
+                        "resource_type": "test",
+                    }
+                },
+            }
+        )
+
+        store_dbt_resource_status_from_log(
+            test_log_line,
+            {"context": {"ti": ti}},
+            tests_per_model={"model.pkg.orders": ["test.pkg.not_null_orders_id"]},
+            test_results_per_model={},
+            upstream_failure_skipped_ids=upstream_failure_skipped_ids,
+        )
+
+        assert ti.store.get("model__pkg__orders_tests_status") == "fail"
+        assert ti.store.get("model__pkg__orders_tests_upstream_failure_skip") is True
+
     def test_store_dbt_resource_status_from_log_does_not_mark_real_failures(self):
         """A node that dbt ran and failed carries no upstream-failure-skip mark (#3023)."""
         ti = _MockTI()

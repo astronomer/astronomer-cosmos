@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, ci/run-integration-tests-on-bigquery] # TEMPORARY: revert before merge
   # Also run on pull requests originating from forks. Every test job here is secret-dependent
   # (integration tests, kubernetes, code coverage) and depends on the Authorize job, which requires
   # manually approving the workflow run for external PRs. Jobs that need no secrets (type-check,
@@ -131,8 +131,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3"]
+        python-version: ["3.12"] # TEMPORARY: restore the full matrix before merge
+        airflow-version: ["3.1"] # TEMPORARY: restore the full matrix before merge
         dbt-version: [ "1.12" ]
         split-group: [1, 2, 3]
         exclude:

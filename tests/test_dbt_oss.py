@@ -37,7 +37,7 @@ def test_dbt_oss():
         profile_config=ProfileConfig(
             profile_name="duckdb_profile",
             target_name="dev",
-            profiles_yml_filepath=DBT_PROJECT_PATH / "profiles.yml",
+            profiles_yml_filepath=Path(__file__).parent / "sample/duckdb_profile/profiles.yml",
         ),
         render_config=RenderConfig(dbt_executable_path=DBT_EXECUTABLE, invocation_mode=InvocationMode.SUBPROCESS),
         start_date=datetime(2023, 1, 1),

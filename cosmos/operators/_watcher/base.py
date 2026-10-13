@@ -703,6 +703,8 @@ class BaseConsumerSensor(BaseSensorOperator):
             return
 
         if reason == WatcherEventReason.NODE_FAILED:
+            if self._fall_back_for_upstream_failure_skip(context):
+                return
             raise AirflowException(
                 f"dbt {self._resource_label.lower()} '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
             )
@@ -780,13 +782,13 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         return None
 
-    def _fall_back_for_upstream_failure_skip(self, context: Context, producer_task_state: str | None) -> bool:
+    def _fall_back_for_upstream_failure_skip(self, context: Context) -> bool:
         """Build the node now if dbt skipped it for an upstream failure, and return whether it did.
 
         Only when a retry would fall back anyway (retries left, producer terminated), so this saves the retry_delay
         without changing the outcome. See #3023.
         """
-        if not self.retries or not is_producer_task_terminated(producer_task_state):
+        if not self.retries:
             return False
         mark_key = (
             get_tests_upstream_failure_skip_xcom_key(self.model_unique_id)
@@ -794,6 +796,8 @@ class BaseConsumerSensor(BaseSensorOperator):
             else get_upstream_failure_skip_xcom_key(self.model_unique_id)
         )
         if not get_xcom_val(context["ti"], self.producer_task_id, mark_key):
+            return False
+        if not is_producer_task_terminated(self._get_producer_task_status(context)):
             return False
         logger.info(
             "dbt skipped %s '%s' for an upstream failure, so it never ran. Running it now instead of on a retry.",
@@ -876,9 +880,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         _log_dbt_event(dbt_events)
 
-        if is_dbt_node_status_failed(status) and self._fall_back_for_upstream_failure_skip(
-            context, producer_task_state
-        ):
+        if is_dbt_node_status_failed(status) and self._fall_back_for_upstream_failure_skip(context):
             return True
         if is_dbt_node_status_skipped(status):
             raise AirflowSkipException(

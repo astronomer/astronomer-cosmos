@@ -1829,6 +1829,36 @@ class TestDbtConsumerWatcherSensor:
         else:
             assert sensor.execute_complete(context=context, event=mock_event) is None
 
+    def test_execute_complete_falls_back_for_upstream_failure_skip(self):
+        """#3023: a deferred consumer of a node dbt skipped for an upstream failure builds it instead of raising."""
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+
+        sensor.execute_complete(context=context, event={"status": "failed", "reason": WatcherEventReason.NODE_FAILED})
+
+        sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
+
+    @pytest.mark.parametrize(
+        "retries, xcoms",
+        [
+            (0, UPSTREAM_SKIP_XCOMS),
+            (1, {"model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []}}),
+        ],
+    )
+    def test_execute_complete_raises_node_failed_without_upstream_failure_skip_fallback(self, retries, xcoms):
+        sensor = self.make_sensor(retries=retries)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor._fallback_to_non_watcher_run = MagicMock()
+        context = self.make_context(self.make_xcom_ti(xcoms))
+
+        with pytest.raises(AirflowException, match="failed. Review the producer task"):
+            sensor.execute_complete(
+                context=context, event={"status": "failed", "reason": WatcherEventReason.NODE_FAILED}
+            )
+        sensor._fallback_to_non_watcher_run.assert_not_called()
+
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
     def test_execute_complete_extracts_compiled_sql(self, mock_override_rtif):
         """Test that execute_complete extracts compiled_sql from the event and sets it on the sensor."""

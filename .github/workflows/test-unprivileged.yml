@@ -135,7 +135,7 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3", "3.4"]
-        dbt-version: ["1.11", "1.12"]
+        dbt-version: ["1.11", "1.12", "v2.0-oss"]
         exclude:
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
           - python-version: "3.13"
@@ -163,17 +163,11 @@ jobs:
           # Apache Airflow 3.4 requires Python >=3.11.
           - python-version: "3.10"
             airflow-version: "3.4"
-        include:
-          # dbt v2 (dbt-oss, the Apache 2.0 distribution) requires Python 3.11+. Each value adds one
-          # dbt v2 minor, e.g. "v2.0-oss" installs dbt-oss~=2.0.0 (see scripts/test/install-dbt-v2.sh).
-          - python-version: "3.11"
-            airflow-version: "2.10"
+          # dbt v2 (dbt-oss) requires Python 3.11+. Python 3.14 is excluded because the dbt v2 jobs install
+          # on top of the dbt-1.11 lockfile baseline, which has no Python 3.14 support (see above).
+          - python-version: "3.10"
             dbt-version: "v2.0-oss"
-          - python-version: "3.12"
-            airflow-version: "3.0"
-            dbt-version: "v2.0-oss"
-          - python-version: "3.12"
-            airflow-version: "3.1"
+          - python-version: "3.14"
             dbt-version: "v2.0-oss"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -30,7 +30,10 @@ on:
         default: "astrocrpublic.azurecr.io/runtime-dev"
         type: choice
         options:
+          # Runtime 3.x (Airflow 3) alphas.
           - "astrocrpublic.azurecr.io/runtime-dev"
+          # Runtime 13 (Airflow 2) alphas.
+          - "quay.io/astronomer/astro-runtime-dev"
       python_versions:
         description: 'JSON list of Python versions the alpha publishes, e.g. ["3.12","3.13"]'
         required: false

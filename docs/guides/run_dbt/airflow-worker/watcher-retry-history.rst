@@ -124,6 +124,14 @@ Task-level retry — consumer
        (``SIGKILL``/OOM) leaves consumers without restored statuses, so they fall back to running
        their dbt node; a graceful producer failure still restores them — see
        *Task-level retry — producer*.
+   * - **1.16.0**
+     - Same as 1.15.0, except that consumers for nodes that dbt skipped due to upstream failure
+       (``upstream_failure``) run their fallback on attempt 1 once the producer has finished,
+       instead of failing and waiting one ``retry_delay`` for attempt 2. Before, each level of
+       the graph below the failed node added one ``retry_delay``. Test consumers whose tests dbt
+       skipped for the same reason behave the same way. This applies only when the task has
+       ``retries``, so the outcome matches attempt 2 and ``retries=0`` keeps the 1.15.0 behavior
+       (`#3023 <https://github.com/astronomer/astronomer-cosmos/issues/3023>`_).
 
 Task-level retry — producer
 +++++++++++++++++++++++++++++

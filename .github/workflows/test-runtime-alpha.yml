@@ -513,7 +513,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions) }}
-        dbt-version: ["2.0"]
+        dbt-version: ["v2"]  # dbt v2 default distribution (`dbt`, formerly "dbt Fusion")
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
       # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.

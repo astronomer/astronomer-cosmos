@@ -1,7 +1,7 @@
 .. _dbt_fusion:
 
-dbt v2 (formerly dbt Fusion) support
-====================================
+dbt v2 support
+==============
 
 .. note::
     Available since Cosmos 1.11.0 when using ``ExecutionMode.LOCAL``.

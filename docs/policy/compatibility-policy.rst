@@ -48,7 +48,7 @@ dbt Core
 ++++++++
 
 - **Minimum required version**: dbt Core 1.8
-- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12, v2 (``dbt``, formerly dbt Fusion)
+- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12, v2 (``dbt``)
 
 .. note::
 
@@ -84,7 +84,7 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
      - OK
      - OK
      - OK
-   * - v2 (``dbt``, formerly dbt Fusion)
+   * - v2 (``dbt``)
      - n/a
      - n/a
      - n/a
@@ -94,7 +94,7 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
 - dbt Core 1.8–1.11 fail on Python 3.14 inside ``dbt_common``'s
   ``mashumaro`` dependency (e.g. ``mashumaro.exceptions.UnserializableField``),
   which hasn't caught up to Python 3.14's typing changes.
-- dbt v2 (formerly dbt Fusion) is a Rust-based engine that dbt Labs distributes as
+- dbt v2 is a Rust-based engine that dbt Labs distributes as
   ``dbt`` (the default distribution) and ``dbt-oss`` (the Apache 2.0 subset),
   rather than as a ``dbt-core`` 2.x release. This table's check of importing
   ``dbt.cli.main`` from ``dbt-core`` does not apply to it.

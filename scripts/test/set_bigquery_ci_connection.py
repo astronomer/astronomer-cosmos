@@ -11,7 +11,8 @@ def set_bigquery_ci_connection() -> None:
     Add the BigQuery ``project`` and a dataset specific to this CI job to the ``gcp_gs_conn`` Airflow connection,
     so that ``GoogleCloudServiceAccountDictProfileMapping(conn_id="gcp_gs_conn")`` writes to that dataset.
 
-    The updated connection is exported to the following steps of the job through ``GITHUB_ENV``.
+    The updated connection is exported to the following steps of the job through ``GITHUB_ENV``. Its content comes
+    from the repository secret, the matrix and the run id, and nothing controlled by the pull request.
     """
     conn = BaseHook.get_connection("gcp_gs_conn")
     extra = conn.extra_dejson

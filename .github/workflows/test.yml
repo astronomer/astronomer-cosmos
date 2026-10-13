@@ -213,7 +213,6 @@ jobs:
         run: |
           DATASET="cosmos_ci_${GITHUB_RUN_ID}_py${PYTHON_VERSION}_af${AIRFLOW_VERSION}_dbt${DBT_VERSION}_g${SPLIT_GROUP}"
           DATASET="${DATASET//[^A-Za-z0-9_]/_}"
-          echo "COSMOS_TEST_BIGQUERY_DATASET=${DATASET}" >> "$GITHUB_ENV"
           COSMOS_TEST_BIGQUERY_DATASET="${DATASET}" hatch run "tests.py${PYTHON_VERSION}-${AIRFLOW_VERSION}-${DBT_VERSION}:python" scripts/test/set_bigquery_ci_connection.py
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)

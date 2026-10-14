@@ -48,7 +48,12 @@ dbt Core
 ++++++++
 
 - **Minimum required version**: dbt Core 1.8
-- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12, v2 (``dbt``)
+- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12
+
+dbt v2
+++++++
+
+- **Supported distribution**: ``v2`` (the ``dbt`` distribution, not a ``dbt-core`` 2.x release)
 
 .. note::
 

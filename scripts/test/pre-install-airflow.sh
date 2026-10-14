@@ -77,7 +77,8 @@ elif [ "$AIRFLOW_VERSION" = "3.4" ] ; then
   uv pip install "apache-airflow-providers-docker" --constraint /tmp/constraint.txt
   # TEMP curation: `-U` floats importlib-metadata to 9.x, but the Airflow 3.4 core
   # tree (litellm) requires <9, so hold it on the 8.x line the constraints pin.
-  uv pip install -U "dbt-core~=$DBT_VERSION" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark "importlib-metadata<9"
+  # `~=$DBT_VERSION.0` pins the minor: a bare `~=1.11` would float to dbt-core 1.12.
+  uv pip install -U "dbt-core~=$DBT_VERSION.0" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark "importlib-metadata<9"
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
   # TEMP curation: gcsfs 2026.x requires google-cloud-storage>=3.14, but the
   # unconstrained dbt-bigquery install above caps it <3.2 and downgrades it to

@@ -180,6 +180,41 @@ jobs:
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
+      - name: Diagnose gcp_gs_conn shape # TEMPORARY: remove before merge. Prints key names only, never values.
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+        run: |
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" - <<'PY'
+          import json, os
+          from airflow.models.connection import Connection
+
+          raw = os.environ["AIRFLOW_CONN_GCP_GS_CONN"]
+          print("format:", "json" if raw.lstrip().startswith("{") else "uri")
+          try:
+              conn = Connection.from_json(raw) if raw.lstrip().startswith("{") else Connection(uri=raw)
+              extra = conn.extra_dejson
+          except Exception as exc:  # print the type only: the message could echo part of the value
+              raise SystemExit(f"could not parse the connection: {type(exc).__name__}")
+          if raw.lstrip().startswith("{"):
+              print("top-level keys:", sorted(json.loads(raw)))
+          print("conn_type:", conn.conn_type)
+          print("extra keys:", sorted(extra))
+          for name in ("keyfile_dict", "extra__google_cloud_platform__keyfile_dict"):
+              value = extra.get(name)
+              if value is None:
+                  continue
+              if isinstance(value, str):
+                  try:
+                      value = json.loads(value)
+                  except ValueError:
+                      print(name, "is a string that is not JSON")
+                      continue
+              print(name, "type:", type(value).__name__, "keys:", sorted(value))
+          for name in ("project", "extra__google_cloud_platform__project", "dataset", "extra__google_cloud_platform__dataset"):
+              print(name, "set:", bool(extra.get(name)))
+          print("key_path set:", bool(extra.get("key_path") or extra.get("extra__google_cloud_platform__key_path")))
+          PY
+
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-setup

@@ -11,7 +11,6 @@ import pytest
 from airflow.models.dagbag import DagBag
 from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
-from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION, PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS

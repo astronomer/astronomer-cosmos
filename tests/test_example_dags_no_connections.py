@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 from airflow.models.dagbag import DagBag
-from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION

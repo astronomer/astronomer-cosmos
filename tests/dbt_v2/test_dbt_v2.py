@@ -1,7 +1,8 @@
 """Integration tests for dbt v2 (dbt-oss), which run against BigQuery because dbt v2 does not support Postgres.
 
-They use their own small dbt project and are skipped unless ``COSMOS_TEST_DBT_V2=1``, which only the dbt v2 CI workflow
-sets (together with ``COSMOS_TEST_BIGQUERY_DATASET`` and the ``gcp_gs_conn`` connection), so the other test jobs ignore them.
+They use their own small dbt project and are skipped unless ``COSMOS_TEST_ADAPTER=bigquery``, which only the dbt v2 CI
+workflow sets (together with ``COSMOS_TEST_BIGQUERY_DATASET`` and the ``gcp_gs_conn`` connection), so the other test jobs
+ignore them.
 """
 
 from __future__ import annotations
@@ -18,9 +19,13 @@ from cosmos.constants import ExecutionMode, InvocationMode, LoadMode
 from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 from tests.utils import new_test_dag
 
-pytestmark = pytest.mark.skipif(
-    os.getenv("COSMOS_TEST_DBT_V2") != "1", reason="Only runs in the dbt v2 (dbt-oss) CI workflow, against BigQuery"
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        os.getenv("COSMOS_TEST_ADAPTER") != "bigquery",
+        reason="Only runs in the dbt v2 (dbt-oss) CI workflow, against BigQuery",
+    ),
+]
 
 PROJECT_PATH = Path(__file__).parent / "project"
 EXPECTED_TASKS = {"raw_customers_seed", "stg_customers_run", "customers_run", "customers_test"}

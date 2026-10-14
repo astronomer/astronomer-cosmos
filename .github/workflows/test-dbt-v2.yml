@@ -1,7 +1,9 @@
 name: test-dbt-v2
 
 # Integration tests for dbt v2 (dbt-oss). dbt v2 does not support the Postgres adapter that the tests in test.yml use, so
-# this workflow runs a small, dedicated set of tests (tests/dbt_v2) against BigQuery instead. test.yml is unchanged.
+# this workflow runs the same integration tests (the ones marked ``integration``) against BigQuery instead: with
+# COSMOS_TEST_ADAPTER=bigquery, tests/conftest.py replaces the Postgres profile mapping used by the tests and the example
+# DAGs with a BigQuery one and skips the tests that need Postgres itself. test.yml is unchanged.
 on:
   push: # Run on pushes to the default branch
     branches: [main, ci/run-integration-tests-dbt-oss] # TEMPORARY: revert before merge
@@ -54,6 +56,7 @@ jobs:
         python-version: ["3.11", "3.12"]
         airflow-version: ["2.10", "3.0", "3.1"]
         dbt-version: ["v2-oss"]
+        split-group: [1, 2, 3]
     env:
       # One BigQuery dataset per job, so concurrent jobs do not write to the same tables. The tests read it, and the last
       # step deletes it. The name only has ids, so it is a valid dataset name (no dots, unlike the matrix).
@@ -121,17 +124,34 @@ jobs:
               raise SystemExit(f"BigQuery dataset {dataset} is still not visible after 60 seconds")
           PY
 
-      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
+      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
           HATCH_ENV="tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}"
           hatch run "$HATCH_ENV:test-integration-dbt-v2-setup"
-          hatch run "$HATCH_ENV:test-dbt-v2"
+          hatch run "$HATCH_ENV:test-integration"
         env:
+          COSMOS_TEST_ADAPTER: bigquery
+          PYTEST_SPLITS: 3
+          PYTEST_SPLIT_GROUP: ${{ matrix.split-group }}
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS: 0
+          AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING: 0
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
+          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 120
+          AIRFLOW__CORE__DAG_FILE_PROCESSOR_TIMEOUT: 120
+          AIRFLOW__DAG_PROCESSOR__DAGBAG_IMPORT_TIMEOUT: 120
+          AIRFLOW__DAG_PROCESSOR__DAG_FILE_PROCESSOR_TIMEOUT: 120
+          AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
           AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
-          COSMOS_TEST_DBT_V2: "1"
+          AIRFLOW_CONN_AZURE_ABFS_CONN: ${{ secrets.AIRFLOW_CONN_AZURE_ABFS_CONN }}
+          DATABRICKS_HOST: mock
+          DATABRICKS_WAREHOUSE_ID: mock
+          DATABRICKS_TOKEN: mock
+          DATABRICKS_CLUSTER_ID: mock
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
-          AIRFLOW__COSMOS__ENABLE_CACHE: 0
+          AIRFLOW__COSMOS__REMOTE_TARGET_PATH: s3://cosmos-remote-cache/target_compiled/
+          AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
+          AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
       - name: Delete the BigQuery dataset
         # Runs on success, failure and cancellation. Inline code in isolated mode (-I), and it only deletes datasets named

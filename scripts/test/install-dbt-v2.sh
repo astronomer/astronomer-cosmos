@@ -18,7 +18,7 @@ case "$DBT_VERSION" in
 esac
 
 # dbt-oss and dbt-core 1.x both provide the ``dbt`` Python package, so remove dbt 1.x and its adapters first.
-pip uninstall -y 'dbt-bigquery' 'dbt-databricks' 'dbt-duckdb' 'dbt-postgres' 'dbt-vertica' 'dbt-core'
+pip uninstall -y 'dbt-bigquery' 'dbt-databricks' 'dbt-duckdb' 'dbt-postgres' 'dbt-spark' 'dbt-vertica' 'dbt-core'
 pip install "dbt-oss~=${MINOR}.0"
 
 dbt --version | grep -q "^dbt-oss ${MINOR}\." || { echo "::error::Expected dbt-oss ${MINOR}.x to be installed"; exit 1; }

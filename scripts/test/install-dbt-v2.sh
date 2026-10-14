@@ -3,8 +3,7 @@
 set -x
 set -e
 
-# Install dbt-oss, the Apache 2.0 distribution of dbt v2 (https://docs.getdbt.com/blog/comparing-dbt-and-dbt-oss),
-# for a hatch ``dbt`` matrix value such as ``v2.0-oss`` (the latest dbt-oss 2.0.x).
+# The hatch ``dbt`` matrix value ``v2.0-oss`` installs the latest dbt-oss 2.0.x.
 DBT_VERSION="$1"
 
 case "$DBT_VERSION" in

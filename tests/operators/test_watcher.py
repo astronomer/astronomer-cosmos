@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -70,7 +71,10 @@ profile_config = ProfileConfig(
     target_name="dev",
     profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
         conn_id="gcp_gs_conn",
-        profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
+        profile_args={
+            "project": "astronomer-dag-authoring",
+            "dataset": os.getenv("COSMOS_TEST_BIGQUERY_DATASET", "COSMOS_CI"),
+        },
         disable_event_tracking=True,
     ),
 )

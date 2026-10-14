@@ -201,6 +201,18 @@ jobs:
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
+      - name: Set the BigQuery dataset for this job
+        # One dataset per job, so concurrent jobs do not write to the same tables. Only the name (not a secret) is
+        # exported; the example DAGs and tests read it as COSMOS_TEST_BIGQUERY_DATASET.
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+          AIRFLOW_VERSION: ${{ matrix.airflow-version }}
+          DBT_VERSION: ${{ matrix.dbt-version }}
+          SPLIT_GROUP: ${{ matrix.split-group }}
+        run: |
+          DATASET="cosmos_ci_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_py${PYTHON_VERSION}_af${AIRFLOW_VERSION}_dbt${DBT_VERSION}_g${SPLIT_GROUP}"
+          echo "COSMOS_TEST_BIGQUERY_DATASET=${DATASET//[^A-Za-z0-9_]/_}" >> "$GITHUB_ENV"
+
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-setup
@@ -235,6 +247,41 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
+
+      - name: Delete the BigQuery dataset
+        # Runs on success, failure and cancellation. The code is inline and runs in isolated mode (-I) so that nothing from
+        # the checkout can shadow its imports, and it only deletes datasets named cosmos_ci_*. The credentials need to be
+        # able to delete only the datasets they created (not a project-wide delete).
+        if: always()
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+          BIGQUERY_PROJECT: astronomer-dag-authoring
+        run: |
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I - <<'PY'
+          import json
+          import os
+
+          from airflow.models.connection import Connection
+          from google.cloud import bigquery
+          from google.oauth2 import service_account
+
+          dataset = os.environ.get("COSMOS_TEST_BIGQUERY_DATASET")
+          if not dataset:
+              raise SystemExit("No BigQuery dataset was set for this job, nothing to delete")
+          if not dataset.startswith("cosmos_ci_"):
+              raise SystemExit(f"Refusing to delete dataset {dataset!r}: it does not start with 'cosmos_ci_'")
+
+          raw = os.environ["AIRFLOW_CONN_GCP_GS_CONN"]
+          conn = Connection.from_json(raw) if raw.lstrip().startswith("{") else Connection(uri=raw)
+          extra = conn.extra_dejson
+          keyfile = extra.get("keyfile_dict") or extra.get("extra__google_cloud_platform__keyfile_dict")
+          if isinstance(keyfile, str):
+              keyfile = json.loads(keyfile)
+          credentials = service_account.Credentials.from_service_account_info(keyfile)
+          client = bigquery.Client(project=os.environ["BIGQUERY_PROJECT"], credentials=credentials)
+          print(f"Deleting BigQuery dataset {dataset}")
+          client.delete_dataset(dataset, delete_contents=True, not_found_ok=True)
+          PY
 
       - name: Upload coverage to GitHub
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -385,6 +432,17 @@ jobs:
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
+      - name: Set the BigQuery dataset for this job
+        # One dataset per job, so concurrent jobs do not write to the same tables. Only the name (not a secret) is
+        # exported; the example DAGs and tests read it as COSMOS_TEST_BIGQUERY_DATASET.
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+          AIRFLOW_VERSION: ${{ matrix.airflow-version }}
+          DBT_VERSION: ${{ matrix.dbt-version }}
+        run: |
+          DATASET="cosmos_ci_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_dbt18_py${PYTHON_VERSION}_af${AIRFLOW_VERSION}_dbt${DBT_VERSION}"
+          echo "COSMOS_TEST_BIGQUERY_DATASET=${DATASET//[^A-Za-z0-9_]/_}" >> "$GITHUB_ENV"
+
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.8 (min supported)
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-1-8
@@ -412,6 +470,41 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
           DBT_PROJECT_NAME: "altered_jaffle_shop"  # The syntax of jaffle_shop is not supported in dbt 1.8, only in dbt >= 1.10
           TEST_SINGLE_DAG: "basic_cosmos_task_group.py"  # There are circumstances when we only need to run a single DAG, but we were parsing all the DAGs. This change is to avoid parsing all the DAGs.
+
+      - name: Delete the BigQuery dataset
+        # Runs on success, failure and cancellation. The code is inline and runs in isolated mode (-I) so that nothing from
+        # the checkout can shadow its imports, and it only deletes datasets named cosmos_ci_*. The credentials need to be
+        # able to delete only the datasets they created (not a project-wide delete).
+        if: always()
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+          BIGQUERY_PROJECT: astronomer-dag-authoring
+        run: |
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I - <<'PY'
+          import json
+          import os
+
+          from airflow.models.connection import Connection
+          from google.cloud import bigquery
+          from google.oauth2 import service_account
+
+          dataset = os.environ.get("COSMOS_TEST_BIGQUERY_DATASET")
+          if not dataset:
+              raise SystemExit("No BigQuery dataset was set for this job, nothing to delete")
+          if not dataset.startswith("cosmos_ci_"):
+              raise SystemExit(f"Refusing to delete dataset {dataset!r}: it does not start with 'cosmos_ci_'")
+
+          raw = os.environ["AIRFLOW_CONN_GCP_GS_CONN"]
+          conn = Connection.from_json(raw) if raw.lstrip().startswith("{") else Connection(uri=raw)
+          extra = conn.extra_dejson
+          keyfile = extra.get("keyfile_dict") or extra.get("extra__google_cloud_platform__keyfile_dict")
+          if isinstance(keyfile, str):
+              keyfile = json.loads(keyfile)
+          credentials = service_account.Credentials.from_service_account_info(keyfile)
+          client = bigquery.Client(project=os.environ["BIGQUERY_PROJECT"], credentials=credentials)
+          print(f"Deleting BigQuery dataset {dataset}")
+          client.delete_dataset(dataset, delete_contents=True, not_found_ok=True)
+          PY
 
   Run-Integration-Tests-DBT-Async:
     needs: [Authorize, Check-changed-files]

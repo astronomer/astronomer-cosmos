@@ -2557,8 +2557,10 @@ def test_dbt_dag_with_watcher_and_failing_model(caplog):
     assert tis["model_a_run"].state == "success"
     assert tis["model_f_run"].state == "failed"
 
-    dbt_error_message = """Database Error in model model_f (models/model_f.sql)\n  column "this_column_does_not_exist_at_all" does not exist\n  LINE 1"""
-    assert dbt_error_message in caplog.text
+    # The wording of the missing-column error depends on the warehouse (Postgres: "column ... does not exist",
+    # BigQuery: "Unrecognized name: ..."), so only the model and the column are asserted.
+    assert "Database Error in model model_f (models/model_f.sql)" in caplog.text
+    assert "this_column_does_not_exist_at_all" in caplog.text
 
 
 @pytest.mark.integration

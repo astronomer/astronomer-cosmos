@@ -91,6 +91,11 @@ class _MockTI:
         self.store[key] = value
 
 
+def _bigquery_dataset() -> str:
+    """The dataset the example BigQuery profile writes to (one per CI job, see COSMOS_TEST_BIGQUERY_DATASET)."""
+    return os.getenv("COSMOS_TEST_BIGQUERY_DATASET", "COSMOS_CI")
+
+
 class _MockContext(dict):
     pass
 
@@ -1976,7 +1981,7 @@ def test_dbt_dag_with_watcher(caplog):
         not in caplog.text
     )
 
-    log_message = "OK loaded seed file public.raw_orders"
+    log_message = f"OK loaded seed file {_bigquery_dataset()}.raw_orders"
     assert log_message in caplog.text
 
     # Verify that log messages are not duplicated (each dbt message should appear only once)
@@ -2088,7 +2093,7 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
         not in caplog.text
     )
 
-    log_message = "OK loaded seed file public.raw_orders"
+    log_message = f"OK loaded seed file {_bigquery_dataset()}.raw_orders"
     assert log_message in caplog.text
 
     # Verify that log messages are not duplicated (each dbt message should appear only once)

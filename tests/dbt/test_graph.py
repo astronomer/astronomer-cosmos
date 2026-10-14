@@ -115,6 +115,7 @@ def postgres_profile_config() -> ProfileConfig:
         target_name="default",
         profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
             conn_id="gcp_gs_conn",
+            profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
         ),
     )
 
@@ -881,6 +882,7 @@ def test_load_automatic_without_manifest_with_profile_mapping(mock_load_via_dbt_
         target_name="test",
         profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
             conn_id="gcp_gs_conn",
+            profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
         ),
     )
     dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)

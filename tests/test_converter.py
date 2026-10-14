@@ -347,6 +347,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents():
         target_name="dev",
         profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
             conn_id="gcp_gs_conn",
+            profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
             disable_event_tracking=True,
         ),
     )
@@ -406,6 +407,7 @@ def test_converter_passes_render_config_exclude_to_test_tasks():
         target_name="dev",
         profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
             conn_id="gcp_gs_conn",
+            profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
             disable_event_tracking=True,
         ),
     )
@@ -469,6 +471,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents_with_should_detac
         target_name="dev",
         profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
             conn_id="gcp_gs_conn",
+            profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
             disable_event_tracking=True,
         ),
     )
@@ -509,6 +512,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents_test_afterall():
         target_name="dev",
         profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
             conn_id="gcp_gs_conn",
+            profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
             disable_event_tracking=True,
         ),
     )
@@ -591,6 +595,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents_test_none():
         target_name="dev",
         profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
             conn_id="gcp_gs_conn",
+            profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
             disable_event_tracking=True,
         ),
     )
@@ -627,6 +632,7 @@ def test_converter_creates_dag_with_test_with_multiple_parents_and_build():
         target_name="dev",
         profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
             conn_id="gcp_gs_conn",
+            profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
             disable_event_tracking=True,
         ),
     )
@@ -1743,6 +1749,7 @@ def _build_altered_jaffle_shop_dag(dag_id, ephemeral_models_as_empty_operator):
             target_name="dev",
             profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
                 conn_id="gcp_gs_conn",
+                profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
                 disable_event_tracking=True,
             ),
         ),

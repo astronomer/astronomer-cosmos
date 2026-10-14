@@ -19,6 +19,7 @@ profile_config = ProfileConfig(
     target_name="dev",
     profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
         conn_id="gcp_gs_conn",
+        profile_args={"project": "astronomer-dag-authoring", "dataset": "COSMOS_CI"},
         disable_event_tracking=True,
     ),
 )

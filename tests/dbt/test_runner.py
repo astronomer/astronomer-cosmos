@@ -287,9 +287,10 @@ def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
     # Version("1.11.0")/Version("1.12.0") boundary is unstable here — it would
     # exclude 1.11.x patches (1.11.11 > 1.11.0) and misclassify 1.12 pre-releases
     # (PEP 440 sorts 1.12.0b2 < 1.12.0).
-    from tests.utils import get_dbt_version
+    from dbt.version import get_installed_version
+    from packaging.version import Version
 
-    installed_dbt_version = get_dbt_version()
+    installed_dbt_version = Version(get_installed_version().to_version_string()[1:])
     if (installed_dbt_version.major, installed_dbt_version.minor) <= (1, 11):
         expected2 = "dbt found 1 package(s) specified in packages.yml, but only 0 package(s) installed"
     else:

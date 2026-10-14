@@ -42,9 +42,9 @@ if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRF
       echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
       exit 1
     fi
-    # Other dbt versions (1.8-1.10, 2.0-dbt-fusion, dbt v2 such as v2.0-oss) have no per-Airflow lockfile; jobs needing
-    # them re-pin dbt in their own setup step, so this is just a throwaway baseline. dbt v2 uses the dbt-1.12
-    # baseline because, unlike the dbt-1.11 one, it supports Python 3.14.
+    # Other dbt versions (1.8-1.10, 2.0-dbt-fusion, v2.0-oss) have no per-Airflow lockfile; jobs needing them re-pin dbt
+    # in their own setup step, so this is just a throwaway baseline. dbt v2 values start from the dbt-1.12
+    # baseline, whose lockfiles support Python 3.14.
     case "$DBT_VERSION" in
       v*) BASELINE_DBT_VERSION="1.12" ;;
       *) BASELINE_DBT_VERSION="1.11" ;;
@@ -143,7 +143,7 @@ else
 fi
 
 # EFFECTIVE_DBT_VERSION differs from DBT_VERSION only when the fallback above
-# substituted the dbt-1.11 baseline.
+# substituted a baseline (dbt-1.11, or dbt-1.12 for dbt v2).
 actual_dbt_version=$(dbt --version 2>/dev/null | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
 if [ "$actual_dbt_version" = "$EFFECTIVE_DBT_VERSION" ]; then
     echo "dbt version is as expected: $EFFECTIVE_DBT_VERSION"

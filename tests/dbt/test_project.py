@@ -513,7 +513,7 @@ def _is_dbt_v2() -> bool:
     return False
 
 
-@pytest.mark.skipif(_is_dbt_v2(), reason="dbt v2 has no dbt.plugins module")
+@pytest.mark.skipif(_is_dbt_v2(), reason="Uses the dbt-core 1.x dbt.plugins module")
 def test_run_command_dbt_runner_excludes_dags_folder_dbt_module(tmp_path):
     """#1673, in-process ``InvocationMode.DBT_RUNNER`` path.
 
@@ -553,7 +553,7 @@ def test_run_command_dbt_runner_excludes_dags_folder_dbt_module(tmp_path):
             sys.path.remove(str(dags_folder))
 
 
-@pytest.mark.skipif(_is_dbt_v2(), reason="dbt v2 does not support the Postgres adapter used by this test profile")
+@pytest.mark.skipif(_is_dbt_v2(), reason="Uses a Postgres profile (dbt1005 on dbt v2)")
 def test_run_command_with_subprocess_excludes_dags_folder_dbt_module(tmp_path):
     """#1673, ``InvocationMode.SUBPROCESS`` path.
 

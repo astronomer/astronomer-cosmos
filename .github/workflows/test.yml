@@ -168,6 +168,10 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+    env:
+      # One dataset per job, so concurrent jobs do not write to the same tables. The example DAGs and tests read it,
+      # and the last step deletes it. The name only has ids, so it is a valid dataset name (no dots, unlike the matrix).
+      COSMOS_TEST_BIGQUERY_DATASET: cosmos_ci_${{ github.run_id }}_${{ github.run_attempt }}_it_${{ strategy.job-index }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -200,18 +204,6 @@ jobs:
           python -m pip install uv
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
-
-      - name: Set the BigQuery dataset for this job
-        # One dataset per job, so concurrent jobs do not write to the same tables. Only the name (not a secret) is
-        # exported; the example DAGs and tests read it as COSMOS_TEST_BIGQUERY_DATASET.
-        env:
-          PYTHON_VERSION: ${{ matrix.python-version }}
-          AIRFLOW_VERSION: ${{ matrix.airflow-version }}
-          DBT_VERSION: ${{ matrix.dbt-version }}
-          SPLIT_GROUP: ${{ matrix.split-group }}
-        run: |
-          DATASET="cosmos_ci_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_py${PYTHON_VERSION}_af${AIRFLOW_VERSION}_dbt${DBT_VERSION}_g${SPLIT_GROUP}"
-          echo "COSMOS_TEST_BIGQUERY_DATASET=${DATASET//[^A-Za-z0-9_]/_}" >> "$GITHUB_ENV"
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
@@ -405,6 +397,10 @@ jobs:
         ports:
           - 5432:5432
 
+    env:
+      # One dataset per job, so concurrent jobs do not write to the same tables. The example DAGs and tests read it,
+      # and the last step deletes it. The name only has ids, so it is a valid dataset name (no dots, unlike the matrix).
+      COSMOS_TEST_BIGQUERY_DATASET: cosmos_ci_${{ github.run_id }}_${{ github.run_attempt }}_d18_${{ strategy.job-index }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -431,17 +427,6 @@ jobs:
           python -m pip install uv
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
-
-      - name: Set the BigQuery dataset for this job
-        # One dataset per job, so concurrent jobs do not write to the same tables. Only the name (not a secret) is
-        # exported; the example DAGs and tests read it as COSMOS_TEST_BIGQUERY_DATASET.
-        env:
-          PYTHON_VERSION: ${{ matrix.python-version }}
-          AIRFLOW_VERSION: ${{ matrix.airflow-version }}
-          DBT_VERSION: ${{ matrix.dbt-version }}
-        run: |
-          DATASET="cosmos_ci_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_dbt18_py${PYTHON_VERSION}_af${AIRFLOW_VERSION}_dbt${DBT_VERSION}"
-          echo "COSMOS_TEST_BIGQUERY_DATASET=${DATASET//[^A-Za-z0-9_]/_}" >> "$GITHUB_ENV"
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.8 (min supported)
         run: |

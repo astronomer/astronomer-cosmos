@@ -10,6 +10,7 @@ Breaking Changes
 
 Behaviour Changes
 
+* ``RenderConfig.exclude`` is now resolved against the full project graph instead of against the subset ``RenderConfig.select`` already narrowed. Graph operators traverse outwards from the nodes their selector matches, so when ``select`` had already dropped those root nodes the traversal had nothing to start from and shared ancestors or descendants were silently kept. For example, given a ``parent`` tagged ``test`` and its ``child``, ``select=["+child"], exclude=["+tag:test"]`` previously rendered both ``parent`` and ``child``, because ``+tag:test`` was evaluated after ``+child`` had already been applied; it now renders only ``child``. This matches dbt, which evaluates both filters against the whole graph and subtracts afterwards. See #2976.
 * ``emit_datasets`` is now a template field on the dbt operators, so emission can be decided per DAG run:
   ``operator_args={"emit_datasets": "{{ dag_run.run_type != 'backfill' }}"}`` stops backfills from triggering downstream
   asset-scheduled DAGs. ``operator_args`` now takes precedence over ``RenderConfig.emit_datasets`` (which remains a

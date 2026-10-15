@@ -34,6 +34,7 @@ class WatcherEventReason(str, Enum):
     NODE_FAILED = "node_failed"
     PRODUCER_FAILED = "producer_failed"
     PRODUCER_SKIPPED = "producer_skipped"
+    PRODUCER_UP_FOR_RETRY = "producer_up_for_retry"
     NODE_NOT_RUN = "node_not_run"
 
 
@@ -264,6 +265,18 @@ class WatcherTrigger(BaseTrigger):
                     self.model_unique_id,
                 )
                 yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_SKIPPED})  # type: ignore[no-untyped-call]
+                return
+            elif producer_task_state == ProducerTaskState.UP_FOR_RETRY:
+                # The producer's retry self-skips without re-running dbt, so any node status we
+                # could read from now on is stale data from the failed attempt. End the trigger
+                # so the consumer falls back instead of polling until the self-skip lands.
+                logger.info(
+                    "Watcher producer task '%s' is awaiting a retry that will skip. "
+                    "Consumer will fall back to running dbt for node '%s'.",
+                    self.producer_task_id,
+                    self.model_unique_id,
+                )
+                yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_UP_FOR_RETRY})  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == ProducerTaskState.SUCCESS and dbt_node_status is None:
                 logger.info(

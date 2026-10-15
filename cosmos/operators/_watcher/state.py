@@ -62,6 +62,7 @@ class ProducerTaskState(str, Enum):
     SUCCESS = "success"
     FAILED = "failed"
     SKIPPED = "skipped"
+    UP_FOR_RETRY = "up_for_retry"
     UPSTREAM_FAILED = "upstream_failed"
     REMOVED = "removed"
 
@@ -126,6 +127,15 @@ def is_dbt_upstream_failure_skip_event(event_name: str | None) -> bool:
 def is_producer_task_terminated(state: str | None) -> bool:
     """Return True when the producer task is in a terminal state."""
     return state in PRODUCER_TERMINAL_STATES
+
+
+def is_producer_task_awaiting_retry(state: str | None) -> bool:
+    """Return True when the producer is waiting on its own retry attempt.
+
+    A producer retry always self-skips (see ``DbtProducerWatcherOperator.execute``),
+    so in this state the producer is alive but will never deliver new node results.
+    """
+    return state == ProducerTaskState.UP_FOR_RETRY
 
 
 def is_producer_task_still_running(state: str | None) -> bool:

@@ -4,6 +4,7 @@ import pytest
 from airflow.exceptions import AirflowException, AirflowSkipException
 
 from cosmos.operators._watcher.base import BaseConsumerSensor, _process_dbt_log_event
+from cosmos.operators._watcher.triggerer import WatcherEventReason
 from cosmos.operators.local import DbtRunLocalOperator
 
 
@@ -274,6 +275,183 @@ class TestHandleNoDbtNodeStatus:
 
         assert result is False
         assert sensor.poke_retry_number == 1
+
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+    def test_producer_up_for_retry_falls_back(self, mock_fallback):
+        """A producer waiting on its own retry self-skips on that retry, so no node
+        status can ever arrive — fall back instead of polling until the skip lands."""
+        sensor = self._make_sensor()
+        sensor.poke_retry_number = 0
+        context = MagicMock()
+
+        result = sensor._handle_no_dbt_node_status("up_for_retry", try_number=1, context=context)
+
+        assert result is True
+        mock_fallback.assert_called_once_with(1, context)
+        assert sensor.poke_retry_number == 0
+
+
+class TestHandleRetry:
+    """Tests for BaseConsumerSensor._handle_retry (#3001)."""
+
+    def _make_sensor(self):
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        extra_context = {"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}}
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context=extra_context,
+        )
+        return sensor
+
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+    def test_producer_up_for_retry_falls_back(self, mock_fallback):
+        """A producer waiting on its own retry will self-skip on that retry,
+        so the sensor must fall back immediately instead of burning its own
+        retries re-poking the producer's stale XCom."""
+        sensor = self._make_sensor()
+        context = MagicMock()
+
+        result = sensor._handle_retry(try_number=2, producer_task_state="up_for_retry", context=context)
+
+        assert result is True
+        mock_fallback.assert_called_once_with(2, context)
+
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+    @pytest.mark.parametrize("state", ["success", "failed", "skipped", "upstream_failed", "removed"])
+    def test_terminated_producer_falls_back(self, mock_fallback, state):
+        sensor = self._make_sensor()
+        context = MagicMock()
+
+        result = sensor._handle_retry(try_number=2, producer_task_state=state, context=context)
+
+        assert result is True
+        mock_fallback.assert_called_once_with(2, context)
+
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+    @pytest.mark.parametrize("state", ["running", "queued", "scheduled", "deferred", "up_for_reschedule", None])
+    def test_active_producer_keeps_polling(self, mock_fallback, state):
+        sensor = self._make_sensor()
+        context = MagicMock()
+
+        result = sensor._handle_retry(try_number=2, producer_task_state=state, context=context)
+
+        assert result is None
+        mock_fallback.assert_not_called()
+
+
+class TestPokeWithProducerUpForRetry:
+    """Full poke() flow for #3001: while the producer waits on a retry that self-skips,
+    the consumer must fall back to a standalone run instead of acting on the failed
+    attempt's stale node status."""
+
+    def _make_sensor(self):
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        extra_context = {"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}}
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context=extra_context,
+        )
+        return sensor
+
+    def test_retry_poke_falls_back_without_reading_stale_status(self):
+        """On a retried sensor, _handle_retry must short-circuit before the stale
+        XCom from the failed producer attempt is ever read."""
+        sensor = self._make_sensor()
+        mock_ti = Mock()
+        mock_ti.try_number = 2
+        context = {"ti": mock_ti, "run_id": "run_123"}
+
+        with (
+            patch.object(sensor, "_get_producer_task_status", return_value="up_for_retry"),
+            patch.object(sensor, "_fallback_to_non_watcher_run", return_value=True) as mock_fallback,
+            patch.object(sensor, "_get_node_status") as mock_node_status,
+            patch.object(sensor, "_log_startup_events"),
+        ):
+            assert sensor.poke(context) is True
+
+        mock_fallback.assert_called_once_with(2, context)
+        mock_node_status.assert_not_called()
+
+    def test_first_poke_with_stale_failed_status_falls_back(self):
+        """try 1 with a stale failed status from the failed attempt: fall back
+        immediately rather than polling until the producer's self-skip lands."""
+        sensor = self._make_sensor()
+        mock_ti = Mock()
+        mock_ti.try_number = 1
+        context = {"ti": mock_ti, "run_id": "run_123"}
+
+        with (
+            patch.object(sensor, "_get_producer_task_status", return_value="up_for_retry"),
+            patch.object(sensor, "_get_node_status", return_value="failed"),
+            patch.object(sensor, "_fallback_to_non_watcher_run", return_value=True) as mock_fallback,
+            patch.object(sensor, "_log_startup_events"),
+        ):
+            assert sensor.poke(context) is True
+
+        mock_fallback.assert_called_once_with(1, context)
+
+    def test_successful_node_still_resolves_while_producer_up_for_retry(self):
+        """A node that succeeded before the producer failed keeps its result even
+        while the producer sits up_for_retry — only failed/missing statuses fall back."""
+        sensor = self._make_sensor()
+        mock_ti = Mock()
+        mock_ti.try_number = 1
+        context = {"ti": mock_ti, "run_id": "run_123"}
+
+        with (
+            patch.object(sensor, "_get_producer_task_status", return_value="up_for_retry"),
+            patch.object(sensor, "_get_node_status", return_value="success"),
+            patch.object(sensor, "_cache_compiled_sql"),
+            patch.object(sensor, "_fallback_to_non_watcher_run") as mock_fallback,
+            patch.object(sensor, "_log_startup_events"),
+            patch("cosmos.operators._watcher.base.get_xcom_val", return_value=None),
+        ):
+            assert sensor.poke(context) is True
+
+        mock_fallback.assert_not_called()
+
+
+class TestExecuteCompleteProducerUpForRetry:
+    """execute_complete handling of the PRODUCER_UP_FOR_RETRY trigger event (#3001)."""
+
+    def _make_sensor(self):
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        extra_context = {"dbt_node_config": {"unique_id": "model.jaffle_shop.stg_orders"}}
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context=extra_context,
+        )
+        return sensor
+
+    def test_falls_back_on_producer_up_for_retry_event(self):
+        sensor = self._make_sensor()
+        mock_ti = Mock()
+        mock_ti.try_number = 1
+        context = {"ti": mock_ti, "run_id": "run_123"}
+        event = {"status": "failed", "reason": WatcherEventReason.PRODUCER_UP_FOR_RETRY}
+
+        with (
+            patch("cosmos.operators._watcher.base.get_xcom_val", return_value=None),
+            patch.object(sensor, "_fallback_to_non_watcher_run") as mock_fallback,
+        ):
+            sensor._process_completion_event(context, event)
+
+        mock_fallback.assert_called_once_with(try_number=1, context=context)
 
 
 class TestBaseConsumerSensorEmitDatasets:

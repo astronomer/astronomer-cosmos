@@ -266,6 +266,9 @@ class ProjectConfig:
     models_paths: list[Path]
     seeds_paths: list[Path]
     snapshots_paths: list[Path]
+    models_relative_paths: list[Path]
+    seeds_relative_paths: list[Path]
+    snapshots_relative_paths: list[Path]
     project_name: str
 
     def __init__(
@@ -301,6 +304,12 @@ class ProjectConfig:
             "snapshots_relative_paths",
         )
         # Assigned here, not as a class-level default, so instances don't share one mutable list.
+        # The relative paths are kept regardless of whether dbt_project_path is set on this config:
+        # the project root may instead be supplied through RenderConfig/ExecutionConfig, and rendering
+        # still needs to know which directories the user configured.
+        self.models_relative_paths = [Path(p) for p in _as_path_list(models_relative_paths)]
+        self.seeds_relative_paths = [Path(p) for p in _as_path_list(seeds_relative_paths)]
+        self.snapshots_relative_paths = [Path(p) for p in _as_path_list(snapshots_relative_paths)]
         self.models_paths = []
         self.seeds_paths = []
         self.snapshots_paths = []
@@ -317,9 +326,9 @@ class ProjectConfig:
 
         if dbt_project_path:
             self.dbt_project_path = Path(dbt_project_path)
-            self.models_paths = [self.dbt_project_path / Path(p) for p in _as_path_list(models_relative_paths)]
-            self.seeds_paths = [self.dbt_project_path / Path(p) for p in _as_path_list(seeds_relative_paths)]
-            self.snapshots_paths = [self.dbt_project_path / Path(p) for p in _as_path_list(snapshots_relative_paths)]
+            self.models_paths = [self.dbt_project_path / p for p in self.models_relative_paths]
+            self.seeds_paths = [self.dbt_project_path / p for p in self.seeds_relative_paths]
+            self.snapshots_paths = [self.dbt_project_path / p for p in self.snapshots_relative_paths]
             if not project_name:
                 self.project_name = self.dbt_project_path.stem
 

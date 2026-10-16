@@ -10,6 +10,7 @@ Breaking Changes
 
 Behaviour Changes
 
+* ``ProjectConfig`` now keeps the ``models``/``seeds``/``snapshots`` relative paths it was configured with even when it has no ``dbt_project_path`` of its own, and ``LoadMode.CUSTOM`` falls back to them when the project root is supplied through ``RenderConfig``/``ExecutionConfig`` instead. Previously those relative paths were discarded in that split configuration and ``LegacyDbtProject`` silently crawled its defaults, so a project declaring e.g. ``models_relative_paths="custom/models"`` rendered no models at all; it now crawls ``custom/models`` as configured. Projects that set ``dbt_project_path`` on ``ProjectConfig`` are unaffected. See #2977.
 * ``emit_datasets`` is now a template field on the dbt operators, so emission can be decided per DAG run:
   ``operator_args={"emit_datasets": "{{ dag_run.run_type != 'backfill' }}"}`` stops backfills from triggering downstream
   asset-scheduled DAGs. ``operator_args`` now takes precedence over ``RenderConfig.emit_datasets`` (which remains a

@@ -82,6 +82,20 @@ def _normalize_path(path: str | None) -> str:
         return Path(path.replace("\\", "/")).as_posix()
 
 
+def _configured_dirs(absolute_paths: list[Path], relative_paths: list[Path], project_path: Path | None) -> list[str]:
+    """
+    Returns the model/seed/snapshot directories to hand to LegacyDbtProject, relative to the project root.
+
+    ProjectConfig only builds absolute paths when its own dbt_project_path is set. When the root comes
+    from RenderConfig/ExecutionConfig instead, fall back to the relative paths the user configured, so
+    they aren't silently replaced by LegacyDbtProject's defaults.
+    """
+    dirs = _relative_dirs(absolute_paths, project_path)
+    if dirs is not None:
+        return dirs
+    return [p.as_posix() for p in relative_paths]
+
+
 def _relative_dirs(paths: list[Path], project_path: Path | None) -> list[str] | None:
     """Returns each path's location relative to project_path, preserving nested subdirectories."""
     # None (not []) triggers LegacyDbtProject's own default; only do that when project_path is unset,
@@ -1123,9 +1137,15 @@ class DbtGraph:
         project = LegacyDbtProject(
             project_name=self.render_config.project_path.stem,
             dbt_root_path=self.render_config.project_path.parent.as_posix(),
-            dbt_models_dir=_relative_dirs(self.project.models_paths, self.project.dbt_project_path),
-            dbt_seeds_dir=_relative_dirs(self.project.seeds_paths, self.project.dbt_project_path),
-            dbt_snapshots_dir=_relative_dirs(self.project.snapshots_paths, self.project.dbt_project_path),
+            dbt_models_dir=_configured_dirs(
+                self.project.models_paths, self.project.models_relative_paths, self.project.dbt_project_path
+            ),
+            dbt_seeds_dir=_configured_dirs(
+                self.project.seeds_paths, self.project.seeds_relative_paths, self.project.dbt_project_path
+            ),
+            dbt_snapshots_dir=_configured_dirs(
+                self.project.snapshots_paths, self.project.snapshots_relative_paths, self.project.dbt_project_path
+            ),
             dbt_vars=self.dbt_vars,
         )
         nodes = {}

@@ -534,3 +534,69 @@ class TestWatcherTriggerProducerSkipped:
         await self.trigger._log_startup_events()
 
         mock_producer_status.assert_called_once()
+
+
+class TestWatcherTriggerProducerUpForRetry:
+    """Trigger behaviour while the producer waits on a retry that always self-skips (#3001)."""
+
+    def setup_method(self):
+        self.trigger = WatcherTrigger(
+            model_unique_id="model.test",
+            producer_task_id="task_1",
+            dag_id="dag_1",
+            run_id="run_123",
+            map_index=None,
+            poke_interval=0.001,
+        )
+
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    @pytest.mark.asyncio
+    async def test_up_for_retry_without_node_status_yields_fallback_event(self, mock_startup_events):
+        """No status can arrive while the producer waits on a self-skipping retry,
+        so the trigger ends with a fallback event instead of polling."""
+        with (
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="up_for_retry")),
+            patch.object(self.trigger, "_parse_dbt_node_status_and_compiled_sql", AsyncMock(return_value=(None, None))),
+        ):
+            events = []
+            async for event in self.trigger.run():
+                events.append(event)
+
+        assert len(events) == 1
+        assert events[0].payload == {"status": "failed", "reason": WatcherEventReason.PRODUCER_UP_FOR_RETRY}
+
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    @pytest.mark.asyncio
+    async def test_up_for_retry_with_stale_failed_status_yields_fallback_event(self, mock_startup_events):
+        """A stale failed status from the producer's failed attempt must not surface as
+        NODE_FAILED — the standalone fallback run re-determines the node's outcome."""
+        with (
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="up_for_retry")),
+            patch.object(
+                self.trigger, "_parse_dbt_node_status_and_compiled_sql", AsyncMock(return_value=("error", None))
+            ),
+        ):
+            events = []
+            async for event in self.trigger.run():
+                events.append(event)
+
+        assert len(events) == 1
+        assert events[0].payload == {"status": "failed", "reason": WatcherEventReason.PRODUCER_UP_FOR_RETRY}
+
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    @pytest.mark.asyncio
+    async def test_node_success_takes_priority_over_producer_up_for_retry(self, mock_startup_events):
+        """A node that succeeded before the producer failed resolves successfully even
+        while the producer sits up_for_retry."""
+        with (
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="up_for_retry")),
+            patch.object(
+                self.trigger, "_parse_dbt_node_status_and_compiled_sql", AsyncMock(return_value=("success", "SELECT 1"))
+            ),
+        ):
+            events = []
+            async for event in self.trigger.run():
+                events.append(event)
+
+        assert len(events) == 1
+        assert events[0].payload["status"] == "success"

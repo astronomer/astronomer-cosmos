@@ -21,6 +21,7 @@ Behaviour Changes
 
 Bug Fixes
 
+* WATCHER consumer sensors no longer burn their own retries while the producer sits in ``up_for_retry``. The producer's retry always self-skips without re-running ``dbt build``, so consumers now fall back to a standalone dbt run for their node as soon as the producer enters that state — on the sensor's own retry, on a first poke with no node status or a stale failed status, and on the deferrable trigger path. Previously, consumer retries that fired in that window re-raised the failed attempt's cached error without ever re-running dbt, so a slow scheduler could exhaust a consumer's retry budget and leave the task permanently failed. See #3001.
 * On Airflow 3.0, the Cosmos plugin now logs a warning and skips the dbt docs views instead of raising ``RuntimeError`` on load. Previously, with ``[core] lazy_load_plugins = False`` (as on Astro Runtime), every Airflow CLI command logged a "Failed to import plugin cosmos" traceback, and the plugin's listeners were never registered.
 * Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn, so ``<folder>+`` and ``<package>+`` behave like their ``path:`` and ``package:`` equivalents and like ``dbt ls``. Previously the graph selector resolved its root by exact node name only, and bare-identifier matching keyed off the absolute file path. See #2962.
 

@@ -21,6 +21,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_producer_task_awaiting_retry,
     is_producer_task_still_running,
     is_producer_task_terminated,
     safe_xcom_push,
@@ -104,15 +105,33 @@ class TestProducerTaskTerminated:
     def test_terminal_states(self, state: str):
         assert is_producer_task_terminated(state) is True
 
-    @pytest.mark.parametrize("state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule", None, ""])
+    @pytest.mark.parametrize(
+        "state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule", "up_for_retry", None, ""]
+    )
     def test_non_terminal_states(self, state: str | None):
         assert is_producer_task_terminated(state) is False
+
+
+class TestProducerTaskAwaitingRetry:
+    """Tests for is_producer_task_awaiting_retry helper (#3001)."""
+
+    def test_up_for_retry(self):
+        assert is_producer_task_awaiting_retry("up_for_retry") is True
+
+    @pytest.mark.parametrize(
+        "state",
+        ["success", "failed", "skipped", "upstream_failed", "removed", "running", "queued", None, ""],
+    )
+    def test_other_states(self, state: str | None):
+        assert is_producer_task_awaiting_retry(state) is False
 
 
 class TestProducerTaskStillRunning:
     """Tests for is_producer_task_still_running helper (#2947)."""
 
-    @pytest.mark.parametrize("state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule"])
+    @pytest.mark.parametrize(
+        "state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule", "up_for_retry"]
+    )
     def test_running_states(self, state: str):
         assert is_producer_task_still_running(state) is True
 

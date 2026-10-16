@@ -301,7 +301,6 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         elif result.exit_code != 0:
             self.log.error("\n".join(result.full_output))
             message = f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
-            # Surface failing nodes via context["exception"] for on_failure_callback (issue-1806)
             failure_details = extract_dbt_failure_details(result.full_output)
             if failure_details:
                 message += " Details:\n" + "\n".join(failure_details)

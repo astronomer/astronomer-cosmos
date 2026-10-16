@@ -110,6 +110,14 @@ def failing_test_dbt_project(tmp_path):
     tmp_dir.cleanup()
 
 
+@pytest.fixture
+def failing_error_test_dbt_project(failing_test_dbt_project):
+    """Same as ``failing_test_dbt_project``, but the failing test has ``severity: error``."""
+    schema = failing_test_dbt_project / "models/schema.yml"
+    schema.write_text(schema.read_text().replace("severity: warn", "severity: error").replace("warn_if", "error_if"))
+    return failing_test_dbt_project
+
+
 class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
     base_cmd = ["cmd"]
 
@@ -1226,6 +1234,44 @@ def test_run_test_operator_with_callback_and_trailing_dbt_output(failing_test_db
 
 
 @pytest.mark.integration
+def test_run_test_operator_subprocess_failure_exposes_failing_tests(failing_error_test_dbt_project):
+    """In SUBPROCESS mode the exception for a failing dbt test names the failing test and its detail. Issue #1806."""
+    raised: list[str] = []
+    original = DbtTestLocalOperator.handle_exception_subprocess
+
+    def capture(self, result):
+        try:
+            original(self, result)
+        except AirflowException as exc:
+            raised.append(str(exc))
+            raise
+
+    with DAG("test-failure-details-subprocess", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_error_test_dbt_project,
+            task_id="seed",
+            append_env=True,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_error_test_dbt_project,
+            task_id="test",
+            append_env=True,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        )
+        seed_operator >> test_operator
+
+    with patch.object(DbtTestLocalOperator, "handle_exception_subprocess", capture):
+        run_test_dag(dag, expected_dag_state=DagRunState.FAILED)
+
+    assert raised, "dbt test was expected to fail"
+    assert "accepted_values_mini_orders_status__placed" in raised[0]
+    assert "Got " in raised[0] and "results, configured to fail if" in raised[0]
+
+
+@pytest.mark.integration
 def test_run_operator_emits_events():
     class MockRun:
         facets = {"c": 3}
@@ -1897,7 +1943,7 @@ def test_handle_exception_subprocess(caplog):
 
 
 def test_handle_exception_subprocess_surfaces_failing_tests():
-    """Failing dbt nodes are included in the raised exception (reachable via context["exception"]). issue-1806."""
+    """Failing dbt nodes are included in the raised exception. Issue #1806."""
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=None,
         task_id="my-task",

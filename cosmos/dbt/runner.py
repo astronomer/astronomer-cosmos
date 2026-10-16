@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import json
 import sys
 from collections.abc import Callable
 from functools import cache as functools_cache
@@ -20,6 +21,9 @@ else:  # pragma: no cover
 
 
 logger = get_logger(__name__)
+
+# dbt events carrying the macro error text of a failed ``run-operation``.
+MACRO_ERROR_EVENTS = ("RunningOperationCaughtError", "RunningOperationUncaughtError")
 
 if TYPE_CHECKING:  # pragma: no cover
     from dbt.cli.main import dbtRunner, dbtRunnerResult
@@ -81,6 +85,58 @@ def _cleanup_dbt_adapters() -> None:
     gc.collect()
 
 
+def dbt_event_to_json(event: Any) -> str:
+    """Serialise a dbt ``EventMsg`` to JSON so DBT_RUNNER consumers read the SUBPROCESS field names.
+
+    Not byte-identical to a ``--log-format json`` line, so read the payload with ``.get()``.
+
+    ``google.protobuf.json_format`` is a transitive dependency of dbt-core and is always available
+    when ``InvocationMode.DBT_RUNNER`` is in use.
+    """
+    from google.protobuf.json_format import MessageToJson
+
+    return str(MessageToJson(event, preserving_proto_field_name=True))
+
+
+def _collect_macro_errors(collected: list[str]) -> Callable[[Any], None]:
+    def collect(event: Any) -> None:
+        # Never raise: dbt wraps a raising callback as GenericExceptionOnRun, which would replace
+        # the dbt error this callback exists to surface with the callback's own failure.
+        try:
+            info = json.loads(dbt_event_to_json(event)).get("info", {})
+            if info.get("name") not in MACRO_ERROR_EVENTS:
+                return
+            msg = info.get("msg")
+            if msg:
+                collected.append(str(msg))
+        except Exception:
+            logger.debug("Unable to read a dbt event while collecting macro errors", exc_info=True)
+
+    return collect
+
+
+def _fill_missing_messages(result: dbtRunnerResult, macro_errors: list[str]) -> None:
+    """dbt < 1.12 hardcodes ``message=None`` on run-operation results (dbt-labs/dbt-core#12730)."""
+    if not macro_errors:
+        return
+
+    node_results = getattr(result.result, "results", None) or []
+    if not node_results:
+        # Debug log rather than an exception: a Cosmos-side complaint about the result shape would
+        # hide the run-operation failure the user came for. It still surfaces the contract change.
+        logger.debug(
+            "Collected %d dbt macro error event(s) but no run-operation result to attach them to "
+            "(result.result.results is missing or empty)",
+            len(macro_errors),
+        )
+        return
+
+    message = "\n".join(macro_errors)
+    for node_result in node_results:
+        if getattr(node_result, "message", None) is None:
+            node_result.message = message
+
+
 def run_command(
     command: list[str], env: dict[str, str], cwd: str, callbacks: list[Callable] | None = None, **kwargs: Any  # type: ignore[type-arg]
 ) -> dbtRunnerResult:
@@ -91,6 +147,11 @@ def run_command(
     # command that is used by `InvocationMode.SUBPROCESS`, and in that scenario the first command is necessarily the path
     # to the dbt executable.
     cli_args = command[1:]
+    macro_errors: list[str] = []
+    # ``build_cmd`` puts flags on both sides of the subcommand — dbt global flags before it,
+    # ``add_global_flags()``/``dbt_cmd_flags`` after it — so a positional check is not safe here.
+    if "run-operation" in cli_args:
+        callbacks = [*(callbacks or []), _collect_macro_errors(macro_errors)]
     # ``exclude_dags_folder_from_sys_path`` must enter *before* ``change_working_directory`` so it
     # resolves ``DAGS_FOLDER`` against the Airflow process cwd. A relative ``DAGS_FOLDER`` resolved
     # after the chdir would point at the dbt project dir and fail to strip the real DAGs folder.
@@ -103,6 +164,8 @@ def run_command(
             # Reset dbt adapters to release semaphores (run on all exit paths)
             # See: https://github.com/astronomer/astronomer-cosmos/issues/2334
             _cleanup_dbt_adapters()
+
+    _fill_missing_messages(result, macro_errors)
 
     return result
 

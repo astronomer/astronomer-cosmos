@@ -8,7 +8,7 @@ you can use your own dbt profiles.yml file. To do so, you'll need to pass the pa
 ``profiles_yml_filepath`` argument in ``ProfileConfig``.
 
 .. tip::
-   This approach works with any adapter compatible with **dbt Core** or **dbt Fusion**, including both official `Trusted Adapters <https://docs.getdbt.com/docs/trusted-adapters>`_ and `Community Adapters <https://docs.getdbt.com/docs/community-adapters>`_.
+   This approach works with any adapter compatible with **dbt Core** or **dbt v2**, including both official `Trusted Adapters <https://docs.getdbt.com/docs/trusted-adapters>`_ and `Community Adapters <https://docs.getdbt.com/docs/community-adapters>`_.
 
 For example, the code snippet below points Cosmos at a ``profiles.yml`` file and instructs Cosmos to use the
 ``my_snowflake_profile`` profile and ``dev`` target:

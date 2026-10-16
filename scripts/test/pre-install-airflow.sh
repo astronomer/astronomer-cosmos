@@ -38,11 +38,11 @@ if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRF
   if [ ! -f "$REQUIREMENTS_FILE" ]; then
     if [ "$DBT_VERSION" = "1.11" ] || [ "$DBT_VERSION" = "1.12" ]; then
       # Every Airflow version should have both a 1.11 and 1.12 lockfile; a missing
-      # one is a real gap, not an intentionally-uncovered dbt minor.
+      # one is a real gap, not an intentionally-uncovered dbt Core minor.
       echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
       exit 1
     fi
-    # Other dbt minors (1.8-1.10, 2.0) have no per-Airflow lockfile; jobs needing
+    # Other dbt Core minors (1.8-1.10) and the dbt v2 distribution (v2) have no per-Airflow lockfile; jobs needing
     # them re-pin dbt in their own setup step, so this is just a throwaway baseline.
     echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline (this job must re-pin dbt itself)."
     REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"

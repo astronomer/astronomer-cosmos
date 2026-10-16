@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main]
+    branches: [main, ci/align-dbt-v2-distribution-names] # TEMPORARY: revert before merge
   # Also run on pull requests originating from forks. Every test job here is secret-dependent
   # (integration tests, kubernetes, code coverage) and depends on the Authorize job, which requires
   # manually approving the workflow run for external PRs. Jobs that need no secrets (type-check,
@@ -511,7 +511,7 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11"]
         airflow-version: ["2.10", "3.0"]
-        dbt-version: ["2.0"]  # dbt Fusion
+        dbt-version: ["v2"]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

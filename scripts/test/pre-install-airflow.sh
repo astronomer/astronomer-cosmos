@@ -42,11 +42,16 @@ if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRF
       echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
       exit 1
     fi
-    # Other dbt minors (1.8-1.10, 2.0) have no per-Airflow lockfile; jobs needing
-    # them re-pin dbt in their own setup step, so this is just a throwaway baseline.
-    echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline (this job must re-pin dbt itself)."
-    REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"
-    EFFECTIVE_DBT_VERSION="1.11"
+    # Other dbt versions (1.8-1.10, 2.0, v2.0-oss) have no per-Airflow lockfile; jobs needing them re-pin dbt
+    # in their own setup step, so this is just a throwaway baseline. dbt v2 values start from the dbt-1.12
+    # baseline, whose lockfiles support Python 3.14.
+    case "$DBT_VERSION" in
+      v*) BASELINE_DBT_VERSION="1.12" ;;
+      *) BASELINE_DBT_VERSION="1.11" ;;
+    esac
+    echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-$BASELINE_DBT_VERSION baseline (this job must re-pin dbt itself)."
+    REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-${BASELINE_DBT_VERSION}.txt"
+    EFFECTIVE_DBT_VERSION="$BASELINE_DBT_VERSION"
   fi
   echo "Installing pinned requirements from $REQUIREMENTS_FILE"
   uv pip install -r "$REQUIREMENTS_FILE"
@@ -90,7 +95,7 @@ else
 fi
 
 # EFFECTIVE_DBT_VERSION differs from DBT_VERSION only when the fallback above
-# substituted the dbt-1.11 baseline.
+# substituted a baseline (dbt-1.11, or dbt-1.12 for dbt v2).
 actual_dbt_version=$(dbt --version 2>/dev/null | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
 if [ "$actual_dbt_version" = "$EFFECTIVE_DBT_VERSION" ]; then
     echo "dbt version is as expected: $EFFECTIVE_DBT_VERSION"

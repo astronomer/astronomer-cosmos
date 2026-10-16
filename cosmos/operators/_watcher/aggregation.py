@@ -18,6 +18,24 @@ def get_tests_status_xcom_key(model_uid: str) -> str:
     return f"{model_uid.replace('.', '__')}_tests_status"
 
 
+def get_tests_upstream_failure_skip_xcom_key(model_uid: str) -> str:
+    """Return the XCom key that marks a model's failed tests as skipped by dbt for an upstream failure."""
+    return f"{model_uid.replace('.', '__')}_tests_upstream_failure_skip"
+
+
+def _failed_only_by_upstream_failure_skips(
+    collected: dict[str, str], upstream_failure_skipped_ids: set[str] | None
+) -> bool:
+    """Whether every non-passing test in ``collected`` was skipped by dbt for an upstream failure."""
+    if not upstream_failure_skipped_ids:
+        return False
+    return all(
+        test_uid in upstream_failure_skipped_ids
+        for test_uid, status in collected.items()
+        if not is_dbt_node_status_success(status)
+    )
+
+
 def accumulate_test_result(
     test_unique_id: str,
     status: str,
@@ -81,6 +99,7 @@ def push_test_result_or_aggregate(
     tests_per_model: dict[str, list[str]],
     test_results_per_model: dict[str, dict[str, str]],
     task_instance: Any,
+    upstream_failure_skipped_ids: set[str] | None = None,
 ) -> None:
     """Accumulate a test result and, when all tests for the parent model have reported, push aggregated XCom.
 
@@ -89,12 +108,22 @@ def push_test_result_or_aggregate(
     :param tests_per_model: Mapping of model unique_id → list of test unique_ids.
     :param test_results_per_model: Mutable accumulator, mutated in place.
     :param task_instance: The Airflow task instance used for XCom push.
+    :param upstream_failure_skipped_ids: Node unique_ids that dbt skipped for an upstream failure. A ``fail``
+        aggregate caused only by these tests also gets a ``<model_uid>_tests_upstream_failure_skip`` XCom.
     """
     with _test_results_lock:
         model_uids = accumulate_test_result(test_unique_id, status, tests_per_model, test_results_per_model)
         for model_uid in model_uids:
             aggregated = get_aggregated_test_status(model_uid, tests_per_model, test_results_per_model)
             if aggregated is not None:
+                if aggregated == DbtTestStatus.FAIL and _failed_only_by_upstream_failure_skips(
+                    test_results_per_model[model_uid], upstream_failure_skipped_ids
+                ):
+                    safe_xcom_push(
+                        task_instance=task_instance,
+                        key=get_tests_upstream_failure_skip_xcom_key(model_uid),
+                        value=True,
+                    )
                 safe_xcom_push(
                     task_instance=task_instance,
                     key=get_tests_status_xcom_key(model_uid),

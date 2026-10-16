@@ -132,10 +132,18 @@ def init_k8s_operator(
     pod_operator_class.__init__(operator, **operator_kwargs)
 
 
-def _build_env_vars(env: dict[str, str | bytes | PathLike[Any]], existing_env_vars: list[Any]) -> list[k8s.V1EnvVar]:
-    """Merge an env dict with existing K8s env vars and return the combined list."""
+def _build_env_vars(
+    env: dict[str, str | bytes | PathLike[Any]], existing_env_vars: list[Any] | dict[str, Any]
+) -> list[k8s.V1EnvVar]:
+    """Merge an env dict with existing K8s env vars and return the combined list.
+
+    cncf-kubernetes >= 10.23.0 leaves a user-supplied ``env_vars`` dict unconverted until pod build time.
+    """
+    existing: list[Any] = (
+        convert_env_vars(existing_env_vars) if isinstance(existing_env_vars, dict) else existing_env_vars
+    )
     env_vars_dict = {k: str(v) for k, v in env.items()}
-    for ev in existing_env_vars:
+    for ev in existing:
         env_vars_dict[ev.name] = ev.value
     return convert_env_vars(env_vars_dict)  # type: ignore[no-any-return]
 

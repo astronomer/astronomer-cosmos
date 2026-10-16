@@ -26,6 +26,7 @@ DBT_TARGET_DIR_NAME = "target"
 DBT_PARTIAL_PARSE_FILE_NAME = "partial_parse.msgpack"
 DBT_MANIFEST_FILE_NAME = "manifest.json"
 DBT_DEPENDENCIES_FILE_NAMES = {"packages.yml", "dependencies.yml"}
+DBT_DISTRIBUTION_NAMES = ("dbt-core", "dbt-oss", "dbt")
 DBT_LOG_FILENAME = "dbt.log"
 DBT_BINARY_NAME = "dbt"
 DEFAULT_PROFILES_FILE_NAME = "profiles.yml"

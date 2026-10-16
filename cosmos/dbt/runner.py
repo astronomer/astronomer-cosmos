@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from packaging.version import Version
 
+from cosmos.constants import DBT_DISTRIBUTION_NAMES
 from cosmos.dbt.project import change_working_directory, environ, exclude_dags_folder_from_sys_path
 from cosmos.exceptions import CosmosDbtRunError
 from cosmos.log import get_logger
@@ -42,11 +43,14 @@ def is_available() -> bool:
 
 @cache
 def is_dbt_v2() -> bool:
-    """Return whether the installed dbt-core distribution is major version 2."""
-    try:
-        return Version(version("dbt-core")).major == 2
-    except PackageNotFoundError:
-        return False
+    """Return whether an installed dbt distribution is major version 2."""
+    for distribution_name in DBT_DISTRIBUTION_NAMES:
+        try:
+            if Version(version(distribution_name)).major == 2:
+                return True
+        except PackageNotFoundError:
+            continue
+    return False
 
 
 @cache

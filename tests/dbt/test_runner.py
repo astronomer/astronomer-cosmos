@@ -3,6 +3,7 @@ import shutil
 import sys
 import tempfile
 import types
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -67,16 +68,20 @@ def test_is_dbt_v2(mock_version):
     mock_version.assert_called_once_with("dbt-core")
 
 
-@patch("cosmos.dbt.runner.version", return_value="1.12.6")
+@patch("cosmos.dbt.runner.version")
 def test_is_dbt_v2_is_false_for_dbt_v1(mock_version):
+    mock_version.side_effect = ["1.12.6", PackageNotFoundError("dbt-oss"), PackageNotFoundError("dbt")]
     assert not dbt_runner.is_dbt_v2()
-    mock_version.assert_called_once_with("dbt-core")
+    assert mock_version.call_count == 3
+    mock_version.assert_called_with("dbt")
 
 
-@patch("cosmos.dbt.runner.version", return_value="3.0.0")
+@patch("cosmos.dbt.runner.version")
 def test_is_dbt_v2_is_false_for_dbt_v3(mock_version):
+    mock_version.side_effect = ["3.0.0", PackageNotFoundError("dbt-oss"), PackageNotFoundError("dbt")]
     assert not dbt_runner.is_dbt_v2()
-    mock_version.assert_called_once_with("dbt-core")
+    assert mock_version.call_count == 3
+    mock_version.assert_called_with("dbt")
 
 
 def test_cleanup_dbt_adapters_calls_reset_adapters_and_gc():

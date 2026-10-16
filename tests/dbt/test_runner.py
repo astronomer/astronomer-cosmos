@@ -61,6 +61,24 @@ def test_is_available_is_false():
     assert not dbt_runner.is_available()
 
 
+@patch("cosmos.dbt.runner.version", return_value="2.0.0rc2")
+def test_is_dbt_v2(mock_version):
+    assert dbt_runner.is_dbt_v2()
+    mock_version.assert_called_once_with("dbt-core")
+
+
+@patch("cosmos.dbt.runner.version", return_value="1.12.6")
+def test_is_dbt_v2_is_false_for_dbt_v1(mock_version):
+    assert not dbt_runner.is_dbt_v2()
+    mock_version.assert_called_once_with("dbt-core")
+
+
+@patch("cosmos.dbt.runner.version", return_value="3.0.0")
+def test_is_dbt_v2_is_false_for_dbt_v3(mock_version):
+    assert not dbt_runner.is_dbt_v2()
+    mock_version.assert_called_once_with("dbt-core")
+
+
 def test_cleanup_dbt_adapters_calls_reset_adapters_and_gc():
     """_cleanup_dbt_adapters calls reset_adapters when available and always runs gc.collect()."""
     factory_mock = MagicMock()

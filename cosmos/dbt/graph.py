@@ -381,7 +381,14 @@ def run_command(
     logger.info("Running command with %s: `%s`", runner, " ".join(command))
     logger.debug("Environment variable keys: %s", env_vars.keys())
 
-    if use_dbt_runner:
+    if use_dbt_runner and command[1] == "ls" and dbt_runner.is_dbt_v2():
+        logger.warning(
+            "dbt-core 2.x does not return JSON records for `dbt ls` through dbtRunner; "
+            "running this command with Python subprocess. Set RenderConfig.invocation_mode to "
+            "InvocationMode.SUBPROCESS to avoid this warning."
+        )
+        stdout = run_command_with_subprocess(command, tmp_dir, env_vars)
+    elif use_dbt_runner:
         stdout = run_command_with_dbt_runner(command, tmp_dir, env_vars)
     else:
         stdout = run_command_with_subprocess(command, tmp_dir, env_vars)

@@ -5,8 +5,12 @@ import sys
 from collections.abc import Callable
 from functools import cache as functools_cache
 from functools import lru_cache
+from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any
 
+from packaging.version import Version
+
+from cosmos.constants import DBT_DISTRIBUTION_NAMES
 from cosmos.dbt.project import change_working_directory, environ, exclude_dags_folder_from_sys_path
 from cosmos.exceptions import CosmosDbtRunError
 from cosmos.log import get_logger
@@ -35,6 +39,18 @@ def is_available() -> bool:
     except ImportError:
         return False
     return True
+
+
+@cache
+def is_dbt_v2() -> bool:
+    """Return whether an installed dbt distribution is major version 2."""
+    for distribution_name in DBT_DISTRIBUTION_NAMES:
+        try:
+            if Version(version(distribution_name)).major == 2:
+                return True
+        except PackageNotFoundError:
+            continue
+    return False
 
 
 @cache

@@ -7,6 +7,7 @@ Unreleased
 Breaking Changes
 
 * Raised the minimum supported dbt Core version to 1.8. dbt Core 1.5, 1.6, and 1.7 have reached End of Life per the `dbt Labs support policy <https://docs.getdbt.com/docs/dbt-versions/core>`_ and are no longer tested or supported; see the :doc:`compatibility policy </policy/compatibility-policy>` for the current supported range. See #2902.
+* ``ExecutionMode.AIRFLOW_ASYNC`` is no longer supported on Apache Airflow 2.x. Cosmos now builds the async operator at runtime in a way that works on Airflow 3.4, which leaves the operator not fully initialised on Airflow 2.9 and unpicklable on Airflow 2.x. Users who run ``AIRFLOW_ASYNC`` and cannot upgrade to Airflow 3 should stay on an earlier Cosmos release. See `#3050 <https://github.com/astronomer/astronomer-cosmos/pull/3050>`_.
 
 Behaviour Changes
 

@@ -117,6 +117,7 @@ class ExecutionMode(Enum):
     AIRFLOW_ASYNC = "airflow_async"
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
+    KUBERNETES_EXEC = "kubernetes_exec"
     AWS_EKS = "aws_eks"
     AWS_ECS = "aws_ecs"
     VIRTUALENV = "virtualenv"

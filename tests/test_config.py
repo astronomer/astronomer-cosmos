@@ -502,3 +502,18 @@ def test_render_config_seed_rendering_when_seed_changes_allowed_with_non_build(t
 
 def test_render_config_seed_rendering_behavior_defaults_to_always():
     assert RenderConfig().seed_rendering_behavior == SeedRenderingBehavior.ALWAYS
+
+
+@pytest.mark.parametrize("execution_mode", list(ExecutionMode))
+@patch("cosmos.config.get_system_dbt", return_value="/scheduler/venv/bin/dbt", autospec=True)
+def test_execution_config_default_executable(mock_get_dbt, execution_mode):
+    config = ExecutionConfig(execution_mode=execution_mode)
+    assert config.dbt_executable_path == (
+        "dbt" if execution_mode == ExecutionMode.KUBERNETES_EXEC else "/scheduler/venv/bin/dbt"
+    )
+
+
+@pytest.mark.parametrize("executable", ["/opt/dbt/bin/dbt", Path("/opt/dbt/bin/dbt")])
+def test_execution_config_preserves_explicit_exec_path(executable):
+    config = ExecutionConfig(execution_mode=ExecutionMode.KUBERNETES_EXEC, dbt_executable_path=executable)
+    assert config.dbt_executable_path == executable

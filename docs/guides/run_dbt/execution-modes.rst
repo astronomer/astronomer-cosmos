@@ -142,6 +142,7 @@ You can also execute dbt commands in a container. Choosing these kinds of execut
 
 - :ref:`docker <docker>` : Run ``dbt`` commands via Docker containers inside the Airflow worker node.
 - :ref:`kubernetes <kubernetes>`: Run ``dbt`` commands within Kubernetes Pods managed by Cosmos.
+- :ref:`kubernetes_exec <kubernetes-exec>`: Run each dbt command in an existing Kubernetes container. The user manages the Pod lifecycle.
 - :ref:`watcher_kubernetes <watcher-kubernetes-execution-mode>`: (Stable since Cosmos 1.15.0) Combines the speed of the watcher execution mode with the isolation of Kubernetes.
 - :ref:`aws_ecs <aws-container-run-job>`: Run ``dbt`` commands in containers via AWS ECS.
 - :ref:`aws_eks <aws-eks>`: Run ``dbt`` commands via Kubernetes Pods in AWS EKS.

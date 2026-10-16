@@ -5,7 +5,7 @@ from unittest.mock import Mock, PropertyMock, call, patch
 import pytest
 from packaging.version import Version
 
-from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AiConfig, CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, InvocationMode, SeedRenderingBehavior, SourceRenderingBehavior, TestBehavior
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.athena.access_key import AthenaAccessKeyProfileMapping
@@ -502,3 +502,34 @@ def test_render_config_seed_rendering_when_seed_changes_allowed_with_non_build(t
 
 def test_render_config_seed_rendering_behavior_defaults_to_always():
     assert RenderConfig().seed_rendering_behavior == SeedRenderingBehavior.ALWAYS
+
+
+def test_ai_config_defaults():
+    ai_config = AiConfig(llm_conn_id="my_llm_conn")
+    assert ai_config.llm_conn_id == "my_llm_conn"
+    assert ai_config.diagnose_on_failure is False
+    assert ai_config.introspect_schema is False
+    assert ai_config.timeout_seconds == 30.0
+    assert ai_config.diagnosis_output_type is None
+    assert ai_config.diagnosis_instructions is None
+
+
+def test_ai_config_custom_values():
+    from pydantic import BaseModel
+
+    class CustomDiagnosis(BaseModel):
+        summary: str
+
+    ai_config = AiConfig(
+        llm_conn_id="my_llm_conn",
+        diagnose_on_failure=True,
+        introspect_schema=True,
+        timeout_seconds=10.0,
+        diagnosis_output_type=CustomDiagnosis,
+        diagnosis_instructions="Be concise.",
+    )
+    assert ai_config.diagnose_on_failure is True
+    assert ai_config.introspect_schema is True
+    assert ai_config.timeout_seconds == 10.0
+    assert ai_config.diagnosis_output_type is CustomDiagnosis
+    assert ai_config.diagnosis_instructions == "Be concise."

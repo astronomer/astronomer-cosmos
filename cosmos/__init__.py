@@ -19,6 +19,7 @@ __version__ = "1.15.1"
 _LAZY_IMPORTS: dict[str, str] = {
     "DbtDag": "cosmos.airflow.dag",
     "DbtTaskGroup": "cosmos.airflow.task_group",
+    "AiConfig": "cosmos.config",
     "ExecutionConfig": "cosmos.config",
     "ProfileConfig": "cosmos.config",
     "ProjectConfig": "cosmos.config",
@@ -116,6 +117,7 @@ _OPTIONAL_DEPS: dict[str, str] = {
 if TYPE_CHECKING:
     from cosmos.airflow.dag import DbtDag as DbtDag
     from cosmos.airflow.task_group import DbtTaskGroup as DbtTaskGroup
+    from cosmos.config import AiConfig as AiConfig
     from cosmos.config import ExecutionConfig as ExecutionConfig
     from cosmos.config import ProfileConfig as ProfileConfig
     from cosmos.config import ProjectConfig as ProjectConfig

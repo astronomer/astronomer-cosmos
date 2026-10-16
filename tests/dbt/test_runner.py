@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import sys
@@ -59,6 +60,14 @@ def invalid_dbt_project_dir(valid_dbt_project_dir):
 @patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_is_available_is_false():
     assert not dbt_runner.is_available()
+
+
+@patch.dict(sys.modules, {"dbt.cli.main": MagicMock(), "dbt.version": None})
+def test_is_available_is_false_without_dbt_version(caplog):
+    """dbt-core 2.x exposes dbtRunner but not dbt.version; Cosmos does not drive it in-process (#2993)."""
+    with caplog.at_level(logging.INFO):
+        assert not dbt_runner.is_available()
+    assert "Cosmos will invoke dbt as a subprocess" in caplog.text
 
 
 def test_cleanup_dbt_adapters_calls_reset_adapters_and_gc():

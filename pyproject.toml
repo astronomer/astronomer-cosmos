@@ -198,6 +198,8 @@ test-kubernetes = "sh scripts/test/integration-kubernetes.sh"
 test-kubernetes-setup = "sh scripts/test/kubernetes-setup.sh {matrix:dbt}"
 test-integration-dbtf-setup = 'sh scripts/test/integration-dbtf-setup.sh'
 test-integration-dbtf = 'sh scripts/test/integration-dbtf.sh'
+test-integration-dbt-core-2-setup = 'sh scripts/test/integration-dbtf-setup.sh'
+test-integration-dbt-core-2 = 'sh scripts/test/integration-dbt-core-2.sh'
 test-integration-dbt-1-8 = 'sh scripts/test/integration-dbt-1-8.sh'
 test-integration-dbt-async = 'sh scripts/test/integration-dbt-async.sh {matrix:dbt}'
 test-integration-dbt-loom = 'sh scripts/test/integration-dbt-loom.sh {matrix:dbt}'
@@ -212,7 +214,7 @@ type-check = "pre-commit run mypy --files cosmos/**/*"
 addopts = "--ignore-glob=**/dbt_packages/*"
 filterwarnings = ["ignore::DeprecationWarning"]
 minversion = "6.0"
-markers = ["integration", "perf", "dbtfusion"]
+markers = ["integration", "perf", "dbtfusion", "dbtcore2"]
 
 ######################################
 # DOCS

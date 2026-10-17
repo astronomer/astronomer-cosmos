@@ -3,8 +3,8 @@ version: 2
 
 sources:
   - name: postgres_db
-    database: "{{ env_var('POSTGRES_DB') }}"
-    schema: "{{ env_var('POSTGRES_SCHEMA') }}"
+    database: "{{ target.database }}"
+    schema: "{{ target.schema }}"
     tables:
       - name: not_connected_source
       - name: raw_customers

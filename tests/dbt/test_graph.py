@@ -39,7 +39,7 @@ from cosmos.dbt.graph import (
     run_command_with_subprocess,
 )
 from cosmos.dbt.selector import YamlSelectors
-from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping, PostgresUserPasswordProfileMapping
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
 DBT_PROJECT_NAME = "jaffle_shop"
@@ -113,9 +113,12 @@ def postgres_profile_config() -> ProfileConfig:
     return ProfileConfig(
         profile_name="default",
         target_name="default",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="gcp_gs_conn",
+            profile_args={
+                "project": "astronomer-dag-authoring",
+                "dataset": os.getenv("COSMOS_TEST_BIGQUERY_DATASET", "COSMOS_CI"),
+            },
         ),
     )
 
@@ -880,9 +883,12 @@ def test_load_automatic_without_manifest_with_profile_mapping(mock_load_via_dbt_
     profile_config = ProfileConfig(
         profile_name="test",
         target_name="test",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="example_conn",
-            profile_args={"schema": "public"},
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="gcp_gs_conn",
+            profile_args={
+                "project": "astronomer-dag-authoring",
+                "dataset": os.getenv("COSMOS_TEST_BIGQUERY_DATASET", "COSMOS_CI"),
+            },
         ),
     )
     dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)
@@ -2639,9 +2645,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
+        assert hash_dir in ("d0d0e05cbe41a4ecee9f1caf27787bf5",)
     else:
-        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
+        assert hash_dir == "d0d0e05cbe41a4ecee9f1caf27787bf5"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2680,9 +2686,9 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
+        assert hash_dir in ("d0d0e05cbe41a4ecee9f1caf27787bf5",)
     else:
-        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
+        assert hash_dir == "d0d0e05cbe41a4ecee9f1caf27787bf5"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")

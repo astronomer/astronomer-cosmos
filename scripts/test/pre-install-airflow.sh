@@ -103,6 +103,7 @@ fi
 # Cap dbt-core below 2.0. Previously dbt-loom (installed here) held dbt-core in
 # the 1.x range; with dbt-loom moved to the dedicated loom job, the bound is
 # explicit so `pip install -U` doesn't pull dbt-core 2.0 (Fusion), which lacks
-# the postgres adapter the subprocess tests rely on.
+# the postgres adapter the subprocess tests rely on. dbt-bigquery is needed too: most example DAGs and
+# integration tests now use a BigQuery profile.
 python -m venv venv-subprocess
-venv-subprocess/bin/pip install -U "dbt-core<2.0" dbt-postgres
+venv-subprocess/bin/pip install -U "dbt-core<2.0" dbt-postgres dbt-bigquery

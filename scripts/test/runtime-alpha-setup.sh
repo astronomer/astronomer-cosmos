@@ -65,7 +65,7 @@ uv pip install --system -r "${SCRIPT_DIR}/requirements-test-tools.txt"
 # Some integration tests execute dbt in a separate virtualenv (subprocess invocation mode).
 # pre-install-airflow.sh normally creates this; reproduce it here since we skip that script.
 python -m venv "${REPO_ROOT}/venv-subprocess"
-"${REPO_ROOT}/venv-subprocess/bin/pip" install -U "dbt-core<2.0" dbt-postgres
+"${REPO_ROOT}/venv-subprocess/bin/pip" install -U "dbt-core<2.0" dbt-postgres dbt-bigquery
 
 # Compatibility signal: show the resolved Airflow / dbt / cosmos versions actually in play.
 uv pip freeze | grep -Ei 'airflow|dbt|cosmos' || true

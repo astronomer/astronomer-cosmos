@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,7 +21,7 @@ from cosmos.listeners.dag_run_listener import (
     on_dag_run_success,
     total_cosmos_tasks,
 )
-from cosmos.profiles import PostgresUserPasswordProfileMapping
+from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 from tests.utils import new_test_dag
 
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -31,9 +32,12 @@ AIRFLOW_VERSION_MAJOR = AIRFLOW_VERSION.major
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
-    profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="example_conn",
-        profile_args={"schema": "public"},
+    profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+        conn_id="gcp_gs_conn",
+        profile_args={
+            "project": "astronomer-dag-authoring",
+            "dataset": os.getenv("COSMOS_TEST_BIGQUERY_DATASET", "COSMOS_CI"),
+        },
         disable_event_tracking=True,
     ),
 )
@@ -233,8 +237,8 @@ def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_e
     assert metrics["test_behavior"] == "after_each"
     assert metrics["source_behavior"] == "none"
     assert metrics["profile_strategy"] == "mapping"
-    assert metrics["profile_mapping_class"] == "PostgresUserPasswordProfileMapping"
-    assert metrics["database"] == "postgres"
+    assert metrics["profile_mapping_class"] == "GoogleCloudServiceAccountDictProfileMapping"
+    assert metrics["database"] == "bigquery"
 
 
 @pytest.mark.integration

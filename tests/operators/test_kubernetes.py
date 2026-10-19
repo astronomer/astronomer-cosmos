@@ -794,7 +794,7 @@ def test_kubernetes_task_group():
         )
 
     assert all(t.task_id.startswith(f"{group_id}.") for t in task_group)
-    assert len(dag.tasks) == len([t for t in task_group])
+    assert len(dag.tasks) == len([*task_group])
     assert any(t for t in task_group if isinstance(t, DbtKubernetesBaseOperator))
     assert all(t.image == image for t in (t for t in task_group if isinstance(t, DbtKubernetesBaseOperator)))
 

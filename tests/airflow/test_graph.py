@@ -212,7 +212,7 @@ def test_build_airflow_graph_with_after_each(hierarchical_naming_disabled):
 
     assert task_seed_parent_seed.owner == DEFAULT_OWNER
     assert task_parent_run.owner == "parent_node"
-    assert {d for d in dag.owner.split(", ")} == {DEFAULT_OWNER, "parent_node"}
+    assert {*dag.owner.split(", ")} == {DEFAULT_OWNER, "parent_node"}
 
 
 @pytest.mark.parametrize(

@@ -12,6 +12,9 @@ AIRFLOW_VERSION = Version(airflow.__version__)
 # dbt materialization for models that are inlined as a CTE into downstream models and never written to the warehouse.
 DBT_EPHEMERAL_MATERIALIZATION = "ephemeral"
 
+# dbt materializations for adapter-native semantic metric views (Databricks metric views, Snowflake semantic views).
+DBT_SEMANTIC_METRIC_VIEW_MATERIALIZATIONS = {"metric_view", "semantic_view"}
+
 BIGQUERY_PROFILE_TYPE = "bigquery"
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
 DBT_PROJECT_FILENAME = "dbt_project.yml"
@@ -189,6 +192,7 @@ class DbtResourceType(aenum.Enum):  # type: ignore[misc]
     TEST = "test"
     SOURCE = "source"
     EXPOSURE = "exposure"
+    SEMANTIC_METRIC_VIEW = "semantic_metric_view"
 
     @classmethod
     def _missing_value_(cls, value):  # type: ignore[no-untyped-def]
@@ -200,6 +204,8 @@ DEFAULT_DBT_RESOURCES = DbtResourceType.__members__.values()
 
 # According to the dbt documentation (https://docs.getdbt.com/reference/commands/build), build also supports test nodes.
 # However, in the context of Cosmos, we will run test nodes together with the respective models/seeds/snapshots nodes
+# These values are passed to dbt as ``--resource-type``, so they must be types dbt knows. ``SEMANTIC_METRIC_VIEW`` is a
+# Cosmos-only type: dbt still sees those nodes as models, so ``MODEL`` already covers them.
 SUPPORTED_BUILD_RESOURCES = [
     DbtResourceType.MODEL,
     DbtResourceType.SNAPSHOT,
@@ -209,7 +215,13 @@ SUPPORTED_BUILD_RESOURCES = [
 # dbt test runs tests defined on models, sources, snapshots, and seeds.
 # It expects that you have already created those resources through the appropriate commands.
 # https://docs.getdbt.com/reference/commands/test
-TESTABLE_DBT_RESOURCES = {DbtResourceType.MODEL, DbtResourceType.SOURCE, DbtResourceType.SNAPSHOT, DbtResourceType.SEED}
+TESTABLE_DBT_RESOURCES = {
+    DbtResourceType.MODEL,
+    DbtResourceType.SOURCE,
+    DbtResourceType.SNAPSHOT,
+    DbtResourceType.SEED,
+    DbtResourceType.SEMANTIC_METRIC_VIEW,
+}
 
 _DATASET_EMITTING_RESOURCE_TYPES = frozenset({"model", "seed", "snapshot"})
 

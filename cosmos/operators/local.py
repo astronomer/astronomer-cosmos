@@ -114,6 +114,7 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
@@ -1169,6 +1170,17 @@ class DbtRunLocalOperator(DbtRunMixin, DbtLocalBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticMetricViewLocalOperator(DbtSemanticMetricViewMixin, DbtLocalBaseOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic metric view.
+    """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

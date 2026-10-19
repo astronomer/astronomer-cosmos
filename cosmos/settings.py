@@ -65,6 +65,13 @@ enable_dags_folder_exclusion_from_dbt = conf.getboolean(
 enable_hierarchical_naming_for_group_nodes_by_folder = conf.getboolean(
     "cosmos", "enable_hierarchical_naming_for_group_nodes_by_folder", fallback=False
 )
+# Opt-in: reclassifies adapter-native semantic metric view models (materialized as metric_view or
+# semantic_view) as DbtResourceType.SEMANTIC_METRIC_VIEW instead of a plain model. Defaults to False
+# to preserve existing task_ids and resource_type:model selectors; enabling it is a breaking change
+# for DAGs that already render these models. See the "Managing semantic metric views" guide.
+enable_semantic_metric_view_reclassification = conf.getboolean(
+    "cosmos", "enable_semantic_metric_view_reclassification", fallback=False
+)
 rich_logging = conf.getboolean("cosmos", "rich_logging", fallback=False)
 dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)

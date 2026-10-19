@@ -14,25 +14,34 @@ from pathlib import Path
 # example DAG tests fail at collection time, so the files that are not listed are added to .airflowignore.
 # cosmos_profile_mapping.py is left out on purpose: it builds its profile from the Postgres Airflow connection
 # `example_conn`, which this job does not have. basic_cosmos_task_group.py, dbt_docs.py and example_duckdb_dag.py
-# are left out until dbt v2 handles their --vars, docs generate and duckdb seed.
+# are left out until dbt v2 handles their --vars, docs generate and duckdb seed. example_cosmos_sources.py (its own
+# Postgres profile) and simple_dag_async.py (async) are left out too.
 ENABLED_DAG_FILES = frozenset(
     {
         "basic_cosmos_dag.py",
         "basic_cosmos_dag_full_module_path_imports.py",
+        "basic_cosmos_task_group_different_owners.py",
         "cosmos_callback_dag.py",
         "cosmos_manifest_example.py",
+        "cosmos_manifest_selectors_example.py",
         "cosmos_seed_dag.py",
         "example_cosmos_dbt_build.py",
+        "example_dbt_deps.py",
+        "example_model_version.py",
         "example_seed_rendering.py",
+        "example_source_pruning.py",
+        "example_source_rendering.py",
+        "example_task_mapping.py",
         "example_taskflow_operator_args.py",
         "example_taskflow_project_config.py",
         "example_tasks_map.py",
+        "example_tests_multiple_parents.py",
         "example_watcher.py",
+        "watcher_with_freshness_check.py",
     }
 )
 
 # Why a test is skipped in the dbt v2 job.
-_STRICT_YAML = "dbt v2 rejects the project's YAML (materialized without +, test arguments not under arguments:)"
 _POSTGRES_ENV = "uses a profiles.yml or sources.yml that reads POSTGRES_* variables, which this job does not set"
 _NO_BQ_ADAPTER_MODULE = "needs dbt-bigquery's dbt.adapters.bigquery, which cannot be installed next to dbt v2 (both provide the dbt package)"
 _NO_CALLBACKS = "dbt v2 dbtRunner does not support callbacks"
@@ -48,24 +57,6 @@ _UNKNOWN = "fails in the dbt v2 job for a cause not yet identified"
 # Tests that fail in the dbt v2 job for a known reason, keyed by pytest node id. Each one is skipped there with its
 # reason until it is fixed or made to work with dbt v2; remove its entry when it does.
 SKIPPED_TESTS: dict[str, str] = {
-    # dbt 2 strict project YAML (17)
-    "tests/dbt/test_graph.py::test_load_dbt_ls_and_manifest_with_model_version[load_via_dbt_ls]": _STRICT_YAML,
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_exclude": _STRICT_YAML,
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_selector_arg": _STRICT_YAML,
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_exclude[project_dir0-41]": _STRICT_YAML,
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_exclude[project_dir1-28]": _STRICT_YAML,
-    "tests/operators/test_watcher.py::test_dbt_dag_with_watcher": _STRICT_YAML,
-    "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_freshness_callback_excludes_model": _STRICT_YAML,
-    "tests/test_airflow_versioning.py::test_cosmos_dag_version_tracking_with_added_model": _STRICT_YAML,
-    "tests/test_airflow_versioning.py::test_cosmos_dag_version_unchanged_without_modifications": _STRICT_YAML,
-    "tests/test_converter.py::test_converter_creates_dag_with_test_with_multiple_parents": _STRICT_YAML,
-    "tests/test_converter.py::test_converter_creates_dag_with_test_with_multiple_parents_and_build": _STRICT_YAML,
-    "tests/test_converter.py::test_converter_creates_dag_with_test_with_multiple_parents_test_afterall": _STRICT_YAML,
-    "tests/test_converter.py::test_converter_creates_dag_with_test_with_multiple_parents_test_none": _STRICT_YAML,
-    "tests/test_converter.py::test_converter_creates_dag_with_test_with_multiple_parents_with_should_detach_multiple_parents_tests_false": _STRICT_YAML,
-    "tests/test_converter.py::test_converter_passes_render_config_exclude_to_test_tasks": _STRICT_YAML,
-    "tests/test_converter.py::test_dbt_dag_renders_ephemeral_model_as_dbt_run_when_disabled": _STRICT_YAML,
-    "tests/test_converter.py::test_dbt_dag_renders_ephemeral_model_as_empty_operator": _STRICT_YAML,
     # Postgres env vars (own profiles.yml/sources) (13)
     "tests/dbt/test_graph.py::test_altered_jaffle_shop_manifest_is_in_sync_with_project": _POSTGRES_ENV,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_project_config_vars": _POSTGRES_ENV,

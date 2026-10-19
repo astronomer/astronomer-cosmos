@@ -92,6 +92,16 @@ jobs:
         run: |
           hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_dataset.py create
 
+      - name: Make the example dbt projects compatible with dbt v2
+        # dbt v2 rejects what dbt 1.x accepts in these projects (materialized without +, test arguments outside
+        # arguments:), so the DAGs and tests that use them cannot even parse. dbt-autofix, pinned, rewrites the checked out
+        # files on this runner only; the repository and the other workflows are not touched.
+        run: |
+          for project in altered_jaffle_shop model_version multiple_parents_test simple; do
+            uv tool run --python ${{ matrix.python-version }} --from "dbt-autofix==0.22.6" dbt-autofix deprecations --path "dev/dags/dbt/$project"
+          done
+          git diff --stat
+
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
           HATCH_ENV="tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}"
@@ -99,6 +109,9 @@ jobs:
           hatch run "$HATCH_ENV:test-integration"
         env:
           COSMOS_TEST_ADAPTER: bigquery
+          # altered_jaffle_shop/models/staging/sources.yml reads these two: point them at this job's BigQuery dataset.
+          POSTGRES_DB: astronomer-dag-authoring
+          POSTGRES_SCHEMA: ${{ env.COSMOS_TEST_BIGQUERY_DATASET }}
           # Loaded only by this job; swaps the Postgres profile mapping for BigQuery and applies tests/dbt_v2_enabled.py.
           PYTEST_PLUGINS: tests.dbt_v2_plugin
           # Summary of the failed, errored and skipped tests at the end of the run.

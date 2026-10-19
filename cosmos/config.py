@@ -587,7 +587,7 @@ class ExecutionConfig:
     :param virtualenv_dir: Directory path to locate the (cached) virtual env that
     should be used for execution when execution mode is set to `ExecutionMode.VIRTUALENV`
     :param async_py_requirements:  A list of Python packages to install when `ExecutionMode.AIRFLOW_ASYNC` is used. This parameter is required only if both `enable_setup_async_task` and `enable_teardown_async_task` are set to `True`.
-    Example: `["dbt-postgres==1.5.0"]`
+    Example: `["dbt-postgres==1.8.0"]`
     :param setup_operator_args: A dictionary of producer operator parameters. These will override the values supplied in operator_args for producer operator.
         Pass ``freshness_callback`` here in `ExecutionMode.WATCHER` to override the default skip-propagation logic when ``source_rendering_behavior`` is not ``NONE``. **Experimental**.
         The callable receives ``(context, dag, task_group, nodes, sources_json)`` and must return a list of ``(unique_id, state)`` tuples.

@@ -44,6 +44,12 @@ In some cases, Cosmos may continue to support older Airflow versions, depending 
 - **Minimum required version**: Apache Airflow 2.9.0
 - **Supported versions**: 2.9, 2.10, 2.11, 3.0, 3.1, 3.2, 3.3
 
+.. note::
+
+   ``ExecutionMode.AIRFLOW_ASYNC`` requires Apache Airflow 3 from Cosmos 1.16.0 onwards. The async operator is built at
+   runtime, and that approach is not supported on Airflow 2.x. Users who run ``AIRFLOW_ASYNC`` and cannot upgrade to
+   Airflow 3 should stay on an earlier Cosmos release (1.15.x or older). All other execution modes are unaffected.
+
 dbt Core
 ++++++++
 

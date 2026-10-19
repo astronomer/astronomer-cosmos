@@ -79,8 +79,10 @@ def test_mock_profile() -> None:
     assert profile_mapping.mock_profile.get("auth_type") == "oauth"
 
 
-def test_profile_strips_https_from_host(mock_databricks_conn: Connection) -> None:
-    """Tests that the OAuth profile removes the host's https:// prefix."""
+@pytest.mark.parametrize("host", ["https://my_host", "https://my_host/", "my_host/", "my_host"])
+def test_profile_normalizes_host(mock_databricks_conn: Connection, host: str) -> None:
+    """Tests that the OAuth profile reduces the host to a bare hostname, as the dbt-databricks docs expect."""
+    mock_databricks_conn.host = host
     profile_mapping = DatabricksOauthProfileMapping(mock_databricks_conn.conn_id, {"schema": "my_schema"})
 
     assert profile_mapping.profile["host"] == "my_host"

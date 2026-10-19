@@ -56,5 +56,5 @@ class DatabricksOauthProfileMapping(BaseProfileMapping):
         }
 
     def transform_host(self, host: str) -> str:
-        """Removes the https:// prefix."""
-        return host.replace("https://", "")
+        """Reduces the host to the bare hostname dbt expects: no https:// prefix and no trailing slash."""
+        return host.removeprefix("https://").rstrip("/")

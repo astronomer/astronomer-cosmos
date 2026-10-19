@@ -208,6 +208,7 @@ test-integration-dbt-1-8 = 'sh scripts/test/integration-dbt-1-8.sh'
 test-integration-dbt-async = 'sh scripts/test/integration-dbt-async.sh {matrix:dbt}'
 test-integration-dbt-loom = 'sh scripts/test/integration-dbt-loom.sh {matrix:dbt}'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
+test-integration-warehouse = 'sh scripts/test/integration-warehouse.sh {args}'
 test-telemetry = 'sh scripts/test/telemetry.sh'
 
 test-performance = 'sh scripts/test/performance.sh'
@@ -218,7 +219,7 @@ type-check = "pre-commit run mypy --files cosmos/**/*"
 addopts = "--ignore-glob=**/dbt_packages/*"
 filterwarnings = ["ignore::DeprecationWarning"]
 minversion = "6.0"
-markers = ["integration", "perf", "dbtfusion"]
+markers = ["integration", "perf", "dbtfusion", "warehouse_e2e"]
 
 ######################################
 # DOCS

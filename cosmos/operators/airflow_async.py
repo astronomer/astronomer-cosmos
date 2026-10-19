@@ -46,7 +46,10 @@ class DbtSourceAirflowAsyncOperator(DbtSourceLocalOperator):
 
 
 class DbtSemanticMetricViewAirflowAsyncOperator(DbtSemanticMetricViewLocalOperator):
-    pass
+    """
+    Runs on the worker like ``ExecutionMode.LOCAL``, as every non-model resource does in this mode. There is no
+    async operator to compose with: only ``DbtRun`` has one, and only for BigQuery, which has no metric views.
+    """
 
 
 class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):

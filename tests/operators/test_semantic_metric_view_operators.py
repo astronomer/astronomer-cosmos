@@ -2,7 +2,12 @@ import importlib
 
 import pytest
 
+from cosmos._utils.importer import load_method_from_module
+from cosmos.airflow.graph import calculate_operator_class
+from cosmos.constants import ExecutionMode
+from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperator
 from cosmos.operators.base import DbtRunMixin, DbtSemanticMetricViewMixin
+from cosmos.operators.local import DbtSemanticMetricViewLocalOperator
 
 # (module, class name, minimal constructor kwargs) for the semantic metric view operator of each execution mode.
 SEMANTIC_METRIC_VIEW_OPERATORS = [
@@ -58,3 +63,14 @@ def test_semantic_metric_view_operator_runs_dbt_run_with_distinct_ui_color(modul
     assert operator.base_cmd == ["run"]
     assert operator.ui_color == DbtSemanticMetricViewMixin.ui_color
     assert operator.ui_color != DbtRunMixin.ui_color
+
+
+def test_semantic_metric_view_airflow_async_operator_runs_synchronously_like_other_non_model_resources():
+    """Only `DbtRun` has an async operator (BigQuery only), so non-model resources, semantic metric views included,
+    run on the worker like in LOCAL mode. Pin that, so it can't silently become an async operator."""
+    operator_path = calculate_operator_class(ExecutionMode.AIRFLOW_ASYNC, "DbtSemanticMetricView")
+
+    operator_class = load_method_from_module(*operator_path.rsplit(".", 1))
+
+    assert issubclass(operator_class, DbtSemanticMetricViewLocalOperator)
+    assert not issubclass(operator_class, DbtRunAirflowAsyncFactoryOperator)

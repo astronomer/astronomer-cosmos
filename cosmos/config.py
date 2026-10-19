@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import math
 import shutil
 import tempfile
 import warnings
@@ -37,6 +38,8 @@ from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 
 if TYPE_CHECKING:
+    from pydantic import BaseModel
+
     from cosmos.profiles import BaseProfileMapping
 
 logger = get_logger(__name__)
@@ -635,3 +638,66 @@ class ExecutionConfig:
                 )
                 self.invocation_mode = InvocationMode.SUBPROCESS
         self.project_path = Path(dbt_project_path) if dbt_project_path else None
+
+
+@dataclass
+class AiConfig:
+    """
+    Configuration for optional AI-assisted features in Cosmos.
+
+    It requires ``apache-airflow-providers-common-ai>=1.0.0``, which needs Python 3.11+ and Airflow 2.11+. Install it
+    with the ``ai`` extra of Cosmos. See :ref:`ai-config`.
+
+    :param llm_conn_id: Airflow connection ID for the LLM provider. It can be any ``pydanticai*`` connection type
+        defined by apache-airflow-providers-common-ai: ``pydanticai``, ``pydanticai_azure``, ``pydanticai_bedrock``
+        or ``pydanticai_vertex``.
+    :param diagnose_on_failure: When True, diagnose a failed dbt task with an LLM call, on its final attempt, and
+        append a structured root-cause summary to the exception message. Defaults to False.
+    :param introspect_schema: When True, let the diagnosis agent list the tables related to the failed node and read
+        their column definitions (never row data) to confirm hypotheses, e.g. whether a column exists. It needs
+        ``ProfileConfig.profile_mapping`` with an SQL connection (one whose Airflow hook is a ``DbApiHook``) and
+        ``apache-airflow-providers-common-ai[sql]``. Otherwise, it is skipped with a warning. Defaults to False.
+    :param timeout_seconds: Time limit for the LLM run. When it is reached, the run is cancelled and the task fails
+        with the standard exception, without a diagnosis. It starts after the connection is loaded, and it is only
+        checked while Cosmos waits for the model, so a call that blocks its thread is cancelled when it returns.
+        Defaults to 30.
+    :param diagnosis_output_type: Optional custom pydantic model class describing the structured output the
+        diagnosis agent should produce. Defaults to Cosmos's built-in ``cosmos.ai.diagnostics.DbtFailureDiagnosis``
+        (fields ``root_cause``, ``suggested_fix``, ``confidence``). Field descriptions on a custom model are used to
+        guide the LLM, so prefer ``pydantic.Field(description=...)`` on each field.
+    :param diagnosis_instructions: Optional custom system instructions for the diagnosis agent. Defaults to Cosmos's
+        built-in prompt for ``DbtFailureDiagnosis`` (or a generic one if ``diagnosis_output_type`` is also set).
+    :param redactor: Optional callable applied to the text sent to the LLM, after Airflow's secrets masker. Use it to
+        hide what the masker cannot know, such as a secret that only exists as a dbt variable.
+    """
+
+    llm_conn_id: str
+    diagnose_on_failure: bool = False
+    introspect_schema: bool = False
+    timeout_seconds: float = 30.0
+    diagnosis_output_type: type[BaseModel] | None = None
+    diagnosis_instructions: str | None = None
+    redactor: Callable[[str], str] | None = None
+
+    def __post_init__(self) -> None:
+        if not self.llm_conn_id or not isinstance(self.llm_conn_id, str):
+            raise CosmosValueError("AiConfig.llm_conn_id must be a non-empty Airflow connection ID.")
+        if (
+            isinstance(self.timeout_seconds, bool)
+            or not isinstance(self.timeout_seconds, (int, float))
+            or not 0 < self.timeout_seconds < math.inf
+        ):
+            raise CosmosValueError(
+                f"AiConfig.timeout_seconds must be a number of seconds greater than 0, got {self.timeout_seconds!r}."
+            )
+        if self.diagnosis_output_type is not None:
+            # Imported here: pydantic is not a dependency of Cosmos, nor of Airflow 2, and Cosmos must import without it.
+            from pydantic import BaseModel
+
+            if not (isinstance(self.diagnosis_output_type, type) and issubclass(self.diagnosis_output_type, BaseModel)):
+                raise CosmosValueError(
+                    "AiConfig.diagnosis_output_type must be a pydantic model class (a subclass of pydantic.BaseModel), "
+                    f"got {self.diagnosis_output_type!r}."
+                )
+        if self.redactor is not None and not callable(self.redactor):
+            raise CosmosValueError(f"AiConfig.redactor must be callable, got {self.redactor!r}.")

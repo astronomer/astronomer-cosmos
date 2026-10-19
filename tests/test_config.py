@@ -5,7 +5,7 @@ from unittest.mock import Mock, PropertyMock, call, patch
 import pytest
 from packaging.version import Version
 
-from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AiConfig, CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, InvocationMode, SeedRenderingBehavior, SourceRenderingBehavior, TestBehavior
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.athena.access_key import AthenaAccessKeyProfileMapping
@@ -534,3 +534,75 @@ def test_render_config_seed_rendering_when_seed_changes_allowed_with_non_build(t
 
 def test_render_config_seed_rendering_behavior_defaults_to_always():
     assert RenderConfig().seed_rendering_behavior == SeedRenderingBehavior.ALWAYS
+
+
+def test_ai_config_defaults():
+    ai_config = AiConfig(llm_conn_id="my_llm_conn")
+    assert ai_config.llm_conn_id == "my_llm_conn"
+    assert ai_config.diagnose_on_failure is False
+    assert ai_config.introspect_schema is False
+    assert ai_config.timeout_seconds == 30.0
+    assert ai_config.diagnosis_output_type is None
+    assert ai_config.diagnosis_instructions is None
+    assert ai_config.redactor is None
+
+
+def test_ai_config_custom_values():
+    from pydantic import BaseModel
+
+    class CustomDiagnosis(BaseModel):
+        summary: str
+
+    ai_config = AiConfig(
+        llm_conn_id="my_llm_conn",
+        diagnose_on_failure=True,
+        introspect_schema=True,
+        timeout_seconds=10.0,
+        diagnosis_output_type=CustomDiagnosis,
+        diagnosis_instructions="Be concise.",
+        redactor=str.upper,
+    )
+    assert ai_config.diagnose_on_failure is True
+    assert ai_config.introspect_schema is True
+    assert ai_config.timeout_seconds == 10.0
+    assert ai_config.diagnosis_output_type is CustomDiagnosis
+    assert ai_config.diagnosis_instructions == "Be concise."
+    assert ai_config.redactor is str.upper
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        ({"llm_conn_id": ""}, "llm_conn_id must be a non-empty Airflow connection ID"),
+        ({"llm_conn_id": None}, "llm_conn_id must be a non-empty Airflow connection ID"),
+        ({"llm_conn_id": "c", "timeout_seconds": 0}, "timeout_seconds must be a number of seconds greater than 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": -5}, "timeout_seconds must be a number of seconds greater than 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": "30"}, "timeout_seconds must be a number of seconds greater than 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": True}, "timeout_seconds must be a number of seconds greater than 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": float("nan")}, "timeout_seconds must be a number of seconds"),
+        ({"llm_conn_id": "c", "timeout_seconds": float("inf")}, "timeout_seconds must be a number of seconds"),
+        ({"llm_conn_id": "c", "diagnosis_output_type": str}, "must be a pydantic model class"),
+        ({"llm_conn_id": "c", "diagnosis_output_type": "DbtFailureDiagnosis"}, "must be a pydantic model class"),
+        ({"llm_conn_id": "c", "redactor": "not callable"}, "redactor must be callable"),
+    ],
+)
+def test_ai_config_rejects_invalid_values(kwargs, message):
+    with pytest.raises(CosmosValueError, match=message):
+        AiConfig(**kwargs)
+
+
+def test_cosmos_config_does_not_import_pydantic_at_module_level():
+    """pydantic is not a dependency of Cosmos, nor of Airflow 2: ``import cosmos`` must not need it."""
+    import ast
+
+    import cosmos.config
+
+    tree = ast.parse(Path(cosmos.config.__file__).read_text())
+    imported = [
+        node.module if isinstance(node, ast.ImportFrom) else alias.name
+        for node in tree.body  # only the top level: imports under ``if TYPE_CHECKING`` or in functions are fine
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        for alias in getattr(node, "names", [])
+    ]
+
+    assert not [name for name in imported if name and name.split(".")[0] == "pydantic"]

@@ -78,15 +78,23 @@ elif [ "$AIRFLOW_VERSION" = "3.4" ] ; then
   # TEMP curation: `-U` floats importlib-metadata to 9.x, but the Airflow 3.4 core
   # tree (litellm) requires <9, so hold it on the 8.x line the constraints pin.
   # `~=$DBT_VERSION.0` pins the minor: a bare `~=1.11` would float to dbt-core 1.12.
-  uv pip install -U "dbt-core~=$DBT_VERSION.0" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark "importlib-metadata<9"
+  # dbt Fusion (2.0) is installed separately and has no dbt-core 2.0 GA on PyPI, so
+  # bootstrap with the 1.11 baseline, as the lockfile fallback above does.
+  INSTALL_DBT_VERSION="$DBT_VERSION"
+  if [ "$DBT_VERSION" = "2.0" ]; then
+    INSTALL_DBT_VERSION="1.11"
+    EFFECTIVE_DBT_VERSION="1.11"
+  fi
+  uv pip install -U "dbt-core~=$INSTALL_DBT_VERSION.0" dbt-postgres dbt-bigquery dbt-vertica dbt-databricks pyspark "importlib-metadata<9"
   uv pip install 'dbt-duckdb' "airflow-provider-duckdb>=0.2.0"
   # TEMP curation: gcsfs 2026.x requires google-cloud-storage>=3.14, but the
   # unconstrained dbt-bigquery install above caps it <3.2 and downgrades it to
   # 3.1.1, which leaves gcsfs unusable. Hold gcsfs to the 2025 line, and s3fs with
   # it because both pin fsspec to the same release. s3fs 2025.x needs aiobotocore 2.x
-  # (botocore<1.42), so boto3 is held to match. Installed without --constraint so
-  # none of these are pinned back to the constraints' 2026.x / 1.43.x.
-  uv pip install "gcsfs<2026" "s3fs<2026" "boto3<1.42"
+  # (botocore<1.42), so boto3 is held to match, and so is the amazon provider, since
+  # 9.38+ requires boto3/botocore>=1.42.79. Installed without --constraint so none of
+  # these are pinned back to the constraints' 2026.x / 1.43.x / amazon 9.38.
+  uv pip install "gcsfs<2026" "s3fs<2026" "boto3<1.42" "apache-airflow-providers-amazon<9.38"
   rm /tmp/constraint.txt
 else
   # Download Airflow constraints according to the version being used

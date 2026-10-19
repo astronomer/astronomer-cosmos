@@ -405,10 +405,10 @@ jobs:
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Install the warehouse adapters
-        # The pinned lockfiles carry dbt-databricks 1.10 and no dbt-snowflake; metric views need
-        # dbt-databricks >= 1.12.5 and semantic views need dbt-snowflake.
+        # The Airflow 3.2 + dbt 1.12 lockfile carries dbt-databricks 1.10 and no dbt-snowflake; metric
+        # views need dbt-databricks >= 1.12.5 and semantic views need dbt-snowflake.
         run: |
-          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip install "dbt-databricks>=1.12.5,<1.13" "dbt-snowflake>=1.12,<1.13"
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-warehouse-setup
 
       - name: Run the integration tests against Snowflake and Databricks
         run: |

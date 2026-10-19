@@ -59,7 +59,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     and deleted at the end of the operator execution.
 
     :param py_requirements: If defined, creates a virtual environment with the specified dependencies. Example:
-           ["dbt-postgres==1.5.0"]
+           ["dbt-postgres==1.8.0"]
     :param pip_install_options: Pip options to use when installing Python dependencies. Example: ["--upgrade", "--no-cache-dir"]
     :param py_system_site_packages: Whether or not all the Python packages from the Airflow instance will be accessible
            within the virtual environment (if py_requirements argument is specified).

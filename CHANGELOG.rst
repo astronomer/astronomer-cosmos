@@ -7,6 +7,7 @@ Unreleased
 Breaking Changes
 
 * Raised the minimum supported dbt Core version to 1.8. dbt Core 1.5, 1.6, and 1.7 have reached End of Life per the `dbt Labs support policy <https://docs.getdbt.com/docs/dbt-versions/core>`_ and are no longer tested or supported; see the :doc:`compatibility policy </policy/compatibility-policy>` for the current supported range. See #2902.
+* ``ExecutionMode.AIRFLOW_ASYNC`` is no longer supported on Apache Airflow 2.x. Cosmos now builds the async operator at runtime in a way that works on Airflow 3.4, which leaves the operator not fully initialised on Airflow 2.9 and unpicklable on Airflow 2.x. Users who run ``AIRFLOW_ASYNC`` and cannot upgrade to Airflow 3 should stay on an earlier Cosmos release. See `#3050 <https://github.com/astronomer/astronomer-cosmos/pull/3050>`_.
 
 Behaviour Changes
 
@@ -21,6 +22,7 @@ Behaviour Changes
 
 Bug Fixes
 
+* On Airflow 3.0, the Cosmos plugin now logs a warning and skips the dbt docs views instead of raising ``RuntimeError`` on load. Previously, with ``[core] lazy_load_plugins = False`` (as on Astro Runtime), every Airflow CLI command logged a "Failed to import plugin cosmos" traceback, and the plugin's listeners were never registered.
 * Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn, so ``<folder>+`` and ``<package>+`` behave like their ``path:`` and ``package:`` equivalents and like ``dbt ls``. Previously the graph selector resolved its root by exact node name only, and bare-identifier matching keyed off the absolute file path. See #2962.
 
 1.15.1 (2026-08-04)

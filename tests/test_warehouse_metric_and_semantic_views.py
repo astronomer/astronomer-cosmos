@@ -5,10 +5,12 @@ topology, run them and verify the objects in the warehouse, in the style of
 tests/operators/test_watcher.py::test_dbt_dag_with_watcher.
 
 Credentials, as provided by CI: ``AIRFLOW_CONN_DATABRICKS_DEFAULT`` plus ``DATABRICKS_CATALOG`` (default ``main``),
-and ``SNOWFLAKE_ACCOUNT``, ``SNOWFLAKE_USER``, ``SNOWFLAKE_PASSWORD``, ``SNOWFLAKE_DATABASE``, ``SNOWFLAKE_WAREHOUSE``
-(optional ``SNOWFLAKE_ROLE``). Locally, a warehouse without credentials or without CREATE SCHEMA is skipped; under CI
-(``CI`` set) the same conditions fail, so a green job always means the warehouses were exercised. Each warehouse gets a
-throwaway schema, so the identity needs CREATE SCHEMA.
+and ``SNOWFLAKE_ACCOUNT``, ``SNOWFLAKE_USER``, ``SNOWFLAKE_PASSWORD``, ``SNOWFLAKE_DATABASE``, ``SNOWFLAKE_SCHEMA``,
+``SNOWFLAKE_WAREHOUSE`` (optional ``SNOWFLAKE_ROLE``). A warehouse without credentials is skipped and, under GitHub
+Actions, listed in the job summary. A warehouse that has credentials but cannot be set up is skipped locally and fails
+under CI (``CI`` set).
+Databricks gets a throwaway schema. The Snowflake CI role cannot create schemas, so its objects go into the existing
+``SNOWFLAKE_SCHEMA`` under a per-run ``RESOURCE_PREFIX`` and only those objects are dropped afterwards.
 """
 
 from __future__ import annotations
@@ -60,6 +62,14 @@ SEEDED_REVENUE_BY_STATUS = {"cancelled": 75.25, "completed": 851.25, "pending": 
 EXPECTED_NODE_COUNT = 9
 
 
+def skip_unconfigured_warehouse(reason: str) -> None:
+    step_summary = os.getenv("GITHUB_STEP_SUMMARY")
+    if step_summary:
+        with open(step_summary, "a") as summary:
+            summary.write(f"- Skipped warehouse tests: {reason}\n")
+    pytest.skip(reason)
+
+
 def skip_unless_ci(reason: str) -> None:
     if os.getenv("CI"):
         pytest.fail(reason)
@@ -79,7 +89,11 @@ class Warehouse:
 
     def __init__(self) -> None:
         self.schema = f"cosmos_e2e_{uuid.uuid4().hex[:8]}"
+        self.resource_prefix = ""
         os.environ["COSMOS_DEMO_SCHEMA"] = self.schema
+
+    def object_name(self, name: str) -> str:
+        return f"{self.resource_prefix}_{name}" if self.resource_prefix else name
 
     @property
     def project_dir(self) -> Path:
@@ -110,10 +124,10 @@ class Warehouse:
         cursor.execute(f"SELECT {self.status_column}, total_revenue FROM {self.qualified('revenue_by_status')}")
         return amounts_by_status(cursor.fetchall())
 
-    def create_schema(self, cursor: Any) -> None:
+    def set_up(self, cursor: Any) -> None:
         cursor.execute(f"CREATE SCHEMA {self.qualified_schema()}")
 
-    def drop_schema(self, cursor: Any) -> None:
+    def tear_down(self, cursor: Any) -> None:
         cursor.execute(f"DROP SCHEMA IF EXISTS {self.qualified_schema()} CASCADE")
 
     def qualified_schema(self) -> str:
@@ -129,7 +143,7 @@ class Databricks(Warehouse):
 
     def configure(self) -> None:
         if not os.getenv("AIRFLOW_CONN_DATABRICKS_DEFAULT"):
-            skip_unless_ci("AIRFLOW_CONN_DATABRICKS_DEFAULT is not set")
+            skip_unconfigured_warehouse("databricks: AIRFLOW_CONN_DATABRICKS_DEFAULT is not set")
         self.catalog = os.getenv("DATABRICKS_CATALOG", "main")
         connection = Connection.get_connection_from_secrets("databricks_default")
         self.connection_params = {
@@ -188,12 +202,17 @@ class Snowflake(Warehouse):
             "SNOWFLAKE_USER",
             "SNOWFLAKE_PASSWORD",
             "SNOWFLAKE_DATABASE",
+            "SNOWFLAKE_SCHEMA",
             "SNOWFLAKE_WAREHOUSE",
         )
         missing = [name for name in required if not os.getenv(name)]
         if missing:
-            skip_unless_ci(f"missing {missing}")
+            skip_unconfigured_warehouse(f"snowflake: missing {missing}")
         self.database = os.environ["SNOWFLAKE_DATABASE"]
+        self.schema = os.environ["SNOWFLAKE_SCHEMA"]
+        self.resource_prefix = f"cosmos_e2e_{uuid.uuid4().hex[:8]}"
+        os.environ["COSMOS_DEMO_SCHEMA"] = self.schema
+        os.environ["RESOURCE_PREFIX"] = self.resource_prefix
         extra = {
             "account": os.environ["SNOWFLAKE_ACCOUNT"],
             "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"],
@@ -241,10 +260,19 @@ class Snowflake(Warehouse):
         return f"{self.database}.{self.schema}"
 
     def qualified(self, name: str) -> str:
-        return f"{self.database}.{self.schema}.{name}"
+        return f"{self.database}.{self.schema}.{self.object_name(name)}"
+
+    def set_up(self, cursor: Any) -> None:
+        cursor.execute(f"SHOW TERSE TABLES IN SCHEMA {self.qualified_schema()} LIMIT 1")
+
+    def tear_down(self, cursor: Any) -> None:
+        cursor.execute(f"DROP SEMANTIC VIEW IF EXISTS {self.qualified(self.semantic_model)}")
+        for table in ("revenue_by_status", "orders", "raw_orders"):
+            cursor.execute(f"DROP TABLE IF EXISTS {self.qualified(table)}")
 
     def is_semantic_object(self, cursor: Any) -> bool:
-        cursor.execute(f"SHOW SEMANTIC VIEWS LIKE '{self.semantic_model.upper()}' IN SCHEMA {self.qualified_schema()}")
+        semantic_view_name = self.object_name(self.semantic_model).upper()
+        cursor.execute(f"SHOW SEMANTIC VIEWS LIKE '{semantic_view_name}' IN SCHEMA {self.qualified_schema()}")
         return len(cursor.fetchall()) == 1
 
     def revenue_from_semantic_object(self, cursor: Any) -> dict[str, float]:
@@ -270,15 +298,17 @@ def warehouse(request) -> Warehouse:
     instance.configure()
     try:
         with instance.connect() as connection, connection.cursor() as cursor:
-            instance.create_schema(cursor)
+            instance.set_up(cursor)
     except instance.driver_error() as error:
-        skip_unless_ci(f"{instance.name}: cannot create a test schema: {error}")
+        skip_unless_ci(f"{instance.name}: cannot set up the test objects: {error}")
     yield instance
     try:
         with instance.connect() as connection, connection.cursor() as cursor:
-            instance.drop_schema(cursor)
+            instance.tear_down(cursor)
     except instance.driver_error() as error:
-        warnings.warn(f"could not drop {instance.name} schema {instance.schema}: {error}")
+        warnings.warn(f"could not drop the {instance.name} test objects in {instance.schema}: {error}")
+    finally:
+        os.environ.pop("RESOURCE_PREFIX", None)
 
 
 def load_example_dag(warehouse: Warehouse, variant: str) -> DbtDag:
@@ -350,6 +380,20 @@ def asset_event_uris_by_task(dag_id: str) -> dict[str, list[str]]:
     return dict(uris)
 
 
+def disable_full_refresh(dag: DbtDag) -> None:
+    for task in dag.tasks:
+        if hasattr(task, "full_refresh"):
+            task.full_refresh = False
+
+
+def run_full_refresh_then_rerun(dag: DbtDag, warehouse: Warehouse) -> None:
+    run_dag(dag)
+    assert_warehouse_objects(warehouse)
+    disable_full_refresh(dag)
+    run_dag(dag)
+    assert_warehouse_objects(warehouse)
+
+
 def semantic_task_id_in(chain: list[str]) -> str:
     return next(task_id for task_id in chain if "semantic_metric_run" in task_id)
 
@@ -357,9 +401,7 @@ def semantic_task_id_in(chain: list[str]) -> str:
 @pytest.fixture(scope="module")
 def local_dag(warehouse: Warehouse) -> DbtDag:
     dag = load_example_dag(warehouse, "local")
-    run_dag(dag)
-    assert_warehouse_objects(warehouse)
-    run_dag(dag)
+    run_full_refresh_then_rerun(dag, warehouse)
     return dag
 
 
@@ -367,7 +409,7 @@ def local_dag(warehouse: Warehouse) -> DbtDag:
 def watcher_dag(warehouse: Warehouse) -> DbtDag:
     dag = load_example_dag(warehouse, "watcher")
     make_watcher_consumers_wait_for_producer(dag)
-    run_dag(dag)
+    run_full_refresh_then_rerun(dag, warehouse)
     return dag
 
 
@@ -388,6 +430,7 @@ def test_dbt_dag_with_local_execution(warehouse: Warehouse, local_dag: DbtDag):
     assert semantic_task.select == f"fqn:{warehouse.project_name}.{warehouse.semantic_model}"
     assert semantic_task.upstream_task_ids == {chain[chain.index(semantic_task_id) - 1]}
     assert semantic_task.downstream_task_ids == {chain[chain.index(semantic_task_id) + 1]}
+    assert "--full-refresh" not in semantic_task.add_cmd_flags()
     assert_warehouse_objects(warehouse)
 
 
@@ -416,6 +459,7 @@ def test_dbt_dag_with_watcher_execution(warehouse: Warehouse, watcher_dag: DbtDa
     resource_types = {flags[index + 1] for index, part in enumerate(flags) if part == "--resource-type"}
     assert resource_types == ({"model", "snapshot", "seed"} if tests_excluded_from_producer else set())
     assert DbtResourceType.SEMANTIC_METRIC_VIEW.value not in flags
+    assert "--full-refresh" not in flags
     assert_warehouse_objects(warehouse)
 
 

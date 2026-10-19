@@ -3,8 +3,8 @@ Example DAGs (local and watcher) for a dbt project with a Snowflake semantic vie
 package), loaded from the committed manifest, rendered as a ``semantic_metric_view`` resource when ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION=True``
 (see "Managing semantic metric views").
 
-Runs with the ``snowflake_default`` connection; its role needs CREATE SCHEMA on the database. Optional:
-``COSMOS_DEMO_SCHEMA`` (default ``cosmos_demo``).
+Runs with the ``snowflake_default`` connection. Optional: ``COSMOS_DEMO_SCHEMA`` (default ``cosmos_demo``) and
+``RESOURCE_PREFIX``, which prefixes every object name so runs can share a schema.
 """
 
 import os

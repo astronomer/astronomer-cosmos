@@ -32,6 +32,7 @@ Features
 * Under ``TestBehavior.BUILD``, a rendered dbt source that has tests is now a task group (``<source>.source`` and
   ``<source>.test``) instead of a single ``<source>_source`` task, so references to the old task id need updating.
   The source tests, which this mode never executed before, now run and can fail the DAG. See #1683.
+* Add optional AI-assisted diagnosis of failed dbt tasks with ``AiConfig``, built on ``apache-airflow-providers-common-ai`` (install it with ``astronomer-cosmos[ai]``, which needs Python 3.11+ and Airflow 2.11+). On a task's last attempt, Cosmos asks an LLM for the root cause and a fix, and adds them after the dbt error. It supports ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``, masks secrets before calling the LLM, and is off by default. See the :doc:`AI config reference </reference/configs/ai-config>` and #3018.
 
 Bug Fixes
 

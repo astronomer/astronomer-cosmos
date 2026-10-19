@@ -2,8 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    # TEMP: bump-apache-airflow-3.4.0b1 runs the Airflow 3.4 integration cells pre-merge. Revert before merge.
-    branches: [main, bump-apache-airflow-3.4.0b1]
+    branches: [main]
   # Also run on pull requests originating from forks. Every test job here is secret-dependent
   # (integration tests, kubernetes, code coverage) and depends on the Authorize job, which requires
   # manually approving the workflow run for external PRs. Jobs that need no secrets (type-check,

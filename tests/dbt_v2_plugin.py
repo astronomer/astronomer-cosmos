@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from tests.dbt_v2_enabled import ENABLED_TEST_FILES
+from tests.dbt_v2_enabled import ENABLED_TEST_FILES, SKIPPED_TESTS
 
 # Tests that depend on Postgres itself (and not only on the profile) and so cannot run against BigQuery.
 POSTGRES_ONLY_TEST_FILES = {
@@ -58,6 +58,8 @@ def pytest_collection_modifyitems(items):
         )
         if reason:
             reason = f"Requires Postgres: {reason}"
+        elif item.nodeid in SKIPPED_TESTS:
+            reason = f"Not working with dbt v2 yet: {SKIPPED_TESTS[item.nodeid]}"
         elif ENABLED_TEST_FILES is not None and file_path not in ENABLED_TEST_FILES:
             reason = "Not enabled for dbt v2 yet (see tests/dbt_v2_enabled.py)"
         if reason:

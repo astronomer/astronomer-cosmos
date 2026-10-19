@@ -204,6 +204,8 @@ DEFAULT_DBT_RESOURCES = DbtResourceType.__members__.values()
 
 # According to the dbt documentation (https://docs.getdbt.com/reference/commands/build), build also supports test nodes.
 # However, in the context of Cosmos, we will run test nodes together with the respective models/seeds/snapshots nodes
+# These values are passed to dbt as ``--resource-type``, so they must be types dbt knows. ``SEMANTIC_METRIC_VIEW`` is a
+# Cosmos-only type: dbt still sees those nodes as models, so ``MODEL`` already covers them.
 SUPPORTED_BUILD_RESOURCES = [
     DbtResourceType.MODEL,
     DbtResourceType.SNAPSHOT,

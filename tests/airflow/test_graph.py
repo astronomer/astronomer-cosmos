@@ -1897,6 +1897,13 @@ def test_watcher_producer_uses_resource_type_flag_to_exclude_tests(test_behavior
     assert "resource_type:test" not in (producer_task.exclude or "")
 
 
+def test_watcher_producer_resource_types_are_all_known_to_dbt():
+    """The producer passes SUPPORTED_BUILD_RESOURCES to dbt as ``--resource-type``. dbt rejects ``semantic_metric_view``
+    (a Cosmos-only type), and it does not need it: dbt still sees metric views as ``model``, which is already built."""
+    assert DbtResourceType.MODEL in SUPPORTED_BUILD_RESOURCES
+    assert DbtResourceType.SEMANTIC_METRIC_VIEW not in SUPPORTED_BUILD_RESOURCES
+
+
 @pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])
 def test_watcher_producer_preserves_existing_dbt_cmd_flags(test_behavior):
     """The producer should not mutate the original dbt_cmd_flags list and should preserve existing flags."""

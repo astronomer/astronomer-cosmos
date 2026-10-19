@@ -67,11 +67,13 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/test_converter.py::test_converter_passes_render_config_exclude_to_test_tasks": _STRICT_YAML,
     "tests/test_converter.py::test_dbt_dag_renders_ephemeral_model_as_dbt_run_when_disabled": _STRICT_YAML,
     "tests/test_converter.py::test_dbt_dag_renders_ephemeral_model_as_empty_operator": _STRICT_YAML,
-    # Postgres env vars (own profiles.yml/sources) (11)
+    # Postgres env vars (own profiles.yml/sources) (13)
     "tests/dbt/test_graph.py::test_altered_jaffle_shop_manifest_is_in_sync_with_project": _POSTGRES_ENV,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_project_config_vars": _POSTGRES_ENV,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_sources[load_via_dbt_ls]": _POSTGRES_ENV,
     "tests/dbt/test_graph.py::test_run_command_with_dbt_runner_exception": _POSTGRES_ENV,
+    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_error": _POSTGRES_ENV,
+    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_exception": _POSTGRES_ENV,
     "tests/operators/test_local.py::test_run_test_operator_subprocess_failure_exposes_failing_tests": _POSTGRES_ENV,
     "tests/operators/test_local.py::test_run_test_operator_with_callback[InvocationMode.DBT_RUNNER]": _POSTGRES_ENV,
     "tests/operators/test_local.py::test_run_test_operator_with_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
@@ -79,12 +81,9 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
     "tests/test_debug.py::test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled": _POSTGRES_ENV,
     "tests/test_example_dags.py::test_source_pruning_dag": _POSTGRES_ENV,
-    # dbt 1.x module/message assumption (8)
+    # dbt 1.x module/message assumption (5)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[False]": _DBT_1X,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[True]": _DBT_1X,
-    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_error": _DBT_1X,
-    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_exception": _DBT_1X,
-    "tests/dbt/test_runner.py::test_run_command": _DBT_1X,
     "tests/operators/_asynchronous/test_bigquery.py::test_mock_bigquery_adapter": _DBT_1X,
     "tests/operators/test_local.py::test_run_operator_caches_partial_parsing": _DBT_1X,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_subprocess": _DBT_1X,

@@ -128,7 +128,7 @@ jobs:
           done <<< "$FILES"
           echo "code_changed=$CODE_CHANGED" >> "$GITHUB_OUTPUT"
           # The warehouse integration job spends real Snowflake and Databricks compute, so it only
-          # runs when the code paths it exercises, or its own fixtures, change.
+          # runs when Cosmos itself, the dependencies, or its own harness and fixtures change.
           WAREHOUSE_E2E_CHANGED=false
           if [ -z "$FILES" ]; then
             WAREHOUSE_E2E_CHANGED=true
@@ -136,10 +136,9 @@ jobs:
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             case "$f" in
-              cosmos/constants.py|cosmos/settings.py|cosmos/dbt/graph.py|cosmos/dbt/selector.py|cosmos/airflow/graph.py) WAREHOUSE_E2E_CHANGED=true; break ;;
-              cosmos/operators/base.py|cosmos/operators/local.py|cosmos/operators/watcher.py|cosmos/operators/_watcher/*) WAREHOUSE_E2E_CHANGED=true; break ;;
-              cosmos/profiles/databricks/*|cosmos/profiles/snowflake/*) WAREHOUSE_E2E_CHANGED=true; break ;;
-              tests/test_warehouse_metric_and_semantic_views.py|tests/airflow/test_metric_and_semantic_view_dags.py|scripts/test/integration-warehouse.sh) WAREHOUSE_E2E_CHANGED=true; break ;;
+              cosmos/*|pyproject.toml|requirements/*) WAREHOUSE_E2E_CHANGED=true; break ;;
+              tests/test_warehouse_metric_and_semantic_views.py|tests/utils.py) WAREHOUSE_E2E_CHANGED=true; break ;;
+              scripts/test/integration-setup.sh|scripts/test/integration-warehouse.sh|scripts/test/integration-warehouse-setup.sh) WAREHOUSE_E2E_CHANGED=true; break ;;
               dev/dags/dbt/databricks_metric_view/*|dev/dags/dbt/snowflake_semantic_view/*) WAREHOUSE_E2E_CHANGED=true; break ;;
               dev/dags/example_databricks_metric_view.py|dev/dags/example_snowflake_semantic_view.py) WAREHOUSE_E2E_CHANGED=true; break ;;
               .github/workflows/test.yml) WAREHOUSE_E2E_CHANGED=true; break ;;
@@ -382,8 +381,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-          # Safe under pull_request_target: this job runs only after the Authorize job's
-          # owner-review environment gate approves the run (see the Authorize job above).
+          # Under pull_request_target, fork PRs reach this checkout only after an owner approves the
+          # Authorize job's `external` environment; same-repo PRs and pushes use `internal`, which has
+          # no reviewers, so they rely on repository write access instead.
           allow-unsafe-pr-checkout: true
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

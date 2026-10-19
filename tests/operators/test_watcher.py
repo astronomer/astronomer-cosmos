@@ -3249,10 +3249,10 @@ class TestDefaultFreshnessCallback:
         # Only model nodes, not test nodes
         assert result == [("model.pkg.m1", "skipped")]
 
-    def test_includes_semantic_layer_nodes(self):
-        """Semantic layer nodes (Databricks metric views, Snowflake semantic views) downstream of a
+    def test_includes_semantic_metric_view_nodes(self):
+        """Semantic metric view nodes (Databricks metric views, Snowflake semantic views) downstream of a
         stale source must be skipped/excluded like any other model — regression test for
-        DbtResourceType.SEMANTIC_LAYER previously being omitted from _excludable_resource_types,
+        DbtResourceType.SEMANTIC_METRIC_VIEW previously being omitted from _excludable_resource_types,
         which would have let dbt build them against stale upstream data in WATCHER mode."""
         from cosmos.constants import DbtResourceType
         from cosmos.dbt.graph import DbtNode
@@ -3267,7 +3267,7 @@ class TestDefaultFreshnessCallback:
             ),
             "model.pkg.m1": DbtNode(
                 unique_id="model.pkg.m1",
-                resource_type=DbtResourceType.SEMANTIC_LAYER,
+                resource_type=DbtResourceType.SEMANTIC_METRIC_VIEW,
                 depends_on=["source.pkg.src1"],
                 path_base=Path("/tmp"),
                 original_file_path=Path("models/m.sql"),

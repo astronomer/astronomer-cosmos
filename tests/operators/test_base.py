@@ -19,7 +19,7 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
-    DbtSemanticMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
     DbtTestMixin,
 )
@@ -138,7 +138,7 @@ def test_dbt_base_operator_context_merge(
         ("ls", DbtLSMixin),
         ("seed", DbtSeedMixin),
         ("run", DbtRunMixin),
-        ("run", DbtSemanticMixin),
+        ("run", DbtSemanticMetricViewMixin),
         ("build", DbtBuildMixin),
         ("compile", DbtCompileMixin),
     ],
@@ -148,11 +148,11 @@ def test_dbt_mixin_base_cmd(dbt_command, dbt_operator_class):
 
 
 def test_dbt_semantic_mixin_ui_color_differs_from_run_mixin():
-    """DbtSemanticMixin reuses DbtRunMixin's command/flags but must render distinctly in the UI."""
-    assert DbtSemanticMixin.ui_color != DbtRunMixin.ui_color
+    """DbtSemanticMetricViewMixin reuses DbtRunMixin's command/flags but must render distinctly in the UI."""
+    assert DbtSemanticMetricViewMixin.ui_color != DbtRunMixin.ui_color
 
 
-@pytest.mark.parametrize("dbt_operator_class", [DbtSeedMixin, DbtRunMixin, DbtSemanticMixin, DbtBuildMixin])
+@pytest.mark.parametrize("dbt_operator_class", [DbtSeedMixin, DbtRunMixin, DbtSemanticMetricViewMixin, DbtBuildMixin])
 @pytest.mark.parametrize(
     "full_refresh, expected_flags", [("True", ["--full-refresh"]), (True, ["--full-refresh"]), (False, [])]
 )

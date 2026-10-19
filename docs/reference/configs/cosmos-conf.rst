@@ -123,23 +123,21 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_HIERARCHICAL_NAMING_FOR_GROUP_NODES_BY_FOLDER``
 
-.. _enable_semantic_layer_reclassification:
+.. _enable_semantic_metric_view_reclassification:
 
-`enable_semantic_layer_reclassification`_:
-    Reclassifies adapter-native semantic layer models (``config.materialized: metric_view`` on Databricks,
-    ``semantic_view`` on Snowflake) from a plain ``model`` node to ``DbtResourceType.SEMANTIC_LAYER``. This
-    changes the task's id (adds a ``_semantic_layer`` suffix) and operator class (a ``DbtSemantic*`` operator
-    instead of ``DbtRun*``; the underlying dbt command is unchanged), and makes ``resource_type:model``
-    selectors stop matching the node in favor of ``resource_type:semantic_layer``.
+`enable_semantic_metric_view_reclassification`_:
+    Opt-in. Reclassifies adapter-native semantic metric views (``config.materialized: metric_view`` on Databricks,
+    ``semantic_view`` on Snowflake) from a plain ``model`` node to ``DbtResourceType.SEMANTIC_METRIC_VIEW``. This
+    changes the task's id (adds a ``_semantic_metric_run`` suffix) and operator class (a ``DbtSemanticMetricView*``
+    operator instead of ``DbtRun*``; the underlying dbt command is unchanged), and makes ``resource_type:model``
+    selectors stop matching the node in favor of ``resource_type:semantic_metric_view``.
 
     .. note::
-        Disabling this restores the pre-reclassification task_id and ``resource_type:model`` matching,
-        which is a breaking change for DAGs that have already adopted the new ``_semantic_layer`` task_id
-        or the ``resource_type:semantic_layer`` selector. See :doc:`Managing semantic layer
-        </guides/translate_dbt_to_airflow/managing-semantic-layer>`.
+        Enabling this changes the task ids of existing ``metric_view`` and ``semantic_view`` models. See
+        :doc:`Managing semantic metric views </guides/translate_dbt_to_airflow/managing-semantic-metric-views>`.
 
-    - Default: ``True``
-    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_LAYER_RECLASSIFICATION``
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION``
 
 .. _enable_cache_partial_parse:
 

@@ -47,7 +47,7 @@ from cosmos.constants import (
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
     DBT_LOG_PATH_ENVVAR,
-    DBT_SEMANTIC_LAYER_MATERIALIZATIONS,
+    DBT_SEMANTIC_METRIC_VIEW_MATERIALIZATIONS,
     DBT_TARGET_DIR_NAME,
     DBT_TARGET_PATH_ENVVAR,
     DbtResourceType,
@@ -303,12 +303,12 @@ def is_freshness_effective(freshness: dict[str, Any] | None) -> bool:
 
 
 def _classify_resource_type(resource_type: DbtResourceType, config: dict[str, Any]) -> DbtResourceType:
-    """Reclassify adapter-native semantic layer materializations as DbtResourceType.SEMANTIC_LAYER."""
-    if not settings.enable_semantic_layer_reclassification:
+    """Reclassify adapter-native semantic metric view materializations as DbtResourceType.SEMANTIC_METRIC_VIEW."""
+    if not settings.enable_semantic_metric_view_reclassification:
         return resource_type
     materialization = str(config.get("materialized") or "").lower()
-    if resource_type == DbtResourceType.MODEL and materialization in DBT_SEMANTIC_LAYER_MATERIALIZATIONS:
-        return DbtResourceType.SEMANTIC_LAYER  # type: ignore[return-value]
+    if resource_type == DbtResourceType.MODEL and materialization in DBT_SEMANTIC_METRIC_VIEW_MATERIALIZATIONS:
+        return DbtResourceType.SEMANTIC_METRIC_VIEW  # type: ignore[return-value]
     return resource_type
 
 

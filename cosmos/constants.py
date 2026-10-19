@@ -12,8 +12,8 @@ AIRFLOW_VERSION = Version(airflow.__version__)
 # dbt materialization for models that are inlined as a CTE into downstream models and never written to the warehouse.
 DBT_EPHEMERAL_MATERIALIZATION = "ephemeral"
 
-# dbt materializations for adapter-native semantic layer objects (Databricks metric views, Snowflake semantic views).
-DBT_SEMANTIC_LAYER_MATERIALIZATIONS = {"metric_view", "semantic_view"}
+# dbt materializations for adapter-native semantic metric views (Databricks metric views, Snowflake semantic views).
+DBT_SEMANTIC_METRIC_VIEW_MATERIALIZATIONS = {"metric_view", "semantic_view"}
 
 BIGQUERY_PROFILE_TYPE = "bigquery"
 DBT_PROFILE_PATH = Path(os.path.expanduser("~")).joinpath(".dbt/profiles.yml")
@@ -192,7 +192,7 @@ class DbtResourceType(aenum.Enum):  # type: ignore[misc]
     TEST = "test"
     SOURCE = "source"
     EXPOSURE = "exposure"
-    SEMANTIC_LAYER = "semantic_layer"
+    SEMANTIC_METRIC_VIEW = "semantic_metric_view"
 
     @classmethod
     def _missing_value_(cls, value):  # type: ignore[no-untyped-def]
@@ -218,7 +218,7 @@ TESTABLE_DBT_RESOURCES = {
     DbtResourceType.SOURCE,
     DbtResourceType.SNAPSHOT,
     DbtResourceType.SEED,
-    DbtResourceType.SEMANTIC_LAYER,
+    DbtResourceType.SEMANTIC_METRIC_VIEW,
 }
 
 _DATASET_EMITTING_RESOURCE_TYPES = frozenset({"model", "seed", "snapshot"})

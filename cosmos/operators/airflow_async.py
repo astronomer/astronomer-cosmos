@@ -16,7 +16,7 @@ from cosmos.operators.local import (
     DbtLSLocalOperator,
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
-    DbtSemanticLocalOperator,
+    DbtSemanticMetricViewLocalOperator,
     DbtSnapshotLocalOperator,
     DbtSourceLocalOperator,
     DbtTestLocalOperator,
@@ -45,7 +45,7 @@ class DbtSourceAirflowAsyncOperator(DbtSourceLocalOperator):
     pass
 
 
-class DbtSemanticAirflowAsyncOperator(DbtSemanticLocalOperator):
+class DbtSemanticMetricViewAirflowAsyncOperator(DbtSemanticMetricViewLocalOperator):
     pass
 
 

@@ -47,7 +47,7 @@ from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
-    DbtSemanticMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
 )
 from cosmos.operators.local import (
@@ -115,7 +115,7 @@ def _default_freshness_callback(
         DbtResourceType.MODEL,
         DbtResourceType.SEED,
         DbtResourceType.SNAPSHOT,
-        DbtResourceType.SEMANTIC_LAYER,
+        DbtResourceType.SEMANTIC_METRIC_VIEW,
     }
     visited: set[str] = set()
     queue = list(stale_source_ids)
@@ -618,13 +618,13 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
         super().__init__(*args, **kwargs)
 
 
-class DbtSemanticWatcherOperator(DbtSemanticMixin, DbtConsumerWatcherSensor):
+class DbtSemanticMetricViewWatcherOperator(DbtSemanticMetricViewMixin, DbtConsumerWatcherSensor):
     """
-    Watches for the progress of an adapter-native semantic layer object, run by the producer task
+    Watches for the progress of an adapter-native semantic metric view, run by the producer task
     (DbtProducerWatcherOperator).
     """
 
-    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtSemanticMixin.template_fields  # type: ignore[operator]
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

@@ -643,10 +643,13 @@ def test_load_from_dbt_manifest_resolves_package_path(tmp_path):
 
 
 @pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
-def test_load_from_dbt_manifest_reclassifies_semantic_layer_materializations(tmp_path, materialization):
-    """Model nodes materialized as an adapter-native semantic layer object (Databricks metric views,
-    Snowflake semantic views) are reclassified to DbtResourceType.SEMANTIC_LAYER, since dbt itself
+def test_load_from_dbt_manifest_reclassifies_semantic_metric_view_materializations(
+    tmp_path, monkeypatch, materialization
+):
+    """Model nodes materialized as an adapter-native semantic metric view (Databricks metric views,
+    Snowflake semantic views) are reclassified to DbtResourceType.SEMANTIC_METRIC_VIEW, since dbt itself
     models them as plain `model` nodes distinguished only by `config.materialized`."""
+    monkeypatch.setattr("cosmos.settings.enable_semantic_metric_view_reclassification", True)
     manifest = {
         "metadata": {"project_name": "my_project"},
         "nodes": {
@@ -677,13 +680,12 @@ def test_load_from_dbt_manifest_reclassifies_semantic_layer_materializations(tmp
         render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
     )
     dbt_graph.load_from_dbt_manifest()
-    assert dbt_graph.nodes["model.my_project.foo"].resource_type == DbtResourceType.SEMANTIC_LAYER
+    assert dbt_graph.nodes["model.my_project.foo"].resource_type == DbtResourceType.SEMANTIC_METRIC_VIEW
 
 
-def test_load_from_dbt_manifest_reclassification_disabled_by_setting(tmp_path, monkeypatch):
-    """Setting `enable_semantic_layer_reclassification=False` restores the pre-reclassification
-    behaviour: adapter-native semantic layer models stay plain MODEL nodes."""
-    monkeypatch.setattr("cosmos.settings.enable_semantic_layer_reclassification", False)
+def test_load_from_dbt_manifest_reclassification_is_opt_in(tmp_path):
+    """Reclassification is opt-in: unless `enable_semantic_metric_view_reclassification` is enabled,
+    adapter-native semantic metric view models stay plain MODEL nodes."""
     manifest = {
         "metadata": {"project_name": "my_project"},
         "nodes": {
@@ -2230,10 +2232,11 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
 
 
 @pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
-def test_parse_dbt_ls_output_reclassifies_semantic_layer_materializations(materialization):
-    """Model nodes materialized as an adapter-native semantic layer object (Databricks metric views,
-    Snowflake semantic views) are reclassified to DbtResourceType.SEMANTIC_LAYER, since dbt itself
+def test_parse_dbt_ls_output_reclassifies_semantic_metric_view_materializations(monkeypatch, materialization):
+    """Model nodes materialized as an adapter-native semantic metric view (Databricks metric views,
+    Snowflake semantic views) are reclassified to DbtResourceType.SEMANTIC_METRIC_VIEW, since dbt itself
     models them as plain `model` nodes distinguished only by `config.materialized`."""
+    monkeypatch.setattr("cosmos.settings.enable_semantic_metric_view_reclassification", True)
     fake_ls_stdout = json.dumps(
         {
             "resource_type": "model",
@@ -2248,10 +2251,11 @@ def test_parse_dbt_ls_output_reclassifies_semantic_layer_materializations(materi
 
     nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
 
-    assert nodes["fake-unique-id"].resource_type == DbtResourceType.SEMANTIC_LAYER
+    assert nodes["fake-unique-id"].resource_type == DbtResourceType.SEMANTIC_METRIC_VIEW
 
 
-def test_parse_dbt_ls_output_does_not_reclassify_regular_materializations():
+def test_parse_dbt_ls_output_does_not_reclassify_regular_materializations(monkeypatch):
+    monkeypatch.setattr("cosmos.settings.enable_semantic_metric_view_reclassification", True)
     fake_ls_stdout = json.dumps(
         {
             "resource_type": "model",
@@ -2261,6 +2265,24 @@ def test_parse_dbt_ls_output_does_not_reclassify_regular_materializations():
             "unique_id": "fake-unique-id",
             "tags": [],
             "config": {"materialized": "view"},
+        }
+    )
+
+    nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert nodes["fake-unique-id"].resource_type == DbtResourceType.MODEL
+
+
+def test_parse_dbt_ls_output_reclassification_is_opt_in():
+    fake_ls_stdout = json.dumps(
+        {
+            "resource_type": "model",
+            "name": "fake-name",
+            "package_name": "fake-project",
+            "original_file_path": "fake-file-path.sql",
+            "unique_id": "fake-unique-id",
+            "tags": [],
+            "config": {"materialized": "metric_view"},
         }
     )
 

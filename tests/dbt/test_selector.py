@@ -997,16 +997,16 @@ def test_select_nodes_by_resource_type_source():
     assert selected == expected
 
 
-def test_select_nodes_by_resource_type_semantic_layer():
+def test_select_nodes_by_resource_type_semantic_metric_view():
     """
-    Test that 'resource_type:semantic_layer' picks up only nodes with resource_type == SEMANTIC_LAYER,
+    Test that 'resource_type:semantic_metric_view' picks up only nodes with resource_type == SEMANTIC_METRIC_VIEW,
     and that 'resource_type:model' no longer matches them (they are reclassified out of MODEL upstream,
     in cosmos.dbt.graph._classify_resource_type).
     """
     local_nodes = dict(sample_nodes)
-    semantic_layer_node = DbtNode(
-        unique_id=f"{DbtResourceType.SEMANTIC_LAYER.value}.{SAMPLE_PROJ_PATH.stem}.my_metric_view",
-        resource_type=DbtResourceType.SEMANTIC_LAYER,
+    semantic_metric_view_node = DbtNode(
+        unique_id=f"{DbtResourceType.SEMANTIC_METRIC_VIEW.value}.{SAMPLE_PROJ_PATH.stem}.my_metric_view",
+        resource_type=DbtResourceType.SEMANTIC_METRIC_VIEW,
         depends_on=[],
         path_base=SAMPLE_PROJ_PATH,
         original_file_path=Path("models/my_metric_view.sql"),
@@ -1014,20 +1014,20 @@ def test_select_nodes_by_resource_type_semantic_layer():
         config={"materialized": "metric_view"},
     )
 
-    local_nodes[semantic_layer_node.unique_id] = semantic_layer_node
+    local_nodes[semantic_metric_view_node.unique_id] = semantic_metric_view_node
     selected = select_nodes(
         project_dir=SAMPLE_PROJ_PATH,
         nodes=local_nodes,
-        select=["resource_type:semantic_layer"],
+        select=["resource_type:semantic_metric_view"],
     )
-    assert selected == {semantic_layer_node.unique_id: semantic_layer_node}
+    assert selected == {semantic_metric_view_node.unique_id: semantic_metric_view_node}
 
     not_selected = select_nodes(
         project_dir=SAMPLE_PROJ_PATH,
         nodes=local_nodes,
         select=["resource_type:model"],
     )
-    assert semantic_layer_node.unique_id not in not_selected
+    assert semantic_metric_view_node.unique_id not in not_selected
 
 
 def test_select_nodes_by_exclude_resource_type_model():

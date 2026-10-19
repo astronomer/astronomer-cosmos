@@ -24,7 +24,7 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
-    DbtSemanticMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
@@ -184,12 +184,12 @@ class DbtRunDockerOperator(DbtRunMixin, DbtDockerBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-class DbtSemanticDockerOperator(DbtSemanticMixin, DbtDockerBaseOperator):
+class DbtSemanticMetricViewDockerOperator(DbtSemanticMetricViewMixin, DbtDockerBaseOperator):
     """
-    Executes a dbt core run command against an adapter-native semantic layer object.
+    Executes a dbt core run command against an adapter-native semantic metric view.
     """
 
-    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtSemanticMixin.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtDockerBaseOperator.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

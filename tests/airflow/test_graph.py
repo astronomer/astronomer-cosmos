@@ -904,10 +904,10 @@ def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_build_in_buil
     assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
 
 
-def _semantic_layer_node(materialization="metric_view"):
+def _semantic_metric_view_node(materialization="metric_view"):
     return DbtNode(
-        unique_id=f"{DbtResourceType.SEMANTIC_LAYER.value}.my_folder.my_model",
-        resource_type=DbtResourceType.SEMANTIC_LAYER,
+        unique_id=f"{DbtResourceType.SEMANTIC_METRIC_VIEW.value}.my_folder.my_model",
+        resource_type=DbtResourceType.SEMANTIC_METRIC_VIEW,
         depends_on=[],
         path_base=Path("."),
         original_file_path=Path("."),
@@ -916,46 +916,46 @@ def _semantic_layer_node(materialization="metric_view"):
     )
 
 
-def test_create_task_metadata_semantic_layer_model_renders_with_semantic_layer_suffix():
-    """Semantic layer nodes (Databricks metric views, Snowflake semantic views) are rendered via a
+def test_create_task_metadata_semantic_metric_view_model_renders_with_semantic_metric_run_suffix():
+    """Semantic metric view nodes (Databricks metric views, Snowflake semantic views) are rendered via a
     dedicated DbtSemantic operator (still just running `dbt run` underneath), with a
-    `_semantic_layer` suffix distinguishing them from plain models. The reclassification tests in
+    `_semantic_metric_run` suffix distinguishing them from plain models. The reclassification tests in
     tests/dbt/test_graph.py already cover both the metric_view and semantic_view materializations;
     create_task_metadata itself doesn't branch on materialized, so a single case suffices here."""
     metadata = create_task_metadata(
-        _semantic_layer_node(),
+        _semantic_metric_view_node(),
         execution_mode=ExecutionMode.LOCAL,
         args={},
         dbt_dag_task_group_identifier="",
     )
-    assert metadata.id == "my_model_semantic_layer"
-    assert metadata.operator_class == "cosmos.operators.local.DbtSemanticLocalOperator"
+    assert metadata.id == "my_model_semantic_metric_run"
+    assert metadata.operator_class == "cosmos.operators.local.DbtSemanticMetricViewLocalOperator"
     assert metadata.arguments == {"select": "my_model"}
 
 
-def test_create_task_metadata_semantic_layer_model_under_build_mode():
-    """Under TestBehavior.BUILD, semantic layer nodes get full BUILD treatment (like MODEL/SEED/SNAPSHOT),
+def test_create_task_metadata_semantic_metric_view_model_under_build_mode():
+    """Under TestBehavior.BUILD, semantic metric view nodes get full BUILD treatment (like MODEL/SEED/SNAPSHOT),
     rendering as dbt build tasks rather than falling through to the generic model branch."""
     metadata = create_task_metadata(
-        _semantic_layer_node(),
+        _semantic_metric_view_node(),
         execution_mode=ExecutionMode.LOCAL,
         args={},
         dbt_dag_task_group_identifier="",
         render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
     )
-    assert metadata.id == "my_model_semantic_layer_build"
+    assert metadata.id == "my_model_semantic_metric_view_build"
     assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
 
 
-def test_generate_task_or_group_semantic_layer_model_bundles_non_detached_test():
-    """A semantic layer node (metric view / semantic view) with a single-parent test must still get
+def test_generate_task_or_group_semantic_metric_view_model_bundles_non_detached_test():
+    """A semantic metric view node (metric view / semantic view) with a single-parent test must still get
     the AFTER_EACH TaskGroup bundling. Regression test: TESTABLE_DBT_RESOURCES previously omitted
-    DbtResourceType.SEMANTIC_LAYER, so `use_task_group` was always False for these nodes and the
+    DbtResourceType.SEMANTIC_METRIC_VIEW, so `use_task_group` was always False for these nodes and the
     non-detached test was silently dropped from the DAG."""
-    with DAG("test-semantic-layer-use-task-group", start_date=datetime(2022, 1, 1)) as dag:
+    with DAG("test-semantic-metric-view-use-task-group", start_date=datetime(2022, 1, 1)) as dag:
         node = DbtNode(
-            unique_id=f"{DbtResourceType.SEMANTIC_LAYER.value}.my_folder.my_model",
-            resource_type=DbtResourceType.SEMANTIC_LAYER,
+            unique_id=f"{DbtResourceType.SEMANTIC_METRIC_VIEW.value}.my_folder.my_model",
+            resource_type=DbtResourceType.SEMANTIC_METRIC_VIEW,
             depends_on=[],
             path_base=Path("."),
             original_file_path=Path("."),
@@ -985,7 +985,7 @@ def test_generate_task_or_group_semantic_layer_model_bundles_non_detached_test()
             test_indirect_selection=TestIndirectSelection.EAGER,
         )
         assert isinstance(task_or_group, TaskGroup)
-        assert "my_model.semantic_layer" in task_or_group.children
+        assert "my_model.semantic_metric_run" in task_or_group.children
         assert "my_model.test" in task_or_group.children
 
 

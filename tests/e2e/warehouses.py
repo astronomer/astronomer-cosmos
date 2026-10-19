@@ -22,6 +22,7 @@ are overwritten, so the fallback requires ``COSMOS_E2E_ALLOW_SHARED_SCHEMA=1``.
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import uuid
@@ -30,7 +31,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import tomllib
 from airflow.models.connection import Connection
 
 from cosmos import ProfileConfig
@@ -285,10 +285,22 @@ def _snowflake_params_from_env() -> dict[str, Any] | None:
     }
 
 
+def _load_toml_parser() -> Any:
+    for module_name in ("tomllib", "tomli"):
+        try:
+            return importlib.import_module(module_name)
+        except ModuleNotFoundError:
+            continue
+    return None
+
+
 def _snowflake_params_from_connections_file() -> dict[str, Any] | None:
     if not SNOWFLAKE_CONNECTIONS_FILE.exists():
         return None
-    connections = tomllib.loads(SNOWFLAKE_CONNECTIONS_FILE.read_text())
+    toml_parser = _load_toml_parser()
+    if toml_parser is None:
+        pytest.skip(f"Reading {SNOWFLAKE_CONNECTIONS_FILE} needs Python 3.11+ (tomllib) or the tomli package")
+    connections = toml_parser.loads(SNOWFLAKE_CONNECTIONS_FILE.read_text())
     if not connections:
         return None
     requested_name = os.getenv("SNOWFLAKE_CONNECTION_NAME")

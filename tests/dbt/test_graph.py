@@ -48,7 +48,7 @@ SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_SMALL_MANIFEST = Path(__file__).parent.parent / "sample/small_manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
-SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
+ALTERED_DBT_PROJECT_MANIFEST = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME / "target/manifest.json"
 SAMPLE_MANIFEST_SELECTORS = Path(__file__).parent.parent / "sample/manifest_selectors.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
@@ -1258,7 +1258,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            manifest_path=SAMPLE_MANIFEST_SOURCE if load_method == "load_from_dbt_manifest" else None,
+            manifest_path=ALTERED_DBT_PROJECT_MANIFEST if load_method == "load_from_dbt_manifest" else None,
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
@@ -1276,6 +1276,42 @@ def test_load_via_dbt_ls_with_sources(load_method):
     assert len(dbt_graph.nodes) >= 4
     assert "source.altered_jaffle_shop.postgres_db.raw_customers" in dbt_graph.nodes
     assert "exposure.altered_jaffle_shop.weekly_metrics" in dbt_graph.nodes
+
+
+@pytest.mark.integration
+def test_altered_jaffle_shop_manifest_is_in_sync_with_project():
+    """
+    The checked-in manifest must describe the same graph as the dbt project next to it.
+
+    If this fails, the project changed without regenerating the manifest. Run `dbt parse`
+    in dev/dags/dbt/altered_jaffle_shop and commit the updated target/manifest.json.
+    """
+    project_path = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME
+
+    def build_graph(manifest_path):
+        return DbtGraph(
+            project=ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path),
+            render_config=RenderConfig(
+                dbt_project_path=project_path,
+                dbt_deps=True,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            ),
+            execution_config=ExecutionConfig(dbt_project_path=project_path),
+            profile_config=ProfileConfig(
+                profile_name="postgres_profile",
+                target_name="dev",
+                profiles_yml_filepath=project_path / "profiles.yml",
+            ),
+        )
+
+    dbt_ls_graph = build_graph(manifest_path=None)
+    dbt_ls_graph.load_via_dbt_ls()
+    manifest_graph = build_graph(manifest_path=ALTERED_DBT_PROJECT_MANIFEST)
+    manifest_graph.load_from_dbt_manifest()
+
+    assert set(manifest_graph.nodes) == set(dbt_ls_graph.nodes)
+    for unique_id, node in dbt_ls_graph.nodes.items():
+        assert sorted(manifest_graph.nodes[unique_id].depends_on) == sorted(node.depends_on), unique_id
 
 
 @pytest.mark.integration

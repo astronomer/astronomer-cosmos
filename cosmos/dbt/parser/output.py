@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,14 @@ DBT_FRESHNESS_WARN_MSG = "WARN freshness of"
 # line that happens to contain a "WARN=<digits>" token (e.g. a --debug resource/usage report printed
 # after the summary) is not mistaken for the warning count.
 DBT_SUMMARY_WARN_RE = re.compile(r"Done\..*\bWARN=(\d+)\b.*\bTOTAL=\d+")
+
+
+def _dbt_log_message(line: str) -> str:
+    """Return ``info.msg`` of a dbt ``--log-format json`` line, or the line unchanged for text output."""
+    try:
+        return str(json.loads(line)["info"]["msg"])
+    except (ValueError, TypeError, KeyError):
+        return line
 
 
 def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> int:
@@ -103,8 +112,11 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
     # dbt <= 1.11 prints "HH:MM:SS  Warning in test <name> (<path>)"; dbt 1.12 reworded this to
     # "HH:MM:SS  [WARNING]: in test <name> (<path>)" (and the result line gains the same
     # "[WARNING]: " prefix). Match both so the parser keeps working across dbt versions.
-    pattern1 = re.compile(r"\d{2}:\d{2}:\d{2}\s+(?:\[WARNING\]:\s*)?(?:Warning )?in test ([\w_]+).*")
-    pattern2 = re.compile(r"\d{2}:\d{2}:\d{2}\s+(?:\[WARNING\]:\s*)?(.*)")
+    # The timestamp is optional because ``--log-format json`` messages (``info.msg``) do not carry one.
+    pattern1 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?(?:\[WARNING\]:\s*)?(?:Warning )?in test ([\w_]+).*")
+    pattern2 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?(?:\[WARNING\]:\s*)?(.*)")
+
+    log_list = [_dbt_log_message(line) for line in log_list]
 
     for line_index, line in enumerate(reversed(log_list)):
         cleaned_line = clean_line(line)
@@ -144,7 +156,7 @@ def extract_dbt_failure_details(log_list: list[str]) -> list[str]:
     def clean_line(line: str) -> str:
         return timestamp.sub("", ansi.sub("", line).strip())
 
-    cleaned = [clean_line(line) for line in log_list]
+    cleaned = [clean_line(_dbt_log_message(line)) for line in log_list]
     details: list[str] = []
     for index, line in enumerate(cleaned):
         match = marker.match(line)

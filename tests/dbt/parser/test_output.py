@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -134,6 +135,23 @@ def test_extract_log_issues_dbt_1_12_format() -> None:
     assert test_results == ["Got 4 results, configured to warn if >1"]
 
 
+def _json_log_line(msg: str) -> str:
+    """A dbt ``--log-format json`` line, as printed by dbt 1.11."""
+    return json.dumps({"data": {}, "info": {"level": "info", "msg": msg, "ts": "2026-10-19T10:00:00.000000Z"}})
+
+
+def test_extract_log_issues_json_log_format() -> None:
+    log_list = [
+        _json_log_line("Finished running 2 data tests, 1 view model in 0 hours 0 minutes and 0.24 seconds (0.24s)."),
+        _json_log_line("\x1b[33mWarning in test unique_m_id (models/schema.yml)\x1b[0m"),
+        _json_log_line("Got 1 result, configured to warn if != 0"),
+        _json_log_line("Done. PASS=1 WARN=1 ERROR=0 SKIP=0 NO-OP=0 TOTAL=2"),
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["unique_m_id"]
+    assert test_results == ["Got 1 result, configured to warn if != 0"]
+
+
 def test_extract_dbt_failure_details() -> None:
     log_list = [
         "20:30:01  \x1b[31mRunning with dbt=1.3.0\x1b[0m",
@@ -149,6 +167,17 @@ def test_extract_dbt_failure_details() -> None:
     ]
 
     assert extract_dbt_failure_details(["20:30:01  Running with dbt=1.3.0", "20:30:02  Completed successfully"]) == []
+
+
+def test_extract_dbt_failure_details_json_log_format() -> None:
+    log_list = [
+        _json_log_line("\x1b[31mFailure in test not_null_m_id (models/schema.yml)\x1b[0m"),
+        _json_log_line("  Got 1 result, configured to fail if != 0"),
+        "not a json line",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Failure in test not_null_m_id (models/schema.yml) Got 1 result, configured to fail if != 0"
+    ]
 
 
 def test_extract_dbt_runner_issues():

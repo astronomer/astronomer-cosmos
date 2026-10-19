@@ -19,11 +19,11 @@ case "$DBT_VERSION" in
     ;;
 esac
 
-if [[ "$SERIES" == *.* ]]; then
-  DBT_OSS_SPEC="dbt-oss~=${SERIES}.0"
-else
-  DBT_OSS_SPEC="dbt-oss>=${SERIES},<$((SERIES + 1))"
-fi
+# Hatch runs this script with sh, which may be dash, so keep it POSIX: no [[ ]].
+case "$SERIES" in
+  *.*) DBT_OSS_SPEC="dbt-oss~=${SERIES}.0" ;;
+  *) DBT_OSS_SPEC="dbt-oss>=${SERIES},<$((SERIES + 1))" ;;
+esac
 
 # dbt-oss and dbt-core 1.x both provide the ``dbt`` Python package, so remove dbt 1.x and its adapters first.
 pip uninstall -y 'dbt-bigquery' 'dbt-databricks' 'dbt-duckdb' 'dbt-postgres' 'dbt-vertica' 'dbt-core'

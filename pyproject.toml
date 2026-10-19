@@ -207,7 +207,8 @@ test-integration-dbt-v2-setup = ['sh scripts/test/integration-dbtf-setup.sh', 's
 test-integration-dbt-v2-setup = [
     'sh scripts/test/integration-dbtf-setup.sh',
     'sh scripts/test/install-dbt-v2.sh {matrix:dbt}',
-    # The subprocess tests run dbt from venv-subprocess/, which only has the Postgres adapter; this job uses BigQuery.
+    # test_dbt_dag_with_watcher_and_subprocess runs dbt from venv-subprocess/, a dbt 1.x environment with only the Postgres
+    # adapter. Add the BigQuery one so it can run here. It checks Cosmos' subprocess mode on BigQuery, not dbt v2 itself.
     'venv-subprocess/bin/pip install -U "dbt-core<2.0" dbt-bigquery',
 ]
 test-integration-dbtf-setup = 'sh scripts/test/integration-dbtf-setup.sh'

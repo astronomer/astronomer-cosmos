@@ -387,6 +387,12 @@ def run_command(
     """Run a command either with dbtRunner or Python subprocess, returning the stdout."""
 
     use_dbt_runner = invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_available()
+    if use_dbt_runner and command[1] == "ls" and dbt_runner.is_dbt_v2():
+        logger.info(
+            "dbt 2 does not return JSON records for `dbt ls` through dbtRunner; "
+            "running it with Python subprocess instead of InvocationMode.DBT_RUNNER."
+        )
+        use_dbt_runner = False
     runner = "dbt Runner" if use_dbt_runner else "Python subprocess"
     command = [str(arg) if arg is not None else "<None>" for arg in command]
     logger.info("Running command with %s: `%s`", runner, " ".join(command))

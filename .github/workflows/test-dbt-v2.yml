@@ -1,9 +1,10 @@
 name: test-dbt-v2
 
 # Integration tests for dbt v2 (dbt-oss). dbt v2 does not support the Postgres adapter that the tests in test.yml use, so
-# this workflow runs the same integration tests (the ones marked ``integration``) against BigQuery instead: with
-# COSMOS_TEST_ADAPTER=bigquery, tests/conftest.py replaces the Postgres profile mapping used by the tests and the example
-# DAGs with a BigQuery one and skips the tests that need Postgres itself. test.yml is unchanged.
+# this workflow runs the same integration tests (the ones marked ``integration``) against BigQuery instead. It loads the
+# tests/dbt_v2_plugin.py pytest plugin, which replaces the Postgres profile mapping used by the tests and the example
+# DAGs with a BigQuery one and skips the tests that need Postgres itself. tests/dbt_v2_enabled.py lists what runs here
+# while dbt v2 is rolled out one group at a time. test.yml is unchanged.
 on:
   push: # Run on pushes to the default branch
     branches: [main, ci/run-integration-tests-dbt-oss] # TEMPORARY: revert before merge
@@ -131,6 +132,10 @@ jobs:
           hatch run "$HATCH_ENV:test-integration"
         env:
           COSMOS_TEST_ADAPTER: bigquery
+          # Loaded only by this job; swaps the Postgres profile mapping for BigQuery and applies tests/dbt_v2_enabled.py.
+          PYTEST_PLUGINS: tests.dbt_v2_plugin
+          # Summary of the failed, errored and skipped tests at the end of the run.
+          PYTEST_ADDOPTS: -rfEs
           PYTEST_SPLITS: 3
           PYTEST_SPLIT_GROUP: ${{ matrix.split-group }}
           AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0

@@ -92,12 +92,12 @@ repos:
           - --py310-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c  # v0.16.7
+    rev: f12be1ebaa5351c1fc76472de98db2c3446c8253  # v0.16.10
     hooks:
       - id: ruff-check
         args: [ --fix ]
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 4160603246a6b365d4a2af661c6d71b0a0f50478  # 26.5.1
+    rev: 96ae3e5802f3fe2d551e703e18f0a367d1a81ac2  # 26.10.0
     hooks:
       - id: black
         args: ["--config", "./pyproject.toml"]
@@ -106,9 +106,9 @@ repos:
     hooks:
       - id: blacken-docs
         alias: black
-        additional_dependencies: [black==26.5.1]
+        additional_dependencies: [black==26.10.0]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 7ff8d35ae36a7d2b968f2f90b4c723e292e594ee  # v2.3.1
+    rev: 2834ec6639549dd6796205c8f011dedcd587288b  # v2.4.0
     hooks:
       - id: mypy
         name: mypy-python

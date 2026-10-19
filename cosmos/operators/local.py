@@ -94,6 +94,7 @@ from cosmos.constants import (
     OPENLINEAGE_PRODUCER,
 )
 from cosmos.dbt.parser.output import (
+    extract_dbt_failure_details,
     extract_freshness_warn_msg,
     extract_log_issues,
     parse_number_of_warnings_subprocess,
@@ -300,7 +301,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
             self.log.error("\n".join(result.full_output))
-            raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
+            message = f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
+            failure_details = extract_dbt_failure_details(result.full_output)
+            if failure_details:
+                message += " Details:\n" + "\n".join(failure_details)
+            raise AirflowException(message)
 
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
         """dbtRunnerResult has an attribute `success` that is False if the command failed."""
@@ -495,7 +500,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """Invokes the dbt command programmatically."""
         if not dbt_runner.is_available():
             raise CosmosDbtRunError(
-                "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
+                "Could not import dbt core. Ensure that dbt-core is installed and available in the environment where the operator is running."
             )
 
         return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks, **kwargs)
@@ -553,16 +558,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.profile_config.target_name,
         ]
         if self.invocation_mode == InvocationMode.DBT_RUNNER:
-            from dbt.version import __version__ as dbt_version
-
-            if Version(dbt_version) >= Version("1.5.6"):
-                # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
-                # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
-                # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
-                # directories, and the use of different temp paths between parsing and execution appears to interfere
-                # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
-                # hangs and ensures reliable task execution.
-                dbt_flags.append("--no-static-parser")
+            # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
+            # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
+            # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
+            # directories, and the use of different temp paths between parsing and execution appears to interfere
+            # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
+            # hangs and ensures reliable task execution.
+            dbt_flags.append("--no-static-parser")
         return dbt_flags
 
     def _install_dependencies(

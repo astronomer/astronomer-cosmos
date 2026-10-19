@@ -38,14 +38,6 @@ Examples of errors
 
 .. code-block:: bash
 
-  ERROR: Cannot install apache-airflow==3.1 and dbt-core==1.5 because these package versions have conflicting dependencies.
-
-  The conflict is caused by:
-      dbt-core 1.5.0 depends on Jinja2==3.1.2
-      apache-airflow-core 3.1.0 depends on jinja2>=3.1.5
-
-.. code-block:: bash
-
   ERROR: Cannot install apache-airflow==3.0 and dbt-core==1.10.0 because these package versions have conflicting dependencies.
 
   The conflict is caused by:
@@ -70,7 +62,7 @@ The table was created by running  `nox <https://nox.thea.codes/en/stable/>`__ wi
     @nox.session(python=["3.10"])
     @nox.parametrize(
         "dbt_version",
-        ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12"],
+        ["1.8", "1.9", "1.10", "1.11", "1.12"],
     )
     @nox.parametrize(
         "airflow_version",

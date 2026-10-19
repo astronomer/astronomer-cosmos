@@ -12,12 +12,6 @@ def test_enabled_dag_files_exist():
     assert not missing, f"Enabled for dbt v2 but not in dev/dags: {missing}"
 
 
-def test_enabled_test_files_exist():
-    enabled = dbt_v2_enabled.ENABLED_TEST_FILES or frozenset()
-    missing = sorted(path for path in enabled if not (Path(__file__).parent.parent / path).is_file())
-    assert not missing, f"Enabled for dbt v2 but not found: {missing}"
-
-
 def test_no_dag_files_are_ignored_outside_the_dbt_v2_job(monkeypatch):
     monkeypatch.delenv("COSMOS_TEST_ADAPTER", raising=False)
     assert dbt_v2_enabled.dag_files_to_ignore(EXAMPLE_DAGS_DIR) == []

@@ -21,7 +21,7 @@ from airflow.utils.types import DagRunType
 from packaging.version import Version
 from sqlalchemy.orm.session import Session
 
-from cosmos.constants import AIRFLOW_VERSION
+from cosmos.constants import AIRFLOW_VERSION, DBT_DISTRIBUTION_NAMES
 
 log = logging.getLogger(__name__)
 
@@ -324,9 +324,9 @@ def _get_or_create_dagrun(
 
 def get_dbt_version() -> Version:
     """Return the installed dbt version, for dbt-core 1.x and dbt-oss (dbt v2 has no ``dbt.version`` module)."""
-    for distribution in ("dbt-core", "dbt-oss"):
+    for distribution in DBT_DISTRIBUTION_NAMES:
         try:
             return Version(importlib.metadata.version(distribution))
         except importlib.metadata.PackageNotFoundError:
             continue
-    raise RuntimeError("Neither dbt-core nor dbt-oss is installed.")
+    raise RuntimeError(f"None of {DBT_DISTRIBUTION_NAMES} is installed.")

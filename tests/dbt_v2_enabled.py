@@ -1,7 +1,8 @@
 """What the dbt v2 (dbt-oss) integration job runs, while it is being rolled out one group at a time.
 
-``.github/workflows/test-dbt-v2.yml`` runs the integration tests against BigQuery. Add a DAG file or a test file here
-once it passes in that job. Everything else is left out and each run reports it as skipped or ignored.
+``.github/workflows/test-dbt-v2.yml`` runs the integration tests against BigQuery. Add an example DAG file to
+ENABLED_DAG_FILES once its DAGs pass in that job, and remove a test from SKIPPED_TESTS once it works with dbt v2. The
+example DAG files that are not enabled are ignored, and each skipped test is reported with its reason.
 """
 
 from __future__ import annotations
@@ -29,10 +30,6 @@ ENABLED_DAG_FILES = frozenset(
         "example_watcher.py",
     }
 )
-
-# Test files (relative to the repository root) that run in the dbt v2 job. ``None`` runs every integration test file
-# that does not need Postgres itself.
-ENABLED_TEST_FILES: frozenset[str] | None = None
 
 # Why a test is skipped in the dbt v2 job.
 _STRICT_YAML = "dbt v2 rejects the project's YAML (materialized without +, test arguments not under arguments:)"

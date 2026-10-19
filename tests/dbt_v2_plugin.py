@@ -5,7 +5,7 @@ BigQuery. It loads this plugin through ``PYTEST_PLUGINS=tests.dbt_v2_plugin``, s
 ``PostgresUserPasswordProfileMapping`` built by the tests and the example DAGs becomes a BigQuery mapping that writes
 to ``COSMOS_TEST_BIGQUERY_DATASET``, and the tests that need Postgres itself are skipped.
 
-Which tests and example DAGs run is controlled by ``tests/dbt_v2_enabled.py``.
+Which example DAGs run, and which tests are skipped for dbt v2, is listed in ``tests/dbt_v2_enabled.py``.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from tests.dbt_v2_enabled import ENABLED_TEST_FILES, SKIPPED_TESTS
+from tests.dbt_v2_enabled import SKIPPED_TESTS
 
 # Tests that depend on Postgres itself (and not only on the profile) and so cannot run against BigQuery.
 POSTGRES_ONLY_TEST_FILES = {
@@ -60,7 +60,5 @@ def pytest_collection_modifyitems(items):
             reason = f"Requires Postgres: {reason}"
         elif item.nodeid in SKIPPED_TESTS:
             reason = f"Not working with dbt v2 yet: {SKIPPED_TESTS[item.nodeid]}"
-        elif ENABLED_TEST_FILES is not None and file_path not in ENABLED_TEST_FILES:
-            reason = "Not enabled for dbt v2 yet (see tests/dbt_v2_enabled.py)"
         if reason:
             item.add_marker(pytest.mark.skip(reason=reason))

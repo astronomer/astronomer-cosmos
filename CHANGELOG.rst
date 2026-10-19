@@ -22,7 +22,7 @@ Behaviour Changes
 
 Features
 
-* Add opt-in support for adapter-native semantic metric views (``config.materialized: metric_view`` on Databricks, ``semantic_view`` on Snowflake). When ``enable_semantic_metric_view_reclassification`` is set (env var ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION``), these models are reclassified from ``model`` to ``DbtResourceType.SEMANTIC_METRIC_VIEW`` and rendered via a dedicated ``DbtSemanticMetricView*`` operator with a ``semantic_metric_run`` task suffix. Disabled by default. See the "Managing semantic metric views" guide. by @corsettigyg in #2885
+* Add opt-in support for adapter-native semantic metric views (``config.materialized: metric_view`` on Databricks, ``semantic_view`` on Snowflake). When ``enable_semantic_metric_view_reclassification`` is set (env var ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION``), these models are reclassified from ``model`` to ``DbtResourceType.SEMANTIC_METRIC_VIEW`` and rendered via a dedicated ``DbtSemanticMetricView*`` operator with a ``semantic_metric_run`` task suffix. Disabled by default. See the "Managing semantic metric views" guide by @corsettigyg in #2885
 * Add dedicated producer, consumer, and retry queues for ``ExecutionMode.WATCHER``. by @jroachgolf84 in #2844
 * Emit per-model outlets in ``ExecutionMode.WATCHER_KUBERNETES``. by @MichaelRBlack in #2595
 * Support lists of paths for the relative-path arguments of ``ProjectConfig``. by @pankajastro in #2875
@@ -72,7 +72,7 @@ Others
 * Fix a mypy ``no-any-return`` error in ``_resolve_env_var`` by @tatiana in #2904
 * Reduce ``create_test_task_metadata`` complexity by @tatiana in #2933
 * Group ``github/codeql-action`` updates in a single Dependabot PR by @tatiana in #2928
-* Dependency updates by @dependabot and @pre-commit-ci in #2854, #2856, #2866, #2872, #2882, #2894, #2897, #2898, #2899, #2907, #2909, #2911, #2912, #2915, #2916, #2919, #2922, #2923, #2924, #2929, #2934, #2937, #2941, #2943, #2946, #2949, #2951, #2954, #2955, #2958, #2963, #2971, #2973, #2974, #2975, #2984, #2985, #2987, #2989, #2994, #3002, #3009, #3010, #3012, #3013, #3014, #3017, #3019, #3020, #3026, #3028, #3029, #3032, #3033, #3039, #3053, #3054, #3056, #3057, #3064, #3065, and #3066, #3067
+* Dependency updates by @dependabot and @pre-commit-ci in #2854, #2856, #2866, #2872, #2882, #2894, #2897, #2898, #2899, #2907, #2909, #2911, #2912, #2915, #2916, #2919, #2922, #2923, #2924, #2929, #2934, #2937, #2941, #2943, #2946, #2949, #2951, #2954, #2955, #2958, #2963, #2971, #2973, #2974, #2975, #2984, #2985, #2987, #2989, #2994, #3002, #3009, #3010, #3012, #3013, #3014, #3017, #3019, #3020, #3026, #3028, #3029, #3032, #3033, #3039, #3053, #3054, #3056, #3057, #3064, #3065, #3066, and #3067
 
 1.15.1 (2026-08-04)
 -------------------

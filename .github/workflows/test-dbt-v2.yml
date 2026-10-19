@@ -97,7 +97,7 @@ jobs:
         # arguments:), so the DAGs and tests that use them cannot even parse. dbt-autofix, pinned, rewrites the checked out
         # files on this runner only; the repository and the other workflows are not touched.
         run: |
-          for project in altered_jaffle_shop model_version multiple_parents_test simple; do
+          for project in altered_jaffle_shop jaffle_shop_python model_version multiple_parents_test simple; do
             uv tool run --python ${{ matrix.python-version }} --from "dbt-autofix==0.22.6" dbt-autofix deprecations --path "dev/dags/dbt/$project"
           done
           git diff --stat

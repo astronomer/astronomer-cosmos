@@ -821,6 +821,21 @@ def _add_dbt_setup_async_task(
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
 
 
+def _reject_cosmos_only_selectors(render_config: RenderConfig) -> None:
+    """
+    ``resource_type:semantic_metric_view`` is resolved by Cosmos, but the watcher producer forwards ``select`` and
+    ``exclude`` to a single ``dbt build``, which rejects it. Fail when building the DAG instead of at run time.
+    """
+    cosmos_only_selector = f"resource_type:{DbtResourceType.SEMANTIC_METRIC_VIEW.value}"  # type: ignore[attr-defined]
+    for argument, items in (("select", render_config.select), ("exclude", render_config.exclude)):
+        if any(cosmos_only_selector in item for item in items):
+            raise CosmosValueError(
+                f"RenderConfig.{argument} uses '{cosmos_only_selector}', which dbt does not know and "
+                "ExecutionMode.WATCHER passes to dbt. Use 'config.materialized:metric_view' and "
+                "'config.materialized:semantic_view' instead."
+            )
+
+
 def _add_watcher_producer_task(
     dag: DAG,
     task_args: dict[str, Any],
@@ -847,6 +862,7 @@ def _add_watcher_producer_task(
         producer_task_args["_check_source_freshness"] = True
 
     if render_config is not None:
+        _reject_cosmos_only_selectors(render_config)
         producer_task_args["select"] = _convert_list_to_str(render_config.select)
         producer_task_args["selector"] = render_config.selector
         producer_task_args["exclude"] = _convert_list_to_str(render_config.exclude)

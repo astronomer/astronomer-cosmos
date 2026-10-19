@@ -1897,6 +1897,57 @@ def test_watcher_producer_uses_resource_type_flag_to_exclude_tests(test_behavior
     assert "resource_type:test" not in (producer_task.exclude or "")
 
 
+def _build_watcher_graph_with_render_config(render_config):
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    build_airflow_graph(
+        nodes=sample_nodes,
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=render_config,
+        dbt_project_name="astro_shop",
+    )
+    return next(task for task in dag.tasks if isinstance(task, DbtProducerWatcherOperator))
+
+
+@pytest.mark.parametrize("argument", ["select", "exclude"])
+@pytest.mark.parametrize(
+    "selector",
+    [
+        "resource_type:semantic_metric_view",
+        "+resource_type:semantic_metric_view",
+        "tag:a,resource_type:semantic_metric_view",
+    ],
+)
+def test_watcher_producer_rejects_semantic_metric_view_resource_type_selector(argument, selector):
+    """dbt rejects ``resource_type:semantic_metric_view``, so the watcher producer can't be given it."""
+    render_config = RenderConfig(**{argument: [selector]})
+
+    with pytest.raises(CosmosValueError, match=rf"RenderConfig.{argument} uses 'resource_type:semantic_metric_view'"):
+        _build_watcher_graph_with_render_config(render_config)
+
+
+@pytest.mark.parametrize("selector", ["config.materialized:metric_view", "config.materialized:semantic_view"])
+def test_watcher_producer_forwards_materialization_selector_for_semantic_metric_views(selector):
+    producer_task = _build_watcher_graph_with_render_config(RenderConfig(select=[selector]))
+
+    assert producer_task.select == selector
+
+
 def test_watcher_producer_resource_types_are_all_known_to_dbt():
     """The producer passes SUPPORTED_BUILD_RESOURCES to dbt as ``--resource-type``. dbt rejects ``semantic_metric_view``
     (a Cosmos-only type), and it does not need it: dbt still sees metric views as ``model``, which is already built."""

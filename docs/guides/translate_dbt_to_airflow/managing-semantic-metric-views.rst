@@ -29,7 +29,9 @@ that materialization at parse time and reclassifies the node as ``semantic_metri
   selector only works when Cosmos itself performs node selection (e.g. ``LoadMode.DBT_MANIFEST``). Under
   ``LoadMode.DBT_LS``, ``select``/``exclude`` are passed directly to ``dbt ls``, which has no
   ``semantic_metric_view`` resource type, so use ``config.materialized:metric_view`` or
-  ``config.materialized:semantic_view`` instead.
+  ``config.materialized:semantic_view`` instead. The same applies to ``ExecutionMode.WATCHER``, whose producer passes
+  ``select``/``exclude`` to ``dbt build``. Cosmos raises an error if they contain
+  ``resource_type:semantic_metric_view``.
 
 Testing
 ~~~~~~~

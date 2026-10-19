@@ -212,7 +212,7 @@ def test_build_airflow_graph_with_after_each(hierarchical_naming_disabled):
 
     assert task_seed_parent_seed.owner == DEFAULT_OWNER
     assert task_parent_run.owner == "parent_node"
-    assert {d for d in dag.owner.split(", ")} == {DEFAULT_OWNER, "parent_node"}
+    assert {*dag.owner.split(", ")} == {DEFAULT_OWNER, "parent_node"}
 
 
 @pytest.mark.parametrize(
@@ -902,6 +902,91 @@ def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_build_in_buil
     )
     assert metadata.id == "my_ephemeral_model_build"
     assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+
+
+def _semantic_metric_view_node(materialization="metric_view"):
+    return DbtNode(
+        unique_id=f"{DbtResourceType.SEMANTIC_METRIC_VIEW.value}.my_folder.my_model",
+        resource_type=DbtResourceType.SEMANTIC_METRIC_VIEW,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={"materialized": materialization},
+    )
+
+
+def test_create_task_metadata_semantic_metric_view_model_renders_with_semantic_metric_run_suffix():
+    """Semantic metric view nodes (Databricks metric views, Snowflake semantic views) are rendered via a
+    dedicated DbtSemantic operator (still just running `dbt run` underneath), with a
+    `_semantic_metric_run` suffix distinguishing them from plain models. The reclassification tests in
+    tests/dbt/test_graph.py already cover both the metric_view and semantic_view materializations;
+    create_task_metadata itself doesn't branch on materialized, so a single case suffices here."""
+    metadata = create_task_metadata(
+        _semantic_metric_view_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+    assert metadata.id == "my_model_semantic_metric_run"
+    assert metadata.operator_class == "cosmos.operators.local.DbtSemanticMetricViewLocalOperator"
+    assert metadata.arguments == {"select": "my_model"}
+
+
+def test_create_task_metadata_semantic_metric_view_model_under_build_mode():
+    """Under TestBehavior.BUILD, semantic metric view nodes get full BUILD treatment (like MODEL/SEED/SNAPSHOT),
+    rendering as dbt build tasks rather than falling through to the generic model branch."""
+    metadata = create_task_metadata(
+        _semantic_metric_view_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
+    )
+    assert metadata.id == "my_model_semantic_metric_view_build"
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+
+
+def test_generate_task_or_group_semantic_metric_view_model_bundles_non_detached_test():
+    """A semantic metric view node (metric view / semantic view) with a single-parent test must still get
+    the AFTER_EACH TaskGroup bundling. Regression test: TESTABLE_DBT_RESOURCES previously omitted
+    DbtResourceType.SEMANTIC_METRIC_VIEW, so `use_task_group` was always False for these nodes and the
+    non-detached test was silently dropped from the DAG."""
+    with DAG("test-semantic-metric-view-use-task-group", start_date=datetime(2022, 1, 1)) as dag:
+        node = DbtNode(
+            unique_id=f"{DbtResourceType.SEMANTIC_METRIC_VIEW.value}.my_folder.my_model",
+            resource_type=DbtResourceType.SEMANTIC_METRIC_VIEW,
+            depends_on=[],
+            path_base=Path("."),
+            original_file_path=Path("."),
+            tags=[],
+            config={"materialized": "metric_view"},
+            has_test=True,
+            has_non_detached_test=True,
+        )
+        task_or_group = generate_task_or_group(
+            dag=dag,
+            task_group=None,
+            node=node,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn",
+                        profile_args={"schema": "public"},
+                    ),
+                ),
+            },
+            render_config=RenderConfig(test_behavior=TestBehavior.AFTER_EACH),
+            node_converters={},
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+        )
+        assert isinstance(task_or_group, TaskGroup)
+        assert "my_model.semantic_metric_run" in task_or_group.children
+        assert "my_model.test" in task_or_group.children
 
 
 def test_create_task_metadata_build_mode_forwards_render_config_exclude():
@@ -1810,6 +1895,64 @@ def test_watcher_producer_uses_resource_type_flag_to_exclude_tests(test_behavior
     actual_resource_types = [flags[i + 1] for i in range(len(flags)) if flags[i] == "--resource-type"]
     assert actual_resource_types == expected_resource_types
     assert "resource_type:test" not in (producer_task.exclude or "")
+
+
+def _build_watcher_graph_with_render_config(render_config):
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    build_airflow_graph(
+        nodes=sample_nodes,
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=render_config,
+        dbt_project_name="astro_shop",
+    )
+    return next(task for task in dag.tasks if isinstance(task, DbtProducerWatcherOperator))
+
+
+@pytest.mark.parametrize("argument", ["select", "exclude"])
+@pytest.mark.parametrize(
+    "selector",
+    [
+        "resource_type:semantic_metric_view",
+        "+resource_type:semantic_metric_view",
+        "tag:a,resource_type:semantic_metric_view",
+    ],
+)
+def test_watcher_producer_rejects_semantic_metric_view_resource_type_selector(argument, selector):
+    """dbt rejects ``resource_type:semantic_metric_view``, so the watcher producer can't be given it."""
+    render_config = RenderConfig(**{argument: [selector]})
+
+    with pytest.raises(CosmosValueError, match=rf"RenderConfig.{argument} uses 'resource_type:semantic_metric_view'"):
+        _build_watcher_graph_with_render_config(render_config)
+
+
+@pytest.mark.parametrize("selector", ["config.materialized:metric_view", "config.materialized:semantic_view"])
+def test_watcher_producer_forwards_materialization_selector_for_semantic_metric_views(selector):
+    producer_task = _build_watcher_graph_with_render_config(RenderConfig(select=[selector]))
+
+    assert producer_task.select == selector
+
+
+def test_watcher_producer_resource_types_are_all_known_to_dbt():
+    """The producer passes SUPPORTED_BUILD_RESOURCES to dbt as ``--resource-type``. dbt rejects ``semantic_metric_view``
+    (a Cosmos-only type), and it does not need it: dbt still sees metric views as ``model``, which is already built."""
+    assert DbtResourceType.MODEL in SUPPORTED_BUILD_RESOURCES
+    assert DbtResourceType.SEMANTIC_METRIC_VIEW not in SUPPORTED_BUILD_RESOURCES
 
 
 @pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])

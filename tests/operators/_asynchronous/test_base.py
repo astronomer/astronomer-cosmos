@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
@@ -74,6 +75,33 @@ def test_dbt_run_airflow_async_factory_operator_init(mock_create_class, profile_
 
     assert operator is not None
     assert isinstance(operator, MockAsyncOperator)
+
+
+class _AbstractMixin(ABC):
+    """Mirrors Airflow 3.4's ABC-based ``ResumableJobMixin``, which broke ``__bases__`` re-assignment."""
+
+
+class AbstractMixinAsyncOperator(_AbstractMixin, MockAsyncOperator):
+    pass
+
+
+def test_dbt_run_airflow_async_factory_operator_resolves_per_instance(profile_config_mock):
+    """Each instance gets its own async class, without re-basing the shared factory class."""
+    async_operator_classes = (MockAsyncOperator, AbstractMixinAsyncOperator)
+    operators = []
+    for async_operator_class in async_operator_classes:
+        with patch(
+            "cosmos.operators._asynchronous.base._create_async_operator_class", return_value=async_operator_class
+        ):
+            operators.append(
+                DbtRunAirflowAsyncFactoryOperator(
+                    task_id="test_task", project_dir="some/path", profile_config=profile_config_mock
+                )
+            )
+
+    for operator, async_operator_class in zip(operators, async_operator_classes):
+        assert isinstance(operator, async_operator_class)
+    assert not issubclass(DbtRunAirflowAsyncFactoryOperator, MockAsyncOperator)
 
 
 @pytest.fixture

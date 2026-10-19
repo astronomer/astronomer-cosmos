@@ -9,6 +9,6 @@ pytest -vv \
     --durations=0 \
     --timeout=1800 \
     --timeout-method=thread \
-    -m 'warehouse_e2e' \
-    tests/e2e \
+    -m 'integration' \
+    tests/test_warehouse_metric_and_semantic_views.py \
     "$@"

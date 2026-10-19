@@ -5,7 +5,7 @@ on:
     # TODO(#3075): cosmos-ci-snowflake-oss is listed only to run the dbt Fusion Snowflake job with the
     # key-pair change and the repo secrets before merge (pull_request_target runs main's workflow).
     # Revert to [main] before merging.
-    # TODO(#3070): pr-2885-e2e is listed only to exercise Run-Warehouse-E2E-Tests with the repo
+    # TODO(#3070): pr-2885-e2e is listed only to exercise Run-Integration-Tests-Warehouse with the repo
     # secrets before merge (pull_request_target runs main's workflow). Revert to [main] before merging.
     branches: [main, cosmos-ci-snowflake-oss, pr-2885-e2e]
   # Also run on pull requests originating from forks. Every test job here is secret-dependent
@@ -127,7 +127,7 @@ jobs:
             esac
           done <<< "$FILES"
           echo "code_changed=$CODE_CHANGED" >> "$GITHUB_OUTPUT"
-          # The warehouse end-to-end job spends real Snowflake and Databricks compute, so it only
+          # The warehouse integration job spends real Snowflake and Databricks compute, so it only
           # runs when the code paths it exercises, or its own fixtures, change.
           WAREHOUSE_E2E_CHANGED=false
           if [ -z "$FILES" ]; then
@@ -139,7 +139,7 @@ jobs:
               cosmos/constants.py|cosmos/settings.py|cosmos/dbt/graph.py|cosmos/dbt/selector.py|cosmos/airflow/graph.py) WAREHOUSE_E2E_CHANGED=true; break ;;
               cosmos/operators/base.py|cosmos/operators/local.py|cosmos/operators/watcher.py|cosmos/operators/_watcher/*) WAREHOUSE_E2E_CHANGED=true; break ;;
               cosmos/profiles/databricks/*|cosmos/profiles/snowflake/*) WAREHOUSE_E2E_CHANGED=true; break ;;
-              tests/e2e/*|tests/airflow/test_metric_and_semantic_view_dags.py|scripts/test/integration-warehouse.sh) WAREHOUSE_E2E_CHANGED=true; break ;;
+              tests/test_warehouse_metric_and_semantic_views.py|tests/airflow/test_metric_and_semantic_view_dags.py|scripts/test/integration-warehouse.sh) WAREHOUSE_E2E_CHANGED=true; break ;;
               dev/dags/dbt/databricks_metric_view/*|dev/dags/dbt/snowflake_semantic_view/*) WAREHOUSE_E2E_CHANGED=true; break ;;
               dev/dags/example_databricks_metric_view.py|dev/dags/example_snowflake_semantic_view.py) WAREHOUSE_E2E_CHANGED=true; break ;;
               .github/workflows/test.yml) WAREHOUSE_E2E_CHANGED=true; break ;;
@@ -364,7 +364,7 @@ jobs:
       AIRFLOW_CONN_DATABRICKS_DEFAULT: ${{ secrets.AIRFLOW_CONN_DATABRICKS_DEFAULT }}
       DATABRICKS_CLUSTER_ID: ${{ secrets.DATABRICKS_CLUSTER_ID }}
 
-  Run-Warehouse-E2E-Tests:
+  Run-Integration-Tests-Warehouse:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.warehouse_e2e_changed == 'true'
     runs-on: ubuntu-latest
@@ -410,7 +410,7 @@ jobs:
         run: |
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip install "dbt-databricks>=1.12.5,<1.13" "dbt-snowflake>=1.12,<1.13"
 
-      - name: Run the end-to-end tests on Snowflake and Databricks
+      - name: Run the integration tests against Snowflake and Databricks
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-setup
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-warehouse
@@ -427,6 +427,7 @@ jobs:
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
 
   Run-Integration-Tests-DBT-1-8:
     needs: [Authorize, Check-changed-files]

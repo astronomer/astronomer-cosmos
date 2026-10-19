@@ -83,47 +83,14 @@ jobs:
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Create the BigQuery dataset
-        # dbt creates a missing dataset itself, but BigQuery does not always make it visible straight away, which made
-        # the first seed fail with "Not found: Dataset". Create it here and wait until it can be read. Inline code in
-        # isolated mode (-I), and only for names that start with cosmos_ci_.
+        # Retries rate-limit errors, waits a random few seconds first so the jobs of a run do not all call the API at once,
+        # and waits until the dataset can be read: BigQuery does not always make it visible straight away, which made the
+        # first seed fail with "Not found: Dataset". Run in isolated mode (-I), and only for names that start with cosmos_ci_.
         env:
           AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
           BIGQUERY_PROJECT: astronomer-dag-authoring
         run: |
-          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I - <<'PY'
-          import json
-          import os
-          import time
-
-          from airflow.models.connection import Connection
-          from google.api_core.exceptions import NotFound
-          from google.cloud import bigquery
-          from google.oauth2 import service_account
-
-          dataset = os.environ["COSMOS_TEST_BIGQUERY_DATASET"]
-          if not dataset.startswith("cosmos_ci_"):
-              raise SystemExit(f"Refusing to create dataset {dataset!r}: it does not start with 'cosmos_ci_'")
-
-          raw = os.environ["AIRFLOW_CONN_GCP_GS_CONN"]
-          conn = Connection.from_json(raw) if raw.lstrip().startswith("{") else Connection(uri=raw)
-          extra = conn.extra_dejson
-          keyfile = extra.get("keyfile_dict") or extra.get("extra__google_cloud_platform__keyfile_dict")
-          if isinstance(keyfile, str):
-              keyfile = json.loads(keyfile)
-          credentials = service_account.Credentials.from_service_account_info(keyfile)
-          client = bigquery.Client(project=os.environ["BIGQUERY_PROJECT"], credentials=credentials)
-
-          print(f"Creating BigQuery dataset {dataset}")
-          client.create_dataset(dataset, exists_ok=True)
-          for _ in range(30):
-              try:
-                  client.get_dataset(dataset)
-                  break
-              except NotFound:
-                  time.sleep(2)
-          else:
-              raise SystemExit(f"BigQuery dataset {dataset} is still not visible after 60 seconds")
-          PY
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_dataset.py create
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
@@ -159,35 +126,12 @@ jobs:
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
       - name: Delete the BigQuery dataset
-        # Runs on success, failure and cancellation. Inline code in isolated mode (-I), and it only deletes datasets named
-        # cosmos_ci_*. The credentials need to be able to delete only the datasets they created (not a project-wide delete).
+        # Runs on success, failure and cancellation. A failure to delete is only a warning: the dataset's tables expire
+        # after a few hours anyway. Isolated mode (-I), and it only touches datasets named cosmos_ci_*. The credentials
+        # need to be able to delete only the datasets they created (not a project-wide delete).
         if: always()
         env:
           AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
           BIGQUERY_PROJECT: astronomer-dag-authoring
         run: |
-          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I - <<'PY'
-          import json
-          import os
-
-          from airflow.models.connection import Connection
-          from google.cloud import bigquery
-          from google.oauth2 import service_account
-
-          dataset = os.environ.get("COSMOS_TEST_BIGQUERY_DATASET")
-          if not dataset:
-              raise SystemExit("No BigQuery dataset was set for this job, nothing to delete")
-          if not dataset.startswith("cosmos_ci_"):
-              raise SystemExit(f"Refusing to delete dataset {dataset!r}: it does not start with 'cosmos_ci_'")
-
-          raw = os.environ["AIRFLOW_CONN_GCP_GS_CONN"]
-          conn = Connection.from_json(raw) if raw.lstrip().startswith("{") else Connection(uri=raw)
-          extra = conn.extra_dejson
-          keyfile = extra.get("keyfile_dict") or extra.get("extra__google_cloud_platform__keyfile_dict")
-          if isinstance(keyfile, str):
-              keyfile = json.loads(keyfile)
-          credentials = service_account.Credentials.from_service_account_info(keyfile)
-          client = bigquery.Client(project=os.environ["BIGQUERY_PROJECT"], credentials=credentials)
-          print(f"Deleting BigQuery dataset {dataset}")
-          client.delete_dataset(dataset, delete_contents=True, not_found_ok=True)
-          PY
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_dataset.py delete

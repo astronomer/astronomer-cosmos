@@ -97,7 +97,7 @@ repos:
       - id: ruff-check
         args: [ --fix ]
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 96ae3e5802f3fe2d551e703e18f0a367d1a81ac2  # 26.10.0
+    rev: a5439e9af2ff9371297bb1a76a01b8ad17989b88  # 26.10.1
     hooks:
       - id: black
         args: ["--config", "./pyproject.toml"]

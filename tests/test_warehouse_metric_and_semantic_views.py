@@ -6,8 +6,9 @@ tests/operators/test_watcher.py::test_dbt_dag_with_watcher.
 
 Credentials, as provided by CI: ``AIRFLOW_CONN_DATABRICKS_DEFAULT`` plus ``DATABRICKS_CATALOG`` (default ``main``),
 and ``SNOWFLAKE_ACCOUNT``, ``SNOWFLAKE_USER``, ``SNOWFLAKE_PASSWORD``, ``SNOWFLAKE_DATABASE``, ``SNOWFLAKE_WAREHOUSE``
-(optional ``SNOWFLAKE_ROLE``). A warehouse without credentials is skipped. Each warehouse gets a throwaway schema,
-so the identity needs CREATE SCHEMA.
+(optional ``SNOWFLAKE_ROLE``). Locally, a warehouse without credentials or without CREATE SCHEMA is skipped; under CI
+(``CI`` set) the same conditions fail, so a green job always means the warehouses were exercised. Each warehouse gets a
+throwaway schema, so the identity needs CREATE SCHEMA.
 """
 
 from __future__ import annotations
@@ -25,10 +26,14 @@ import pytest
 from airflow.models.connection import Connection
 from airflow.utils.session import create_session
 from airflow.utils.state import DagRunState, TaskInstanceState
-from airflow.utils.trigger_rule import TriggerRule
+
+try:
+    from airflow.task.trigger_rule import TriggerRule
+except ImportError:  # pragma: no cover
+    from airflow.utils.trigger_rule import TriggerRule
 
 from cosmos import DbtDag, ProfileConfig, TestBehavior, settings
-from cosmos.constants import DbtResourceType
+from cosmos.constants import AIRFLOW_VERSION, DbtResourceType
 from cosmos.operators.base import DbtSemanticMetricViewMixin
 from cosmos.operators.local import (
     DbtRunLocalOperator,
@@ -53,6 +58,12 @@ DEV_DAGS_DIR = Path(__file__).parent.parent / "dev" / "dags"
 DBT_ROOT_PATH = DEV_DAGS_DIR / "dbt"
 SEEDED_REVENUE_BY_STATUS = {"cancelled": 75.25, "completed": 851.25, "pending": 45.00}
 EXPECTED_NODE_COUNT = 9
+
+
+def skip_unless_ci(reason: str) -> None:
+    if os.getenv("CI"):
+        pytest.fail(reason)
+    pytest.skip(reason)
 
 
 def amounts_by_status(rows: list[tuple[Any, Any]]) -> dict[str, float]:
@@ -81,6 +92,9 @@ class Warehouse:
         raise NotImplementedError
 
     def connect(self) -> Any:
+        raise NotImplementedError
+
+    def driver_error(self) -> type[Exception]:
         raise NotImplementedError
 
     def qualified(self, name: str) -> str:
@@ -115,7 +129,7 @@ class Databricks(Warehouse):
 
     def configure(self) -> None:
         if not os.getenv("AIRFLOW_CONN_DATABRICKS_DEFAULT"):
-            pytest.skip("AIRFLOW_CONN_DATABRICKS_DEFAULT is not set")
+            skip_unless_ci("AIRFLOW_CONN_DATABRICKS_DEFAULT is not set")
         self.catalog = os.getenv("DATABRICKS_CATALOG", "main")
         connection = Connection.get_connection_from_secrets("databricks_default")
         self.connection_params = {
@@ -137,6 +151,11 @@ class Databricks(Warehouse):
         from databricks import sql
 
         return sql.connect(**self.connection_params)
+
+    def driver_error(self) -> type[Exception]:
+        from databricks.sql.exc import Error
+
+        return Error
 
     def qualified_schema(self) -> str:
         return f"{self.catalog}.{self.schema}"
@@ -173,7 +192,7 @@ class Snowflake(Warehouse):
         )
         missing = [name for name in required if not os.getenv(name)]
         if missing:
-            pytest.skip(f"missing {missing}")
+            skip_unless_ci(f"missing {missing}")
         self.database = os.environ["SNOWFLAKE_DATABASE"]
         extra = {
             "account": os.environ["SNOWFLAKE_ACCOUNT"],
@@ -213,6 +232,11 @@ class Snowflake(Warehouse):
 
         return snowflake.connector.connect(**self.connection_params)
 
+    def driver_error(self) -> type[Exception]:
+        from snowflake.connector.errors import Error
+
+        return Error
+
     def qualified_schema(self) -> str:
         return f"{self.database}.{self.schema}"
 
@@ -244,16 +268,16 @@ def _cosmos_settings():
 def warehouse(request) -> Warehouse:
     instance = request.param()
     instance.configure()
-    with instance.connect() as connection, connection.cursor() as cursor:
-        try:
+    try:
+        with instance.connect() as connection, connection.cursor() as cursor:
             instance.create_schema(cursor)
-        except Exception as error:
-            pytest.skip(f"{instance.name}: cannot create a test schema: {error}")
+    except instance.driver_error() as error:
+        skip_unless_ci(f"{instance.name}: cannot create a test schema: {error}")
     yield instance
     try:
         with instance.connect() as connection, connection.cursor() as cursor:
             instance.drop_schema(cursor)
-    except Exception as error:
+    except instance.driver_error() as error:
         warnings.warn(f"could not drop {instance.name} schema {instance.schema}: {error}")
 
 
@@ -317,10 +341,8 @@ def assert_warehouse_objects(warehouse: Warehouse) -> None:
 
 
 def asset_event_uris_by_task(dag_id: str) -> dict[str, list[str]]:
-    try:
-        from airflow.models.asset import AssetEvent
-    except ImportError:
-        return {}
+    from airflow.models.asset import AssetEvent
+
     uris: dict[str, list[str]] = defaultdict(list)
     with create_session() as session:
         for event in session.query(AssetEvent).filter(AssetEvent.source_dag_id == dag_id).all():
@@ -328,54 +350,64 @@ def asset_event_uris_by_task(dag_id: str) -> dict[str, list[str]]:
     return dict(uris)
 
 
-def test_dbt_dag_with_local_execution(warehouse: Warehouse):
+def semantic_task_id_in(chain: list[str]) -> str:
+    return next(task_id for task_id in chain if "semantic_metric_run" in task_id)
+
+
+@pytest.fixture(scope="module")
+def local_dag(warehouse: Warehouse) -> DbtDag:
     dag = load_example_dag(warehouse, "local")
+    run_dag(dag)
+    assert_warehouse_objects(warehouse)
+    run_dag(dag)
+    return dag
+
+
+@pytest.fixture(scope="module")
+def watcher_dag(warehouse: Warehouse) -> DbtDag:
+    dag = load_example_dag(warehouse, "watcher")
+    make_watcher_consumers_wait_for_producer(dag)
+    run_dag(dag)
+    return dag
+
+
+def test_dbt_dag_with_local_execution(warehouse: Warehouse, local_dag: DbtDag):
     chain = expected_task_chain(warehouse)
     seed_task_id, orders_task_id = chain[0], chain[1]
-    semantic_task_id = next(task_id for task_id in chain if "semantic_metric_run" in task_id)
+    semantic_task_id = semantic_task_id_in(chain)
 
-    assert len(dag.dbt_graph.filtered_nodes) == EXPECTED_NODE_COUNT
-    assert topological_task_ids(dag) == chain
-    assert isinstance(dag.task_dict[seed_task_id], DbtSeedLocalOperator)
-    assert isinstance(dag.task_dict[orders_task_id], DbtRunLocalOperator)
-    assert isinstance(dag.task_dict[chain[-1]], DbtTestLocalOperator)
-    semantic_task = dag.task_dict[semantic_task_id]
+    assert len(local_dag.dbt_graph.filtered_nodes) == EXPECTED_NODE_COUNT
+    assert topological_task_ids(local_dag) == chain
+    assert isinstance(local_dag.task_dict[seed_task_id], DbtSeedLocalOperator)
+    assert isinstance(local_dag.task_dict[orders_task_id], DbtRunLocalOperator)
+    assert isinstance(local_dag.task_dict[chain[-1]], DbtTestLocalOperator)
+    semantic_task = local_dag.task_dict[semantic_task_id]
     assert isinstance(semantic_task, DbtSemanticMetricViewLocalOperator)
     assert semantic_task.ui_color == DbtSemanticMetricViewMixin.ui_color
     assert semantic_task.base_cmd == ["run"]
     assert semantic_task.select == f"fqn:{warehouse.project_name}.{warehouse.semantic_model}"
     assert semantic_task.upstream_task_ids == {chain[chain.index(semantic_task_id) - 1]}
     assert semantic_task.downstream_task_ids == {chain[chain.index(semantic_task_id) + 1]}
-
-    run_dag(dag)
-    assert_warehouse_objects(warehouse)
-    run_dag(dag)
     assert_warehouse_objects(warehouse)
 
-    events = asset_event_uris_by_task(dag.dag_id)
-    if not events.get(orders_task_id):
-        pytest.skip("asset events are not observable through dag.test() on this Airflow version")
-    assert events.get(semantic_task_id), events
 
-
-def test_dbt_dag_with_watcher_execution(warehouse: Warehouse):
-    dag = load_example_dag(warehouse, "watcher")
+def test_dbt_dag_with_watcher_execution(warehouse: Warehouse, watcher_dag: DbtDag):
     chain = expected_task_chain(warehouse)
     seed_task_id, orders_task_id = chain[0], chain[1]
-    semantic_task_id = next(task_id for task_id in chain if "semantic_metric_run" in task_id)
+    semantic_task_id = semantic_task_id_in(chain)
     tests_excluded_from_producer = warehouse.test_behavior != TestBehavior.AFTER_EACH
 
-    assert len(dag.dbt_graph.filtered_nodes) == EXPECTED_NODE_COUNT
-    assert topological_task_ids(dag) == ["dbt_producer_watcher", *chain]
-    producer = dag.task_dict["dbt_producer_watcher"]
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == EXPECTED_NODE_COUNT
+    assert topological_task_ids(watcher_dag) == ["dbt_producer_watcher", *chain]
+    producer = watcher_dag.task_dict["dbt_producer_watcher"]
     assert isinstance(producer, DbtProducerWatcherOperator)
-    assert isinstance(dag.task_dict[seed_task_id], DbtSeedWatcherOperator)
-    assert isinstance(dag.task_dict[orders_task_id], DbtRunWatcherOperator)
-    assert isinstance(dag.task_dict[semantic_task_id], DbtSemanticMetricViewWatcherOperator)
+    assert isinstance(watcher_dag.task_dict[seed_task_id], DbtSeedWatcherOperator)
+    assert isinstance(watcher_dag.task_dict[orders_task_id], DbtRunWatcherOperator)
+    assert isinstance(watcher_dag.task_dict[semantic_task_id], DbtSemanticMetricViewWatcherOperator)
     # With tests excluded from the producer, the trailing test task is a plain local dbt test, not a sensor.
     expected_test_operator = DbtTestLocalOperator if tests_excluded_from_producer else DbtTestWatcherOperator
-    assert isinstance(dag.task_dict[chain[-1]], expected_test_operator)
-    assert "dbt_producer_watcher" in dag.task_dict[seed_task_id].upstream_task_ids
+    assert isinstance(watcher_dag.task_dict[chain[-1]], expected_test_operator)
+    assert "dbt_producer_watcher" in watcher_dag.task_dict[seed_task_id].upstream_task_ids
 
     # The producer narrows `dbt build` with dbt resource types; dbt still classifies these nodes as
     # models, so Cosmos's own type must never appear in the command.
@@ -384,7 +416,18 @@ def test_dbt_dag_with_watcher_execution(warehouse: Warehouse):
     resource_types = {flags[index + 1] for index, part in enumerate(flags) if part == "--resource-type"}
     assert resource_types == ({"model", "snapshot", "seed"} if tests_excluded_from_producer else set())
     assert DbtResourceType.SEMANTIC_METRIC_VIEW.value not in flags
-
-    make_watcher_consumers_wait_for_producer(dag)
-    run_dag(dag)
     assert_warehouse_objects(warehouse)
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION.major < 3, reason="Asset events are read from airflow.models.asset, available from Airflow 3"
+)
+@pytest.mark.parametrize("dag_fixture", ["local_dag", "watcher_dag"])
+def test_semantic_metric_view_task_emits_asset_events(
+    warehouse: Warehouse, dag_fixture: str, request: pytest.FixtureRequest
+):
+    dag = request.getfixturevalue(dag_fixture)
+    chain = expected_task_chain(warehouse)
+    events = asset_event_uris_by_task(dag.dag_id)
+    assert events.get(chain[1]), events
+    assert events.get(semantic_task_id_in(chain)), events

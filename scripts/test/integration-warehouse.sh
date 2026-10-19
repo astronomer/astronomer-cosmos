@@ -7,6 +7,7 @@ airflow db check
 
 pytest -vv \
     --durations=0 \
+    -rs \
     --timeout=1800 \
     --timeout-method=thread \
     -m 'integration' \

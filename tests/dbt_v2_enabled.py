@@ -34,12 +34,11 @@ ENABLED_DAG_FILES = frozenset(
 # Why a test is skipped in the dbt v2 job.
 _STRICT_YAML = "dbt v2 rejects the project's YAML (materialized without +, test arguments not under arguments:)"
 _POSTGRES_ENV = "uses a profiles.yml or sources.yml that reads POSTGRES_* variables, which this job does not set"
-_DBT_1X = "asserts on dbt 1.x modules, messages or behaviour"
+_NO_BQ_ADAPTER_MODULE = "needs dbt-bigquery's dbt.adapters.bigquery, which cannot be installed next to dbt v2 (both provide the dbt package)"
 _NO_CALLBACKS = "dbt v2 dbtRunner does not support callbacks"
 _NO_LOAD_ERROR = "dbt v2 does not raise the load error the test expects"
-_PG_ERROR_TEXT = "asserts on Postgres error text, which BigQuery words differently"
 _PG_URIS = "asserts on Postgres dataset URIs (cause inferred, not checked against the test)"
-_NO_PARTIAL_PARSE = "dbt v2 writes no target/partial_parse.msgpack"
+_NO_PARTIAL_PARSE = "dbt v2 has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _SCHEMA_ARG = (
     "reads profile_args['schema'], which the BigQuery swap drops (cause inferred, not checked against the test)"
 )
@@ -81,12 +80,6 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
     "tests/test_debug.py::test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled": _POSTGRES_ENV,
     "tests/test_example_dags.py::test_source_pruning_dag": _POSTGRES_ENV,
-    # dbt 1.x module/message assumption (5)
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[False]": _DBT_1X,
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[True]": _DBT_1X,
-    "tests/operators/_asynchronous/test_bigquery.py::test_mock_bigquery_adapter": _DBT_1X,
-    "tests/operators/test_local.py::test_run_operator_caches_partial_parsing": _DBT_1X,
-    "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_subprocess": _DBT_1X,
     # dbt 2 dbtRunner has no callbacks (4)
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_group_nodes_by_folder": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event": _NO_CALLBACKS,
@@ -95,19 +88,22 @@ SKIPPED_TESTS: dict[str, str] = {
     # dbt 2 behaves differently: expected load error not raised (2)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[dbt_runner]": _NO_LOAD_ERROR,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[subprocess]": _NO_LOAD_ERROR,
-    # Postgres-specific error text in assertion (1)
-    "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_failing_model": _PG_ERROR_TEXT,
     # Dataset/asset assertions use Postgres URIs (3)
     "tests/operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_210": _PG_URIS,
     "tests/operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards": _PG_URIS,
     "tests/operators/test_local.py::test_run_operator_dataset_manual_outlets_airflow_210": _PG_URIS,
-    # dbt 2 writes no target/partial_parse.msgpack (1)
+    # dbt v2 has no partial parsing artifact (4)
+    "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[False]": _NO_PARTIAL_PARSE,
+    "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[True]": _NO_PARTIAL_PARSE,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_uses_partial_parse_when_cache_is_disabled": _NO_PARTIAL_PARSE,
+    "tests/operators/test_local.py::test_run_operator_caches_partial_parsing": _NO_PARTIAL_PARSE,
     # Test reads profile_args['schema'], which the BigQuery swap drops (1)
     "tests/airflow/test_graph.py::test_build_airflow_graph_with_override_profile_config": _SCHEMA_ARG,
     # dbt 2 runs dbt ls through a subprocess (2)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder[dbt_runner-False]": _LS_SUBPROCESS,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder[dbt_runner-True]": _LS_SUBPROCESS,
+    # dbt-bigquery module cannot be installed next to dbt v2 (1)
+    "tests/operators/_asynchronous/test_bigquery.py::test_mock_bigquery_adapter": _NO_BQ_ADAPTER_MODULE,
     # Unknown, needs investigation (4)
     "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.DBT_RUNNER]": _UNKNOWN,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_empty_model": _UNKNOWN,

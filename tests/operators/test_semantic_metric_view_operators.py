@@ -9,6 +9,18 @@ from cosmos.operators._asynchronous.base import DbtRunAirflowAsyncFactoryOperato
 from cosmos.operators.base import DbtRunMixin, DbtSemanticMetricViewMixin
 from cosmos.operators.local import DbtSemanticMetricViewLocalOperator
 
+try:
+    from airflow.providers.google.cloud.operators.kubernetes_engine import GKEStartPodOperator  # noqa: F401
+
+    GOOGLE_PROVIDER_AVAILABLE = True
+except ImportError:
+    GOOGLE_PROVIDER_AVAILABLE = False
+
+requires_google_provider = pytest.mark.skipif(
+    not GOOGLE_PROVIDER_AVAILABLE, reason="Google Cloud provider not importable"
+)
+GKE_MODULES = {"gcp_gke", "watcher_gcp_gke"}
+
 # (module, class name, minimal constructor kwargs) for the semantic metric view operator of each execution mode.
 SEMANTIC_METRIC_VIEW_OPERATORS = [
     ("local", "DbtSemanticMetricViewLocalOperator", {"profile_config": None}),
@@ -49,8 +61,10 @@ SEMANTIC_METRIC_VIEW_OPERATORS = [
 
 @pytest.mark.parametrize(
     "module_name, class_name, kwargs",
-    SEMANTIC_METRIC_VIEW_OPERATORS,
-    ids=[module_name for module_name, _, _ in SEMANTIC_METRIC_VIEW_OPERATORS],
+    [
+        pytest.param(*case, id=case[0], marks=requires_google_provider if case[0] in GKE_MODULES else [])
+        for case in SEMANTIC_METRIC_VIEW_OPERATORS
+    ],
 )
 def test_semantic_metric_view_operator_runs_dbt_run_with_distinct_ui_color(module_name, class_name, kwargs):
     """Every execution mode exposes a DbtSemanticMetricView operator that still runs `dbt run`,

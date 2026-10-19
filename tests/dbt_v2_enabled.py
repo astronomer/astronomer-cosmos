@@ -76,13 +76,14 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
     "tests/test_debug.py::test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled": _POSTGRES_ENV,
     "tests/test_example_dags.py::test_source_pruning_dag": _POSTGRES_ENV,
-    # dbt 2 dbtRunner has no callbacks (6)
+    # dbt 2 dbtRunner has no callbacks (7)
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_group_nodes_by_folder": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_freshness_callback_excludes_model": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event": _NO_CALLBACKS,
     "tests/test_example_dags.py::test_example_dag[example_watcher]": _NO_CALLBACKS,
     "tests/test_example_dags.py::test_example_dag[example_watcher_synchronous]": _NO_CALLBACKS,
+    "tests/test_example_dags.py::test_example_dag[example_watcher_with_freshness]": _NO_CALLBACKS,
     # dbt 2 behaves differently: expected load error not raised (2)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[dbt_runner]": _NO_LOAD_ERROR,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[subprocess]": _NO_LOAD_ERROR,

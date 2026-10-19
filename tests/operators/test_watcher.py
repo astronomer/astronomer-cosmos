@@ -219,6 +219,17 @@ def test_producer_queue_from_setup_operator_args():
     assert producer.queue == "dbt_producer_task_queue"
 
 
+def test_dbt_producer_watcher_operator_never_diagnoses_failures_with_ai():
+    """The producer runs a single dbt build for the DAG, and its source freshness check fails by design."""
+    from cosmos.config import AiConfig
+
+    op = DbtProducerWatcherOperator(
+        project_dir=".", profile_config=None, ai_config=AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
+    )
+
+    assert op.ai_config is None
+
+
 def test_dbt_producer_watcher_operator_priority_weight_override():
     """Test that DbtProducerWatcherOperator allows overriding priority_weight."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, priority_weight=100)

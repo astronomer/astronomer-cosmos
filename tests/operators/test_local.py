@@ -6,9 +6,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import zlib
 from pathlib import Path
-from unittest.mock import MagicMock, call, mock_open, patch
+from unittest.mock import MagicMock, PropertyMock, call, mock_open, patch
 from urllib.parse import urlparse
 
 import pytest
@@ -33,7 +34,7 @@ from pendulum import datetime
 
 import cosmos.dbt.runner as dbt_runner
 from cosmos import DbtDag, DbtTaskGroup, ProjectConfig, RenderConfig, cache
-from cosmos.config import ProfileConfig
+from cosmos.config import AiConfig, ProfileConfig
 from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
 from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
@@ -3199,3 +3200,323 @@ def test_run_command_emits_datasets_only_when_flag_resolves_true(
     )
 
     assert mock_handle_datasets.called is expected_emission
+
+
+# --- AI-assisted failure diagnosis -------------------------------------------------------------------------------------
+
+AI_CONFIG = AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
+FINAL_ATTEMPT_CONTEXT = {"ti": MagicMock(try_number=3, max_tries=2)}
+DIAGNOSIS_TEXT = "-" * 80 + "\nAI diagnosis (confidence: high)\n" + "-" * 80 + "\nRoot cause:\n  Column foo is missing."
+
+
+def _ai_operator(ai_config=AI_CONFIG, invocation_mode=InvocationMode.SUBPROCESS, **kwargs):
+    return ConcreteDbtLocalBaseOperator(
+        profile_config=None,
+        task_id="my-task",
+        project_dir="my/dir",
+        invocation_mode=invocation_mode,
+        ai_config=ai_config,
+        **kwargs,
+    )
+
+
+def _failed_subprocess_result(full_output=None):
+    return FullOutputSubprocessResult(exit_code=1, output="test", full_output=full_output or ["boom"])
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_failure_is_followed_by_the_ai_diagnosis_on_the_final_attempt(mock_diagnose):
+    operator = _ai_operator()
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    message = str(exc_info.value)
+    # The dbt failure comes first, as retry policies and callbacks read the head of the message.
+    assert message.startswith("dbt command failed. The command returned a non-zero exit code 1.")
+    assert message.endswith(DIAGNOSIS_TEXT)
+    assert message.index("dbt command failed") < message.index("AI diagnosis")
+    mock_diagnose.assert_called_once()
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_ai_diagnosis_goes_after_the_failing_node_details(mock_diagnose):
+    operator = _ai_operator()
+    log = [
+        "10:00:00  Failure in test not_null_my_model_id (models/schema.yml)",
+        "10:00:00    Got 5 results, configured to fail if != 0",
+    ]
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(log), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    message = str(exc_info.value)
+    assert (
+        message.index("Details:")
+        < message.index("Failure in test not_null_my_model_id")
+        < message.index("AI diagnosis")
+    )
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_ai_diagnosis_keeps_the_exception_type_of_the_dbt_runner_path(mock_diagnose):
+    operator = _ai_operator(invocation_mode=InvocationMode.DBT_RUNNER)
+    result = MagicMock(success=False, exception="some exception")
+
+    with pytest.raises(CosmosDbtRunError) as exc_info:
+        operator._handle_exception_and_diagnose(result, "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert str(exc_info.value).startswith("dbt invocation did not complete with unhandled error: some exception")
+    assert str(exc_info.value).endswith(DIAGNOSIS_TEXT)
+
+
+@patch("cosmos.ai.context.build_failure_context")
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=None)
+def test_ai_diagnosis_is_given_the_artifacts_of_the_project_and_the_output(mock_diagnose, mock_build_context):
+    operator = _ai_operator()
+
+    with pytest.raises(AirflowException):
+        operator._handle_exception_and_diagnose(
+            _failed_subprocess_result(["line 1", "line 2"]), "/tmp/project", FINAL_ATTEMPT_CONTEXT
+        )
+
+    mock_build_context.assert_called_once_with("/tmp/project", "line 1\nline 2")
+    kwargs = mock_diagnose.call_args.kwargs
+    assert kwargs["ai_config"] is AI_CONFIG
+    assert kwargs["failure_context"] is mock_build_context.return_value
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=None)
+def test_failure_message_is_unchanged_when_there_is_no_diagnosis(mock_diagnose):
+    operator = _ai_operator()
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
+
+
+@pytest.mark.parametrize(
+    "ai_config",
+    [None, AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=False)],
+    ids=["no_ai_config", "diagnosis_disabled"],
+)
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
+def test_no_ai_diagnosis_unless_enabled(mock_diagnose, ai_config):
+    operator = _ai_operator(ai_config=ai_config)
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    mock_diagnose.assert_not_called()
+    assert "AI diagnosis" not in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "try_number, max_tries, diagnoses",
+    [
+        (1, 0, True),  # no retries: the first attempt is the final one
+        (1, 2, False),  # first of three attempts
+        (2, 2, False),  # second of three attempts
+        (3, 2, True),  # final attempt
+        (5, 2, True),  # beyond max_tries, e.g. after a manual clear
+    ],
+)
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_ai_diagnosis_only_runs_on_the_final_attempt(mock_diagnose, try_number, max_tries, diagnoses):
+    operator = _ai_operator()
+    context = {"ti": MagicMock(try_number=try_number, max_tries=max_tries)}
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", context)
+
+    assert mock_diagnose.called is diagnoses
+    assert ("AI diagnosis" in str(exc_info.value)) is diagnoses
+
+
+@pytest.mark.parametrize("context", [{}, {"ti": MagicMock()}, {"ti": MagicMock(try_number=None, max_tries=None)}])
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_ai_diagnosis_runs_when_the_attempt_cannot_be_determined(mock_diagnose, context):
+    operator = _ai_operator()
+
+    with pytest.raises(AirflowException):
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", context)
+
+    mock_diagnose.assert_called_once()
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
+def test_skipped_task_is_not_diagnosed(mock_diagnose):
+    operator = _ai_operator(skip_exit_code=1)
+
+    with pytest.raises(AirflowSkipException):
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    mock_diagnose.assert_not_called()
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
+def test_successful_command_is_not_diagnosed(mock_diagnose):
+    operator = _ai_operator()
+    result = FullOutputSubprocessResult(exit_code=0, output="ok", full_output=["ok"])
+
+    operator._handle_exception_and_diagnose(result, "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    mock_diagnose.assert_not_called()
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", side_effect=RuntimeError("diagnosis bug"))
+def test_a_failing_diagnosis_never_hides_the_dbt_failure(mock_diagnose, caplog):
+    operator = _ai_operator()
+
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(AirflowException) as exc_info:
+            operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
+    assert "AI diagnosis crashed unexpectedly" in caplog.text
+    assert operator._ai_diagnosis_handle is None
+
+
+def test_ai_diagnosis_without_its_dependencies_warns_and_keeps_the_dbt_failure(caplog):
+    operator = _ai_operator()
+
+    # ``None`` in ``sys.modules`` makes the import fail, as if pydantic or the provider were not installed.
+    with patch.dict("sys.modules", {"cosmos.ai.diagnostics": None}), caplog.at_level(logging.WARNING):
+        with pytest.raises(AirflowException) as exc_info:
+            operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
+    assert "astronomer-cosmos[ai]" in caplog.text
+    assert "crashed unexpectedly" not in caplog.text
+    assert operator._ai_diagnosis_handle is None
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_ai_diagnosis_leaves_exceptions_without_a_text_message_untouched(mock_diagnose):
+    operator = _ai_operator()
+    exception = CosmosDbtRunError(404)
+
+    with patch.object(
+        ConcreteDbtLocalBaseOperator,
+        "handle_exception",
+        new_callable=PropertyMock,
+        return_value=MagicMock(side_effect=exception),
+    ):
+        with pytest.raises(CosmosDbtRunError) as exc_info:
+            operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert exc_info.value.args == (404,)
+
+
+def test_on_kill_cancels_the_diagnosis_in_flight():
+    operator = _ai_operator()
+    token = MagicMock()
+    cancelled = threading.Event()
+    token.cancel.side_effect = cancelled.set
+    observed = {}
+
+    def diagnose_then_get_killed(**kwargs):
+        observed["handle"] = kwargs["handle"]
+        kwargs["handle"].bind(token)
+        operator.on_kill()
+        observed["cancelled"] = cancelled.wait(timeout=5)
+        return None
+
+    with patch("cosmos.ai.diagnostics.diagnose_dbt_failure", side_effect=diagnose_then_get_killed):
+        with pytest.raises(AirflowException):
+            operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert operator._ai_diagnosis_handle is observed["handle"] or operator._ai_diagnosis_handle is None
+    assert observed["cancelled"] is True
+    # The handle is released once the diagnosis ends, so a later ``on_kill`` has nothing to cancel.
+    assert operator._ai_diagnosis_handle is None
+
+
+def test_on_kill_without_a_diagnosis_only_stops_dbt():
+    operator = _ai_operator()
+    operator.subprocess_hook = MagicMock()
+
+    operator.on_kill()
+
+    operator.subprocess_hook.send_sigint.assert_called_once()
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator._handle_post_execution")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.calculate_openlineage_events_completes", return_value=False)
+@patch("cosmos.config.ProfileConfig.ensure_profile")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.invoke_dbt")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._clone_project")
+@patch("cosmos.operators.local.tempfile.TemporaryDirectory")
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_run_command_diagnoses_a_failed_dbt_command_inside_the_project_directory(
+    mock_diagnose,
+    mock_tmp_dir,
+    mock_clone_project,
+    mock_invoke_dbt,
+    mock_ensure_profile,
+    mock_calculate_openlineage,
+    mock_handle_post_execution,
+    tmp_path,
+):
+    mock_tmp_dir.return_value.__enter__.return_value = str(tmp_path)
+    mock_ensure_profile.return_value.__enter__.return_value = (tmp_path / "profiles.yml", {})
+    mock_invoke_dbt.return_value = _failed_subprocess_result()
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        install_deps=False,
+        emit_datasets=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+        ai_config=AI_CONFIG,
+    )
+
+    with patch("cosmos.ai.context.build_failure_context") as mock_build_context:
+        with pytest.raises(AirflowException) as exc_info:
+            operator.run_command(
+                cmd=["dbt", "cmd"], env={}, context={"run_id": "id", "ti": MagicMock(try_number=1, max_tries=0)}
+            )
+
+    # The artifacts are read from the temporary project, which is gone once ``run_command`` returns.
+    mock_build_context.assert_called_once()
+    assert mock_build_context.call_args.args[0] == str(tmp_path)
+    assert str(exc_info.value).endswith(DIAGNOSIS_TEXT)
+
+
+@patch("cosmos.operators.local._read_target_sources_json", return_value={})
+@patch("cosmos.config.ProfileConfig.ensure_profile")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.invoke_dbt")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._clone_project")
+@patch("cosmos.operators.local.tempfile.TemporaryDirectory")
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
+def test_run_command_does_not_diagnose_the_source_freshness_check(
+    mock_diagnose,
+    mock_tmp_dir,
+    mock_clone_project,
+    mock_invoke_dbt,
+    mock_ensure_profile,
+    mock_read_sources,
+    tmp_path,
+):
+    """``dbt source freshness`` exits non-zero by design when a source is stale: it is an outcome, not a failure."""
+    mock_tmp_dir.return_value.__enter__.return_value = str(tmp_path)
+    mock_ensure_profile.return_value.__enter__.return_value = (tmp_path / "profiles.yml", {})
+    mock_invoke_dbt.return_value = _failed_subprocess_result()
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        install_deps=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+        ai_config=AI_CONFIG,
+    )
+
+    with pytest.raises(AirflowException):
+        operator.run_command(
+            cmd=["dbt", "cmd"],
+            env={},
+            context={"run_id": "id", "ti": MagicMock(try_number=1, max_tries=0), "_check_source_freshness": True},
+        )
+
+    mock_diagnose.assert_not_called()

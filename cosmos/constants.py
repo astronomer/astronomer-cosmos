@@ -131,6 +131,12 @@ class ExecutionMode(Enum):
     WATCHER_KUBERNETES = "watcher_kubernetes"
 
 
+# Execution modes whose operators consume ``AiConfig``: they run dbt on the worker, so the dbt artifacts of a failed
+# task are available to diagnose it. ``ExecutionMode.WATCHER`` is excluded on purpose: its producer runs a single
+# ``dbt build`` for the whole DAG, so there is no per-task failure to diagnose.
+AI_DIAGNOSIS_SUPPORTED_EXECUTION_MODES = frozenset({ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV})
+
+
 class InvocationMode(Enum):
     """
     How the dbt command should be invoked.

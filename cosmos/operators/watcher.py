@@ -249,6 +249,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # picks DBT_RUNNER when available and falls back to SUBPROCESS otherwise.
         # An explicit invocation_mode passed by the caller is preserved as-is.
         super().__init__(task_id=task_id, *args, **kwargs)
+        # The producer runs one ``dbt build`` for the whole DAG, and the consumers report each node's outcome. There is
+        # no per-task failure to diagnose, and the source freshness check it runs fails by design.
+        self.ai_config = None
         self.log_format = "json"
         # Flush the in-memory backup to a Variable so the producer retry can restore it. A graceful
         # failure with retries left is UP_FOR_RETRY (on_retry_callback), not FAILED, so register on

@@ -1,0 +1,796 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+import sys
+import threading
+import time
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import pytest
+from airflow.exceptions import AirflowException
+from pydantic import BaseModel
+
+import cosmos.ai.diagnostics as diagnostics
+from cosmos.ai.context import FailedNode, FailureContext
+from cosmos.ai.diagnostics import DbtFailureDiagnosis, DiagnosisHandle, diagnose_dbt_failure
+from cosmos.config import AiConfig
+
+try:
+    from pydantic_ai import Agent
+    from pydantic_ai.exceptions import UsageLimitExceeded
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from pydantic_ai.models.function import AgentInfo, FunctionModel
+
+    PROVIDER_AVAILABLE = diagnostics.PydanticAIHook is not None
+except Exception:  # pragma: no cover - depends on the optional provider
+    PROVIDER_AVAILABLE = False
+
+requires_provider = pytest.mark.skipif(
+    not PROVIDER_AVAILABLE, reason="apache-airflow-providers-common-ai>=1.0.0 is not importable"
+)
+
+FAILURE_CONTEXT = FailureContext(
+    failed_nodes=(
+        FailedNode(
+            unique_id="model.p.orders",
+            status="error",
+            message="Database Error: column foo does not exist, password=SECRET-VALUE",
+            compiled_code="select foo from raw.orders",
+            relations=("analytics.orders", "raw.orders"),
+        ),
+    )
+)
+DIAGNOSIS = DbtFailureDiagnosis(root_cause="Column foo is missing.", suggested_fix="Rename it.", confidence="high")
+AI_CONFIG = AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
+
+
+# --- A fake provider: lets the diagnosis logic run, and be covered, without the optional dependencies ---------------
+
+
+class FakeRunCancelled(Exception):
+    pass
+
+
+class FakeAgentRunError(Exception):
+    pass
+
+
+class FakeUserError(Exception):
+    pass
+
+
+class FakeToken:
+    def __init__(self):
+        self.cancelled = threading.Event()
+
+    def cancel(self):
+        self.cancelled.set()
+
+
+class FakeAgent:
+    def __init__(self, behaviour):
+        self.behaviour = behaviour
+        self.runs = []
+
+    def run_sync(self, prompt, cancellation_token, usage_limits):
+        self.runs.append(SimpleNamespace(prompt=prompt, token=cancellation_token, usage_limits=usage_limits))
+        return self.behaviour(prompt, cancellation_token)
+
+
+@pytest.fixture
+def fake_provider(monkeypatch):
+    """Swap the provider API for fakes. ``.behaviour`` decides what a run does; ``.agent`` is the agent it ran on."""
+    state = SimpleNamespace(
+        behaviour=lambda prompt, token: SimpleNamespace(
+            output=DIAGNOSIS, usage=SimpleNamespace(requests=1, input_tokens=10, output_tokens=5)
+        ),
+        agent=None,
+        agent_kwargs=None,
+        conn_ids=[],
+    )
+
+    class FakeHook:
+        @classmethod
+        def get_hook(cls, conn_id, hook_params=None):
+            state.conn_ids.append(conn_id)
+            return cls()
+
+        def create_agent(self, **kwargs):
+            state.agent_kwargs = kwargs
+            state.agent = FakeAgent(lambda prompt, token: state.behaviour(prompt, token))
+            return state.agent
+
+    monkeypatch.setattr(diagnostics, "PydanticAIHook", FakeHook)
+    monkeypatch.setattr(diagnostics, "CancellationToken", FakeToken)
+    monkeypatch.setattr(diagnostics, "UsageLimits", lambda request_limit: SimpleNamespace(request_limit=request_limit))
+    monkeypatch.setattr(diagnostics, "RunCancelled", FakeRunCancelled)
+    monkeypatch.setattr(diagnostics, "AgentRunError", FakeAgentRunError)
+    monkeypatch.setattr(diagnostics, "UserError", FakeUserError)
+    monkeypatch.setattr(diagnostics, "mask_secrets", lambda text: text.replace("SECRET-VALUE", "***"))
+    return state
+
+
+def _block_until_cancelled(prompt, token):
+    token.cancelled.wait(timeout=10)
+    raise FakeRunCancelled
+
+
+def test_diagnose_dbt_failure_returns_the_rendered_diagnosis(fake_provider):
+    diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert diagnosis is not None
+    assert "AI diagnosis (confidence: high)" in diagnosis
+    assert "Root cause:\n  Column foo is missing." in diagnosis
+    assert "Suggested fix:\n  Rename it." in diagnosis
+
+
+def test_diagnose_dbt_failure_resolves_the_hook_class_from_the_connection_type(fake_provider):
+    diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    # ``PydanticAIHook.get_hook`` returns the Azure, Bedrock or Vertex subclass that matches the connection.
+    assert fake_provider.conn_ids == ["my_llm_conn"]
+
+
+def test_diagnose_dbt_failure_uses_the_default_model_and_instructions(fake_provider):
+    diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert fake_provider.agent_kwargs["output_type"] is DbtFailureDiagnosis
+    assert "`root_cause` strictly" in fake_provider.agent_kwargs["instructions"]
+    assert fake_provider.agent_kwargs["toolsets"] == []
+
+
+def test_diagnose_dbt_failure_uses_a_custom_output_type_and_generic_instructions(fake_provider):
+    class Custom(BaseModel):
+        summary: str
+
+    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
+        output=Custom(summary="It broke."), usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1)
+    )
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_output_type=Custom)
+
+    diagnosis = diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert fake_provider.agent_kwargs["output_type"] is Custom
+    assert "populate the requested structured output" in fake_provider.agent_kwargs["instructions"]
+    assert "Summary:\n  It broke." in diagnosis
+
+
+def test_diagnose_dbt_failure_custom_instructions_replace_the_default(fake_provider):
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_instructions="Be terse.")
+
+    diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert fake_provider.agent_kwargs["instructions"] == "Be terse."
+
+
+def test_diagnose_dbt_failure_bounds_the_number_of_model_requests(fake_provider):
+    diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert fake_provider.agent.runs[0].usage_limits.request_limit == 8
+
+
+def test_diagnose_dbt_failure_masks_secrets_before_calling_the_model(fake_provider):
+    diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    prompt = fake_provider.agent.runs[0].prompt
+    assert "SECRET-VALUE" not in prompt
+    assert "password=***" in prompt
+    assert "select foo from raw.orders" in prompt
+
+
+def test_diagnose_dbt_failure_applies_the_user_redactor_after_the_masker(fake_provider):
+    config = AiConfig(
+        llm_conn_id="c", diagnose_on_failure=True, redactor=lambda text: text.replace("raw.orders", "<table>")
+    )
+
+    diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    prompt = fake_provider.agent.runs[0].prompt
+    assert "raw.orders" not in prompt and "<table>" in prompt
+    assert "SECRET-VALUE" not in prompt
+
+
+def test_diagnose_dbt_failure_redacts_the_diagnosis_too(fake_provider):
+    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
+        output=DbtFailureDiagnosis(root_cause="Leaked SECRET-VALUE.", suggested_fix="Fix.", confidence="low"),
+        usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1),
+    )
+
+    diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert "SECRET-VALUE" not in diagnosis and "Leaked ***." in diagnosis
+
+
+def test_diagnose_dbt_failure_sends_nothing_if_the_redactor_fails(fake_provider, caplog):
+    def broken_redactor(text):
+        raise RuntimeError("redactor bug")
+
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken_redactor)
+
+    with caplog.at_level(logging.WARNING):
+        diagnosis = diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert diagnosis is None
+    assert fake_provider.agent.runs == []
+    assert "AiConfig.redactor failed, so nothing was sent" in caplog.text
+
+
+def test_diagnose_dbt_failure_without_the_provider_skips_with_a_warning(monkeypatch, caplog):
+    monkeypatch.setattr(diagnostics, "PydanticAIHook", None)
+
+    with caplog.at_level(logging.WARNING):
+        diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert diagnosis is None
+    assert "apache-airflow-providers-common-ai>=1.0.0" in caplog.text
+    assert "astronomer-cosmos[ai]" in caplog.text
+
+
+def test_diagnose_dbt_failure_returns_none_when_the_model_call_fails(fake_provider, caplog):
+    def fail(prompt, token):
+        raise ConnectionError("LLM unreachable")
+
+    fake_provider.behaviour = fail
+
+    with caplog.at_level(logging.WARNING):
+        diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert diagnosis is None
+    assert "AI diagnosis failed; falling back" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        FakeAgentRunError("rate limited"),
+        FakeUserError("bad model name"),
+        AirflowException("connection not found"),
+        ImportError("Please install `openai`"),
+        TimeoutError("socket timeout"),
+        ConnectionError("LLM unreachable"),
+        ValueError("not a Pydantic AI connection"),
+    ],
+    ids=lambda error: type(error).__name__,
+)
+def test_diagnose_dbt_failure_logs_the_failures_it_expects(fake_provider, caplog, error):
+    def fail(prompt, token):
+        raise error
+
+    fake_provider.behaviour = fail
+
+    with caplog.at_level(logging.WARNING):
+        diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert diagnosis is None
+    assert "AI diagnosis failed; falling back" in caplog.text
+
+
+@pytest.mark.parametrize("error", [TypeError("create_agent() got an unexpected keyword"), AttributeError("gone")])
+def test_diagnose_dbt_failure_does_not_hide_bugs(fake_provider, error):
+    """A programming error, or an incompatible provider, must surface instead of passing as a normal LLM failure."""
+
+    def fail(prompt, token):
+        raise error
+
+    fake_provider.behaviour = fail
+
+    with pytest.raises(type(error)):
+        diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+
+def test_diagnose_dbt_failure_does_not_report_a_timeout_error_of_the_call_as_the_time_limit(fake_provider, caplog):
+    """On Python 3.11+, a socket timeout is a ``TimeoutError`` too, and the time limit was not reached."""
+
+    def socket_timeout(prompt, token):
+        raise TimeoutError("read timed out")
+
+    fake_provider.behaviour = socket_timeout
+
+    with caplog.at_level(logging.WARNING):
+        diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert diagnosis is None
+    assert "timed out after" not in caplog.text
+    assert "AI diagnosis failed; falling back" in caplog.text
+
+
+def test_diagnose_dbt_failure_returns_none_when_the_diagnosis_can_not_be_rendered(fake_provider, caplog):
+    class Unrenderable(BaseModel):
+        value: str = "x"
+
+        def model_dump(self, *args, **kwargs):
+            raise ValueError("cannot serialize")
+
+    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
+        output=Unrenderable(), usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1)
+    )
+
+    with caplog.at_level(logging.WARNING):
+        diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert diagnosis is None
+    assert "AI diagnosis failed; falling back" in caplog.text
+
+
+def test_diagnose_dbt_failure_returns_none_when_the_connection_is_wrong(fake_provider, monkeypatch, caplog):
+    def get_hook(cls, conn_id, hook_params=None):
+        raise ValueError("Connection 'x' has type 'postgres', but a Pydantic AI hook needs one of [...]")
+
+    monkeypatch.setattr(diagnostics.PydanticAIHook, "get_hook", classmethod(get_hook))
+
+    with caplog.at_level(logging.WARNING):
+        diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert diagnosis is None
+    assert "needs one of" in caplog.text
+
+
+def test_diagnose_dbt_failure_times_out_without_leaving_threads_behind(fake_provider, caplog):
+    fake_provider.behaviour = _block_until_cancelled
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, timeout_seconds=0.05)
+    threads_before = threading.active_count()
+
+    started = time.monotonic()
+    with caplog.at_level(logging.WARNING):
+        diagnosis = diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert diagnosis is None
+    assert time.monotonic() - started < 5
+    assert "timed out after 0.05 seconds" in caplog.text
+    # The run happens on the task's own thread and the timer is cancelled: nothing outlives the call.
+    assert threading.active_count() == threads_before
+
+
+def test_diagnose_dbt_failure_stops_when_the_task_is_killed(fake_provider, caplog):
+    fake_provider.behaviour = _block_until_cancelled
+    handle = DiagnosisHandle()
+    threading.Timer(0.05, handle.cancel).start()
+
+    with caplog.at_level(logging.INFO):
+        diagnosis = diagnose_dbt_failure(
+            ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT, handle=handle
+        )
+
+    assert diagnosis is None
+    assert "cancelled because the task was killed" in caplog.text
+
+
+def test_diagnosis_handle_cancels_a_token_bound_after_the_cancellation():
+    handle = DiagnosisHandle()
+    token = FakeToken()
+
+    handle.cancel()
+    handle.bind(token)
+
+    assert token.cancelled.is_set()
+
+
+def test_diagnosis_handle_cancels_from_another_thread():
+    handle = DiagnosisHandle()
+    token = FakeToken()
+    handle.bind(token)
+
+    handle.cancel()
+
+    assert token.cancelled.wait(timeout=5)
+
+
+def test_diagnosis_handle_cancel_without_a_run_is_a_noop():
+    DiagnosisHandle().cancel()
+
+
+# --- Schema introspection ------------------------------------------------------------------------------------------
+
+
+def _profile_config(conn_id="my_db_conn"):
+    return SimpleNamespace(profile_mapping=SimpleNamespace(conn_id=conn_id))
+
+
+def test_build_toolsets_is_empty_unless_introspection_is_enabled():
+    assert diagnostics._build_toolsets(AI_CONFIG, _profile_config(), FAILURE_CONTEXT) == []
+
+
+@pytest.mark.parametrize(
+    "profile_config, context, message",
+    [
+        (None, FAILURE_CONTEXT, "needs ProfileConfig.profile_mapping"),
+        (SimpleNamespace(profile_mapping=None), FAILURE_CONTEXT, "needs ProfileConfig.profile_mapping"),
+        (_profile_config(), FailureContext(), "no related tables"),
+    ],
+)
+def test_build_toolsets_skips_introspection_without_what_it_needs(profile_config, context, message, caplog):
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+
+    with caplog.at_level(logging.WARNING):
+        assert diagnostics._build_toolsets(config, profile_config, context) == []
+
+    assert message in caplog.text
+
+
+def test_build_toolsets_skips_introspection_when_the_sql_extra_is_missing(monkeypatch, caplog):
+    # Importing the toolset without the ``sql`` extra of the provider fails with ``AirflowOptionalProviderFeatureException``.
+    from airflow.exceptions import AirflowOptionalProviderFeatureException
+
+    class MissingSqlToolset:
+        def __getattr__(self, name):
+            raise AirflowOptionalProviderFeatureException("No module named 'sqlglot'")
+
+    monkeypatch.setitem(__import__("sys").modules, "airflow.providers.common.ai.toolsets.sql", MissingSqlToolset())
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+
+    with caplog.at_level(logging.WARNING):
+        assert diagnostics._build_toolsets(config, _profile_config(), FAILURE_CONTEXT) == []
+
+    assert "needs apache-airflow-providers-common-ai[sql]" in caplog.text
+
+
+class FakeDbApiHook:
+    pass
+
+
+def test_is_dbapi_connection_accepts_sql_hooks(monkeypatch):
+    monkeypatch.setattr(
+        diagnostics.BaseHook, "get_connection", lambda conn_id: SimpleNamespace(get_hook=lambda: FakeDbApiHook())
+    )
+
+    assert diagnostics._is_dbapi_connection("my_db_conn", FakeDbApiHook) is True
+
+
+@pytest.mark.parametrize("conn_type", ["google_cloud_platform", "databricks", "aws", "spark"])
+def test_is_dbapi_connection_rejects_other_hooks_with_a_warning(monkeypatch, caplog, conn_type):
+    # The hooks of connection types used by several Cosmos profile mappings are not DbApiHooks.
+    other_hook = type(f"{conn_type.title()}Hook", (), {})()
+    monkeypatch.setattr(
+        diagnostics.BaseHook, "get_connection", lambda conn_id: SimpleNamespace(get_hook=lambda: other_hook)
+    )
+
+    with caplog.at_level(logging.WARNING):
+        assert diagnostics._is_dbapi_connection("my_conn", FakeDbApiHook) is False
+
+    assert "is not a DbApiHook" in caplog.text
+
+
+def test_is_dbapi_connection_rejects_an_unloadable_connection(monkeypatch, caplog):
+    def get_connection(conn_id):
+        raise RuntimeError("The conn_id `my_conn` isn't defined")
+
+    monkeypatch.setattr(diagnostics.BaseHook, "get_connection", get_connection)
+
+    with caplog.at_level(logging.WARNING):
+        assert diagnostics._is_dbapi_connection("my_conn", FakeDbApiHook) is False
+
+    assert "Could not load a hook for connection 'my_conn'" in caplog.text
+    assert "The conn_id `my_conn` isn't defined" in caplog.text
+    assert "Airflow provider of your warehouse" in caplog.text
+
+
+@pytest.fixture
+def fake_sql_toolset_module(monkeypatch):
+    """A stand-in for ``airflow.providers.common.ai.toolsets.sql``, which is only importable with the provider."""
+    created = []
+
+    class FakeSQLToolset:
+        def __init__(self, db_conn_id, allowed_tables):
+            created.append(SimpleNamespace(db_conn_id=db_conn_id, allowed_tables=allowed_tables))
+
+        def filtered(self, tool_filter):
+            return SimpleNamespace(tool_filter=tool_filter)
+
+    monkeypatch.setitem(
+        sys.modules, "airflow.providers.common.ai.toolsets.sql", SimpleNamespace(SQLToolset=FakeSQLToolset)
+    )
+    return created
+
+
+def _sql_connection(monkeypatch):
+    from airflow.providers.common.sql.hooks.sql import DbApiHook
+
+    monkeypatch.setattr(
+        diagnostics.BaseHook,
+        "get_connection",
+        lambda conn_id: SimpleNamespace(get_hook=lambda: MagicMock(spec=DbApiHook)),
+    )
+
+
+def test_build_toolsets_limits_the_agent_to_the_related_tables_and_the_metadata_tools(
+    monkeypatch, fake_sql_toolset_module
+):
+    _sql_connection(monkeypatch)
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+
+    toolsets = diagnostics._build_toolsets(config, _profile_config("my_db_conn"), FAILURE_CONTEXT)
+
+    assert len(toolsets) == 1
+    assert fake_sql_toolset_module[0].db_conn_id == "my_db_conn"
+    # The failed node's own table and its parents, nothing else of the warehouse.
+    assert fake_sql_toolset_module[0].allowed_tables == ["analytics.orders", "raw.orders"]
+    tool_filter = toolsets[0].tool_filter
+    assert [
+        name
+        for name in ("list_tables", "get_schema", "query", "check_query")
+        if tool_filter(None, SimpleNamespace(name=name))
+    ] == [
+        "list_tables",
+        "get_schema",
+    ]
+
+
+def test_diagnose_dbt_failure_tells_the_agent_which_tables_it_can_inspect(
+    fake_provider, monkeypatch, fake_sql_toolset_module
+):
+    _sql_connection(monkeypatch)
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+
+    diagnose_dbt_failure(ai_config=config, profile_config=_profile_config(), failure_context=FAILURE_CONTEXT)
+
+    assert "analytics.orders, raw.orders" in fake_provider.agent.runs[0].prompt
+
+
+def test_diagnose_dbt_failure_without_introspection_does_not_mention_tables_to_inspect(fake_provider):
+    diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert "get_schema" not in fake_provider.agent.runs[0].prompt
+
+
+def _tool_messages(call_args, return_content, return_kind="tool-return", tool_name="get_schema"):
+    """The messages of an agent that called one tool and got ``return_content`` back."""
+    return [
+        SimpleNamespace(parts=[SimpleNamespace(part_kind="tool-call", tool_name=tool_name, args=call_args)]),
+        SimpleNamespace(parts=[SimpleNamespace(part_kind=return_kind, tool_name=tool_name, content=return_content)]),
+    ]
+
+
+def test_diagnose_dbt_failure_logs_the_tool_calls_of_the_agent(fake_provider, caplog):
+    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
+        output=DIAGNOSIS,
+        usage=SimpleNamespace(requests=2, input_tokens=1, output_tokens=1),
+        all_messages=lambda: _tool_messages({"table_name": "raw.orders"}, '{"columns": []}'),
+    )
+
+    with caplog.at_level(logging.INFO):
+        diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert "AI diagnosis tool call: get_schema({'table_name': 'raw.orders'})" in caplog.text
+
+
+def test_diagnose_dbt_failure_warns_when_the_agent_is_refused_a_table(fake_provider, caplog):
+    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
+        output=DIAGNOSIS,
+        usage=SimpleNamespace(requests=2, input_tokens=1, output_tokens=1),
+        all_messages=lambda: _tool_messages(
+            {"table_name": "base"}, "Table 'base' is not in the allowed tables list.", return_kind="retry-prompt"
+        ),
+    )
+
+    with caplog.at_level(logging.WARNING):
+        diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert "refused a table" in caplog.text and "'base' is not in the allowed tables" in caplog.text
+
+
+def test_diagnose_dbt_failure_redacts_what_it_logs_of_the_tool_calls(fake_provider, caplog):
+    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
+        output=DIAGNOSIS,
+        usage=SimpleNamespace(requests=2, input_tokens=1, output_tokens=1),
+        all_messages=lambda: _tool_messages(
+            {"table_name": "SECRET-VALUE"}, "SECRET-VALUE is not in the allowed tables"
+        ),
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert "SECRET-VALUE" not in caplog.text
+
+
+def test_diagnose_dbt_failure_ignores_tool_calls_that_are_not_the_metadata_tools(fake_provider, caplog):
+    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
+        output=DIAGNOSIS,
+        usage=SimpleNamespace(requests=2, input_tokens=1, output_tokens=1),
+        all_messages=lambda: _tool_messages({"sql": "select 1"}, "1", tool_name="final_result"),
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert "tool call" not in caplog.text and "select 1" not in caplog.text
+
+
+def test_build_toolsets_skips_introspection_if_the_toolset_cannot_be_set_up(monkeypatch, caplog):
+    class BrokenSQLToolset:
+        def __init__(self, db_conn_id, allowed_tables):
+            raise ValueError("allowed_tables must name at least one table")
+
+    monkeypatch.setitem(
+        sys.modules, "airflow.providers.common.ai.toolsets.sql", SimpleNamespace(SQLToolset=BrokenSQLToolset)
+    )
+    _sql_connection(monkeypatch)
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+
+    with caplog.at_level(logging.WARNING):
+        assert diagnostics._build_toolsets(config, _profile_config(), FAILURE_CONTEXT) == []
+
+    assert "Could not set up schema introspection" in caplog.text
+
+
+def test_build_toolsets_skips_introspection_for_connections_that_are_not_sql(
+    monkeypatch, fake_sql_toolset_module, caplog
+):
+    monkeypatch.setattr(
+        diagnostics.BaseHook, "get_connection", lambda conn_id: SimpleNamespace(get_hook=lambda: object())
+    )
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+
+    with caplog.at_level(logging.WARNING):
+        assert diagnostics._build_toolsets(config, _profile_config(), FAILURE_CONTEXT) == []
+
+    assert "is not a DbApiHook" in caplog.text
+    assert fake_sql_toolset_module == []
+
+
+# --- The real pydantic-ai agent (needs apache-airflow-providers-common-ai>=1.0.0) ---------------------------------
+
+
+def _answer(info: AgentInfo, **fields) -> ModelResponse:
+    output_tool = info.output_tools[0]
+    return ModelResponse(
+        parts=[ToolCallPart(output_tool.name, {"root_cause": "r", "suggested_fix": "f", "confidence": "low", **fields})]
+    )
+
+
+class StubHook:
+    def __init__(self, model):
+        self.model = model
+
+    def create_agent(self, **kwargs):
+        return Agent(self.model, **kwargs)
+
+
+@pytest.fixture
+def real_agent_hook(monkeypatch):
+    """Route ``PydanticAIHook.get_hook`` to a hook that builds a real agent around a scripted ``FunctionModel``."""
+
+    def install(handler):
+        monkeypatch.setattr(
+            diagnostics.PydanticAIHook,
+            "get_hook",
+            classmethod(lambda cls, conn_id, hook_params=None: StubHook(FunctionModel(handler))),
+        )
+
+    return install
+
+
+@requires_provider
+def test_real_agent_runs_end_to_end_and_masks_registered_secrets(real_agent_hook):
+    try:
+        from airflow.sdk.execution_time.secrets_masker import mask_secret  # Airflow 3
+    except ImportError:
+        from airflow.utils.log.secrets_masker import mask_secret  # Airflow 2
+
+    prompts = []
+
+    def handler(messages, info):
+        prompts.append(messages[0].parts[-1].content)
+        return _answer(info, root_cause="The column is missing.")
+
+    real_agent_hook(handler)
+    mask_secret("hunter2-secret-value")
+    context = FailureContext(
+        failed_nodes=(FailedNode("model.p.m", "error", "LINE 3: SECRET 'hunter2-secret-value'", "select 1", ()),)
+    )
+
+    diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=context)
+
+    assert "Root cause:\n  The column is missing." in diagnosis
+    assert len(prompts) == 1
+    assert "hunter2-secret-value" not in prompts[0]
+    assert "SECRET '***'" in prompts[0]
+
+
+@requires_provider
+def test_real_agent_returns_a_custom_output_type(real_agent_hook):
+    class Issue(BaseModel):
+        file: str
+        problem: str
+
+    class Custom(BaseModel):
+        issues: list[Issue]
+
+    def handler(messages, info):
+        tool = info.output_tools[0]
+        return ModelResponse(
+            parts=[ToolCallPart(tool.name, {"issues": [{"file": "models/a.sql", "problem": "bad join"}]})]
+        )
+
+    real_agent_hook(handler)
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_output_type=Custom)
+
+    diagnosis = diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert "Issues:\n  - file: models/a.sql\n    problem: bad join" in diagnosis
+
+
+@requires_provider
+def test_real_agent_is_cancelled_when_the_timeout_expires(real_agent_hook):
+    async def slow(messages, info):
+        await asyncio.sleep(30)
+        return _answer(info)
+
+    real_agent_hook(slow)
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, timeout_seconds=0.3)
+
+    started = time.monotonic()
+    diagnosis = diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert diagnosis is None
+    # Cancelled right away, not after the 30 seconds of the model call.
+    assert time.monotonic() - started < 5
+
+
+@requires_provider
+def test_real_agent_is_cancelled_when_the_task_is_killed(real_agent_hook):
+    async def slow(messages, info):
+        await asyncio.sleep(30)
+        return _answer(info)
+
+    real_agent_hook(slow)
+    handle = DiagnosisHandle()
+    threading.Timer(0.3, handle.cancel).start()
+
+    started = time.monotonic()
+    diagnosis = diagnose_dbt_failure(
+        ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT, handle=handle
+    )
+
+    assert diagnosis is None
+    assert time.monotonic() - started < 5
+
+
+@requires_provider
+def test_real_agent_cannot_exceed_the_request_limit():
+    calls = []
+
+    def handler(messages, info):
+        calls.append(1)
+        # Never answers: keeps asking to run a tool, which is what an agent looping over schema checks would do.
+        return ModelResponse(parts=[ToolCallPart("ping", {})])
+
+    agent = Agent(FunctionModel(handler), output_type=DbtFailureDiagnosis)
+
+    @agent.tool_plain
+    def ping() -> str:
+        return "pong"
+
+    with pytest.raises(UsageLimitExceeded):
+        diagnostics._run_agent(agent, "prompt", timeout_seconds=10, handle=None)
+
+    assert len(calls) == diagnostics._REQUEST_LIMIT
+
+
+@requires_provider
+def test_real_toolset_exposes_only_the_metadata_tools_for_the_related_tables(monkeypatch):
+    from airflow.providers.common.sql.hooks.sql import DbApiHook
+
+    monkeypatch.setattr(
+        diagnostics.BaseHook,
+        "get_connection",
+        lambda conn_id: SimpleNamespace(get_hook=lambda: MagicMock(spec=DbApiHook)),
+    )
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+
+    toolsets = diagnostics._build_toolsets(config, _profile_config(), FAILURE_CONTEXT)
+
+    assert len(toolsets) == 1
+    offered = []
+
+    def handler(messages, info):
+        offered.extend(sorted(tool.name for tool in info.function_tools))
+        return _answer(info)
+
+    agent = Agent(FunctionModel(handler), output_type=DbtFailureDiagnosis, toolsets=toolsets)
+    agent.run_sync("prompt")
+
+    # ``query`` and ``check_query`` are filtered out: the agent reads metadata, never rows.
+    assert offered == ["get_schema", "list_tables"]

@@ -84,6 +84,20 @@ def test_is_dbt_v2_is_false_for_dbt_v3(mock_version):
     mock_version.assert_called_with("dbt")
 
 
+@patch("cosmos.dbt.runner.version")
+def test_is_dbt_v2_ignores_invalid_version(mock_version):
+    mock_version.side_effect = ["not-a-version", PackageNotFoundError("dbt-oss"), PackageNotFoundError("dbt")]
+    assert not dbt_runner.is_dbt_v2()
+    assert mock_version.call_count == 3
+
+
+@patch("cosmos.dbt.runner.version")
+def test_is_dbt_v2_with_dbt_core_v1_next_to_dbt_v2(mock_version):
+    mock_version.side_effect = ["1.12.6", PackageNotFoundError("dbt-oss"), "2.0.8"]
+    assert dbt_runner.is_dbt_v2()
+    assert mock_version.call_count == 3
+
+
 def test_cleanup_dbt_adapters_calls_reset_adapters_and_gc():
     """_cleanup_dbt_adapters calls reset_adapters when available and always runs gc.collect()."""
     factory_mock = MagicMock()

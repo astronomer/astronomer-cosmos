@@ -1986,6 +1986,7 @@ def test_run_command_uses_subprocess_for_dbt_v2_ls(
 ):
     command = ["dbt", "ls", "--output", "json"]
     project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    caplog.set_level(logging.INFO)
 
     response = run_command(command, project_dir, {}, InvocationMode.DBT_RUNNER)
 
@@ -1994,7 +1995,27 @@ def test_run_command_uses_subprocess_for_dbt_v2_ls(
     mock_is_dbt_v2.assert_called_once_with()
     assert not mock_dbt_runner.called
     mock_subprocess.assert_called_once_with(command, project_dir, {})
-    assert "dbt-core 2.x does not return JSON records" in caplog.text
+    assert "dbt 2 does not return JSON records for `dbt ls` through dbtRunner" in caplog.text
+    assert "Running command with Python subprocess: `dbt ls --output json`" in caplog.text
+    assert "dbt Runner" not in caplog.text
+
+
+@patch("cosmos.dbt.graph.run_command_with_subprocess")
+@patch("cosmos.dbt.graph.run_command_with_dbt_runner", return_value="")
+@patch("cosmos.dbt.graph.dbt_runner.is_dbt_v2", return_value=True)
+@patch("cosmos.dbt.graph.dbt_runner.is_available", return_value=True)
+def test_run_command_uses_dbt_runner_for_dbt_v2_deps(
+    mock_is_available, mock_is_dbt_v2, mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir
+):
+    command = ["dbt", "deps"]
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+
+    run_command(command, project_dir, {}, InvocationMode.DBT_RUNNER)
+
+    mock_is_available.assert_called_once_with()
+    assert not mock_is_dbt_v2.called
+    mock_dbt_runner.assert_called_once_with(command, project_dir, {})
+    assert not mock_subprocess.called
 
 
 @patch("cosmos.dbt.graph.run_command_with_subprocess")

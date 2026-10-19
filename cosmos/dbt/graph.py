@@ -376,19 +376,18 @@ def run_command(
     """Run a command either with dbtRunner or Python subprocess, returning the stdout."""
 
     use_dbt_runner = invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_available()
+    if use_dbt_runner and command[1] == "ls" and dbt_runner.is_dbt_v2():
+        logger.info(
+            "dbt 2 does not return JSON records for `dbt ls` through dbtRunner; "
+            "running it with Python subprocess instead of InvocationMode.DBT_RUNNER."
+        )
+        use_dbt_runner = False
     runner = "dbt Runner" if use_dbt_runner else "Python subprocess"
     command = [str(arg) if arg is not None else "<None>" for arg in command]
     logger.info("Running command with %s: `%s`", runner, " ".join(command))
     logger.debug("Environment variable keys: %s", env_vars.keys())
 
-    if use_dbt_runner and command[1] == "ls" and dbt_runner.is_dbt_v2():
-        logger.warning(
-            "dbt-core 2.x does not return JSON records for `dbt ls` through dbtRunner; "
-            "running this command with Python subprocess. Set RenderConfig.invocation_mode to "
-            "InvocationMode.SUBPROCESS to avoid this warning."
-        )
-        stdout = run_command_with_subprocess(command, tmp_dir, env_vars)
-    elif use_dbt_runner:
+    if use_dbt_runner:
         stdout = run_command_with_dbt_runner(command, tmp_dir, env_vars)
     else:
         stdout = run_command_with_subprocess(command, tmp_dir, env_vars)

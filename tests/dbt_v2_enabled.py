@@ -46,12 +46,13 @@ _NO_PARTIAL_PARSE = "dbt v2 writes no target/partial_parse.msgpack"
 _SCHEMA_ARG = (
     "reads profile_args['schema'], which the BigQuery swap drops (cause inferred, not checked against the test)"
 )
+_LS_SUBPROCESS = "dbt v2 runs dbt ls through a subprocess, which bypasses the dbtRunner this test mocks"
 _UNKNOWN = "fails in the dbt v2 job for a cause not yet identified"
 
 # Tests that fail in the dbt v2 job for a known reason, keyed by pytest node id. Each one is skipped there with its
 # reason until it is fixed or made to work with dbt v2; remove its entry when it does.
 SKIPPED_TESTS: dict[str, str] = {
-    # dbt 2 strict project YAML (16)
+    # dbt 2 strict project YAML (17)
     "tests/dbt/test_graph.py::test_load_dbt_ls_and_manifest_with_model_version[load_via_dbt_ls]": _STRICT_YAML,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_exclude": _STRICT_YAML,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_selector_arg": _STRICT_YAML,
@@ -65,6 +66,7 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/test_converter.py::test_converter_creates_dag_with_test_with_multiple_parents_and_build": _STRICT_YAML,
     "tests/test_converter.py::test_converter_creates_dag_with_test_with_multiple_parents_test_afterall": _STRICT_YAML,
     "tests/test_converter.py::test_converter_creates_dag_with_test_with_multiple_parents_test_none": _STRICT_YAML,
+    "tests/test_converter.py::test_converter_creates_dag_with_test_with_multiple_parents_with_should_detach_multiple_parents_tests_false": _STRICT_YAML,
     "tests/test_converter.py::test_converter_passes_render_config_exclude_to_test_tasks": _STRICT_YAML,
     "tests/test_converter.py::test_dbt_dag_renders_ephemeral_model_as_dbt_run_when_disabled": _STRICT_YAML,
     "tests/test_converter.py::test_dbt_dag_renders_ephemeral_model_as_empty_operator": _STRICT_YAML,
@@ -89,10 +91,11 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/_asynchronous/test_bigquery.py::test_mock_bigquery_adapter": _DBT_1X,
     "tests/operators/test_local.py::test_run_operator_caches_partial_parsing": _DBT_1X,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_subprocess": _DBT_1X,
-    # dbt 2 dbtRunner has no callbacks (3)
+    # dbt 2 dbtRunner has no callbacks (4)
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_group_nodes_by_folder": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event": _NO_CALLBACKS,
     "tests/test_example_dags.py::test_example_dag[example_watcher]": _NO_CALLBACKS,
+    "tests/test_example_dags.py::test_example_dag[example_watcher_synchronous]": _NO_CALLBACKS,
     # dbt 2 behaves differently: expected load error not raised (2)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[dbt_runner]": _NO_LOAD_ERROR,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[subprocess]": _NO_LOAD_ERROR,
@@ -106,6 +109,9 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_uses_partial_parse_when_cache_is_disabled": _NO_PARTIAL_PARSE,
     # Test reads profile_args['schema'], which the BigQuery swap drops (1)
     "tests/airflow/test_graph.py::test_build_airflow_graph_with_override_profile_config": _SCHEMA_ARG,
+    # dbt 2 runs dbt ls through a subprocess (2)
+    "tests/dbt/test_graph.py::test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder[dbt_runner-False]": _LS_SUBPROCESS,
+    "tests/dbt/test_graph.py::test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder[dbt_runner-True]": _LS_SUBPROCESS,
     # Unknown, needs investigation (4)
     "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.DBT_RUNNER]": _UNKNOWN,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_empty_model": _UNKNOWN,

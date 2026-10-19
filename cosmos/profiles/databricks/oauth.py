@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..base import BaseProfileMapping
+from .host import normalize_host
 
 
 class DatabricksOauthProfileMapping(BaseProfileMapping):
@@ -56,5 +57,4 @@ class DatabricksOauthProfileMapping(BaseProfileMapping):
         }
 
     def transform_host(self, host: str) -> str:
-        """Reduces the host to the bare hostname dbt expects: no https:// prefix and no trailing slash."""
-        return host.removeprefix("https://").rstrip("/")
+        return normalize_host(host)

@@ -139,6 +139,34 @@ def test_watcher_topology(project):
     assert "dbt_producer_watcher" in dag.task_dict["raw_orders_seed"].upstream_task_ids
 
 
+DBT_BUILD_RESOURCE_TYPES = {"model", "snapshot", "seed"}
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])
+def test_watcher_producer_builds_reclassified_node_through_dbt_resource_types(project, test_behavior):
+    """With tests excluded, the producer narrows `dbt build` with `--resource-type`. Those values go to
+    dbt, which still classifies a metric view or semantic view as `model`, so the reclassified node is
+    built by `--resource-type model`; Cosmos's own type must never leak into the command."""
+    project_name, semantic_model = project
+    dag = build_dag(
+        project_name,
+        dag_id=f"{project_name}_watcher_{test_behavior.value}",
+        test_behavior=test_behavior,
+        execution_mode=ExecutionMode.WATCHER,
+    )
+    producer = dag.task_dict["dbt_producer_watcher"]
+    command, _ = producer.build_cmd({}, {})
+    flags = [str(part) for part in command]
+    resource_types = {flags[index + 1] for index, part in enumerate(flags) if part == "--resource-type"}
+
+    assert resource_types == DBT_BUILD_RESOURCE_TYPES
+    assert RECLASSIFIED_RESOURCE_TYPE not in flags
+    assert f"{semantic_model}_{RECLASSIFIED_TASK_SUFFIX}" in dag.task_ids
+    assert isinstance(
+        dag.task_dict[f"{semantic_model}_{RECLASSIFIED_TASK_SUFFIX}"], DbtSemanticMetricViewWatcherOperator
+    )
+
+
 def test_build_topology(project):
     project_name, semantic_model = project
     dag = build_dag(project_name, dag_id=f"{project_name}_build", test_behavior=TestBehavior.BUILD)

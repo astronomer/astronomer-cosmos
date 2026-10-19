@@ -29,6 +29,8 @@ from cosmos import (
     ExecutionConfig,
     ExecutionMode,
     ProjectConfig,
+    RenderConfig,
+    TestBehavior,
 )
 from cosmos.operators.base import DbtSemanticMetricViewMixin
 from cosmos.operators.local import (
@@ -47,6 +49,7 @@ from cosmos.operators.watcher import (
 
 from .. import utils as test_utils
 from .warehouses import (
+    RECLASSIFIED_RESOURCE_TYPE,
     RECLASSIFIED_TASK_SUFFIX,
     SEEDED_REVENUE_BY_STATUS,
     DatabricksHarness,
@@ -75,10 +78,12 @@ def build_dag(
     warehouse: WarehouseHarness,
     dag_id: str,
     execution_mode: ExecutionMode = ExecutionMode.LOCAL,
+    test_behavior: TestBehavior = TestBehavior.AFTER_EACH,
 ) -> DbtDag:
     return DbtDag(
         project_config=ProjectConfig(dbt_project_path=warehouse.project_dir),
         profile_config=warehouse.profile_config(),
+        render_config=RenderConfig(test_behavior=test_behavior),
         execution_config=ExecutionConfig(execution_mode=execution_mode),
         operator_args={"install_deps": True, "full_refresh": True},
         dag_id=dag_id,
@@ -91,6 +96,11 @@ def build_dag(
 
 def topological_task_ids(dag: DbtDag) -> list[str]:
     return [task.task_id for task in dag.topological_sort()]
+
+
+def flat_chain(warehouse: WarehouseHarness) -> list[str]:
+    semantic = warehouse.semantic_object_model
+    return ["raw_orders_seed", "orders_run", f"{semantic}_{RECLASSIFIED_TASK_SUFFIX}", "revenue_by_status_run"]
 
 
 def grouped_chain(warehouse: WarehouseHarness) -> list[str]:
@@ -187,21 +197,37 @@ def test_dbt_dag_with_local_execution(warehouse: WarehouseHarness):
     ), f"the reclassified task stopped emitting asset events; events recorded: {events}"
 
 
-def test_dbt_dag_with_watcher_execution(warehouse: WarehouseHarness):
-    dag = build_dag(warehouse, dag_id=warehouse.dag_id("watcher"), execution_mode=ExecutionMode.WATCHER)
+@pytest.mark.parametrize("test_behavior", [TestBehavior.AFTER_EACH, TestBehavior.NONE], ids=["after_each", "none"])
+def test_dbt_dag_with_watcher_execution(warehouse: WarehouseHarness, test_behavior: TestBehavior):
+    dag = build_dag(
+        warehouse,
+        dag_id=warehouse.dag_id(f"watcher_{test_behavior.value}"),
+        execution_mode=ExecutionMode.WATCHER,
+        test_behavior=test_behavior,
+    )
     semantic = warehouse.semantic_object_model
+    grouped = test_behavior == TestBehavior.AFTER_EACH
+    semantic_task_id = f"{semantic}.{RECLASSIFIED_TASK_SUFFIX}" if grouped else f"{semantic}_{RECLASSIFIED_TASK_SUFFIX}"
+    seed_task_id = "raw_orders_seed"
+    orders_task_id = "orders.run" if grouped else "orders_run"
 
     assert len(dag.dbt_graph.filtered_nodes) == EXPECTED_NODE_COUNT
-    assert len(dag.task_dict) == 8
-    assert topological_task_ids(dag) == ["dbt_producer_watcher", *grouped_chain(warehouse)]
-    assert isinstance(dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
-    assert isinstance(dag.task_dict["raw_orders_seed"], DbtSeedWatcherOperator)
-    assert isinstance(dag.task_dict["orders.run"], DbtRunWatcherOperator)
-    assert isinstance(dag.task_dict["revenue_by_status.run"], DbtRunWatcherOperator)
-    assert isinstance(dag.task_dict["orders.test"], DbtTestWatcherOperator)
-    assert isinstance(dag.task_dict[f"{semantic}.test"], DbtTestWatcherOperator)
-    assert isinstance(dag.task_dict[f"{semantic}.{RECLASSIFIED_TASK_SUFFIX}"], DbtSemanticMetricViewWatcherOperator)
-    assert "dbt_producer_watcher" in dag.task_dict["raw_orders_seed"].upstream_task_ids
+    expected_chain = grouped_chain(warehouse) if grouped else flat_chain(warehouse)
+    assert topological_task_ids(dag) == ["dbt_producer_watcher", *expected_chain]
+    producer = dag.task_dict["dbt_producer_watcher"]
+    assert isinstance(producer, DbtProducerWatcherOperator)
+    assert isinstance(dag.task_dict[seed_task_id], DbtSeedWatcherOperator)
+    assert isinstance(dag.task_dict[orders_task_id], DbtRunWatcherOperator)
+    assert isinstance(dag.task_dict[semantic_task_id], DbtSemanticMetricViewWatcherOperator)
+    if grouped:
+        assert isinstance(dag.task_dict["orders.test"], DbtTestWatcherOperator)
+    assert "dbt_producer_watcher" in dag.task_dict[seed_task_id].upstream_task_ids
+
+    command, _ = producer.build_cmd({}, {})
+    flags = [str(part) for part in command]
+    resource_types = {flags[index + 1] for index, part in enumerate(flags) if part == "--resource-type"}
+    assert resource_types == (set() if grouped else {"model", "snapshot", "seed"})
+    assert RECLASSIFIED_RESOURCE_TYPE not in flags
 
     make_watcher_consumers_wait_for_producer(dag)
     assert_dag_succeeded(dag)

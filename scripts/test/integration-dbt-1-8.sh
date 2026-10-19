@@ -16,9 +16,10 @@ else
 fi
 pip install "dbt-core~=$DBT_VERSION.0" "dbt-postgres$ADAPTER_SPEC" "dbt-duckdb$ADAPTER_SPEC" "dbt-databricks$ADAPTER_SPEC" "dbt-bigquery$ADAPTER_SPEC"
 
-# dbt 1.9 adapters pull in pydantic 1.10.x, which breaks apache-airflow-core 3 (see integration-dbt-async.sh).
+# dbt 1.9 adapters can pull in pydantic 1.10.x, which breaks apache-airflow-core 3. Use a floor, not
+# an exact pin, because newer Airflow needs pydantic>2.11.0 (FieldInfo._copy) and a pin downgrades it.
 if [ "$DBT_VERSION" = "1.9" ]; then
-    pip install "pydantic==2.11.0"
+    pip install "pydantic>2.11.0"
 fi
 
 actual_dbt_version=$(dbt --version | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')

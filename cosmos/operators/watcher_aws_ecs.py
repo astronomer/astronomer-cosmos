@@ -8,6 +8,7 @@ import time
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
+from airflow.exceptions import AirflowException
 from packaging.version import Version
 
 from cosmos.constants import _ECS_WATCHER_MIN_AMAZON_PROVIDER_VERSION
@@ -52,27 +53,29 @@ if Version(amazon_provider_version) < _ECS_WATCHER_MIN_AMAZON_PROVIDER_VERSION: 
 
 logger = get_logger(__name__)
 
-# dbt's last JSON event of a run; once seen, no more log lines will arrive for this task.
-_COMMAND_COMPLETED_EVENT = "CommandCompleted"
+# dbt's last JSON event of a run; once read, no node status is left in the log stream. At the
+# default log level dbt-core 1.x ends with StatsLine, or NothingToDo when nothing is selected, and
+# CommandCompleted is a debug event; dbt 2 ends with CommandCompleted.
+_END_OF_RUN_EVENTS = frozenset({"StatsLine", "NothingToDo", "CommandCompleted"})
 _DRAIN_POLL_SECONDS = 1.0
 _STOPPED = "STOPPED"
 
 
-def _is_command_completed(message: str) -> bool:
-    if _COMMAND_COMPLETED_EVENT not in message:
+def _is_end_of_run(message: str) -> bool:
+    if not any(name in message for name in _END_OF_RUN_EVENTS):
         return False
     try:
         event = json.loads(message)
     except json.JSONDecodeError:
         return False
     info = event.get("info") if isinstance(event, dict) else None
-    return isinstance(info, dict) and info.get("name") == _COMMAND_COMPLETED_EVENT
+    return isinstance(info, dict) and info.get("name") in _END_OF_RUN_EVENTS
 
 
 class WatcherEcsLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
     """Queues the dbt container's CloudWatch events for the producer to parse on its own thread.
 
-    After ``stop()``, keeps polling until dbt's ``CommandCompleted`` event has been read or
+    After ``stop()``, keeps polling until dbt's last event of the run has been read or
     ``drain_timeout`` has elapsed.
     """
 
@@ -80,24 +83,24 @@ class WatcherEcsLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
         super().__init__(**kwargs)
         self.events: queue.SimpleQueue[str] = queue.SimpleQueue()
         self.drain_timeout = drain_timeout
-        self.command_completed = False
+        self.read_any_event = False
+        self.run_completed = False
         self._continuation_token = AwsLogsHook.ContinuationToken()
 
     def run(self) -> None:
         while not self.is_stopped():
             time.sleep(self.fetch_interval.total_seconds())
             self._poll()
-        # The provider's loop returns on stop(), dropping the events written since its last poll:
-        # for the watcher, the last NodeFinished events.
+        # Stopping at the task's end would drop the events CloudWatch has not served yet: the
+        # statuses of the last nodes.
         deadline = time.monotonic() + self.drain_timeout.total_seconds()
-        while not self.command_completed and time.monotonic() < deadline:
+        while not self.run_completed and time.monotonic() < deadline:
             time.sleep(_DRAIN_POLL_SECONDS)
             self._poll()
-        if not self.command_completed:
+        if not self.run_completed:
             self.logger.warning(
-                "dbt's %s event was not read within %s after the ECS task stopped; consumers of nodes whose "
-                "status never arrived will fall back to running them on their own.",
-                _COMMAND_COMPLETED_EVENT,
+                "dbt's last event of the run was not read within %s after the ECS task stopped; the statuses "
+                "of the last nodes may not have reached their consumers.",
                 self.drain_timeout,
             )
 
@@ -113,9 +116,10 @@ class WatcherEcsLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
         """Read the events available now, queue their messages and log them as the parent does."""
         for event in self._get_log_events(self._continuation_token):
             message = event["message"]
+            self.read_any_event = True
             self.events.put(message)
-            if _is_command_completed(message):
-                self.command_completed = True
+            if _is_end_of_run(message):
+                self.run_completed = True
             self.logger.info(self.event_to_str(event))
 
 
@@ -128,8 +132,8 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
     :param awslogs_fetch_interval: how often CloudWatch is polled while the task runs; it bounds the
         delay before a consumer can see its node's status. The provider default of 30 seconds is
         meant for displaying logs, so this operator defaults to 5 seconds.
-    :param drain_timeout: how long to keep polling after the task stopped, waiting for dbt's
-        ``CommandCompleted`` event.
+    :param drain_timeout: how long to keep polling after the task stopped, waiting for dbt's last
+        event of the run.
     """
 
     template_fields: tuple[str, ...] = tuple(DbtBuildAwsEcsOperator.template_fields)
@@ -167,8 +171,6 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
         finalize_watcher_producer(self)
 
     def _get_task_log_fetcher(self) -> WatcherEcsLogFetcher:
-        if not self.awslogs_group:
-            raise ValueError("must specify awslogs_group to fetch task logs")
         # Amazon provider 9.34.0 stopped defaulting awslogs_region to the operator's region and
         # resolves it here instead.
         resolve_awslogs_region = getattr(self, "resolve_awslogs_region", None)
@@ -214,8 +216,6 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
         """
         from botocore.exceptions import WaiterError
 
-        if not self.client or not self.arn:
-            return
         response: dict[str, Any] = {}
         for _ in range(self.waiter_max_attempts):
             self._process_log_events()
@@ -234,11 +234,19 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
             response,
         )
 
-    def _after_execution(self) -> None:
+    def _after_execution(self, *args: Any, **kwargs: Any) -> None:
         # Runs after ``EcsRunTaskOperator.execute`` has stopped and joined the fetcher: the drained
-        # tail of the log stream is still in the queue.
+        # tail of the log stream is still in the queue. Amazon provider 8.3.0 to 8.5.1 pass the session.
         self._process_log_events()
-        super()._after_execution()
+        super()._after_execution(*args, **kwargs)
+        fetcher = self.task_log_fetcher
+        if isinstance(fetcher, WatcherEcsLogFetcher) and not fetcher.read_any_event:
+            raise AirflowException(
+                f"The ECS task succeeded, but no event was read from log stream {fetcher.log_stream_name} "
+                f"in log group {fetcher.log_group}, so no node status reached the consumers. The awslogs "
+                "driver writes <prefix>/<container>/<task id>: set awslogs_stream_prefix to "
+                "<prefix>/<container>, and grant logs:GetLogEvents to the aws_conn_id connection."
+            )
 
     def execute(self, context: Context, **kwargs: Any) -> Any:
         # Bind before passing, because bare super() doesn't work inside lambdas or when called outside this method.
@@ -256,9 +264,8 @@ class DbtConsumerWatcherAwsEcsSensor(BaseConsumerSensor, DbtRunAwsEcsOperator):
     """Consumer sensor for ``ExecutionMode.WATCHER_AWS_ECS``.
 
     Polls the producer's per-node status XCom and, on successful model completion, emits one
-    Airflow Asset per outlet URI the producer computed from the manifest. On retry, or when the
-    producer finished without reporting this node, runs ``dbt run --select <model>`` in an ECS task
-    through ``DbtRunAwsEcsOperator``.
+    Airflow Asset per outlet URI the producer computed from the manifest. When it falls back, as on
+    retry, runs ``dbt run --select <model>`` in an ECS task through ``DbtRunAwsEcsOperator``.
     """
 
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + tuple(DbtRunAwsEcsOperator.template_fields)

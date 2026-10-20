@@ -54,6 +54,10 @@ class FakeRunCancelled(Exception):
     pass
 
 
+class FakeFallbackExceptionGroup(Exception):
+    pass
+
+
 class FakeAgentRunError(Exception):
     pass
 
@@ -109,6 +113,7 @@ def fake_provider(monkeypatch):
     monkeypatch.setattr(diagnostics, "UsageLimits", lambda request_limit: SimpleNamespace(request_limit=request_limit))
     monkeypatch.setattr(diagnostics, "RunCancelled", FakeRunCancelled)
     monkeypatch.setattr(diagnostics, "AgentRunError", FakeAgentRunError)
+    monkeypatch.setattr(diagnostics, "FallbackExceptionGroup", FakeFallbackExceptionGroup)
     monkeypatch.setattr(diagnostics, "UserError", FakeUserError)
     monkeypatch.setattr(diagnostics, "mask_secrets", lambda text: text.replace("SECRET-VALUE", "***"))
     return state
@@ -251,6 +256,7 @@ def test_diagnose_dbt_failure_returns_none_when_the_model_call_fails(fake_provid
     "error",
     [
         FakeAgentRunError("rate limited"),
+        FakeFallbackExceptionGroup("all connections failed"),
         FakeUserError("bad model name"),
         AirflowException("connection not found"),
         ImportError("Please install `openai`"),

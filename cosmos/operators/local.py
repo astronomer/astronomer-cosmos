@@ -701,11 +701,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 if ai_config and ai_config.diagnose_on_failure and self._is_last_attempt(context):
                     self._append_ai_diagnosis(ai_config, exc, result, tmp_project_dir)
             except Exception:
-                # The diagnosis handles the failures it expects, so this is a bug in Cosmos, or a version of the
-                # provider or of the LLM SDK it doesn't support. Log it loudly, but never let it replace the dbt failure.
+                # The diagnosis handles the failures it expects, so this is a bug in Cosmos, a version of the provider
+                # it doesn't support, or an error of the model SDK, such as missing cloud credentials. Log it loudly,
+                # but never let it replace the dbt failure.
                 self.log.error(
-                    "AI diagnosis crashed unexpectedly (a bug, or an unsupported provider version?); "
-                    "falling back to the standard error message.",
+                    "AI diagnosis failed unexpectedly (see the error below: a bug, an unsupported provider version "
+                    "or a credentials error of the model SDK); falling back to the standard error message.",
                     exc_info=True,
                 )
             finally:

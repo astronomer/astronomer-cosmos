@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
@@ -25,13 +24,14 @@ try:
     from airflow.providers.common.ai.hooks.pydantic_ai import PydanticAIHook
     from airflow.providers.common.ai.utils.masking import mask_secrets  # needs apache-airflow-providers-common-ai>=1.0
     from pydantic_ai import CancellationToken, UsageLimits
-    from pydantic_ai.exceptions import AgentRunError, RunCancelled, UserError
+    from pydantic_ai.exceptions import AgentRunError, FallbackExceptionGroup, RunCancelled, UserError
 except (ImportError, AirflowOptionalProviderFeatureException):
     PydanticAIHook = None
     mask_secrets = None
     CancellationToken = None
     UsageLimits = None
     AgentRunError = None
+    FallbackExceptionGroup = None
     RunCancelled = None
     UserError = None
 
@@ -103,10 +103,6 @@ def diagnose_dbt_failure(
         )
         return None
 
-    # pydantic-ai prints an ASCII-art banner to stderr on first agent creation, which Airflow
-    # logs at ERROR level, making a successful diagnosis look like a failure. Suppress it.
-    os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
-
     try:
         output_type = ai_config.diagnosis_output_type or DbtFailureDiagnosis
         default_instructions = (
@@ -136,9 +132,10 @@ def diagnose_dbt_failure(
             usage.output_tokens,
         )
         return redact(format_diagnosis(result.output), ai_config)
-    except (AgentRunError, UserError, AirflowException, ImportError, OSError, ValueError):
+    except (AgentRunError, FallbackExceptionGroup, UserError, AirflowException, ImportError, OSError, ValueError):
         # ``ImportError``: pydantic-ai asks for the SDK of the model's provider (e.g. ``openai``) when it is missing.
         # ``ValueError``: the hook raises it for a connection that is not a Pydantic AI one.
+        # ``FallbackExceptionGroup``: every connection of a ``fallback_conn_ids`` chain failed.
         logger.warning("AI diagnosis failed; falling back to the standard error message.", exc_info=True)
         return None
 

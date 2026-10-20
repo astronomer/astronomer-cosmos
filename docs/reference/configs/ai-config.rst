@@ -24,6 +24,10 @@ The provider needs Python 3.11+ and Airflow 2.11+. On older versions, installing
 To let the agent check your warehouse schema (``introspect_schema``), also install the provider's SQL extra:
 ``apache-airflow-providers-common-ai[sql]``.
 
+Install the SDK of your model vendor with an extra of the provider: ``apache-airflow-providers-common-ai[openai]`` (also
+for Azure), ``[anthropic]``, ``[bedrock]`` or ``[google]`` (also for Vertex). Without it, Cosmos logs a warning and
+skips the diagnosis.
+
 Then create an Airflow connection for your LLM. Its type can be ``pydanticai``, ``pydanticai_azure``,
 ``pydanticai_bedrock`` or ``pydanticai_vertex``.
 
@@ -149,6 +153,9 @@ looked at. If it asks for another table, Cosmos logs a warning and the diagnosis
 It needs ``ProfileConfig.profile_mapping`` with a connection whose Airflow hook is a SQL hook (``DbApiHook``), such as
 Postgres, Snowflake, Redshift or MySQL. For other connections (BigQuery, Databricks, Athena, Spark and ``generic``),
 Cosmos logs a warning and diagnoses without introspection.
+
+The agent uses the connection that dbt uses. Cosmos only gives it these two read-only tools, and only for those tables,
+but the provider calls such an allow-list a guardrail, not a security boundary.
 
 Two more things to know:
 

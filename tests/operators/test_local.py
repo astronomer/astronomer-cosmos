@@ -3374,7 +3374,7 @@ def test_a_failing_diagnosis_never_hides_the_dbt_failure(mock_diagnose, caplog):
             operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
 
     assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
-    assert "AI diagnosis crashed unexpectedly" in caplog.text
+    assert "AI diagnosis failed unexpectedly" in caplog.text
     assert operator._ai_diagnosis_handle is None
 
 
@@ -3388,7 +3388,7 @@ def test_ai_diagnosis_without_its_dependencies_warns_and_keeps_the_dbt_failure(c
 
     assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
     assert "astronomer-cosmos[ai]" in caplog.text
-    assert "crashed unexpectedly" not in caplog.text
+    assert "failed unexpectedly" not in caplog.text
     assert operator._ai_diagnosis_handle is None
 
 
@@ -3403,7 +3403,7 @@ def test_a_crash_deciding_whether_to_diagnose_never_hides_the_dbt_failure(caplog
                 )
 
     assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
-    assert "crashed unexpectedly" in caplog.text
+    assert "failed unexpectedly" in caplog.text
 
 
 @patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)

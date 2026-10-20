@@ -696,9 +696,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         except AirflowSkipException:
             raise
         except Exception as exc:
+            ai_config = self.ai_config
             try:
-                if self._should_diagnose_failure(context):
-                    self._append_ai_diagnosis(exc, result, tmp_project_dir)
+                if ai_config and ai_config.diagnose_on_failure and self._is_last_attempt(context):
+                    self._append_ai_diagnosis(ai_config, exc, result, tmp_project_dir)
             except Exception:
                 # The diagnosis handles the failures it expects, so this is a bug in Cosmos, or a version of the
                 # provider or of the LLM SDK it doesn't support. Log it loudly, but never let it replace the dbt failure.
@@ -711,10 +712,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self._ai_diagnosis_handle = None
             raise
 
-    def _should_diagnose_failure(self, context: Context) -> bool:
+    def _is_last_attempt(self, context: Context) -> bool:
         """Diagnose only on the final attempt: every attempt would pay for an LLM call, and retries may fix it."""
-        if not (self.ai_config and self.ai_config.diagnose_on_failure):
-            return False
         task_instance = context.get("ti")
         try_number = getattr(task_instance, "try_number", None)
         max_tries = getattr(task_instance, "max_tries", None)
@@ -728,7 +727,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             return False
         return True
 
-    def _append_ai_diagnosis(self, exc: Exception, result: Any, tmp_project_dir: str) -> None:
+    def _append_ai_diagnosis(self, ai_config: AiConfig, exc: Exception, result: Any, tmp_project_dir: str) -> None:
         """Add the AI diagnosis to the message of ``exc``."""
         try:
             # Imported only here: ``cosmos.ai`` needs pydantic, which Airflow 2 and Cosmos themselves don't require.
@@ -742,15 +741,12 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             )
             return
 
+        output = "\n".join(getattr(result, "full_output", [])) or str(exc)
         self._ai_diagnosis_handle = DiagnosisHandle()
         diagnosis = diagnose_dbt_failure(
-            ai_config=self.ai_config,  # type: ignore[arg-type]
+            ai_config=ai_config,
             profile_config=self.profile_config,
-            failure_context=build_failure_context(
-                tmp_project_dir,
-                "\n".join(getattr(result, "full_output", [])) or str(exc),
-                self.ai_config,  # type: ignore[arg-type]
-            ),
+            failure_context=build_failure_context(tmp_project_dir, output, ai_config),
             handle=self._ai_diagnosis_handle,
         )
         if diagnosis and exc.args and isinstance(exc.args[0], str):

@@ -3,9 +3,9 @@
 AI config
 =========
 
-Cosmos can ask an LLM why a dbt task failed, and add a structured root-cause summary to the task's error message and
-logs. It is built on the `Common AI provider <https://airflow.apache.org/docs/apache-airflow-providers-common-ai/stable/index.html>`_
-of Airflow and is configured with the ``cosmos.config.AiConfig`` class. It is off by default.
+Cosmos can ask an LLM why a dbt task failed, and add its answer to the error message and the logs of the task. It uses
+the `Common AI provider <https://airflow.apache.org/docs/apache-airflow-providers-common-ai/stable/index.html>`_ of
+Airflow, and it is configured with ``cosmos.config.AiConfig``. It is off by default.
 
 .. note::
 
@@ -20,7 +20,7 @@ Install Cosmos with the ``ai`` extra, which installs ``apache-airflow-providers-
 
     pip install "astronomer-cosmos[ai]"
 
-The provider needs Python 3.11+ and Airflow 2.11+. On older versions, the install would try to upgrade Airflow itself.
+The provider needs Python 3.11+ and Airflow 2.11+. On older versions, installing it would try to upgrade Airflow itself.
 To let the agent check your warehouse schema (``introspect_schema``), also install the provider's SQL extra:
 ``apache-airflow-providers-common-ai[sql]``.
 
@@ -39,26 +39,41 @@ Usage
         ai_config=AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True),
     )
 
-``ai_config`` can also be set in ``operator_args``, but not in both places. ``diagnose_on_failure=True`` is only
-supported with ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``. Cosmos raises an error when parsing the DAG for
-any other execution mode, such as ``ExecutionMode.WATCHER``, whose producer runs one ``dbt build`` for the whole DAG.
+When a task fails, its error message keeps the dbt error first, and ends with the diagnosis:
 
-The diagnosis is added after the original error, so the dbt failure details always come first.
+.. code-block:: text
+
+    dbt invocation completed with errors: db_error: Database Error in model db_error (models/db_error.sql)
+      column "missing_column" does not exist
+
+    --------------------------------------------------------------------------------
+    AI diagnosis (confidence: high)
+    --------------------------------------------------------------------------------
+    Root cause:
+      The model selects a column named missing_column from s.base, but that table only has id and
+      amount. The column was probably mistyped, or renamed upstream.
+
+    Suggested fix:
+      Select an existing column in models/db_error.sql, or add the column to s.base.
+
+    --------------------------------------------------------------------------------
+
+``ai_config`` can also be set in ``operator_args``, but not in both places. ``diagnose_on_failure=True`` only works with
+``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``. With any other execution mode, such as
+``ExecutionMode.WATCHER``, Cosmos raises an error when it parses the DAG.
 
 When it runs, and what it costs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- It runs once per failed task, on the task's last attempt. With ``retries=3``, the first three failures don't call the
-  LLM.
-- A diagnosis makes at most ``max_requests`` requests to the model, and its LLM run is cancelled after
-  ``timeout_seconds``. Every request carries the whole prompt, which is bounded by the limits of
-  :ref:`what is sent <ai-config-sent>`. The time limit is checked while Cosmos waits for the model, so a call that blocks
-  its thread is cancelled when it returns.
-- Many tasks failing for the same reason mean many calls. To limit the cost, set ``ai_config`` only on the
+- It runs once per failed task, on its last attempt. With ``retries=3``, the first three failures don't call the LLM.
+- It makes at most ``max_requests`` requests to the model, and the run is cancelled after ``timeout_seconds``. Every
+  request carries the whole prompt, which is bounded by the :ref:`limits below <ai-config-sent>`.
+- Many tasks that fail for the same reason mean many calls. To limit the cost, set ``ai_config`` only on the
   ``DbtTaskGroup`` that needs it.
-- The diagnosis runs inside the task, so its time counts toward the task's ``execution_timeout``.
-- A failed diagnosis never hides the dbt error: Cosmos logs a warning and raises the original error. The same goes for an
-  error that Cosmos did not expect, which it logs at the error level.
+- The diagnosis runs inside the task, so its time counts toward the ``execution_timeout`` of the task. The time limit is
+  checked while Cosmos waits for the model, so a call that blocks its thread is cancelled when it returns.
+- A diagnosis that fails never hides the dbt error: Cosmos logs why, and raises the original error. An error that
+  Cosmos didn't expect is logged at the error level.
 - Killing the task cancels the diagnosis.
 
 .. _ai-config-sent:
@@ -68,10 +83,10 @@ What is sent to the LLM
 
 For each failed dbt node, Cosmos sends the error message and the compiled SQL that dbt wrote in ``run_results.json``.
 When dbt fails before it runs any node, such as on a compilation error, it sends the end of the dbt output instead. With
-``InvocationMode.DBT_RUNNER``, that is the error summary that dbt returns, not its full log.
+``InvocationMode.DBT_RUNNER``, that is the error summary of dbt, not its full log.
 
-You decide how much is sent, with these limits. A text over its limit keeps its head and its tail, with a marker for
-what was left out, except the dbt output, which keeps its end:
+You choose how much is sent. A text over its limit keeps its head and its tail, with a marker for what was left out,
+except the dbt output, which keeps its end.
 
 .. list-table::
    :header-rows: 1
@@ -98,9 +113,15 @@ what was left out, except the dbt output, which keeps its end:
 The task log says how many characters were sent, so you can tune the limits with a real failure. Raise them to give the
 model more to work with, at the cost of more tokens, or lower them to send less.
 
-Before sending, Cosmos masks every secret registered with Airflow's secrets masker, such as connection passwords, and
-then applies ``redactor``. Airflow can't know a secret that only exists as a dbt variable, and dbt errors can echo the SQL
-around the problem. Use ``redactor`` to cover those cases:
+Protect sensitive data
+~~~~~~~~~~~~~~~~~~~~~~
+
+Before anything is sent, Cosmos masks every secret that Airflow knows, such as connection passwords, and then applies
+your ``redactor``. This also covers what the schema tools return to the agent, and the diagnosis itself.
+
+Airflow can't know a secret that only exists as a dbt variable. And the error text of dbt and of the database can repeat
+the values of the rows involved, as in a unique key violation, and names such as hosts and users. Use ``redactor`` to
+hide them:
 
 .. code-block:: python
 
@@ -112,34 +133,38 @@ around the problem. Use ``redactor`` to cover those cases:
         redactor=lambda text: re.sub(r"(?i)(password|token)=\S+", r"\1=***", text),
     )
 
-The error text of dbt and of the database can repeat the values of the rows involved, such as in a unique key
-violation, and names such as hosts and users. Airflow's masker doesn't know them, so they are sent unless
-``redactor`` hides them. The text from dbt is untrusted: Cosmos fences it and tells the model never to follow it, which
-reduces the risk of prompt injection but doesn't remove it. If ``redactor`` raises, nothing is sent. What the schema tools return to the agent goes through the same masking and
-``redactor``.
+If ``redactor`` raises, nothing is sent.
+
+The text from dbt is untrusted. Cosmos fences it and tells the model never to follow it, which reduces the risk of
+prompt injection but doesn't remove it.
 
 Schema introspection
 ~~~~~~~~~~~~~~~~~~~~
 
-With ``introspect_schema=True``, the agent can list the tables and read the column definitions of the failed node and
-of its parents, to check things like whether a column exists. It can't read rows or query other tables. Cosmos tells
-the agent the exact names of the tables it can inspect, such as ``analytics.orders``, and the task log shows every table
-it looked at. If it asks for a table outside that list, Cosmos logs a warning and the diagnosis continues without it.
+With ``introspect_schema=True``, the agent can list the tables and read the column definitions of the failed node and of
+its parents, to check things like whether a column exists. It can't read rows or query other tables. Cosmos tells the
+agent the exact names of the tables it can inspect, such as ``analytics.orders``, and the task log shows each table it
+looked at. If it asks for another table, Cosmos logs a warning and the diagnosis goes on without it.
 
-Cosmos looks the tables up in the database of the Airflow connection, so a different database in ``profile_args`` is not
-used. It needs ``ProfileConfig.profile_mapping`` with a connection whose Airflow hook is a SQL hook (``DbApiHook``), such as
-Postgres, Snowflake, Redshift or MySQL. Cosmos reads the connection through Airflow, so the Airflow provider of your
-warehouse must be installed, for example ``apache-airflow-providers-postgres``. This is not needed to run dbt itself.
-For other connections (BigQuery, Databricks, Athena, Spark and ``generic``), or when the provider is missing, Cosmos
-logs a warning and diagnoses without introspection.
+It needs ``ProfileConfig.profile_mapping`` with a connection whose Airflow hook is a SQL hook (``DbApiHook``), such as
+Postgres, Snowflake, Redshift or MySQL. For other connections (BigQuery, Databricks, Athena, Spark and ``generic``),
+Cosmos logs a warning and diagnoses without introspection.
+
+Two more things to know:
+
+- Cosmos reads the connection through Airflow, so the Airflow provider of your warehouse must be installed, for example
+  ``apache-airflow-providers-postgres``. Running dbt doesn't need it. Without it, Cosmos logs a warning and diagnoses
+  without introspection.
+- The tables are looked up in the database of the Airflow connection, so a different database in ``profile_args`` is
+  not used.
 
 Customize the output
 ~~~~~~~~~~~~~~~~~~~~
 
-Use ``diagnosis_output_type`` for your own structured output. It must be a pydantic ``BaseModel``: Cosmos raises an error
-for anything else, such as ``str``, a dataclass or a ``TypedDict``. Add ``pydantic.Field(description=...)`` to each field
-to guide the LLM. Lists, dicts and nested models are rendered one item per line in the logs, and the line breaks and
-indentation of a multi-line text, such as a SQL snippet, are kept.
+Use ``diagnosis_output_type`` for your own structured output. It must be a pydantic ``BaseModel``: Cosmos raises an
+error for anything else, such as ``str``, a dataclass or a ``TypedDict``. Add ``pydantic.Field(description=...)`` to each
+field to guide the LLM. Lists, dicts and nested models are rendered one item per line in the logs, and the line breaks
+and indentation of a multi-line text, such as a SQL snippet, are kept.
 
 .. code-block:: python
 
@@ -176,4 +201,4 @@ Arguments
 - ``diagnosis_output_type``: A pydantic model class (a subclass of ``pydantic.BaseModel``) for the output. Defaults to
   ``root_cause``, ``suggested_fix`` and ``confidence``.
 - ``diagnosis_instructions``: Your own system instructions for the agent.
-- ``redactor``: A function that hides what Airflow's secrets masker can't know.
+- ``redactor``: A function that hides what the secrets masker of Airflow can't know.

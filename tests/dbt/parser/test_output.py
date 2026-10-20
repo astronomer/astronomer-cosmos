@@ -136,7 +136,7 @@ def test_extract_log_issues_dbt_1_12_format() -> None:
 
 
 def _json_log_line(msg: str) -> str:
-    """A dbt ``--log-format json`` line, as printed by dbt 1.11."""
+    """A dbt ``--log-format json`` line."""
     return json.dumps({"data": {}, "info": {"level": "info", "msg": msg, "ts": "2026-10-19T10:00:00.000000Z"}})
 
 
@@ -150,6 +150,18 @@ def test_extract_log_issues_json_log_format() -> None:
     test_names, test_results = extract_log_issues(log_list)
     assert test_names == ["unique_m_id"]
     assert test_results == ["Got 1 result, configured to warn if != 0"]
+
+
+def test_extract_log_issues_json_log_format_dbt_1_12() -> None:
+    log_list = [
+        _json_log_line("Finished running 1 test in 0 hours 0 minutes and 0.13 seconds (0.13s)."),
+        _json_log_line("[WARNING]: in test accepted_values_mini_orders_status__placed (models/schema.yml)"),
+        _json_log_line("[WARNING]: Got 4 results, configured to warn if >1"),
+        _json_log_line("Done. PASS=0 WARN=1 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=1"),
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["accepted_values_mini_orders_status__placed"]
+    assert test_results == ["Got 4 results, configured to warn if >1"]
 
 
 def test_extract_dbt_failure_details() -> None:
@@ -177,6 +189,16 @@ def test_extract_dbt_failure_details_json_log_format() -> None:
     ]
     assert extract_dbt_failure_details(log_list) == [
         "Failure in test not_null_m_id (models/schema.yml) Got 1 result, configured to fail if != 0"
+    ]
+
+
+def test_extract_dbt_failure_details_json_log_format_dbt_1_12() -> None:
+    log_list = [
+        _json_log_line("[ERROR]: in test not_null_m_id (models/schema.yml)"),
+        _json_log_line("[ERROR]: Got 1 result, configured to fail if != 0"),
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Error in test not_null_m_id (models/schema.yml) Got 1 result, configured to fail if != 0"
     ]
 
 
@@ -238,3 +260,4 @@ def test_extract_freshness_warn_msg():
     assert node_results == [
         "INFO - 11:50:42  1 of 1 WARN freshness of postgres_db.raw_orders ................................ [WARN in 0.01s]"
     ]
+

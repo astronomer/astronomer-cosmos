@@ -43,7 +43,11 @@ def delete_snowflake_resource():
         if re.match(r"^[A-Za-z0-9_]+$", prefix):
             # Semantic views are not listed in information_schema.tables
             cursor.execute(f"SHOW SEMANTIC VIEWS LIKE '{prefix}_%'")
-            resources += [(row[1], "SEMANTIC VIEW") for row in cursor.fetchall()]
+            resources += [
+                (row[1], "SEMANTIC VIEW")
+                for row in cursor.fetchall()
+                if row[1].startswith(f"{prefix.upper()}_")
+            ]
 
         for resource_name, resource_type in resources:
             # Validate table name contains only safe characters (prevent injection)

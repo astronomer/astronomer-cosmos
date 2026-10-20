@@ -82,8 +82,7 @@ def extract_freshness_warn_msg(result: FullOutputSubprocessResult) -> tuple[list
     node_names = []
     node_results = []
 
-    for line in log_list:
-
+    for line in map(_dbt_log_message, log_list):
         if DBT_FRESHNESS_WARN_MSG in line:
             node_name = line.split(DBT_FRESHNESS_WARN_MSG)[1].split(" ")[1]
             node_names.append(node_name)

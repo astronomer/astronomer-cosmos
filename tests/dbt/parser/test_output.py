@@ -261,3 +261,15 @@ def test_extract_freshness_warn_msg():
         "INFO - 11:50:42  1 of 1 WARN freshness of postgres_db.raw_orders ................................ [WARN in 0.01s]"
     ]
 
+
+def test_extract_freshness_warn_msg_json_log_format():
+    warn_msg = "1 of 1 WARN freshness of postgres_db.raw_orders ................................ [WARN in 0.01s]"
+    result = FullOutputSubprocessResult(
+        full_output=[_json_log_line(warn_msg), _json_log_line("Done.")],
+        output=_json_log_line("Done."),
+        exit_code=0,
+    )
+    node_names, node_results = extract_freshness_warn_msg(result)
+
+    assert node_names == ["postgres_db.raw_orders"]
+    assert node_results == [warn_msg]

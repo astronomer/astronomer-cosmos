@@ -215,8 +215,15 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
 
   The ephemeral row is the one that matters most: it is on by default, so the *most common*
   configuration is also the one where a `RENDER_ONLY`-only check is wrong. The structural check must
-  recognize all three - `EMPTY_OPERATOR_CLASS_PATH` appearing in `tasks_map` is the single signal that
-  covers them - rather than special-casing seeds. What it does with them differs by kind: a seed or
+  recognize all three rather than special-casing seeds, and the signal is the instantiated task, not the
+  class path: `tasks_map` holds the `BaseOperator`/`TaskGroup` that `generate_task_or_group` returns
+  (`build_airflow_graph`, `cosmos/airflow/graph.py:1286-1288`), and `EMPTY_OPERATOR_CLASS_PATH` is
+  consumed before that, when `get_airflow_task` (`cosmos/core/airflow.py:41-49`) imports the class and
+  instantiates it. So the check is `isinstance(task, EmptyOperator)`, using the `EmptyOperator` that
+  `cosmos/airflow/compatibility.py` resolves for the running Airflow version (the class the path is
+  derived from), and when the node rendered as a `TaskGroup` - `TestBehavior.AFTER_EACH` wraps a tested
+  node and its test task in one group (`generate_task_or_group`) - it inspects the group's child for the
+  node itself, not the test task. What it does with them differs by kind: a seed or
   source placeholder is never a producer, because nothing upstream of it substitutes for the work it
   skips; an ephemeral placeholder is only ever a pass-through, acceptable when the coordinator can verify
   that its own upstream chain resolves to real tasks among the peers - see the F3 rule in Proposed design.
@@ -538,8 +545,9 @@ So routing every source to `external_sources` *and stopping there* would drop a 
 whenever one group owns a source's freshness task and another group's models read that source. The
 coordinator must check for a rendered, real (non-`EmptyOperator`) source task among its peers and wire
 it like any other external parent; the bottom two rows are exempt from its ownership check, and the
-placeholder rule is the same one F5 applies to seeds - `EMPTY_OPERATOR_CLASS_PATH` in `tasks_map` means
-"not a producer", whichever rendering behavior put it there.
+placeholder rule is the same one F5 applies to seeds - an `EmptyOperator` instance in `tasks_map` (or
+as the node's own child of an `AFTER_EACH` group) means "not a producer", whichever rendering behavior
+put it there.
 
 **Traversal can land back inside `owned` - that's `internal_edges`, never `external_edges`.** Consider
 `a` (owned) -> `e` (excluded from selection, ephemeral) -> `c` (owned): `c` depends on `e`, `e` depends
@@ -829,7 +837,9 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
 - Placeholder producers - one case each, since screening only `RENDER_ONLY` would let a partial
   implementation pass: a `RENDER_ONLY` seed and a freshness-less source (under
   `SourceRenderingBehavior.ALL`, and under `WITH_TESTS_OR_FRESHNESS` with tests only) are each rejected
-  as producers by the coordinator's ownership check; an ephemeral model under the default
+  as producers by the coordinator's ownership check, including when `TestBehavior.AFTER_EACH` wraps the
+  placeholder and its test task in a `TaskGroup` (the screen inspects the instantiated task, since
+  `tasks_map` carries no metadata); an ephemeral model under the default
   `ephemeral_models_as_empty_operator=True` is accepted only as a pass-through - a peer selected for `e`
   alone, with `a` owned by a second peer and `c` by a third, ends up with both `task(a) >> task(e)` and
   `task(e) >> task(c)` wired, and the same topology with `a` rendered by no peer raises; and the two

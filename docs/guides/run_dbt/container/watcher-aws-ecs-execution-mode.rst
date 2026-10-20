@@ -15,14 +15,7 @@ This execution mode is for users who:
 - Run dbt in ECS tasks today (``ExecutionMode.AWS_ECS``) and want one ``dbt build`` per Dag run instead of one container per node
 - Run the ``ExecutionMode.WATCHER`` producer on an `Apache Airflow® <https://airflow.apache.org/>`_ worker whose memory is shared with other tasks, as on Amazon MWAA, and want the dbt process out of the worker
 
-Background
-~~~~~~~~~~
-
-The :ref:`watcher-execution-mode` runs dbt as a single command while keeping model-level tasks in Airflow: a producer task runs ``dbt build`` and publishes the status of every node as dbt reports it; one consumer sensor per node waits for its status.
-
-With ``ExecutionMode.WATCHER`` the producer runs dbt as a subprocess of the Airflow worker. With ``ExecutionMode.WATCHER_AWS_ECS`` the producer starts an ECS task, as ``ExecutionMode.AWS_ECS`` does, and reads dbt's JSON log lines from the task's CloudWatch log stream while it runs. The consumer sensors are unchanged.
-
-For the watcher concept itself, refer to :ref:`watcher-execution-mode`.
+The one difference from ``ExecutionMode.WATCHER``: the producer runs ``dbt build`` in an ECS task and reads node statuses from the task's CloudWatch log stream. The consumer sensors are unchanged.
 
 How to use
 ~~~~~~~~~~
@@ -57,10 +50,15 @@ Users of ``ExecutionMode.AWS_ECS`` replace the ``execution_mode`` and add the Cl
 - The producer task runs the entire ``dbt build`` command in a single ECS task
 - Consumer tasks (sensors) watch for the completion of their corresponding dbt models
 - ``awslogs_group`` and ``awslogs_stream_prefix`` are mandatory: node statuses are read from that log stream
-- ``awslogs_stream_prefix`` follows the Amazon provider's convention: the log stream name is ``<awslogs_stream_prefix>/<ECS task id>``, and the ``awslogs`` driver names streams ``<awslogs-stream-prefix option>/<container name>/<task id>``, so the argument is the task definition's prefix option followed by the container name (``ecs/dbt`` for the example task definition of :ref:`aws-container-run-job`, whose prefix is ``ecs`` and whose container is ``dbt``)
+- The ``awslogs`` driver names log streams ``<prefix>/<container>/<task id>``. Set ``awslogs_stream_prefix`` to ``<prefix>/<container>``: ``ecs/dbt`` for the example task definition of :ref:`aws-container-run-job`.
 - As in ``ExecutionMode.AWS_ECS``, the command runs without ``--project-dir`` or ``--profiles-dir``: the container's working directory must be the dbt project, with ``profiles.yml`` inside it or ``DBT_PROFILES_DIR`` set in the image
 
 For the ECS task definition, IAM permissions and profile setup, refer to :ref:`aws-container-run-job`.
+
+The producer rejects:
+
+- ``deferrable=True``: the log stream is only read on the synchronous path. Leave it unset; the producer holds a worker slot while it polls CloudWatch, and the consumer sensors still defer.
+- ``reattach=True`` and ``wait_for_completion=False``: the producer never re-runs or re-attaches to a build. Leave them unset; on retry the producer restores the statuses it had published and skips.
 
 How statuses reach the consumers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -100,13 +98,12 @@ Known limitations
 Amazon provider version
 +++++++++++++++++++++++
 
-Requires ``apache-airflow-providers-amazon >= 8.3.0``, the first release whose ``EcsRunTaskOperator`` and ``AwsTaskLogFetcher`` expose the hooks this producer builds on.
+Requires ``apache-airflow-providers-amazon >= 8.3.0``, which ``astronomer-cosmos[aws-ecs]`` installs.
 
-Producer arguments
-++++++++++++++++++
+Consumer fallback
++++++++++++++++++
 
-- ``deferrable=True`` is rejected for the producer: the log stream is only read on the synchronous path, and the deferred path of ``EcsRunTaskOperator`` waits for the task without reading its logs. The producer holds a worker slot for the duration of the build, occupied by the CloudWatch polling, not by dbt. Consumer sensors defer as in the other watcher modes.
-- ``reattach=True`` and ``wait_for_completion=False`` are rejected: the producer never re-runs or re-attaches to a dbt build. On retry it restores the statuses it had published and skips; consumers whose status is missing fall back to running their node in an ECS task.
+A consumer whose status never arrived runs its node in an ECS task. That task runs synchronously, holding a worker slot until it stops, even when the sensor is deferrable.
 
 Log delivery
 ++++++++++++

@@ -1,10 +1,4 @@
-"""``ExecutionMode.WATCHER_AWS_ECS``: the watcher producer runs ``dbt build`` in an ECS task.
-
-The producer starts the task through ``EcsRunTaskOperator`` and reads dbt's JSON log lines from the
-task's CloudWatch stream while it runs, pushing one status XCom per node as the consumer sensors
-expect. The provider's log-fetcher thread only collects the CloudWatch events into a queue; parsing
-and XCom pushes happen on the operator's own thread, as they do for the Kubernetes producer.
-"""
+"""``ExecutionMode.WATCHER_AWS_ECS``: the watcher producer runs ``dbt build`` in an ECS task."""
 
 from __future__ import annotations
 
@@ -14,7 +8,6 @@ import time
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException
 from packaging.version import Version
 
 from cosmos.constants import _ECS_WATCHER_MIN_AMAZON_PROVIDER_VERSION
@@ -45,11 +38,11 @@ try:
     from airflow.providers.amazon import __version__ as amazon_provider_version
     from airflow.providers.amazon.aws.hooks.logs import AwsLogsHook
     from airflow.providers.amazon.aws.utils.task_log_fetcher import AwsTaskLogFetcher
-except ImportError:  # pragma: no cover
+except ImportError as err:  # pragma: no cover
     raise ImportError(
         "Could not import the Amazon provider log fetcher. Ensure you've installed the Amazon Web Services "
         "provider separately or with `pip install astronomer-cosmos[...,aws-ecs]`."
-    )
+    ) from err
 
 if Version(amazon_provider_version) < _ECS_WATCHER_MIN_AMAZON_PROVIDER_VERSION:  # pragma: no cover
     raise ImportError(
@@ -72,22 +65,20 @@ def _is_command_completed(message: str) -> bool:
         event = json.loads(message)
     except json.JSONDecodeError:
         return False
-    return isinstance(event, dict) and event.get("info", {}).get("name") == _COMMAND_COMPLETED_EVENT
+    info = event.get("info") if isinstance(event, dict) else None
+    return isinstance(info, dict) and info.get("name") == _COMMAND_COMPLETED_EVENT
 
 
 class WatcherEcsLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
-    """Collects the dbt container's CloudWatch events for the producer to parse on its own thread.
+    """Queues the dbt container's CloudWatch events for the producer to parse on its own thread.
 
-    ``AwsTaskLogFetcher.run`` sleeps ``fetch_interval`` before every poll and returns as soon as
-    ``stop()`` is called, so the events written between the last poll and the task's end are never
-    read; for the watcher those are the last ``NodeFinished`` events. This subclass queues every
-    event message for the producer and, after ``stop()``, keeps polling until dbt's
-    ``CommandCompleted`` event has been read or ``drain_timeout`` has elapsed.
+    After ``stop()``, keeps polling until dbt's ``CommandCompleted`` event has been read or
+    ``drain_timeout`` has elapsed.
     """
 
-    def __init__(self, *, events: queue.SimpleQueue[str], drain_timeout: timedelta, **kwargs: Any) -> None:
+    def __init__(self, *, drain_timeout: timedelta, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.events = events
+        self.events: queue.SimpleQueue[str] = queue.SimpleQueue()
         self.drain_timeout = drain_timeout
         self.command_completed = False
         self._continuation_token = AwsLogsHook.ContinuationToken()
@@ -95,11 +86,13 @@ class WatcherEcsLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
     def run(self) -> None:
         while not self.is_stopped():
             time.sleep(self.fetch_interval.total_seconds())
-            self.collect()
+            self._poll()
+        # The provider's loop returns on stop(), dropping the events written since its last poll:
+        # for the watcher, the last NodeFinished events.
         deadline = time.monotonic() + self.drain_timeout.total_seconds()
         while not self.command_completed and time.monotonic() < deadline:
             time.sleep(_DRAIN_POLL_SECONDS)
-            self.collect()
+            self._poll()
         if not self.command_completed:
             self.logger.warning(
                 "dbt's %s event was not read within %s after the ECS task stopped; consumers of nodes whose "
@@ -107,6 +100,14 @@ class WatcherEcsLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
                 _COMMAND_COMPLETED_EVENT,
                 self.drain_timeout,
             )
+
+    def _poll(self) -> None:
+        # An exception escaping run() would end the thread silently: no more statuses would reach
+        # the consumers while the task keeps running.
+        try:
+            self.collect()
+        except Exception:
+            self.logger.exception("Failed to read the dbt container's CloudWatch log events; retrying.")
 
     def collect(self) -> None:
         """Read the events available now, queue their messages and log them as the parent does."""
@@ -121,10 +122,8 @@ class WatcherEcsLogFetcher(AwsTaskLogFetcher):  # type: ignore[misc]
 class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
     """Runs ``dbt build`` in an ECS task and publishes per-node statuses read from CloudWatch.
 
-    Requires ``awslogs_group`` and ``awslogs_stream_prefix``: without the log stream there is no
-    source of node statuses and every consumer would wait for nothing. ``deferrable``, ``reattach``
-    and ``wait_for_completion=False`` are rejected: the log stream is only read on the synchronous
-    path, and the producer never re-attaches to a previous build (see ``execute_watcher_producer``).
+    Requires ``awslogs_group`` and ``awslogs_stream_prefix``; rejects ``deferrable=True``,
+    ``reattach=True`` and ``wait_for_completion=False``. See :ref:`watcher-aws-ecs-execution-mode`.
 
     :param awslogs_fetch_interval: how often CloudWatch is polled while the task runs; it bounds the
         delay before a consumer can see its node's status. The provider default of 30 seconds is
@@ -148,6 +147,8 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
                 "are read from the CloudWatch log stream while the task runs, which only happens on the "
                 "synchronous path."
             )
+        # The provider's default is [operators] default_deferrable.
+        kwargs["deferrable"] = False
         if kwargs.get("wait_for_completion") is False:
             raise CosmosValueError("ExecutionMode.WATCHER_AWS_ECS requires the producer to wait for completion.")
         if kwargs.get("reattach"):
@@ -161,7 +162,6 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
                 "node statuses are read from the dbt container's CloudWatch log stream."
             )
         task_id = init_watcher_producer(self, kwargs)
-        self._log_events: queue.SimpleQueue[str] = queue.SimpleQueue()
         self.drain_timeout = drain_timeout
         super().__init__(task_id=task_id, awslogs_fetch_interval=awslogs_fetch_interval, *args, **kwargs)
         finalize_watcher_producer(self)
@@ -169,11 +169,13 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
     def _get_task_log_fetcher(self) -> WatcherEcsLogFetcher:
         if not self.awslogs_group:
             raise ValueError("must specify awslogs_group to fetch task logs")
+        # Amazon provider 9.34.0 stopped defaulting awslogs_region to the operator's region and
+        # resolves it here instead.
+        resolve_awslogs_region = getattr(self, "resolve_awslogs_region", None)
         return WatcherEcsLogFetcher(
-            events=self._log_events,
             drain_timeout=self.drain_timeout,
             aws_conn_id=self.aws_conn_id,
-            region_name=self.awslogs_region,
+            region_name=resolve_awslogs_region() if resolve_awslogs_region else self.awslogs_region,
             log_group=self.awslogs_group,
             log_stream_name=self._get_logs_stream_name(),
             fetch_interval=self.awslogs_fetch_interval,
@@ -182,11 +184,14 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
 
     def _process_log_events(self) -> None:
         """Parse the queued dbt log lines and push node statuses; runs on the operator's thread."""
+        fetcher = self.task_log_fetcher
+        if not isinstance(fetcher, WatcherEcsLogFetcher):
+            return
         context = self._context_holder.get(CONTEXT_KEY)
         extra_kwargs = {"context": context} if context else {}
         while True:
             try:
-                line = self._log_events.get_nowait()
+                line = fetcher.events.get_nowait()
             except queue.Empty:
                 return
             store_dbt_resource_status_from_log(
@@ -203,20 +208,30 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
         """Poll the task status, parsing the queued log lines between polls.
 
         Replaces the provider's blocking ``tasks_stopped`` waiter so the lines collected by the
-        fetcher thread are parsed here, on the operator's thread, while the build is running.
+        fetcher thread are parsed here, on the operator's thread, while the build is running. Raises
+        ``WaiterError`` as that waiter does, so the provider still stops the task on failure
+        (``stop_task_on_failure``, amazon provider 9.22.0 and later).
         """
+        from botocore.exceptions import WaiterError
+
         if not self.client or not self.arn:
             return
+        response: dict[str, Any] = {}
         for _ in range(self.waiter_max_attempts):
             self._process_log_events()
-            tasks = self.client.describe_tasks(cluster=self.cluster, tasks=[self.arn]).get("tasks") or []
+            response = self.client.describe_tasks(cluster=self.cluster, tasks=[self.arn])
+            tasks = response.get("tasks") or []
             if not tasks:
-                raise AirflowException(f"ECS task {self.arn} was not found in cluster {self.cluster}")
+                raise WaiterError(
+                    "TasksStopped", f"ECS task {self.arn} was not found in cluster {self.cluster}", response
+                )
             if tasks[0].get("lastStatus") == _STOPPED:
                 return
             time.sleep(self.waiter_delay)
-        raise AirflowException(
-            f"ECS task {self.arn} did not stop within {self.waiter_max_attempts} polls of {self.waiter_delay}s"
+        raise WaiterError(
+            "TasksStopped",
+            f"ECS task {self.arn} did not stop within {self.waiter_max_attempts} polls of {self.waiter_delay}s",
+            response,
         )
 
     def _after_execution(self) -> None:
@@ -228,7 +243,13 @@ class DbtProducerWatcherAwsEcsOperator(DbtBuildAwsEcsOperator):
     def execute(self, context: Context, **kwargs: Any) -> Any:
         # Bind before passing, because bare super() doesn't work inside lambdas or when called outside this method.
         parent_execute = super().execute
-        return execute_watcher_producer(self, context, parent_execute, **kwargs)
+        try:
+            return execute_watcher_producer(self, context, parent_execute, **kwargs)
+        except Exception:
+            # When _wait_for_task_ended raises, the provider skips _after_execution: publish the
+            # statuses already read, so the consumers of nodes that finished do not fail with the producer.
+            self._process_log_events()
+            raise
 
 
 class DbtConsumerWatcherAwsEcsSensor(BaseConsumerSensor, DbtRunAwsEcsOperator):
@@ -241,6 +262,28 @@ class DbtConsumerWatcherAwsEcsSensor(BaseConsumerSensor, DbtRunAwsEcsOperator):
     """
 
     template_fields: tuple[str, ...] = BaseConsumerSensor.template_fields + tuple(DbtRunAwsEcsOperator.template_fields)
+
+    def build_and_run_cmd(
+        self,
+        context: Context,
+        cmd_flags: list[str] | None = None,
+        run_as_async: bool = False,
+        async_context: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Run the fallback ECS task synchronously, whatever ``deferrable`` is.
+
+        ``deferrable`` is the sensor's: it defers while waiting for the producer. A deferred ECS task
+        would resume in the sensor's ``execute_complete``, which reads the trigger's ``success`` (the
+        task stopped) as the node's status, without checking the container's exit code.
+        """
+        deferrable, self.deferrable = self.deferrable, False
+        try:
+            return super().build_and_run_cmd(
+                context, cmd_flags=cmd_flags, run_as_async=run_as_async, async_context=async_context, **kwargs
+            )
+        finally:
+            self.deferrable = deferrable
 
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.

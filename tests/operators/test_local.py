@@ -3392,6 +3392,20 @@ def test_ai_diagnosis_without_its_dependencies_warns_and_keeps_the_dbt_failure(c
     assert operator._ai_diagnosis_handle is None
 
 
+def test_a_crash_deciding_whether_to_diagnose_never_hides_the_dbt_failure(caplog):
+    operator = _ai_operator()
+
+    with patch.object(operator, "_should_diagnose_failure", side_effect=RuntimeError("bug")):
+        with caplog.at_level(logging.ERROR):
+            with pytest.raises(AirflowException) as exc_info:
+                operator._handle_exception_and_diagnose(
+                    _failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT
+                )
+
+    assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
+    assert "crashed unexpectedly" in caplog.text
+
+
 @patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
 def test_ai_diagnosis_leaves_exceptions_without_a_text_message_untouched(mock_diagnose):
     operator = _ai_operator()

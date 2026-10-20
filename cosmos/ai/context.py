@@ -20,6 +20,8 @@ _MAX_FAILED_NODES = 5
 _MAX_MESSAGE_CHARS = 4000
 _MAX_COMPILED_SQL_CHARS = 8000
 _MAX_OUTPUT_CHARS = 8000
+# The manifest of a big project can be hundreds of MB, and loading it would cost the worker its memory.
+_MAX_ARTIFACT_BYTES = 50 * 1024 * 1024
 
 # Resource types that live in the warehouse as a table or view the agent can inspect.
 _RELATION_RESOURCE_TYPES = frozenset({"model", "seed", "snapshot", "source"})
@@ -126,6 +128,11 @@ def _relation(entry: dict[str, Any]) -> str | None:
 
 def _load_json(path: Path) -> dict[str, Any] | None:
     try:
+        if path.stat().st_size > _MAX_ARTIFACT_BYTES:
+            logger.warning(
+                "%s is larger than %s MB; not reading it to diagnose the dbt failure.", path, _MAX_ARTIFACT_BYTES >> 20
+            )
+            return None
         with path.open() as file:
             loaded = json.load(file)
     except FileNotFoundError:

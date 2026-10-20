@@ -137,7 +137,6 @@ def diagnose_dbt_failure(
             usage.input_tokens,
             usage.output_tokens,
         )
-        _log_tool_calls(result)
         return redact(format_diagnosis(result.output), ai_config)
     except (AgentRunError, UserError, AirflowException, ImportError, OSError, ValueError):
         # ``ImportError``: pydantic-ai asks for the SDK of the model's provider (e.g. ``openai``) when it is missing.
@@ -175,16 +174,6 @@ def _run_agent(agent: Any, prompt: str, timeout_seconds: float, handle: Diagnosi
         return None
     finally:
         timer.cancel()
-
-
-def _log_tool_calls(result: Any) -> None:
-    """Log what the agent asked of its tools, and when it was refused a table: a blind diagnosis looks like any other."""
-    for message in result.all_messages():
-        for part in message.parts:
-            if part.part_kind == "tool-call" and part.tool_name in _SCHEMA_ONLY_TOOLS:
-                logger.info("AI diagnosis tool call: %s %s", part.tool_name, part.args)
-            elif part.part_kind in ("tool-return", "retry-prompt") and "not in the allowed tables" in str(part.content):
-                logger.warning("AI diagnosis was refused a table that is not one of the tables of the failed node.")
 
 
 def _build_toolsets(
@@ -230,14 +219,18 @@ def _build_toolsets(
 
 
 def _redacting(toolset: Any, ai_config: AiConfig) -> Any:
-    """Wrap ``toolset`` so that what its tools return is redacted like the prompt before the model sees it."""
+    """Wrap ``toolset`` to log what the agent asks of its tools, and to redact what they return like the prompt."""
     from pydantic_ai.toolsets import WrapperToolset  # the provider, so pydantic-ai, is there by now
 
     @dataclass
     class RedactingToolset(WrapperToolset):  # type: ignore[misc]
         async def call_tool(self, name: str, tool_args: dict[str, Any], ctx: Any, tool: Any) -> Any:
+            logger.info("AI diagnosis tool call: %s %s", name, tool_args)
             result = await self.wrapped.call_tool(name, tool_args, ctx, tool)
-            return redact(result if isinstance(result, str) else json.dumps(result, default=str), ai_config)
+            text = result if isinstance(result, str) else json.dumps(result, default=str)
+            if "not in the allowed tables" in text:
+                logger.warning("AI diagnosis was refused a table that is not one of the tables of the failed node.")
+            return redact(text, ai_config)
 
     return RedactingToolset(wrapped=toolset)
 

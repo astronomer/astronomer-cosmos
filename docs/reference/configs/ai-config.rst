@@ -50,7 +50,8 @@ When it runs, and what it costs
 
 - It runs once per failed task, on the task's last attempt. With ``retries=3``, the first three failures don't call the
   LLM.
-- A diagnosis is limited to 8 model requests, and its LLM run is cancelled after ``timeout_seconds``. The time limit
+- A diagnosis is limited to 8 model requests, and its LLM run is cancelled after ``timeout_seconds``. Every request
+  carries the whole prompt, which can reach about 60,000 characters with 5 failed nodes. The time limit
   is checked while Cosmos waits for the model, so a call that blocks its thread is cancelled when it returns.
 - Many tasks failing for the same reason mean many calls. To limit the cost, set ``ai_config`` only on the
   ``DbtTaskGroup`` that needs it.
@@ -80,7 +81,10 @@ around the problem. Use ``redactor`` to cover those cases:
         redactor=lambda text: re.sub(r"(?i)(password|token)=\S+", r"\1=***", text),
     )
 
-If ``redactor`` raises, nothing is sent. What the schema tools return to the agent goes through the same masking and
+The error text of dbt and of the database can repeat the values of the rows involved, such as in a unique key
+violation, and names such as hosts and users. Airflow's masker doesn't know them, so they are sent unless
+``redactor`` hides them. The text from dbt is untrusted: Cosmos fences it and tells the model never to follow it, which
+reduces the risk of prompt injection but doesn't remove it. If ``redactor`` raises, nothing is sent. What the schema tools return to the agent goes through the same masking and
 ``redactor``.
 
 Schema introspection
@@ -91,7 +95,8 @@ of its parents, to check things like whether a column exists. It can't read rows
 the agent the exact names of the tables it can inspect, such as ``analytics.orders``, and the task log shows every table
 it looked at. If it asks for a table outside that list, Cosmos logs a warning and the diagnosis continues without it.
 
-It needs ``ProfileConfig.profile_mapping`` with a connection whose Airflow hook is a SQL hook (``DbApiHook``), such as
+Cosmos looks the tables up in the database of the Airflow connection, so a different database in ``profile_args`` is not
+used. It needs ``ProfileConfig.profile_mapping`` with a connection whose Airflow hook is a SQL hook (``DbApiHook``), such as
 Postgres, Snowflake, Redshift or MySQL. Cosmos reads the connection through Airflow, so the Airflow provider of your
 warehouse must be installed, for example ``apache-airflow-providers-postgres``. This is not needed to run dbt itself.
 For other connections (BigQuery, Databricks, Athena, Spark and ``generic``), or when the provider is missing, Cosmos

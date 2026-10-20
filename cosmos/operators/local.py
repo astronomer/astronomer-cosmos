@@ -696,8 +696,19 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         except AirflowSkipException:
             raise
         except Exception as exc:
-            if self._should_diagnose_failure(context):
-                self._append_ai_diagnosis(exc, result, tmp_project_dir)
+            try:
+                if self._should_diagnose_failure(context):
+                    self._append_ai_diagnosis(exc, result, tmp_project_dir)
+            except Exception:
+                # The diagnosis handles the failures it expects, so this is a bug in Cosmos, or a version of the
+                # provider or of the LLM SDK it doesn't support. Log it loudly, but never let it replace the dbt failure.
+                self.log.error(
+                    "AI diagnosis crashed unexpectedly (a bug, or an unsupported provider version?); "
+                    "falling back to the standard error message.",
+                    exc_info=True,
+                )
+            finally:
+                self._ai_diagnosis_handle = None
             raise
 
     def _should_diagnose_failure(self, context: Context) -> bool:
@@ -718,7 +729,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         return True
 
     def _append_ai_diagnosis(self, exc: Exception, result: Any, tmp_project_dir: str) -> None:
-        """Add the AI diagnosis to the message of ``exc``. A failure here is logged, it never hides the dbt failure."""
+        """Add the AI diagnosis to the message of ``exc``."""
         try:
             # Imported only here: ``cosmos.ai`` needs pydantic, which Airflow 2 and Cosmos themselves don't require.
             from cosmos.ai.context import build_failure_context
@@ -731,27 +742,17 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             )
             return
 
-        try:
-            output = "\n".join(getattr(result, "full_output", [])) or str(exc)
-            self._ai_diagnosis_handle = DiagnosisHandle()
-            diagnosis = diagnose_dbt_failure(
-                ai_config=self.ai_config,  # type: ignore[arg-type]
-                profile_config=self.profile_config,
-                failure_context=build_failure_context(tmp_project_dir, output),
-                handle=self._ai_diagnosis_handle,
-            )
-            if diagnosis and exc.args and isinstance(exc.args[0], str):
-                exc.args = (f"{exc.args[0]}\n\n{diagnosis}", *exc.args[1:])
-        except Exception:
-            # The diagnosis handles the failures it expects, so this is a bug in Cosmos, or a version of the provider
-            # or of the LLM SDK it doesn't support. Log it loudly, but never let it replace the dbt failure.
-            self.log.error(
-                "AI diagnosis crashed unexpectedly (a bug, or an unsupported provider version?); "
-                "falling back to the standard error message.",
-                exc_info=True,
-            )
-        finally:
-            self._ai_diagnosis_handle = None
+        self._ai_diagnosis_handle = DiagnosisHandle()
+        diagnosis = diagnose_dbt_failure(
+            ai_config=self.ai_config,  # type: ignore[arg-type]
+            profile_config=self.profile_config,
+            failure_context=build_failure_context(
+                tmp_project_dir, "\n".join(getattr(result, "full_output", [])) or str(exc)
+            ),
+            handle=self._ai_diagnosis_handle,
+        )
+        if diagnosis and exc.args and isinstance(exc.args[0], str):
+            exc.args = (f"{exc.args[0]}\n\n{diagnosis}", *exc.args[1:])
 
     def run_command(  # noqa: C901
         self,

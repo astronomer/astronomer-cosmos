@@ -1,9 +1,11 @@
 import json
+import logging
 import shutil
 from pathlib import Path
 
 import pytest
 
+import cosmos.ai.context as context_module
 from cosmos.ai.context import FailedNode, FailureContext, build_failure_context
 
 # Artifacts of a real ``dbt build`` (dbt-core 1.11, Postgres) with a model that fails with a database error, a test that
@@ -139,6 +141,20 @@ def test_build_failure_context_tolerates_null_fields_in_the_artifacts(tmp_path):
             relations=("analytics.child",),
         ),
     )
+
+
+def test_build_failure_context_does_not_read_an_artifact_that_is_too_big(sample_project, monkeypatch, caplog):
+    """The manifest of a big project is hundreds of MB: loading it could cost the worker its memory."""
+    manifest = sample_project / "target" / "manifest.json"
+    monkeypatch.setattr(context_module, "_MAX_ARTIFACT_BYTES", manifest.stat().st_size - 1)
+
+    with caplog.at_level(logging.WARNING):
+        context = build_failure_context(sample_project)
+
+    # The failure is still reported from ``run_results.json``, only without the related tables from the manifest.
+    assert [node.unique_id for node in context.failed_nodes][0] == "model.real_fail.leak"
+    assert context.allowed_tables == []
+    assert "manifest.json is larger than" in caplog.text
 
 
 def test_build_failure_context_limits_the_number_of_failed_nodes(tmp_path):

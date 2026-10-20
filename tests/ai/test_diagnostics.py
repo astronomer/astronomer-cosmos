@@ -87,7 +87,6 @@ def fake_provider(monkeypatch):
         behaviour=lambda prompt, token: SimpleNamespace(
             output=DIAGNOSIS,
             usage=SimpleNamespace(requests=1, input_tokens=10, output_tokens=5),
-            all_messages=lambda: [],
         ),
         agent=None,
         agent_kwargs=None,
@@ -151,7 +150,6 @@ def test_diagnose_dbt_failure_uses_a_custom_output_type_and_generic_instructions
     fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
         output=Custom(summary="It broke."),
         usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1),
-        all_messages=lambda: [],
     )
     config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_output_type=Custom)
 
@@ -201,7 +199,6 @@ def test_diagnose_dbt_failure_redacts_the_diagnosis_too(fake_provider):
     fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
         output=DbtFailureDiagnosis(root_cause="Leaked SECRET-VALUE.", suggested_fix="Fix.", confidence="low"),
         usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1),
-        all_messages=lambda: [],
     )
 
     diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
@@ -312,7 +309,6 @@ def test_diagnose_dbt_failure_returns_none_when_the_diagnosis_can_not_be_rendere
     fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
         output=Unrenderable(),
         usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1),
-        all_messages=lambda: [],
     )
 
     with caplog.at_level(logging.WARNING):
@@ -559,88 +555,14 @@ def test_diagnose_dbt_failure_without_introspection_does_not_mention_tables_to_i
     assert "get_schema" not in fake_provider.agent.runs[0].prompt
 
 
-def _tool_messages(call_args, return_content, return_kind="tool-return", tool_name="get_schema"):
-    """The messages of an agent that called one tool and got ``return_content`` back."""
-    return [
-        SimpleNamespace(
-            parts=[SimpleNamespace(part_kind="tool-call", tool_name=tool_name, tool_call_id="c1", args=call_args)]
-        ),
-        SimpleNamespace(
-            parts=[
-                SimpleNamespace(part_kind=return_kind, tool_name=tool_name, tool_call_id="c1", content=return_content)
-            ]
-        ),
-    ]
-
-
-def _run_with_messages(fake_provider, messages):
-    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
-        output=DIAGNOSIS,
-        usage=SimpleNamespace(requests=2, input_tokens=1, output_tokens=1),
-        all_messages=lambda: messages,
-    )
-    return diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
-
-
-@pytest.mark.parametrize("call_args", [{"table_name": "raw.orders"}, '{"table_name": "raw.orders"}'])
-def test_diagnose_dbt_failure_logs_the_table_the_agent_asked_for(fake_provider, caplog, call_args):
-    with caplog.at_level(logging.INFO):
-        _run_with_messages(fake_provider, _tool_messages(call_args, '{"columns": []}'))
-
-    assert "AI diagnosis tool call: get_schema" in caplog.text and "raw.orders" in caplog.text
-
-
-def test_diagnose_dbt_failure_logs_a_tool_call_without_a_table(fake_provider, caplog):
-    with caplog.at_level(logging.INFO):
-        _run_with_messages(fake_provider, _tool_messages({}, "[]", tool_name="list_tables"))
-
-    assert "AI diagnosis tool call: list_tables" in caplog.text
-
-
-def test_diagnose_dbt_failure_tolerates_tool_call_arguments_that_are_not_json(fake_provider, caplog):
-    with caplog.at_level(logging.INFO):
-        diagnosis = _run_with_messages(fake_provider, _tool_messages("not json", "[]"))
-
-    assert diagnosis is not None
-    assert "AI diagnosis tool call: get_schema" in caplog.text
-
-
-@pytest.mark.parametrize("return_kind", ["tool-return", "retry-prompt"])
-def test_diagnose_dbt_failure_warns_when_the_agent_is_refused_a_table(fake_provider, caplog, return_kind):
-    messages = _tool_messages(
-        {"table_name": "base"}, "Table 'base' is not in the allowed tables list.", return_kind=return_kind
-    )
-
-    with caplog.at_level(logging.WARNING):
-        _run_with_messages(fake_provider, messages)
-
-    assert "was refused a table" in caplog.text
-
-
-def test_diagnose_dbt_failure_never_logs_what_a_tool_returned(fake_provider, caplog):
-    messages = _tool_messages({"table_name": "raw.orders"}, '{"columns": [{"name": "SECRET-VALUE"}]}')
-
-    with caplog.at_level(logging.DEBUG):
-        _run_with_messages(fake_provider, messages)
-
-    assert "SECRET-VALUE" not in caplog.text
-
-
-def test_diagnose_dbt_failure_ignores_tool_calls_that_are_not_the_metadata_tools(fake_provider, caplog):
-    with caplog.at_level(logging.DEBUG):
-        _run_with_messages(fake_provider, _tool_messages({"sql": "select 1"}, "1", tool_name="final_result"))
-
-    assert "tool call" not in caplog.text and "select 1" not in caplog.text
-
-
-def _tool_result(returned, config):
+def _tool_result(returned, config, tool_args=None):
     """What the model gets when a tool, wrapped to redact, returns ``returned``."""
 
     class Tools:
         async def call_tool(self, name, tool_args, ctx, tool):
             return returned
 
-    return asyncio.run(diagnostics._redacting(Tools(), config).call_tool("get_schema", {}, None, None))
+    return asyncio.run(diagnostics._redacting(Tools(), config).call_tool("get_schema", tool_args or {}, None, None))
 
 
 @pytest.fixture
@@ -663,6 +585,30 @@ def fake_wrapper_toolset(monkeypatch):
 )
 def test_redacting_toolset_masks_secrets_in_any_kind_of_result(fake_provider, fake_wrapper_toolset, returned, expected):
     assert _tool_result(returned, AI_CONFIG) == expected
+
+
+def test_redacting_toolset_logs_the_tool_calls_as_they_happen(fake_provider, fake_wrapper_toolset, caplog):
+    with caplog.at_level(logging.INFO):
+        _tool_result('{"columns": []}', AI_CONFIG, tool_args={"table_name": "raw.orders"})
+
+    assert "AI diagnosis tool call: get_schema {'table_name': 'raw.orders'}" in caplog.text
+
+
+def test_redacting_toolset_warns_when_the_agent_is_refused_a_table(fake_provider, fake_wrapper_toolset, caplog):
+    refusal = '{"error": "Table \'base\' is not in the allowed tables list."}'
+
+    with caplog.at_level(logging.WARNING):
+        returned = _tool_result(refusal, AI_CONFIG)
+
+    assert "was refused a table" in caplog.text
+    assert returned == refusal
+
+
+def test_redacting_toolset_never_logs_what_a_tool_returned(fake_provider, fake_wrapper_toolset, caplog):
+    with caplog.at_level(logging.DEBUG):
+        _tool_result('{"columns": [{"name": "SECRET-VALUE"}]}', AI_CONFIG)
+
+    assert "SECRET-VALUE" not in caplog.text
 
 
 def test_redacting_toolset_applies_the_user_redactor(fake_provider, fake_wrapper_toolset):

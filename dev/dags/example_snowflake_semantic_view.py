@@ -3,8 +3,9 @@ Example DAGs (local and watcher) for a dbt project with a Snowflake semantic vie
 package), loaded from the committed manifest, rendered as a ``semantic_metric_view`` resource when ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION=True``
 (see "Managing semantic metric views").
 
-Runs with the ``snowflake_default`` connection. Optional: ``COSMOS_DEMO_SCHEMA`` (default ``cosmos_demo``) and
-``RESOURCE_PREFIX``, which prefixes every object name so runs can share a schema.
+Runs with the ``snowflake_default`` connection, authenticated with a private key (``private_key_content``).
+Optional: ``COSMOS_DEMO_SCHEMA`` (default ``cosmos_demo``) and ``RESOURCE_PREFIX``, which prefixes every object name
+so runs can share a schema.
 """
 
 import os
@@ -20,14 +21,14 @@ from cosmos import (
     ProjectConfig,
     RenderConfig,
 )
-from cosmos.profiles import SnowflakeUserPasswordProfileMapping
+from cosmos.profiles import SnowflakePrivateKeyPemProfileMapping
 
 DBT_PROJECT_PATH = Path(__file__).parent / "dbt" / "snowflake_semantic_view"
 
 profile_config = ProfileConfig(
     profile_name="snowflake_semantic_view",
     target_name="dev",
-    profile_mapping=SnowflakeUserPasswordProfileMapping(
+    profile_mapping=SnowflakePrivateKeyPemProfileMapping(
         conn_id="snowflake_default",
         profile_args={"schema": os.getenv("COSMOS_DEMO_SCHEMA", "cosmos_demo")},
     ),

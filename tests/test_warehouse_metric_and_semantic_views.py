@@ -5,7 +5,7 @@ topology, run them and verify the objects in the warehouse, in the style of
 tests/operators/test_watcher.py::test_dbt_dag_with_watcher.
 
 Credentials, as provided by CI: ``AIRFLOW_CONN_DATABRICKS_DEFAULT`` plus ``DATABRICKS_CATALOG`` (default ``main``),
-and ``SNOWFLAKE_ACCOUNT``, ``SNOWFLAKE_USER``, ``SNOWFLAKE_PASSWORD``, ``SNOWFLAKE_DATABASE``, ``SNOWFLAKE_SCHEMA``,
+and ``SNOWFLAKE_ACCOUNT``, ``SNOWFLAKE_USER``, ``SNOWFLAKE_PRIVATE_KEY`` (PKCS#8 PEM), ``SNOWFLAKE_DATABASE``, ``SNOWFLAKE_SCHEMA``,
 ``SNOWFLAKE_WAREHOUSE`` (optional ``SNOWFLAKE_ROLE``). A warehouse without credentials is skipped and, under GitHub
 Actions, listed in the job summary. A warehouse that has credentials but cannot be set up is skipped locally and fails
 under CI (``CI`` set).
@@ -50,7 +50,7 @@ from cosmos.operators.watcher import (
     DbtSemanticMetricViewWatcherOperator,
     DbtTestWatcherOperator,
 )
-from cosmos.profiles import DatabricksTokenProfileMapping, SnowflakeUserPasswordProfileMapping
+from cosmos.profiles import DatabricksTokenProfileMapping, SnowflakePrivateKeyPemProfileMapping
 
 from . import utils as test_utils
 
@@ -74,6 +74,17 @@ def skip_unless_ci(reason: str) -> None:
     if os.getenv("CI"):
         pytest.fail(reason)
     pytest.skip(reason)
+
+
+def private_key_der(private_key_pem: str) -> bytes:
+    from cryptography.hazmat.primitives import serialization
+
+    private_key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
+    return private_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
 
 
 def amounts_by_status(rows: list[tuple[Any, Any]]) -> dict[str, float]:
@@ -200,7 +211,7 @@ class Snowflake(Warehouse):
         required = (
             "SNOWFLAKE_ACCOUNT",
             "SNOWFLAKE_USER",
-            "SNOWFLAKE_PASSWORD",
+            "SNOWFLAKE_PRIVATE_KEY",
             "SNOWFLAKE_DATABASE",
             "SNOWFLAKE_SCHEMA",
             "SNOWFLAKE_WAREHOUSE",
@@ -218,12 +229,12 @@ class Snowflake(Warehouse):
             "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"],
             "database": self.database,
             "role": os.getenv("SNOWFLAKE_ROLE"),
+            "private_key_content": os.environ["SNOWFLAKE_PRIVATE_KEY"],
         }
         os.environ["AIRFLOW_CONN_SNOWFLAKE_DEFAULT"] = json.dumps(
             {
                 "conn_type": "snowflake",
                 "login": os.environ["SNOWFLAKE_USER"],
-                "password": os.environ["SNOWFLAKE_PASSWORD"],
                 "schema": self.schema,
                 "extra": {key: value for key, value in extra.items() if value},
             }
@@ -231,7 +242,7 @@ class Snowflake(Warehouse):
         self.connection_params = {
             "account": extra["account"],
             "user": os.environ["SNOWFLAKE_USER"],
-            "password": os.environ["SNOWFLAKE_PASSWORD"],
+            "private_key": private_key_der(os.environ["SNOWFLAKE_PRIVATE_KEY"]),
             "warehouse": extra["warehouse"],
             "database": self.database,
             **({"role": extra["role"]} if extra["role"] else {}),
@@ -241,7 +252,7 @@ class Snowflake(Warehouse):
         return ProfileConfig(
             profile_name=self.project_name,
             target_name="dev",
-            profile_mapping=SnowflakeUserPasswordProfileMapping(
+            profile_mapping=SnowflakePrivateKeyPemProfileMapping(
                 conn_id="snowflake_default", profile_args={"schema": self.schema}
             ),
         )

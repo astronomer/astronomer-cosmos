@@ -38,6 +38,10 @@ GKE_KWARGS = {
 }
 
 
+def test_emit_datasets_is_a_template_field_on_consumer():
+    assert "emit_datasets" in DbtConsumerWatcherGcpGkeSensor.template_fields
+
+
 def test_retries_not_forced_to_zero():
     """
     Test that the operator does not force retries to 0, allowing user-configured retries.

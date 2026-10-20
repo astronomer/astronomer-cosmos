@@ -128,6 +128,16 @@ def is_producer_task_terminated(state: str | None) -> bool:
     return state in PRODUCER_TERMINAL_STATES
 
 
+def is_producer_task_still_running(state: str | None) -> bool:
+    """Return True when the producer task is still running (a known, non-terminal state).
+
+    Not the plain negation of ``is_producer_task_terminated``: an unknown/unfetchable state
+    (``None`` or empty) is treated as *not* running, so a failed node with no known producer
+    state still surfaces rather than polling forever.
+    """
+    return bool(state) and not is_producer_task_terminated(state)
+
+
 def get_status_xcom_key(unique_id: str) -> str:
     """Build the XCom key used to publish a dbt node's status, sanitising dots in ``unique_id`` to ``__``."""
     return f"{unique_id.replace('.', '__')}_status"
@@ -214,7 +224,10 @@ def build_producer_state_fetcher(
                     .one_or_none()
                 )
                 if ti is not None:
-                    return str(ti.state)
+                    # Normalise a null state to None (not the string "None") so callers such as
+                    # is_producer_task_still_running treat an unknown producer state consistently
+                    # with Airflow 3, where the fetcher already returns None. See #2947.
+                    return str(ti.state) if ti.state is not None else None
                 return None
 
         return fetch_state_airflow2

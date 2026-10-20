@@ -148,7 +148,8 @@ templated values via ``operator_args``.
 
 The fields that support Airflow templating via
 ``DbtDag(operator_args=...)`` or ``DbtTaskGroup(operator_args=...)`` are
-``env``, ``vars``, ``full_refresh``, and ``dbt_cmd_flags``. ``select``,
+``env``, ``vars``, ``full_refresh``, ``dbt_cmd_flags``, and
+``emit_datasets``. ``select``,
 ``selector``, and ``exclude`` are also templatable when passed via
 ``operator_args`` (or directly to a standalone operator instance), with
 the caveat below.

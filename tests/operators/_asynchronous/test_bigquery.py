@@ -446,3 +446,65 @@ def test_get_remote_sql_reads_from_object_storage(profile_config_mock):
     assert result == "SELECT 1;"
     fake_file.read.assert_called_once()
     fake_path.open.assert_called_once()
+
+
+ASYNC_EMIT_DATASETS_VALUES = [
+    (True, True),
+    ("True", True),
+    (" true ", True),
+    (False, False),
+    ("False", False),
+    ("false", False),
+    ("0", False),
+    (" false ", False),
+]
+
+
+@pytest.mark.parametrize("emit_datasets, expected_emission", ASYNC_EMIT_DATASETS_VALUES)
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "build_and_run_cmd")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
+@patch("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
+def test_execute_resolves_rendered_emit_datasets(
+    mock_register_event,
+    mock_store_template_fields,
+    mock_build_and_run_cmd,
+    profile_config_mock,
+    emit_datasets,
+    expected_emission,
+):
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+    operator.emit_datasets = emit_datasets
+    operator.gcp_project = "test_project"
+    operator.dataset = "test_dataset"
+
+    operator.execute(MagicMock())
+
+    assert mock_register_event.called is expected_emission
+
+
+@pytest.mark.parametrize("emit_datasets, expected_emission", ASYNC_EMIT_DATASETS_VALUES)
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
+def test_execute_complete_resolves_rendered_emit_datasets(
+    mock_register_event, mock_store_template_fields, profile_config_mock, emit_datasets, expected_emission
+):
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+    operator.emit_datasets = emit_datasets
+    operator.gcp_project = "test_project"
+    operator.dataset = "test_dataset"
+
+    with patch.object(BigQueryInsertJobOperator, "execute_complete"):
+        operator.execute_complete(MagicMock(), {"job_id": "job", "status": "success"})
+
+    assert mock_register_event.called is expected_emission

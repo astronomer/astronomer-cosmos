@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import types
+from functools import lru_cache
 from typing import Any
 
 from cosmos._utils.importer import load_method_from_module
 from cosmos.airflow.graph import _snake_case_to_camelcase
 from cosmos.config import ProfileConfig
 from cosmos.constants import ExecutionMode
-from cosmos.operators.local import DbtRunLocalOperator
+
+try:  # Airflow 3
+    from airflow.sdk.bases.operator import BaseOperator
+except ImportError:  # Airflow 2
+    from airflow.models import BaseOperator
 
 
 def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
@@ -29,7 +35,23 @@ def _create_async_operator_class(profile_type: str, dbt_class: str) -> Any:
         raise ImportError(f"Error in loading class: {class_path}. Unable to find the specified operator class.") from e
 
 
-class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):
+@lru_cache(maxsize=None)
+def _get_async_subclass(factory_cls: type, async_operator_class: type) -> type:
+    """
+    Mix ``factory_cls`` with the runtime-resolved async operator class without re-basing the shared class.
+
+    Assigning ``__bases__`` raises ``TypeError`` when the instance layouts differ, as with Airflow 3.4's ABC-based
+    ``ResumableJobMixin``. Composition instead raises ``DuplicateTaskIdFound``.
+    """
+    return types.new_class(
+        factory_cls.__name__,
+        (factory_cls, async_operator_class),
+        exec_body=lambda ns: ns.update(__module__=factory_cls.__module__),
+    )
+
+
+class DbtRunAirflowAsyncFactoryOperator(BaseOperator):
+    """Resolves the profile-specific async operator at construction and mixes it in via a dynamic subclass."""
 
     def __init__(
         self,
@@ -42,13 +64,9 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):
         self.project_dir = project_dir
         self.profile_config = profile_config
 
-        async_operator_class = self.create_async_operator()
-
-        # Dynamically modify the base classes.
-        # This is necessary because the async operator class is only known at runtime.
-        # When using composition instead of inheritance to initialize the async class and run its execute method,
-        # Airflow throws a `DuplicateTaskIdFound` error.
-        DbtRunAirflowAsyncFactoryOperator.__bases__ = (async_operator_class,)
+        async_operator_class = _create_async_operator_class(profile_config.get_profile_type(), "DbtRun")
+        # Safe because the dynamic class is a subclass of ``type(self)``, so the instance layout is unchanged.
+        self.__class__ = _get_async_subclass(type(self), async_operator_class)
         super().__init__(
             project_dir=project_dir,
             profile_config=profile_config,
@@ -56,11 +74,3 @@ class DbtRunAirflowAsyncFactoryOperator(DbtRunLocalOperator):
             dbt_kwargs=dbt_kwargs,
             **kwargs,
         )
-
-    def create_async_operator(self) -> Any:
-
-        profile_type = self.profile_config.get_profile_type()
-
-        async_class_operator = _create_async_operator_class(profile_type, "DbtRun")
-
-        return async_class_operator

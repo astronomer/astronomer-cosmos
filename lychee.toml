@@ -29,8 +29,8 @@ exclude_loopback = true
 # URLs an automated checker cannot verify, plus intentional placeholders.
 # Genuinely broken links are fixed in the docs, not excluded here.
 exclude = [
-    # Auth wall — Slack invite links return 403 to unauthenticated requests.
-    'https://join\.slack\.com',
+    # Auth wall — Slack links return 403 to unauthenticated requests.
+    'https://[a-z0-9-]+\.slack\.com',
     # Flaky / rate-limited from CI — intermittent TLS failures.
     'https://ossrank\.com',
     # Bot-blocked — the Bitnami Helm chart repo returns 403 to non-Helm clients.

@@ -38,7 +38,7 @@ At the moment, the user is expected to add to the Docker image both:
 - The dbt Profile, which contains the information for dbt to access the database while parsing the project from Apache Airflow nodes
 - Handle secrets
 
-If you plan to generate dbt docs and upload them to S3 from Kubernetes, the image also needs the AWS CLI because Cosmos performs the upload from inside the Pod.
+If you plan to generate dbt docs and upload them to S3 from Kubernetes, the Pod image must have ``boto3`` available, either installed directly or provided by packages such as ``apache-airflow-providers-amazon``.
 
 Additional KubernetesPodOperator parameters can be added to the ``operator_args`` parameter of the ``DbtKubernetesOperator``.
 

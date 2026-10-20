@@ -3,6 +3,7 @@ import shutil
 import sys
 import tempfile
 import types
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +15,8 @@ from cosmos.operators.local import DbtRunLocalOperator
 from cosmos.operators.watcher import DbtProducerWatcherOperator
 
 sys.modules.pop("dbt.cli.main", None)
+
+from types import SimpleNamespace
 
 import pytest
 
@@ -57,6 +60,42 @@ def invalid_dbt_project_dir(valid_dbt_project_dir):
 @patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_is_available_is_false():
     assert not dbt_runner.is_available()
+
+
+@patch("cosmos.dbt.runner.version", return_value="2.0.0rc2")
+def test_is_dbt_v2(mock_version):
+    assert dbt_runner.is_dbt_v2()
+    mock_version.assert_called_once_with("dbt-core")
+
+
+@patch("cosmos.dbt.runner.version")
+def test_is_dbt_v2_is_false_for_dbt_v1(mock_version):
+    mock_version.side_effect = ["1.12.6", PackageNotFoundError("dbt-oss"), PackageNotFoundError("dbt")]
+    assert not dbt_runner.is_dbt_v2()
+    assert mock_version.call_count == 3
+    mock_version.assert_called_with("dbt")
+
+
+@patch("cosmos.dbt.runner.version")
+def test_is_dbt_v2_is_false_for_dbt_v3(mock_version):
+    mock_version.side_effect = ["3.0.0", PackageNotFoundError("dbt-oss"), PackageNotFoundError("dbt")]
+    assert not dbt_runner.is_dbt_v2()
+    assert mock_version.call_count == 3
+    mock_version.assert_called_with("dbt")
+
+
+@patch("cosmos.dbt.runner.version")
+def test_is_dbt_v2_ignores_invalid_version(mock_version):
+    mock_version.side_effect = ["not-a-version", PackageNotFoundError("dbt-oss"), PackageNotFoundError("dbt")]
+    assert not dbt_runner.is_dbt_v2()
+    assert mock_version.call_count == 3
+
+
+@patch("cosmos.dbt.runner.version")
+def test_is_dbt_v2_with_dbt_core_v1_next_to_dbt_v2(mock_version):
+    mock_version.side_effect = ["1.12.6", PackageNotFoundError("dbt-oss"), "2.0.8"]
+    assert dbt_runner.is_dbt_v2()
+    assert mock_version.call_count == 3
 
 
 def test_cleanup_dbt_adapters_calls_reset_adapters_and_gc():
@@ -377,3 +416,23 @@ def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
             assert not instances[0].callbacks
             # 3. Second instance has one callback
             assert len(instances[1].callbacks) == 1
+
+
+def test_extract_message_by_status_falls_back_to_unique_id_without_node():
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    result = SimpleNamespace(result=SimpleNamespace(results=[entry]))
+
+    names, messages = dbt_runner.extract_message_by_status(result, ["error"])
+
+    assert names == ["macro.probe.boom"]
+    assert messages == ["None"]
+
+
+def test_extract_message_by_status_still_prefers_node_name():
+    entry = SimpleNamespace(status="error", node=SimpleNamespace(name="my_model"), message="boom")
+    result = SimpleNamespace(result=SimpleNamespace(results=[entry]))
+
+    names, messages = dbt_runner.extract_message_by_status(result, ["error"])
+
+    assert names == ["my_model"]
+    assert messages == ["boom"]

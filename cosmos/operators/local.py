@@ -18,7 +18,6 @@ from urllib.parse import urlparse
 import jinja2
 from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
-from airflow.utils.strings import to_boolean
 from packaging.version import Version
 
 from cosmos.airflow.compatibility import AirflowSkipException
@@ -95,6 +94,7 @@ from cosmos.constants import (
     OPENLINEAGE_PRODUCER,
 )
 from cosmos.dbt.parser.output import (
+    extract_dbt_failure_details,
     extract_freshness_warn_msg,
     extract_log_issues,
     parse_number_of_warnings_subprocess,
@@ -114,10 +114,12 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
     _sanitize_xcom_key,
+    resolve_templated_bool,
 )
 
 logger = get_logger(__name__)
@@ -257,11 +259,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """Resolve the effective ``install_deps`` flag, normalizing a rendered template string to a bool."""
         if not self._has_dependencies_file:
             return False
-        value = self.install_deps
-        if isinstance(value, str):
-            # ``to_boolean`` does not strip whitespace, so a rendered " true " would otherwise be False.
-            return bool(to_boolean(value.strip()))
-        return bool(value)
+        return resolve_templated_bool(self.install_deps)
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -303,7 +301,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
             self.log.error("\n".join(result.full_output))
-            raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
+            message = f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
+            failure_details = extract_dbt_failure_details(result.full_output)
+            if failure_details:
+                message += " Details:\n" + "\n".join(failure_details)
+            raise AirflowException(message)
 
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
         """dbtRunnerResult has an attribute `success` that is False if the command failed."""
@@ -498,7 +500,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """Invokes the dbt command programmatically."""
         if not dbt_runner.is_available():
             raise CosmosDbtRunError(
-                "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
+                "Could not import dbt core. Ensure that dbt-core is installed and available in the environment where the operator is running."
             )
 
         return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks, **kwargs)
@@ -556,16 +558,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.profile_config.target_name,
         ]
         if self.invocation_mode == InvocationMode.DBT_RUNNER:
-            from dbt.version import __version__ as dbt_version
-
-            if Version(dbt_version) >= Version("1.5.6"):
-                # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
-                # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
-                # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
-                # directories, and the use of different temp paths between parsing and execution appears to interfere
-                # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
-                # hangs and ensures reliable task execution.
-                dbt_flags.append("--no-static-parser")
+            # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
+            # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
+            # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
+            # directories, and the use of different temp paths between parsing and execution appears to interfere
+            # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
+            # hangs and ensures reliable task execution.
+            dbt_flags.append("--no-static-parser")
         return dbt_flags
 
     def _install_dependencies(
@@ -738,7 +737,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     # in that case we're storing as self.openlineage_events_completes
                     context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
 
-                if self.emit_datasets:
+                if resolve_templated_bool(self.emit_datasets):
                     self._handle_datasets(context)
 
                 if self.partial_parse:
@@ -1112,10 +1111,7 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
 
     def _is_full_refresh(self) -> bool:
         """Return whether --full-refresh is requested, mirroring DbtSeedMixin.add_cmd_flags handling."""
-        if isinstance(self.full_refresh, str):
-            # `to_boolean` does not strip whitespace, so a rendered " true " would otherwise be False.
-            return bool(to_boolean(self.full_refresh.strip()))
-        return bool(self.full_refresh)
+        return resolve_templated_bool(self.full_refresh)
 
 
 class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
@@ -1174,6 +1170,17 @@ class DbtRunLocalOperator(DbtRunMixin, DbtLocalBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticMetricViewLocalOperator(DbtSemanticMetricViewMixin, DbtLocalBaseOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic metric view.
+    """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

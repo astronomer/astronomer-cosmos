@@ -15,7 +15,7 @@ rm -f $AIRFLOW_HOME/airflow.db
 airflow db reset -y
 
 # ATTENTION: Airflow and its dependencies are installed using pre-install-airflow.sh script, so we don't install them here.
-AIRFLOW_VERSION=$(airflow version | tr -d '[:space:]')
+AIRFLOW_VERSION=$(python -c 'from importlib.metadata import version; print(version("apache-airflow"))')
 AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | grep -oE '^[0-9]+')
 
 echo "Detected Airflow version: [$AIRFLOW_VERSION]"

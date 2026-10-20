@@ -48,7 +48,7 @@ SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_SMALL_MANIFEST = Path(__file__).parent.parent / "sample/small_manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
-SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
+ALTERED_DBT_PROJECT_MANIFEST = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME / "target/manifest.json"
 SAMPLE_MANIFEST_SELECTORS = Path(__file__).parent.parent / "sample/manifest_selectors.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
@@ -642,6 +642,83 @@ def test_load_from_dbt_manifest_resolves_package_path(tmp_path):
     assert node.file_path.name == "foo.sql"
 
 
+@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
+def test_load_from_dbt_manifest_reclassifies_semantic_metric_view_materializations(
+    tmp_path, monkeypatch, materialization
+):
+    """Model nodes materialized as an adapter-native semantic metric view (Databricks metric views,
+    Snowflake semantic views) are reclassified to DbtResourceType.SEMANTIC_METRIC_VIEW, since dbt itself
+    models them as plain `model` nodes distinguished only by `config.materialized`."""
+    monkeypatch.setattr("cosmos.settings.enable_semantic_metric_view_reclassification", True)
+    manifest = {
+        "metadata": {"project_name": "my_project"},
+        "nodes": {
+            "model.my_project.foo": {
+                "original_file_path": "models/foo.sql",
+                "package_name": "my_project",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": materialization},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_file = tmp_path / "manifest.json"
+    manifest_file.write_text(json.dumps(manifest))
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="my_project")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+    assert dbt_graph.nodes["model.my_project.foo"].resource_type == DbtResourceType.SEMANTIC_METRIC_VIEW
+
+
+def test_load_from_dbt_manifest_reclassification_is_opt_in(tmp_path):
+    """Reclassification is opt-in: unless `enable_semantic_metric_view_reclassification` is enabled,
+    adapter-native semantic metric view models stay plain MODEL nodes."""
+    manifest = {
+        "metadata": {"project_name": "my_project"},
+        "nodes": {
+            "model.my_project.foo": {
+                "original_file_path": "models/foo.sql",
+                "package_name": "my_project",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "metric_view"},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_file = tmp_path / "manifest.json"
+    manifest_file.write_text(json.dumps(manifest))
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="my_project")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+    assert dbt_graph.nodes["model.my_project.foo"].resource_type == DbtResourceType.MODEL
+
+
 def test_load_via_manifest_with_selectors_and_missing_definitions():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST_MODEL_VERSION
@@ -1181,7 +1258,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            manifest_path=SAMPLE_MANIFEST_SOURCE if load_method == "load_from_dbt_manifest" else None,
+            manifest_path=ALTERED_DBT_PROJECT_MANIFEST if load_method == "load_from_dbt_manifest" else None,
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
@@ -1199,6 +1276,42 @@ def test_load_via_dbt_ls_with_sources(load_method):
     assert len(dbt_graph.nodes) >= 4
     assert "source.altered_jaffle_shop.postgres_db.raw_customers" in dbt_graph.nodes
     assert "exposure.altered_jaffle_shop.weekly_metrics" in dbt_graph.nodes
+
+
+@pytest.mark.integration
+def test_altered_jaffle_shop_manifest_is_in_sync_with_project():
+    """
+    The checked-in manifest must describe the same graph as the dbt project next to it.
+
+    If this fails, the project changed without regenerating the manifest. Run `dbt parse`
+    in dev/dags/dbt/altered_jaffle_shop and commit the updated target/manifest.json.
+    """
+    project_path = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME
+
+    def build_graph(manifest_path):
+        return DbtGraph(
+            project=ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path),
+            render_config=RenderConfig(
+                dbt_project_path=project_path,
+                dbt_deps=True,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            ),
+            execution_config=ExecutionConfig(dbt_project_path=project_path),
+            profile_config=ProfileConfig(
+                profile_name="postgres_profile",
+                target_name="dev",
+                profiles_yml_filepath=project_path / "profiles.yml",
+            ),
+        )
+
+    dbt_ls_graph = build_graph(manifest_path=None)
+    dbt_ls_graph.load_via_dbt_ls()
+    manifest_graph = build_graph(manifest_path=ALTERED_DBT_PROJECT_MANIFEST)
+    manifest_graph.load_from_dbt_manifest()
+
+    assert set(manifest_graph.nodes) == set(dbt_ls_graph.nodes)
+    for unique_id, node in dbt_ls_graph.nodes.items():
+        assert sorted(manifest_graph.nodes[unique_id].depends_on) == sorted(node.depends_on), unique_id
 
 
 @pytest.mark.integration
@@ -1977,6 +2090,66 @@ def test_run_command_forcing_dbt_runner(mock_dbt_runner, mock_subprocess, tmp_db
     assert mock_dbt_runner.called
 
 
+@patch("cosmos.dbt.graph.run_command_with_subprocess", return_value='{"unique_id": "model.probe.a"}')
+@patch("cosmos.dbt.graph.dbt_runner.run_command")
+@patch("cosmos.dbt.graph.dbt_runner.is_dbt_v2", return_value=True)
+@patch("cosmos.dbt.graph.dbt_runner.is_available", return_value=True)
+def test_run_command_uses_subprocess_for_dbt_v2_ls(
+    mock_is_available, mock_is_dbt_v2, mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir, caplog
+):
+    command = ["dbt", "ls", "--output", "json"]
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    caplog.set_level(logging.INFO)
+
+    response = run_command(command, project_dir, {}, InvocationMode.DBT_RUNNER)
+
+    assert response == '{"unique_id": "model.probe.a"}'
+    mock_is_available.assert_called_once_with()
+    mock_is_dbt_v2.assert_called_once_with()
+    assert not mock_dbt_runner.called
+    mock_subprocess.assert_called_once_with(command, project_dir, {})
+    assert "dbt 2 does not return JSON records for `dbt ls` through dbtRunner" in caplog.text
+    assert "Running command with Python subprocess: `dbt ls --output json`" in caplog.text
+    assert "dbt Runner" not in caplog.text
+
+
+@patch("cosmos.dbt.graph.run_command_with_subprocess")
+@patch("cosmos.dbt.graph.run_command_with_dbt_runner", return_value="")
+@patch("cosmos.dbt.graph.dbt_runner.is_dbt_v2", return_value=True)
+@patch("cosmos.dbt.graph.dbt_runner.is_available", return_value=True)
+def test_run_command_uses_dbt_runner_for_dbt_v2_deps(
+    mock_is_available, mock_is_dbt_v2, mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir
+):
+    command = ["dbt", "deps"]
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+
+    run_command(command, project_dir, {}, InvocationMode.DBT_RUNNER)
+
+    mock_is_available.assert_called_once_with()
+    assert not mock_is_dbt_v2.called
+    mock_dbt_runner.assert_called_once_with(command, project_dir, {})
+    assert not mock_subprocess.called
+
+
+@patch("cosmos.dbt.graph.run_command_with_subprocess")
+@patch("cosmos.dbt.graph.run_command_with_dbt_runner", return_value='{"unique_id": "model.probe.a"}')
+@patch("cosmos.dbt.graph.dbt_runner.is_dbt_v2", return_value=False)
+@patch("cosmos.dbt.graph.dbt_runner.is_available", return_value=True)
+def test_run_command_uses_dbt_runner_for_dbt_v1_ls(
+    mock_is_available, mock_is_dbt_v2, mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir
+):
+    command = ["dbt", "ls", "--output", "json"]
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+
+    response = run_command(command, project_dir, {}, InvocationMode.DBT_RUNNER)
+
+    assert response == '{"unique_id": "model.probe.a"}'
+    mock_is_available.assert_called_once_with()
+    mock_is_dbt_v2.assert_called_once_with()
+    mock_dbt_runner.assert_called_once_with(command, project_dir, {})
+    assert not mock_subprocess.called
+
+
 @pytest.mark.integration
 def test_run_command_with_dbt_runner_exception(tmp_dbt_project_dir):
     with pytest.raises(CosmosLoadDbtException) as err_info:
@@ -2152,6 +2325,66 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
     nodes = parse_dbt_ls_output(Path("some-project"), some_ls_stdout)
 
     assert expected_nodes == nodes
+
+
+@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
+def test_parse_dbt_ls_output_reclassifies_semantic_metric_view_materializations(monkeypatch, materialization):
+    """Model nodes materialized as an adapter-native semantic metric view (Databricks metric views,
+    Snowflake semantic views) are reclassified to DbtResourceType.SEMANTIC_METRIC_VIEW, since dbt itself
+    models them as plain `model` nodes distinguished only by `config.materialized`."""
+    monkeypatch.setattr("cosmos.settings.enable_semantic_metric_view_reclassification", True)
+    fake_ls_stdout = json.dumps(
+        {
+            "resource_type": "model",
+            "name": "fake-name",
+            "package_name": "fake-project",
+            "original_file_path": "fake-file-path.sql",
+            "unique_id": "fake-unique-id",
+            "tags": [],
+            "config": {"materialized": materialization},
+        }
+    )
+
+    nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert nodes["fake-unique-id"].resource_type == DbtResourceType.SEMANTIC_METRIC_VIEW
+
+
+def test_parse_dbt_ls_output_does_not_reclassify_regular_materializations(monkeypatch):
+    monkeypatch.setattr("cosmos.settings.enable_semantic_metric_view_reclassification", True)
+    fake_ls_stdout = json.dumps(
+        {
+            "resource_type": "model",
+            "name": "fake-name",
+            "package_name": "fake-project",
+            "original_file_path": "fake-file-path.sql",
+            "unique_id": "fake-unique-id",
+            "tags": [],
+            "config": {"materialized": "view"},
+        }
+    )
+
+    nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert nodes["fake-unique-id"].resource_type == DbtResourceType.MODEL
+
+
+def test_parse_dbt_ls_output_reclassification_is_opt_in():
+    fake_ls_stdout = json.dumps(
+        {
+            "resource_type": "model",
+            "name": "fake-name",
+            "package_name": "fake-project",
+            "original_file_path": "fake-file-path.sql",
+            "unique_id": "fake-unique-id",
+            "tags": [],
+            "config": {"materialized": "metric_view"},
+        }
+    )
+
+    nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert nodes["fake-unique-id"].resource_type == DbtResourceType.MODEL
 
 
 def test_parse_dbt_ls_output_skips_dbt_loom_external_nodes(caplog):

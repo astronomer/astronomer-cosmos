@@ -268,11 +268,12 @@ def test_version_gate_raises_on_pre_31():
         af3.create_cosmos_fastapi_app()
 
 
-def test_plugin_init_raises_on_pre_31():
+def test_plugin_init_warns_and_skips_views_on_pre_31(caplog):
     af3 = _reload_af3_with_version("3.0.9")
-    with patch("cosmos.plugin.airflow3._load_projects_from_conf", return_value={}):
-        with pytest.raises(RuntimeError):
-            af3.CosmosAF3Plugin()
+    with patch("cosmos.plugin.airflow3._load_projects_from_conf", return_value={"proj": {}}):
+        plugin = af3.CosmosAF3Plugin()
+    assert plugin.fastapi_apps == []
+    assert "require Airflow >= 3.1" in caplog.text
 
 
 @pytest.mark.parametrize(

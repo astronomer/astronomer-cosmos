@@ -327,3 +327,23 @@ def test_the_output_that_is_sent_without_failed_nodes_is_as_long_as_the_user_all
 
     assert context.output == output[-30:]
     assert context.output.endswith("the-error")
+
+
+@pytest.mark.parametrize("limit", [1, 2, 3, 10, 11])
+def test_a_text_over_the_limit_never_sends_more_than_the_limit(tmp_path, limit):
+    """Even for a limit of 1, where half of it is 0 characters, and ``text[-0:]`` would be the whole text."""
+    text = "".join(chr(ord("a") + i % 26) for i in range(500))
+    _write_artifacts(
+        tmp_path,
+        run_results={
+            "results": [{"status": "error", "unique_id": "model.p.m", "message": text, "compiled_code": text}]
+        },
+    )
+
+    node = build_failure_context(tmp_path, max_message_chars=limit, max_sql_chars=limit).failed_nodes[0]
+
+    for sent in (node.message, node.compiled_code):
+        kept = sent.replace(f"\n... [truncated {500 - limit} characters] ...\n", "")
+        assert len(kept) == limit
+        assert f"[truncated {500 - limit} characters]" in sent
+        assert kept == text[: limit - limit // 2] + text[500 - limit // 2 :]

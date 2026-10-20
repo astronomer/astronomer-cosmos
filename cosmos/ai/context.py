@@ -151,5 +151,6 @@ def _truncate_middle(text: str, max_chars: int) -> str:
     """Keep the head and the tail of a long text: the beginning gives the context, the end gives the error."""
     if len(text) <= max_chars:
         return text
-    half = max_chars // 2
-    return f"{text[:half]}\n... [truncated {len(text) - 2 * half} characters] ...\n{text[-half:]}"
+    tail = max_chars // 2
+    head = max_chars - tail
+    return f"{text[:head]}\n... [truncated {len(text) - max_chars} characters] ...\n{text[len(text) - tail:]}"

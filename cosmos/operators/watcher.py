@@ -15,6 +15,7 @@ try:
 except ImportError:
     from airflow.utils.task_group import TaskGroup
 
+import cosmos.dbt.runner as dbt_runner
 from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
@@ -23,9 +24,11 @@ from cosmos.constants import (
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
     DbtResourceType,
+    InvocationMode,
 )
 from cosmos.dataset import get_dataset_namespace
 from cosmos.dbt.graph import DbtNode
+from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.base import (
@@ -276,6 +279,16 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             upstream_failure_skipped_ids=self._upstream_failure_skipped_ids,
         )
 
+    def _discover_invocation_mode(self) -> None:
+        """Fall back to subprocess on dbt-core 2.x, whose dbtRunner has no event callbacks to stream node status."""
+        super()._discover_invocation_mode()
+        if self.invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_dbt_v2():
+            self.invocation_mode = InvocationMode.SUBPROCESS
+            self.log.info(
+                "dbt-core 2.x does not support dbtRunner event callbacks, which the watcher producer needs. "
+                "Falling back to subprocess for invoking dbt."
+            )
+
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> Any:
         """Wire up per-line JSON log parsing before delegating to the subprocess runner.
 
@@ -321,6 +334,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 with contextlib.redirect_stdout(_StdoutFilter()):
                     return super().run_dbt_runner(command, env, cwd, **kwargs)
 
+            if dbt_runner.is_dbt_v2():
+                raise CosmosValueError(
+                    "ExecutionMode.WATCHER streams node status through dbtRunner event callbacks, which dbt-core 2.x "
+                    "does not support. Use InvocationMode.SUBPROCESS, or leave invocation_mode unset."
+                )
             extra_kwargs: dict[str, Any] = {"project_dir": cwd, "context": context}
             parse = self._make_parse_callable()
             # Collect callback errors rather than raising inside the callback: dbt catches

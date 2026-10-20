@@ -217,7 +217,8 @@ By default (``enable_watcher_reliable_retry = True``), each XCom push is increme
 Variable. This ensures that when the producer fails and Airflow clears XCom entries before the retry,
 the backed-up values can be restored. On a successful run, the backup Variable is automatically deleted
 to avoid stale data accumulating over time. These eager per-node writes can be deferred to a single
-on-failure write to improve producer performance — see :ref:`producer-status-backup` below.
+on-failure write to improve producer performance — see :ref:`producer-status-backup` below. On Airflow 3.3
+and later, the backup uses the Airflow task store instead; see :ref:`producer-status-backup-task-store`.
 
 **How consumer retries work:**
 
@@ -294,10 +295,25 @@ Set it via the ``[cosmos]`` section or the ``AIRFLOW__COSMOS__ENABLE_WATCHER_REL
 variable. Consider ``False`` for large dbt projects where the producer's per-node Variable I/O is a
 bottleneck and occasional duplicate consumer runs after a hard producer kill are acceptable.
 
-A future approach that delivers reliability and performance together is tracked in
-`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task & Asset
-Store, AIP-103), which would let retries resume from the point of failure without the per-node
-Variable backup.
+.. _producer-status-backup-task-store:
+
+Airflow 3.3 and later: backup in the task store
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. versionchanged:: 1.16.0
+
+On Airflow 3.3 and later, the producer stores this backup in the Airflow
+`task store <https://cwiki.apache.org/confluence/display/AIRFLOW/AIP-103%3A+Task+State+Management>`_
+instead of a Variable (`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_). This means:
+
+- No Variables are written, so the producer makes no secrets-backend calls. With an external secrets
+  backend, each Variable write costs extra lookups, and the task store was about 4.5 times faster in
+  our tests.
+- Backups left by a failed producer expire after ``[state_store] default_retention_days``.
+- The backup is always written after every dbt node, because the task store cannot be written to after
+  the task fails. ``enable_watcher_reliable_retry`` has no effect.
+
+Older Airflow versions still use a Variable.
 
 Producer done gateway task (DbtTaskGroup only)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

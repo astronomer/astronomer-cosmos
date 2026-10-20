@@ -198,6 +198,12 @@ Task-level retry — producer
        long-term reliable-and-fast replacement is tracked in
        `#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task &
        Asset Store).
+   * - **1.16.0**
+     - Same as 1.15.0, except on Airflow 3.3 and later: the producer stores its backup in the
+       Airflow task store instead of a Variable
+       (`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_). This avoids
+       secrets-backend calls, and backups left by a failed producer expire.
+       ``enable_watcher_reliable_retry`` has no effect there.
 
 Automatic retries
 +++++++++++++++++

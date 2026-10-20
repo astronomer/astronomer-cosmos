@@ -2,6 +2,17 @@ import os
 import re
 
 import snowflake.connector
+from cryptography.hazmat.primitives import serialization
+from snowflake.connector.errors import ProgrammingError
+
+
+def load_private_key() -> bytes:
+    private_key = serialization.load_pem_private_key(os.environ["SNOWFLAKE_PRIVATE_KEY"].encode(), password=None)
+    return private_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
 
 
 def delete_snowflake_resource():
@@ -10,7 +21,8 @@ def delete_snowflake_resource():
     """
     conn = snowflake.connector.connect(
         user=os.environ["SNOWFLAKE_USER"],
-        password=os.environ["SNOWFLAKE_PASSWORD"],
+        private_key=load_private_key(),
+        role=os.environ["SNOWFLAKE_ROLE"],
         account=os.environ["SNOWFLAKE_ACCOUNT"],
         warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
         database=os.environ["SNOWFLAKE_DATABASE"],
@@ -28,6 +40,10 @@ def delete_snowflake_resource():
         """
         cursor.execute(query, (os.environ["SNOWFLAKE_SCHEMA"], f"{prefix}_%"))
         resources = cursor.fetchall()
+        if re.match(r"^[A-Za-z0-9_]+$", prefix):
+            # Semantic views are not listed in information_schema.tables
+            cursor.execute(f"SHOW SEMANTIC VIEWS LIKE '{prefix}_%'")
+            resources += [(row[1], "SEMANTIC VIEW") for row in cursor.fetchall()]
 
         for resource_name, resource_type in resources:
             # Validate table name contains only safe characters (prevent injection)
@@ -45,7 +61,11 @@ def delete_snowflake_resource():
                     drop_sql = f"DROP VIEW IF EXISTS {resource_name}"
                     print(f"Executing: {drop_sql}")
                     cursor.execute(drop_sql)
-            except Exception as e:
+                elif resource_type == "SEMANTIC VIEW":
+                    drop_sql = f"DROP SEMANTIC VIEW IF EXISTS {resource_name}"
+                    print(f"Executing: {drop_sql}")
+                    cursor.execute(drop_sql)
+            except ProgrammingError as e:
                 print(f"Failed to drop {resource_name}: {e}")
 
         cursor.close()

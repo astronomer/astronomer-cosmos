@@ -532,7 +532,7 @@ def create_task_metadata(  # noqa: C901
                 resource_suffix=r"source",
                 execution_mode=execution_mode,
             )
-            if node.has_freshness is False and render_config.source_rendering_behavior == SourceRenderingBehavior.ALL:
+            if node.has_freshness is False:
                 # render sources without freshness as empty operators
                 # empty operator does not accept custom parameters (e.g., profile_args). recreate the args.
                 if "task_display_name" in args:
@@ -541,6 +541,7 @@ def create_task_metadata(  # noqa: C901
                     args = {}
                 return TaskMetadata(
                     id=task_id,
+                    owner=node.owner if render_config.enable_owner_inheritance else "",
                     operator_class=EMPTY_OPERATOR_CLASS_PATH,
                     arguments=args,
                 )

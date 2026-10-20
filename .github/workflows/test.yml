@@ -132,7 +132,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3"]
+        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3", "3.4"]
         dbt-version: [ "1.12" ]
         split-group: [1, 2, 3]
         exclude:
@@ -156,6 +156,9 @@ jobs:
             airflow-version: "3.0"
           - python-version: "3.14"
             airflow-version: "3.1"
+          # Apache Airflow 3.4 requires Python >=3.11.
+          - python-version: "3.10"
+            airflow-version: "3.4"
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
@@ -562,7 +565,8 @@ jobs:
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
@@ -585,7 +589,8 @@ jobs:
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}

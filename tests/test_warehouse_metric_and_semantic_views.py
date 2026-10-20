@@ -6,9 +6,8 @@ tests/operators/test_watcher.py::test_dbt_dag_with_watcher.
 
 Credentials, as provided by CI: ``AIRFLOW_CONN_DATABRICKS_DEFAULT`` plus ``DATABRICKS_CATALOG`` (default ``main``),
 and ``SNOWFLAKE_ACCOUNT``, ``SNOWFLAKE_USER``, ``SNOWFLAKE_PRIVATE_KEY`` (PKCS#8 PEM), ``SNOWFLAKE_DATABASE``, ``SNOWFLAKE_SCHEMA``,
-``SNOWFLAKE_WAREHOUSE`` (optional ``SNOWFLAKE_ROLE``). A warehouse without credentials is skipped and, under GitHub
-Actions, listed in the job summary. A warehouse that has credentials but cannot be set up is skipped locally and fails
-under CI (``CI`` set).
+``SNOWFLAKE_WAREHOUSE`` (optional ``SNOWFLAKE_ROLE``). A warehouse with missing credentials, or that cannot be set up,
+is skipped locally and fails under CI (``CI`` set).
 Databricks gets a throwaway schema. The Snowflake CI role cannot create schemas, so its objects go into the existing
 ``SNOWFLAKE_SCHEMA`` under a per-run ``RESOURCE_PREFIX`` and only those objects are dropped afterwards.
 """
@@ -60,14 +59,6 @@ DEV_DAGS_DIR = Path(__file__).parent.parent / "dev" / "dags"
 DBT_ROOT_PATH = DEV_DAGS_DIR / "dbt"
 SEEDED_REVENUE_BY_STATUS = {"cancelled": 75.25, "completed": 851.25, "pending": 45.00}
 EXPECTED_NODE_COUNT = 9
-
-
-def skip_unconfigured_warehouse(reason: str) -> None:
-    step_summary = os.getenv("GITHUB_STEP_SUMMARY")
-    if step_summary:
-        with open(step_summary, "a") as summary:
-            summary.write(f"- Skipped warehouse tests: {reason}\n")
-    pytest.skip(reason)
 
 
 def skip_unless_ci(reason: str) -> None:
@@ -154,7 +145,7 @@ class Databricks(Warehouse):
 
     def configure(self) -> None:
         if not os.getenv("AIRFLOW_CONN_DATABRICKS_DEFAULT"):
-            skip_unconfigured_warehouse("databricks: AIRFLOW_CONN_DATABRICKS_DEFAULT is not set")
+            skip_unless_ci("databricks: AIRFLOW_CONN_DATABRICKS_DEFAULT is not set")
         self.catalog = os.getenv("DATABRICKS_CATALOG", "main")
         connection = Connection.get_connection_from_secrets("databricks_default")
         self.connection_params = {
@@ -218,7 +209,7 @@ class Snowflake(Warehouse):
         )
         missing = [name for name in required if not os.getenv(name)]
         if missing:
-            skip_unconfigured_warehouse(f"snowflake: missing {missing}")
+            skip_unless_ci(f"snowflake: missing {missing}")
         self.database = os.environ["SNOWFLAKE_DATABASE"]
         self.schema = os.environ["SNOWFLAKE_SCHEMA"]
         self.resource_prefix = f"cosmos_e2e_{uuid.uuid4().hex[:8]}"

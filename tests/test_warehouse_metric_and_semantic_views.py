@@ -392,9 +392,17 @@ def asset_event_uris_by_task(dag_id: str) -> dict[str, list[str]]:
 
 
 def disable_full_refresh(dag: DbtDag) -> None:
-    for task in dag.tasks:
-        if hasattr(task, "full_refresh"):
-            task.full_refresh = False
+    refreshable_tasks = [task for task in dag.tasks if hasattr(task, "full_refresh")]
+    # Seed consumers in watcher mode lose full_refresh (DbtRunMixin.__init__ runs after DbtSeedMixin.__init__ and
+    # resets it), so only the run tasks and the producer are expected to carry the flag before the toggle.
+    expected_refreshing = {
+        task.task_id for task in refreshable_tasks if task.task_id.endswith(("_run", ".run", "dbt_producer_watcher"))
+    }
+    refreshing = {task.task_id for task in refreshable_tasks if "--full-refresh" in task.add_cmd_flags()}
+    assert expected_refreshing <= refreshing, expected_refreshing - refreshing
+    for task in refreshable_tasks:
+        task.full_refresh = False
+        assert "--full-refresh" not in task.add_cmd_flags(), task.task_id
 
 
 def run_full_refresh_then_rerun(dag: DbtDag, warehouse: Warehouse) -> None:
@@ -465,7 +473,7 @@ def test_dbt_dag_with_watcher_execution(warehouse: Warehouse, watcher_dag: DbtDa
 
     # The producer narrows `dbt build` with dbt resource types; dbt still classifies these nodes as
     # models, so Cosmos's own type must never appear in the command.
-    command, _ = producer.build_cmd({}, {})
+    command, _ = producer.build_cmd({}, producer.add_cmd_flags())
     flags = [str(part) for part in command]
     resource_types = {flags[index + 1] for index, part in enumerate(flags) if part == "--resource-type"}
     assert resource_types == ({"model", "snapshot", "seed"} if tests_excluded_from_producer else set())

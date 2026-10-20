@@ -542,6 +542,9 @@ def test_ai_config_defaults():
     assert ai_config.diagnose_on_failure is False
     assert ai_config.introspect_schema is False
     assert ai_config.timeout_seconds == 30.0
+    assert (ai_config.max_requests, ai_config.max_failed_nodes) == (8, 5)
+    assert (ai_config.max_message_chars, ai_config.max_sql_chars, ai_config.max_output_chars) == (4000, 8000, 8000)
+    assert ai_config.max_artifact_mb == 50
     assert ai_config.diagnosis_output_type is None
     assert ai_config.diagnosis_instructions is None
     assert ai_config.redactor is None
@@ -579,6 +582,9 @@ def test_ai_config_custom_values():
         ({"llm_conn_id": "c", "timeout_seconds": -5}, "timeout_seconds must be a finite number above 0"),
         ({"llm_conn_id": "c", "timeout_seconds": float("nan")}, "timeout_seconds must be a finite number above 0"),
         ({"llm_conn_id": "c", "timeout_seconds": float("inf")}, "timeout_seconds must be a finite number above 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": None}, "timeout_seconds must be a finite number above 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": "30"}, "timeout_seconds must be a finite number above 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": True}, "timeout_seconds must be a finite number above 0"),
         ({"llm_conn_id": "c", "diagnosis_output_type": str}, "must be a pydantic model class"),
         ({"llm_conn_id": "c", "diagnosis_output_type": "DbtFailureDiagnosis"}, "must be a pydantic model class"),
         ({"llm_conn_id": "c", "redactor": "not callable"}, "redactor must be callable"),
@@ -604,3 +610,28 @@ def test_cosmos_config_does_not_import_pydantic_at_module_level():
     ]
 
     assert not [name for name in imported if name and name.split(".")[0] == "pydantic"]
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["max_requests", "max_failed_nodes", "max_message_chars", "max_sql_chars", "max_output_chars", "max_artifact_mb"],
+)
+@pytest.mark.parametrize("value", [0, -1, 2.5, "10", None, True])
+def test_ai_config_limits_must_be_whole_numbers_of_at_least_one(name, value):
+    with pytest.raises(CosmosValueError, match=f"AiConfig.{name} must be a whole number of at least 1"):
+        AiConfig(llm_conn_id="c", **{name: value})
+
+
+def test_ai_config_accepts_the_limits_the_user_chooses():
+    ai_config = AiConfig(
+        llm_conn_id="c",
+        max_requests=1,
+        max_failed_nodes=20,
+        max_message_chars=100_000,
+        max_sql_chars=1,
+        max_output_chars=2,
+        max_artifact_mb=500,
+    )
+
+    assert (ai_config.max_requests, ai_config.max_failed_nodes, ai_config.max_artifact_mb) == (1, 20, 500)
+    assert (ai_config.max_message_chars, ai_config.max_sql_chars, ai_config.max_output_chars) == (100_000, 1, 2)

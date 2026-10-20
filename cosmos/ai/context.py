@@ -6,22 +6,17 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from cosmos.log import get_logger
+
+if TYPE_CHECKING:
+    from cosmos.config import AiConfig
 
 logger = get_logger(__name__)
 
 # ``run_results.json`` statuses of a node that failed (models/seeds/snapshots error, tests fail).
 _FAILED_STATUSES = frozenset({"error", "fail", "runtime error"})
-
-# Bounds on what is sent to the LLM. A single failure can include every compiled model of the project.
-_MAX_FAILED_NODES = 5
-_MAX_MESSAGE_CHARS = 4000
-_MAX_COMPILED_SQL_CHARS = 8000
-_MAX_OUTPUT_CHARS = 8000
-# The manifest of a big project can be hundreds of MB, and loading it would cost the worker its memory.
-_MAX_ARTIFACT_BYTES = 50 * 1024 * 1024
 
 # Resource types that live in the warehouse as a table or view the agent can inspect.
 _RELATION_RESOURCE_TYPES = frozenset({"model", "seed", "snapshot", "source"})
@@ -81,26 +76,29 @@ class FailureContext:
         return "\n\n".join(parts)
 
 
-def build_failure_context(project_dir: str | Path, output: str = "") -> FailureContext:
+def build_failure_context(project_dir: str | Path, output: str, ai_config: AiConfig) -> FailureContext:
     """
     Build the context of a failed dbt invocation from the ``target`` folder of ``project_dir``.
+
+    What it can hold is bounded by the ``max_*`` options of ``ai_config``.
 
     :param project_dir: dbt project directory where the failed command ran.
     :param output: dbt output or exception message, used when the artifacts do not describe the failure.
     """
     target_dir = Path(project_dir) / "target"
-    run_results = _load_json(target_dir / "run_results.json")
+    max_bytes = ai_config.max_artifact_mb << 20
+    run_results = _load_json(target_dir / "run_results.json", max_bytes)
     failed = [result for result in (run_results or {}).get("results", []) if result.get("status") in _FAILED_STATUSES]
     if not failed:
-        return FailureContext(output=output[-_MAX_OUTPUT_CHARS:])
+        return FailureContext(output=output[-ai_config.max_output_chars :])
 
-    manifest = _load_json(target_dir / "manifest.json") or {}
+    manifest = _load_json(target_dir / "manifest.json", max_bytes) or {}
     entries = {**(manifest.get("sources") or {}), **(manifest.get("nodes") or {})}
-    nodes = tuple(_to_failed_node(result, entries) for result in failed[:_MAX_FAILED_NODES])
-    return FailureContext(failed_nodes=nodes, omitted_nodes=max(len(failed) - _MAX_FAILED_NODES, 0))
+    nodes = tuple(_to_failed_node(result, entries, ai_config) for result in failed[: ai_config.max_failed_nodes])
+    return FailureContext(failed_nodes=nodes, omitted_nodes=max(len(failed) - ai_config.max_failed_nodes, 0))
 
 
-def _to_failed_node(result: dict[str, Any], entries: dict[str, Any]) -> FailedNode:
+def _to_failed_node(result: dict[str, Any], entries: dict[str, Any], ai_config: AiConfig) -> FailedNode:
     unique_id = result.get("unique_id", "")
     node = entries.get(unique_id) or {}
     related_ids = (node.get("depends_on") or {}).get("nodes") or []
@@ -109,8 +107,8 @@ def _to_failed_node(result: dict[str, Any], entries: dict[str, Any]) -> FailedNo
     return FailedNode(
         unique_id=unique_id,
         status=result.get("status", ""),
-        message=_truncate_middle(result.get("message") or "", _MAX_MESSAGE_CHARS),
-        compiled_code=_truncate_middle(result.get("compiled_code") or "", _MAX_COMPILED_SQL_CHARS),
+        message=_truncate_middle(result.get("message") or "", ai_config.max_message_chars),
+        compiled_code=_truncate_middle(result.get("compiled_code") or "", ai_config.max_sql_chars),
         relations=tuple(dict.fromkeys(relation for relation in relations if relation)),
     )
 
@@ -126,11 +124,11 @@ def _relation(entry: dict[str, Any]) -> str | None:
     return f"{schema}.{name}" if schema and name else None
 
 
-def _load_json(path: Path) -> dict[str, Any] | None:
+def _load_json(path: Path, max_bytes: int) -> dict[str, Any] | None:
     try:
-        if path.stat().st_size > _MAX_ARTIFACT_BYTES:
+        if path.stat().st_size > max_bytes:
             logger.warning(
-                "%s is larger than %s MB; not reading it to diagnose the dbt failure.", path, _MAX_ARTIFACT_BYTES >> 20
+                "%s is larger than %s MB, the limit of AiConfig.max_artifact_mb; not reading it.", path, max_bytes >> 20
             )
             return None
         with path.open() as file:

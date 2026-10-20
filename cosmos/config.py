@@ -661,6 +661,17 @@ class AiConfig:
         with the standard exception, without a diagnosis. It starts after the connection is loaded, and it is only
         checked while Cosmos waits for the model, so a call that blocks its thread is cancelled when it returns.
         Defaults to 30.
+    :param max_requests: Most requests that the agent can make to the model: the answer, and the schema checks before
+        it. Defaults to 8.
+    :param max_failed_nodes: Most failed dbt nodes of the task that are sent to the model. Defaults to 5.
+    :param max_message_chars: Most characters of the error message of each failed node. A longer one keeps its head and
+        its tail. Defaults to 4000.
+    :param max_sql_chars: Most characters of the compiled SQL of each failed node. A longer one keeps its head and its
+        tail. Defaults to 8000.
+    :param max_output_chars: Most characters of the dbt output that are sent when dbt fails before it runs a node, such
+        as on a compilation error. The end of the output is kept. Defaults to 8000.
+    :param max_artifact_mb: The biggest dbt artifact (``run_results.json`` or ``manifest.json``) that is read, in MB. A
+        bigger one is skipped, to protect the memory of the worker. Defaults to 50.
     :param diagnosis_output_type: Optional custom pydantic model class describing the structured output the
         diagnosis agent should produce. Defaults to Cosmos's built-in ``cosmos.ai.diagnostics.DbtFailureDiagnosis``
         (fields ``root_cause``, ``suggested_fix``, ``confidence``). Field descriptions on a custom model are used to
@@ -675,6 +686,12 @@ class AiConfig:
     diagnose_on_failure: bool = False
     introspect_schema: bool = False
     timeout_seconds: float = 30.0
+    max_requests: int = 8
+    max_failed_nodes: int = 5
+    max_message_chars: int = 4000
+    max_sql_chars: int = 8000
+    max_output_chars: int = 8000
+    max_artifact_mb: int = 50
     diagnosis_output_type: type[BaseModel] | None = None
     diagnosis_instructions: str | None = None
     redactor: Callable[[str], str] | None = None
@@ -682,10 +699,20 @@ class AiConfig:
     def __post_init__(self) -> None:
         if not self.llm_conn_id or not isinstance(self.llm_conn_id, str):
             raise CosmosValueError("AiConfig.llm_conn_id must be a non-empty Airflow connection ID.")
-        if not 0 < self.timeout_seconds < math.inf:
-            raise CosmosValueError(
-                f"AiConfig.timeout_seconds must be a finite number above 0, got {self.timeout_seconds}."
-            )
+        timeout = self.timeout_seconds
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 0 < timeout < math.inf:
+            raise CosmosValueError(f"AiConfig.timeout_seconds must be a finite number above 0, got {timeout!r}.")
+        for name in (
+            "max_requests",
+            "max_failed_nodes",
+            "max_message_chars",
+            "max_sql_chars",
+            "max_output_chars",
+            "max_artifact_mb",
+        ):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise CosmosValueError(f"AiConfig.{name} must be a whole number of at least 1, got {value!r}.")
         if self.diagnosis_output_type is not None:
             # Imported here: pydantic is not a dependency of Cosmos, nor of Airflow 2, and Cosmos must import without it.
             from pydantic import BaseModel

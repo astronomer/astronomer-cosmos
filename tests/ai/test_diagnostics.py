@@ -168,10 +168,13 @@ def test_diagnose_dbt_failure_custom_instructions_replace_the_default(fake_provi
     assert fake_provider.agent_kwargs["instructions"] == "Be terse."
 
 
-def test_diagnose_dbt_failure_bounds_the_number_of_model_requests(fake_provider):
-    diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+def test_diagnose_dbt_failure_bounds_the_number_of_model_requests_as_the_user_says(fake_provider):
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, max_requests=3)
 
-    assert fake_provider.agent.runs[0].usage_limits.request_limit == 8
+    diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
+
+    assert AI_CONFIG.max_requests == 8  # the default
+    assert fake_provider.agent.runs[0].usage_limits.request_limit == 3
 
 
 def test_diagnose_dbt_failure_masks_secrets_before_calling_the_model(fake_provider):
@@ -793,9 +796,9 @@ def test_real_agent_cannot_exceed_the_request_limit():
         return "pong"
 
     with pytest.raises(UsageLimitExceeded):
-        diagnostics._run_agent(agent, "prompt", timeout_seconds=10, handle=DiagnosisHandle())
+        diagnostics._run_agent(agent, "prompt", AI_CONFIG, DiagnosisHandle())
 
-    assert len(calls) == diagnostics._REQUEST_LIMIT
+    assert len(calls) == AI_CONFIG.max_requests
 
 
 @requires_provider
@@ -848,7 +851,7 @@ def test_real_agent_is_stopped_when_a_tool_result_can_not_be_redacted(caplog):
     )
 
     with pytest.raises(RuntimeError, match="redactor bug"):
-        diagnostics._run_agent(agent, "prompt", timeout_seconds=10, handle=DiagnosisHandle())
+        diagnostics._run_agent(agent, "prompt", AI_CONFIG, DiagnosisHandle())
 
 
 @requires_provider

@@ -41,9 +41,6 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-# Model requests a single diagnosis can make: the answer plus a few schema checks.
-_REQUEST_LIMIT = 8
-
 # SQLToolset's ``query`` tool can read arbitrary rows and hand them to the LLM; introspection only needs metadata.
 _SCHEMA_ONLY_TOOLS = frozenset({"list_tables", "get_schema"})
 
@@ -126,13 +123,14 @@ def diagnose_dbt_failure(
         # The tools only accept the exact names of the allow-list: a model that guesses another spelling of the
         # same table is refused, so it is told the names.
         prompt = redact(failure_context.to_prompt(failure_context.allowed_tables if toolsets else None), ai_config)
-        result = _run_agent(agent, prompt, ai_config.timeout_seconds, handle or DiagnosisHandle())
+        result = _run_agent(agent, prompt, ai_config, handle or DiagnosisHandle())
         if result is None:
             return None
 
         usage = result.usage
         logger.info(
-            "AI diagnosis used %s model request(s), %s input and %s output tokens.",
+            "AI diagnosis sent %s characters, and used %s model request(s), %s input and %s output tokens.",
+            len(prompt),
             usage.requests,
             usage.input_tokens,
             usage.output_tokens,
@@ -151,7 +149,7 @@ def redact(text: str, ai_config: AiConfig) -> str:
     return ai_config.redactor(text) if ai_config.redactor else text
 
 
-def _run_agent(agent: Any, prompt: str, timeout_seconds: float, handle: DiagnosisHandle) -> Any:
+def _run_agent(agent: Any, prompt: str, ai_config: AiConfig, handle: DiagnosisHandle) -> Any:
     """Run the agent on this thread. Returns None if the time limit is reached or the task is killed."""
     timed_out = threading.Event()
 
@@ -159,16 +157,16 @@ def _run_agent(agent: Any, prompt: str, timeout_seconds: float, handle: Diagnosi
         timed_out.set()
         handle.token.cancel()
 
-    timer = threading.Timer(timeout_seconds, cancel_on_timeout)
+    timer = threading.Timer(ai_config.timeout_seconds, cancel_on_timeout)
     timer.daemon = True
     timer.start()
     try:
         return agent.run_sync(
-            prompt, cancellation_token=handle.token, usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT)
+            prompt, cancellation_token=handle.token, usage_limits=UsageLimits(request_limit=ai_config.max_requests)
         )
     except RunCancelled:
         if timed_out.is_set():
-            logger.warning("AI diagnosis timed out after %s seconds; skipping.", timeout_seconds)
+            logger.warning("AI diagnosis timed out after %s seconds; skipping.", ai_config.timeout_seconds)
         else:
             logger.info("AI diagnosis cancelled because the task was killed.")
         return None

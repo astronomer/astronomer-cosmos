@@ -50,9 +50,10 @@ When it runs, and what it costs
 
 - It runs once per failed task, on the task's last attempt. With ``retries=3``, the first three failures don't call the
   LLM.
-- A diagnosis is limited to 8 model requests, and its LLM run is cancelled after ``timeout_seconds``. Every request
-  carries the whole prompt, which can reach about 60,000 characters with 5 failed nodes. The time limit
-  is checked while Cosmos waits for the model, so a call that blocks its thread is cancelled when it returns.
+- A diagnosis makes at most ``max_requests`` requests to the model, and its LLM run is cancelled after
+  ``timeout_seconds``. Every request carries the whole prompt, which is bounded by the limits of
+  :ref:`what is sent <ai-config-sent>`. The time limit is checked while Cosmos waits for the model, so a call that blocks
+  its thread is cancelled when it returns.
 - Many tasks failing for the same reason mean many calls. To limit the cost, set ``ai_config`` only on the
   ``DbtTaskGroup`` that needs it.
 - The diagnosis runs inside the task, so its time counts toward the task's ``execution_timeout``.
@@ -60,12 +61,42 @@ When it runs, and what it costs
   error that Cosmos did not expect, which it logs at the error level.
 - Killing the task cancels the diagnosis.
 
+.. _ai-config-sent:
+
 What is sent to the LLM
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-For each failed dbt node (up to 5), Cosmos sends the error message and the compiled SQL that dbt wrote in
-``run_results.json``. When dbt fails before it runs any node, such as on a compilation error, it sends the end of the
-dbt output instead. With ``InvocationMode.DBT_RUNNER``, that is the error summary that dbt returns, not its full log.
+For each failed dbt node, Cosmos sends the error message and the compiled SQL that dbt wrote in ``run_results.json``.
+When dbt fails before it runs any node, such as on a compilation error, it sends the end of the dbt output instead. With
+``InvocationMode.DBT_RUNNER``, that is the error summary that dbt returns, not its full log.
+
+You decide how much is sent, with these limits. A text over its limit keeps its head and its tail, with a marker for
+what was left out, except the dbt output, which keeps its end:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Option
+     - Limits
+     - Default
+   * - ``max_failed_nodes``
+     - The failed nodes that are sent. The others are counted, not sent.
+     - 5
+   * - ``max_message_chars``
+     - The characters of the error message of each node.
+     - 4000
+   * - ``max_sql_chars``
+     - The characters of the compiled SQL of each node.
+     - 8000
+   * - ``max_output_chars``
+     - The characters of the dbt output, when no node failed.
+     - 8000
+   * - ``max_artifact_mb``
+     - The size of the biggest dbt artifact that is read. A bigger one is skipped, to protect the memory of the worker.
+     - 50
+
+The task log says how many characters were sent, so you can tune the limits with a real failure. Raise them to give the
+model more to work with, at the cost of more tokens, or lower them to send less.
 
 Before sending, Cosmos masks every secret registered with Airflow's secrets masker, such as connection passwords, and
 then applies ``redactor``. Airflow can't know a secret that only exists as a dbt variable, and dbt errors can echo the SQL
@@ -138,7 +169,10 @@ Arguments
 - ``diagnose_on_failure``: Diagnose failed tasks. Defaults to ``False``.
 - ``introspect_schema``: Let the agent check the schema of the related tables. Defaults to ``False``.
 - ``timeout_seconds``: Time limit for the LLM run. When it is reached, the run is cancelled and the task fails with the
-  dbt error, without a diagnosis. Must be greater than ``0``. Defaults to ``30``.
+  dbt error, without a diagnosis. Must be a number above ``0``. Defaults to ``30``.
+- ``max_requests``: The most requests that the agent can make to the model. Defaults to ``8``.
+- ``max_failed_nodes``, ``max_message_chars``, ``max_sql_chars``, ``max_output_chars`` and ``max_artifact_mb``: How much
+  is sent to the model, as described in :ref:`what is sent <ai-config-sent>`. Each is a whole number of at least ``1``.
 - ``diagnosis_output_type``: A pydantic model class (a subclass of ``pydantic.BaseModel``) for the output. Defaults to
   ``root_cause``, ``suggested_fix`` and ``confidence``.
 - ``diagnosis_instructions``: Your own system instructions for the agent.

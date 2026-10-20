@@ -747,7 +747,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             ai_config=self.ai_config,  # type: ignore[arg-type]
             profile_config=self.profile_config,
             failure_context=build_failure_context(
-                tmp_project_dir, "\n".join(getattr(result, "full_output", [])) or str(exc)
+                tmp_project_dir,
+                "\n".join(getattr(result, "full_output", [])) or str(exc),
+                self.ai_config,  # type: ignore[arg-type]
             ),
             handle=self._ai_diagnosis_handle,
         )

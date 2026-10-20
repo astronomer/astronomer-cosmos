@@ -5,13 +5,19 @@ from pathlib import Path
 
 import pytest
 
-import cosmos.ai.context as context_module
-from cosmos.ai.context import FailedNode, FailureContext, build_failure_context
+from cosmos.ai.context import FailedNode, FailureContext
+from cosmos.ai.context import build_failure_context as build
+from cosmos.config import AiConfig
 
 # Artifacts of a real ``dbt build`` (dbt-core 1.11, Postgres) with a model that fails with a database error, a test that
 # fails, and a model skipped because of a failed parent. The failing hook carries a fake secret, as in a real leak.
 # They are stored outside a ``target`` folder, which git ignores, and copied into one by the ``sample_project`` fixture.
 SAMPLE_ARTIFACTS = Path(__file__).parent.parent / "sample" / "ai_diagnosis"
+
+
+def build_failure_context(project_dir, output="", **limits):
+    """Build the context with the default limits of ``AiConfig``, or with the ones given."""
+    return build(project_dir, output, AiConfig(llm_conn_id="my_llm_conn", **limits))
 
 
 @pytest.fixture
@@ -143,18 +149,26 @@ def test_build_failure_context_tolerates_null_fields_in_the_artifacts(tmp_path):
     )
 
 
-def test_build_failure_context_does_not_read_an_artifact_that_is_too_big(sample_project, monkeypatch, caplog):
+def test_build_failure_context_does_not_read_an_artifact_that_is_too_big(tmp_path, caplog):
     """The manifest of a big project is hundreds of MB: loading it could cost the worker its memory."""
-    manifest = sample_project / "target" / "manifest.json"
-    monkeypatch.setattr(context_module, "_MAX_ARTIFACT_BYTES", manifest.stat().st_size - 1)
+    _write_artifacts(
+        tmp_path,
+        run_results={"results": [{"status": "error", "unique_id": "model.p.m", "message": "boom"}]},
+        manifest={
+            "nodes": {"model.p.m": {"resource_type": "model", "schema": "s", "name": "m"}},
+            "padding": "x" * 2_000_000,
+        },
+    )
 
     with caplog.at_level(logging.WARNING):
-        context = build_failure_context(sample_project)
+        too_small = build_failure_context(tmp_path, max_artifact_mb=1)
+    roomy = build_failure_context(tmp_path, max_artifact_mb=5)
 
-    # The failure is still reported from ``run_results.json``, only without the related tables from the manifest.
-    assert [node.unique_id for node in context.failed_nodes][0] == "model.real_fail.leak"
-    assert context.allowed_tables == []
-    assert "manifest.json is larger than" in caplog.text
+    # The failure is still reported from ``run_results.json``, only without the related tables of the manifest.
+    assert [node.unique_id for node in too_small.failed_nodes] == ["model.p.m"]
+    assert too_small.allowed_tables == []
+    assert "manifest.json is larger than 1 MB" in caplog.text and "max_artifact_mb" in caplog.text
+    assert roomy.allowed_tables == ["s.m"]
 
 
 def test_build_failure_context_limits_the_number_of_failed_nodes(tmp_path):
@@ -271,3 +285,45 @@ def test_to_prompt_does_not_mention_tools_the_agent_does_not_have(inspectable_ta
     prompt = context.to_prompt(inspectable_tables)
 
     assert "get_schema" not in prompt and "analytics.m" not in prompt
+
+
+def test_the_failed_nodes_that_are_sent_are_the_ones_the_user_allows(tmp_path):
+    results = [{"status": "error", "unique_id": f"model.p.m{i}", "message": "boom"} for i in range(4)]
+    _write_artifacts(tmp_path, run_results={"results": results})
+
+    context = build_failure_context(tmp_path, max_failed_nodes=2)
+
+    assert [node.unique_id for node in context.failed_nodes] == ["model.p.m0", "model.p.m1"]
+    assert context.omitted_nodes == 2
+
+
+def test_the_message_and_the_sql_are_cut_where_the_user_says(tmp_path):
+    message, sql = "M" * 100 + "-the-end", "S" * 100 + "-the-end"
+    _write_artifacts(
+        tmp_path,
+        run_results={
+            "results": [{"status": "error", "unique_id": "model.p.m", "message": message, "compiled_code": sql}]
+        },
+    )
+
+    node = build_failure_context(tmp_path, max_message_chars=40, max_sql_chars=60).failed_nodes[0]
+
+    assert (
+        len(node.message) < len(message)
+        and node.message.startswith("M" * 20)
+        and node.message.endswith("M-the-end"[-20:])
+    )
+    assert len(node.compiled_code) < len(sql) and node.compiled_code.endswith("-the-end")
+    assert "[truncated" in node.message and "[truncated" in node.compiled_code
+    # And nothing is cut when the user gives more room than the text needs.
+    roomy = build_failure_context(tmp_path, max_message_chars=1000, max_sql_chars=1000).failed_nodes[0]
+    assert (roomy.message, roomy.compiled_code) == (message, sql)
+
+
+def test_the_output_that_is_sent_without_failed_nodes_is_as_long_as_the_user_allows(tmp_path):
+    output = "start " + "x" * 200 + " the-error"
+
+    context = build_failure_context(tmp_path, output, max_output_chars=30)
+
+    assert context.output == output[-30:]
+    assert context.output.endswith("the-error")

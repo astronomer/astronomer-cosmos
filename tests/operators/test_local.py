@@ -3280,7 +3280,7 @@ def test_ai_diagnosis_is_given_the_artifacts_of_the_project_and_the_output(mock_
             _failed_subprocess_result(["line 1", "line 2"]), "/tmp/project", FINAL_ATTEMPT_CONTEXT
         )
 
-    mock_build_context.assert_called_once_with("/tmp/project", "line 1\nline 2")
+    mock_build_context.assert_called_once_with("/tmp/project", "line 1\nline 2", AI_CONFIG)
     kwargs = mock_diagnose.call_args.kwargs
     assert kwargs["ai_config"] is AI_CONFIG
     assert kwargs["failure_context"] is mock_build_context.return_value
@@ -3495,6 +3495,8 @@ def test_run_command_diagnoses_a_failed_dbt_command_inside_the_project_directory
     # The artifacts are read from the temporary project, which is gone once ``run_command`` returns.
     mock_build_context.assert_called_once()
     assert mock_build_context.call_args.args[0] == str(tmp_path)
+    # The limits of what is sent come from the user's ``AiConfig``.
+    assert mock_build_context.call_args.args[2] is AI_CONFIG
     assert str(exc_info.value).endswith(DIAGNOSIS_TEXT)
 
 

@@ -80,7 +80,8 @@ around the problem. Use ``redactor`` to cover those cases:
         redactor=lambda text: re.sub(r"(?i)(password|token)=\S+", r"\1=***", text),
     )
 
-If ``redactor`` raises, nothing is sent.
+If ``redactor`` raises, nothing is sent. What the schema tools return to the agent goes through the same masking and
+``redactor``.
 
 Schema introspection
 ~~~~~~~~~~~~~~~~~~~~

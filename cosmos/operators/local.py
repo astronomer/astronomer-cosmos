@@ -1001,9 +1001,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         )
         return result
 
-    def on_kill(self) -> None:
+    def _cancel_ai_diagnosis(self) -> None:
+        """Cancel the AI diagnosis in flight, if any. Operators that override ``on_kill`` must call it."""
         if self._ai_diagnosis_handle is not None:
             self._ai_diagnosis_handle.cancel()
+
+    def on_kill(self) -> None:
+        self._cancel_ai_diagnosis()
         if self.invocation_mode == InvocationMode.SUBPROCESS:
             if self.cancel_query_on_kill:
                 self.subprocess_hook.send_sigint()

@@ -6,6 +6,7 @@ import importlib
 import json
 import os
 import threading
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field
@@ -332,10 +333,30 @@ def _build_toolsets(
     try:
         # Only the tables of the failed node and its parents: enough to check a column, no more of the warehouse.
         sql_toolset = SQLToolset(db_conn_id=conn_id, allowed_tables=allowed_tables)
-        return [sql_toolset.filtered(lambda _ctx, tool_def: tool_def.name in _SCHEMA_ONLY_TOOLS)]
+        metadata_tools = sql_toolset.filtered(lambda _ctx, tool_def: tool_def.name in _SCHEMA_ONLY_TOOLS)
+        return [_redacting(metadata_tools, ai_config)]
     except Exception:
         logger.warning("Could not set up schema introspection; skipping it.", exc_info=True)
         return []
+
+
+def redact_tool_result(result: Any, ai_config: AiConfig) -> str:
+    """What a tool returned, redacted like the prompt: the model must not see more than the prompt let through."""
+    text = result if isinstance(result, str) else json.dumps(result, default=str)
+    return redact(text, ai_config)
+
+
+def _redacting(toolset: Any, ai_config: AiConfig) -> Any:
+    """Wrap ``toolset`` so that everything its tools return goes through ``redact`` before the model sees it."""
+    # Imported here: ``pydantic_ai`` is only there with the provider, and this runs once the provider was imported.
+    from pydantic_ai.toolsets import WrapperToolset
+
+    @dataclass
+    class RedactingToolset(WrapperToolset):  # type: ignore[misc]
+        async def call_tool(self, name: str, tool_args: dict[str, Any], ctx: Any, tool: Any) -> Any:
+            return redact_tool_result(await self.wrapped.call_tool(name, tool_args, ctx, tool), ai_config)
+
+    return RedactingToolset(wrapped=toolset)
 
 
 def _is_dbapi_connection(conn_id: str, dbapi_hook_class: type) -> bool:

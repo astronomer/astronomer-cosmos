@@ -5,6 +5,7 @@ import logging
 import sys
 import threading
 import time
+from dataclasses import dataclass
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -478,9 +479,14 @@ def fake_sql_toolset_module(monkeypatch):
         def filtered(self, tool_filter):
             return SimpleNamespace(tool_filter=tool_filter)
 
+    @dataclass
+    class FakeWrapperToolset:
+        wrapped: object
+
     monkeypatch.setitem(
         sys.modules, "airflow.providers.common.ai.toolsets.sql", SimpleNamespace(SQLToolset=FakeSQLToolset)
     )
+    monkeypatch.setitem(sys.modules, "pydantic_ai.toolsets", SimpleNamespace(WrapperToolset=FakeWrapperToolset))
     return created
 
 
@@ -506,7 +512,7 @@ def test_build_toolsets_limits_the_agent_to_the_related_tables_and_the_metadata_
     assert fake_sql_toolset_module[0].db_conn_id == "my_db_conn"
     # The failed node's own table and its parents, nothing else of the warehouse.
     assert fake_sql_toolset_module[0].allowed_tables == ["analytics.orders", "raw.orders"]
-    tool_filter = toolsets[0].tool_filter
+    tool_filter = toolsets[0].wrapped.tool_filter  # the metadata tools, wrapped to redact what they return
     assert [
         name
         for name in ("list_tables", "get_schema", "query", "check_query")
@@ -606,6 +612,51 @@ def test_diagnose_dbt_failure_ignores_tool_calls_that_are_not_the_metadata_tools
         _run_with_messages(fake_provider, _tool_messages({"sql": "select 1"}, "1", tool_name="final_result"))
 
     assert "tool call" not in caplog.text and "select 1" not in caplog.text
+
+
+def test_build_toolsets_redacts_what_the_metadata_tools_return(monkeypatch, fake_sql_toolset_module):
+    _sql_connection(monkeypatch)
+    monkeypatch.setattr(diagnostics, "mask_secrets", lambda text: text.replace("SECRET-VALUE", "***"))
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+    [toolset] = diagnostics._build_toolsets(config, _profile_config(), FAILURE_CONTEXT)
+
+    class Tools:
+        async def call_tool(self, name, tool_args, ctx, tool):
+            return '{"columns": [{"name": "SECRET-VALUE"}]}'
+
+    toolset.wrapped = Tools()
+    returned = asyncio.run(toolset.call_tool("get_schema", {"table_name": "raw.orders"}, None, None))
+
+    assert returned == '{"columns": [{"name": "***"}]}'
+
+
+@pytest.mark.parametrize(
+    "result, expected",
+    [
+        ("password=SECRET-VALUE", "password=***"),
+        ({"columns": [{"name": "SECRET-VALUE"}]}, '{"columns": [{"name": "***"}]}'),
+        (["SECRET-VALUE", 1], '["***", 1]'),
+        (None, "null"),
+    ],
+)
+def test_redact_tool_result_masks_secrets_in_any_kind_of_result(fake_provider, result, expected):
+    assert diagnostics.redact_tool_result(result, AI_CONFIG) == expected
+
+
+def test_redact_tool_result_applies_the_user_redactor(fake_provider):
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=lambda text: text.replace("pii", "<x>"))
+
+    assert diagnostics.redact_tool_result("a pii column", config) == "a <x> column"
+
+
+def test_redact_tool_result_fails_closed_if_the_redactor_fails(fake_provider):
+    def broken(text):
+        raise RuntimeError("redactor bug")
+
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken)
+
+    with pytest.raises(diagnostics._RedactionError):
+        diagnostics.redact_tool_result("anything", config)
 
 
 def test_build_toolsets_skips_introspection_if_the_toolset_cannot_be_set_up(monkeypatch, caplog):
@@ -777,6 +828,59 @@ def test_real_agent_cannot_exceed_the_request_limit():
         diagnostics._run_agent(agent, "prompt", timeout_seconds=10, handle=None)
 
     assert len(calls) == diagnostics._REQUEST_LIMIT
+
+
+@requires_provider
+def test_real_agent_never_sees_an_unredacted_tool_result(monkeypatch):
+    from pydantic_ai.toolsets import FunctionToolset
+
+    monkeypatch.setattr(diagnostics, "mask_secrets", lambda text: text.replace("SECRET-VALUE", "***"))
+    tools = FunctionToolset()
+
+    @tools.tool_plain
+    def get_schema(table_name: str) -> str:
+        return '{"columns": [{"name": "SECRET-VALUE"}]}'
+
+    seen = []
+
+    def handler(messages, info):
+        returns = [p for m in messages for p in m.parts if p.part_kind == "tool-return"]
+        if not returns:
+            return ModelResponse(parts=[ToolCallPart("get_schema", {"table_name": "raw.orders"})])
+        seen.extend(str(p.content) for p in returns)
+        return _answer(info)
+
+    agent = Agent(
+        FunctionModel(handler), output_type=DbtFailureDiagnosis, toolsets=[diagnostics._redacting(tools, AI_CONFIG)]
+    )
+    agent.run_sync("prompt")
+
+    assert seen == ['{"columns": [{"name": "***"}]}']
+
+
+@requires_provider
+def test_real_agent_is_stopped_when_a_tool_result_can_not_be_redacted(caplog):
+    from pydantic_ai.toolsets import FunctionToolset
+
+    def broken(text):
+        raise RuntimeError("redactor bug")
+
+    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken)
+    tools = FunctionToolset()
+
+    @tools.tool_plain
+    def get_schema(table_name: str) -> str:
+        return "columns"
+
+    def handler(messages, info):
+        return ModelResponse(parts=[ToolCallPart("get_schema", {"table_name": "raw.orders"})])
+
+    agent = Agent(
+        FunctionModel(handler), output_type=DbtFailureDiagnosis, toolsets=[diagnostics._redacting(tools, config)]
+    )
+
+    with pytest.raises(diagnostics._RedactionError):
+        diagnostics._run_agent(agent, "prompt", timeout_seconds=10, handle=None)
 
 
 @requires_provider

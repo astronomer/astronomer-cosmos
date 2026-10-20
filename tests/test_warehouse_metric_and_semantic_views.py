@@ -50,6 +50,7 @@ from cosmos.operators.watcher import (
     DbtTestWatcherOperator,
 )
 from cosmos.profiles import DatabricksTokenProfileMapping, SnowflakePrivateKeyPemProfileMapping
+from cosmos.profiles.databricks.host import normalize_host
 
 from . import utils as test_utils
 
@@ -149,7 +150,7 @@ class Databricks(Warehouse):
         self.catalog = os.getenv("DATABRICKS_CATALOG", "main")
         connection = Connection.get_connection_from_secrets("databricks_default")
         self.connection_params = {
-            "server_hostname": connection.host.replace("https://", "").rstrip("/"),
+            "server_hostname": normalize_host(connection.host),
             "http_path": connection.extra_dejson["http_path"],
             "access_token": connection.password or connection.extra_dejson.get("token"),
         }

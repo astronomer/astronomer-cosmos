@@ -44,9 +44,7 @@ def delete_snowflake_resource():
             # Semantic views are not listed in information_schema.tables
             cursor.execute(f"SHOW SEMANTIC VIEWS LIKE '{prefix}_%'")
             resources += [
-                (row[1], "SEMANTIC VIEW")
-                for row in cursor.fetchall()
-                if row[1].startswith(f"{prefix.upper()}_")
+                (row[1], "SEMANTIC VIEW") for row in cursor.fetchall() if row[1].startswith(f"{prefix.upper()}_")
             ]
 
         for resource_name, resource_type in resources:

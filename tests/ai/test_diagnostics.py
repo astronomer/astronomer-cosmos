@@ -537,63 +537,73 @@ def test_diagnose_dbt_failure_without_introspection_does_not_mention_tables_to_i
 def _tool_messages(call_args, return_content, return_kind="tool-return", tool_name="get_schema"):
     """The messages of an agent that called one tool and got ``return_content`` back."""
     return [
-        SimpleNamespace(parts=[SimpleNamespace(part_kind="tool-call", tool_name=tool_name, args=call_args)]),
-        SimpleNamespace(parts=[SimpleNamespace(part_kind=return_kind, tool_name=tool_name, content=return_content)]),
+        SimpleNamespace(
+            parts=[SimpleNamespace(part_kind="tool-call", tool_name=tool_name, tool_call_id="c1", args=call_args)]
+        ),
+        SimpleNamespace(
+            parts=[
+                SimpleNamespace(part_kind=return_kind, tool_name=tool_name, tool_call_id="c1", content=return_content)
+            ]
+        ),
     ]
 
 
-def test_diagnose_dbt_failure_logs_the_tool_calls_of_the_agent(fake_provider, caplog):
+def _run_with_messages(fake_provider, messages):
     fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
         output=DIAGNOSIS,
         usage=SimpleNamespace(requests=2, input_tokens=1, output_tokens=1),
-        all_messages=lambda: _tool_messages({"table_name": "raw.orders"}, '{"columns": []}'),
+        all_messages=lambda: messages,
     )
+    return diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
 
+
+@pytest.mark.parametrize("call_args", [{"table_name": "raw.orders"}, '{"table_name": "raw.orders"}'])
+def test_diagnose_dbt_failure_logs_the_table_the_agent_asked_for(fake_provider, caplog, call_args):
     with caplog.at_level(logging.INFO):
-        diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+        _run_with_messages(fake_provider, _tool_messages(call_args, '{"columns": []}'))
 
-    assert "AI diagnosis tool call: get_schema({'table_name': 'raw.orders'})" in caplog.text
+    assert "AI diagnosis tool call: get_schema 'raw.orders'" in caplog.text
 
 
-def test_diagnose_dbt_failure_warns_when_the_agent_is_refused_a_table(fake_provider, caplog):
-    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
-        output=DIAGNOSIS,
-        usage=SimpleNamespace(requests=2, input_tokens=1, output_tokens=1),
-        all_messages=lambda: _tool_messages(
-            {"table_name": "base"}, "Table 'base' is not in the allowed tables list.", return_kind="retry-prompt"
-        ),
+def test_diagnose_dbt_failure_logs_a_tool_call_without_a_table(fake_provider, caplog):
+    with caplog.at_level(logging.INFO):
+        _run_with_messages(fake_provider, _tool_messages({}, "[]", tool_name="list_tables"))
+
+    assert "AI diagnosis tool call: list_tables" in caplog.text
+
+
+def test_diagnose_dbt_failure_tolerates_tool_call_arguments_that_are_not_json(fake_provider, caplog):
+    with caplog.at_level(logging.INFO):
+        diagnosis = _run_with_messages(fake_provider, _tool_messages("not json", "[]"))
+
+    assert diagnosis is not None
+    assert "AI diagnosis tool call: get_schema" in caplog.text
+
+
+@pytest.mark.parametrize("return_kind", ["tool-return", "retry-prompt"])
+def test_diagnose_dbt_failure_warns_when_the_agent_is_refused_a_table(fake_provider, caplog, return_kind):
+    messages = _tool_messages(
+        {"table_name": "base"}, "Table 'base' is not in the allowed tables list.", return_kind=return_kind
     )
 
     with caplog.at_level(logging.WARNING):
-        diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+        _run_with_messages(fake_provider, messages)
 
-    assert "refused a table" in caplog.text and "'base' is not in the allowed tables" in caplog.text
+    assert "refused the table 'base'" in caplog.text
 
 
-def test_diagnose_dbt_failure_redacts_what_it_logs_of_the_tool_calls(fake_provider, caplog):
-    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
-        output=DIAGNOSIS,
-        usage=SimpleNamespace(requests=2, input_tokens=1, output_tokens=1),
-        all_messages=lambda: _tool_messages(
-            {"table_name": "SECRET-VALUE"}, "SECRET-VALUE is not in the allowed tables"
-        ),
-    )
+def test_diagnose_dbt_failure_never_logs_what_a_tool_returned(fake_provider, caplog):
+    messages = _tool_messages({"table_name": "raw.orders"}, '{"columns": [{"name": "SECRET-VALUE"}]}')
 
     with caplog.at_level(logging.DEBUG):
-        diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+        _run_with_messages(fake_provider, messages)
 
     assert "SECRET-VALUE" not in caplog.text
 
 
 def test_diagnose_dbt_failure_ignores_tool_calls_that_are_not_the_metadata_tools(fake_provider, caplog):
-    fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
-        output=DIAGNOSIS,
-        usage=SimpleNamespace(requests=2, input_tokens=1, output_tokens=1),
-        all_messages=lambda: _tool_messages({"sql": "select 1"}, "1", tool_name="final_result"),
-    )
-
     with caplog.at_level(logging.DEBUG):
-        diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
+        _run_with_messages(fake_provider, _tool_messages({"sql": "select 1"}, "1", tool_name="final_result"))
 
     assert "tool call" not in caplog.text and "select 1" not in caplog.text
 

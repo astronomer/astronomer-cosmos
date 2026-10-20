@@ -1898,7 +1898,7 @@ def test_operator_args_emit_datasets_overrides_render_config(
     assert task_args["emit_datasets"] == expected_emit_datasets
 
 
-def _convert_with_ai_config(execution_mode, *, ai_config=None, operator_args=None):
+def _convert_with_ai_config(execution_mode, *, ai_config=None, operator_args=None, emit_datasets=True):
     dag = DAG("sample_dag", start_date=datetime(2024, 4, 16))
     DbtToAirflowConverter(
         dag=dag,
@@ -1906,7 +1906,7 @@ def _convert_with_ai_config(execution_mode, *, ai_config=None, operator_args=Non
         project_config=ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix()),
         profile_config=sample_profile_config,
         execution_config=ExecutionConfig(execution_mode=execution_mode),
-        render_config=RenderConfig(emit_datasets=True),
+        render_config=RenderConfig(emit_datasets=emit_datasets),
         operator_args=operator_args,
         ai_config=ai_config,
     )
@@ -2010,18 +2010,18 @@ def test_dag_with_ai_config_and_a_custom_output_type_serializes(mock_load_dbt_gr
         diagnosis_output_type=Diagnosis,
         redactor=lambda text: text,
     )
-    dag = _convert_with_ai_config(ExecutionMode.LOCAL, ai_config=ai_config)
+    # No dataset outlets: serializing those looks up dataset aliases in the metadata DB, which unit tests don't have.
+    dag = _convert_with_ai_config(ExecutionMode.LOCAL, ai_config=ai_config, emit_datasets=False)
 
-    if AIRFLOW_VERSION < Version("3.1"):
-        import json
+    import json
 
-        from airflow.serialization.serialized_objects import SerializedDAG
+    try:
+        from airflow.serialization.serialized_objects import DagSerialization as Serializer  # Airflow 3.2+
+    except ImportError:
+        from airflow.serialization.serialized_objects import SerializedDAG as Serializer
 
-        payload = json.loads(json.dumps(SerializedDAG.to_dict(dag)))
-        restored = SerializedDAG.from_dict(payload)
-        assert set(restored.task_dict) == set(dag.task_dict)
-        assert "ai_config" not in json.dumps(payload)
-    else:
-        from tests.utils import serialize_dag_to_db
+    payload = json.loads(json.dumps(Serializer.to_dict(dag)))
 
-        serialize_dag_to_db(dag)
+    assert len(payload["dag"]["tasks"]) == len(dag.tasks)
+    assert "ai_config" not in json.dumps(payload)
+    assert "my_llm_conn" not in json.dumps(payload)

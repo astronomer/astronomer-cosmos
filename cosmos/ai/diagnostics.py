@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import threading
 from typing import TYPE_CHECKING, Any, Literal
@@ -190,7 +191,7 @@ def diagnose_dbt_failure(
             usage.input_tokens,
             usage.output_tokens,
         )
-        _log_tool_calls(result, ai_config)
+        _log_tool_calls(result)
         return redact(format_diagnosis(result.output), ai_config)
     except _DiagnosisTimeoutError:
         logger.warning("AI diagnosis timed out after %s seconds; skipping.", ai_config.timeout_seconds)
@@ -206,23 +207,47 @@ def diagnose_dbt_failure(
         return None
 
 
-def _log_tool_calls(result: Any, ai_config: AiConfig) -> None:
-    """Log what the agent asked of its tools, and what was refused: otherwise a diagnosis made blind looks the same."""
+def _log_tool_calls(result: Any) -> None:
+    """
+    Log which tables the agent asked about, and when it was refused one: otherwise a diagnosis made blind looks the same.
+
+    Only the name of the tool and the table the agent asked for are logged, never what a tool returned.
+    """
     try:
         messages = result.all_messages()
     except AttributeError:
         return
+    requested: dict[Any, str] = {}
     for message in messages:
         for part in getattr(message, "parts", ()):
+            if getattr(part, "tool_name", None) not in _SCHEMA_ONLY_TOOLS:
+                continue
             kind = getattr(part, "part_kind", "")
-            if kind == "tool-call" and part.tool_name in _SCHEMA_ONLY_TOOLS:
-                logger.info("AI diagnosis tool call: %s", redact(f"{part.tool_name}({part.args})", ai_config))
-            elif kind in ("tool-return", "retry-prompt") and part.tool_name in _SCHEMA_ONLY_TOOLS:
-                content = redact(str(part.content), ai_config)
-                if "not in the allowed tables" in content:
-                    logger.warning("AI diagnosis was refused a table: %s", content)
-                else:
-                    logger.debug("AI diagnosis tool result: %s", content)
+            call_id = getattr(part, "tool_call_id", None)
+            if kind == "tool-call":
+                requested[call_id] = _requested_table(part)
+                logger.info(
+                    "AI diagnosis tool call: %s%s",
+                    part.tool_name,
+                    f" {requested[call_id]!r}" if requested[call_id] else "",
+                )
+            elif kind in ("tool-return", "retry-prompt") and "not in the allowed tables" in str(part.content):
+                logger.warning(
+                    "AI diagnosis was refused the table %r: it is not one of the tables of the failed node.",
+                    requested.get(call_id, "?"),
+                )
+
+
+def _requested_table(tool_call: Any) -> str:
+    """The table a ``get_schema`` call asks for, or an empty string for a tool that does not take one."""
+    args = getattr(tool_call, "args", None)
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except ValueError:
+            args = None
+    table = args.get("table_name") if isinstance(args, dict) else None
+    return str(table)[:200] if table is not None else ""
 
 
 def redact(text: str, ai_config: AiConfig) -> str:

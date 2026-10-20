@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 import os
 import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
+from airflow.exceptions import AirflowException, AirflowOptionalProviderFeatureException
 from pydantic import BaseModel, Field
 
 try:
@@ -19,42 +19,14 @@ except ImportError:
 from cosmos.ai.formatting import format_diagnosis
 from cosmos.log import get_logger
 
-
-def _airflow_exceptions(name: str) -> tuple[type[Exception], ...]:
-    """The exception ``name`` of Airflow core and of the Task SDK. Airflow 3 has both, and they are different types."""
-    classes = []
-    for module_name in ("airflow.exceptions", "airflow.sdk.exceptions"):
-        try:
-            classes.append(getattr(importlib.import_module(module_name), name))
-        except (ImportError, AttributeError):
-            continue
-    return tuple(classes)
-
-
-# The provider or one of its own dependencies is not usable.
-_PROVIDER_IMPORT_ERRORS: tuple[type[BaseException], ...] = (
-    ImportError,
-    *_airflow_exceptions("AirflowOptionalProviderFeatureException"),
-)
-# How the diagnosis is expected to fail, as opposed to a bug: pydantic-ai's own errors (added where they are imported)
-# plus Airflow's (e.g. connection not found), the network and the SDK of the model's provider (``ImportError``, which
-# pydantic-ai raises when e.g. ``openai`` is missing), and the ``ValueError`` of the hook for a wrong connection type
-# (also the base of pydantic's validation and serialization errors).
-_EXPECTED_ERRORS: tuple[type[BaseException], ...] = (
-    *_airflow_exceptions("AirflowException"),
-    ImportError,
-    OSError,
-    ValueError,
-)
-
-# The provider is optional. Importing it fails with ``ImportError``, or with ``AirflowOptionalProviderFeatureException``
-# (an ``AirflowException``, not an ``ImportError``) when one of its own dependencies is missing.
+# The provider is optional. A dependency of its own that is missing raises ``AirflowOptionalProviderFeatureException``,
+# which is an ``AirflowException`` and not an ``ImportError``.
 try:
     from airflow.providers.common.ai.hooks.pydantic_ai import PydanticAIHook
     from airflow.providers.common.ai.utils.masking import mask_secrets  # needs apache-airflow-providers-common-ai>=1.0
     from pydantic_ai import CancellationToken, UsageLimits
     from pydantic_ai.exceptions import AgentRunError, RunCancelled, UserError
-except _PROVIDER_IMPORT_ERRORS:
+except (ImportError, AirflowOptionalProviderFeatureException):
     PydanticAIHook = None
     mask_secrets = None
     CancellationToken = None
@@ -84,22 +56,13 @@ _DEFAULT_DIAGNOSIS_INSTRUCTIONS = (
     "should be 1-3 short sentences; do not restate the raw error text verbatim."
 )
 
-# Used when AiConfig.diagnosis_output_type overrides the default model: field-specific guidance
-# above wouldn't make sense for arbitrary fields, so rely on the custom model's own Field
-# descriptions (surfaced to the LLM via its generated schema) to steer the output instead.
+# For a custom ``diagnosis_output_type``: the field names are the user's, so the model is steered by the ``Field``
+# descriptions of that type instead.
 _CUSTOM_OUTPUT_TYPE_INSTRUCTIONS = (
     "You are a dbt/warehouse failure diagnosis assistant embedded in Apache Airflow's "
     "astronomer-cosmos. Given the error and the compiled SQL of the dbt nodes that failed, "
     "populate the requested structured output as accurately and concisely as possible."
 )
-
-
-class _DiagnosisTimeoutError(Exception):
-    """The diagnosis did not finish within ``AiConfig.timeout_seconds``."""
-
-
-class _RedactionError(Exception):
-    """``AiConfig.redactor`` raised, so the text can't be proven safe to send."""
 
 
 class DbtFailureDiagnosis(BaseModel):
@@ -109,31 +72,17 @@ class DbtFailureDiagnosis(BaseModel):
 
 
 class DiagnosisHandle:
-    """
-    Lets another thread cancel a diagnosis in flight, e.g. an operator's ``on_kill``.
-
-    The cancellation is requested from a new thread: ``on_kill`` runs in a signal handler on the thread that drives
-    the agent, and a cancellation issued from that same thread would only take effect when the pending call returns.
-    """
+    """Lets another thread cancel a diagnosis in flight, e.g. an operator's ``on_kill``."""
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._token: Any = None
-        self._cancelled = False
-
-    def bind(self, token: Any) -> None:
-        with self._lock:
-            self._token = token
-            already_cancelled = self._cancelled
-        if already_cancelled:
-            token.cancel()
+        # No token without the provider: ``diagnose_dbt_failure`` then says so and does nothing.
+        self.token: Any = CancellationToken() if CancellationToken else None
 
     def cancel(self) -> None:
-        with self._lock:
-            self._cancelled = True
-            token = self._token
-        if token is not None:
-            threading.Thread(target=token.cancel, name="cosmos-ai-diagnosis-cancel", daemon=True).start()
+        # ``on_kill`` runs in a signal handler on the thread that drives the agent, where a cancellation would only take
+        # effect when the pending call returns. From another thread it interrupts the call.
+        if self.token:
+            threading.Thread(target=self.token.cancel, daemon=True).start()
 
 
 def diagnose_dbt_failure(
@@ -143,15 +92,12 @@ def diagnose_dbt_failure(
     failure_context: FailureContext,
     handle: DiagnosisHandle | None = None,
 ) -> str | None:
-    """Best-effort diagnosis of a dbt task failure using an LLM.
+    """
+    Ask an LLM for the root cause of a dbt failure, and return its answer as text to append to the exception message.
 
-    Returns the diagnosis rendered as text, ready to append to the task's exception message.
-
-    Returns None and logs a warning when the diagnosis can't be had for an expected reason: the optional dependency is
-    missing, the connection or the LLM call fails (``pydantic-ai`` and Airflow errors, ``OSError``, and the
-    ``ValueError`` the hook raises for a wrong connection), the redactor fails, or it is cancelled or times out.
-    Anything else is a bug or an incompatible provider version, and propagates so it isn't hidden: the caller must
-    make sure that the original dbt failure still surfaces.
+    Returns None, and logs why, when the diagnosis can't be had for an expected reason: the provider is missing, the
+    connection or the LLM call fails, the time limit is reached or the task is killed. Any other error is a bug, or
+    an incompatible provider version: it propagates so it isn't hidden, and the caller keeps the dbt failure.
     """
     if PydanticAIHook is None:
         logger.warning(
@@ -169,21 +115,20 @@ def diagnose_dbt_failure(
         default_instructions = (
             _DEFAULT_DIAGNOSIS_INSTRUCTIONS if output_type is DbtFailureDiagnosis else _CUSTOM_OUTPUT_TYPE_INSTRUCTIONS
         )
-
-        # ``get_hook`` picks the hook class that matches the connection type (Azure, Bedrock, Vertex, ...).
-        hook = PydanticAIHook.get_hook(ai_config.llm_conn_id)
         toolsets = _build_toolsets(ai_config, profile_config, failure_context)
-        agent = hook.create_agent(
+        # ``get_hook`` picks the hook class that matches the connection type (Azure, Bedrock, Vertex, ...).
+        agent = PydanticAIHook.get_hook(ai_config.llm_conn_id).create_agent(
             output_type=output_type,
             instructions=ai_config.diagnosis_instructions or default_instructions,
             toolsets=toolsets,
         )
 
-        # The tools only accept the exact names of the allow-list, and a model that guesses another spelling of the same
-        # table (unqualified, or with the database) is refused. So tell it the names.
-        inspectable_tables = failure_context.allowed_tables if toolsets else None
-        prompt = redact(failure_context.to_prompt(inspectable_tables), ai_config)
-        result = _run_agent(agent, prompt, ai_config.timeout_seconds, handle)
+        # The tools only accept the exact names of the allow-list: a model that guesses another spelling of the
+        # same table is refused, so it is told the names.
+        prompt = redact(failure_context.to_prompt(failure_context.allowed_tables if toolsets else None), ai_config)
+        result = _run_agent(agent, prompt, ai_config.timeout_seconds, handle or DiagnosisHandle())
+        if result is None:
+            return None
 
         usage = result.usage
         logger.info(
@@ -194,112 +139,61 @@ def diagnose_dbt_failure(
         )
         _log_tool_calls(result)
         return redact(format_diagnosis(result.output), ai_config)
-    except _DiagnosisTimeoutError:
-        logger.warning("AI diagnosis timed out after %s seconds; skipping.", ai_config.timeout_seconds)
-        return None
-    except RunCancelled:
-        logger.info("AI diagnosis cancelled because the task was killed.")
-        return None
-    except _RedactionError:
-        logger.warning("AiConfig.redactor failed, so nothing was sent to the LLM; skipping.", exc_info=True)
-        return None
-    except (AgentRunError, UserError, *_EXPECTED_ERRORS):
+    except (AgentRunError, UserError, AirflowException, ImportError, OSError, ValueError):
+        # ``ImportError``: pydantic-ai asks for the SDK of the model's provider (e.g. ``openai``) when it is missing.
+        # ``ValueError``: the hook raises it for a connection that is not a Pydantic AI one.
         logger.warning("AI diagnosis failed; falling back to the standard error message.", exc_info=True)
         return None
 
 
-def _log_tool_calls(result: Any) -> None:
-    """
-    Log which tables the agent asked about, and when it was refused one: otherwise a diagnosis made blind looks the same.
-
-    Only the name of the tool and the table the agent asked for are logged, never what a tool returned.
-    """
-    try:
-        messages = result.all_messages()
-    except AttributeError:
-        return
-    requested: dict[Any, str] = {}
-    for message in messages:
-        for part in getattr(message, "parts", ()):
-            if getattr(part, "tool_name", None) not in _SCHEMA_ONLY_TOOLS:
-                continue
-            kind = getattr(part, "part_kind", "")
-            call_id = getattr(part, "tool_call_id", None)
-            if kind == "tool-call":
-                requested[call_id] = _requested_table(part)
-                logger.info(
-                    "AI diagnosis tool call: %s%s",
-                    part.tool_name,
-                    f" {requested[call_id]!r}" if requested[call_id] else "",
-                )
-            elif kind in ("tool-return", "retry-prompt") and "not in the allowed tables" in str(part.content):
-                logger.warning(
-                    "AI diagnosis was refused the table %r: it is not one of the tables of the failed node.",
-                    requested.get(call_id, "?"),
-                )
-
-
-def _requested_table(tool_call: Any) -> str:
-    """The table a ``get_schema`` call asks for, or an empty string for a tool that does not take one."""
-    args = getattr(tool_call, "args", None)
-    if isinstance(args, str):
-        try:
-            args = json.loads(args)
-        except ValueError:
-            args = None
-    table = args.get("table_name") if isinstance(args, dict) else None
-    return str(table)[:200] if table is not None else ""
-
-
 def redact(text: str, ai_config: AiConfig) -> str:
-    """Mask the secrets Airflow knows about and then apply ``AiConfig.redactor``, so none go to the LLM or the logs."""
+    """Mask the secrets Airflow knows about, then apply ``AiConfig.redactor``: what Airflow can't know is up to it."""
     text = mask_secrets(text)
-    if ai_config.redactor is not None:
-        try:
-            text = ai_config.redactor(text)
-        except Exception as exc:  # user code: any failure means the text can't be trusted
-            raise _RedactionError from exc
-    return text
+    return ai_config.redactor(text) if ai_config.redactor else text
 
 
-def _run_agent(agent: Any, prompt: str, timeout_seconds: float, handle: DiagnosisHandle | None) -> Any:
-    """
-    Run the agent on this thread, cancelling it cooperatively when ``timeout_seconds`` pass.
-
-    :raises _DiagnosisTimeoutError: when the deadline is reached before the agent finishes.
-    """
-    token = CancellationToken()
-    if handle is not None:
-        handle.bind(token)
-
+def _run_agent(agent: Any, prompt: str, timeout_seconds: float, handle: DiagnosisHandle) -> Any:
+    """Run the agent on this thread. Returns None if the time limit is reached or the task is killed."""
     timed_out = threading.Event()
 
-    def _cancel_on_timeout() -> None:
+    def cancel_on_timeout() -> None:
         timed_out.set()
-        token.cancel()
+        handle.token.cancel()
 
-    timer = threading.Timer(timeout_seconds, _cancel_on_timeout)
+    timer = threading.Timer(timeout_seconds, cancel_on_timeout)
     timer.daemon = True
     timer.start()
     try:
-        return agent.run_sync(prompt, cancellation_token=token, usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT))
-    except RunCancelled as exc:
+        return agent.run_sync(
+            prompt, cancellation_token=handle.token, usage_limits=UsageLimits(request_limit=_REQUEST_LIMIT)
+        )
+    except RunCancelled:
         if timed_out.is_set():
-            raise _DiagnosisTimeoutError from exc
-        raise
+            logger.warning("AI diagnosis timed out after %s seconds; skipping.", timeout_seconds)
+        else:
+            logger.info("AI diagnosis cancelled because the task was killed.")
+        return None
     finally:
         timer.cancel()
+
+
+def _log_tool_calls(result: Any) -> None:
+    """Log what the agent asked of its tools, and when it was refused a table: a blind diagnosis looks like any other."""
+    for message in result.all_messages():
+        for part in message.parts:
+            if part.part_kind == "tool-call" and part.tool_name in _SCHEMA_ONLY_TOOLS:
+                logger.info("AI diagnosis tool call: %s %s", part.tool_name, part.args)
+            elif part.part_kind in ("tool-return", "retry-prompt") and "not in the allowed tables" in str(part.content):
+                logger.warning("AI diagnosis was refused a table that is not one of the tables of the failed node.")
 
 
 def _build_toolsets(
     ai_config: AiConfig, profile_config: ProfileConfig | None, failure_context: FailureContext
 ) -> list[Any]:
     """
-    The tools the agent can use to confirm a hypothesis in the warehouse.
+    The tools the agent can use to check the warehouse, for the tables of the failed node and its parents only.
 
-    Introspection is a best-effort extra: whenever it can't be set up safely, the diagnosis still runs without it. That
-    is why the clauses below are broad: hooks of any warehouse run their own code here, and none of their failures
-    should cost the user the diagnosis itself.
+    Introspection is a best-effort extra: when it can't be set up safely, the diagnosis runs without it.
     """
     if not ai_config.introspect_schema:
         return []
@@ -309,52 +203,41 @@ def _build_toolsets(
         logger.warning("AiConfig.introspect_schema needs ProfileConfig.profile_mapping; skipping schema introspection.")
         return []
 
-    allowed_tables = failure_context.allowed_tables
-    if not allowed_tables:
+    if not failure_context.allowed_tables:
         logger.warning("The failure has no related tables to inspect; skipping schema introspection.")
         return []
 
     try:
-        # Imported only here: importing the SQL toolset needs the optional ``sql`` extra of the provider, which fails
-        # with ``AirflowOptionalProviderFeatureException`` if it is missing.
+        # Imported here: the SQL toolset needs the ``sql`` extra of the provider.
         from airflow.providers.common.ai.toolsets.sql import SQLToolset
         from airflow.providers.common.sql.hooks.sql import DbApiHook
-    except _PROVIDER_IMPORT_ERRORS:
+    except (ImportError, AirflowOptionalProviderFeatureException):
         logger.warning(
             "Schema introspection needs apache-airflow-providers-common-ai[sql]; skipping schema introspection.",
             exc_info=True,
         )
         return []
 
-    conn_id = profile_mapping.conn_id
-    if not _is_dbapi_connection(conn_id, DbApiHook):
+    if not _is_dbapi_connection(profile_mapping.conn_id, DbApiHook):
         return []
 
     try:
-        # Only the tables of the failed node and its parents: enough to check a column, no more of the warehouse.
-        sql_toolset = SQLToolset(db_conn_id=conn_id, allowed_tables=allowed_tables)
-        metadata_tools = sql_toolset.filtered(lambda _ctx, tool_def: tool_def.name in _SCHEMA_ONLY_TOOLS)
-        return [_redacting(metadata_tools, ai_config)]
-    except Exception:
+        toolset = SQLToolset(db_conn_id=profile_mapping.conn_id, allowed_tables=failure_context.allowed_tables)
+        return [_redacting(toolset.filtered(lambda _ctx, tool_def: tool_def.name in _SCHEMA_ONLY_TOOLS), ai_config)]
+    except Exception:  # a warehouse hook runs its own code here: losing introspection beats losing the diagnosis
         logger.warning("Could not set up schema introspection; skipping it.", exc_info=True)
         return []
 
 
-def redact_tool_result(result: Any, ai_config: AiConfig) -> str:
-    """What a tool returned, redacted like the prompt: the model must not see more than the prompt let through."""
-    text = result if isinstance(result, str) else json.dumps(result, default=str)
-    return redact(text, ai_config)
-
-
 def _redacting(toolset: Any, ai_config: AiConfig) -> Any:
-    """Wrap ``toolset`` so that everything its tools return goes through ``redact`` before the model sees it."""
-    # Imported here: ``pydantic_ai`` is only there with the provider, and this runs once the provider was imported.
-    from pydantic_ai.toolsets import WrapperToolset
+    """Wrap ``toolset`` so that what its tools return is redacted like the prompt before the model sees it."""
+    from pydantic_ai.toolsets import WrapperToolset  # the provider, so pydantic-ai, is there by now
 
     @dataclass
     class RedactingToolset(WrapperToolset):  # type: ignore[misc]
         async def call_tool(self, name: str, tool_args: dict[str, Any], ctx: Any, tool: Any) -> Any:
-            return redact_tool_result(await self.wrapped.call_tool(name, tool_args, ctx, tool), ai_config)
+            result = await self.wrapped.call_tool(name, tool_args, ctx, tool)
+            return redact(result if isinstance(result, str) else json.dumps(result, default=str), ai_config)
 
     return RedactingToolset(wrapped=toolset)
 

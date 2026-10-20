@@ -85,7 +85,9 @@ def fake_provider(monkeypatch):
     """Swap the provider API for fakes. ``.behaviour`` decides what a run does; ``.agent`` is the agent it ran on."""
     state = SimpleNamespace(
         behaviour=lambda prompt, token: SimpleNamespace(
-            output=DIAGNOSIS, usage=SimpleNamespace(requests=1, input_tokens=10, output_tokens=5)
+            output=DIAGNOSIS,
+            usage=SimpleNamespace(requests=1, input_tokens=10, output_tokens=5),
+            all_messages=lambda: [],
         ),
         agent=None,
         agent_kwargs=None,
@@ -147,7 +149,9 @@ def test_diagnose_dbt_failure_uses_a_custom_output_type_and_generic_instructions
         summary: str
 
     fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
-        output=Custom(summary="It broke."), usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1)
+        output=Custom(summary="It broke."),
+        usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1),
+        all_messages=lambda: [],
     )
     config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_output_type=Custom)
 
@@ -197,6 +201,7 @@ def test_diagnose_dbt_failure_redacts_the_diagnosis_too(fake_provider):
     fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
         output=DbtFailureDiagnosis(root_cause="Leaked SECRET-VALUE.", suggested_fix="Fix.", confidence="low"),
         usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1),
+        all_messages=lambda: [],
     )
 
     diagnosis = diagnose_dbt_failure(ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT)
@@ -204,18 +209,18 @@ def test_diagnose_dbt_failure_redacts_the_diagnosis_too(fake_provider):
     assert "SECRET-VALUE" not in diagnosis and "Leaked ***." in diagnosis
 
 
-def test_diagnose_dbt_failure_sends_nothing_if_the_redactor_fails(fake_provider, caplog):
+def test_diagnose_dbt_failure_sends_nothing_if_the_redactor_fails(fake_provider):
+    """A bug in the user's redactor is not an expected failure: it surfaces, and nothing has been sent."""
+
     def broken_redactor(text):
         raise RuntimeError("redactor bug")
 
     config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken_redactor)
 
-    with caplog.at_level(logging.WARNING):
-        diagnosis = diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
+    with pytest.raises(RuntimeError, match="redactor bug"):
+        diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
 
-    assert diagnosis is None
-    assert fake_provider.agent.runs == []
-    assert "AiConfig.redactor failed, so nothing was sent" in caplog.text
+    assert fake_provider.agent is None or fake_provider.agent.runs == []
 
 
 def test_diagnose_dbt_failure_without_the_provider_skips_with_a_warning(monkeypatch, caplog):
@@ -305,7 +310,9 @@ def test_diagnose_dbt_failure_returns_none_when_the_diagnosis_can_not_be_rendere
             raise ValueError("cannot serialize")
 
     fake_provider.behaviour = lambda prompt, token: SimpleNamespace(
-        output=Unrenderable(), usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1)
+        output=Unrenderable(),
+        usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1),
+        all_messages=lambda: [],
     )
 
     with caplog.at_level(logging.WARNING):
@@ -358,28 +365,40 @@ def test_diagnose_dbt_failure_stops_when_the_task_is_killed(fake_provider, caplo
     assert "cancelled because the task was killed" in caplog.text
 
 
-def test_diagnosis_handle_cancels_a_token_bound_after_the_cancellation():
+def test_diagnose_dbt_failure_stops_if_the_task_was_killed_before_the_run(fake_provider, caplog):
+    fake_provider.behaviour = _block_until_cancelled
     handle = DiagnosisHandle()
-    token = FakeToken()
-
-    handle.cancel()
-    handle.bind(token)
-
-    assert token.cancelled.is_set()
-
-
-def test_diagnosis_handle_cancels_from_another_thread():
-    handle = DiagnosisHandle()
-    token = FakeToken()
-    handle.bind(token)
-
     handle.cancel()
 
-    assert token.cancelled.wait(timeout=5)
+    with caplog.at_level(logging.INFO):
+        diagnosis = diagnose_dbt_failure(
+            ai_config=AI_CONFIG, profile_config=None, failure_context=FAILURE_CONTEXT, handle=handle
+        )
+
+    assert diagnosis is None
+    assert "cancelled because the task was killed" in caplog.text
 
 
-def test_diagnosis_handle_cancel_without_a_run_is_a_noop():
-    DiagnosisHandle().cancel()
+def test_diagnosis_handle_cancels_its_token_from_another_thread(fake_provider):
+    handle = DiagnosisHandle()
+    cancelled_by = []
+    handle.token.cancel = lambda: cancelled_by.append(threading.current_thread())
+
+    handle.cancel()
+
+    deadline = time.monotonic() + 5
+    while not cancelled_by and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert cancelled_by and cancelled_by[0] is not threading.current_thread()
+
+
+def test_diagnosis_handle_without_the_provider_has_nothing_to_cancel(monkeypatch):
+    monkeypatch.setattr(diagnostics, "CancellationToken", None)
+
+    handle = DiagnosisHandle()
+    handle.cancel()
+
+    assert handle.token is None
 
 
 # --- Schema introspection ------------------------------------------------------------------------------------------
@@ -568,7 +587,7 @@ def test_diagnose_dbt_failure_logs_the_table_the_agent_asked_for(fake_provider, 
     with caplog.at_level(logging.INFO):
         _run_with_messages(fake_provider, _tool_messages(call_args, '{"columns": []}'))
 
-    assert "AI diagnosis tool call: get_schema 'raw.orders'" in caplog.text
+    assert "AI diagnosis tool call: get_schema" in caplog.text and "raw.orders" in caplog.text
 
 
 def test_diagnose_dbt_failure_logs_a_tool_call_without_a_table(fake_provider, caplog):
@@ -595,7 +614,7 @@ def test_diagnose_dbt_failure_warns_when_the_agent_is_refused_a_table(fake_provi
     with caplog.at_level(logging.WARNING):
         _run_with_messages(fake_provider, messages)
 
-    assert "refused the table 'base'" in caplog.text
+    assert "was refused a table" in caplog.text
 
 
 def test_diagnose_dbt_failure_never_logs_what_a_tool_returned(fake_provider, caplog):
@@ -614,24 +633,27 @@ def test_diagnose_dbt_failure_ignores_tool_calls_that_are_not_the_metadata_tools
     assert "tool call" not in caplog.text and "select 1" not in caplog.text
 
 
-def test_build_toolsets_redacts_what_the_metadata_tools_return(monkeypatch, fake_sql_toolset_module):
-    _sql_connection(monkeypatch)
-    monkeypatch.setattr(diagnostics, "mask_secrets", lambda text: text.replace("SECRET-VALUE", "***"))
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
-    [toolset] = diagnostics._build_toolsets(config, _profile_config(), FAILURE_CONTEXT)
+def _tool_result(returned, config):
+    """What the model gets when a tool, wrapped to redact, returns ``returned``."""
 
     class Tools:
         async def call_tool(self, name, tool_args, ctx, tool):
-            return '{"columns": [{"name": "SECRET-VALUE"}]}'
+            return returned
 
-    toolset.wrapped = Tools()
-    returned = asyncio.run(toolset.call_tool("get_schema", {"table_name": "raw.orders"}, None, None))
+    return asyncio.run(diagnostics._redacting(Tools(), config).call_tool("get_schema", {}, None, None))
 
-    assert returned == '{"columns": [{"name": "***"}]}'
+
+@pytest.fixture
+def fake_wrapper_toolset(monkeypatch):
+    @dataclass
+    class FakeWrapperToolset:
+        wrapped: object
+
+    monkeypatch.setitem(sys.modules, "pydantic_ai.toolsets", SimpleNamespace(WrapperToolset=FakeWrapperToolset))
 
 
 @pytest.mark.parametrize(
-    "result, expected",
+    "returned, expected",
     [
         ("password=SECRET-VALUE", "password=***"),
         ({"columns": [{"name": "SECRET-VALUE"}]}, '{"columns": [{"name": "***"}]}'),
@@ -639,24 +661,24 @@ def test_build_toolsets_redacts_what_the_metadata_tools_return(monkeypatch, fake
         (None, "null"),
     ],
 )
-def test_redact_tool_result_masks_secrets_in_any_kind_of_result(fake_provider, result, expected):
-    assert diagnostics.redact_tool_result(result, AI_CONFIG) == expected
+def test_redacting_toolset_masks_secrets_in_any_kind_of_result(fake_provider, fake_wrapper_toolset, returned, expected):
+    assert _tool_result(returned, AI_CONFIG) == expected
 
 
-def test_redact_tool_result_applies_the_user_redactor(fake_provider):
+def test_redacting_toolset_applies_the_user_redactor(fake_provider, fake_wrapper_toolset):
     config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=lambda text: text.replace("pii", "<x>"))
 
-    assert diagnostics.redact_tool_result("a pii column", config) == "a <x> column"
+    assert _tool_result("a pii column", config) == "a <x> column"
 
 
-def test_redact_tool_result_fails_closed_if_the_redactor_fails(fake_provider):
+def test_redacting_toolset_returns_nothing_if_the_redactor_fails(fake_provider, fake_wrapper_toolset):
     def broken(text):
         raise RuntimeError("redactor bug")
 
     config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken)
 
-    with pytest.raises(diagnostics._RedactionError):
-        diagnostics.redact_tool_result("anything", config)
+    with pytest.raises(RuntimeError, match="redactor bug"):
+        _tool_result("anything", config)
 
 
 def test_build_toolsets_skips_introspection_if_the_toolset_cannot_be_set_up(monkeypatch, caplog):
@@ -825,7 +847,7 @@ def test_real_agent_cannot_exceed_the_request_limit():
         return "pong"
 
     with pytest.raises(UsageLimitExceeded):
-        diagnostics._run_agent(agent, "prompt", timeout_seconds=10, handle=None)
+        diagnostics._run_agent(agent, "prompt", timeout_seconds=10, handle=DiagnosisHandle())
 
     assert len(calls) == diagnostics._REQUEST_LIMIT
 
@@ -879,8 +901,8 @@ def test_real_agent_is_stopped_when_a_tool_result_can_not_be_redacted(caplog):
         FunctionModel(handler), output_type=DbtFailureDiagnosis, toolsets=[diagnostics._redacting(tools, config)]
     )
 
-    with pytest.raises(diagnostics._RedactionError):
-        diagnostics._run_agent(agent, "prompt", timeout_seconds=10, handle=None)
+    with pytest.raises(RuntimeError, match="redactor bug"):
+        diagnostics._run_agent(agent, "prompt", timeout_seconds=10, handle=DiagnosisHandle())
 
 
 @requires_provider

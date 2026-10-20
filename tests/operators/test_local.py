@@ -3418,7 +3418,7 @@ def test_on_kill_cancels_the_diagnosis_in_flight():
 
     def diagnose_then_get_killed(**kwargs):
         observed["handle"] = kwargs["handle"]
-        kwargs["handle"].bind(token)
+        kwargs["handle"].token = token
         operator.on_kill()
         observed["cancelled"] = cancelled.wait(timeout=5)
         return None

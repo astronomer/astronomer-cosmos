@@ -732,7 +732,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             return
 
         try:
-            output = "\n".join(getattr(result, "full_output", None) or []) or str(exc)
+            output = "\n".join(getattr(result, "full_output", [])) or str(exc)
             self._ai_diagnosis_handle = DiagnosisHandle()
             diagnosis = diagnose_dbt_failure(
                 ai_config=self.ai_config,  # type: ignore[arg-type]

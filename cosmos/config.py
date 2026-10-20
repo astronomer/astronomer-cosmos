@@ -682,13 +682,9 @@ class AiConfig:
     def __post_init__(self) -> None:
         if not self.llm_conn_id or not isinstance(self.llm_conn_id, str):
             raise CosmosValueError("AiConfig.llm_conn_id must be a non-empty Airflow connection ID.")
-        if (
-            isinstance(self.timeout_seconds, bool)
-            or not isinstance(self.timeout_seconds, (int, float))
-            or not 0 < self.timeout_seconds < math.inf
-        ):
+        if not 0 < self.timeout_seconds < math.inf:
             raise CosmosValueError(
-                f"AiConfig.timeout_seconds must be a number of seconds greater than 0, got {self.timeout_seconds!r}."
+                f"AiConfig.timeout_seconds must be a finite number above 0, got {self.timeout_seconds}."
             )
         if self.diagnosis_output_type is not None:
             # Imported here: pydantic is not a dependency of Cosmos, nor of Airflow 2, and Cosmos must import without it.

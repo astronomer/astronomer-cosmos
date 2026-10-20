@@ -90,7 +90,7 @@ def build_failure_context(project_dir: str | Path, output: str = "") -> FailureC
     run_results = _load_json(target_dir / "run_results.json")
     failed = [result for result in (run_results or {}).get("results", []) if result.get("status") in _FAILED_STATUSES]
     if not failed:
-        return FailureContext(output=_tail(output, _MAX_OUTPUT_CHARS))
+        return FailureContext(output=output[-_MAX_OUTPUT_CHARS:])
 
     manifest = _load_json(target_dir / "manifest.json") or {}
     entries = {**(manifest.get("sources") or {}), **(manifest.get("nodes") or {})}
@@ -140,10 +140,6 @@ def _fence(tag: str, body: str) -> str:
     # Stop the data from closing its own fence.
     safe_body = body.replace("</" + tag, "<\\/" + tag)
     return f"<{tag}>\n{safe_body}\n</{tag}>"
-
-
-def _tail(text: str, max_chars: int) -> str:
-    return text[-max_chars:]
 
 
 def _truncate_middle(text: str, max_chars: int) -> str:

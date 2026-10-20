@@ -2,10 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    # TODO(#3075): cosmos-ci-snowflake-oss is listed only to run the dbt Fusion Snowflake job with the
-    # key-pair change and the repo secrets before merge (pull_request_target runs main's workflow).
-    # Revert to [main] before merging.
-    branches: [main, cosmos-ci-snowflake-oss]
+    branches: [main]
   # Also run on pull requests originating from forks. Every test job here is secret-dependent
   # (integration tests, kubernetes, code coverage) and depends on the Authorize job, which requires
   # manually approving the workflow run for external PRs. Jobs that need no secrets (type-check,

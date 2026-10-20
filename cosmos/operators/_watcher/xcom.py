@@ -21,6 +21,7 @@ from cosmos.operators._watcher.state import safe_xcom_push
 logger = get_logger(__name__)
 
 XCOM_BACKUP_VARIABLE_PREFIX = "cosmos_xcom_backup"
+TASK_STATE_STORE_BACKUP_KEY = "cosmos_xcom_backup"
 
 # Characters that secrets backends commonly reject in Variable keys. AWS
 # Secrets Manager allows alphanumerics + ``-/_+=.@!``; GCP Secret Manager is
@@ -79,19 +80,26 @@ def _init_xcom_backup(context: Any, *, persist: bool = True) -> None:
     """Set up the producer's in-memory backup buffer and Variable key; ``persist`` writes to the Variable on every push, otherwise it is flushed only on failure via the producer's on-failure callback."""
     ti = context["ti"]
     ti._cosmos_xcom_backup_buffer = {}
-    ti._cosmos_xcom_persist_incrementally = persist
+    task_state_store = context.get("task_state_store")
+    ti._cosmos_task_state_store = task_state_store
+    # The Airflow task store rejects writes once the task has failed, so it cannot rely on the on-failure flush.
+    ti._cosmos_xcom_persist_incrementally = persist or task_state_store is not None
     dag_id = ti.dag_id
     run_id = context["run_id"]
     task_group_id = _get_task_group_id(ti)
     ti._cosmos_xcom_backup_var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
 
 
-def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
-    """Write the current backup buffer to an Airflow Variable."""
+def _persist_backup(var_key: str, backup_buffer: dict[str, Any], task_state_store: Any = None) -> None:
+    """Write the current backup buffer to the Airflow task store when available, otherwise to an Airflow Variable."""
     if not backup_buffer:
         return
 
     compressed = base64.b64encode(zlib.compress(json.dumps(backup_buffer, default=str).encode("utf-8"))).decode("utf-8")
+    if task_state_store is not None:
+        task_state_store.set(TASK_STATE_STORE_BACKUP_KEY, compressed)
+        logger.debug("Persisted %d XCom entries to the task store", len(backup_buffer))
+        return
     set_variable(var_key, compressed)
     logger.debug("Persisted %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
 
@@ -104,7 +112,7 @@ def _backup_xcom_to_variable(context: Any) -> None:
     """
     ti = context["ti"]
     var_key = getattr(ti, "_cosmos_xcom_backup_var_key", None)
-    if not isinstance(var_key, str):
+    if not isinstance(var_key, str) or getattr(ti, "_cosmos_task_state_store", None) is not None:
         return
 
     backup_buffer = getattr(ti, "_cosmos_xcom_backup_buffer", {})
@@ -125,6 +133,10 @@ def _compose_backup_callback(existing: Any) -> Any:
 
 def _delete_xcom_backup_variable(context: Any) -> None:
     """Delete the XCom backup Variable after a successful producer execution."""
+    task_state_store = context.get("task_state_store")
+    if task_state_store is not None:
+        task_state_store.delete(TASK_STATE_STORE_BACKUP_KEY)
+        return
     ti = context["ti"]
     var_key = getattr(ti, "_cosmos_xcom_backup_var_key", None)
     if not isinstance(var_key, str):
@@ -142,6 +154,16 @@ def _restore_xcom_from_variable(context: Any) -> bool:
     Returns True if the restore succeeded, False if no backup was found.
     """
     ti = context["ti"]
+    task_state_store = context.get("task_state_store")
+    if task_state_store is not None:
+        compressed = task_state_store.get(TASK_STATE_STORE_BACKUP_KEY)
+        if compressed is None:
+            logger.info("No XCom backup found in the task store")
+            return False
+        _push_backup(ti, compressed)
+        task_state_store.delete(TASK_STATE_STORE_BACKUP_KEY)
+        return True
+
     dag_id = ti.dag_id
     run_id = context["run_id"]
     task_group_id = _get_task_group_id(ti)
@@ -152,10 +174,7 @@ def _restore_xcom_from_variable(context: Any) -> bool:
         logger.info("No XCom backup Variable found at '%s'", var_key)
         return False
 
-    backup: dict[str, Any] = json.loads(zlib.decompress(base64.b64decode(compressed.encode("utf-8"))).decode("utf-8"))
-    for key, value in backup.items():
-        safe_xcom_push(task_instance=ti, key=key, value=value)
-    logger.info("Restored %d XCom entries from Variable '%s'", len(backup), var_key)
+    _push_backup(ti, compressed)
 
     try:
         delete_variable(var_key)
@@ -163,3 +182,11 @@ def _restore_xcom_from_variable(context: Any) -> bool:
     except KeyError:
         logger.debug("XCom backup Variable '%s' already deleted", var_key)
     return True
+
+
+def _push_backup(ti: Any, compressed: str) -> None:
+    """Decompress a backup created by ``_persist_backup`` and push its entries back to XCom."""
+    backup: dict[str, Any] = json.loads(zlib.decompress(base64.b64decode(compressed.encode("utf-8"))).decode("utf-8"))
+    for key, value in backup.items():
+        safe_xcom_push(task_instance=ti, key=key, value=value)
+    logger.info("Restored %d XCom entries from the backup", len(backup))

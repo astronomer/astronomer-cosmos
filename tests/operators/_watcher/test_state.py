@@ -438,3 +438,95 @@ class TestRestoreXcomFromVariable:
         result = _restore_xcom_from_variable(context)
 
         assert result is False
+
+
+class _FakeTaskStateStore:
+    def __init__(self):
+        self.values = {}
+
+    def get(self, key, default=None):
+        return self.values.get(key, default)
+
+    def set(self, key, value):
+        self.values[key] = value
+
+    def delete(self, key):
+        self.values.pop(key, None)
+
+
+class TestXcomBackupWithTaskStateStore:
+    @patch("cosmos.operators._watcher.xcom.set_variable")
+    def test_safe_xcom_push_persists_to_task_state_store_instead_of_variable(self, mock_set_variable):
+        ti = _MockTI()
+        task_state_store = _FakeTaskStateStore()
+        _init_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
+
+        safe_xcom_push(ti, "model__a_status", "success")
+
+        stored = task_state_store.values["cosmos_xcom_backup"]
+        assert json.loads(zlib.decompress(base64.b64decode(stored.encode("utf-8"))).decode("utf-8")) == {
+            "model__a_status": "success"
+        }
+        mock_set_variable.assert_not_called()
+
+    @patch("cosmos.operators._watcher.xcom.set_variable")
+    def test_persists_incrementally_even_when_not_reliable(self, mock_set_variable):
+        ti = _MockTI()
+        task_state_store = _FakeTaskStateStore()
+        _init_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store}, persist=False)
+
+        safe_xcom_push(ti, "model__a_status", "success")
+
+        assert "cosmos_xcom_backup" in task_state_store.values
+        mock_set_variable.assert_not_called()
+
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
+    def test_failure_callback_does_not_write(self, mock_persist):
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run", "task_state_store": _FakeTaskStateStore()}
+        _init_xcom_backup(context)
+        ti._cosmos_xcom_backup_buffer = {"k": "v"}
+
+        _backup_xcom_to_variable(context)
+
+        mock_persist.assert_not_called()
+
+    @patch("cosmos.operators._watcher.xcom.get_variable")
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    def test_restore_reads_and_deletes_task_state_store_backup(self, mock_delete_variable, mock_get_variable):
+        backup = {"key1": "val1", "key2": "val2"}
+        task_state_store = _FakeTaskStateStore()
+        task_state_store.values["cosmos_xcom_backup"] = base64.b64encode(
+            zlib.compress(json.dumps(backup).encode("utf-8"))
+        ).decode("utf-8")
+        ti = _MockTI()
+
+        result = _restore_xcom_from_variable({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
+
+        assert result is True
+        assert ti.store == backup
+        assert task_state_store.values == {}
+        mock_get_variable.assert_not_called()
+        mock_delete_variable.assert_not_called()
+
+    def test_restore_returns_false_when_task_state_store_is_empty(self):
+        ti = _MockTI()
+
+        result = _restore_xcom_from_variable(
+            {"ti": ti, "run_id": "test_run", "task_state_store": _FakeTaskStateStore()}
+        )
+
+        assert result is False
+        assert ti.store == {}
+
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    def test_delete_removes_task_state_store_backup(self, mock_delete_variable):
+        task_state_store = _FakeTaskStateStore()
+        task_state_store.values["cosmos_xcom_backup"] = "compressed"
+        context = {"ti": _MockTI(), "run_id": "test_run", "task_state_store": task_state_store}
+        _init_xcom_backup(context)
+
+        _delete_xcom_backup_variable(context)
+
+        assert task_state_store.values == {}
+        mock_delete_variable.assert_not_called()

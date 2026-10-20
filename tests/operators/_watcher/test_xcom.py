@@ -3,10 +3,22 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
+from packaging.version import Version
+
 from cosmos.airflow import compatibility
-from cosmos.operators._watcher.xcom import _persist_backup
+from cosmos.constants import AIRFLOW_VERSION
+from cosmos.operators._watcher.state import safe_xcom_push
+from cosmos.operators._watcher.xcom import (
+    TASK_STATE_STORE_BACKUP_KEY,
+    _init_xcom_backup,
+    _persist_backup,
+    _restore_xcom_from_variable,
+    _xcom_backup_variable_key,
+)
 
 
 @patch("cosmos.operators._watcher.xcom.set_variable")
@@ -48,3 +60,33 @@ def test_get_variable_falls_back_to_models_outside_task_runner():
         compatibility.get_variable("k", default="x")
 
     models_variable.get.assert_called_once_with("k", default_var="x")
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("3.3.0"), reason="The Airflow task store was added in Airflow 3.3")
+def test_xcom_backup_survives_retry_in_task_state_store():
+    from airflow.sdk import DAG, task
+
+    from tests.utils import new_test_dag
+
+    observed = {}
+
+    @task(retries=1, retry_delay=timedelta(seconds=0))
+    def producer(**context):
+        ti = context["ti"]
+        if ti.try_number == 1:
+            _init_xcom_backup(context)
+            safe_xcom_push(ti, "model__a_status", "success")
+            raise RuntimeError("fail the first attempt")
+        observed["restored"] = _restore_xcom_from_variable(context)
+        observed["status"] = ti.xcom_pull(task_ids=ti.task_id, key="model__a_status")
+        observed["leftover"] = context["task_state_store"].get(TASK_STATE_STORE_BACKUP_KEY)
+
+    with DAG("cosmos_xcom_backup_task_state_store", start_date=datetime(2024, 1, 1), schedule=None) as dag:
+        producer()
+
+    dag_run = new_test_dag(dag)
+
+    assert observed == {"restored": True, "status": "success", "leftover": None}
+    variable_key = _xcom_backup_variable_key(dag.dag_id, None, dag_run.run_id)
+    assert compatibility.get_variable(variable_key, default=None) is None

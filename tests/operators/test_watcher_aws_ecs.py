@@ -5,7 +5,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock, call, patch
 
 import pytest
-from airflow.exceptions import AirflowSkipException
+from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.providers.amazon import __version__ as amazon_provider_version
 from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
 from botocore.exceptions import WaiterError
@@ -18,6 +18,7 @@ from cosmos.constants import (
     ExecutionMode,
 )
 from cosmos.exceptions import CosmosValueError
+from cosmos.operators._watcher.state import get_status_xcom_key
 
 if Version(amazon_provider_version) < _ECS_WATCHER_MIN_AMAZON_PROVIDER_VERSION:
     pytest.skip(
@@ -56,7 +57,12 @@ def node_finished(unique_id: str, status: str = "success") -> str:
     )
 
 
-COMMAND_COMPLETED = json.dumps({"data": {}, "info": {"name": "CommandCompleted", "level": "info", "msg": ""}})
+def dbt_event(name: str) -> str:
+    return json.dumps({"data": {}, "info": {"name": name, "level": "info", "msg": ""}})
+
+
+# dbt-core 1.x's last event of a run at the default log level.
+STATS_LINE = dbt_event("StatsLine")
 
 
 TASK_ARN = "arn:aws:ecs:eu-west-1:123456789012:task/dbt-cluster/abcdef"
@@ -199,47 +205,65 @@ def make_fetcher(**overrides):
     return WatcherEcsLogFetcher(**kwargs)
 
 
-def test_fetcher_collect_queues_messages_and_detects_command_completed():
+def test_fetcher_collect_queues_messages_and_detects_the_end_of_run():
     fetcher = make_fetcher()
     events = [
         {"timestamp": 1_700_000_000_000, "message": node_finished("model.pkg.a")},
-        {"timestamp": 1_700_000_001_000, "message": COMMAND_COMPLETED},
+        {"timestamp": 1_700_000_001_000, "message": STATS_LINE},
     ]
     with patch.object(fetcher, "_get_log_events", return_value=iter(events)) as mock_get:
         fetcher.collect()
 
     mock_get.assert_called_once_with(fetcher._continuation_token)
     assert fetcher.events.get_nowait() == node_finished("model.pkg.a")
-    assert fetcher.events.get_nowait() == COMMAND_COMPLETED
-    assert fetcher.command_completed is True
+    assert fetcher.events.get_nowait() == STATS_LINE
+    assert fetcher.read_any_event is True
+    assert fetcher.run_completed is True
     assert fetcher.logger.info.call_count == 2
+
+
+@pytest.mark.parametrize(
+    "name, is_end_of_run",
+    [
+        ("StatsLine", True),  # dbt-core 1.x
+        ("NothingToDo", True),  # dbt-core 1.x, empty selection
+        ("CommandCompleted", True),  # dbt 2, and dbt-core 1.x at debug level
+        ("EndOfRunSummary", False),  # dbt-core 1.x prints StatsLine after it
+        ("LogModelResult", False),
+    ],
+)
+def test_fetcher_detects_the_last_event_of_each_dbt_version(name, is_end_of_run):
+    fetcher = make_fetcher()
+    with patch.object(fetcher, "_get_log_events", return_value=iter([{"timestamp": 1, "message": dbt_event(name)}])):
+        fetcher.collect()
+    assert fetcher.run_completed is is_end_of_run
 
 
 def test_fetcher_ignores_non_json_and_other_events_for_completion():
     fetcher = make_fetcher()
     events = [
-        {"timestamp": 1, "message": "plain text mentioning CommandCompleted"},
+        {"timestamp": 1, "message": "plain text mentioning StatsLine"},
         {"timestamp": 2, "message": node_finished("model.pkg.a")},
     ]
     with patch.object(fetcher, "_get_log_events", return_value=iter(events)):
         fetcher.collect()
-    assert fetcher.command_completed is False
+    assert fetcher.run_completed is False
     assert fetcher.events.qsize() == 2
 
 
 @pytest.mark.parametrize(
     "message",
     [
-        '{"info": null, "msg": "CommandCompleted"}',
-        '{"info": "CommandCompleted"}',
-        '["CommandCompleted"]',
+        '{"info": null, "msg": "StatsLine"}',
+        '{"info": "StatsLine"}',
+        '["StatsLine"]',
     ],
 )
 def test_fetcher_ignores_completion_lookalikes_that_are_not_dbt_events(message):
     fetcher = make_fetcher()
     with patch.object(fetcher, "_get_log_events", return_value=iter([{"timestamp": 1, "message": message}])):
         fetcher.collect()
-    assert fetcher.command_completed is False
+    assert fetcher.run_completed is False
 
 
 @patch("cosmos.operators.watcher_aws_ecs.time.sleep")
@@ -248,7 +272,7 @@ def test_fetcher_keeps_polling_after_a_read_error(mock_sleep):
     fetcher = make_fetcher()
     reads = [
         RuntimeError("Read timeout on endpoint URL"),
-        iter([{"timestamp": 1, "message": COMMAND_COMPLETED}]),
+        iter([{"timestamp": 1, "message": STATS_LINE}]),
     ]
 
     def read(token):
@@ -261,13 +285,13 @@ def test_fetcher_keeps_polling_after_a_read_error(mock_sleep):
     with patch.object(fetcher, "_get_log_events", side_effect=read):
         fetcher.run()
 
-    assert fetcher.command_completed is True
+    assert fetcher.run_completed is True
     fetcher.logger.exception.assert_called_once()
 
 
 @patch("cosmos.operators.watcher_aws_ecs.time.sleep")
-def test_fetcher_drains_after_stop_until_command_completed(mock_sleep):
-    """After stop(), the events written since the last poll are still read (the provider's loop drops them)."""
+def test_fetcher_drains_after_stop_until_the_end_of_run(mock_sleep):
+    """After stop(), the events CloudWatch has not served yet are still read."""
     fetcher = make_fetcher()
     fetcher.stop()
     tail = [
@@ -275,7 +299,7 @@ def test_fetcher_drains_after_stop_until_command_completed(mock_sleep):
         iter(
             [
                 {"timestamp": 1, "message": node_finished("model.pkg.last")},
-                {"timestamp": 2, "message": COMMAND_COMPLETED},
+                {"timestamp": 2, "message": STATS_LINE},
             ]
         ),
     ]
@@ -283,7 +307,7 @@ def test_fetcher_drains_after_stop_until_command_completed(mock_sleep):
         fetcher.run()
 
     assert mock_get.call_count == 2
-    assert fetcher.command_completed is True
+    assert fetcher.run_completed is True
     assert fetcher.events.qsize() == 2
 
 
@@ -295,9 +319,9 @@ def test_fetcher_drain_gives_up_after_the_timeout(mock_sleep, mock_monotonic):
     with patch.object(fetcher, "_get_log_events", return_value=iter([])):
         fetcher.run()
 
-    assert fetcher.command_completed is False
+    assert fetcher.run_completed is False
     fetcher.logger.warning.assert_called_once()
-    assert "CommandCompleted" in fetcher.logger.warning.call_args[0][1]
+    assert "last event of the run was not read" in fetcher.logger.warning.call_args[0][0]
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +446,82 @@ def test_after_execution_parses_the_drained_tail_before_checking_success(mock_pa
     with patch.object(op, "_process_log_events", side_effect=lambda: order.append("process")):
         op._after_execution()
     assert order == ["process", "check_success"]
+
+
+@patch("cosmos.operators.aws_ecs.EcsRunTaskOperator._after_execution")
+def test_after_execution_forwards_the_provider_arguments(mock_parent_after):
+    """Amazon provider 8.3.0 to 8.5.1 call _after_execution(session)."""
+    session = MagicMock()
+    make_producer()._after_execution(session)
+    mock_parent_after.assert_called_once_with(session)
+
+
+def run_producer(*, log_events, exit_code=0, **overrides):
+    """Run the producer through the provider's execute(), with only the ECS and CloudWatch APIs faked.
+
+    The log fetcher thread runs for real; ``log_events`` is what the first CloudWatch read returns.
+    """
+    op = make_producer(
+        container_name="dbt",
+        awslogs_fetch_interval=timedelta(0),
+        drain_timeout=timedelta(seconds=0.2),
+        waiter_delay=0,
+        **overrides,
+    )
+    client = MagicMock()
+    client.run_task.return_value = {"tasks": [{"taskArn": TASK_ARN}], "failures": []}
+    client.describe_tasks.return_value = {
+        "tasks": [
+            {"lastStatus": "STOPPED", "containers": [{"name": "dbt", "lastStatus": "STOPPED", "exitCode": exit_code}]}
+        ],
+        "failures": [],
+    }
+    reads = [[{"timestamp": 1_700_000_000_000 + i, "message": m} for i, m in enumerate(log_events)]]
+    ti = MagicMock(try_number=1)
+    with (
+        patch.object(DbtProducerWatcherAwsEcsOperator, "client", client),
+        patch.object(
+            WatcherEcsLogFetcher, "_get_log_events", side_effect=lambda token: iter(reads.pop() if reads else [])
+        ),
+        patch.object(WatcherEcsLogFetcher, "get_last_log_messages", return_value=[]),
+        patch.object(WatcherEcsLogFetcher, "get_last_log_message", return_value=None),
+        patch("cosmos.operators.watcher_aws_ecs._DRAIN_POLL_SECONDS", 0.01),
+        patch("cosmos.operators._watcher.producer._init_xcom_backup"),
+        patch("cosmos.operators._watcher.producer._delete_xcom_backup"),
+    ):
+        try:
+            op.execute(context={"ti": ti, "run_id": "test_run"})
+        finally:
+            op.task_log_fetcher.join(timeout=5)
+            assert not op.task_log_fetcher.is_alive()
+    return op, ti
+
+
+def pushed_statuses(ti):
+    return {
+        c.kwargs["key"]: c.kwargs["value"]
+        for c in ti.xcom_push.call_args_list
+        if c.kwargs.get("key", "").endswith("_status")
+    }
+
+
+def test_producer_publishes_statuses_through_the_provider_execute():
+    op, ti = run_producer(log_events=[node_finished("model.pkg.a"), STATS_LINE])
+    assert pushed_statuses(ti) == {get_status_xcom_key("model.pkg.a"): {"status": "success", "outlet_uris": []}}
+    assert op.task_log_fetcher.run_completed is True
+
+
+def test_producer_fails_when_no_log_event_was_read():
+    """A wrong awslogs_stream_prefix or a missing logs:GetLogEvents reads nothing; the build itself succeeded."""
+    with pytest.raises(
+        AirflowException, match="no event was read from log stream ecs/dbt/abcdef in log group /ecs/dbt"
+    ):
+        run_producer(log_events=[])
+
+
+def test_producer_reports_a_failed_container_before_an_empty_log_stream():
+    with pytest.raises(AirflowException, match="not in success state"):
+        run_producer(log_events=[], exit_code=1)
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)

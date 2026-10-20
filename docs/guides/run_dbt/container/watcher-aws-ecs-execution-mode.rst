@@ -63,7 +63,7 @@ The producer rejects:
 How statuses reach the consumers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-ECS has no streaming log API, so the producer polls CloudWatch: every ``awslogs_fetch_interval`` (default 5 seconds for this producer; the provider default of 30 seconds is meant for displaying logs) it reads the new events of the task's log stream, parses each dbt JSON line and pushes the node statuses. After the task stops, it keeps polling until dbt's final ``CommandCompleted`` event has been read, or ``drain_timeout`` (default 60 seconds) has elapsed, so the last ``NodeFinished`` events are not lost.
+ECS has no streaming log API, so the producer polls CloudWatch: every ``awslogs_fetch_interval`` (default 5 seconds for this producer; the provider default of 30 seconds is meant for displaying logs) it reads the new events of the task's log stream, parses each dbt JSON line and pushes the node statuses. After the task stops, it keeps polling until dbt's last event of the run has been read, or ``drain_timeout`` (default 60 seconds) has elapsed, so the statuses of the last nodes are not lost.
 
 The delay between a node finishing in dbt and its consumer seeing the status is therefore bounded by ``awslogs_fetch_interval`` plus the consumer's own ``poke_interval``.
 
@@ -103,13 +103,14 @@ Requires ``apache-airflow-providers-amazon >= 8.3.0``, which ``astronomer-cosmos
 Consumer fallback
 +++++++++++++++++
 
-A consumer whose status never arrived runs its node in an ECS task. That task runs synchronously, holding a worker slot until it stops, even when the sensor is deferrable.
+A consumer that falls back to running its node, as on retry, does so in an ECS task. That task runs synchronously, holding a worker slot until it stops, even when the sensor is deferrable.
 
 Log delivery
 ++++++++++++
 
-- The ``awslogs`` log driver of the dbt container must run in its default ``blocking`` mode. In ``non-blocking`` mode the driver drops lines under back-pressure, and a dropped ``NodeFinished`` line means a consumer that only fails when the producer has finished.
+- The ``awslogs`` log driver of the dbt container must run in its default ``blocking`` mode. In ``non-blocking`` mode the driver drops lines under back-pressure, and a dropped status line leaves its consumer without a status.
 - The Airflow connection used for ``aws_conn_id`` needs ``logs:GetLogEvents`` on the log group, in addition to the ECS permissions ``ExecutionMode.AWS_ECS`` already requires.
+- If the ECS task succeeds but no event was read from its log stream, the producer fails and names the stream: a wrong ``awslogs_stream_prefix`` or a missing ``logs:GetLogEvents`` would otherwise leave every consumer without a status.
 - Lines the CloudWatch agent splits (events above 256 KB) are not parseable as JSON and are skipped; node status events are far below that limit.
 
 Other inherited limitations

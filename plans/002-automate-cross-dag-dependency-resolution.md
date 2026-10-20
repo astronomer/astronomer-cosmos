@@ -276,8 +276,9 @@ to `InvocationMode.DBT_RUNNER` (`cosmos/config.py:90`) and is orthogonal to all 
 
    **Unifying the URI construction is not enough on its own: the producer side silently skips nodes,
    and that has to be fixed too.** Even for the WATCHER family, which builds its URIs straight from the
-   manifest, `compute_model_outlet_uris` drops any node where `database`/`schema`/`alias` is falsy - a
-   bare `continue` with no log line (`cosmos/dataset.py:317-322`) - and returns `{}` outright, at
+   manifest, `compute_model_outlet_uris` drops any node whose `database` or `schema` is falsy, or that
+   has neither an `alias` nor a `name` to fall back on (`alias = node.get("alias") or node.get("name", "")`)
+   - a bare `continue` with no log line (`cosmos/dataset.py:317-322`) - and returns `{}` outright, at
    warning level, when the manifest can't be read or parsed (`cosmos/dataset.py:297-308`). The producer
    reads its run's `target/manifest.json` while the consumer resolves URIs from the project manifest at
    parse time, so the two can disagree. A consumer that has correctly resolved a URI can therefore gate
@@ -585,12 +586,15 @@ only - model, seed, snapshot, and `DbtResourceType.SEMANTIC_METRIC_VIEW` (added 
 commit: `create_task_metadata` renders it as a real dbt task and `create_airflow_task_dependencies` wires
 it like a model, so a selected metric view with a parent in another group needs a coordinator edge like
 any model, and an owned metric view reached by traversal ends an `internal_edges` pair like any model).
-Test nodes are not a source of boundary edges. For S2 there is one more consequence:
-`compute_model_outlet_uris` only emits for `model`/`seed`/`snapshot` (`_DATASET_EMITTING_RESOURCE_TYPES`,
-`cosmos/constants.py` on `main`), so a semantic metric view that is an *external* parent has no Asset to
-wait on today. Until emission covers it (a #2959 concern), `auto_schedule` must raise for it (constraint
-9) rather than traverse past it: unlike an ephemeral model, it is a real relation whose own refresh is
-the work the consumer is waiting for.
+Test nodes are not a source of boundary edges. For S2, a semantic metric view is simply a model:
+`SEMANTIC_METRIC_VIEW` is a Cosmos-side reclassification of a dbt `model` node whose `materialized` is
+`metric_view` or `semantic_view` (`DBT_SEMANTIC_METRIC_VIEW_MATERIALIZATIONS`, opt-in through
+`settings.enable_semantic_metric_view_reclassification`), while the manifest still records
+`resource_type: "model"` with the usual `database`/`schema`/`alias`. `compute_model_outlet_uris` filters
+on that raw manifest field, so it already produces a URI for these nodes, and the watcher consumer emits
+it like any model's. `resolve_external_uris` must therefore accept the reclassified `DbtNode` type
+alongside model/seed/snapshot rather than keying on dbt's own resource types only; it needs no special
+case beyond that.
 
 ### Separate `DbtDag`s: Dataset scheduling (ticket-primary)
 
@@ -763,8 +767,8 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   before it's built for those modes. The seven modes that don't emit at all are separate - #2959 doesn't
   cover them, and `auto_schedule` stays gated there regardless (constraint 5).
 - **The producer can silently decline to emit a URI the consumer correctly resolved.**
-  `compute_model_outlet_uris` `continue`s past any node with a falsy `database`/`schema`/`alias`
-  (`cosmos/dataset.py:317-322`) and returns `{}` when the manifest is unreadable
+  `compute_model_outlet_uris` `continue`s past any node with a falsy `database` or `schema`, or with
+  neither `alias` nor `name` (`cosmos/dataset.py:317-322`), and returns `{}` when the manifest is unreadable
   (`cosmos/dataset.py:297-308`). Neither is visible to the consuming `DbtDag`, so its schedule waits
   forever on an Asset that will never arrive. Consumer-side fail-closed checks cannot catch this; the
   producer has to stop skipping silently (constraint 5).
@@ -828,8 +832,8 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   end-to-end test confirms both `auto_schedule` and the coordinator actually wire that edge
   (`a >> c` present in the rendered DAG), not just that the resolver reports it.
 - `resolve_external_uris` (takes a node map, not a manifest): against a manifest-loaded node map,
-  resolves each non-source external parent to a URI, a source never gets one, a semantic metric view
-  external parent raises for as long as `compute_model_outlet_uris` emits nothing for it, and missing
+  resolves each non-source external parent to a URI, a source never gets one, a reclassified semantic
+  metric view resolves to the same URI `compute_model_outlet_uris` produces for it as a model, and missing
   relation identity raises with a clear error. Against a `DBT_LS`-loaded node map with a genuinely external
   parent (not in `nodes`), it raises "not resolvable under `DBT_LS`" rather than silently omitting the
   dependency - it does not just work once #2959/#2960 land (open question 1); a separate test covers
@@ -879,7 +883,8 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
 - F5: `auto_schedule` raises when ownership, emission, or namespace can't be verified (once the
   peer-visibility mechanism from open question 5 exists to make that check possible at all).
 - Producer/consumer URI agreement: a node the producer skips - a manifest entry with a falsy
-  `database`/`schema`/`alias`, and an unreadable `target/manifest.json` - surfaces as a loud failure on
+  `database` or `schema`, one with neither `alias` nor `name`, and an unreadable `target/manifest.json` -
+  surfaces as a loud failure on
   the producer rather than as a consumer that waits forever. This tests the constraint 5 producer
   change, not `resolve_external_uris`.
 - End-to-end: WATCHER/WATCHER_KUBERNETES/WATCHER_GCP_GKE producer emits and the consumer triggers

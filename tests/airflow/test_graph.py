@@ -1116,6 +1116,76 @@ def test_create_task_metadata_source_with_rendering_options(
         assert metadata.operator_class == expected_operator_class
 
 
+@pytest.mark.parametrize(
+    "has_freshness, has_test, expected_operator_class",
+    [
+        (True, False, "cosmos.operators.local.DbtSourceLocalOperator"),
+        (True, True, "cosmos.operators.local.DbtSourceLocalOperator"),
+        (False, True, EMPTY_OPERATOR_CLASS_PATH),
+        (False, False, None),
+    ],
+)
+def test_create_task_metadata_source_with_tests_or_freshness(has_freshness, has_test, expected_operator_class):
+    """Sources with tests but no freshness are rendered as EmptyOperator under WITH_TESTS_OR_FRESHNESS."""
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        has_freshness=has_freshness,
+        has_test=has_test,
+    )
+
+    metadata = create_task_metadata(
+        source_node,
+        execution_mode=ExecutionMode.LOCAL,
+        render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS),
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+
+    if expected_operator_class is None:
+        assert metadata is None
+    else:
+        assert metadata.id == "my_source_source"
+        assert metadata.operator_class == expected_operator_class
+
+
+@pytest.mark.parametrize(
+    "source_rendering_behavior", [SourceRenderingBehavior.ALL, SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS]
+)
+@pytest.mark.parametrize("enable_owner_inheritance, expected_owner", [(True, "dbt-owner"), (False, "")])
+def test_create_task_metadata_source_empty_operator_owner(
+    source_rendering_behavior, enable_owner_inheritance, expected_owner
+):
+    """The source EmptyOperator inherits the dbt owner when owner inheritance is enabled (default)."""
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        config={"meta": {"owner": "dbt-owner"}},
+        has_freshness=False,
+        has_test=True,
+    )
+
+    metadata = create_task_metadata(
+        source_node,
+        execution_mode=ExecutionMode.LOCAL,
+        render_config=RenderConfig(
+            source_rendering_behavior=source_rendering_behavior,
+            enable_owner_inheritance=enable_owner_inheritance,
+        ),
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
+    assert metadata.owner == expected_owner
+
+
 def test_create_task_metadata_source_honors_on_warning_callback_from_task_args():
     """``dbt source freshness`` tasks accept ``on_warning_callback``, so one passed through ``operator_args``
     must not be dropped by the unset top-level argument.

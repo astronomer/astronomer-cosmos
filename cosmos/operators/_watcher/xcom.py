@@ -22,6 +22,8 @@ logger = get_logger(__name__)
 
 XCOM_BACKUP_VARIABLE_PREFIX = "cosmos_xcom_backup"
 TASK_STATE_STORE_BACKUP_KEY = "cosmos_xcom_backup"
+TASK_STATE_STORE_CONTEXT_KEY = "task_state_store"
+TASK_STATE_STORE_TI_ATTRIBUTE = "_cosmos_task_state_store"
 
 # Characters that secrets backends commonly reject in Variable keys. AWS
 # Secrets Manager allows alphanumerics + ``-/_+=.@!``; GCP Secret Manager is
@@ -76,12 +78,17 @@ def _get_task_group_id(ti: Any) -> str | None:
     return group_id
 
 
+def _uses_task_state_store(context: Any) -> bool:
+    """Whether the XCom backup is kept in the Airflow task store (Airflow 3.3+) instead of an Airflow Variable."""
+    return context.get(TASK_STATE_STORE_CONTEXT_KEY) is not None
+
+
 def _init_xcom_backup(context: Any, *, persist: bool = True) -> None:
     """Set up the producer's in-memory backup buffer and Variable key; ``persist`` writes to the Variable on every push, otherwise it is flushed only on failure via the producer's on-failure callback."""
     ti = context["ti"]
     ti._cosmos_xcom_backup_buffer = {}
-    task_state_store = context.get("task_state_store")
-    ti._cosmos_task_state_store = task_state_store
+    task_state_store = context.get(TASK_STATE_STORE_CONTEXT_KEY)
+    setattr(ti, TASK_STATE_STORE_TI_ATTRIBUTE, task_state_store)
     # The Airflow task store rejects writes once the task has failed, so it cannot rely on the on-failure flush.
     ti._cosmos_xcom_persist_incrementally = persist or task_state_store is not None
     dag_id = ti.dag_id
@@ -112,7 +119,7 @@ def _backup_xcom_to_variable(context: Any) -> None:
     """
     ti = context["ti"]
     var_key = getattr(ti, "_cosmos_xcom_backup_var_key", None)
-    if not isinstance(var_key, str) or getattr(ti, "_cosmos_task_state_store", None) is not None:
+    if not isinstance(var_key, str) or getattr(ti, TASK_STATE_STORE_TI_ATTRIBUTE, None) is not None:
         return
 
     backup_buffer = getattr(ti, "_cosmos_xcom_backup_buffer", {})
@@ -133,7 +140,7 @@ def _compose_backup_callback(existing: Any) -> Any:
 
 def _delete_xcom_backup_variable(context: Any) -> None:
     """Delete the XCom backup Variable after a successful producer execution."""
-    task_state_store = context.get("task_state_store")
+    task_state_store = context.get(TASK_STATE_STORE_CONTEXT_KEY)
     if task_state_store is not None:
         task_state_store.delete(TASK_STATE_STORE_BACKUP_KEY)
         return
@@ -154,7 +161,7 @@ def _restore_xcom_from_variable(context: Any) -> bool:
     Returns True if the restore succeeded, False if no backup was found.
     """
     ti = context["ti"]
-    task_state_store = context.get("task_state_store")
+    task_state_store = context.get(TASK_STATE_STORE_CONTEXT_KEY)
     if task_state_store is not None:
         compressed = task_state_store.get(TASK_STATE_STORE_BACKUP_KEY)
         if compressed is None:

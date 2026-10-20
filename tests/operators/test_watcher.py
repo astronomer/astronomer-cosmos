@@ -388,6 +388,19 @@ def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_succes
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_deletes_task_state_store_backup_on_success(mock_execute, mock_delete):
+    """With a task store the backup is always persisted, so a successful producer deletes it even when not reliable (#2771)."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    context = {"ti": _MockTI(), "run_id": "test_run", "task_state_store": MagicMock()}
+
+    op.execute(context=context)
+
+    mock_delete.assert_called_once_with(context)
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
 @patch("cosmos.operators.watcher._delete_xcom_backup_variable")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")

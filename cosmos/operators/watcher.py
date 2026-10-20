@@ -42,6 +42,7 @@ from cosmos.operators._watcher.xcom import (
     _delete_xcom_backup_variable,
     _init_xcom_backup,
     _restore_xcom_from_variable,
+    _uses_task_state_store,
 )
 from cosmos.operators.base import (
     DbtBuildMixin,
@@ -508,7 +509,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         try:
             return_value = super().execute(context=context, **kwargs)
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
-            if reliable_retry:
+            if reliable_retry or _uses_task_state_store(context):
                 _delete_xcom_backup_variable(context)
             return return_value
 

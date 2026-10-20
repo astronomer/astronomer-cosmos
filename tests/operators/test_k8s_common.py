@@ -530,6 +530,20 @@ def test_execute_watcher_producer_in_memory_mode_skips_variable_backup(mock_init
     mock_delete.assert_not_called()
 
 
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._init_xcom_backup")
+def test_execute_watcher_producer_deletes_task_state_store_backup_on_success(mock_init, mock_delete):
+    """With a task store the backup is always persisted, so a successful producer deletes it even when not reliable (#2771)."""
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti, "run_id": "test_run", "task_state_store": MagicMock()}
+
+    execute_watcher_producer(MagicMock(), context, MagicMock(return_value="result"))
+
+    mock_delete.assert_called_once_with(context)
+
+
 def test_execute_watcher_producer_raises_when_ti_missing():
     from airflow.exceptions import AirflowException
 

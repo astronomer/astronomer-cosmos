@@ -35,6 +35,7 @@ from cosmos.operators._watcher.xcom import (
     _delete_xcom_backup_variable,
     _init_xcom_backup,
     _restore_xcom_from_variable,
+    _uses_task_state_store,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -652,6 +653,6 @@ def execute_watcher_producer(operator: Any, context: Context, parent_execute: Ca
 
     # On failure parent_execute() raises and the on-failure callback flushes the backup.
     return_value = parent_execute(context, **kwargs)
-    if reliable_retry:
+    if reliable_retry or _uses_task_state_store(context):
         _delete_xcom_backup_variable(context)
     return return_value

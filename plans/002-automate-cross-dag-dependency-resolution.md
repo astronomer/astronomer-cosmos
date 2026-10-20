@@ -452,7 +452,17 @@ One further path bypasses `--output-keys` entirely: when `settings.pre_dbt_fusio
 `RenderConfig.source_rendering_behavior` is `NONE`, Cosmos runs a bare `dbt ls --output json`
 (`cosmos/dbt/graph.py:831-858`). dbt Fusion's default key set is
 `name`/`package_name`/`path`/`resource_type`/`unique_id` - no `config` (the comment at
-`cosmos/dbt/graph.py:827-830` records this) - so every node again arrives with `config={}`.
+`cosmos/dbt/graph.py:827-830` records this) - so every node again arrives with `config={}`. It has no
+`depends_on` either, and `parse_dbt_ls_output` defaults that to `[]`
+(`depends_on=node_dict.get("depends_on", {}).get("nodes", [])`, `cosmos/dbt/graph.py:435`), which is
+worse than the missing `config`: an empty parent list is a legitimate value for a root node, so no
+per-node check can tell "no parents" from "parents never requested", and the structural resolver would
+walk a graph with no edges and report no boundary at all - silently, for both consumers, not just for
+the ephemeral decision. This path is therefore rejected by how it was invoked, not by inspecting nodes:
+when `DbtGraph.load_method` is a `DBT_LS` mode and the listing was produced by the bare command
+(`settings.pre_dbt_fusion` with `source_rendering_behavior == NONE`), `resolve_graph_boundary` raises
+before resolving anything. The `DBT_LS_FILE` row inherits the same rule: a file without `depends_on`
+is rejected, not read as a project with no dependencies.
 
 The consequence for implementation: because an absent `config` becomes `{}` rather than `None`, a
 per-node check cannot distinguish "this model declares no ephemeral materialization" from "`config` was
@@ -851,7 +861,9 @@ which. Tests must assert the producer's actual execution order (e.g. via the pro
   rather than being confused with a placeholder.
 - `LoadMode` coverage - one case per row of the support matrix: `DBT_MANIFEST` and `DBT_LS` resolve a
   boundary; a `DBT_LS_FILE` fixture produced *without* `--output-keys config` raises rather than
-  reporting every node as non-ephemeral; `LoadMode.CUSTOM` raises as out of scope; and `AUTOMATIC` is
+  reporting every node as non-ephemeral, and one without `depends_on` raises rather than reporting no
+  boundary; the bare `pre_dbt_fusion` `dbt ls --output json` path raises before resolving, for both
+  consumers; `LoadMode.CUSTOM` raises as out of scope; and `AUTOMATIC` is
   decided from `DbtGraph.load_method` after `load()`, including the `FileNotFoundError` fallback to
   `CUSTOM`, which must raise even though the user requested `AUTOMATIC`.
 - Sources - one case per row of the source-rendering table, since the S2 and S3 answers differ: a

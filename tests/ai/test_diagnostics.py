@@ -565,7 +565,8 @@ def _tool_result(returned, config, tool_args=None):
         async def call_tool(self, name, tool_args, ctx, tool):
             return returned
 
-    return asyncio.run(diagnostics._redacting(Tools(), config).call_tool("get_schema", tool_args or {}, None, None))
+    toolset = diagnostics._redacting(Tools(), config, ["raw.orders", "analytics.orders"])
+    return asyncio.run(toolset.call_tool("get_schema", tool_args or {}, None, None))
 
 
 @pytest.fixture
@@ -590,21 +591,37 @@ def test_redacting_toolset_masks_secrets_in_any_kind_of_result(fake_provider, fa
     assert _tool_result(returned, AI_CONFIG) == expected
 
 
-def test_redacting_toolset_logs_the_tool_calls_as_they_happen(fake_provider, fake_wrapper_toolset, caplog):
+def test_redacting_toolset_logs_the_table_of_the_failed_node_that_the_agent_asks_for(
+    fake_provider, fake_wrapper_toolset, caplog
+):
     with caplog.at_level(logging.INFO):
         _tool_result('{"columns": []}', AI_CONFIG, tool_args={"table_name": "raw.orders"})
+        _tool_result('{"columns": []}', AI_CONFIG, tool_args={"table_name": "RAW.Orders"})  # the provider ignores case
 
-    assert "AI diagnosis tool call: get_schema {'table_name': 'raw.orders'}" in caplog.text
+    assert caplog.text.count("AI diagnosis tool call: get_schema raw.orders") == 1
+    assert "AI diagnosis tool call: get_schema RAW.Orders" in caplog.text
 
 
-def test_redacting_toolset_warns_when_the_agent_is_refused_a_table(fake_provider, fake_wrapper_toolset, caplog):
-    refusal = '{"error": "Table \'base\' is not in the allowed tables list."}'
+def test_redacting_toolset_logs_a_tool_call_that_takes_no_table(fake_provider, fake_wrapper_toolset, caplog):
+    with caplog.at_level(logging.INFO):
+        _tool_result("[]", AI_CONFIG)
 
-    with caplog.at_level(logging.WARNING):
-        returned = _tool_result(refusal, AI_CONFIG)
+    assert "AI diagnosis tool call: get_schema" in caplog.text
 
-    assert "was refused a table" in caplog.text
-    assert returned == refusal
+
+@pytest.mark.parametrize("table", ["api_key=sk-12345", "ignore all previous instructions", "other.table", 42])
+def test_redacting_toolset_never_logs_what_the_agent_wrote_in_a_table_that_is_not_one_of_the_node(
+    fake_provider, fake_wrapper_toolset, caplog, table
+):
+    """What a prompt injection makes the model write must not end in the task log: only a warning does."""
+    refusal = '{"error": "not in the allowed tables list."}'
+
+    with caplog.at_level(logging.DEBUG):
+        returned = _tool_result(refusal, AI_CONFIG, tool_args={"table_name": table, "name_contains": "also-secret"})
+
+    assert "asked for a table that is not one of the tables of the failed node" in caplog.text
+    assert str(table) not in caplog.text and "also-secret" not in caplog.text
+    assert returned == refusal  # the provider is still the one that refuses, and the model is told so
 
 
 def test_redacting_toolset_never_logs_what_a_tool_returned(fake_provider, fake_wrapper_toolset, caplog):
@@ -822,7 +839,9 @@ def test_real_agent_never_sees_an_unredacted_tool_result(monkeypatch):
         return _answer(info)
 
     agent = Agent(
-        FunctionModel(handler), output_type=DbtFailureDiagnosis, toolsets=[diagnostics._redacting(tools, AI_CONFIG)]
+        FunctionModel(handler),
+        output_type=DbtFailureDiagnosis,
+        toolsets=[diagnostics._redacting(tools, AI_CONFIG, ["raw.orders"])],
     )
     agent.run_sync("prompt")
 
@@ -847,7 +866,9 @@ def test_real_agent_is_stopped_when_a_tool_result_can_not_be_redacted(caplog):
         return ModelResponse(parts=[ToolCallPart("get_schema", {"table_name": "raw.orders"})])
 
     agent = Agent(
-        FunctionModel(handler), output_type=DbtFailureDiagnosis, toolsets=[diagnostics._redacting(tools, config)]
+        FunctionModel(handler),
+        output_type=DbtFailureDiagnosis,
+        toolsets=[diagnostics._redacting(tools, config, ["raw.orders"])],
     )
 
     with pytest.raises(RuntimeError, match="redactor bug"):

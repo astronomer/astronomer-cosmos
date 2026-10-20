@@ -209,26 +209,33 @@ def _build_toolsets(
         return []
 
     try:
-        toolset = SQLToolset(db_conn_id=profile_mapping.conn_id, allowed_tables=failure_context.allowed_tables)
-        return [_redacting(toolset.filtered(lambda _ctx, tool_def: tool_def.name in _SCHEMA_ONLY_TOOLS), ai_config)]
+        allowed_tables = failure_context.allowed_tables
+        toolset = SQLToolset(db_conn_id=profile_mapping.conn_id, allowed_tables=allowed_tables)
+        metadata_tools = toolset.filtered(lambda _ctx, tool_def: tool_def.name in _SCHEMA_ONLY_TOOLS)
+        return [_redacting(metadata_tools, ai_config, allowed_tables)]
     except Exception:  # a warehouse hook runs its own code here: losing introspection beats losing the diagnosis
         logger.warning("Could not set up schema introspection; skipping it.", exc_info=True)
         return []
 
 
-def _redacting(toolset: Any, ai_config: AiConfig) -> Any:
+def _redacting(toolset: Any, ai_config: AiConfig, allowed_tables: list[str]) -> Any:
     """Wrap ``toolset`` to log what the agent asks of its tools, and to redact what they return like the prompt."""
     from pydantic_ai.toolsets import WrapperToolset  # the provider, so pydantic-ai, is there by now
+
+    allowed = {table.casefold() for table in allowed_tables}
 
     @dataclass
     class RedactingToolset(WrapperToolset):  # type: ignore[misc]
         async def call_tool(self, name: str, tool_args: dict[str, Any], ctx: Any, tool: Any) -> Any:
-            logger.info("AI diagnosis tool call: %s %s", name, tool_args)
+            # Only a table of the failed node is logged. The rest of what the model writes in a tool call could be
+            # anything, such as what a prompt injection asked for, so it is not.
+            table = str(tool_args.get("table_name", ""))
+            if not table or table.casefold() in allowed:
+                logger.info("AI diagnosis tool call: %s %s", name, table)
+            else:
+                logger.warning("AI diagnosis asked for a table that is not one of the tables of the failed node.")
             result = await self.wrapped.call_tool(name, tool_args, ctx, tool)
-            text = result if isinstance(result, str) else json.dumps(result, default=str)
-            if "not in the allowed tables" in text:
-                logger.warning("AI diagnosis was refused a table that is not one of the tables of the failed node.")
-            return redact(text, ai_config)
+            return redact(result if isinstance(result, str) else json.dumps(result, default=str), ai_config)
 
     return RedactingToolset(wrapped=toolset)
 

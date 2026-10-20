@@ -256,8 +256,7 @@ TELEMETRY_TIMEOUT = 1.0
 _AIRFLOW3_MAJOR_VERSION = 3
 
 _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION = Version("10.8.0")
-# First release with `AwsTaskLogFetcher._get_log_events(skip_token)` and the `_wait_for_task_ended` /
-# `_after_execution` seams of `EcsRunTaskOperator` that the ECS watcher producer overrides.
+# First release with `EcsRunTaskOperator._after_execution`, which the ECS watcher producer overrides.
 _ECS_WATCHER_MIN_AMAZON_PROVIDER_VERSION = Version("8.3.0")
 _DBT_STARTUP_EVENTS_XCOM_KEY = "dbt_startup_events"
 _PRODUCER_CMD_FLAGS_XCOM_KEY = "producer_cmd_flags"

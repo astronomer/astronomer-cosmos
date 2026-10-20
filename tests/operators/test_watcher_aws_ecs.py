@@ -1,11 +1,14 @@
+import copy
+import inspect
 import json
-import queue
 from datetime import timedelta
 from unittest.mock import MagicMock, call, patch
 
 import pytest
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowSkipException
 from airflow.providers.amazon import __version__ as amazon_provider_version
+from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
+from botocore.exceptions import WaiterError
 from packaging.version import Version
 
 from cosmos.airflow.graph import _WATCHER_TO_FALLBACK_EXECUTION_MODE, calculate_operator_class
@@ -56,8 +59,18 @@ def node_finished(unique_id: str, status: str = "success") -> str:
 COMMAND_COMPLETED = json.dumps({"data": {}, "info": {"name": "CommandCompleted", "level": "info", "msg": ""}})
 
 
+TASK_ARN = "arn:aws:ecs:eu-west-1:123456789012:task/dbt-cluster/abcdef"
+
+
 def make_producer(**overrides):
     return DbtProducerWatcherAwsEcsOperator(**{**ECS_KWARGS, **overrides})
+
+
+def attach_fetcher(op):
+    """Bind the log fetcher the provider's execute() would create, without starting its thread."""
+    op.arn = TASK_ARN
+    op.task_log_fetcher = op._get_task_log_fetcher()
+    return op.task_log_fetcher
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +128,22 @@ def test_producer_rejects_unsupported_arguments(overrides, match):
         make_producer(**overrides)
 
 
+def test_producer_passes_deferrable_false_to_the_provider():
+    """The provider defaults deferrable to [operators] default_deferrable, which the producer cannot honour."""
+    with patch.object(EcsRunTaskOperator, "__init__", autospec=True, side_effect=EcsRunTaskOperator.__init__) as init:
+        op = make_producer()
+    assert init.call_args.kwargs["deferrable"] is False
+    assert op.deferrable is False
+
+
+def test_producer_can_be_deep_copied():
+    """Airflow deep-copies operators (task clear, partial_subset); the per-run queue lives on the fetcher."""
+    op = make_producer()
+    clone = copy.deepcopy(op)
+    assert clone.task_id == op.task_id
+    assert clone.task_log_fetcher is None
+
+
 def test_producer_stores_tests_per_model():
     tests_per_model = {"model.pkg.orders": ["test.pkg.t1", "test.pkg.t2"]}
     op = make_producer(tests_per_model=tests_per_model)
@@ -124,14 +153,32 @@ def test_producer_stores_tests_per_model():
 
 def test_producer_log_fetcher_is_bound_to_the_operator_state():
     op = make_producer()
-    op.arn = "arn:aws:ecs:eu-west-1:123456789012:task/dbt-cluster/abcdef"
+    op.arn = TASK_ARN
     fetcher = op._get_task_log_fetcher()
     assert isinstance(fetcher, WatcherEcsLogFetcher)
-    assert fetcher.events is op._log_events
+    assert fetcher.events.empty()
+    assert fetcher.events is not op._get_task_log_fetcher().events
     assert fetcher.drain_timeout == op.drain_timeout
     assert fetcher.log_group == "/ecs/dbt"
     assert fetcher.log_stream_name == "ecs/dbt/abcdef"
     assert fetcher.fetch_interval == timedelta(seconds=5)
+
+
+def test_producer_log_fetcher_reads_the_awslogs_region():
+    op = make_producer(awslogs_region="us-east-1")
+    op.arn = TASK_ARN
+    assert op._get_task_log_fetcher().hook.region_name == "us-east-1"
+
+
+@pytest.mark.skipif(
+    not hasattr(EcsRunTaskOperator, "resolve_awslogs_region"),
+    reason="amazon provider releases before 9.34.0 default awslogs_region to the operator's region on init",
+)
+def test_producer_log_fetcher_falls_back_to_the_operator_region():
+    op = make_producer(region_name="eu-west-1")
+    op.arn = TASK_ARN
+    assert op.awslogs_region is None
+    assert op._get_task_log_fetcher().hook.region_name == "eu-west-1"
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +188,6 @@ def test_producer_log_fetcher_is_bound_to_the_operator_state():
 
 def make_fetcher(**overrides):
     kwargs = {
-        "events": queue.SimpleQueue(),
         "drain_timeout": timedelta(seconds=3),
         "log_group": "/ecs/dbt",
         "log_stream_name": "ecs/dbt/abcdef",
@@ -179,6 +225,44 @@ def test_fetcher_ignores_non_json_and_other_events_for_completion():
         fetcher.collect()
     assert fetcher.command_completed is False
     assert fetcher.events.qsize() == 2
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        '{"info": null, "msg": "CommandCompleted"}',
+        '{"info": "CommandCompleted"}',
+        '["CommandCompleted"]',
+    ],
+)
+def test_fetcher_ignores_completion_lookalikes_that_are_not_dbt_events(message):
+    fetcher = make_fetcher()
+    with patch.object(fetcher, "_get_log_events", return_value=iter([{"timestamp": 1, "message": message}])):
+        fetcher.collect()
+    assert fetcher.command_completed is False
+
+
+@patch("cosmos.operators.watcher_aws_ecs.time.sleep")
+def test_fetcher_keeps_polling_after_a_read_error(mock_sleep):
+    """An exception escaping run() would end the thread and every later status would be lost."""
+    fetcher = make_fetcher()
+    reads = [
+        RuntimeError("Read timeout on endpoint URL"),
+        iter([{"timestamp": 1, "message": COMMAND_COMPLETED}]),
+    ]
+
+    def read(token):
+        result = reads.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        fetcher.stop()
+        return result
+
+    with patch.object(fetcher, "_get_log_events", side_effect=read):
+        fetcher.run()
+
+    assert fetcher.command_completed is True
+    fetcher.logger.exception.assert_called_once()
 
 
 @patch("cosmos.operators.watcher_aws_ecs.time.sleep")
@@ -224,10 +308,11 @@ def test_fetcher_drain_gives_up_after_the_timeout(mock_sleep, mock_monotonic):
 @patch("cosmos.operators.watcher_aws_ecs.store_dbt_resource_status_from_log")
 def test_process_log_events_parses_the_queue_with_the_execution_context(mock_store):
     op = make_producer(tests_per_model={"model.pkg.a": ["test.pkg.t"]})
+    fetcher = attach_fetcher(op)
     context = {"ti": MagicMock()}
     op._context_holder[CONTEXT_KEY] = context
-    op._log_events.put(node_finished("model.pkg.a"))
-    op._log_events.put(node_finished("model.pkg.b"))
+    fetcher.events.put(node_finished("model.pkg.a"))
+    fetcher.events.put(node_finished("model.pkg.b"))
 
     op._process_log_events()
 
@@ -238,14 +323,20 @@ def test_process_log_events_parses_the_queue_with_the_execution_context(mock_sto
     assert first.kwargs["test_results_per_model"] is op._test_results_per_model
     assert first.kwargs["model_outlet_uris"] is op._model_outlet_uris
     assert first.kwargs["upstream_failure_skipped_ids"] is op._upstream_failure_skipped_ids
-    assert op._log_events.empty()
+    assert fetcher.events.empty()
+
+
+@patch("cosmos.operators.watcher_aws_ecs.store_dbt_resource_status_from_log")
+def test_process_log_events_without_a_fetcher_is_a_no_op(mock_store):
+    make_producer()._process_log_events()
+    mock_store.assert_not_called()
 
 
 @patch("cosmos.operators.watcher_aws_ecs.time.sleep")
 @patch("cosmos.operators.watcher_aws_ecs.DbtProducerWatcherAwsEcsOperator.client", new_callable=lambda: MagicMock())
 def test_wait_for_task_ended_parses_between_status_polls(mock_client, mock_sleep):
     op = make_producer(waiter_delay=7, waiter_max_attempts=5)
-    op.arn = "arn:aws:ecs:eu-west-1:123456789012:task/dbt-cluster/abcdef"
+    op.arn = TASK_ARN
     mock_client.describe_tasks.side_effect = [
         {"tasks": [{"lastStatus": "RUNNING"}]},
         {"tasks": [{"lastStatus": "STOPPED"}]},
@@ -262,19 +353,65 @@ def test_wait_for_task_ended_parses_between_status_polls(mock_client, mock_sleep
 @patch("cosmos.operators.watcher_aws_ecs.DbtProducerWatcherAwsEcsOperator.client", new_callable=lambda: MagicMock())
 def test_wait_for_task_ended_fails_when_the_task_never_stops(mock_client, mock_sleep):
     op = make_producer(waiter_delay=1, waiter_max_attempts=2)
-    op.arn = "arn:aws:ecs:eu-west-1:123456789012:task/dbt-cluster/abcdef"
+    op.arn = TASK_ARN
     mock_client.describe_tasks.return_value = {"tasks": [{"lastStatus": "RUNNING"}]}
-    with patch.object(op, "_process_log_events"), pytest.raises(AirflowException, match="did not stop within 2 polls"):
+    with patch.object(op, "_process_log_events"), pytest.raises(WaiterError, match="did not stop within 2 polls"):
         op._wait_for_task_ended()
 
 
 @patch("cosmos.operators.watcher_aws_ecs.DbtProducerWatcherAwsEcsOperator.client", new_callable=lambda: MagicMock())
 def test_wait_for_task_ended_fails_when_the_task_is_missing(mock_client):
     op = make_producer()
-    op.arn = "arn:aws:ecs:eu-west-1:123456789012:task/dbt-cluster/abcdef"
+    op.arn = TASK_ARN
     mock_client.describe_tasks.return_value = {"tasks": [], "failures": [{"reason": "MISSING"}]}
-    with patch.object(op, "_process_log_events"), pytest.raises(AirflowException, match="was not found"):
+    with patch.object(op, "_process_log_events"), pytest.raises(WaiterError, match="was not found"):
         op._wait_for_task_ended()
+
+
+def start_task_on(op):
+    def start(*args):  # amazon provider 8.x passes the context
+        op.arn = TASK_ARN
+
+    return patch.object(op, "_start_task", side_effect=start)
+
+
+@pytest.mark.skipif(
+    "stop_task_on_failure" not in inspect.signature(EcsRunTaskOperator.__init__).parameters,
+    reason="stop_task_on_failure was added in amazon provider 9.22.0",
+)
+@patch("cosmos.operators._watcher.producer._init_xcom_backup")
+@patch("cosmos.operators.watcher_aws_ecs.WatcherEcsLogFetcher.start")
+@patch("cosmos.operators.watcher_aws_ecs.time.sleep")
+@patch("cosmos.operators.watcher_aws_ecs.DbtProducerWatcherAwsEcsOperator.client", new_callable=lambda: MagicMock())
+def test_producer_stops_the_ecs_task_when_waiting_fails(mock_client, mock_sleep, mock_start, mock_init):
+    """The provider's stop_task_on_failure cleanup only handles WaiterError, the error its waiter raises."""
+    op = make_producer(waiter_delay=0, waiter_max_attempts=1)
+    mock_client.describe_tasks.return_value = {"tasks": [{"lastStatus": "RUNNING"}]}
+    ti = MagicMock(try_number=1)
+    with start_task_on(op), pytest.raises(WaiterError):
+        op.execute(context={"ti": ti, "run_id": "test_run"})
+    mock_client.stop_task.assert_called_once()
+    assert mock_client.stop_task.call_args.kwargs["task"] == TASK_ARN
+
+
+@patch("cosmos.operators._watcher.producer._init_xcom_backup")
+@patch("cosmos.operators.watcher_aws_ecs.WatcherEcsLogFetcher.start")
+@patch("cosmos.operators.watcher_aws_ecs.store_dbt_resource_status_from_log")
+@patch("cosmos.operators.watcher_aws_ecs.DbtProducerWatcherAwsEcsOperator.client", new_callable=lambda: MagicMock())
+def test_producer_publishes_the_statuses_read_before_the_wait_failed(mock_client, mock_store, mock_start, mock_init):
+    """The provider skips _after_execution when the wait raises; statuses already queued are still pushed."""
+    op = make_producer()
+
+    def wait():
+        op.task_log_fetcher.events.put(node_finished("model.pkg.a"))
+        raise WaiterError("TasksStopped", "did not stop", {})
+
+    ti = MagicMock(try_number=1)
+    with start_task_on(op), patch.object(op, "_wait_for_task_ended", side_effect=wait), pytest.raises(WaiterError):
+        op.execute(context={"ti": ti, "run_id": "test_run"})
+
+    mock_store.assert_called_once()
+    assert mock_store.call_args.args[0] == node_finished("model.pkg.a")
 
 
 @patch("cosmos.operators.aws_ecs.EcsRunTaskOperator._after_execution")
@@ -379,7 +516,27 @@ def test_test_sensor_retry_runs_dbt_test_for_the_model(mock_build_and_run_cmd):
     assert sensor.base_cmd == ["test"]
     context = make_context(MagicMock())
     assert sensor._fallback_to_non_watcher_run(try_number=2, context=context) is True
-    mock_build_and_run_cmd.assert_called_once_with(context, cmd_flags=["--select", "stg_orders"])
+    mock_build_and_run_cmd.assert_called_once()
+    assert mock_build_and_run_cmd.call_args.args == (context,)
+    assert mock_build_and_run_cmd.call_args.kwargs["cmd_flags"] == ["--select", "stg_orders"]
+
+
+@pytest.mark.parametrize("sensor_class", [DbtRunWatcherAwsEcsOperator, DbtTestWatcherAwsEcsOperator])
+def test_deferrable_consumer_runs_its_fallback_ecs_task_synchronously(sensor_class):
+    """A deferred ECS task would resume in the sensor's execute_complete, which ignores the exit code."""
+    sensor = make_sensor(sensor_class)
+    sensor.deferrable = True
+    seen = []
+    with (
+        patch.object(
+            EcsRunTaskOperator, "execute", autospec=True, side_effect=lambda op, ctx: seen.append(op.deferrable)
+        ),
+        patch.object(sensor, "build_command"),
+    ):
+        sensor._fallback_to_non_watcher_run(try_number=2, context=make_context(MagicMock()))
+
+    assert seen == [False]
+    assert sensor.deferrable is True
 
 
 def test_dbt_build_watcher_aws_ecs_operator_raises_not_implemented_error():

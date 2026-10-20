@@ -2,8 +2,6 @@ name: test-unprivileged
 
 on:
   push: # Run on pushes to the default branch so coverage on main stays current.
-    # TODO(#3075): mirrors the temporary push trigger in test.yml, whose Code-Coverage job waits for
-    # this workflow's artifacts for the same commit. Revert to [main] before merging.
     branches: [main, cosmos-ci-snowflake-oss]
   # Unprivileged test jobs that execute untrusted PR code but require no secrets. Running them
   # under `pull_request` (not `pull_request_target`) means fork PRs get a read-only token and no

@@ -21,6 +21,10 @@ _FAILED_STATUSES = frozenset({"error", "fail", "runtime error"})
 # Resource types that live in the warehouse as a table or view the agent can inspect.
 _RELATION_RESOURCE_TYPES = frozenset({"model", "seed", "snapshot", "source"})
 
+# The most tables the agent is told about and can inspect: a node with many parents would otherwise grow the prompt
+# past the limits of the ``max_*`` options.
+_MAX_TABLES = 100
+
 
 @dataclass(frozen=True)
 class FailedNode:
@@ -46,7 +50,8 @@ class FailureContext:
     @property
     def allowed_tables(self) -> list[str]:
         """The relations of the failed nodes and of their parents, without duplicates, in order of appearance."""
-        return list(dict.fromkeys(relation for node in self.failed_nodes for relation in node.relations))
+        relations = dict.fromkeys(relation for node in self.failed_nodes for relation in node.relations)
+        return list(relations)[:_MAX_TABLES]
 
     def to_prompt(self, inspectable_tables: Sequence[str] | None = None) -> str:
         """

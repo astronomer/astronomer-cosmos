@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from cosmos.ai.context import FailedNode, FailureContext
+from cosmos.ai.context import _MAX_TABLES, FailedNode, FailureContext
 from cosmos.ai.context import build_failure_context as build
 from cosmos.config import AiConfig
 
@@ -347,3 +347,13 @@ def test_a_text_over_the_limit_never_sends_more_than_the_limit(tmp_path, limit):
         assert len(kept) == limit
         assert f"[truncated {500 - limit} characters]" in sent
         assert kept == text[: limit - limit // 2] + text[500 - limit // 2 :]
+
+
+def test_allowed_tables_are_capped_and_keep_the_node_s_own_table_first():
+    relations = tuple(f"s.parent_{number}" for number in range(300))
+    node = FailedNode("model.p.m", "error", "boom", "", relations=("s.m", *relations))
+
+    tables = FailureContext(failed_nodes=(node,)).allowed_tables
+
+    assert len(tables) == _MAX_TABLES
+    assert tables[:2] == ["s.m", "s.parent_0"]

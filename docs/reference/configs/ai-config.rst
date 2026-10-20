@@ -138,8 +138,9 @@ Schema introspection
 ~~~~~~~~~~~~~~~~~~~~
 
 With ``introspect_schema=True``, the agent can list the tables and read the columns of the failed node and of its
-parents, to check things like whether a column exists. It can't read rows or query other tables, and the task log shows
-each table it looked at. If it asks for another table, Cosmos logs a warning and the diagnosis goes on without it.
+parents, to check things like whether a column exists. It is limited to 100 tables, the failed node first. It can't
+read rows or query other tables, and the task log shows each table it looked at. If it asks for another table, Cosmos
+logs a warning and the diagnosis goes on without it.
 
 It needs ``ProfileConfig.profile_mapping`` with a connection whose Airflow hook is a SQL hook (``DbApiHook``), such as
 Postgres, Snowflake, Redshift or MySQL. For other connections (BigQuery, Databricks, Athena, Spark and ``generic``),

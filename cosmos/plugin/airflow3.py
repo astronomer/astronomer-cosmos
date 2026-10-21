@@ -78,7 +78,7 @@ def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  
 
 def _read_content_via_object_storage(path: str, conn_id: str | None = None) -> Any:
     # Use connection_env only for Airflow 3.1.0
-    if is_airflow_310():
+    if is_airflow_310() and conn_id is not None:
         with connection_env(conn_id):
             p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
             with p.open("r") as f:  # type: ignore[no-untyped-call]

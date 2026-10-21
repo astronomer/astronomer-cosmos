@@ -2,7 +2,7 @@ name: test
 
 on:
   push: # Run on pushes to the default branch
-    branches: [main, cosmos-ci-snowflake-oss]
+    branches: [main]
   # Also run on pull requests originating from forks. Every test job here is secret-dependent
   # (integration tests, kubernetes, code coverage) and depends on the Authorize job, which requires
   # manually approving the workflow run for external PRs. Jobs that need no secrets (type-check,
@@ -370,6 +370,8 @@ jobs:
         python-version: ["3.11"]
         airflow-version: ["3.2"]
         dbt-version: ["1.12"]
+    env:
+      RESOURCE_PREFIX: cosmos_e2e_${{ github.run_id }}_${{ github.run_attempt }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -400,6 +402,7 @@ jobs:
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Install the warehouse adapters
+        id: warehouse-adapters
         # The Airflow 3.2 + dbt 1.12 lockfile carries dbt-databricks 1.10 and no dbt-snowflake; metric
         # views need dbt-databricks >= 1.12.5 and semantic views need dbt-snowflake.
         run: |
@@ -414,6 +417,23 @@ jobs:
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 90.0
           AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION: "True"
+          AIRFLOW_CONN_DATABRICKS_DEFAULT: ${{ secrets.AIRFLOW_CONN_DATABRICKS_DEFAULT }}
+          DATABRICKS_CATALOG: hive_metastore
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+
+      - name: Drop the warehouse test objects
+        # A cancelled run (cancel-in-progress) stops the tests before their fixture teardown drops these objects.
+        if: always() && steps.warehouse-adapters.outcome == 'success'
+        run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python -c "from tests.test_warehouse_metric_and_semantic_views import drop_test_objects; drop_test_objects()"
+        env:
+          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW_CONN_DATABRICKS_DEFAULT: ${{ secrets.AIRFLOW_CONN_DATABRICKS_DEFAULT }}
           DATABRICKS_CATALOG: hive_metastore
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}

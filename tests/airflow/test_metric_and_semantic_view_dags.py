@@ -41,6 +41,7 @@ from cosmos.operators.watcher import (
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev" / "dags" / "dbt"
 SEMANTIC_METRIC_VIEW = DbtResourceType.SEMANTIC_METRIC_VIEW.value
 EXPECTED_NODE_COUNT = 9
+DBT_BUILD_RESOURCE_TYPES = {"model", "snapshot", "seed"}
 PROJECTS = {
     "databricks": ("databricks_metric_view", "order_metrics"),
     "snowflake": ("snowflake_semantic_view", "orders_semantic_view"),
@@ -133,9 +134,6 @@ def test_watcher_topology(project):
     assert isinstance(dag.task_dict["orders.test"], DbtTestWatcherOperator)
     assert isinstance(dag.task_dict[f"{semantic_model}.semantic_metric_run"], DbtSemanticMetricViewWatcherOperator)
     assert "dbt_producer_watcher" in dag.task_dict["raw_orders_seed"].upstream_task_ids
-
-
-DBT_BUILD_RESOURCE_TYPES = {"model", "snapshot", "seed"}
 
 
 @pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])

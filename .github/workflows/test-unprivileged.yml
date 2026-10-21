@@ -2,7 +2,7 @@ name: test-unprivileged
 
 on:
   push: # Run on pushes to the default branch so coverage on main stays current.
-    branches: [main, cosmos-ci-snowflake-oss]
+    branches: [main]
   # Unprivileged test jobs that execute untrusted PR code but require no secrets. Running them
   # under `pull_request` (not `pull_request_target`) means fork PRs get a read-only token and no
   # access to repository secrets, so checking out and running the PR's code is not a privileged

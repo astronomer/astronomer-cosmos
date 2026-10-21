@@ -9,7 +9,8 @@ and ``SNOWFLAKE_ACCOUNT``, ``SNOWFLAKE_USER``, ``SNOWFLAKE_PRIVATE_KEY`` (PKCS#8
 ``SNOWFLAKE_WAREHOUSE`` (optional ``SNOWFLAKE_ROLE``). A warehouse with missing credentials, or that cannot be set up,
 is skipped locally and fails under CI (``CI`` set).
 Databricks gets a throwaway schema. The Snowflake CI role cannot create schemas, so its objects go into the existing
-``SNOWFLAKE_SCHEMA`` under a per-run ``RESOURCE_PREFIX`` and only those objects are dropped afterwards.
+``SNOWFLAKE_SCHEMA`` under a per-run ``RESOURCE_PREFIX`` and only those objects are dropped afterwards. CI sets
+``RESOURCE_PREFIX`` so a cancelled job can drop the same objects with ``drop_test_objects``.
 """
 
 from __future__ import annotations
@@ -90,10 +91,12 @@ class Warehouse:
     status_column: str
     test_behavior: TestBehavior
 
-    def __init__(self) -> None:
-        self.schema = f"cosmos_e2e_{uuid.uuid4().hex[:8]}"
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.monkeypatch = monkeypatch
+        self.run_prefix = os.getenv("RESOURCE_PREFIX") or f"cosmos_e2e_{uuid.uuid4().hex[:8]}"
+        self.schema = self.run_prefix
         self.resource_prefix = ""
-        os.environ["COSMOS_DEMO_SCHEMA"] = self.schema
+        monkeypatch.setenv("COSMOS_DEMO_SCHEMA", self.schema)
 
     def object_name(self, name: str) -> str:
         return f"{self.resource_prefix}_{name}" if self.resource_prefix else name
@@ -213,9 +216,9 @@ class Snowflake(Warehouse):
             skip_unless_ci(f"snowflake: missing {missing}")
         self.database = os.environ["SNOWFLAKE_DATABASE"]
         self.schema = os.environ["SNOWFLAKE_SCHEMA"]
-        self.resource_prefix = f"cosmos_e2e_{uuid.uuid4().hex[:8]}"
-        os.environ["COSMOS_DEMO_SCHEMA"] = self.schema
-        os.environ["RESOURCE_PREFIX"] = self.resource_prefix
+        self.resource_prefix = self.run_prefix
+        self.monkeypatch.setenv("COSMOS_DEMO_SCHEMA", self.schema)
+        self.monkeypatch.setenv("RESOURCE_PREFIX", self.resource_prefix)
         extra = {
             "account": os.environ["SNOWFLAKE_ACCOUNT"],
             "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"],
@@ -223,13 +226,16 @@ class Snowflake(Warehouse):
             "role": os.getenv("SNOWFLAKE_ROLE"),
             "private_key_content": os.environ["SNOWFLAKE_PRIVATE_KEY"],
         }
-        os.environ["AIRFLOW_CONN_SNOWFLAKE_DEFAULT"] = json.dumps(
-            {
-                "conn_type": "snowflake",
-                "login": os.environ["SNOWFLAKE_USER"],
-                "schema": self.schema,
-                "extra": {key: value for key, value in extra.items() if value},
-            }
+        self.monkeypatch.setenv(
+            "AIRFLOW_CONN_SNOWFLAKE_DEFAULT",
+            json.dumps(
+                {
+                    "conn_type": "snowflake",
+                    "login": os.environ["SNOWFLAKE_USER"],
+                    "schema": self.schema,
+                    "extra": {key: value for key, value in extra.items() if value},
+                }
+            ),
         )
         self.connection_params = {
             "account": extra["account"],
@@ -295,23 +301,31 @@ def _cosmos_settings():
     settings.enable_cache, settings.enable_semantic_metric_view_reclassification = original
 
 
+def drop_test_objects() -> None:
+    for warehouse_class in (Snowflake, Databricks):
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            instance = warehouse_class(monkeypatch)
+            instance.configure()
+            with instance.connect() as connection, connection.cursor() as cursor:
+                instance.tear_down(cursor)
+
+
 @pytest.fixture(scope="module", params=[Snowflake, Databricks], ids=["snowflake", "databricks"])
 def warehouse(request) -> Warehouse:
-    instance = request.param()
-    instance.configure()
-    try:
-        with instance.connect() as connection, connection.cursor() as cursor:
-            instance.set_up(cursor)
-    except instance.driver_error() as error:
-        skip_unless_ci(f"{instance.name}: cannot set up the test objects: {error}")
-    yield instance
-    try:
-        with instance.connect() as connection, connection.cursor() as cursor:
-            instance.tear_down(cursor)
-    except instance.driver_error() as error:
-        warnings.warn(f"could not drop the {instance.name} test objects in {instance.schema}: {error}")
-    finally:
-        os.environ.pop("RESOURCE_PREFIX", None)
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        instance = request.param(monkeypatch)
+        instance.configure()
+        try:
+            with instance.connect() as connection, connection.cursor() as cursor:
+                instance.set_up(cursor)
+        except instance.driver_error() as error:
+            skip_unless_ci(f"{instance.name}: cannot set up the test objects: {error}")
+        yield instance
+        try:
+            with instance.connect() as connection, connection.cursor() as cursor:
+                instance.tear_down(cursor)
+        except instance.driver_error() as error:
+            warnings.warn(f"could not drop the {instance.name} test objects in {instance.schema}: {error}")
 
 
 def load_example_dag(warehouse: Warehouse, variant: str) -> DbtDag:
@@ -397,7 +411,14 @@ def disable_full_refresh(dag: DbtDag) -> None:
         assert "--full-refresh" not in task.add_cmd_flags(), task.task_id
 
 
+def recreate_test_objects(warehouse: Warehouse) -> None:
+    with warehouse.connect() as connection, connection.cursor() as cursor:
+        warehouse.tear_down(cursor)
+        warehouse.set_up(cursor)
+
+
 def run_full_refresh_then_rerun(dag: DbtDag, warehouse: Warehouse) -> None:
+    recreate_test_objects(warehouse)
     run_dag(dag)
     assert_warehouse_objects(warehouse)
     disable_full_refresh(dag)
@@ -441,8 +462,6 @@ def test_dbt_dag_with_local_execution(warehouse: Warehouse, local_dag: DbtDag):
     assert semantic_task.select == f"fqn:{warehouse.project_name}.{warehouse.semantic_model}"
     assert semantic_task.upstream_task_ids == {chain[chain.index(semantic_task_id) - 1]}
     assert semantic_task.downstream_task_ids == {chain[chain.index(semantic_task_id) + 1]}
-    assert "--full-refresh" not in semantic_task.add_cmd_flags()
-    assert_warehouse_objects(warehouse)
 
 
 def test_dbt_dag_with_watcher_execution(warehouse: Warehouse, watcher_dag: DbtDag):
@@ -470,8 +489,6 @@ def test_dbt_dag_with_watcher_execution(warehouse: Warehouse, watcher_dag: DbtDa
     resource_types = {flags[index + 1] for index, part in enumerate(flags) if part == "--resource-type"}
     assert resource_types == ({"model", "snapshot", "seed"} if tests_excluded_from_producer else set())
     assert DbtResourceType.SEMANTIC_METRIC_VIEW.value not in flags
-    assert "--full-refresh" not in flags
-    assert_warehouse_objects(warehouse)
 
 
 @pytest.mark.skipif(

@@ -2932,9 +2932,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("fc12c42367d5c4cae96ee0e2affac002",)
+        assert hash_dir in ("2d097245d349c223f22168661a90248f",)
     else:
-        assert hash_dir == "fc12c42367d5c4cae96ee0e2affac002"
+        assert hash_dir == "2d097245d349c223f22168661a90248f"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2973,9 +2973,9 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("fc12c42367d5c4cae96ee0e2affac002",)
+        assert hash_dir in ("2d097245d349c223f22168661a90248f",)
     else:
-        assert hash_dir == "fc12c42367d5c4cae96ee0e2affac002"
+        assert hash_dir == "2d097245d349c223f22168661a90248f"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")

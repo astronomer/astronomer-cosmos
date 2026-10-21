@@ -16,8 +16,10 @@ Using ``select`` and ``exclude``
 The ``select`` and ``exclude`` parameters are lists, with values like the following:
 
 - ``tag:my_tag``: include/exclude models with the tag ``my_tag``
-- ``config.meta.some_key:some_value``: include/exclude models with ``config.meta_some_key: some_value``
+- ``config.meta.some_key:some_value``: include/exclude models with the config ``meta: {some_key: some_value}``
 - ``config.materialized:table``: include/exclude models with the config ``materialized: table``
+- ``config.group:customer_mart``: include/exclude models with the config ``group: customer_mart``
+- ``group:customer_mart``: include/exclude nodes that belong to the dbt group ``customer_mart``. This is dbt's shorthand for ``config.group:customer_mart`` and selects the same nodes. The group name must be non-empty (use ``group:customer_mart``, not ``group:``).
 - ``path:analytics/tables``: include/exclude models in the ``analytics/tables`` directory. In this example, ``analytics/table`` is a relative path, but absolute paths are also supported.
 - ``+node_name+1`` (graph operators): include/exclude the node with name ``node_name``, all its parents, and its first generation of children (`dbt graph selector docs <https://docs.getdbt.com/reference/node-selection/graph-operators>`_)
 - ``+/path/to/model_g+`` (graph operators): include/exclude all the nodes in the absolute path ``/path/to/model_g``, their parents and children. Relative paths are also supported.
@@ -26,7 +28,7 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``@node_name`` (@ operator): include/exclude the node with name ``node_name``, all its descendants, and all ancestors of those descendants. This is useful in CI environments where you want to build a model and all its descendants, but you need the ancestors of those descendants to exist first.
 - ``tag:my_tag,+node_name`` (intersection): include/exclude ``node_name`` and its parents if they have the tag ``my_tag`` (`dbt set operator docs <https://docs.getdbt.com/reference/node-selection/set-operators>`_)
 - ``['tag:first_tag', 'tag:second_tag']`` (union): include/exclude nodes that have either ``tag:first_tag`` or ``tag:second_tag``
-- ``resource_type:<resource>``: include nodes with the resource type ``seed, snapshot, model, test, source``. For example, ``resource_type:source`` returns only nodes where resource_type == SOURCE
+- ``resource_type:<resource>``: include nodes with the resource type ``seed, snapshot, model, test, source, semantic_metric_view``. For example, ``resource_type:source`` returns only nodes where resource_type == SOURCE. ``semantic_metric_view`` matches adapter-native semantic metric views, and only when :ref:`enable_semantic_metric_view_reclassification` is on (see :doc:`Managing semantic metric views <managing-semantic-metric-views>`). It only works when Cosmos applies selection itself (e.g. ``LoadMode.DBT_MANIFEST``). Under ``LoadMode.DBT_LS`` or ``ExecutionMode.WATCHER``, where ``select``/``exclude`` are passed directly to the dbt CLI, use ``config.materialized:metric_view`` or ``config.materialized:semantic_view`` instead (``ExecutionMode.WATCHER`` raises an error for ``resource_type:semantic_metric_view``).
 - ``exclude_resource_type:<resource>``: exclude nodes with the resource type ``analysis, exposure, metric, model, saved_query, seed, semantic_model, snapshot, source, test, unit_test``. For example, ``exclude_resource_type:source`` returns only nodes where resource_type != SOURCE
 - ``source:my_source``: include/exclude nodes that have the source ``my_source`` and are of resource_type ``source``
 - ``source:my_source+``: include/exclude nodes that have the source ``my_source`` and their children

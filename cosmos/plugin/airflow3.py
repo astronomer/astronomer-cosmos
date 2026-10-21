@@ -317,6 +317,8 @@ class CosmosAF3Plugin(AirflowPlugin):
             }
         ]
         projects = _load_projects_from_conf()
+        # Instance-level list: Airflow 3 can instantiate the plugin more than once per process
+        self.external_views = []
         for slug, cfg in projects.items():
             display_name = cfg.get("name") or f"dbt Docs ({slug})"
             self.external_views.append(

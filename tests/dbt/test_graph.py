@@ -1949,6 +1949,40 @@ def test_update_node_dependency_does_not_add_back_excluded_tests(render_config_a
     ]
 
 
+def test_apply_manifest_node_selection_exclude_does_not_widen_select():
+    def build_node(unique_id, resource_type, depends_on, tags, original_file_path):
+        return DbtNode(
+            unique_id=unique_id,
+            resource_type=resource_type,
+            depends_on=depends_on,
+            path_base=EXCLUDED_TESTS_PROJECT,
+            original_file_path=Path(original_file_path),
+            tags=tags,
+            config={},
+        )
+
+    nodes = {
+        "model.p.a": build_node("model.p.a", DbtResourceType.MODEL, [], ["chosen"], "models/a.sql"),
+        "model.p.b": build_node("model.p.b", DbtResourceType.MODEL, [], [], "models/b.sql"),
+        "test.p.t": build_node("test.p.t", DbtResourceType.TEST, ["model.p.a", "model.p.b"], [], "tests/t.sql"),
+    }
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        execution_config=ExecutionConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=EXCLUDED_TESTS_PROJECT / "profiles.yml",
+        ),
+        render_config=RenderConfig(select=["+tag:chosen"], exclude=["tag:unused"]),
+    )
+
+    dbt_graph._apply_manifest_node_selection(nodes, {})
+
+    assert set(dbt_graph.filtered_nodes) == {"model.p.a"}
+    assert dbt_graph.excluded_node_ids == set()
+
+
 def test_tests_per_model_populated():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST

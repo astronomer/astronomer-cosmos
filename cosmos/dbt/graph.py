@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import datetime
 import functools
 import itertools
@@ -1398,8 +1399,9 @@ class DbtGraph:
         else:
             select, exclude = self.render_config.select, self.render_config.exclude
         self.nodes = nodes
-        self.excluded_node_ids = apply_exclude_filter(nodes, project_dir, exclude or [])
         self.filtered_nodes = select_nodes(project_dir=project_dir, nodes=nodes, select=select, exclude=exclude)
+        nodes_copy = {node_id: copy.copy(node) for node_id, node in nodes.items()}
+        self.excluded_node_ids = apply_exclude_filter(nodes_copy, project_dir, exclude or [])
 
     def _load_manifest_from_file(self, manifest_path: Path | ObjectStoragePath) -> dict[str, Any]:
         """

@@ -711,7 +711,8 @@ class NodeSelector:
         self.visited_nodes.add(node_id)
 
         # Disclaimer: this method currently adds the tags of the first parent node to tests, keeping the tests'
-        # own tags. This can lead to incorrect results in graph node selectors such as reported in
+        # own tags, so an intersection such as tag:a,tag:b can match across own and inherited tags, unlike dbt.
+        # This can lead to incorrect results in graph node selectors such as reported in
         # https://github.com/astronomer/astronomer-cosmos/pull/1466
         if node.resource_type == DbtResourceType.TEST and node.depends_on and len(node.depends_on) > 0:
             parent_tags = getattr(self.nodes.get(node.depends_on[0]), "tags", [])

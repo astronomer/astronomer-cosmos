@@ -1400,8 +1400,13 @@ class DbtGraph:
             select, exclude = self.render_config.select, self.render_config.exclude
         self.nodes = nodes
         self.filtered_nodes = select_nodes(project_dir=project_dir, nodes=nodes, select=select, exclude=exclude)
-        nodes_copy = {node_id: copy.copy(node) for node_id, node in nodes.items()}
-        self.excluded_node_ids = apply_exclude_filter(nodes_copy, project_dir, exclude or [])
+        # Evaluated on the full graph because select may have left the tests out, and on copies because the selector
+        # rewrites test tags. A graph-operator exclude rooted outside the select subset matches nothing in
+        # select_nodes but does here, so only its tests are dropped.
+        self.excluded_node_ids = set()
+        if exclude:
+            nodes_copy = {node_id: copy.copy(node) for node_id, node in nodes.items()}
+            self.excluded_node_ids = apply_exclude_filter(nodes_copy, project_dir, exclude)
 
     def _load_manifest_from_file(self, manifest_path: Path | ObjectStoragePath) -> dict[str, Any]:
         """

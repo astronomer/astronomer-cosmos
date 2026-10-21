@@ -1949,6 +1949,29 @@ def test_update_node_dependency_does_not_add_back_excluded_tests(render_config_a
     ]
 
 
+def test_select_by_test_tag_selects_the_tests_without_their_parents():
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(
+            dbt_project_path=EXCLUDED_TESTS_PROJECT,
+            manifest_path=EXCLUDED_TESTS_PROJECT / "target/manifest.json",
+        ),
+        execution_config=ExecutionConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=EXCLUDED_TESTS_PROJECT / "profiles.yml",
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["tag:excluded"]),
+    )
+    dbt_graph.load()
+
+    assert set(dbt_graph.filtered_nodes) == {
+        "test.excluded_tests.excluded_singular_test",
+        "test.excluded_tests.unique_model_a_id.94b83a3ca6",
+    }
+    assert dbt_graph.tests_per_model == {}
+
+
 def test_apply_manifest_node_selection_exclude_does_not_widen_select():
     def build_node(unique_id, resource_type, depends_on, tags, original_file_path):
         return DbtNode(

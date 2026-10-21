@@ -46,6 +46,7 @@ SAMPLE_DBT_MANIFEST = Path(__file__).parent / "sample/manifest.json"
 MULTIPLE_PARENTS_TEST_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt/multiple_parents_test/"
 DBT_PROJECTS_PROJ_WITH_DEPS_DIR = Path(__file__).parent.parent / "dev/dags/dbt" / "jaffle_shop"
 ALTERED_JAFFLE_SHOP_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt" / "altered_jaffle_shop"
+EXCLUDED_TESTS_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt" / "excluded_tests"
 
 skipif_airflow_lt_3_dag_doc_hash = pytest.mark.skipif(
     AIRFLOW_VERSION < Version("3.0.0"),
@@ -1823,6 +1824,22 @@ def test_dbt_dag_honors_on_warning_callback_from_operator_args(test_behavior, ex
     assert {type(task) for task in tasks} == set(expected_operator_classes)
     for task in tasks:
         assert task.on_warning_callback is on_warning_callback, task.task_id
+
+
+def test_dbt_dag_renders_no_task_for_tests_whose_parents_are_not_selected():
+    dag = DbtDag(
+        dag_id="only_tests_selected",
+        start_date=datetime(2024, 4, 16),
+        project_config=ProjectConfig(
+            dbt_project_path=EXCLUDED_TESTS_DBT_PROJECT,
+            manifest_path=EXCLUDED_TESTS_DBT_PROJECT / "target" / "manifest.json",
+        ),
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.LOCAL),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["tag:excluded"], emit_datasets=False),
+        profile_config=sample_profile_config,
+    )
+
+    assert dag.tasks == []
 
 
 @pytest.mark.parametrize(

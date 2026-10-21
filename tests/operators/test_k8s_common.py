@@ -379,6 +379,26 @@ def test_progress_callback_delegates_with_correct_args():
     assert call_kwargs["upstream_failure_skipped_ids"] is None
 
 
+def test_progress_callback_marks_upstream_failure_skip_in_status_xcom():
+    """#3023: a pod's info-level dbt log has no ``NodeFinished``, so ``SkippingDetails`` alone marks the status XCom."""
+    ti = MagicMock(spec=["xcom_push"])
+
+    WatcherK8sCallback.progress_callback(
+        line=_make_dbt_log_line("model.pkg.downstream", "skipped", "SkippingDetails"),
+        **_CALLBACK_KWARGS,
+        context_holder={CONTEXT_KEY: {"ti": ti}},
+        tests_per_model={},
+        test_results_per_model={},
+        upstream_failure_skipped_ids=set(),
+    )
+
+    # The only XCom written for the node is its status.
+    ti.xcom_push.assert_called_once_with(
+        key="model__pkg__downstream_status",
+        value={"status": "failed", "outlet_uris": [], "upstream_failure_skip": True},
+    )
+
+
 def test_callback_opts_in_to_cosmos_callback_kwargs():
     """The marker attribute read by CosmosKubernetesPodManager._extra_kwargs_for must be set."""
     assert WatcherK8sCallback.receives_cosmos_callback_kwargs is True

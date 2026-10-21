@@ -1,4 +1,5 @@
 name: test-runtime-alpha
+run-name: test-runtime-alpha ${{ inputs.runtime_version }}
 
 # Run the Cosmos test suites (from this checkout / latest main) AGAINST a published Astronomer
 # Runtime alpha image, to validate that cosmos still works on that exact Airflow build before the
@@ -679,6 +680,8 @@ jobs:
         # Job results arrive via env (never interpolated into the run body) so the summary cannot be
         # shell-injected. A `skipped` result means the suite did not run on this dispatch.
         env:
+          REGISTRY: ${{ inputs.registry }}
+          RUNTIME_VERSION: ${{ inputs.runtime_version }}
           UNIT: ${{ needs.Run-Unit-Tests.result }}
           INTEGRATION: ${{ needs.Run-Integration-Tests.result }}
           TELEMETRY: ${{ needs.Run-Telemetry-Tests.result }}
@@ -692,6 +695,8 @@ jobs:
         run: |
           {
             echo "## Runtime alpha suite coverage"
+            echo ""
+            echo "Image: \`${REGISTRY}:${RUNTIME_VERSION}-python-<version>\`"
             echo ""
             echo "A result of \`skipped\` means the suite did not run on this dispatch (disabled, or paid and not opted in), so a green check does not cover it."
             echo ""

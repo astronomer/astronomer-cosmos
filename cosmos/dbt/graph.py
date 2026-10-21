@@ -18,14 +18,14 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.models import Variable
 
-from cosmos.operators._watcher.aggregation import TestsPerModel
-
 try:
     import orjson
 except ImportError:  # pragma: no cover
     orjson = None
 
 if TYPE_CHECKING:
+    from cosmos.operators._watcher.aggregation import TestsPerModel
+
     try:
         # Airflow 3 onwards
         from airflow.sdk import ObjectStoragePath

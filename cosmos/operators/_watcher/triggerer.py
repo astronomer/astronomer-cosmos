@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
@@ -24,6 +24,9 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_terminal,
     is_producer_task_still_running,
 )
+
+if TYPE_CHECKING:
+    from cosmos.operators._watcher.aggregation import TestResultSummary
 
 logger = get_logger(__name__)
 
@@ -61,6 +64,7 @@ class WatcherTrigger(BaseTrigger):
         self.map_index = map_index
         self.poke_interval = poke_interval
         self.is_test_sensor = is_test_sensor
+        self._test_result_summary: TestResultSummary | None = None
 
     def serialize(self) -> tuple[str, dict[str, Any]]:
         return (
@@ -228,9 +232,8 @@ class WatcherTrigger(BaseTrigger):
         outlet_uris = getattr(self, "_outlet_uris", [])
         if outlet_uris:
             event_data["outlet_uris"] = outlet_uris
-        test_summary = getattr(self, "_test_result_summary", None)
-        if test_summary:
-            event_data["test_result_counts"] = test_summary.to_dict()
+        if self._test_result_summary:
+            event_data["test_result_summary"] = self._test_result_summary.to_dict()
         return event_data
 
     async def run(self) -> AsyncIterator[TriggerEvent]:
@@ -252,12 +255,11 @@ class WatcherTrigger(BaseTrigger):
                 # Surface a node failure only once the producer has terminated. While it is still
                 # running, fall through to the sleep below and keep polling. See #2947.
                 logger.warning("dbt node '%s' failed", self.model_unique_id)
-                event_data = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
+                event_data: dict[str, Any] = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
-                test_summary = getattr(self, "_test_result_summary", None)
-                if test_summary:
-                    event_data["test_result_counts"] = test_summary.to_dict()
+                if self._test_result_summary:
+                    event_data["test_result_summary"] = self._test_result_summary.to_dict()
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == ProducerTaskState.FAILED:

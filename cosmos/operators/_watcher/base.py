@@ -24,6 +24,7 @@ from cosmos.dbt.graph import DbtNode
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import (
+    MAX_FAILED_TESTS_IN_SUMMARY,
     ResultsTestsPerModel,
     TestResultSummary,
     TestsPerModel,
@@ -667,10 +668,9 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         _log_dbt_event(dbt_events)
 
-        # Log test result summary if available in the event
-        test_counts = event.get("test_result_counts")
-        if self.is_test_sensor and test_counts:
-            self._log_test_result_summary(TestResultSummary.from_dict(test_counts))
+        test_result_summary = event.get("test_result_summary")
+        if self.is_test_sensor and test_result_summary:
+            self._log_test_result_summary(TestResultSummary.from_dict(test_result_summary))
 
         if status == EventStatus.SKIPPED:
             raise AirflowSkipException(
@@ -717,8 +717,6 @@ class BaseConsumerSensor(BaseSensorOperator):
     def _log_test_result_summary(self, summary: TestResultSummary) -> None:
         """Log a human-readable summary of test results for test sensors."""
         if summary.failed_count:
-            from cosmos.operators._watcher.aggregation import MAX_FAILED_TESTS_IN_SUMMARY
-
             truncation_note = (
                 f" (showing first {MAX_FAILED_TESTS_IN_SUMMARY} of {summary.failed_count})"
                 if summary.failed_count > MAX_FAILED_TESTS_IN_SUMMARY

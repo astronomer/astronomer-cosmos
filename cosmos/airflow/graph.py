@@ -4,9 +4,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
-
-from cosmos.operators._watcher.aggregation import TestsPerModel
+from typing import TYPE_CHECKING, Any
 
 try:  # Airflow 3
     from airflow.sdk.bases.operator import BaseOperator
@@ -49,6 +47,9 @@ from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
+
+if TYPE_CHECKING:
+    from cosmos.operators._watcher.aggregation import TestsPerModel
 
 logger = get_logger(__name__)
 

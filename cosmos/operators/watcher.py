@@ -655,12 +655,13 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
 
     The producer task (``DbtProducerWatcherOperator``) collects individual test
     results as they finish and, once every test for a given model has reported,
-    pushes a single aggregated XCom (``"pass"`` or ``"fail"``) under the key
-    ``<model_unique_id>_tests_status``.
+    pushes a single aggregated XCom under the key ``<model_unique_id>_tests_status``: a dict
+    with ``status`` (``"pass"`` or ``"fail"``), ``passed_count``, ``failed_count``, ``total_count``
+    and up to ``MAX_FAILED_TESTS_IN_SUMMARY`` ``failed_tests`` unique_ids.
 
-    This sensor polls that key and:
-    * returns success when the value is ``"pass"``,
-    * raises ``AirflowException`` when the value is ``"fail"``.
+    This sensor polls that key, logs the summary and:
+    * returns success when ``status`` is ``"pass"``,
+    * raises ``AirflowException`` when ``status`` is ``"fail"``.
 
     Deferral is fully supported: the ``WatcherTrigger`` receives
     ``is_test_sensor=True`` and polls the correct aggregated key.

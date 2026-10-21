@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cosmos.operators._watcher.aggregation import (
+    MAX_FAILED_TESTS_IN_SUMMARY,
     ResultsTestsPerModel,
     TestResultSummary,
     accumulate_test_result,
@@ -52,7 +53,7 @@ class TestTestResultSummaryClass:
             passed_count=2,
             failed_count=0,
             total_count=2,
-            failed_tests=[],
+            failed_tests=(),
         )
         d = summary.to_dict()
         assert d == {
@@ -74,8 +75,15 @@ class TestTestResultSummaryClass:
             "failed_tests": ["test.pkg.b"],
         }
         summary = TestResultSummary.from_dict(d)
-        assert summary.status == DbtTestStatus.FAIL
-        assert summary.failed_tests == ["test.pkg.b"]
+        assert summary.status is DbtTestStatus.FAIL
+        assert summary.failed_tests == ("test.pkg.b",)
+
+    def test_from_dict_normalises_status_and_copies_failed_tests(self):
+        failed_tests = ["test.pkg.b"]
+        summary = TestResultSummary.from_dict({"status": DbtTestStatus.FAIL, "failed_tests": failed_tests})
+        failed_tests.append("test.pkg.c")
+        assert summary.status is DbtTestStatus.FAIL
+        assert summary.failed_tests == ("test.pkg.b",)
 
     def test_from_dict_raises_on_invalid_status(self):
         with pytest.raises(ValueError, match="Invalid TestResultSummary status"):
@@ -91,7 +99,7 @@ class TestTestResultSummaryClass:
             passed_count=1,
             failed_count=0,
             total_count=1,
-            failed_tests=[],
+            failed_tests=(),
         )
         with pytest.raises(AttributeError):
             summary.status = DbtTestStatus.FAIL  # type: ignore[misc]
@@ -174,7 +182,7 @@ class TestGetAggregatedTestStatus:
         assert summary.passed_count == 2
         assert summary.failed_count == 0
         assert summary.total_count == 2
-        assert summary.failed_tests == []
+        assert summary.failed_tests == ()
 
     def test_returns_summary_fail_when_any_test_fails(self):
         results: ResultsTestsPerModel = {
@@ -185,7 +193,7 @@ class TestGetAggregatedTestStatus:
         assert summary.status == DbtTestStatus.FAIL
         assert summary.passed_count == 1
         assert summary.failed_count == 1
-        assert summary.failed_tests == ["test.pkg.unique_orders_id"]
+        assert summary.failed_tests == ("test.pkg.unique_orders_id",)
 
     def test_returns_summary_fail_when_all_tests_fail(self):
         results: ResultsTestsPerModel = {
@@ -216,7 +224,16 @@ class TestGetAggregatedTestStatus:
         summary = get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results)
         assert summary is not None
         assert summary.status == DbtTestStatus.FAIL
-        assert summary.failed_tests == ["test.pkg.unique_orders_id"]
+        assert summary.failed_tests == ("test.pkg.unique_orders_id",)
+
+    def test_caps_failed_tests_in_summary(self):
+        test_ids = [f"test.pkg.test_{index}" for index in range(MAX_FAILED_TESTS_IN_SUMMARY + 2)]
+        tests_per_model = {"model.pkg.big_model": test_ids}
+        results: ResultsTestsPerModel = {"model.pkg.big_model": {test_id: "fail" for test_id in test_ids}}
+        summary = get_aggregated_test_status("model.pkg.big_model", tests_per_model, results)
+        assert summary is not None
+        assert summary.failed_count == len(test_ids)
+        assert summary.failed_tests == tuple(test_ids[:MAX_FAILED_TESTS_IN_SUMMARY])
 
     def test_treats_success_status_as_pass(self):
         """'success' is used by models; tests use 'pass' — both should be treated as success."""

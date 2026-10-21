@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from threading import Lock
 from typing import Any, TypeAlias
 
@@ -37,10 +37,16 @@ class TestResultSummary:
     passed_count: int
     failed_count: int
     total_count: int
-    failed_tests: list[str]
+    failed_tests: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {
+            "status": self.status.value,
+            "passed_count": self.passed_count,
+            "failed_count": self.failed_count,
+            "total_count": self.total_count,
+            "failed_tests": list(self.failed_tests),
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TestResultSummary:
@@ -48,11 +54,11 @@ class TestResultSummary:
         if status not in (DbtTestStatus.PASS, DbtTestStatus.FAIL):
             raise ValueError(f"Invalid TestResultSummary status: {status!r}")
         return cls(
-            status=status,
+            status=DbtTestStatus(status),
             passed_count=data.get("passed_count", 0),
             failed_count=data.get("failed_count", 0),
             total_count=data.get("total_count", 0),
-            failed_tests=data.get("failed_tests", []),
+            failed_tests=tuple(data.get("failed_tests", ())),
         )
 
 
@@ -127,7 +133,7 @@ def get_aggregated_test_status(
         passed_count=passed_count,
         failed_count=len(failed_tests),
         total_count=len(collected),
-        failed_tests=failed_tests[:MAX_FAILED_TESTS_IN_SUMMARY],
+        failed_tests=tuple(failed_tests[:MAX_FAILED_TESTS_IN_SUMMARY]),
     )
 
 

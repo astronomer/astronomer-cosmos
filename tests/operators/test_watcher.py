@@ -6,6 +6,7 @@ import logging
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
@@ -30,7 +31,9 @@ from cosmos.constants import (
 )
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
+from cosmos.operators._watcher.aggregation import TestResultSummary
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
+from cosmos.operators._watcher.state import DbtTestStatus
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
@@ -79,12 +82,12 @@ profile_config = ProfileConfig(
 
 class _MockTI:
     def __init__(self) -> None:
-        self.store: dict[str, str] = {}
+        self.store: dict[str, Any] = {}
         self.try_number = 1
         self.dag_id = "test_dag"
         self.task_id = "test_task"
 
-    def xcom_push(self, key: str, value: str, **_):
+    def xcom_push(self, key: str, value: Any, **_):
         self.store[key] = value
 
 
@@ -3077,6 +3080,76 @@ class TestDbtTestWatcherOperator:
 
         with pytest.raises(AirflowException, match="Tests for model"):
             sensor.poke(context)
+
+    def test_poke_reads_summary_dict_and_logs_it(self, caplog):
+        sensor = self.make_sensor()
+        summary = {"status": "pass", "passed_count": 2, "failed_count": 0, "total_count": 2, "failed_tests": []}
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.side_effect = lambda *_, key=None, **__: summary if key == self.TESTS_STATUS_XCOM_KEY else None
+        context = self.make_context(ti)
+
+        with caplog.at_level(logging.INFO):
+            assert sensor.poke(context) is True
+
+        assert f"2 out of 2 tests passed for '{self.MODEL_UID}'." in caplog.messages
+
+    def test_poke_raises_and_logs_failed_tests_from_summary_dict(self, caplog):
+        sensor = self.make_sensor()
+        summary = {
+            "status": "fail",
+            "passed_count": 1,
+            "failed_count": 1,
+            "total_count": 2,
+            "failed_tests": ["test.pkg.unique_orders_id"],
+        }
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.side_effect = lambda *_, key=None, **__: summary if key == self.TESTS_STATUS_XCOM_KEY else None
+        context = self.make_context(ti)
+
+        with caplog.at_level(logging.INFO), pytest.raises(AirflowException, match="Tests for model"):
+            sensor.poke(context)
+
+        assert any(
+            "1 out of 2 tests passed, 1 failed" in message and "test.pkg.unique_orders_id" in message
+            for message in caplog.messages
+        )
+
+    def test_execute_complete_logs_summary_from_event(self, caplog):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.xcom_pull.return_value = None
+        event = {
+            "status": "success",
+            "test_result_summary": {
+                "status": "pass",
+                "passed_count": 3,
+                "failed_count": 0,
+                "total_count": 3,
+                "failed_tests": [],
+            },
+        }
+
+        with caplog.at_level(logging.INFO):
+            sensor.execute_complete({"dag_run": MagicMock(), "ti": ti}, event)
+
+        assert f"3 out of 3 tests passed for '{self.MODEL_UID}'." in caplog.messages
+
+    def test_log_test_result_summary_notes_truncation(self, caplog):
+        sensor = self.make_sensor()
+        summary = TestResultSummary(
+            status=DbtTestStatus.FAIL,
+            passed_count=0,
+            failed_count=7,
+            total_count=7,
+            failed_tests=tuple(f"test.pkg.test_{index}" for index in range(5)),
+        )
+
+        with caplog.at_level(logging.INFO):
+            sensor._log_test_result_summary(summary)
+
+        assert any("(showing first 5 of 7)" in message for message in caplog.messages)
 
     def test_poke_returns_false_when_no_status_yet(self):
         """When the aggregated test status has not been pushed yet, poke should return False."""

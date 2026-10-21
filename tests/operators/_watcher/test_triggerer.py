@@ -414,6 +414,24 @@ class TestWatcherTrigger:
         assert len(events) == 1
         assert events[0].payload == {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}
 
+    @pytest.mark.asyncio
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    async def test_run_failed_node_event_marks_upstream_failure_skip(self, mock_startup_events):
+        """#3023: the deferred consumer reads the upstream-failure-skip mark from the event, not from XCom."""
+        xcoms = {"model__test_status": {"status": "failed", "outlet_uris": [], "upstream_failure_skip": True}}
+        with (
+            patch.object(self.trigger, "get_xcom_val", AsyncMock(side_effect=xcoms.get)),
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="success")),
+        ):
+            events = [event async for event in self.trigger.run()]
+
+        assert len(events) == 1
+        assert events[0].payload == {
+            "status": "failed",
+            "reason": WatcherEventReason.NODE_FAILED,
+            "upstream_failure_skip": True,
+        }
+
     @patch("cosmos.operators._watcher.triggerer.logger")
     @patch("cosmos.operators._watcher.triggerer.asyncio.sleep", new_callable=AsyncMock)
     @patch("cosmos.operators._watcher.triggerer.is_dbt_node_status_terminal", return_value=True)

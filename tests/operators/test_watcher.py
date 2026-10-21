@@ -676,12 +676,18 @@ class TestStoreDbtStatusFromLog:
         )
 
         assert upstream_failure_skipped_ids == {"model.pkg.downstream_model"}
-        assert ti.store.get("model__pkg__downstream_model_status") == {"status": "failed", "outlet_uris": []}
-        # The consumer tells an upstream-failure skip from a real failure by this raw event status (#3023).
-        assert ti.store.get("model__pkg__downstream_model_dbt_event")["status"] == "skipped"
+        # The consumer tells an upstream-failure skip from a real failure by this flag (#3023).
+        assert ti.store.get("model__pkg__downstream_model_status") == {
+            "status": "failed",
+            "outlet_uris": [],
+            "upstream_failure_skip": True,
+        }
 
-    def test_store_dbt_resource_status_from_log_keeps_skipped_event_without_node_finished(self):
-        """Subprocess and Kubernetes producers print no ``NodeFinished`` at dbt's default log level (#3023)."""
+    def test_store_dbt_resource_status_from_log_marks_upstream_failure_skip_without_node_finished(self):
+        """Subprocess and Kubernetes producers print no ``NodeFinished`` at dbt's default log level (#3023).
+
+        The status XCom alone carries the mark, so the producer writes no extra XCom for it.
+        """
         ti = _MockTI()
 
         store_dbt_resource_status_from_log(
@@ -692,8 +698,13 @@ class TestStoreDbtStatusFromLog:
             upstream_failure_skipped_ids=set(),
         )
 
-        assert ti.store.get("model__pkg__downstream_model_status") == {"status": "failed", "outlet_uris": []}
-        assert ti.store.get("model__pkg__downstream_model_dbt_event")["status"] == "skipped"
+        assert ti.store == {
+            "model__pkg__downstream_model_status": {
+                "status": "failed",
+                "outlet_uris": [],
+                "upstream_failure_skip": True,
+            }
+        }
 
     def test_store_dbt_resource_status_from_log_keeps_plain_skips_as_skipped(self):
         """Plain skips are unchanged, including when no rewrite accumulator is passed."""
@@ -1571,8 +1582,7 @@ class TestDbtConsumerWatcherSensor:
         mock_log_dbt_event.assert_not_called()
 
     UPSTREAM_SKIP_XCOMS = {
-        "model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []},
-        "model__jaffle_shop__stg_orders_dbt_event": {"status": "skipped"},
+        "model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": [], "upstream_failure_skip": True},
     }
     REAL_FAILURE_XCOMS = {
         "model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []},
@@ -1605,8 +1615,15 @@ class TestDbtConsumerWatcherSensor:
             (0, UPSTREAM_SKIP_XCOMS, "success"),
             # dbt ran the node and it failed.
             (1, REAL_FAILURE_XCOMS, "success"),
-            # No dbt event to tell an upstream-failure skip from a real failure.
-            (1, {"model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []}}, "success"),
+            # Only the status XCom marks an upstream-failure skip, not the dbt event.
+            (
+                1,
+                {
+                    "model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []},
+                    "model__jaffle_shop__stg_orders_dbt_event": {"status": "skipped"},
+                },
+                "success",
+            ),
             # The producer state is unknown, so it may still write XComs.
             (1, UPSTREAM_SKIP_XCOMS, None),
         ],
@@ -1863,29 +1880,30 @@ class TestDbtConsumerWatcherSensor:
         sensor = self.make_sensor(retries=1)
         sensor._get_producer_task_status.return_value = "success"
         sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
-        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+        context = self.make_context(self.make_xcom_ti(self.REAL_FAILURE_XCOMS))
 
-        sensor.execute_complete(context=context, event={"status": "failed", "reason": WatcherEventReason.NODE_FAILED})
+        sensor.execute_complete(
+            context=context,
+            event={"status": "failed", "reason": WatcherEventReason.NODE_FAILED, "upstream_failure_skip": True},
+        )
 
         sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
 
     @pytest.mark.parametrize(
-        "retries, xcoms",
+        "retries, event",
         [
-            (0, UPSTREAM_SKIP_XCOMS),
-            (1, REAL_FAILURE_XCOMS),
+            (0, {"status": "failed", "reason": WatcherEventReason.NODE_FAILED, "upstream_failure_skip": True}),
+            (1, {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}),
         ],
     )
-    def test_execute_complete_raises_node_failed_without_upstream_failure_skip_fallback(self, retries, xcoms):
+    def test_execute_complete_raises_node_failed_without_upstream_failure_skip_fallback(self, retries, event):
         sensor = self.make_sensor(retries=retries)
         sensor._get_producer_task_status.return_value = "success"
         sensor._fallback_to_non_watcher_run = MagicMock()
-        context = self.make_context(self.make_xcom_ti(xcoms))
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
 
         with pytest.raises(AirflowException, match="failed. Review the producer task"):
-            sensor.execute_complete(
-                context=context, event={"status": "failed", "reason": WatcherEventReason.NODE_FAILED}
-            )
+            sensor.execute_complete(context=context, event=event)
         sensor._fallback_to_non_watcher_run.assert_not_called()
         sensor._get_producer_task_status.assert_not_called()
 
@@ -2975,8 +2993,8 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
     ``SkippingDetails``/``LogSkipBecauseError``, since both come from
     ``on_skip()`` which is only reached via ``do_skip(cause=...)``). Subsequent
     "skipped" terminal events for those unique_ids are rewritten to "failed" so
-    the consumer does not end SKIPPED. Since #3023 their consumers see that the
-    dbt event still says "skipped", so they run the existing
+    the consumer does not end SKIPPED. Since #3023 their status XCom also
+    carries ``upstream_failure_skip``, so their consumers run the existing
     ``_fallback_to_non_watcher_run`` path on attempt 1 once the upstream has
     recovered, instead of raising and waiting one ``retry_delay`` for attempt 2.
     """

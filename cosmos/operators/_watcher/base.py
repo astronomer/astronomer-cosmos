@@ -102,10 +102,7 @@ _DBT_ERROR_EVENTS_TYPES = frozenset(
     }
 )
 
-# SkippingDetails is the only event an info-level log (subprocess, Kubernetes) prints for a node dbt skipped.
-_DBT_NODE_STATUS_EVENT_TYPES = frozenset(
-    {"NodeStart", "NodeCompiling", "NodeExecuting", "NodeFinished", "SkippingDetails"}
-)
+_DBT_NODE_STATUS_EVENT_TYPES = frozenset({"NodeStart", "NodeCompiling", "NodeExecuting", "NodeFinished"})
 
 _DBT_EVENT_ALLOWLIST = _DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES
 
@@ -295,6 +292,16 @@ def _rewrite_upstream_failure_skip_status(
     return dbt_node_status
 
 
+def _node_status_xcom_value(
+    dbt_node_status: Any, outlet_uris: list[str], is_upstream_failure_skip: bool
+) -> dict[str, Any]:
+    """The ``<unique_id>_status`` XCom value. An upstream-failure skip is marked, since dbt never ran the node (#3023)."""
+    status_value: dict[str, Any] = {"status": dbt_node_status, "outlet_uris": outlet_uris}
+    if is_upstream_failure_skip:
+        status_value["upstream_failure_skip"] = True
+    return status_value
+
+
 def _surface_non_json_stdout(line: str) -> None:
     """Forward non-JSON stdout (e.g. Snowflake connector's "Going to open: <URL>" prompt
     during externalbrowser auth) to the task log instead of silently dropping it.
@@ -365,9 +372,11 @@ def store_dbt_resource_status_from_log(
 
         # Rewrite "skipped" to "failed" when dbt skipped the node because an
         # upstream node failed (#2698). See _rewrite_upstream_failure_skip_status.
+        raw_node_status = dbt_node_status
         dbt_node_status = _rewrite_upstream_failure_skip_status(
             log_line, unique_id, dbt_node_status, upstream_failure_skipped_ids
         )
+        is_upstream_failure_skip = dbt_node_status != raw_node_status
 
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
@@ -395,14 +404,10 @@ def store_dbt_resource_status_from_log(
                     _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
                     outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
 
-                status_value: dict[str, Any] | str = {
-                    "status": dbt_node_status,
-                    "outlet_uris": outlet_uris,
-                }
                 safe_xcom_push(
                     task_instance=context["ti"],
                     key=get_status_xcom_key(unique_id),
-                    value=status_value,
+                    value=_node_status_xcom_value(dbt_node_status, outlet_uris, is_upstream_failure_skip),
                 )
 
             # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
@@ -687,7 +692,9 @@ class BaseConsumerSensor(BaseSensorOperator):
 
         if reason == WatcherEventReason.NODE_FAILED:
             if (
-                self._should_fall_back_for_upstream_failure_skip(context["ti"], dbt_events)
+                self._should_fall_back_for_upstream_failure_skip(
+                    context["ti"], bool(event.get("upstream_failure_skip"))
+                )
                 and is_producer_task_terminated(self._get_producer_task_status(context))
                 and self._fall_back_for_upstream_failure_skip(context)
             ):
@@ -726,10 +733,12 @@ class BaseConsumerSensor(BaseSensorOperator):
         For test sensors, reads the aggregated ``_tests_status`` key.
         For model sensors, reads the per-model ``*_status`` key (same for both
         SUBPROCESS and DBT_RUNNER invocation modes). The value is always a dict
-        with ``status`` and ``outlet_uris`` keys.
+        with ``status`` and ``outlet_uris`` keys, plus ``upstream_failure_skip``
+        for a node that dbt skipped for an upstream failure.
 
         Side effect: stores outlet URIs on ``self._outlet_uris`` for later
-        dataset emission.
+        dataset emission, and the upstream-failure-skip mark on
+        ``self._upstream_failure_skip``.
         """
         if self.is_test_sensor:
             return get_xcom_val(ti, self.producer_task_id, get_tests_status_xcom_key(self.model_unique_id))
@@ -737,6 +746,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         if xcom_val is None:
             return None
         self._outlet_uris = xcom_val.get("outlet_uris", [])
+        self._upstream_failure_skip = bool(xcom_val.get("upstream_failure_skip"))
         return xcom_val.get("status")
 
     def _cache_compiled_sql(self, ti: Any, context: Context) -> None:
@@ -769,7 +779,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         return None
 
-    def _should_fall_back_for_upstream_failure_skip(self, ti: Any, dbt_event: dict[str, Any] | None) -> bool:
+    def _should_fall_back_for_upstream_failure_skip(self, ti: Any, upstream_failure_skip: bool) -> bool:
         """Whether to build now a failed node that dbt skipped for an upstream failure, instead of on a retry.
 
         Only when the task has ``retries`` configured, so a retry would fall back too. The node then gets
@@ -786,8 +796,7 @@ class BaseConsumerSensor(BaseSensorOperator):
             # dbt never runs a model's tests when the model did not succeed.
             model_status = get_xcom_val(ti, self.producer_task_id, get_status_xcom_key(self.model_unique_id)) or {}
             return bool(model_status) and not is_dbt_node_status_success(model_status.get("status"))
-        # The status XCom of an upstream-failure skip says "failed", but its dbt event still says "skipped".
-        return is_dbt_node_status_skipped((dbt_event or {}).get("status"))
+        return upstream_failure_skip
 
     def _fall_back_for_upstream_failure_skip(self, context: Context) -> bool:
         """Build the node that dbt skipped for an upstream failure now, instead of on a retry."""
@@ -875,7 +884,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         if (
             is_dbt_node_status_failed(status)
             and is_producer_task_terminated(producer_task_state)
-            and self._should_fall_back_for_upstream_failure_skip(ti, dbt_events)
+            and self._should_fall_back_for_upstream_failure_skip(ti, getattr(self, "_upstream_failure_skip", False))
             and self._fall_back_for_upstream_failure_skip(context)
         ):
             return True

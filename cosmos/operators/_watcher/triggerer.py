@@ -125,13 +125,16 @@ class WatcherTrigger(BaseTrigger):
     async def _get_node_status(self) -> Any | None:
         """Return the dbt node status from XCom.
 
-        The XCom value is always a dict with ``status`` and ``outlet_uris`` keys.
-        Stores outlet URIs on ``self._outlet_uris`` for later dataset emission.
+        The XCom value is always a dict with ``status`` and ``outlet_uris`` keys, plus
+        ``upstream_failure_skip`` for a node that dbt skipped for an upstream failure.
+        Stores outlet URIs on ``self._outlet_uris`` for later dataset emission, and the
+        upstream-failure-skip mark on ``self._upstream_failure_skip``.
         """
         xcom_val = await self.get_xcom_val(get_status_xcom_key(self.model_unique_id))
         if xcom_val is None:
             return None
         self._outlet_uris = xcom_val.get("outlet_uris", [])
+        self._upstream_failure_skip = bool(xcom_val.get("upstream_failure_skip"))
         return xcom_val.get("status")
 
     async def _parse_dbt_node_status_and_compiled_sql(self) -> tuple[str | None, str | None]:
@@ -243,9 +246,11 @@ class WatcherTrigger(BaseTrigger):
                 # Surface a node failure only once the producer has terminated. While it is still
                 # running, fall through to the sleep below and keep polling. See #2947.
                 logger.warning("dbt node '%s' failed", self.model_unique_id)
-                event_data = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
+                event_data: dict[str, Any] = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
                 if compiled_sql:
                     event_data["compiled_sql"] = compiled_sql
+                if getattr(self, "_upstream_failure_skip", False):
+                    event_data["upstream_failure_skip"] = True
                 yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == ProducerTaskState.FAILED:

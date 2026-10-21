@@ -6,119 +6,76 @@ dbt v2 support
 .. note::
     Available since Cosmos 1.11.0 when using ``ExecutionMode.LOCAL``.
 
+.. note::
+    As part of releasing dbt v2 to general availability, dbt Labs renamed the dbt Fusion engine to "dbt", and dbt Core v2 to "dbt OSS"
+    (see `Comparing dbt and dbt OSS <https://docs.getdbt.com/blog/comparing-dbt-and-dbt-oss>`_).
+    "dbt Fusion" in this page refers to what is now the ``dbt`` distribution.
+
 Context
 ~~~~~~~
 
-dbt Labs `launched <https://www.getdbt.com/blog/dbt-launch-showcase-2025-recap>`_ `dbt Fusion <https://github.com/dbt-labs/dbt-fusion>`_ on 28 May 2025.
-It is a next-generation dbt engine, implemented in Rust instead of Python, that enables real-time model validation,
-improved SQL parsing and state-aware orchestration.
+dbt Labs `launched <https://www.getdbt.com/blog/dbt-launch-showcase-2025-recap>`_ `dbt Fusion <https://github.com/dbt-labs/dbt-fusion>`_ on 28 May 2025. dbt Fusion is the next-generation dbt engine that enables real-time model validation, improved SQL parsing and state-aware orchestration.
+It is a unified approach that aims to merge dbt Core and dbt Cloud features via a completely new CLI,
+implemented in a different programming language (Rust, as opposed to Python).
+As part of this, dbt Labs are `rewriting all dbt adapters <https://github.com/dbt-labs/dbt-fusion/tree/main/crates/dbt-adapter>`_ (equivalent to `Apache Airflow® <https://airflow.apache.org/>`_ providers) in Rust, starting from Snowflake.
+They are also changing the `licensing model <https://github.com/dbt-labs/dbt-fusion/blob/main/LICENSES.md>`_ to a hybrid Open-Source and commercial license. We're supporting dbt Fusion with a license-complaint integration. This integration enables teams to:
 
-With the general availability of dbt v2, dbt Labs renamed the dbt Fusion engine to **dbt**, and dbt Core v2 to **dbt OSS**
-(see `Comparing dbt and dbt OSS <https://docs.getdbt.com/blog/comparing-dbt-and-dbt-oss>`_). This page uses the
-current names and mentions the previous ones where it helps.
+- Use dbt Fusion locally for enhanced development experience with real-time validation
+- Deploy dbt Fusion on Astro for production compliance with ELv2 licensing restrictions
+- Maintain consistent workflows across development and production environments
 
-What dbt 2 is
-~~~~~~~~~~~~~
+Some reported dbt Fusion features include:
+ - **Lightning-fast performance:** Up to 30× faster parsing speeds
+ - **Smarter orchestration:** Build only what’s changed, thanks to Fusion’s state-awareness
+ - **Real-time dev experience:** Catch errors instantly and explore lineage as you code, if you're using the VS Code extension
+ - **Multi-dialect support:** Instant error detection across Snowflake, Databricks, BigQuery, and Redshift SQL dialects
 
-.. list-table::
-   :header-rows: 1
+.. note::
+    dbt v2 (formerly dbt Fusion) has reached general availability. Check the `dbt documentation <https://docs.getdbt.com/docs/supported-data-platforms>`_ for the data platforms it currently supports.
 
-   * - Name
-     - Previously
-     - Licence
-     - Installed with
-   * - ``dbt``
-     - dbt Fusion engine
-     - Hybrid open source and commercial
-     - ``pip install dbt``
-   * - ``dbt-oss``
-     - dbt Core v2
-     - Apache 2.0
-     - ``pip install dbt-oss``
-   * - ``dbt-core`` 2.x
-     - dbt Core v2
-     - Apache 2.0 (installs dbt OSS)
-     - ``pip install dbt-core``
-   * - dbt Fusion binary
-     - dbt Fusion
-     - Hybrid open source and commercial
-     - The `dbt installer <https://github.com/dbt-labs/dbt-fusion>`_, which downloads a standalone executable
+Support
+~~~~~~~
 
-dbt Core 1.x (versions lower than 2.0) is the previous, Python-based engine and is documented elsewhere.
-All of the above share the same language specification, so the same dbt project can be used with each of them.
-Refer to the `dbt documentation <https://docs.getdbt.com/docs/supported-data-platforms>`_ for the data platforms each one supports.
+Cosmos 1.11.0 adds initial support for running dbt Fusion with Cosmos when using ``ExecutionMode.LOCAL``.
 
-Supported setups
-~~~~~~~~~~~~~~~~
-
-.. list-table::
-   :header-rows: 1
-
-   * - Setup
-     - How Cosmos runs dbt
-     - Execution modes
-     - Tested in Cosmos CI
-   * - dbt Fusion binary
-     - Subprocess. ``dbt`` is not importable from Airflow's Python environment, so ``dbtRunner`` is not used.
-     - ``ExecutionMode.LOCAL`` and ``ExecutionMode.WATCHER``
-     - Yes (matrix value ``2.0-dbt-fusion``): Snowflake and BigQuery
-   * - ``dbt`` (``pip install dbt``)
-     - ``InvocationMode.SUBPROCESS`` recommended
-     - ``ExecutionMode.LOCAL``
-     - No dedicated job yet
-   * - ``dbt-oss`` (``pip install dbt-oss``)
-     - ``InvocationMode.SUBPROCESS`` recommended
-     - ``ExecutionMode.LOCAL``
-     - No dedicated job yet
-
-Cosmos's CI does not yet cover running tasks through ``dbtRunner`` on dbt 2 installed with ``pip``, so
-set ``invocation_mode=InvocationMode.SUBPROCESS`` for pip installs.
+We do not have a solution for using :ref:`ExecutionMode.AIRFLOW_ASYNC <async-execution-mode>`.
 
 How to use
 ~~~~~~~~~~
 
-Install Cosmos 1.11.0 or later:
+1. Install Cosmos 1.11.0 or later
 
-.. code-block:: bash
+   .. code-block:: bash
 
-    pip install "astronomer-cosmos>=1.11.0"
+       pip install "astronomer-cosmos>=1.11.0"
 
-**With the dbt Fusion binary**
+2. Install dbt Fusion in your Airflow deployment
 
-Install the binary in your Airflow deployment. On Astro, add the following lines to your ``Dockerfile``, replacing
-``<version>`` with the dbt version you want to pin:
+   End-users should install the dbt Fusion package themselves. An example of how to do this in Astro would be to add the following lines in your ``Dockerfile``:
 
-.. code-block:: dockerfile
+   .. code-block:: dockerfile
 
-    USER root
-    RUN apt-get update && apt-get install -y curl
-    USER astro
-    RUN curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update --version <version>
+       USER root
+       RUN apt install -y curl
+       RUN curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update
 
-Then point your ``DbtDag`` or ``DbtTaskGroup`` at the binary:
+3. Update your ``DbtDag`` or ``DbtTaskGroup`` to use the dbt Fusion binary
 
-.. code-block:: python
+   Example:
 
-    DbtDag(
-        ...,
-        execution_config=ExecutionConfig(dbt_executable_path="/home/astro/.local/bin/dbt"),
-    )
+   .. code-block:: python
 
-**With ``pip``**
+       DbtDag(
+           ...,
+           execution_config=ExecutionConfig(dbt_executable_path="/home/astro/.local/bin/dbt"),
+       )
 
-Install ``dbt`` or ``dbt-oss`` in the Python environment where Airflow runs, and use the subprocess invocation mode:
-
-.. code-block:: python
-
-    DbtDag(
-        ...,
-        execution_config=ExecutionConfig(invocation_mode=InvocationMode.SUBPROCESS),
-    )
 
 Limitations
 ~~~~~~~~~~~
 
-- Cosmos does not support dbt 2 when using :ref:`ExecutionMode.AIRFLOW_ASYNC <async-execution-mode>`.
-- dbt 2 has no Postgres adapter.
+- This feature is available since Cosmos 1.11.0
+- dbt Fusion only supports Snowflake
+- Cosmos does not support dbt Fusion when using ``ExecutionMode.AIRFLOW_ASYNC``
 
-To support dbt 2, Cosmos modified its interaction with dbt. This works with the latest versions of dbt-core, but may not work with older versions. If you want to continue using dbt-core and were affected, set the environment variable ``AIRFLOW__COSMOS__PRE_DBT_FUSION=1`` and Cosmos interaction with dbt-core will work as previous versions.
+To support dbt Fusion, Cosmos modified its interaction with dbt. This works with the latest versions of dbt-core, but may not work with older versions. If you want to continue using dbt-core and was affected, set the environment variable ``AIRFLOW__COSMOS__PRE_DBT_FUSION=1`` and Cosmos interaction with dbt-core will work as previous versions.

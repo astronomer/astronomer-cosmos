@@ -8,7 +8,7 @@ you can use the same connection objects you use in Airflow to authenticate with 
 a class in Cosmos for each Airflow connection to dbt profile mapping.
 
 .. note::
-   Cosmos natively supports all adapters compatible with **dbt Core 1.x** and **dbt 2** (**dbt** and **dbt OSS**, previously dbt Fusion and dbt Core v2) without any reliance on dbt Platform. This includes both official `Trusted Adapters <https://docs.getdbt.com/docs/trusted-adapters>`_ and `Community Adapters <https://docs.getdbt.com/docs/community-adapters>`_.
+   Cosmos natively supports all adapters compatible with **dbt Core** and **dbt v2** without any reliance on dbt Platform. This includes both official `Trusted Adapters <https://docs.getdbt.com/docs/trusted-adapters>`_ and `Community Adapters <https://docs.getdbt.com/docs/community-adapters>`_.
    While some of these adapters lack a built-in automated profile mapping class in Cosmos, including
    `AWS Glue <https://docs.getdbt.com/docs/local/connect-data-platform/glue-setup?version=2.0&name=Fusion>`_,
    `Dremio <https://docs.getdbt.com/docs/local/connect-data-platform/dremio-setup?version=2.0&name=Fusion>`_,

@@ -318,7 +318,7 @@ class CosmosAF3Plugin(AirflowPlugin):
             }
         ]
         projects = _load_projects_from_conf()
-        if projects and AIRFLOW_VERSION == Version("3.1.0"):
+        if projects and Version(AIRFLOW_VERSION.base_version) == Version("3.1.0"):
             # The Airflow 3.1.0 UI deletes its session cookie after login, so the browser cannot authenticate to plugin routes.
             logger.warning(
                 "Cosmos dbt docs require an authenticated user, which the Airflow 3.1.0 UI cannot provide to plugin "

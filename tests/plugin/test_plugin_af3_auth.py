@@ -136,7 +136,10 @@ def test_plugin_still_registers_the_dbt_docs_menu_entry(docs_dir: Path):
     assert [app["url_prefix"] for app in plugin.fastapi_apps] == ["/cosmos"]
 
 
-@pytest.mark.parametrize("running_airflow_version, warns", [("3.1.0", True), ("3.1.1", False)])
+@pytest.mark.parametrize(
+    "running_airflow_version, warns",
+    [("3.1.0", True), ("3.1.0+astro.2", True), ("3.1.1", False), ("3.1.8+astro.9", False)],
+)
 def test_plugin_warns_that_airflow_310_cannot_open_dbt_docs(
     docs_dir: Path, caplog: pytest.LogCaptureFixture, running_airflow_version: str, warns: bool
 ):

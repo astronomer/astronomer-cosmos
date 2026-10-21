@@ -132,7 +132,7 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
         airflow-version: ["2.10", "3.0", "3.1"]
-        dbt-version: ["v2-oss"]
+        dbt-version: ["2.0-dbt-oss"]
         split-group: [1, 2, 3]
     env:
       # One BigQuery dataset per job, so concurrent jobs do not write to the same tables. The tests read it, and the last
@@ -181,7 +181,7 @@ jobs:
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
           HATCH_ENV="tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}"
-          hatch run "$HATCH_ENV:test-integration-dbt-v2-setup"
+          hatch run "$HATCH_ENV:test-integration-dbt-oss-setup"
           hatch run "$HATCH_ENV:test-integration"
         env:
           COSMOS_TEST_ADAPTER: bigquery

@@ -6,8 +6,10 @@ Changelog
 
 Breaking Changes
 
+* Cosmos now keeps the Airflow DAGs folder out of dbt's plugin discovery path during every dbt invocation (``sys.path`` under ``InvocationMode.DBT_RUNNER``, ``PYTHONPATH`` under ``InvocationMode.SUBPROCESS``). **If you keep a dbt plugin whose module name starts with ``dbt_`` inside the DAGs folder, it will no longer be discovered: move it out of the DAGs folder, or set ``enable_dags_folder_exclusion_from_dbt=False`` (env var ``AIRFLOW__COSMOS__ENABLE_DAGS_FOLDER_EXCLUSION_FROM_DBT``) to restore the previous behaviour.** This fixes dbt importing DAG files named ``dbt_*.py`` as plugins, which leaked or duplicated DAGs across unrelated Cosmos DAGs in-process and could crash the dbt command in subprocess mode. See #1673 and #2893.
+* Bare selectors (no method prefix, such as ``marts`` or ``marts+``) now resolve against each node's fully qualified name (fqn) under ``LoadMode.DBT_MANIFEST``, as dbt does. **Review bare ``select`` and ``exclude`` entries before upgrading: an ``exclude`` that was a silent no-op, or that matched too broadly, now removes exactly the dbt-selected nodes and their descendants, so tasks can disappear from an existing DAG.** A graph operator on a folder or package root (e.g. ``post_processing+`` or ``fhir_dbt_utils+``) now resolves nodes where it previously matched nothing, and a token equal to the model-paths directory (``models``), a filesystem ancestor, or a single middle folder segment no longer matches, because those are not an fqn prefix. See #2962 and #2978.
 * Raised the minimum supported dbt Core version to 1.8. dbt Core 1.5, 1.6, and 1.7 have reached End of Life per the `dbt Labs support policy <https://docs.getdbt.com/docs/dbt-versions/core>`_ and are no longer tested or supported; see the :doc:`compatibility policy </policy/compatibility-policy>` for the current supported range. See #2902.
-* ``ExecutionMode.AIRFLOW_ASYNC`` is no longer supported on Apache Airflow 2.x. Cosmos now builds the async operator at runtime in a way that works on Airflow 3.4, which leaves the operator not fully initialised on Airflow 2.9 and unpicklable on Airflow 2.x. Users who run ``AIRFLOW_ASYNC`` and cannot upgrade to Airflow 3 should stay on an earlier Cosmos release. See `#3050 <https://github.com/astronomer/astronomer-cosmos/pull/3050>`_.
+* Starting in Cosmos 1.16.0, ``ExecutionMode.AIRFLOW_ASYNC`` is no longer supported on Apache Airflow 2.x. This change was necessary in order to support this execution mode in Airflow 3.4. Users who rely on ``AIRFLOW_ASYNC`` and cannot upgrade to Airflow 3 should stay on an earlier Cosmos release. See more information on `#3050 <https://github.com/astronomer/astronomer-cosmos/pull/3050>`_.
 * The Airflow 3 dbt docs plugin now requires authentication. Every ``/cosmos`` route requires a logged-in Airflow user with read access to the ``Website`` view, matching the Airflow 2 plugin; unauthenticated requests receive HTTP 401 and users without that permission receive HTTP 403. Previously these routes were served without authentication, exposing model SQL and schema metadata to anyone who could reach the API server. As a result, opening dbt docs from the Airflow UI now requires Airflow 3.1.1 or later (Astro Runtime 3.1-3 or later): the Airflow 3.1.0 UI discards its session cookie after login, so on Airflow 3.1.0 (including Astro Runtime 3.1-1 and 3.1-2) the docs return HTTP 401 and the plugin logs a warning. The plugin still loads on Airflow 3.1.0, and bearer-token API access to the docs still works. FastAPI's ``/openapi.json``, ``/docs`` and ``/redoc`` under ``/cosmos`` are disabled, and the plugin registers no sub-application or menu entry when ``dbt_docs_projects`` is empty. See `#3081 <https://github.com/astronomer/astronomer-cosmos/pull/3081>`_.
 
 Behaviour Changes
@@ -17,16 +19,14 @@ Behaviour Changes
   asset-scheduled DAGs. ``operator_args`` now takes precedence over ``RenderConfig.emit_datasets`` (which remains a
   parse-time boolean and is not templatable). Previously an ``operator_args`` value was silently discarded, so
   ``operator_args={"emit_datasets": False}`` now takes effect. See #2996.
-* Cosmos now removes the Airflow DAGs folder from dbt's plugin discovery path for the duration of each dbt invocation, in both ``InvocationMode.DBT_RUNNER`` (in-process, via ``sys.path``) and ``InvocationMode.SUBPROCESS`` (via ``PYTHONPATH``). Previously dbt-core imported DAG files named ``dbt_*.py`` as a side effect of plugin discovery, which leaked or duplicated DAGs across unrelated Cosmos DAGs when running in-process and could crash the dbt command in subprocess mode. This is enabled by default. As a result, a genuine dbt plugin named ``dbt_*`` placed inside the DAGs folder will no longer be discovered; set ``enable_dags_folder_exclusion_from_dbt=False`` (env var ``AIRFLOW__COSMOS__ENABLE_DAGS_FOLDER_EXCLUSION_FROM_DBT``) to restore the previous behaviour. See #1673 and #2893.
 * When a dbt project cannot be found, Cosmos now raises a clearer error, and on Airflow 3 with an absolute ``dbt_project_path`` it appends guidance to set the path relative to the DAG file (e.g. ``(Path(__file__).parent / "dbt/my_dbt_project").absolute().as_posix()``). This makes failures caused by versioned DAG bundles (e.g. on Astronomer) relocating the project between DAG parsing and task execution self-explanatory in the logs. The missing-project case in ``create_symlinks`` now raises ``CosmosValueError`` instead of a bare ``FileNotFoundError``. See #2921.
-* Bare folder and package selectors now resolve against each node's fully qualified name (fqn) under ``LoadMode.DBT_MANIFEST``, following dbt's default fqn selector (leaf name, or an ordered folder path from the project root). A graph operator on a bare folder or package root (e.g. ``post_processing+`` or ``fhir_dbt_utils+``) now resolves nodes where it previously matched nothing. Bare matching is also stricter: a token equal to the model-paths directory (``models``), a filesystem ancestor, or a single middle folder segment no longer matches, because those are not an fqn prefix. This mainly affects ``exclude``: bare ``exclude`` entries that were previously a silent no-op or matched too broadly now remove exactly the dbt-selected nodes and their descendants, so review them before upgrading. See #2962.
 * In ``ExecutionMode.WATCHER`` (including the Kubernetes and GKE variants), the aggregated test status that the producer pushes to XCom under ``<model_unique_id>_tests_status`` is now a dict (``status``, ``passed_count``, ``failed_count``, ``total_count`` and up to five ``failed_tests`` unique_ids) instead of the ``"pass"`` or ``"fail"`` string, and the test sensors log that summary. The sensors and the trigger still accept the string, so DAG runs in flight during the upgrade are unaffected; anything reading that XCom key directly must now read ``status`` from the dict. See #2750.
 * Under ``SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS``, a source that has tests but no freshness checks now renders its freshness task as an ``EmptyOperator`` instead of a ``DbtSource`` task that always ended with "Nothing to do" and failed when warn-error is enabled, matching the existing ``SourceRenderingBehavior.ALL`` path. The ``EmptyOperator`` keeps the dbt owner and does not receive ``operator_args`` or per-node ``operator_kwargs``. The test tasks are unchanged. See #3044.
 
 Features
 
 * Log a per-model test summary (passed and failed counts, and the failing test unique_ids) in the ``ExecutionMode.WATCHER`` test sensors by @michal-mrazek in #2750
-* Add opt-in support for adapter-native semantic metric views (``config.materialized: metric_view`` on Databricks, ``semantic_view`` on Snowflake). When ``enable_semantic_metric_view_reclassification`` is set (env var ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION``), these models are reclassified from ``model`` to ``DbtResourceType.SEMANTIC_METRIC_VIEW`` and rendered via a dedicated ``DbtSemanticMetricView*`` operator with a ``semantic_metric_run`` task suffix. Disabled by default. See the "Managing semantic metric views" guide by @corsettigyg in #2885
+* Add opt-in experimental support for adapter-native semantic metric views (``config.materialized: metric_view`` on Databricks, ``semantic_view`` on Snowflake). When ``enable_semantic_metric_view_reclassification`` is set (env var ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION``), these models are reclassified from ``model`` to ``DbtResourceType.SEMANTIC_METRIC_VIEW`` and rendered via a dedicated ``DbtSemanticMetricView*`` operator with a ``semantic_metric_run`` task suffix. Disabled by default. See the "Managing semantic metric views" guide by @corsettigyg in #2885
 * Add dedicated producer, consumer, and retry queues for ``ExecutionMode.WATCHER`` by @jroachgolf84 in #2844
 * Emit per-model outlets in ``ExecutionMode.WATCHER_KUBERNETES`` by @MichaelRBlack in #2595
 * Support lists of paths for the relative-path arguments of ``ProjectConfig`` by @pankajastro in #2875
@@ -41,16 +41,13 @@ Enhancements
 * Raise the minimum supported dbt Core version to 1.8 by @pankajastro in #2939
 * Clean up leftover dbt Core <1.8 references by @pankajastro in #2995
 * Add a DAG-bundle hint when a dbt project path is missing by @pankajkoti in #2921
-* Use ``EmptyOperator`` for freshness tasks of test-only sources by @JH0917 in #3044
 * Clarify missing profile field errors by @nightcityblade in #2970
 
 Bug Fixes
 
 * On Airflow 3.0, the Cosmos plugin now logs a warning and skips the dbt docs views instead of raising ``RuntimeError`` on load. Previously, with ``[core] lazy_load_plugins = False`` (as on Astro Runtime), every Airflow CLI command logged a "Failed to import plugin cosmos" traceback, and the plugin's listeners were never registered by @jedcunningham in #3055
-* Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn, so ``<folder>+`` and ``<package>+`` behave like their ``path:`` and ``package:`` equivalents and like ``dbt ls``. Previously the graph selector resolved its root by exact node name only, and bare-identifier matching keyed off the absolute file path by @pankajkoti in #2978
 * ``LoadMode.DBT_LS`` now runs ``dbt ls`` through a Python subprocess when dbt 2 (``dbt-core``, ``dbt-oss`` or ``dbt`` 2.x) is installed in the Airflow environment, even under the default ``InvocationMode.DBT_RUNNER``. dbt 2's ``dbtRunner`` returns only node names for ``dbt ls --output json``, which previously rendered an empty DAG. The fallback runs ``dbt_executable_path`` and is logged at INFO level; ``dbt deps`` still runs through ``dbtRunner`` by @tatiana in #3060
 * Fix async operator construction on Airflow 3.4 by @pankajkoti in #3050
-* Keep the Airflow DAGs folder out of dbt's plugin discovery path by @pankajkoti in #2893
 * Fix ``on_warning_callback`` not being called after deferral in Kubernetes mode by @mathiasgout in #3062
 * Fix the ``ExecutionMode.WATCHER`` consumer never reaching the fallback when its node errors early by @pankajkoti in #3011
 * Fix ``ExecutionMode.WATCHER`` dataset emission being silently disabled when ``profiles.yml`` uses dbt Jinja filters by @goingforstudying-ctrl in #2950
@@ -62,15 +59,19 @@ Bug Fixes
 * Fix duplicate dbt Docs views in the Airflow 3 plugin by @ieCecchetti in #3071
 * Fall back to subprocess in the ``ExecutionMode.WATCHER`` producer on dbt (oss) 2.0 by @fpiped in #2998
 * Parse dbt JSON log output when extracting error and warning messages in subprocess mode by @ieCecchetti in #3072
+* Use ``EmptyOperator`` for freshness tasks of test-only sources, which now carry the dbt owner when owner inheritance is enabled by @JH0917 in #3044
 
 Docs
 
 * Unify internal doc links to use the ``:ref:`` role by @pankajastro in #2873
 * Document the list-based relative-path arguments of ``ProjectConfig`` by @pankajastro in #2876
 * Link the ``AGENTS.md`` test matrix to ``pyproject.toml`` instead of hardcoding versions by @pankajastro in #2887
-* Add a proposal for a Snowflake dbt Project execution mode by @tatiana in #2896
 * Add dbt-core 1.12 to the Airflow/dbt conflicts table by @pankajastro in #2938
 * Fix broken Slack invite links to the #airflow-dbt channel by @pankajastro in #2956
+
+Architectural Proposal
+
+* Add a proposal for a Snowflake dbt Project execution mode by @tatiana in #2896. Community contributions are welcome on the umbrella issue: https://github.com/astronomer/astronomer-cosmos/issues/3058
 
 Others
 

@@ -702,17 +702,8 @@ class BaseConsumerSensor(BaseSensorOperator):
             return
 
         if reason == WatcherEventReason.NODE_FAILED:
-            if (
-                self._should_fall_back_for_upstream_failure_skip(
-                    context["ti"], bool(event.get("upstream_failure_skip"))
-                )
-                and is_producer_task_terminated(self._get_producer_task_status(context))
-                and self._fall_back_for_upstream_failure_skip(context)
-            ):
-                return
-            raise AirflowException(
-                f"dbt {self._resource_label.lower()} '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
-            )
+            self._handle_node_failed_event(context, event)
+            return
 
         if reason == WatcherEventReason.PRODUCER_FAILED:
             raise AirflowException(
@@ -728,6 +719,18 @@ class BaseConsumerSensor(BaseSensorOperator):
             )
             self._fallback_to_non_watcher_run(try_number=context["ti"].try_number, context=context)
             return
+
+    def _handle_node_failed_event(self, context: Context, event: dict[str, Any]) -> None:
+        """Build now a node that dbt skipped for an upstream failure (#3023), or raise for the failed node."""
+        if (
+            self._should_fall_back_for_upstream_failure_skip(context["ti"], bool(event.get("upstream_failure_skip")))
+            and is_producer_task_terminated(self._get_producer_task_status(context))
+            and self._fall_back_for_upstream_failure_skip(context)
+        ):
+            return
+        raise AirflowException(
+            f"dbt {self._resource_label.lower()} '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
+        )
 
     def _log_test_result_summary(self, summary: TestResultSummary) -> None:
         """Log a human-readable summary of test results for test sensors."""
@@ -903,13 +906,11 @@ class BaseConsumerSensor(BaseSensorOperator):
         if not self.is_test_sensor:
             self._log_startup_events(ti)
         status = self._get_node_status(ti, context)
-
-        # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
-        if status is not None:
-            self._cache_compiled_sql(ti, context)
-
         if status is None:
             return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
+
+        # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
+        self._cache_compiled_sql(ti, context)
 
         # A failed node while the producer is still building is not terminal for the sensor yet: keep
         # polling (in deferrable mode this defers back to the trigger) so the retry path can fall back

@@ -239,6 +239,17 @@ class WatcherTrigger(BaseTrigger):
             event_data["test_result_summary"] = self._test_result_summary.to_dict()
         return event_data
 
+    def _build_node_failed_event(self, compiled_sql: str | None) -> dict[str, Any]:
+        """Build the TriggerEvent payload for a failed dbt node."""
+        event_data: dict[str, Any] = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
+        if compiled_sql:
+            event_data["compiled_sql"] = compiled_sql
+        if getattr(self, "_upstream_failure_skip", False):
+            event_data["upstream_failure_skip"] = True
+        if self._test_result_summary:
+            event_data["test_result_summary"] = self._test_result_summary.to_dict()
+        return event_data
+
     async def run(self) -> AsyncIterator[TriggerEvent]:
         logger.info("Starting WatcherTrigger for model: %s", self.model_unique_id)
         await self._log_startup_events()
@@ -258,14 +269,7 @@ class WatcherTrigger(BaseTrigger):
                 # Surface a node failure only once the producer has terminated. While it is still
                 # running, fall through to the sleep below and keep polling. See #2947.
                 logger.warning("dbt node '%s' failed", self.model_unique_id)
-                event_data: dict[str, Any] = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
-                if compiled_sql:
-                    event_data["compiled_sql"] = compiled_sql
-                if getattr(self, "_upstream_failure_skip", False):
-                    event_data["upstream_failure_skip"] = True
-                if self._test_result_summary:
-                    event_data["test_result_summary"] = self._test_result_summary.to_dict()
-                yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
+                yield TriggerEvent(self._build_node_failed_event(compiled_sql))  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == ProducerTaskState.FAILED:
                 logger.error(

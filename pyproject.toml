@@ -186,7 +186,7 @@ dbt = ["1.8", "1.9", "1.10", "1.11", "1.12", "2.0-dbt-fusion"]
 [[tool.hatch.envs.tests.matrix]]
 python = ["3.11", "3.12", "3.13", "3.14"]
 airflow = ["3.4"]
-dbt = ["1.8", "1.9", "1.10", "1.11", "1.12", "2.0"]
+dbt = ["1.8", "1.9", "1.10", "1.11", "1.12", "2.0-dbt-fusion"]
 
 [tool.hatch.envs.tests.overrides]
 matrix.airflow.dependencies = [

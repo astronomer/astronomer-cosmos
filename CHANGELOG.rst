@@ -60,6 +60,8 @@ Bug Fixes
 * Fall back to subprocess in the ``ExecutionMode.WATCHER`` producer on dbt (oss) 2.0 by @fpiped in #2998
 * Parse dbt JSON log output when extracting error and warning messages in subprocess mode by @ieCecchetti in #3072
 * Use ``EmptyOperator`` for freshness tasks of test-only sources, which now carry the dbt owner when owner inheritance is enabled by @JH0917 in #3044
+* Keep the Airflow DAGs folder out of dbt's plugin discovery path by @pankajkoti in #2893
+* Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn by @pankajkoti in #2978
 
 Docs
 

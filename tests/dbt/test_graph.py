@@ -1909,6 +1909,46 @@ def test_update_node_dependency_test_not_exist():
         assert nodes.has_non_detached_test is False
 
 
+EXCLUDED_TESTS_PROJECT = DBT_PROJECTS_ROOT_DIR / "excluded_tests"
+
+
+@pytest.mark.parametrize(
+    "render_config_args",
+    [
+        {"select": ["path:models"], "exclude": ["tag:excluded"]},
+        {"exclude": ["tag:excluded"]},
+        {"selector": "models_without_excluded_tests"},
+    ],
+)
+def test_update_node_dependency_does_not_add_back_excluded_tests(render_config_args):
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(
+            dbt_project_path=EXCLUDED_TESTS_PROJECT,
+            manifest_path=EXCLUDED_TESTS_PROJECT / "target/manifest.json",
+        ),
+        execution_config=ExecutionConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=EXCLUDED_TESTS_PROJECT / "profiles.yml",
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, **render_config_args),
+    )
+    dbt_graph.load()
+
+    rendered_tests = {
+        node_id for node_id, node in dbt_graph.filtered_nodes.items() if node.resource_type == DbtResourceType.TEST
+    }
+    assert rendered_tests == {
+        "test.excluded_tests.kept_singular_test",
+        "test.excluded_tests.not_null_model_a_id.1e928b9f1f",
+    }
+    assert dbt_graph.tests_per_model["model.excluded_tests.model_a"] == [
+        "test.excluded_tests.kept_singular_test",
+        "test.excluded_tests.not_null_model_a_id.1e928b9f1f",
+    ]
+
+
 def test_tests_per_model_populated():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST

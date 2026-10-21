@@ -1,0 +1,659 @@
+{
+  "child_map": {
+    "model.excluded_tests.model_a": [
+      "model.excluded_tests.model_b",
+      "test.excluded_tests.excluded_singular_test",
+      "test.excluded_tests.kept_singular_test",
+      "test.excluded_tests.not_null_model_a_id.1e928b9f1f",
+      "test.excluded_tests.unique_model_a_id.94b83a3ca6"
+    ],
+    "model.excluded_tests.model_b": [],
+    "test.excluded_tests.excluded_singular_test": [],
+    "test.excluded_tests.kept_singular_test": [],
+    "test.excluded_tests.not_null_model_a_id.1e928b9f1f": [],
+    "test.excluded_tests.unique_model_a_id.94b83a3ca6": []
+  },
+  "disabled": {},
+  "docs": {
+    "doc.dbt.__overview__": {
+      "block_contents": "### Welcome!\n\nWelcome to the auto-generated documentation for your dbt project!\n\n### Navigation\n\nYou can use the `Project` and `Database` navigation tabs on the left side of the window to explore the models\nin your project.\n\n#### Project Tab\nThe `Project` tab mirrors the directory structure of your dbt project. In this tab, you can see all of the\nmodels defined in your dbt project, as well as models imported from dbt packages.\n\n#### Database Tab\nThe `Database` tab also exposes your models, but in a format that looks more like a database explorer. This view\nshows relations (tables and views) grouped into database schemas. Note that ephemeral models are _not_ shown\nin this interface, as they do not exist in the database.\n\n### Graph Exploration\nYou can click the blue icon on the bottom-right corner of the page to view the lineage graph of your models.\n\nOn model pages, you'll see the immediate parents and children of the model you're exploring. By clicking the `Expand`\nbutton at the top-right of this lineage pane, you'll be able to see all of the models that are used to build,\nor are built from, the model you're exploring.\n\nOnce expanded, you'll be able to use the `--select` and `--exclude` model selection syntax to filter the\nmodels in the graph. For more information on model selection, check out the [dbt docs](https://docs.getdbt.com/docs/model-selection-syntax).\n\nNote that you can also right-click on models to interactively filter and explore the graph.\n\n---\n\n### More information\n\n- [What is dbt](https://docs.getdbt.com/docs/introduction)?\n- Read the [dbt viewpoint](https://docs.getdbt.com/docs/viewpoint)\n- [Installation](https://docs.getdbt.com/docs/installation)\n- Join the [dbt Community](https://www.getdbt.com/community/) for questions and discussion",
+      "name": "__overview__",
+      "original_file_path": "docs/overview.md",
+      "package_name": "dbt",
+      "path": "overview.md",
+      "resource_type": "doc",
+      "unique_id": "doc.dbt.__overview__"
+    }
+  },
+  "exposures": {},
+  "functions": {},
+  "group_map": {},
+  "groups": {},
+  "macros": {},
+  "metadata": {
+    "adapter_type": "postgres",
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+    "dbt_version": "1.11.6",
+    "env": {},
+    "generated_at": "2026-10-21T08:20:41.411541Z",
+    "invocation_id": "8b1e00d4-59b1-43c7-9995-9aaee63706d5",
+    "invocation_started_at": "2026-10-21T08:20:39.154637Z",
+    "project_id": "d5b9ab06eb03f151453d95d9a595937e",
+    "project_name": "excluded_tests",
+    "quoting": {
+      "column": null,
+      "database": true,
+      "identifier": true,
+      "schema": true
+    },
+    "run_started_at": "2026-10-21T08:20:39.155631+00:00",
+    "send_anonymous_usage_stats": true,
+    "user_id": null
+  },
+  "metrics": {},
+  "nodes": {
+    "model.excluded_tests.model_a": {
+      "access": "protected",
+      "alias": "model_a",
+      "build_path": null,
+      "checksum": {
+        "checksum": "3ea0f972fa1b56aa2dc2f56ee784b6a5796312f9a813d59ae70fd8855f10d16d",
+        "name": "sha256"
+      },
+      "columns": {
+        "id": {
+          "config": {
+            "meta": {},
+            "tags": []
+          },
+          "constraints": [],
+          "data_type": null,
+          "description": "",
+          "doc_blocks": [],
+          "granularity": null,
+          "meta": {},
+          "name": "id",
+          "quote": null,
+          "tags": []
+        }
+      },
+      "compiled_path": null,
+      "config": {
+        "access": "protected",
+        "alias": null,
+        "batch_size": null,
+        "begin": null,
+        "column_types": {},
+        "concurrent_batches": null,
+        "contract": {
+          "alias_types": true,
+          "enforced": false
+        },
+        "database": null,
+        "docs": {
+          "node_color": null,
+          "show": true
+        },
+        "enabled": true,
+        "event_time": null,
+        "freshness": null,
+        "full_refresh": null,
+        "grants": {},
+        "group": null,
+        "incremental_strategy": null,
+        "lookback": 1,
+        "materialized": "view",
+        "meta": {},
+        "on_configuration_change": "apply",
+        "on_schema_change": "ignore",
+        "packages": [],
+        "persist_docs": {},
+        "post-hook": [],
+        "pre-hook": [],
+        "quoting": {},
+        "schema": null,
+        "tags": [],
+        "unique_key": null
+      },
+      "constraints": [],
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792570842.076947,
+      "database": "x",
+      "depends_on": {
+        "macros": [],
+        "nodes": []
+      },
+      "deprecation_date": null,
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "excluded_tests",
+        "model_a"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "latest_version": null,
+      "meta": {},
+      "metrics": [],
+      "name": "model_a",
+      "original_file_path": "models/model_a.sql",
+      "package_name": "excluded_tests",
+      "patch_path": "excluded_tests://models/schema.yml",
+      "path": "model_a.sql",
+      "primary_key": [
+        "id"
+      ],
+      "raw_code": "select 1 as id",
+      "refs": [],
+      "relation_name": "\"x\".\"x\".\"model_a\"",
+      "resource_type": "model",
+      "schema": "x",
+      "sources": [],
+      "tags": [],
+      "time_spine": null,
+      "unique_id": "model.excluded_tests.model_a",
+      "unrendered_config": {
+        "materialized": "view"
+      },
+      "version": null
+    },
+    "model.excluded_tests.model_b": {
+      "access": "protected",
+      "alias": "model_b",
+      "build_path": null,
+      "checksum": {
+        "checksum": "48c279eb862928fc9bbd8699b9585be0c92953e669256b0776ff4292d386eafa",
+        "name": "sha256"
+      },
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "access": "protected",
+        "alias": null,
+        "batch_size": null,
+        "begin": null,
+        "column_types": {},
+        "concurrent_batches": null,
+        "contract": {
+          "alias_types": true,
+          "enforced": false
+        },
+        "database": null,
+        "docs": {
+          "node_color": null,
+          "show": true
+        },
+        "enabled": true,
+        "event_time": null,
+        "freshness": null,
+        "full_refresh": null,
+        "grants": {},
+        "group": null,
+        "incremental_strategy": null,
+        "lookback": 1,
+        "materialized": "view",
+        "meta": {},
+        "on_configuration_change": "apply",
+        "on_schema_change": "ignore",
+        "packages": [],
+        "persist_docs": {},
+        "post-hook": [],
+        "pre-hook": [],
+        "quoting": {},
+        "schema": null,
+        "tags": [],
+        "unique_key": null
+      },
+      "constraints": [],
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792570841.952845,
+      "database": "x",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.excluded_tests.model_a"
+        ]
+      },
+      "deprecation_date": null,
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "excluded_tests",
+        "model_b"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "latest_version": null,
+      "meta": {},
+      "metrics": [],
+      "name": "model_b",
+      "original_file_path": "models/model_b.sql",
+      "package_name": "excluded_tests",
+      "patch_path": null,
+      "path": "model_b.sql",
+      "primary_key": [],
+      "raw_code": "select id from {{ ref('model_a') }}",
+      "refs": [
+        {
+          "name": "model_a",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": "\"x\".\"x\".\"model_b\"",
+      "resource_type": "model",
+      "schema": "x",
+      "sources": [],
+      "tags": [],
+      "time_spine": null,
+      "unique_id": "model.excluded_tests.model_b",
+      "unrendered_config": {
+        "materialized": "view"
+      },
+      "version": null
+    },
+    "test.excluded_tests.excluded_singular_test": {
+      "alias": "excluded_singular_test",
+      "build_path": null,
+      "checksum": {
+        "checksum": "765207ebe9512f5b1623f994d7484bfe936d06d0a9e9ec0e3cb466e2bdf94094",
+        "name": "sha256"
+      },
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [
+          "excluded"
+        ],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792570842.022794,
+      "database": "x",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.excluded_tests.model_a"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "excluded_tests",
+        "excluded_singular_test"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "excluded_singular_test",
+      "original_file_path": "tests/excluded_singular_test.sql",
+      "package_name": "excluded_tests",
+      "patch_path": null,
+      "path": "excluded_singular_test.sql",
+      "raw_code": "{{ config(tags=['excluded']) }}\n\nselect id from {{ ref('model_a') }} where id < 0",
+      "refs": [
+        {
+          "name": "model_a",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "x_dbt_test__audit",
+      "sources": [],
+      "tags": [
+        "excluded"
+      ],
+      "unique_id": "test.excluded_tests.excluded_singular_test",
+      "unrendered_config": {
+        "tags": [
+          "excluded"
+        ]
+      }
+    },
+    "test.excluded_tests.kept_singular_test": {
+      "alias": "kept_singular_test",
+      "build_path": null,
+      "checksum": {
+        "checksum": "c673e001647db9c3e97d59ed1dad094014a4927217c4afeee2cc0312dc1c0ed9",
+        "name": "sha256"
+      },
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792570842.030365,
+      "database": "x",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.excluded_tests.model_a"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "excluded_tests",
+        "kept_singular_test"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "kept_singular_test",
+      "original_file_path": "tests/kept_singular_test.sql",
+      "package_name": "excluded_tests",
+      "patch_path": null,
+      "path": "kept_singular_test.sql",
+      "raw_code": "select id from {{ ref('model_a') }} where id < 0",
+      "refs": [
+        {
+          "name": "model_a",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "x_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "unique_id": "test.excluded_tests.kept_singular_test",
+      "unrendered_config": {}
+    },
+    "test.excluded_tests.not_null_model_a_id.1e928b9f1f": {
+      "alias": "not_null_model_a_id",
+      "attached_node": "model.excluded_tests.model_a",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "id",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792570842.114156,
+      "database": "x",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.excluded_tests.model_a"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "models.model_a",
+      "fqn": [
+        "excluded_tests",
+        "not_null_model_a_id"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "not_null_model_a_id",
+      "original_file_path": "models/schema.yml",
+      "package_name": "excluded_tests",
+      "patch_path": null,
+      "path": "not_null_model_a_id.sql",
+      "raw_code": "{{ test_not_null(**_dbt_generic_test_kwargs) }}",
+      "refs": [
+        {
+          "name": "model_a",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "x_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "id",
+          "model": "{{ get_where_subquery(ref('model_a')) }}"
+        },
+        "name": "not_null",
+        "namespace": null
+      },
+      "unique_id": "test.excluded_tests.not_null_model_a_id.1e928b9f1f",
+      "unrendered_config": {}
+    },
+    "test.excluded_tests.unique_model_a_id.94b83a3ca6": {
+      "alias": "unique_model_a_id",
+      "attached_node": "model.excluded_tests.model_a",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "id",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [
+          "excluded"
+        ],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792570842.1154041,
+      "database": "x",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.excluded_tests.model_a"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "models.model_a",
+      "fqn": [
+        "excluded_tests",
+        "unique_model_a_id"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "unique_model_a_id",
+      "original_file_path": "models/schema.yml",
+      "package_name": "excluded_tests",
+      "patch_path": null,
+      "path": "unique_model_a_id.sql",
+      "raw_code": "{{ test_unique(**_dbt_generic_test_kwargs) }}{{ config(tags=['excluded']) }}",
+      "refs": [
+        {
+          "name": "model_a",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "x_dbt_test__audit",
+      "sources": [],
+      "tags": [
+        "excluded"
+      ],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "id",
+          "model": "{{ get_where_subquery(ref('model_a')) }}"
+        },
+        "name": "unique",
+        "namespace": null
+      },
+      "unique_id": "test.excluded_tests.unique_model_a_id.94b83a3ca6",
+      "unrendered_config": {
+        "tags": [
+          "excluded"
+        ]
+      }
+    }
+  },
+  "parent_map": {
+    "model.excluded_tests.model_a": [],
+    "model.excluded_tests.model_b": [
+      "model.excluded_tests.model_a"
+    ],
+    "test.excluded_tests.excluded_singular_test": [
+      "model.excluded_tests.model_a"
+    ],
+    "test.excluded_tests.kept_singular_test": [
+      "model.excluded_tests.model_a"
+    ],
+    "test.excluded_tests.not_null_model_a_id.1e928b9f1f": [
+      "model.excluded_tests.model_a"
+    ],
+    "test.excluded_tests.unique_model_a_id.94b83a3ca6": [
+      "model.excluded_tests.model_a"
+    ]
+  },
+  "saved_queries": {},
+  "selectors": {
+    "models_without_excluded_tests": {
+      "definition": {
+        "union": [
+          {
+            "method": "path",
+            "value": "models"
+          },
+          {
+            "exclude": [
+              {
+                "method": "tag",
+                "value": "excluded"
+              }
+            ]
+          }
+        ]
+      },
+      "name": "models_without_excluded_tests"
+    }
+  },
+  "semantic_models": {},
+  "sources": {},
+  "unit_tests": {}
+}

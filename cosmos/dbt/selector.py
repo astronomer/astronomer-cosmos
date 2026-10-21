@@ -710,11 +710,12 @@ class NodeSelector:
 
         self.visited_nodes.add(node_id)
 
-        # Disclaimer: this method currently copies the tags from parent nodes to children nodes
-        # that are tests. This can lead to incorrect results in graph node selectors such as reported in
+        # Disclaimer: this method currently adds the tags of the first parent node to tests, keeping the tests'
+        # own tags. This can lead to incorrect results in graph node selectors such as reported in
         # https://github.com/astronomer/astronomer-cosmos/pull/1466
         if node.resource_type == DbtResourceType.TEST and node.depends_on and len(node.depends_on) > 0:
-            node.tags = getattr(self.nodes.get(node.depends_on[0]), "tags", [])
+            parent_tags = getattr(self.nodes.get(node.depends_on[0]), "tags", [])
+            node.tags = list(dict.fromkeys([*node.tags, *parent_tags]))
             logger.debug(
                 "The test node <%s> inherited these tags from the parent node <%s>: %s",
                 node_id,

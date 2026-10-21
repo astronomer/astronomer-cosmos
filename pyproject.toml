@@ -208,6 +208,8 @@ test-integration-dbt-1-8 = 'sh scripts/test/integration-dbt-1-8.sh'
 test-integration-dbt-async = 'sh scripts/test/integration-dbt-async.sh {matrix:dbt}'
 test-integration-dbt-loom = 'sh scripts/test/integration-dbt-loom.sh {matrix:dbt}'
 test-integration-expensive = 'sh scripts/test/integration-expensive.sh'
+test-integration-warehouse = 'sh scripts/test/integration-warehouse.sh {args}'
+test-integration-warehouse-setup = 'sh scripts/test/integration-warehouse-setup.sh {matrix:airflow} {matrix:dbt}'
 test-telemetry = 'sh scripts/test/telemetry.sh'
 
 test-performance = 'sh scripts/test/performance.sh'

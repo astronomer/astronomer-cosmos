@@ -20,6 +20,7 @@ from jwt import InvalidTokenError
 
 VALID_TOKEN = "valid-token"
 DBT_DOCS_ROUTES = ("/core/dbt_docs", "/core/dbt_docs_index.html", "/core/manifest.json", "/core/catalog.json")
+FASTAPI_BUILTIN_ROUTES = ("/openapi.json", "/docs", "/redoc")
 SECRET_MODEL_SQL = "select credit_card_number from customers"
 
 skip_airflow_without_jwt_cookie_support = pytest.mark.skipif(
@@ -102,15 +103,22 @@ def test_user_without_website_access_is_forbidden(client: TestClient, auth_manag
 def test_invalid_token_is_rejected(client: TestClient, auth_manager: MagicMock):
     response = client.get("/core/manifest.json", headers={"Authorization": "Bearer stale-token"})
 
-    assert response.status_code in (401, 403)
+    assert response.status_code == 403
     assert SECRET_MODEL_SQL not in response.text
 
 
-def test_routes_are_denied_when_airflow_auth_helpers_are_missing(docs_dir: Path, auth_manager: MagicMock):
+def test_routes_are_denied_when_airflow_auth_helpers_are_missing(
+    docs_dir: Path, auth_manager: MagicMock, caplog: pytest.LogCaptureFixture
+):
     import cosmos.plugin.airflow3 as af3
 
-    with patch.dict(sys.modules, {"airflow.api_fastapi.core_api.security": None}):
+    with (
+        patch.dict(sys.modules, {"airflow.api_fastapi.core_api.security": None}),
+        caplog.at_level(logging.WARNING),
+    ):
         dependencies = af3.airflow3_auth.dbt_docs_auth_dependencies()
+
+    assert "airflow.api_fastapi.core_api.security" in caplog.text
 
     with (
         patch.object(af3.airflow3_auth, "dbt_docs_auth_dependencies", return_value=dependencies),
@@ -121,6 +129,26 @@ def test_routes_are_denied_when_airflow_auth_helpers_are_missing(docs_dir: Path,
     response = client.get("/core/manifest.json", headers={"Authorization": f"Bearer {VALID_TOKEN}"})
     assert response.status_code == 403
     assert SECRET_MODEL_SQL not in response.text
+
+
+def test_fastapi_builtin_routes_are_disabled(client: TestClient, auth_manager: MagicMock):
+    for route in FASTAPI_BUILTIN_ROUTES:
+        assert client.get(route).status_code == 404, route
+        assert client.get(route, headers={"Authorization": f"Bearer {VALID_TOKEN}"}).status_code == 404, route
+
+
+def test_plugin_registers_no_app_without_projects():
+    import cosmos.plugin.airflow3 as af3
+
+    with (
+        patch.object(af3, "_load_projects_from_conf", return_value={}),
+        patch.object(af3, "create_cosmos_fastapi_app") as create_cosmos_fastapi_app,
+    ):
+        plugin = af3.CosmosAF3Plugin()
+
+    create_cosmos_fastapi_app.assert_not_called()
+    assert plugin.fastapi_apps == []
+    assert plugin.external_views == []
 
 
 def test_plugin_still_registers_the_dbt_docs_menu_entry(docs_dir: Path):
@@ -147,9 +175,25 @@ def test_plugin_warns_that_airflow_310_cannot_open_dbt_docs(
 
     with (
         patch.object(af3, "AIRFLOW_VERSION", Version(running_airflow_version)),
+        patch.object(af3, "_airflow_310_docs_warning_logged", False),
         patch.object(af3, "_load_projects_from_conf", return_value={"core": {"dir": str(docs_dir)}}),
         caplog.at_level(logging.WARNING),
     ):
         af3.CosmosAF3Plugin()
 
     assert ("upgrade to Airflow >= 3.1.1" in caplog.text) is warns
+
+
+def test_airflow_310_warning_is_logged_once_per_process(docs_dir: Path, caplog: pytest.LogCaptureFixture):
+    import cosmos.plugin.airflow3 as af3
+
+    with (
+        patch.object(af3, "AIRFLOW_VERSION", Version("3.1.0")),
+        patch.object(af3, "_airflow_310_docs_warning_logged", False),
+        patch.object(af3, "_load_projects_from_conf", return_value={"core": {"dir": str(docs_dir)}}),
+        caplog.at_level(logging.WARNING),
+    ):
+        af3.CosmosAF3Plugin()
+        af3.CosmosAF3Plugin()
+
+    assert caplog.text.count("upgrade to Airflow >= 3.1.1") == 1

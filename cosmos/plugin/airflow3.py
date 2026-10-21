@@ -133,7 +133,13 @@ def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
 
 def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     ensure_airflow_version_supported()
-    app = FastAPI(dependencies=airflow3_auth.dbt_docs_auth_dependencies())
+    # FastAPI registers /openapi.json, /docs and /redoc without the app-wide dependencies, so they would be served unauthenticated.
+    app = FastAPI(
+        dependencies=airflow3_auth.dbt_docs_auth_dependencies(),
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
 
     projects = _load_projects_from_conf()
 
@@ -291,6 +297,21 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     return app
 
 
+_airflow_310_docs_warning_logged = False
+
+
+def _warn_once_that_airflow_310_cannot_open_dbt_docs() -> None:
+    global _airflow_310_docs_warning_logged
+    if _airflow_310_docs_warning_logged:
+        return
+    _airflow_310_docs_warning_logged = True
+    # The Airflow 3.1.0 UI deletes its session cookie after login, so the browser cannot authenticate to plugin routes.
+    logger.warning(
+        "Cosmos dbt docs require an authenticated user, which the Airflow 3.1.0 UI cannot provide to plugin "
+        "views; upgrade to Airflow >= 3.1.1 to open dbt docs from the Airflow UI."
+    )
+
+
 class CosmosAF3Plugin(AirflowPlugin):
     name = "cosmos"
 
@@ -309,6 +330,9 @@ class CosmosAF3Plugin(AirflowPlugin):
                 "Cosmos dbt docs views require Airflow >= 3.1 (running %s); skipping them.", airflow.__version__
             )
             return
+        projects = _load_projects_from_conf()
+        if not projects:
+            return
         # Initialize FastAPI app only after version support is confirmed
         self.fastapi_apps = [
             {
@@ -317,13 +341,8 @@ class CosmosAF3Plugin(AirflowPlugin):
                 "url_prefix": "/cosmos",
             }
         ]
-        projects = _load_projects_from_conf()
-        if projects and Version(AIRFLOW_VERSION.base_version) == Version("3.1.0"):
-            # The Airflow 3.1.0 UI deletes its session cookie after login, so the browser cannot authenticate to plugin routes.
-            logger.warning(
-                "Cosmos dbt docs require an authenticated user, which the Airflow 3.1.0 UI cannot provide to plugin "
-                "views; upgrade to Airflow >= 3.1.1 to open dbt docs from the Airflow UI."
-            )
+        if Version(AIRFLOW_VERSION.base_version) == Version("3.1.0"):
+            _warn_once_that_airflow_310_cannot_open_dbt_docs()
         # Instance-level list: Airflow 3 can instantiate the plugin more than once per process
         self.external_views = []
         for slug, cfg in projects.items():

@@ -24,8 +24,10 @@ def dbt_docs_auth_dependencies() -> list[Any]:
     try:
         from airflow.api_fastapi.auth.managers.models.resource_details import AccessView
         from airflow.api_fastapi.core_api.security import requires_access_view
-    except ImportError:
-        logger.warning("Airflow API auth helpers are unavailable: denying access to the Cosmos dbt docs routes.")
+    except ImportError as error:
+        logger.warning(
+            "Airflow API auth helpers are unavailable (%s): denying access to the Cosmos dbt docs routes.", error
+        )
         return [Depends(_forbid)]
 
     return [Depends(requires_access_view(AccessView.WEBSITE))]

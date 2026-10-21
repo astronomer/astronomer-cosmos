@@ -137,7 +137,7 @@ class DbtTestWatcherGcpGkeOperator(DbtConsumerWatcherGcpGkeSensor):
     once every test for a given model has reported, pushes a single
     aggregated XCom under the key returned by ``get_tests_status_xcom_key(model_uid)``:
     a dict with ``status`` (``"pass"`` or ``"fail"``), ``passed_count``, ``failed_count``,
-    ``total_count`` and up to ``MAX_FAILED_TESTS_IN_SUMMARY`` ``failed_tests`` unique_ids.
+    ``skipped_count``, ``total_count`` and up to ``MAX_FAILED_TESTS_IN_SUMMARY`` ``failed_tests`` unique_ids.
     The key sanitizes the dbt
     model unique ID by replacing ``.`` with ``__`` before appending
     ``_tests_status`` (for example,

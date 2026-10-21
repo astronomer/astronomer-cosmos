@@ -142,6 +142,7 @@ class TestWatcherTrigger:
             "status": "fail",
             "passed_count": 1,
             "failed_count": 1,
+            "skipped_count": 0,
             "total_count": 2,
             "failed_tests": ["test.pkg.b"],
         }
@@ -170,6 +171,7 @@ class TestWatcherTrigger:
             "status": "fail",
             "passed_count": 1,
             "failed_count": 1,
+            "skipped_count": 0,
             "total_count": 2,
             "failed_tests": ["test.pkg.b"],
         }
@@ -544,6 +546,7 @@ class TestBuildSuccessEvent:
             "status": "pass",
             "passed_count": 2,
             "failed_count": 0,
+            "skipped_count": 0,
             "total_count": 2,
             "failed_tests": [],
         }

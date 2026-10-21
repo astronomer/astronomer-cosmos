@@ -60,6 +60,7 @@ class TestTestResultSummaryClass:
             "status": "pass",
             "passed_count": 2,
             "failed_count": 0,
+            "skipped_count": 0,
             "total_count": 2,
             "failed_tests": [],
         }
@@ -84,6 +85,10 @@ class TestTestResultSummaryClass:
         failed_tests.append("test.pkg.c")
         assert summary.status is DbtTestStatus.FAIL
         assert summary.failed_tests == ("test.pkg.b",)
+
+    def test_from_dict_defaults_skipped_count_for_older_payloads(self):
+        summary = TestResultSummary.from_dict({"status": "pass", "passed_count": 1, "total_count": 1})
+        assert summary.skipped_count == 0
 
     def test_from_dict_raises_on_invalid_status(self):
         with pytest.raises(ValueError, match="Invalid TestResultSummary status"):
@@ -225,6 +230,30 @@ class TestGetAggregatedTestStatus:
         assert summary is not None
         assert summary.status == DbtTestStatus.FAIL
         assert summary.failed_tests == ("test.pkg.unique_orders_id",)
+
+    def test_counts_skipped_tests_separately_from_failed(self):
+        results: ResultsTestsPerModel = {
+            "model.pkg.orders": {"test.pkg.not_null_orders_id": "fail", "test.pkg.unique_orders_id": "skipped"}
+        }
+        summary = get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results)
+        assert summary is not None
+        assert summary.status == DbtTestStatus.FAIL
+        assert summary.passed_count == 0
+        assert summary.failed_count == 1
+        assert summary.skipped_count == 1
+        assert summary.total_count == 2
+        assert summary.failed_tests == ("test.pkg.not_null_orders_id",)
+
+    def test_returns_fail_when_tests_are_only_skipped(self):
+        results: ResultsTestsPerModel = {
+            "model.pkg.orders": {"test.pkg.not_null_orders_id": "pass", "test.pkg.unique_orders_id": "skipped"}
+        }
+        summary = get_aggregated_test_status("model.pkg.orders", TESTS_PER_MODEL, results)
+        assert summary is not None
+        assert summary.status == DbtTestStatus.FAIL
+        assert summary.failed_count == 0
+        assert summary.skipped_count == 1
+        assert summary.failed_tests == ()
 
     def test_caps_failed_tests_in_summary(self):
         test_ids = [f"test.pkg.test_{index}" for index in range(MAX_FAILED_TESTS_IN_SUMMARY + 2)]

@@ -681,6 +681,42 @@ class TestStoreDbtStatusFromLog:
         assert upstream_failure_skipped_ids == {"model.pkg.downstream_model"}
         assert ti.store.get("model__pkg__downstream_model_status") == {"status": "failed", "outlet_uris": []}
 
+    def test_store_dbt_resource_status_from_log_counts_upstream_failure_skipped_tests_as_skipped(self):
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        upstream_failure_skipped_ids: set[str] = set()
+        test_results_per_model: dict[str, dict[str, str]] = {}
+
+        for event_name in ("SkippingDetails", "NodeFinished"):
+            log_line = json.dumps(
+                {
+                    "info": {"name": event_name},
+                    "data": {
+                        "node_info": {
+                            "node_status": "skipped",
+                            "resource_type": "test",
+                            "unique_id": "test.pkg.not_null_downstream_id",
+                        }
+                    },
+                }
+            )
+            store_dbt_resource_status_from_log(
+                log_line,
+                {"context": ctx},
+                tests_per_model={"model.pkg.downstream_model": ["test.pkg.not_null_downstream_id"]},
+                test_results_per_model=test_results_per_model,
+                upstream_failure_skipped_ids=upstream_failure_skipped_ids,
+            )
+
+        assert ti.store.get("model__pkg__downstream_model_tests_status") == {
+            "status": "fail",
+            "passed_count": 0,
+            "failed_count": 0,
+            "skipped_count": 1,
+            "total_count": 1,
+            "failed_tests": [],
+        }
+
     def test_store_dbt_resource_status_from_log_keeps_plain_skips_as_skipped(self):
         """Plain skips are unchanged, including when no rewrite accumulator is passed."""
         ti = _MockTI()
@@ -3150,6 +3186,25 @@ class TestDbtTestWatcherOperator:
             sensor._log_test_result_summary(summary)
 
         assert any("(showing first 5 of 7)" in message for message in caplog.messages)
+
+    def test_log_test_result_summary_reports_skipped_tests(self, caplog):
+        sensor = self.make_sensor()
+        summary = TestResultSummary(
+            status=DbtTestStatus.FAIL,
+            passed_count=1,
+            failed_count=1,
+            total_count=3,
+            failed_tests=("test.pkg.unique_orders_id",),
+            skipped_count=1,
+        )
+
+        with caplog.at_level(logging.INFO):
+            sensor._log_test_result_summary(summary)
+
+        assert any(
+            f"1 out of 3 tests passed, 1 failed, 1 skipped for '{self.MODEL_UID}'" in message
+            for message in caplog.messages
+        )
 
     def test_poke_returns_false_when_no_status_yet(self):
         """When the aggregated test status has not been pushed yet, poke should return False."""

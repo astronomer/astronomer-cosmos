@@ -5,7 +5,12 @@ from threading import Lock
 from typing import Any, TypeAlias
 
 from cosmos.log import get_logger
-from cosmos.operators._watcher.state import DbtTestStatus, is_dbt_node_status_success, safe_xcom_push
+from cosmos.operators._watcher.state import (
+    DbtTestStatus,
+    is_dbt_node_status_skipped,
+    is_dbt_node_status_success,
+    safe_xcom_push,
+)
 
 logger = get_logger(__name__)
 
@@ -38,12 +43,14 @@ class TestResultSummary:
     failed_count: int
     total_count: int
     failed_tests: tuple[str, ...]
+    skipped_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status.value,
             "passed_count": self.passed_count,
             "failed_count": self.failed_count,
+            "skipped_count": self.skipped_count,
             "total_count": self.total_count,
             "failed_tests": list(self.failed_tests),
         }
@@ -59,6 +66,7 @@ class TestResultSummary:
             failed_count=data.get("failed_count", 0),
             total_count=data.get("total_count", 0),
             failed_tests=tuple(data.get("failed_tests", ())),
+            skipped_count=data.get("skipped_count", 0),
         )
 
 
@@ -125,8 +133,11 @@ def get_aggregated_test_status(
         )
         return None
     passed_count = sum(1 for s in collected.values() if is_dbt_node_status_success(s))
-    failed_tests = [tid for tid, s in collected.items() if not is_dbt_node_status_success(s)]
-    aggregated_status = DbtTestStatus.PASS if not failed_tests else DbtTestStatus.FAIL
+    skipped_count = sum(1 for s in collected.values() if is_dbt_node_status_skipped(s))
+    failed_tests = [
+        tid for tid, s in collected.items() if not is_dbt_node_status_success(s) and not is_dbt_node_status_skipped(s)
+    ]
+    aggregated_status = DbtTestStatus.PASS if passed_count == len(collected) else DbtTestStatus.FAIL
     logger.debug("Model '%s' has all tests reported. Aggregated result: %s", model_uid, aggregated_status)
     return TestResultSummary(
         status=aggregated_status,
@@ -134,6 +145,7 @@ def get_aggregated_test_status(
         failed_count=len(failed_tests),
         total_count=len(collected),
         failed_tests=tuple(failed_tests[:MAX_FAILED_TESTS_IN_SUMMARY]),
+        skipped_count=skipped_count,
     )
 
 

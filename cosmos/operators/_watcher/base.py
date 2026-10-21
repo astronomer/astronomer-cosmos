@@ -363,14 +363,14 @@ def store_dbt_resource_status_from_log(
         if context is not None:
             _store_startup_event_from_log(context["ti"], log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
-        dbt_node_status = node_info.get("node_status")
+        reported_dbt_node_status = node_info.get("node_status")
         dbt_node_resource_type = node_info.get("resource_type")
         unique_id = node_info.get("unique_id")
 
         # Rewrite "skipped" to "failed" when dbt skipped the node because an
         # upstream node failed (#2698). See _rewrite_upstream_failure_skip_status.
         dbt_node_status = _rewrite_upstream_failure_skip_status(
-            log_line, unique_id, dbt_node_status, upstream_failure_skipped_ids
+            log_line, unique_id, reported_dbt_node_status, upstream_failure_skipped_ids
         )
 
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
@@ -385,9 +385,9 @@ def store_dbt_resource_status_from_log(
                 )
                 return
             if dbt_node_resource_type == "test" and tests_per_model and test_results_per_model is not None:
-                logger.debug("Test '%s' finished with status '%s'", unique_id, dbt_node_status)
+                logger.debug("Test '%s' finished with status '%s'", unique_id, reported_dbt_node_status)
                 push_test_result_or_aggregate(
-                    unique_id, dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
+                    unique_id, reported_dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
                 )
             else:
                 # Lazily populate per-model outlet URIs from the manifest, but only when the
@@ -716,6 +716,7 @@ class BaseConsumerSensor(BaseSensorOperator):
 
     def _log_test_result_summary(self, summary: TestResultSummary) -> None:
         """Log a human-readable summary of test results for test sensors."""
+        skipped_note = f", {summary.skipped_count} skipped" if summary.skipped_count else ""
         if summary.failed_count:
             truncation_note = (
                 f" (showing first {MAX_FAILED_TESTS_IN_SUMMARY} of {summary.failed_count})"
@@ -723,19 +724,21 @@ class BaseConsumerSensor(BaseSensorOperator):
                 else ""
             )
             logger.info(
-                "%s out of %s tests passed, %s failed for '%s'. Failed%s: %s",
+                "%s out of %s tests passed, %s failed%s for '%s'. Failed%s: %s",
                 summary.passed_count,
                 summary.total_count,
                 summary.failed_count,
+                skipped_note,
                 self.model_unique_id,
                 truncation_note,
                 ", ".join(summary.failed_tests),
             )
         else:
             logger.info(
-                "%s out of %s tests passed for '%s'.",
+                "%s out of %s tests passed%s for '%s'.",
                 summary.passed_count,
                 summary.total_count,
+                skipped_note,
                 self.model_unique_id,
             )
 

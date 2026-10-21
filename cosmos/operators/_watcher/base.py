@@ -23,7 +23,14 @@ from cosmos.constants import (
 from cosmos.dbt.graph import DbtNode
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
-from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
+from cosmos.operators._watcher.aggregation import (
+    MAX_FAILED_TESTS_IN_SUMMARY,
+    ResultsTestsPerModel,
+    TestResultSummary,
+    TestsPerModel,
+    get_tests_status_xcom_key,
+    push_test_result_or_aggregate,
+)
 from cosmos.operators._watcher.state import (
     DbtNodeStatus,
     ProducerTaskState,
@@ -314,8 +321,8 @@ def store_dbt_resource_status_from_log(
     line: str,
     extra_kwargs: Any,
     *,
-    tests_per_model: dict[str, list[str]] | None = None,
-    test_results_per_model: dict[str, dict[str, str]] | None = None,
+    tests_per_model: TestsPerModel | None = None,
+    test_results_per_model: ResultsTestsPerModel | None = None,
     model_outlet_uris: dict[str, list[str]] | None = None,
     dataset_namespace: str | None = None,
     should_generate_model_uris: bool = True,
@@ -366,17 +373,16 @@ def store_dbt_resource_status_from_log(
         if context is not None:
             _store_startup_event_from_log(context["ti"], log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
-        dbt_node_status = node_info.get("node_status")
+        reported_dbt_node_status = node_info.get("node_status")
         dbt_node_resource_type = node_info.get("resource_type")
         unique_id = node_info.get("unique_id")
 
         # Rewrite "skipped" to "failed" when dbt skipped the node because an
         # upstream node failed (#2698). See _rewrite_upstream_failure_skip_status.
-        raw_node_status = dbt_node_status
         dbt_node_status = _rewrite_upstream_failure_skip_status(
-            log_line, unique_id, dbt_node_status, upstream_failure_skipped_ids
+            log_line, unique_id, reported_dbt_node_status, upstream_failure_skipped_ids
         )
-        is_upstream_failure_skip = dbt_node_status != raw_node_status
+        is_upstream_failure_skip = dbt_node_status != reported_dbt_node_status
 
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
@@ -390,9 +396,9 @@ def store_dbt_resource_status_from_log(
                 )
                 return
             if dbt_node_resource_type == "test" and tests_per_model and test_results_per_model is not None:
-                logger.debug("Test '%s' finished with status '%s'", unique_id, dbt_node_status)
+                logger.debug("Test '%s' finished with status '%s'", unique_id, reported_dbt_node_status)
                 push_test_result_or_aggregate(
-                    unique_id, dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
+                    unique_id, reported_dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
                 )
             else:
                 # Lazily populate per-model outlet URIs from the manifest, but only when the
@@ -467,6 +473,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         self.producer_task_id = producer_task_id
         self.deferrable = deferrable
         self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
+        self._test_result_summary: TestResultSummary | None = None
 
     @property
     def is_test_sensor(self) -> bool:
@@ -668,6 +675,10 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         _log_dbt_event(dbt_events)
 
+        test_result_summary = event.get("test_result_summary")
+        if self.is_test_sensor and test_result_summary:
+            self._log_test_result_summary(TestResultSummary.from_dict(test_result_summary))
+
         if status == EventStatus.SKIPPED:
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
@@ -718,6 +729,34 @@ class BaseConsumerSensor(BaseSensorOperator):
             self._fallback_to_non_watcher_run(try_number=context["ti"].try_number, context=context)
             return
 
+    def _log_test_result_summary(self, summary: TestResultSummary) -> None:
+        """Log a human-readable summary of test results for test sensors."""
+        skipped_note = f", {summary.skipped_count} skipped" if summary.skipped_count else ""
+        if summary.failed_count:
+            truncation_note = (
+                f" (showing first {MAX_FAILED_TESTS_IN_SUMMARY} of {summary.failed_count})"
+                if summary.failed_count > MAX_FAILED_TESTS_IN_SUMMARY
+                else ""
+            )
+            logger.info(
+                "%s out of %s tests passed, %s failed%s for '%s'. Failed%s: %s",
+                summary.passed_count,
+                summary.total_count,
+                summary.failed_count,
+                skipped_note,
+                self.model_unique_id,
+                truncation_note,
+                ", ".join(summary.failed_tests),
+            )
+        else:
+            logger.info(
+                "%s out of %s tests passed%s for '%s'.",
+                summary.passed_count,
+                summary.total_count,
+                skipped_note,
+                self.model_unique_id,
+            )
+
     def _log_startup_events(self, ti: Any) -> None:
         dbt_startup_events: list[dict[str, Any]] = ti.xcom_pull(
             task_ids=self.producer_task_id, key=_DBT_STARTUP_EVENTS_XCOM_KEY
@@ -741,7 +780,14 @@ class BaseConsumerSensor(BaseSensorOperator):
         ``self._upstream_failure_skip``.
         """
         if self.is_test_sensor:
-            return get_xcom_val(ti, self.producer_task_id, get_tests_status_xcom_key(self.model_unique_id))
+            xcom_val = get_xcom_val(ti, self.producer_task_id, get_tests_status_xcom_key(self.model_unique_id))
+            if xcom_val is None:
+                return None
+            if isinstance(xcom_val, dict):
+                self._test_result_summary = TestResultSummary.from_dict(xcom_val)
+                return self._test_result_summary.status
+            # Backward compatibility: plain string value
+            return xcom_val
         xcom_val = get_xcom_val(ti, self.producer_task_id, get_status_xcom_key(self.model_unique_id))
         if xcom_val is None:
             return None
@@ -892,6 +938,8 @@ class BaseConsumerSensor(BaseSensorOperator):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
+        if self.is_test_sensor and self._test_result_summary:
+            self._log_test_result_summary(self._test_result_summary)
         if is_dbt_node_status_success(status):
             return True
         raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")

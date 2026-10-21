@@ -35,6 +35,13 @@ def _isolate_env():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _bypass_dbt_docs_auth():
+    # Authentication is covered by test_plugin_af3_auth.py; these tests exercise the routes themselves.
+    with patch("cosmos.plugin.airflow3_auth.dbt_docs_auth_dependencies", return_value=[]):
+        yield
+
+
 def _reload_af3_module(api_base: str | None = None):
     # Reload module to recompute API_BASE_PATH under patched env
     with patch.dict(os.environ, {"AIRFLOW__API__BASE_URL": api_base or ""}, clear=False):
@@ -297,6 +304,7 @@ def test_plugin_init_warns_and_skips_views_on_pre_31(caplog):
     "af_ver, should_use_ctx",
     [
         ("3.1.0", True),
+        ("3.1.0+astro.2", True),
         ("3.1.1", False),
         ("3.1.2", False),
         ("3.2.0", False),

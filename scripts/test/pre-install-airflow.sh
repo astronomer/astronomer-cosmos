@@ -42,7 +42,7 @@ if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRF
       echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
       exit 1
     fi
-    # Other dbt minors (1.8-1.10, 2.0) have no per-Airflow lockfile; jobs needing
+    # Other dbt minors (1.8-1.10) and the dbt 2 lane (2.0-dbt-fusion) have no per-Airflow lockfile; jobs needing
     # them re-pin dbt in their own setup step, so this is just a throwaway baseline.
     echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline (this job must re-pin dbt itself)."
     REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"
@@ -78,8 +78,8 @@ elif [ "$AIRFLOW_VERSION" = "3.4" ] ; then
   # TEMP curation: `-U` floats importlib-metadata to 9.x, but the Airflow 3.4 core
   # tree (litellm) requires <9, so hold it on the 8.x line the constraints pin.
   # `~=$DBT_VERSION.0` pins the minor: a bare `~=1.11` would float to dbt-core 1.12.
-  # dbt Fusion (2.0) is installed separately and has no dbt-core 2.0 GA on PyPI, so
-  # bootstrap with the 1.11 baseline, as the lockfile fallback above does.
+  # The dbt 2 lane (2.0-dbt-fusion, the standalone dbt Fusion binary) is installed separately
+  # from dbt-core, so bootstrap with the 1.11 baseline, as the lockfile fallback above does.
   INSTALL_DBT_VERSION="$DBT_VERSION"
   case "$DBT_VERSION" in
     2.*)
@@ -150,7 +150,7 @@ fi
 # Installation of dbt in a separate Python virtual environment:
 # Cap dbt-core below 2.0. Previously dbt-loom (installed here) held dbt-core in
 # the 1.x range; with dbt-loom moved to the dedicated loom job, the bound is
-# explicit so `pip install -U` doesn't pull dbt-core 2.0 (Fusion), which lacks
+# explicit so `pip install -U` doesn't pull dbt-core 2.x (dbt OSS), which lacks
 # the postgres adapter the subprocess tests rely on.
 python -m venv venv-subprocess
 venv-subprocess/bin/pip install -U "dbt-core<2.0" dbt-postgres

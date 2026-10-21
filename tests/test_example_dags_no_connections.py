@@ -10,7 +10,7 @@ from packaging.version import Version
 from cosmos.constants import AIRFLOW_VERSION
 
 from . import utils as test_utils
-from .dbt_v2_enabled import dag_files_to_ignore
+from .dbt_oss_enabled import dag_files_to_ignore
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
@@ -32,7 +32,7 @@ def get_dag_bag() -> DagBag:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
 
-        # The dbt v2 job only runs the DAGs that are enabled for it (tests/dbt_v2_enabled.py); no-op elsewhere.
+        # The dbt-oss job only runs the DAGs that are enabled for it (tests/dbt_oss_enabled.py); no-op elsewhere.
         for dagfile in dag_files_to_ignore(EXAMPLE_DAGS_DIR):
             file.writelines([f"{dagfile}\n"])
 

@@ -1,6 +1,6 @@
-"""Create or delete the BigQuery dataset that one job of the dbt v2 workflow writes to.
+"""Create or delete the BigQuery dataset that one job of the dbt-oss workflow writes to.
 
-Usage, from ``.github/workflows/test-dbt-v2.yml`` (``-I`` keeps the working directory and ``PYTHONPATH`` off ``sys.path``)::
+Usage, from ``.github/workflows/test-dbt-oss.yml`` (``-I`` keeps the working directory and ``PYTHONPATH`` off ``sys.path``)::
 
     python -I scripts/test/bigquery_ci_dataset.py create
     python -I scripts/test/bigquery_ci_dataset.py delete
@@ -79,7 +79,11 @@ def create(dataset: str, max_start_jitter: float = MAX_START_JITTER_SECONDS) -> 
     time.sleep(random.uniform(0, max_start_jitter))
     new_dataset = bigquery.Dataset(f"{client.project}.{dataset}")
     new_dataset.default_table_expiration_ms = TABLE_EXPIRATION_MS
-    new_dataset.labels = {"ci": "cosmos", "workflow": "test-dbt-v2", "run-id": os.environ.get("GITHUB_RUN_ID", "local")}
+    new_dataset.labels = {
+        "ci": "cosmos",
+        "workflow": "test-dbt-oss",
+        "run-id": os.environ.get("GITHUB_RUN_ID", "local"),
+    }
     print(f"Creating BigQuery dataset {dataset}")
     client.create_dataset(new_dataset, exists_ok=True, retry=RETRY)
     # dbt would create a missing dataset itself, but BigQuery does not always make it visible straight away, which made

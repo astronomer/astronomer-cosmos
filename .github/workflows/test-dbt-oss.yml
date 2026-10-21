@@ -1,10 +1,10 @@
-name: test-dbt-v2
+name: test-dbt-oss
 
-# Integration tests for dbt v2 (dbt-oss). dbt v2 does not support the Postgres adapter that the tests in test.yml use, so
+# Integration tests for dbt-oss. dbt-oss does not support the Postgres adapter that the tests in test.yml use, so
 # this workflow runs the same integration tests (the ones marked ``integration``) against BigQuery instead. It loads the
-# tests/dbt_v2_plugin.py pytest plugin, which replaces the Postgres profile mapping used by the tests and the example
-# DAGs with a BigQuery one and skips the tests that need Postgres itself. tests/dbt_v2_enabled.py lists what runs here
-# while dbt v2 is rolled out one group at a time. test.yml is unchanged.
+# tests/dbt_oss_plugin.py pytest plugin, which replaces the Postgres profile mapping used by the tests and the example
+# DAGs with a BigQuery one and skips the tests that need Postgres itself. tests/dbt_oss_enabled.py lists what runs here
+# while dbt-oss is rolled out one group at a time. test.yml is unchanged.
 on:
   push: # Run on pushes to the default branch
     branches: [main, ci/run-integration-tests-dbt-oss] # TEMPORARY: revert before merge
@@ -120,7 +120,7 @@ jobs:
           done <<< "$FILES"
           echo "code_changed=$CODE_CHANGED" >> "$GITHUB_OUTPUT"
 
-  Run-dbt-v2-Tests:
+  Run-dbt-oss-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
@@ -137,7 +137,7 @@ jobs:
     env:
       # One BigQuery dataset per job, so concurrent jobs do not write to the same tables. The tests read it, and the last
       # step deletes it. The name only has ids, so it is a valid dataset name (no dots, unlike the matrix).
-      COSMOS_TEST_BIGQUERY_DATASET: cosmos_ci_${{ github.run_id }}_${{ github.run_attempt }}_v2_${{ strategy.job-index }}
+      COSMOS_TEST_BIGQUERY_DATASET: cosmos_ci_${{ github.run_id }}_${{ github.run_attempt }}_oss_${{ strategy.job-index }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -168,8 +168,8 @@ jobs:
         run: |
           hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_dataset.py create
 
-      - name: Make the example dbt projects compatible with dbt v2
-        # dbt v2 rejects what dbt 1.x accepts in these projects (materialized without +, test arguments outside
+      - name: Make the example dbt projects compatible with dbt-oss
+        # dbt-oss rejects what dbt 1.x accepts in these projects (materialized without +, test arguments outside
         # arguments:), so the DAGs and tests that use them cannot even parse. dbt-autofix, pinned, rewrites the checked out
         # files on this runner only; the repository and the other workflows are not touched.
         run: |
@@ -188,8 +188,8 @@ jobs:
           # altered_jaffle_shop/models/staging/sources.yml reads these two: point them at this job's BigQuery dataset.
           POSTGRES_DB: astronomer-dag-authoring
           POSTGRES_SCHEMA: ${{ env.COSMOS_TEST_BIGQUERY_DATASET }}
-          # Loaded only by this job; swaps the Postgres profile mapping for BigQuery and applies tests/dbt_v2_enabled.py.
-          PYTEST_PLUGINS: tests.dbt_v2_plugin
+          # Loaded only by this job; swaps the Postgres profile mapping for BigQuery and applies tests/dbt_oss_enabled.py.
+          PYTEST_PLUGINS: tests.dbt_oss_plugin
           # Summary of the failed, errored and skipped tests at the end of the run.
           PYTEST_ADDOPTS: -rfEs
           PYTEST_SPLITS: 3

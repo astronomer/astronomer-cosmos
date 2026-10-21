@@ -1,11 +1,11 @@
-"""Pytest plugin for the dbt v2 (dbt-oss) integration job, ``.github/workflows/test-dbt-v2.yml``.
+"""Pytest plugin for the dbt-oss integration job, ``.github/workflows/test-dbt-oss.yml``.
 
-dbt v2 does not support the Postgres adapter the integration tests are written for, so that job runs them against
-BigQuery. It loads this plugin through ``PYTEST_PLUGINS=tests.dbt_v2_plugin``, so no other job imports it: every
+dbt-oss does not support the Postgres adapter the integration tests are written for, so that job runs them against
+BigQuery. It loads this plugin through ``PYTEST_PLUGINS=tests.dbt_oss_plugin``, so no other job imports it: every
 ``PostgresUserPasswordProfileMapping`` built by the tests and the example DAGs becomes a BigQuery mapping that writes
 to ``COSMOS_TEST_BIGQUERY_DATASET``, and the tests that need Postgres itself are skipped.
 
-Which example DAGs run, and which tests are skipped for dbt v2, is listed in ``tests/dbt_v2_enabled.py``.
+Which example DAGs run, and which tests are skipped for dbt-oss, is listed in ``tests/dbt_oss_enabled.py``.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from tests.dbt_v2_enabled import SKIPPED_TESTS
+from tests.dbt_oss_enabled import SKIPPED_TESTS
 
 # Tests that depend on Postgres itself (and not only on the profile) and so cannot run against BigQuery.
 POSTGRES_ONLY_TEST_FILES = {
@@ -59,6 +59,6 @@ def pytest_collection_modifyitems(items):
         if reason:
             reason = f"Requires Postgres: {reason}"
         elif item.nodeid in SKIPPED_TESTS:
-            reason = f"Not working with dbt v2 yet: {SKIPPED_TESTS[item.nodeid]}"
+            reason = f"Not working with dbt-oss yet: {SKIPPED_TESTS[item.nodeid]}"
         if reason:
             item.add_marker(pytest.mark.skip(reason=reason))

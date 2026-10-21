@@ -6,6 +6,7 @@ import logging
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
@@ -29,7 +30,10 @@ from cosmos.constants import (
     SourceRenderingBehavior,
 )
 from cosmos.dbt.graph import DbtNode
+from cosmos.exceptions import CosmosValueError
+from cosmos.operators._watcher.aggregation import TestResultSummary
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
+from cosmos.operators._watcher.state import DbtTestStatus
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
@@ -78,12 +82,12 @@ profile_config = ProfileConfig(
 
 class _MockTI:
     def __init__(self) -> None:
-        self.store: dict[str, str] = {}
+        self.store: dict[str, Any] = {}
         self.try_number = 1
         self.dag_id = "test_dag"
         self.task_id = "test_task"
 
-    def xcom_push(self, key: str, value: str, **_):
+    def xcom_push(self, key: str, value: Any, **_):
         self.store[key] = value
 
 
@@ -677,6 +681,42 @@ class TestStoreDbtStatusFromLog:
         assert upstream_failure_skipped_ids == {"model.pkg.downstream_model"}
         assert ti.store.get("model__pkg__downstream_model_status") == {"status": "failed", "outlet_uris": []}
 
+    def test_store_dbt_resource_status_from_log_counts_upstream_failure_skipped_tests_as_skipped(self):
+        ti = _MockTI()
+        ctx = {"ti": ti}
+        upstream_failure_skipped_ids: set[str] = set()
+        test_results_per_model: dict[str, dict[str, str]] = {}
+
+        for event_name in ("SkippingDetails", "NodeFinished"):
+            log_line = json.dumps(
+                {
+                    "info": {"name": event_name},
+                    "data": {
+                        "node_info": {
+                            "node_status": "skipped",
+                            "resource_type": "test",
+                            "unique_id": "test.pkg.not_null_downstream_id",
+                        }
+                    },
+                }
+            )
+            store_dbt_resource_status_from_log(
+                log_line,
+                {"context": ctx},
+                tests_per_model={"model.pkg.downstream_model": ["test.pkg.not_null_downstream_id"]},
+                test_results_per_model=test_results_per_model,
+                upstream_failure_skipped_ids=upstream_failure_skipped_ids,
+            )
+
+        assert ti.store.get("model__pkg__downstream_model_tests_status") == {
+            "status": "fail",
+            "passed_count": 0,
+            "failed_count": 0,
+            "skipped_count": 1,
+            "total_count": 1,
+            "failed_tests": [],
+        }
+
     def test_store_dbt_resource_status_from_log_keeps_plain_skips_as_skipped(self):
         """Plain skips are unchanged, including when no rewrite accumulator is passed."""
         ti = _MockTI()
@@ -852,7 +892,10 @@ class TestStoreDbtStatusFromLog:
             test_results_per_model=test_results_per_model,
         )
         assert "test__pkg__unique_orders_id_status" not in ti.store  # no per-test key
-        assert ti.store.get("model__pkg__orders_tests_status") == "pass"
+        aggregated = ti.store.get("model__pkg__orders_tests_status")
+        assert aggregated["status"] == "pass"
+        assert aggregated["passed_count"] == 2
+        assert aggregated["failed_count"] == 0
 
     def test_store_dbt_resource_status_from_log_aggregates_fail_when_any_test_fails(self):
         """When at least one test fails, the aggregated status should be 'fail'."""
@@ -878,7 +921,11 @@ class TestStoreDbtStatusFromLog:
                 test_results_per_model=test_results_per_model,
             )
 
-        assert ti.store.get("model__pkg__orders_tests_status") == "fail"
+        aggregated = ti.store.get("model__pkg__orders_tests_status")
+        assert aggregated["status"] == "fail"
+        assert aggregated["passed_count"] == 1
+        assert aggregated["failed_count"] == 1
+        assert aggregated["failed_tests"] == ["test.pkg.unique_orders_id"]
         # No per-test status keys should exist
         assert "test__pkg__not_null_orders_id_status" not in ti.store
         assert "test__pkg__unique_orders_id_status" not in ti.store
@@ -1160,6 +1207,34 @@ def test_producer_respects_explicit_invocation_mode():
 
     op2 = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=InvocationMode.DBT_RUNNER)
     assert op2.invocation_mode == InvocationMode.DBT_RUNNER
+
+
+@pytest.mark.parametrize(
+    "is_dbt_v2, expected_mode", [(True, InvocationMode.SUBPROCESS), (False, InvocationMode.DBT_RUNNER)]
+)
+@patch("cosmos.dbt.runner.is_available", return_value=True)
+def test_producer_discovery_falls_back_to_subprocess_on_dbt_v2(mock_is_available, is_dbt_v2, expected_mode):
+    """dbt-core 2.x's dbtRunner has no event callbacks, so discovery picks subprocess for the producer (#2993)."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2):
+        op._discover_invocation_mode()
+    assert op.invocation_mode == expected_mode
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
+def test_run_dbt_runner_rejects_dbt_v2(mock_is_dbt_v2):
+    """An explicit InvocationMode.DBT_RUNNER on dbt-core 2.x fails before dbt is invoked."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=InvocationMode.DBT_RUNNER)
+    context = {"ti": _MockTI(), "run_id": "run-1"}
+
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.run_dbt_runner") as mock_run,
+        pytest.raises(CosmosValueError, match="Use InvocationMode.SUBPROCESS"),
+    ):
+        op.run_dbt_runner(command=["dbt", "build"], env={}, cwd="/tmp/proj", context=context)
+
+    mock_run.assert_not_called()
+    assert not op._dbt_runner_callbacks
 
 
 @pytest.mark.parametrize(
@@ -3041,6 +3116,95 @@ class TestDbtTestWatcherOperator:
 
         with pytest.raises(AirflowException, match="Tests for model"):
             sensor.poke(context)
+
+    def test_poke_reads_summary_dict_and_logs_it(self, caplog):
+        sensor = self.make_sensor()
+        summary = {"status": "pass", "passed_count": 2, "failed_count": 0, "total_count": 2, "failed_tests": []}
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.side_effect = lambda *_, key=None, **__: summary if key == self.TESTS_STATUS_XCOM_KEY else None
+        context = self.make_context(ti)
+
+        with caplog.at_level(logging.INFO):
+            assert sensor.poke(context) is True
+
+        assert f"2 out of 2 tests passed for '{self.MODEL_UID}'." in caplog.messages
+
+    def test_poke_raises_and_logs_failed_tests_from_summary_dict(self, caplog):
+        sensor = self.make_sensor()
+        summary = {
+            "status": "fail",
+            "passed_count": 1,
+            "failed_count": 1,
+            "total_count": 2,
+            "failed_tests": ["test.pkg.unique_orders_id"],
+        }
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.side_effect = lambda *_, key=None, **__: summary if key == self.TESTS_STATUS_XCOM_KEY else None
+        context = self.make_context(ti)
+
+        with caplog.at_level(logging.INFO), pytest.raises(AirflowException, match="finished with status 'fail'"):
+            sensor.poke(context)
+
+        assert any(
+            "1 out of 2 tests passed, 1 failed" in message and "test.pkg.unique_orders_id" in message
+            for message in caplog.messages
+        )
+
+    def test_execute_complete_logs_summary_from_event(self, caplog):
+        sensor = self.make_sensor()
+        ti = MagicMock()
+        ti.xcom_pull.return_value = None
+        event = {
+            "status": "success",
+            "test_result_summary": {
+                "status": "pass",
+                "passed_count": 3,
+                "failed_count": 0,
+                "total_count": 3,
+                "failed_tests": [],
+            },
+        }
+
+        with caplog.at_level(logging.INFO):
+            sensor.execute_complete({"dag_run": MagicMock(), "ti": ti}, event)
+
+        assert f"3 out of 3 tests passed for '{self.MODEL_UID}'." in caplog.messages
+
+    def test_log_test_result_summary_notes_truncation(self, caplog):
+        sensor = self.make_sensor()
+        summary = TestResultSummary(
+            status=DbtTestStatus.FAIL,
+            passed_count=0,
+            failed_count=7,
+            total_count=7,
+            failed_tests=tuple(f"test.pkg.test_{index}" for index in range(5)),
+        )
+
+        with caplog.at_level(logging.INFO):
+            sensor._log_test_result_summary(summary)
+
+        assert any("(showing first 5 of 7)" in message for message in caplog.messages)
+
+    def test_log_test_result_summary_reports_skipped_tests(self, caplog):
+        sensor = self.make_sensor()
+        summary = TestResultSummary(
+            status=DbtTestStatus.FAIL,
+            passed_count=1,
+            failed_count=1,
+            total_count=3,
+            failed_tests=("test.pkg.unique_orders_id",),
+            skipped_count=1,
+        )
+
+        with caplog.at_level(logging.INFO):
+            sensor._log_test_result_summary(summary)
+
+        assert any(
+            f"1 out of 3 tests passed, 1 failed, 1 skipped for '{self.MODEL_UID}'" in message
+            for message in caplog.messages
+        )
 
     def test_poke_returns_false_when_no_status_yet(self):
         """When the aggregated test status has not been pushed yet, poke should return False."""

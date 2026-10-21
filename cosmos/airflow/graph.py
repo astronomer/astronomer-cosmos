@@ -4,7 +4,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 try:  # Airflow 3
     from airflow.sdk.bases.operator import BaseOperator
@@ -47,6 +47,9 @@ from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
+
+if TYPE_CHECKING:
+    from cosmos.operators._watcher.aggregation import TestsPerModel
 
 logger = get_logger(__name__)
 
@@ -532,7 +535,7 @@ def create_task_metadata(  # noqa: C901
                 resource_suffix=r"source",
                 execution_mode=execution_mode,
             )
-            if node.has_freshness is False and render_config.source_rendering_behavior == SourceRenderingBehavior.ALL:
+            if node.has_freshness is False:
                 # render sources without freshness as empty operators
                 # empty operator does not accept custom parameters (e.g., profile_args). recreate the args.
                 if "task_display_name" in args:
@@ -541,6 +544,7 @@ def create_task_metadata(  # noqa: C901
                     args = {}
                 return TaskMetadata(
                     id=task_id,
+                    owner=node.owner if render_config.enable_owner_inheritance else "",
                     operator_class=EMPTY_OPERATOR_CLASS_PATH,
                     arguments=args,
                 )
@@ -843,7 +847,7 @@ def _add_watcher_producer_task(
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
     execution_mode: ExecutionMode = ExecutionMode.WATCHER,
-    tests_per_model: dict[str, list[str]] | None = None,
+    tests_per_model: TestsPerModel | None = None,
 ) -> BaseOperator:
     """
     Create the producer task for the watcher execution mode and add it to the tasks_map.
@@ -1214,7 +1218,7 @@ def build_airflow_graph(
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
     async_py_requirements: list[str] | None = None,
     execution_config: ExecutionConfig | None = None,
-    tests_per_model: dict[str, list[str]] | None = None,
+    tests_per_model: TestsPerModel | None = None,
 ) -> dict[str, TaskGroup | BaseOperator]:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).

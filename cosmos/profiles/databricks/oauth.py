@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..base import BaseProfileMapping
+from .host import normalize_host
 
 
 class DatabricksOauthProfileMapping(BaseProfileMapping):
@@ -54,3 +55,6 @@ class DatabricksOauthProfileMapping(BaseProfileMapping):
             "client_secret": self.get_env_var_format("client_secret"),
             "client_id": self.get_env_var_format("client_id"),
         }
+
+    def transform_host(self, host: str) -> str:
+        return normalize_host(host)

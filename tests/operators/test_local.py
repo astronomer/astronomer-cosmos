@@ -9,6 +9,7 @@ import tempfile
 import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, call, mock_open, patch
+from urllib.parse import urlparse
 
 import pytest
 from airflow import DAG
@@ -107,6 +108,14 @@ def failing_test_dbt_project(tmp_path):
     shutil.copy(MINI_DBT_PROJ_DIR_FAILING_SCHEMA, target_schema)
     yield tmp_dir_path
     tmp_dir.cleanup()
+
+
+@pytest.fixture
+def failing_error_test_dbt_project(failing_test_dbt_project):
+    """Same as ``failing_test_dbt_project``, but the failing test has ``severity: error``."""
+    schema = failing_test_dbt_project / "models/schema.yml"
+    schema.write_text(schema.read_text().replace("severity: warn", "severity: error").replace("warn_if", "error_if"))
+    return failing_test_dbt_project
 
 
 class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
@@ -375,7 +384,7 @@ def test_dbt_base_operator_run_dbt_runner_cannot_import():
         project_dir="my/dir",
         invocation_mode=InvocationMode.DBT_RUNNER,
     )
-    expected_error_message = "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
+    expected_error_message = "Could not import dbt core. Ensure that dbt-core is installed and available in the environment where the operator is running."
     with patch.dict(sys.modules, {"dbt.cli.main": None}):
         with pytest.raises(CosmosDbtRunError, match=expected_error_message):
             dbt_base_operator.run_dbt_runner(command=["cmd"], env={}, cwd="some-project")
@@ -818,10 +827,13 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
 
     new_test_dag(dag)
     assert "Assigning outlets with DatasetAlias in Airflow 3" in caplog.text
-    assert (
-        "Outlets: [Asset(name='postgres://0.0.0.0:5432/postgres/public/stg_customers', uri='postgres://0.0.0.0:5432/postgres/public/stg_customers'"
-        in caplog.text
-    )
+    # The Asset URI host, port, and database name come from the example_conn connection, which
+    # differs between setups (0.0.0.0 on a runner, the service hostname inside a container). Derive
+    # them all so the assertion is host-agnostic.
+    conn = urlparse(os.environ.get("AIRFLOW_CONN_EXAMPLE_CONN", "postgres://user:pass@0.0.0.0:5432/postgres"))
+    db_name = conn.path.lstrip("/") or "postgres"
+    expected_asset = f"postgres://{conn.hostname}:{conn.port or 5432}/{db_name}/public/stg_customers"
+    assert f"Outlets: [Asset(name='{expected_asset}', uri='{expected_asset}'" in caplog.text
 
 
 @pytest.mark.integration
@@ -1219,6 +1231,44 @@ def test_run_test_operator_with_callback_and_trailing_dbt_output(failing_test_db
     context = on_warning_callback.call_args.args[0]
     assert context.get("test_names")
     assert context.get("test_results")
+
+
+@pytest.mark.integration
+def test_run_test_operator_subprocess_failure_exposes_failing_tests(failing_error_test_dbt_project):
+    """In SUBPROCESS mode the exception for a failing dbt test names the failing test and its detail. Issue #1806."""
+    raised: list[str] = []
+    original = DbtTestLocalOperator.handle_exception_subprocess
+
+    def capture(self, result):
+        try:
+            original(self, result)
+        except AirflowException as exc:
+            raised.append(str(exc))
+            raise
+
+    with DAG("test-failure-details-subprocess", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_error_test_dbt_project,
+            task_id="seed",
+            append_env=True,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_error_test_dbt_project,
+            task_id="test",
+            append_env=True,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        )
+        seed_operator >> test_operator
+
+    with patch.object(DbtTestLocalOperator, "handle_exception_subprocess", capture):
+        run_test_dag(dag, expected_dag_state=DagRunState.FAILED)
+
+    assert raised, "dbt test was expected to fail"
+    assert "accepted_values_mini_orders_status__placed" in raised[0]
+    assert "Got " in raised[0] and "results, configured to fail if" in raised[0]
 
 
 @pytest.mark.integration
@@ -1669,6 +1719,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
                 "vars",
                 "models",
                 "dbt_cmd_flags",
+                "emit_datasets",
                 "compiled_sql",
                 "freshness",
                 "install_deps",
@@ -1685,6 +1736,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
                 "vars",
                 "models",
                 "dbt_cmd_flags",
+                "emit_datasets",
                 "compiled_sql",
                 "freshness",
                 "install_deps",
@@ -1701,6 +1753,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
                 "vars",
                 "models",
                 "dbt_cmd_flags",
+                "emit_datasets",
                 "compiled_sql",
                 "freshness",
                 "install_deps",
@@ -1717,6 +1770,7 @@ def test_run_command_passes_full_cmd_with_profiles_dir_to_openlineage_processor(
                 "vars",
                 "models",
                 "dbt_cmd_flags",
+                "emit_datasets",
                 "compiled_sql",
                 "freshness",
                 "install_deps",
@@ -1886,6 +1940,28 @@ def test_handle_exception_subprocess(caplog):
 
     assert len(str(err_context.value)) < 100  # Ensure the error message is not too long
     assert "\n".join(full_output) in caplog.text
+
+
+def test_handle_exception_subprocess_surfaces_failing_tests():
+    """Failing dbt nodes are included in the raised exception. Issue #1806."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=None,
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+    full_output = [
+        "20:30:02  Failure in test not_null_my_model_id (models/schema.yml)",
+        "20:30:02    Got 5 results, configured to fail if != 0",
+    ]
+    result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=full_output)
+
+    with pytest.raises(AirflowException) as err_context:
+        operator.handle_exception_subprocess(result)
+
+    message = str(err_context.value)
+    assert "non-zero exit code 1" in message
+    assert "not_null_my_model_id" in message
+    assert "Got 5 results, configured to fail if != 0" in message
 
 
 @pytest.fixture
@@ -3061,3 +3137,65 @@ def test_dbt_run_local_operator_rejects_output_only_template_fields():
             compiled_sql="SELECT 1",
             freshness="test",
         )
+
+
+EMIT_DATASETS_VALUES = [
+    (True, True),
+    ("True", True),
+    ("true", True),
+    ("1", True),
+    (" true ", True),
+    (False, False),
+    ("False", False),
+    ("false", False),
+    ("0", False),
+    (" false ", False),
+]
+
+
+def test_emit_datasets_is_a_template_field():
+    assert "emit_datasets" in DbtLocalBaseOperator.template_fields
+
+
+@pytest.mark.parametrize("emit_datasets, expected_emission", EMIT_DATASETS_VALUES)
+@patch("cosmos.operators.local.DbtLocalBaseOperator._handle_datasets")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._handle_post_execution")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.handle_exception")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.calculate_openlineage_events_completes")
+@patch("cosmos.config.ProfileConfig.ensure_profile")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.invoke_dbt")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._clone_project")
+@patch("cosmos.operators.local.tempfile.TemporaryDirectory")
+def test_run_command_emits_datasets_only_when_flag_resolves_true(
+    mock_tmp_dir,
+    mock_clone_project,
+    mock_invoke_dbt,
+    mock_ensure_profile,
+    mock_calculate_openlineage,
+    mock_handle_exception,
+    mock_handle_post_execution,
+    mock_handle_datasets,
+    emit_datasets,
+    expected_emission,
+    tmp_path,
+):
+    mock_tmp_dir.return_value.__enter__.return_value = str(tmp_path)
+    mock_ensure_profile.return_value.__enter__.return_value = (tmp_path / "profiles.yml", {})
+    mock_invoke_dbt.return_value = MagicMock()
+    mock_calculate_openlineage.return_value = False
+
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        emit_datasets=emit_datasets,
+        install_deps=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+    )
+    operator.run_command(
+        cmd=["dbt", "cmd"],
+        env={},
+        context={"run_id": "test_run_id", "task_instance": MagicMock()},
+    )
+
+    assert mock_handle_datasets.called is expected_emission

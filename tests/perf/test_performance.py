@@ -104,6 +104,11 @@ def test_perf_dag():
         # verify the integrity of the dag
         assert len(dag.tasks) == num_models
 
+        # Airflow 3.1+ requires the DAG serialized before dag.test(); do it outside the timed region.
+        from tests.utils import serialize_dag_to_db
+
+        serialize_dag_to_db(dag)
+
         # measure the time before and after the dag is run
 
         start = time.time()

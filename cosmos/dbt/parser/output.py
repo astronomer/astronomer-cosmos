@@ -125,6 +125,36 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
     return test_names, test_results
 
 
+def extract_dbt_failure_details(log_list: list[str]) -> list[str]:
+    """
+    Extract failing dbt nodes and their messages from subprocess output.
+
+    Counterpart of :func:`extract_log_issues`, which handles warnings.
+
+    :param log_list: List of strings, where each string is a log line from a dbt command.
+    :return: A list of formatted ``"<failure line> <detail>"`` strings, one per failing node.
+    """
+    # dbt <= 1.11 prints "Failure in test <name> (<path>)"; dbt 1.12 reworded this to
+    # "[ERROR]: in test <name> (<path>)" (also used for errored models) and prefixes the detail line the same way.
+    ansi = re.compile(r"\x1b\[[0-9;]*m")
+    timestamp = re.compile(r"^\d{2}:\d{2}:\d{2}\s+")
+    error_prefix = re.compile(r"^\[ERROR\]:\s*")
+    marker = re.compile(r"^(?:(?:Failure|Error) in |\[ERROR\]:\s*in )(.*)")
+
+    def clean_line(line: str) -> str:
+        return timestamp.sub("", ansi.sub("", line).strip())
+
+    cleaned = [clean_line(line) for line in log_list]
+    details: list[str] = []
+    for index, line in enumerate(cleaned):
+        match = marker.match(line)
+        if match:
+            failure = line if not error_prefix.match(line) else f"Error in {match.group(1)}"
+            detail = error_prefix.sub("", cleaned[index + 1]) if index + 1 < len(cleaned) else ""
+            details.append(f"{failure} {detail}".strip())
+    return details
+
+
 # Python 3.13 exposes a deprecated operator, we can replace it in the future
 @deprecation.deprecated(
     deprecated_in="1.9",

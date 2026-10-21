@@ -9,7 +9,7 @@ It does this by exposing a ``cosmos.config.RenderConfig`` class that you can use
 
 The ``RenderConfig`` class takes the following arguments:
 
-- ``emit_datasets``: whether or not to emit Airflow datasets to be used for data-aware scheduling. Defaults to True. This feature is only available for ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV``, ``ExecutionMode.WATCHER`` and ``ExecutionMode.AIRFLOW_ASYNC``.
+- ``emit_datasets``: whether or not to emit Airflow datasets to be used for data-aware scheduling. Defaults to True. This feature is only available for ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV``, ``ExecutionMode.WATCHER``, ``ExecutionMode.WATCHER_KUBERNETES``, ``ExecutionMode.WATCHER_GCP_GKE`` and ``ExecutionMode.AIRFLOW_ASYNC``. This is the parse-time default; to decide per DAG run, pass a templated ``emit_datasets`` via ``operator_args`` instead (see :ref:`operator-args`).
 - ``test_behavior``: how to run tests. Defaults to running a model's tests immediately after the model is run. For more information, see the :ref:`Testing Behavior <testing-behavior>` section.
 - ``load_method``: how to load your dbt project. See :ref:`Parsing Methods <parsing-methods>` for more information.
 - ``invocation_mode``: (new in v1.9) how to run ``dbt ls``, when using ``LoadMode.DBT_LS``. Learn more about this below.
@@ -42,7 +42,7 @@ How to run dbt ls (invocation mode)
 
 When using ``LoadMode.DBT_LS``, Cosmos runs ``dbt ls`` to parse the dbt project.
 
-Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__. This mode requires dbt version 1.5.0 or higher.
+Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__.
 This mode,  named ``InvocationMode.DBT_RUNNER``, also depends on dbt being installed in the same Python virtual environment as Airflow.
 In previous Cosmos versions, Cosmos would always run ``dbt ls`` using the  Python ``subprocess`` module, which can lead to significant CPU and memory usage (including OOM errors), both in the scheduler and worker nodes.
 
@@ -52,7 +52,7 @@ Although ``InvocationMode.DBT_RUNNER`` is the default behaviour in Cosmos 1.9, u
 
 2. ``InvocationMode.DBT_RUNNER``: (default since Cosmos 1.9) In this mode, Cosmos uses the ``dbtRunner`` available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__ to run dbt commands. \
    In order to use this mode, dbt must be installed in the same local environment. This mode does not have the overhead of spawning new subprocesses or parsing the output of dbt commands and is faster than ``InvocationMode.SUBPROCESS``. \
-   This mode requires dbt version 1.5.0 or higher. It is up to the user to resolve :ref:`execution-modes-local-conflicts` when using this mode.
+   It is up to the user to resolve :ref:`execution-modes-local-conflicts` when using this mode.
 
 Users may opt to use ``InvocationMode.SUBPROCESS`` when they have multiple Python virtual environments with different versions of dbt and its adaptors,
 and do not want Cosmos to use the dbt version installed in the same Python Virtualenv as Airflow to parse the DAG.

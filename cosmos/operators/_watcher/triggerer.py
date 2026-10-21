@@ -22,6 +22,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_producer_task_still_running,
 )
 
 logger = get_logger(__name__)
@@ -238,7 +239,9 @@ class WatcherTrigger(BaseTrigger):
                 logger.info("dbt node '%s' was skipped", self.model_unique_id)
                 yield TriggerEvent({"status": EventStatus.SKIPPED})  # type: ignore[no-untyped-call]
                 return
-            elif is_dbt_node_status_failed(dbt_node_status):
+            elif is_dbt_node_status_failed(dbt_node_status) and not is_producer_task_still_running(producer_task_state):
+                # Surface a node failure only once the producer has terminated. While it is still
+                # running, fall through to the sleep below and keep polling. See #2947.
                 logger.warning("dbt node '%s' failed", self.model_unique_id)
                 event_data = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
                 if compiled_sql:

@@ -28,6 +28,7 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
+    DbtSemanticMetricViewLocalOperator,
     DbtSnapshotLocalOperator,
     DbtSourceLocalOperator,
     DbtTestLocalOperator,
@@ -59,7 +60,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
     and deleted at the end of the operator execution.
 
     :param py_requirements: If defined, creates a virtual environment with the specified dependencies. Example:
-           ["dbt-postgres==1.5.0"]
+           ["dbt-postgres==1.8.0"]
     :param pip_install_options: Pip options to use when installing Python dependencies. Example: ["--upgrade", "--no-cache-dir"]
     :param py_system_site_packages: Whether or not all the Python packages from the Airflow instance will be accessible
            within the virtual environment (if py_requirements argument is specified).
@@ -286,6 +287,17 @@ class DbtRunVirtualenvOperator(DbtVirtualenvBaseOperator, DbtRunLocalOperator):
     """
     Executes a dbt core run command within a Python Virtual Environment, that is created before running the dbt command
     and deleted just after.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticMetricViewVirtualenvOperator(DbtVirtualenvBaseOperator, DbtSemanticMetricViewLocalOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic metric view within a
+    Python Virtual Environment, that is created before running the dbt command and deleted just
+    after.
     """
 
     def __init__(self, *args: Any, **kwargs: Any):

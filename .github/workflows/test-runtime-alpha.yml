@@ -1,4 +1,5 @@
 name: test-runtime-alpha
+run-name: test-runtime-alpha ${{ inputs.runtime_version }}
 
 # Run the Cosmos test suites (from this checkout / latest main) AGAINST a published Astronomer
 # Runtime alpha image, to validate that cosmos still works on that exact Airflow build before the
@@ -512,7 +513,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions) }}
-        dbt-version: ["2.0"]
+        dbt-version: ["2.0-dbt-fusion"]
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
       # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
@@ -535,6 +536,7 @@ jobs:
         run: |
           PREFIX="COSMOS_${RUN_ID}_PY${PY_VERSION}_RT${RT_VERSION}_DBT${DBT_VERSION}"
           PREFIX="${PREFIX//[^A-Za-z0-9_]/_}"
+          PREFIX=$(echo "$PREFIX" | tr '[:lower:]' '[:upper:]')
           echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
       - name: Run dbt Fusion integration tests
         run: |
@@ -679,6 +681,8 @@ jobs:
         # Job results arrive via env (never interpolated into the run body) so the summary cannot be
         # shell-injected. A `skipped` result means the suite did not run on this dispatch.
         env:
+          REGISTRY: ${{ inputs.registry }}
+          RUNTIME_VERSION: ${{ inputs.runtime_version }}
           UNIT: ${{ needs.Run-Unit-Tests.result }}
           INTEGRATION: ${{ needs.Run-Integration-Tests.result }}
           TELEMETRY: ${{ needs.Run-Telemetry-Tests.result }}
@@ -692,6 +696,8 @@ jobs:
         run: |
           {
             echo "## Runtime alpha suite coverage"
+            echo ""
+            echo "Image: \`${REGISTRY}:${RUNTIME_VERSION}-python-<version>\`"
             echo ""
             echo "A result of \`skipped\` means the suite did not run on this dispatch (disabled, or paid and not opted in), so a green check does not cover it."
             echo ""

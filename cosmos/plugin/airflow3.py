@@ -26,6 +26,7 @@ from cosmos import telemetry
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
 from cosmos.listeners import dag_run_listener, task_instance_listener
 from cosmos.log import get_logger
+from cosmos.plugin import airflow3_auth
 from cosmos.plugin.snippets import IFRAME_SCRIPT
 from cosmos.plugin.storage import get_storage_type_from_path
 
@@ -34,6 +35,12 @@ logger = get_logger(__name__)
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
 # Note: We compute AIRFLOW_VERSION locally here (not from constants) so that tests can patch airflow.__version__ and reload this module
 AIRFLOW_VERSION = Version(airflow.__version__)
+_airflow_310_docs_warning_logged = False
+
+
+def is_airflow_310() -> bool:
+    # Astro builds carry a local suffix (3.1.0+astro.2), and tests patch AIRFLOW_VERSION, so compare at call time.
+    return Version(AIRFLOW_VERSION.base_version) == Version("3.1.0")
 
 
 def ensure_airflow_version_supported() -> None:
@@ -71,7 +78,7 @@ def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  
 
 def _read_content_via_object_storage(path: str, conn_id: str | None = None) -> Any:
     # Use connection_env only for Airflow 3.1.0
-    if AIRFLOW_VERSION == Version("3.1.0"):
+    if is_airflow_310() and conn_id is not None:
         with connection_env(conn_id):
             p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
             with p.open("r") as f:  # type: ignore[no-untyped-call]
@@ -132,7 +139,13 @@ def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
 
 def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     ensure_airflow_version_supported()
-    app = FastAPI()
+    # FastAPI registers /openapi.json, /docs and /redoc without the app-wide dependencies, so they would be served unauthenticated.
+    app = FastAPI(
+        dependencies=airflow3_auth.dbt_docs_auth_dependencies(),
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
 
     projects = _load_projects_from_conf()
 
@@ -290,6 +303,18 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     return app
 
 
+def _warn_once_that_airflow_310_cannot_open_dbt_docs() -> None:
+    global _airflow_310_docs_warning_logged
+    if _airflow_310_docs_warning_logged:
+        return
+    _airflow_310_docs_warning_logged = True
+    # The Airflow 3.1.0 UI deletes its session cookie after login, so the browser cannot authenticate to plugin routes.
+    logger.warning(
+        "Cosmos dbt docs require an authenticated user, which the Airflow 3.1.0 UI cannot provide to plugin "
+        "views; upgrade to Airflow >= 3.1.1 to open dbt docs from the Airflow UI."
+    )
+
+
 class CosmosAF3Plugin(AirflowPlugin):
     name = "cosmos"
 
@@ -308,6 +333,9 @@ class CosmosAF3Plugin(AirflowPlugin):
                 "Cosmos dbt docs views require Airflow >= 3.1 (running %s); skipping them.", airflow.__version__
             )
             return
+        projects = _load_projects_from_conf()
+        if not projects:
+            return
         # Initialize FastAPI app only after version support is confirmed
         self.fastapi_apps = [
             {
@@ -316,7 +344,10 @@ class CosmosAF3Plugin(AirflowPlugin):
                 "url_prefix": "/cosmos",
             }
         ]
-        projects = _load_projects_from_conf()
+        if is_airflow_310():
+            _warn_once_that_airflow_310_cannot_open_dbt_docs()
+        # Instance-level list: Airflow 3 can instantiate the plugin more than once per process
+        self.external_views = []
         for slug, cfg in projects.items():
             display_name = cfg.get("name") or f"dbt Docs ({slug})"
             self.external_views.append(

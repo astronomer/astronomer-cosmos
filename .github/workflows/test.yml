@@ -622,7 +622,7 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11"]
         airflow-version: ["2.10", "3.0"]
-        dbt-version: ["2.0"]  # dbt Fusion
+        dbt-version: ["2.0-dbt-fusion"]  # dbt Fusion
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -651,13 +651,13 @@ jobs:
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
-      - name: Set RESOURCE_PREFIX without periods
+      - name: Set RESOURCE_PREFIX without periods or dashes
         id: set-resource-prefix
         run: |
           PYTHON_VER=$(echo "${{ matrix.python-version }}" | tr -d '.')
           AIRFLOW_VER=$(echo "${{ matrix.airflow-version }}" | tr -d '.')
-          DBT_VER=$(echo "${{ matrix.dbt-version }}" | tr -d '.')
-          PREFIX="COSMOS_${{ github.run_id }}_PY${PYTHON_VER}_AF${AIRFLOW_VER}_DBT${DBT_VER}"
+          DBT_VER=$(echo "${{ matrix.dbt-version }}" | tr -d '.' | tr '-' '_')
+          PREFIX=$(echo "COSMOS_${{ github.run_id }}_PY${PYTHON_VER}_AF${AIRFLOW_VER}_DBT${DBT_VER}" | tr '[:lower:]' '[:upper:]')
           echo "prefix=${PREFIX}" >> "$GITHUB_OUTPUT"
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}

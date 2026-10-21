@@ -3108,7 +3108,7 @@ class TestDbtTestWatcherOperator:
         ti.xcom_pull.side_effect = lambda *_, key=None, **__: summary if key == self.TESTS_STATUS_XCOM_KEY else None
         context = self.make_context(ti)
 
-        with caplog.at_level(logging.INFO), pytest.raises(AirflowException, match="Tests for model"):
+        with caplog.at_level(logging.INFO), pytest.raises(AirflowException, match="finished with status 'fail'"):
             sensor.poke(context)
 
         assert any(

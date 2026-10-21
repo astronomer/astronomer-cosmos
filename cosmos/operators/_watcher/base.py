@@ -729,7 +729,7 @@ class BaseConsumerSensor(BaseSensorOperator):
                 summary.failed_count,
                 self.model_unique_id,
                 truncation_note,
-                summary.failed_tests,
+                ", ".join(summary.failed_tests),
             )
         else:
             logger.info(

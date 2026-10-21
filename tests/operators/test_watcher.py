@@ -29,6 +29,7 @@ from cosmos.constants import (
     SourceRenderingBehavior,
 )
 from cosmos.dbt.graph import DbtNode
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
@@ -1160,6 +1161,34 @@ def test_producer_respects_explicit_invocation_mode():
 
     op2 = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=InvocationMode.DBT_RUNNER)
     assert op2.invocation_mode == InvocationMode.DBT_RUNNER
+
+
+@pytest.mark.parametrize(
+    "is_dbt_v2, expected_mode", [(True, InvocationMode.SUBPROCESS), (False, InvocationMode.DBT_RUNNER)]
+)
+@patch("cosmos.dbt.runner.is_available", return_value=True)
+def test_producer_discovery_falls_back_to_subprocess_on_dbt_v2(mock_is_available, is_dbt_v2, expected_mode):
+    """dbt-core 2.x's dbtRunner has no event callbacks, so discovery picks subprocess for the producer (#2993)."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2):
+        op._discover_invocation_mode()
+    assert op.invocation_mode == expected_mode
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
+def test_run_dbt_runner_rejects_dbt_v2(mock_is_dbt_v2):
+    """An explicit InvocationMode.DBT_RUNNER on dbt-core 2.x fails before dbt is invoked."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=InvocationMode.DBT_RUNNER)
+    context = {"ti": _MockTI(), "run_id": "run-1"}
+
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.run_dbt_runner") as mock_run,
+        pytest.raises(CosmosValueError, match="Use InvocationMode.SUBPROCESS"),
+    ):
+        op.run_dbt_runner(command=["dbt", "build"], env={}, cwd="/tmp/proj", context=context)
+
+    mock_run.assert_not_called()
+    assert not op._dbt_runner_callbacks
 
 
 @pytest.mark.parametrize(

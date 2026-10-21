@@ -166,9 +166,6 @@ jobs:
           # dbt v2 (dbt-oss) requires Python 3.11+.
           - python-version: "3.10"
             dbt-version: "2.0-dbt-oss"
-          # The Airflow 3.4 hatch environments (pyproject.toml) do not define a dbt v2 variant yet.
-          - airflow-version: "3.4"
-            dbt-version: "2.0-dbt-oss"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

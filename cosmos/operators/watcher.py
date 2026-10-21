@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 
+from cosmos.operators._watcher.aggregation import ResultsTestsPerModel, TestsPerModel
+
 try:
     # Airflow 3.1 onwards
     from airflow.sdk import TaskGroup
@@ -226,8 +228,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
-        self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
-        self.test_results_per_model: dict[str, dict[str, str]] = {}
+        self.tests_per_model: TestsPerModel = kwargs.pop("tests_per_model", {})
+        self.test_results_per_model: ResultsTestsPerModel = {}
         self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
         self._should_generate_model_uris: bool = kwargs.pop(
             "_should_generate_model_uris", kwargs.get("emit_datasets", True)
@@ -653,12 +655,13 @@ class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
 
     The producer task (``DbtProducerWatcherOperator``) collects individual test
     results as they finish and, once every test for a given model has reported,
-    pushes a single aggregated XCom (``"pass"`` or ``"fail"``) under the key
-    ``<model_unique_id>_tests_status``.
+    pushes a single aggregated XCom under the key ``<model_unique_id>_tests_status``: a dict
+    with ``status`` (``"pass"`` or ``"fail"``), ``passed_count``, ``failed_count``, ``skipped_count``, ``total_count``
+    and up to ``MAX_FAILED_TESTS_IN_SUMMARY`` ``failed_tests`` unique_ids.
 
-    This sensor polls that key and:
-    * returns success when the value is ``"pass"``,
-    * raises ``AirflowException`` when the value is ``"fail"``.
+    This sensor polls that key, logs the summary and:
+    * returns success when ``status`` is ``"pass"``,
+    * raises ``AirflowException`` when ``status`` is ``"fail"``.
 
     Deferral is fully supported: the ``WatcherTrigger`` receives
     ``is_test_sensor=True`` and polls the correct aggregated key.

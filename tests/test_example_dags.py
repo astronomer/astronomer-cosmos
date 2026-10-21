@@ -26,6 +26,8 @@ IGNORED_DAG_FILES = [
     "performance_dag.py",
     "jaffle_shop_kubernetes.py",
     "jaffle_shop_watcher_kubernetes.py",
+    "example_databricks_metric_view.py",
+    "example_snowflake_semantic_view.py",
 ]
 
 # cross_project_manifest_dag.py, cross_project_dbt_ls_dag.py, and

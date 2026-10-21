@@ -244,7 +244,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 .. _pre_dbt_fusion:
 
 `pre_dbt_fusion`_:
-    From Cosmos 1.11, we have introduced support for dbt v2. Some of the changes may not be compatible with legacy versions of dbt-core.
+    From Cosmos 1.11, we have introduced support for dbt 2 (the ``dbt`` distribution, previously dbt Fusion, and its standalone binary). Some of the changes may not be compatible with legacy versions of dbt-core.
     If you find any issues on how Cosmos interacts with older versions of dbt-core you can use this configuration.
 
     - Default: ``False``

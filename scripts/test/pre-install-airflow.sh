@@ -84,9 +84,14 @@ elif [ "$AIRFLOW_VERSION" = "3.4" ] ; then
   # tree (litellm) requires <9, so hold it on the 8.x line the constraints pin.
   # `~=$DBT_VERSION.0` pins the minor: a bare `~=1.11` would float to dbt-core 1.12.
   # The dbt 2 lanes (2.0-dbt-fusion, the standalone dbt Fusion binary, and 2.0-dbt-oss) are installed
-  # separately from dbt-core, so bootstrap with the 1.11 baseline, as the lockfile fallback above does.
+  # separately from dbt-core, so bootstrap with a 1.x baseline, as the lockfile fallback above does: 1.12 for
+  # dbt-oss, since dbt-core 1.11 does not work on Python 3.14, and 1.11 otherwise.
   INSTALL_DBT_VERSION="$DBT_VERSION"
   case "$DBT_VERSION" in
+    *-dbt-oss)
+      INSTALL_DBT_VERSION="1.12"
+      EFFECTIVE_DBT_VERSION="1.12"
+      ;;
     2.*)
       INSTALL_DBT_VERSION="1.11"
       EFFECTIVE_DBT_VERSION="1.11"

@@ -3,16 +3,15 @@
 set -x
 set -e
 
-# The hatch ``dbt`` matrix value ``v2.0-oss`` installs the latest dbt-oss 2.0.x.
+# The hatch ``dbt`` matrix value ``2.0-dbt-oss`` installs the latest dbt-oss 2.0.x.
 DBT_VERSION="$1"
 
 case "$DBT_VERSION" in
-  v*-oss)
-    MINOR="${DBT_VERSION#v}"
-    MINOR="${MINOR%-oss}"
+  *-dbt-oss)
+    MINOR="${DBT_VERSION%-dbt-oss}"
     ;;
   *)
-    echo "::error::Unsupported dbt-oss version '$DBT_VERSION'. Expected v<major>.<minor>-oss."
+    echo "::error::Unsupported dbt-oss version '$DBT_VERSION'. Expected <major>.<minor>-dbt-oss."
     exit 1
     ;;
 esac

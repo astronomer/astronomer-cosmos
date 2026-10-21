@@ -135,7 +135,7 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3", "3.4"]
-        dbt-version: ["1.11", "1.12", "v2.0-oss"]
+        dbt-version: ["1.11", "1.12", "2.0-dbt-oss"]
         exclude:
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
           - python-version: "3.13"
@@ -165,10 +165,10 @@ jobs:
             airflow-version: "3.4"
           # dbt v2 (dbt-oss) requires Python 3.11+.
           - python-version: "3.10"
-            dbt-version: "v2.0-oss"
+            dbt-version: "2.0-dbt-oss"
           # The Airflow 3.4 hatch environments (pyproject.toml) do not define a dbt v2 variant yet.
           - airflow-version: "3.4"
-            dbt-version: "v2.0-oss"
+            dbt-version: "2.0-dbt-oss"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -200,7 +200,7 @@ jobs:
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Install dbt v2 ${{ matrix.dbt-version }}
-        if: startsWith(matrix.dbt-version, 'v')
+        if: contains(matrix.dbt-version, 'dbt-oss')
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-dbt-v2-setup
 

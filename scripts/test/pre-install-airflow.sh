@@ -42,11 +42,11 @@ if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRF
       echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
       exit 1
     fi
-    # Other dbt versions (1.8-1.10, 2.0-dbt-fusion, v2.0-oss) have no per-Airflow lockfile; jobs needing them re-pin dbt
+    # Other dbt versions (1.8-1.10, 2.0-dbt-fusion, 2.0-dbt-oss) have no per-Airflow lockfile; jobs needing them re-pin dbt
     # in their own setup step, so this is just a throwaway baseline. dbt v2 values start from the dbt-1.12
     # baseline, whose lockfiles support Python 3.14.
     case "$DBT_VERSION" in
-      v*) BASELINE_DBT_VERSION="1.12" ;;
+      *-dbt-oss) BASELINE_DBT_VERSION="1.12" ;;
       *) BASELINE_DBT_VERSION="1.11" ;;
     esac
     echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-$BASELINE_DBT_VERSION baseline (this job must re-pin dbt itself)."

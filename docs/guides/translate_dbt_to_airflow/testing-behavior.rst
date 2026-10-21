@@ -162,9 +162,22 @@ Tests configured with ``severity: error`` fail the task when they fail. To send 
 Airflow's standard ``on_failure_callback``. Airflow exposes the raised exception to the callback as
 ``context["exception"]``.
 
-With ``InvocationMode.DBT_RUNNER`` (the default), Cosmos includes the failing dbt nodes (test names and messages) in
-that exception. With ``InvocationMode.SUBPROCESS``, the exception currently only includes the dbt command's exit
-code.
+When running dbt locally (for example ``ExecutionMode.LOCAL`` or ``ExecutionMode.VIRTUALENV``), Cosmos includes the
+failing dbt nodes (test names and messages) in that exception, so no extra configuration or XCom is needed to report
+which tests failed. This applies to both ``InvocationMode.DBT_RUNNER`` (the default) and
+``InvocationMode.SUBPROCESS``.
+
+.. note::
+
+    In Cosmos 1.15.x and earlier, ``InvocationMode.SUBPROCESS`` only included the dbt command's exit code in the
+    exception. The failing dbt nodes are available in both invocation modes starting with Cosmos 1.16.0.
+
+.. note::
+
+    With ``InvocationMode.SUBPROCESS``, the failing nodes are read from dbt's text output. When ``log_format="json"``
+    is used, they are not parsed and the exception only includes the exit code (tracked in
+    `#3059 <https://github.com/astronomer/astronomer-cosmos/issues/3059>`_). Only the line following each failure
+    marker is included, which covers data test failures such as ``Got 5 results, configured to fail if != 0``.
 
 .. code-block:: python
 

@@ -199,10 +199,10 @@ jobs:
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
-      - name: Install dbt v2 ${{ matrix.dbt-version }}
+      - name: Install dbt-oss ${{ matrix.dbt-version }}
         if: contains(matrix.dbt-version, 'dbt-oss')
         run: |
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-dbt-v2-setup
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-dbt-oss-setup
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
         run: |

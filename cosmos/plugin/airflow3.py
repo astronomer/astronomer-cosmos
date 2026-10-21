@@ -35,6 +35,12 @@ logger = get_logger(__name__)
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
 # Note: We compute AIRFLOW_VERSION locally here (not from constants) so that tests can patch airflow.__version__ and reload this module
 AIRFLOW_VERSION = Version(airflow.__version__)
+_airflow_310_docs_warning_logged = False
+
+
+def is_airflow_310() -> bool:
+    # Astro builds carry a local suffix (3.1.0+astro.2), and tests patch AIRFLOW_VERSION, so compare at call time.
+    return Version(AIRFLOW_VERSION.base_version) == Version("3.1.0")
 
 
 def ensure_airflow_version_supported() -> None:
@@ -72,7 +78,7 @@ def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  
 
 def _read_content_via_object_storage(path: str, conn_id: str | None = None) -> Any:
     # Use connection_env only for Airflow 3.1.0
-    if AIRFLOW_VERSION == Version("3.1.0"):
+    if is_airflow_310():
         with connection_env(conn_id):
             p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
             with p.open("r") as f:  # type: ignore[no-untyped-call]
@@ -297,9 +303,6 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     return app
 
 
-_airflow_310_docs_warning_logged = False
-
-
 def _warn_once_that_airflow_310_cannot_open_dbt_docs() -> None:
     global _airflow_310_docs_warning_logged
     if _airflow_310_docs_warning_logged:
@@ -341,7 +344,7 @@ class CosmosAF3Plugin(AirflowPlugin):
                 "url_prefix": "/cosmos",
             }
         ]
-        if Version(AIRFLOW_VERSION.base_version) == Version("3.1.0"):
+        if is_airflow_310():
             _warn_once_that_airflow_310_cannot_open_dbt_docs()
         # Instance-level list: Airflow 3 can instantiate the plugin more than once per process
         self.external_views = []

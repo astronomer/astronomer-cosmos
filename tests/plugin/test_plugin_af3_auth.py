@@ -7,6 +7,7 @@ from packaging.version import Version
 if Version(airflow_version) < Version("3.1.0"):
     pytest.skip("The Cosmos AF3 plugin requires Airflow >= 3.1", allow_module_level=True)
 
+import importlib
 import json
 import logging
 import sys
@@ -27,6 +28,14 @@ skip_airflow_without_jwt_cookie_support = pytest.mark.skipif(
     Version(airflow_version) < Version("3.1.1"),
     reason="Airflow only reads the JWT cookie from 3.1.1",
 )
+
+
+@pytest.fixture(autouse=True)
+def _reload_af3_with_the_installed_airflow_version():
+    # test_plugin_af3.py reloads the module under a patched airflow.__version__ and can leave it that way.
+    import cosmos.plugin.airflow3 as af3
+
+    importlib.reload(af3)
 
 
 @pytest.fixture

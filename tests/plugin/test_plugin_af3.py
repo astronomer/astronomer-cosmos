@@ -304,6 +304,7 @@ def test_plugin_init_warns_and_skips_views_on_pre_31(caplog):
     "af_ver, should_use_ctx",
     [
         ("3.1.0", True),
+        ("3.1.0+astro.2", True),
         ("3.1.1", False),
         ("3.1.2", False),
         ("3.2.0", False),

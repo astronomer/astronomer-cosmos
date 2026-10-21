@@ -95,6 +95,7 @@ Notes and behavior
 - Every ``/cosmos`` route requires an authenticated Airflow user with read access to the ``Website`` view, the same permission the Airflow 2 plugin checks. Unauthenticated requests receive HTTP 401 and users without that permission receive HTTP 403. Both the Airflow UI session and an ``Authorization: Bearer`` token are accepted.
 - Opening dbt docs from the Airflow UI requires Airflow >= 3.1.1. The Airflow 3.1.0 UI discards its session cookie after login, so the browser cannot authenticate to plugin views and the docs return HTTP 401; bearer-token API access still works on 3.1.0.
 - Whether the ``Browse`` menu entry is shown is decided by Airflow, which lists plugin views only for users who can read ``Plugins``. With the FAB auth manager this means the ``Op`` and ``Admin`` roles; ``Viewer`` and ``User`` can still open the docs by URL.
+- Only the dbt docs routes are served under ``/cosmos``: FastAPI's ``/openapi.json``, ``/docs`` and ``/redoc`` are disabled and return HTTP 404. When no project is configured, the plugin registers no routes and no menu entry.
 
 Apache Airflow® 2
 ~~~~~~~~~~~~~~~~~~

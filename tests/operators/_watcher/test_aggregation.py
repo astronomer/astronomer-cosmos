@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import threading
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from cosmos.operators._watcher.aggregation import (
     accumulate_test_result,
     get_aggregated_test_status,
     get_tests_status_xcom_key,
-    get_tests_upstream_failure_skip_xcom_key,
     push_test_result_or_aggregate,
 )
 from cosmos.operators._watcher.state import DbtTestStatus
@@ -40,14 +37,6 @@ class TestGetTestsStatusXcomKey:
 
     def test_no_dots(self):
         assert get_tests_status_xcom_key("orders") == "orders_tests_status"
-
-
-class TestGetTestsUpstreamFailureSkipXcomKey:
-    """Tests for get_tests_upstream_failure_skip_xcom_key."""
-
-    def test_replaces_dots_with_double_underscores(self):
-        key = get_tests_upstream_failure_skip_xcom_key("model.pkg.orders")
-        assert key == "model__pkg__orders_tests_upstream_failure_skip"
 
 
 class TestAccumulateTestResult:
@@ -217,68 +206,6 @@ class TestPushTestResultOrAggregate:
         )
         mock_xcom_push.assert_any_call(
             task_instance=ti, key="model__pkg__customers_tests_status", value=DbtTestStatus.FAIL
-        )
-
-    @pytest.mark.parametrize(
-        "unique_orders_status, upstream_failure_skipped_ids",
-        [
-            ("failed", {"test.pkg.not_null_orders_id", "test.pkg.unique_orders_id"}),
-            ("pass", {"test.pkg.not_null_orders_id"}),
-        ],
-    )
-    @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
-    def test_marks_fail_caused_only_by_upstream_failure_skips(
-        self, mock_xcom_push: MagicMock, unique_orders_status, upstream_failure_skipped_ids
-    ):
-        """#3023: when every non-passing test was skipped for an upstream failure, mark the aggregate."""
-        results: dict[str, dict[str, str]] = {}
-        ti = MagicMock()
-        push_test_result_or_aggregate(
-            "test.pkg.not_null_orders_id", "failed", TESTS_PER_MODEL, results, ti, upstream_failure_skipped_ids
-        )
-        push_test_result_or_aggregate(
-            "test.pkg.unique_orders_id",
-            unique_orders_status,
-            TESTS_PER_MODEL,
-            results,
-            ti,
-            upstream_failure_skipped_ids,
-        )
-        assert mock_xcom_push.call_args_list == [
-            call(task_instance=ti, key="model__pkg__orders_tests_upstream_failure_skip", value=True),
-            call(task_instance=ti, key="model__pkg__orders_tests_status", value=DbtTestStatus.FAIL),
-        ]
-
-    @pytest.mark.parametrize(
-        "unique_orders_status, upstream_failure_skipped_ids",
-        [
-            # One test failed for real.
-            ("fail", {"test.pkg.not_null_orders_id"}),
-            # One test was skipped for another reason.
-            ("skipped", {"test.pkg.not_null_orders_id"}),
-            # No accumulator, e.g. a caller that does not track upstream-failure skips.
-            ("failed", None),
-        ],
-    )
-    @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")
-    def test_does_not_mark_fail_with_other_causes(
-        self, mock_xcom_push: MagicMock, unique_orders_status, upstream_failure_skipped_ids
-    ):
-        results: dict[str, dict[str, str]] = {}
-        ti = MagicMock()
-        push_test_result_or_aggregate(
-            "test.pkg.not_null_orders_id", "failed", TESTS_PER_MODEL, results, ti, upstream_failure_skipped_ids
-        )
-        push_test_result_or_aggregate(
-            "test.pkg.unique_orders_id",
-            unique_orders_status,
-            TESTS_PER_MODEL,
-            results,
-            ti,
-            upstream_failure_skipped_ids,
-        )
-        mock_xcom_push.assert_called_once_with(
-            task_instance=ti, key="model__pkg__orders_tests_status", value=DbtTestStatus.FAIL
         )
 
     @patch("cosmos.operators._watcher.aggregation.safe_xcom_push")

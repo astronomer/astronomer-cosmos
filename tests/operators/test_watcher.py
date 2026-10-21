@@ -677,50 +677,8 @@ class TestStoreDbtStatusFromLog:
 
         assert upstream_failure_skipped_ids == {"model.pkg.downstream_model"}
         assert ti.store.get("model__pkg__downstream_model_status") == {"status": "failed", "outlet_uris": []}
-        assert ti.store.get("model__pkg__downstream_model_upstream_failure_skip") is True
-
-    def test_store_dbt_resource_status_from_log_marks_upstream_failure_skipped_tests(self):
-        """#3023: tests dbt skipped for an upstream failure mark the model's aggregated test status."""
-        ti = _MockTI()
-        upstream_failure_skipped_ids: set[str] = set()
-        test_log_line = json.dumps(
-            {
-                "info": {"name": "SkippingDetails"},
-                "data": {
-                    "node_info": {
-                        "node_status": "skipped",
-                        "unique_id": "test.pkg.not_null_orders_id",
-                        "resource_type": "test",
-                    }
-                },
-            }
-        )
-
-        store_dbt_resource_status_from_log(
-            test_log_line,
-            {"context": {"ti": ti}},
-            tests_per_model={"model.pkg.orders": ["test.pkg.not_null_orders_id"]},
-            test_results_per_model={},
-            upstream_failure_skipped_ids=upstream_failure_skipped_ids,
-        )
-
-        assert ti.store.get("model__pkg__orders_tests_status") == "fail"
-        assert ti.store.get("model__pkg__orders_tests_upstream_failure_skip") is True
-
-    def test_store_dbt_resource_status_from_log_does_not_mark_real_failures(self):
-        """A node that dbt ran and failed carries no upstream-failure-skip mark (#3023)."""
-        ti = _MockTI()
-
-        store_dbt_resource_status_from_log(
-            self._node_log_line("model.pkg.failed_model", "error"),
-            {"context": {"ti": ti}},
-            tests_per_model={},
-            test_results_per_model={},
-            upstream_failure_skipped_ids=set(),
-        )
-
-        assert ti.store.get("model__pkg__failed_model_status") == {"status": "error", "outlet_uris": []}
-        assert "model__pkg__failed_model_upstream_failure_skip" not in ti.store
+        # The consumer tells an upstream-failure skip from a real failure by this raw event status (#3023).
+        assert ti.store.get("model__pkg__downstream_model_dbt_event")["status"] == "skipped"
 
     def test_store_dbt_resource_status_from_log_keeps_plain_skips_as_skipped(self):
         """Plain skips are unchanged, including when no rewrite accumulator is passed."""
@@ -744,8 +702,6 @@ class TestStoreDbtStatusFromLog:
 
         assert ti.store.get("model__pkg__with_accumulator_status") == {"status": "skipped", "outlet_uris": []}
         assert ti.store.get("model__pkg__without_accumulator_status") == {"status": "skipped", "outlet_uris": []}
-        assert "model__pkg__with_accumulator_upstream_failure_skip" not in ti.store
-        assert "model__pkg__without_accumulator_upstream_failure_skip" not in ti.store
 
     def test_store_dbt_resource_status_from_log_ignores_other_statuses(self):
         """Test that statuses other than success/failed are ignored."""
@@ -1601,7 +1557,11 @@ class TestDbtConsumerWatcherSensor:
 
     UPSTREAM_SKIP_XCOMS = {
         "model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []},
-        "model__jaffle_shop__stg_orders_upstream_failure_skip": True,
+        "model__jaffle_shop__stg_orders_dbt_event": {"status": "skipped"},
+    }
+    REAL_FAILURE_XCOMS = {
+        "model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []},
+        "model__jaffle_shop__stg_orders_dbt_event": {"status": "error"},
     }
 
     @staticmethod
@@ -1628,6 +1588,8 @@ class TestDbtConsumerWatcherSensor:
             # A retry would not fall back either, so the outcome stays a failure.
             (0, UPSTREAM_SKIP_XCOMS, "success"),
             # dbt ran the node and it failed.
+            (1, REAL_FAILURE_XCOMS, "success"),
+            # No dbt event to tell an upstream-failure skip from a real failure.
             (1, {"model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []}}, "success"),
             # The producer state is unknown, so it may still write XComs.
             (1, UPSTREAM_SKIP_XCOMS, None),
@@ -1873,7 +1835,7 @@ class TestDbtConsumerWatcherSensor:
         "retries, xcoms",
         [
             (0, UPSTREAM_SKIP_XCOMS),
-            (1, {"model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []}}),
+            (1, REAL_FAILURE_XCOMS),
         ],
     )
     def test_execute_complete_raises_node_failed_without_upstream_failure_skip_fallback(self, retries, xcoms):
@@ -3247,23 +3209,44 @@ class TestDbtTestWatcherOperator:
         _, kwargs = sensor.build_and_run_cmd.call_args
         assert kwargs["cmd_flags"] == ["--select", DbtNode.get_resource_name_from_unique_id(self.MODEL_UID)]
 
-    def test_poke_runs_tests_on_first_try_when_fail_came_from_upstream_failure_skips(self):
-        """#3023: tests that dbt skipped for an upstream failure never ran, so run them on try 1."""
-        sensor = self.make_sensor(retries=1)
-        sensor._get_producer_task_status.return_value = "success"
-        sensor.build_and_run_cmd = MagicMock()
-        xcoms = {
-            self.TESTS_STATUS_XCOM_KEY: "fail",
-            "model__jaffle_shop__stg_orders_tests_upstream_failure_skip": True,
-        }
+    def make_xcom_ti(self, model_status: str | None) -> MagicMock:
+        xcoms: dict = {self.TESTS_STATUS_XCOM_KEY: "fail"}
+        if model_status is not None:
+            xcoms["model__jaffle_shop__stg_orders_status"] = {"status": model_status, "outlet_uris": []}
         ti = MagicMock()
         ti.try_number = 1
         ti.xcom_pull.side_effect = lambda *args, key=None, **kwargs: xcoms.get(key)
-        context = self.make_context(ti)
+        return ti
+
+    def test_poke_runs_tests_on_first_try_when_model_did_not_succeed(self):
+        """#3023: dbt never runs a model's tests when the model did not succeed, so run them on try 1."""
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor.build_and_run_cmd = MagicMock()
+        context = self.make_context(self.make_xcom_ti("failed"))
 
         assert sensor.poke(context) is True
         _, kwargs = sensor.build_and_run_cmd.call_args
         assert kwargs["cmd_flags"] == ["--select", DbtNode.get_resource_name_from_unique_id(self.MODEL_UID)]
+
+    @pytest.mark.parametrize(
+        "model_status",
+        [
+            # dbt ran the tests and at least one failed.
+            "success",
+            # The producer reported no status for the model.
+            None,
+        ],
+    )
+    def test_poke_raises_on_first_try_when_tests_may_have_run(self, model_status):
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor.build_and_run_cmd = MagicMock()
+        context = self.make_context(self.make_xcom_ti(model_status))
+
+        with pytest.raises(AirflowException, match="finished with status 'fail'"):
+            sensor.poke(context)
+        sensor.build_and_run_cmd.assert_not_called()
 
     def test_fallback_via_poke_does_not_forward_producer_flags(self):
         """Driving through ``poke`` on retry, the fallback should issue ``dbt test`` with

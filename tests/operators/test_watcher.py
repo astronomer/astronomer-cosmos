@@ -2960,10 +2960,10 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
     ``SkippingDetails``/``LogSkipBecauseError``, since both come from
     ``on_skip()`` which is only reached via ``do_skip(cause=...)``). Subsequent
     "skipped" terminal events for those unique_ids are rewritten to "failed" so
-    the consumer does not end SKIPPED. Since #3023 the producer also marks those
-    nodes, so their consumers run the existing ``_fallback_to_non_watcher_run``
-    path on attempt 1 once the upstream has recovered, instead of raising and
-    waiting one ``retry_delay`` for attempt 2.
+    the consumer does not end SKIPPED. Since #3023 their consumers see that the
+    dbt event still says "skipped", so they run the existing
+    ``_fallback_to_non_watcher_run`` path on attempt 1 once the upstream has
+    recovered, instead of raising and waiting one ``retry_delay`` for attempt 2.
     """
     from airflow import DAG
 
@@ -3022,6 +3022,69 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
     # Producer/gateway/post_dbt sanity (matches the gateway-prevents-skip test).
     assert tis["watcher_upstream_failure_recovery.dbt_producer_watcher_done"].state == "success"
     assert tis["post_dbt"].state == "success"
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    reason=(
+        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
+        "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
+        "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
+        "the watcher sensor cannot detect producer termination on retry. "
+        "Airflow 3.1.x crashes during task finalization (SetRenderedFields) when retrying "
+        "tasks inside a DbtTaskGroup via dag.test()."
+    ),
+)
+@pytest.mark.integration
+def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(reset_fail_once_sequence):
+    """With ``AFTER_EACH``, every run and test that dbt skipped below a failed model ends on attempt 1 (#3023).
+
+    Before, each of them failed on attempt 1 and waited one ``retry_delay``, so every level added a delay.
+    """
+    from airflow import DAG
+
+    from cosmos import DbtTaskGroup
+
+    reset_fail_once_sequence("_cosmos_recovery_fail_once_seq")
+
+    with DAG(
+        dag_id="watcher_upstream_failure_recovery_after_each_test",
+        start_date=datetime(2023, 1, 1),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        dagrun_timeout=timedelta(seconds=180),
+    ) as dag:
+        dbt_group = DbtTaskGroup(
+            group_id="watcher_upstream_failure_recovery",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_UPSTREAM_FAILURE_RECOVERY_PATH),
+            profile_config=profile_config,
+            render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.AFTER_EACH),
+            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=180)},
+        )
+
+        # Same dag.test() ordering workaround as test_dbt_task_group_watcher_retry_recovers_skipped_downstream.
+        gateway = dag.task_dict["watcher_upstream_failure_recovery.dbt_producer_watcher_done"]
+        for root_task in dbt_group.get_roots():
+            if root_task.task_id.endswith("_done") or root_task.task_id.endswith("dbt_producer_watcher"):
+                continue
+            gateway >> root_task
+
+    outcome = new_test_dag(dag, expected_dag_state=DagRunState.SUCCESS)
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    group = "watcher_upstream_failure_recovery"
+
+    # model_flaky failed for real inside the producer, so it still recovers through an Airflow retry.
+    assert tis[f"{group}.model_flaky.run"].state == "success"
+    assert tis[f"{group}.model_flaky.run"].try_number > 1
+    for task_id in (
+        "model_flaky.test",
+        "model_downstream.run",
+        "model_downstream.test",
+        "model_downstream_2.run",
+        "model_downstream_2.test",
+    ):
+        assert (tis[f"{group}.{task_id}"].state, tis[f"{group}.{task_id}"].try_number) == ("success", 1), task_id
 
 
 @pytest.mark.skipif(

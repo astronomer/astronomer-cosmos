@@ -1499,6 +1499,7 @@ class DbtGraph:
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
                 if node.unique_id in self.excluded_node_ids:
+                    self.filtered_nodes.pop(node.unique_id, None)
                     continue
                 for node_id in node.depends_on:
                     if node_id in self.filtered_nodes:

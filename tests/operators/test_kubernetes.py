@@ -1,10 +1,12 @@
+import json
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 import kubernetes.client as k8s
 import pytest
 from airflow.models import DAG
-from airflow.models.connection import Connection
 
 try:
     from airflow.sdk.definitions.context import Context
@@ -31,7 +33,7 @@ from cosmos.operators.kubernetes import (
     DbtTestKubernetesOperator,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
-from tests.conftest import base_operator_get_connection_path, make_task_instance
+from tests.conftest import make_task_instance
 
 profile_config = ProfileConfig(
     profile_name="default",
@@ -212,8 +214,9 @@ def test_dbt_kubernetes_build_command():
     """
     for command_name, command_operator in result_map.items():
         command_operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
-        assert command_operator.cmds == ["dbt"]
+        assert command_operator.cmds == []
         assert command_operator.arguments == [
+            "dbt",
             *command_name,
             "--vars",
             "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
@@ -222,6 +225,46 @@ def test_dbt_kubernetes_build_command():
             "--project-dir",
             "my/dir",
         ]
+
+
+def test_dbt_kubernetes_build_command_with_explicit_cmds():
+    """
+    If the user has explicitly set ``cmds`` on the operator, build_kube_args should honor that by
+    splitting the executable from the rest of the arguments, instead of leaving ``cmds`` untouched.
+    """
+    operator = DbtLSKubernetesOperator(cmds=["dbt"], **base_kwargs)
+    operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
+    assert operator.cmds == ["dbt"]
+    assert operator.arguments == [
+        "ls",
+        "--vars",
+        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
+        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        "--no-version-check",
+        "--project-dir",
+        "my/dir",
+    ]
+
+
+def test_dbt_kubernetes_build_command_preserves_custom_cmds():
+    """
+    A user-supplied wrapper ``cmds`` must be preserved unchanged, with the full dbt command
+    (including the ``dbt`` executable) passed as ``arguments`` for the wrapper to invoke
+    (regression for #2889).
+    """
+    operator = DbtLSKubernetesOperator(cmds=["/custom-entrypoint.sh"], **base_kwargs)
+    operator.build_kube_args(context=MagicMock(), cmd_flags=MagicMock())
+    assert operator.cmds == ["/custom-entrypoint.sh"]
+    assert operator.arguments == [
+        "dbt",
+        "ls",
+        "--vars",
+        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
+        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        "--no-version-check",
+        "--project-dir",
+        "my/dir",
+    ]
 
 
 def test_dbt_test_kubernetes_operator_constructor(kubernetes_pod_operator_callback):
@@ -585,6 +628,7 @@ def test_created_pod():
     assert container.image == "my_image"
 
     expected_container_args = [
+        "dbt",
         "ls",
         "--vars",
         "end_time: '{{ "
@@ -598,7 +642,7 @@ def test_created_pod():
         "my/dir",
     ]
     assert container.args == expected_container_args
-    assert container.command == ["dbt"]
+    assert container.command == []
 
 
 @pytest.mark.parametrize(
@@ -667,9 +711,10 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_args):
 
     container = get_or_create_pod.call_args.kwargs["pod_request_obj"].to_dict()["spec"]["containers"][0]
 
-    # build_kube_args now splits the executable into cmds and arguments
-    assert container["command"] == ["dbt"]
-    assert container["args"] == expected_args
+    # By default, cmds is left untouched (empty) so the container image's ENTRYPOINT is
+    # preserved; the full dbt command (including the "dbt" executable) is passed as args.
+    assert container["command"] == []
+    assert container["args"] == ["dbt", *expected_args]
 
 
 @pytest.mark.parametrize(
@@ -749,7 +794,7 @@ def test_kubernetes_task_group():
         )
 
     assert all(t.task_id.startswith(f"{group_id}.") for t in task_group)
-    assert len(dag.tasks) == len([t for t in task_group])
+    assert len(dag.tasks) == len([*task_group])
     assert any(t for t in task_group if isinstance(t, DbtKubernetesBaseOperator))
     assert all(t.image == image for t in (t for t in task_group if isinstance(t, DbtKubernetesBaseOperator)))
 
@@ -839,17 +884,20 @@ def test_dbt_docs_kubernetes_operator_ignores_graph_gpickle():
     assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
 
 
+@pytest.mark.parametrize(
+    ("folder_dir", "expected_folder_dir", "region_name", "session_token"),
+    [
+        ("docs", "docs", "us-east-1", "session-token"),
+        (None, "", None, None),
+        ("docs/", "docs", None, None),
+    ],
+)
 @patch(
     "cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_cmd", return_value=(["dbt", "docs", "generate"], {})
 )
-def test_dbt_docs_s3_kubernetes_operator_uses_connection_id(mock_build_cmd, mock_kubernetes_execute):
-    conn = Connection(
-        conn_id="aws_s3_conn",
-        conn_type="aws",
-        login="l",
-        password="p",
-        extra='{"region_name": "us-east-1", "aws_session_token": "t"}',
-    )
+def test_dbt_docs_s3_kubernetes_operator_uses_connection_id(
+    _mock_build_cmd, mock_kubernetes_execute, folder_dir, expected_folder_dir, region_name, session_token
+):
     operator = DbtDocsS3KubernetesOperator(
         task_id="fake-task",
         project_dir="fake-dir",
@@ -857,20 +905,153 @@ def test_dbt_docs_s3_kubernetes_operator_uses_connection_id(mock_build_cmd, mock
         profile_config=profile_config,
         connection_id="aws_s3_conn",
         bucket_name="fake-bucket",
+        folder_dir=folder_dir,
     )
 
-    with patch(base_operator_get_connection_path, return_value=conn):
+    with patch("airflow.providers.amazon.aws.hooks.base_aws.AwsBaseHook") as mock_aws_base_hook:
+        mock_hook = mock_aws_base_hook.return_value
+        mock_hook.get_credentials.side_effect = AssertionError("worker credentials should not be resolved")
+        mock_hook.region_name = region_name
+        mock_hook.verify = None
+        mock_hook.conn_config.aws_access_key_id = "access-key"
+        mock_hook.conn_config.aws_secret_access_key = "secret-key"
+        mock_hook.conn_config.aws_session_token = session_token
+        mock_hook.conn_config.get_service_endpoint_url.return_value = None
+        mock_hook.conn_config.extra_config = {}
+
         operator.build_and_run_cmd(context={})
 
+    mock_aws_base_hook.assert_called_once_with(aws_conn_id="aws_s3_conn", client_type="s3")
+    mock_hook.get_credentials.assert_not_called()
+
     env_vars = {env_var.name: env_var.value for env_var in operator.env_vars}
-    assert env_vars["AWS_ACCESS_KEY_ID"] == "l"
-    assert env_vars["AWS_SECRET_ACCESS_KEY"] == "p"
-    assert env_vars["AWS_SESSION_TOKEN"] == "t"
-    assert env_vars["AWS_DEFAULT_REGION"] == "us-east-1"
+    assert env_vars["AWS_ACCESS_KEY_ID"] == "access-key"
+    assert env_vars["AWS_SECRET_ACCESS_KEY"] == "secret-key"
+    if session_token:
+        assert env_vars["AWS_SESSION_TOKEN"] == session_token
+    else:
+        assert "AWS_SESSION_TOKEN" not in env_vars
+    if region_name:
+        assert env_vars["AWS_DEFAULT_REGION"] == region_name
+        assert env_vars["AWS_REGION"] == region_name
+    else:
+        assert "AWS_DEFAULT_REGION" not in env_vars
+        assert "AWS_REGION" not in env_vars
 
     # Guard the bash -c path: build_kube_args splits "dbt" into self.cmds, so the shell
     # command must still start with the full "dbt docs generate" and not drop the executable
     # (regression in the cloud-docs build_and_run_cmd, see PR #2488).
     assert operator.cmds == ["/bin/bash", "-c"]
-    assert operator.arguments[0].startswith("dbt docs generate")
-    assert " && aws s3 sync " in operator.arguments[0]
+
+    shell_cmd = operator.arguments[0]
+    assert shell_cmd.startswith("dbt docs generate")
+    assert "--profile default" in shell_cmd
+    assert "--target dev" in shell_cmd
+    assert "--project-dir fake-dir" in shell_cmd
+    assert " && $(command -v python3 || command -v python) - <<'PY'" in shell_cmd
+    assert f'folder_dir = "{expected_folder_dir}"' in shell_cmd
+
+
+@patch(
+    "cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_cmd", return_value=(["dbt", "docs", "generate"], {})
+)
+def test_dbt_docs_s3_kubernetes_operator_passes_s3_client_config(_mock_build_cmd, mock_kubernetes_execute):
+    operator = DbtDocsS3KubernetesOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        image="fake-image",
+        profile_config=profile_config,
+        connection_id="aws_s3_conn",
+        bucket_name="fake-bucket",
+        folder_dir="docs",
+    )
+
+    with patch("airflow.providers.amazon.aws.hooks.base_aws.AwsBaseHook") as mock_aws_base_hook:
+        mock_hook = mock_aws_base_hook.return_value
+        mock_hook.get_credentials.side_effect = AssertionError("worker credentials should not be resolved")
+        mock_hook.region_name = None
+        mock_hook.verify = False
+        mock_hook.conn_config.aws_access_key_id = None
+        mock_hook.conn_config.aws_secret_access_key = None
+        mock_hook.conn_config.aws_session_token = None
+        mock_hook.conn_config.get_service_endpoint_url.return_value = "http://minio:9000"
+        mock_hook.conn_config.extra_config = {"config_kwargs": {"s3": {"addressing_style": "path"}}}
+
+        operator.build_and_run_cmd(context={})
+
+    env_vars = {env_var.name: env_var.value for env_var in operator.env_vars}
+    assert "AWS_ACCESS_KEY_ID" not in env_vars
+    assert "AWS_SECRET_ACCESS_KEY" not in env_vars
+    assert "AWS_SESSION_TOKEN" not in env_vars
+    assert env_vars["AWS_ENDPOINT_URL_S3"] == "http://minio:9000"
+    assert json.loads(env_vars["COSMOS_AWS_CLIENT_CONFIG"]) == {
+        "verify": False,
+        "config_kwargs": {"s3": {"addressing_style": "path"}},
+    }
+
+    shell_cmd = operator.arguments[0]
+    assert 'endpoint_url = os.environ.get("AWS_ENDPOINT_URL_S3")' in shell_cmd
+    assert 'client_config = json.loads(os.environ.get("COSMOS_AWS_CLIENT_CONFIG", "{}"))' in shell_cmd
+    assert 'client_kwargs["endpoint_url"] = endpoint_url' in shell_cmd
+    assert 'client_kwargs["verify"] = client_config["verify"]' in shell_cmd
+    assert "from botocore.config import Config" in shell_cmd
+    assert 'client_kwargs["config"] = Config(**config_kwargs)' in shell_cmd
+    assert 's3 = boto3.client("s3", **client_kwargs)' in shell_cmd
+
+
+def test_dbt_docs_s3_kubernetes_operator_upload_script_uploads_target_tree(tmp_path, monkeypatch):
+    target_dir = tmp_path / "target"
+    (target_dir / "nested").mkdir(parents=True)
+    (target_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    (target_dir / "nested" / "artifact").write_text("{}", encoding="utf-8")
+
+    uploads = []
+
+    def fake_upload_file(filename, bucket, key, ExtraArgs=None):
+        uploads.append(
+            {
+                "filename": filename,
+                "bucket": bucket,
+                "key": key,
+                "ExtraArgs": ExtraArgs,
+            }
+        )
+
+    def fake_client(service_name, **kwargs):
+        assert service_name == "s3"
+        assert kwargs == {}
+        return SimpleNamespace(upload_file=fake_upload_file)
+
+    monkeypatch.setitem(sys.modules, "boto3", SimpleNamespace(client=fake_client))
+    monkeypatch.delenv("AWS_ENDPOINT_URL_S3", raising=False)
+    monkeypatch.delenv("COSMOS_AWS_CLIENT_CONFIG", raising=False)
+
+    operator = DbtDocsS3KubernetesOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        image="fake-image",
+        profile_config=profile_config,
+        connection_id="aws_s3_conn",
+        bucket_name="fake-bucket",
+        folder_dir="docs",
+    )
+
+    shell_cmd = operator.build_upload_shell_command(str(target_dir))
+    upload_script = shell_cmd.split("<<'PY'\n", 1)[1].removesuffix("\nPY")
+
+    exec(upload_script, {})
+
+    assert sorted(uploads, key=lambda upload: upload["key"]) == [
+        {
+            "filename": str(target_dir / "index.html"),
+            "bucket": "fake-bucket",
+            "key": "docs/index.html",
+            "ExtraArgs": {"ContentType": "text/html"},
+        },
+        {
+            "filename": str(target_dir / "nested" / "artifact"),
+            "bucket": "fake-bucket",
+            "key": "docs/nested/artifact",
+            "ExtraArgs": None,
+        },
+    ]

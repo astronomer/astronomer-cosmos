@@ -303,7 +303,11 @@ class CosmosAF3Plugin(AirflowPlugin):
 
     def __init__(self) -> None:
         super().__init__()
-        ensure_airflow_version_supported()
+        if AIRFLOW_VERSION < Version("3.1.0"):
+            logger.warning(
+                "Cosmos dbt docs views require Airflow >= 3.1 (running %s); skipping them.", airflow.__version__
+            )
+            return
         # Initialize FastAPI app only after version support is confirmed
         self.fastapi_apps = [
             {
@@ -313,6 +317,8 @@ class CosmosAF3Plugin(AirflowPlugin):
             }
         ]
         projects = _load_projects_from_conf()
+        # Instance-level list: Airflow 3 can instantiate the plugin more than once per process
+        self.external_views = []
         for slug, cfg in projects.items():
             display_name = cfg.get("name") or f"dbt Docs ({slug})"
             self.external_views.append(

@@ -4,7 +4,7 @@ Managing sources
 ================
 
 .. note::
-    This feature is only available for dbt-core >= 1.5 and cosmos >= 1.6.0.
+    This feature is only available for cosmos >= 1.6.0.
 
 By default, Cosmos does not render dbt sources automatically. Instead, you need to configure the rendering of sources explicitly.
 You can control this behavior using the ``source_rendering_behavior`` field in the ``RenderConfig`` object. This is how it works:
@@ -22,6 +22,7 @@ You can control this behavior using the ``source_rendering_behavior`` field in t
 - **none** (default): When set to ``none``, Cosmos does not automatically render any sources. Note that if node converters are being used for sources, they will still function as intended.
 
 - **with_tests_or_freshness**: When set to ``with_tests_or_freshness``, Cosmos only renders sources that have either tests or freshness checks.
+  Sources that have tests but no freshness checks are rendered as ``EmptyOperator``.
 
 Example:
 
@@ -67,6 +68,10 @@ on_warning_callback callback
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``on_warning_callback`` is a callback parameter available on the ``DbtSourceLocalOperator``. This callback is triggered when a warning occurs during the execution of the ``dbt source freshness`` command. The callback accepts the task context, which includes additional parameters: test_names and test_results
+
+As with test warnings, this callback can be given either as a top-level ``DbtDag`` / ``DbtTaskGroup`` argument or
+inside ``operator_args``, and the top-level argument wins when both are given. See :ref:`testing-behavior` for
+details.
 
 Example:
 

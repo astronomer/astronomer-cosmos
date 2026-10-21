@@ -1,0 +1,24 @@
+name: 'project_a'
+version: '1.0.0'
+config-version: 2
+
+profile: 'project_a'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Model configurations
+models:
+  project_a:
+    +materialized: table
+    # Staging model - public for cross-project reference (consumed by project_b)
+    stg_a_customers:
+      +materialized: view
+      +access: public

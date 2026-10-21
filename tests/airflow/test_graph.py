@@ -23,11 +23,13 @@ from cosmos.airflow.graph import (
     _add_teardown_task,
     _add_watcher_producer_task,
     _convert_list_to_str,
+    _honor_on_warning_callback,
     _snake_case_to_camelcase,
     build_airflow_graph,
     calculate_detached_node_name,
     calculate_leaves,
     calculate_operator_class,
+    calculate_test_operator_kwargs,
     create_task_groups_based_on_folder,
     create_task_metadata,
     create_test_task_metadata,
@@ -210,7 +212,7 @@ def test_build_airflow_graph_with_after_each(hierarchical_naming_disabled):
 
     assert task_seed_parent_seed.owner == DEFAULT_OWNER
     assert task_parent_run.owner == "parent_node"
-    assert {d for d in dag.owner.split(", ")} == {DEFAULT_OWNER, "parent_node"}
+    assert {*dag.owner.split(", ")} == {DEFAULT_OWNER, "parent_node"}
 
 
 @pytest.mark.parametrize(
@@ -902,6 +904,91 @@ def test_create_task_metadata_ephemeral_model_disabled_renders_dbt_build_in_buil
     assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
 
 
+def _semantic_metric_view_node(materialization="metric_view"):
+    return DbtNode(
+        unique_id=f"{DbtResourceType.SEMANTIC_METRIC_VIEW.value}.my_folder.my_model",
+        resource_type=DbtResourceType.SEMANTIC_METRIC_VIEW,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={"materialized": materialization},
+    )
+
+
+def test_create_task_metadata_semantic_metric_view_model_renders_with_semantic_metric_run_suffix():
+    """Semantic metric view nodes (Databricks metric views, Snowflake semantic views) are rendered via a
+    dedicated DbtSemantic operator (still just running `dbt run` underneath), with a
+    `_semantic_metric_run` suffix distinguishing them from plain models. The reclassification tests in
+    tests/dbt/test_graph.py already cover both the metric_view and semantic_view materializations;
+    create_task_metadata itself doesn't branch on materialized, so a single case suffices here."""
+    metadata = create_task_metadata(
+        _semantic_metric_view_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+    assert metadata.id == "my_model_semantic_metric_run"
+    assert metadata.operator_class == "cosmos.operators.local.DbtSemanticMetricViewLocalOperator"
+    assert metadata.arguments == {"select": "my_model"}
+
+
+def test_create_task_metadata_semantic_metric_view_model_under_build_mode():
+    """Under TestBehavior.BUILD, semantic metric view nodes get full BUILD treatment (like MODEL/SEED/SNAPSHOT),
+    rendering as dbt build tasks rather than falling through to the generic model branch."""
+    metadata = create_task_metadata(
+        _semantic_metric_view_node(),
+        execution_mode=ExecutionMode.LOCAL,
+        args={},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
+    )
+    assert metadata.id == "my_model_semantic_metric_view_build"
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+
+
+def test_generate_task_or_group_semantic_metric_view_model_bundles_non_detached_test():
+    """A semantic metric view node (metric view / semantic view) with a single-parent test must still get
+    the AFTER_EACH TaskGroup bundling. Regression test: TESTABLE_DBT_RESOURCES previously omitted
+    DbtResourceType.SEMANTIC_METRIC_VIEW, so `use_task_group` was always False for these nodes and the
+    non-detached test was silently dropped from the DAG."""
+    with DAG("test-semantic-metric-view-use-task-group", start_date=datetime(2022, 1, 1)) as dag:
+        node = DbtNode(
+            unique_id=f"{DbtResourceType.SEMANTIC_METRIC_VIEW.value}.my_folder.my_model",
+            resource_type=DbtResourceType.SEMANTIC_METRIC_VIEW,
+            depends_on=[],
+            path_base=Path("."),
+            original_file_path=Path("."),
+            tags=[],
+            config={"materialized": "metric_view"},
+            has_test=True,
+            has_non_detached_test=True,
+        )
+        task_or_group = generate_task_or_group(
+            dag=dag,
+            task_group=None,
+            node=node,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn",
+                        profile_args={"schema": "public"},
+                    ),
+                ),
+            },
+            render_config=RenderConfig(test_behavior=TestBehavior.AFTER_EACH),
+            node_converters={},
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+        )
+        assert isinstance(task_or_group, TaskGroup)
+        assert "my_model.semantic_metric_run" in task_or_group.children
+        assert "my_model.test" in task_or_group.children
+
+
 def test_create_task_metadata_build_mode_forwards_render_config_exclude():
     """Under TestBehavior.BUILD, tests run inline with `dbt build`, so RenderConfig.exclude must be
     forwarded to the build command — otherwise e.g. exclude=["resource_type:unit_test"] would not
@@ -924,6 +1011,32 @@ def test_create_task_metadata_build_mode_forwards_render_config_exclude():
     assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
     assert metadata.arguments["select"] == "fqn:my_project.model_a"
     assert metadata.arguments["exclude"] == "resource_type:unit_test"
+
+
+def test_create_task_metadata_build_honors_on_warning_callback_from_task_args():
+    """Under TestBehavior.BUILD there is no separate test task, so an ``on_warning_callback`` passed through
+    ``operator_args`` must reach the build task instead of being dropped by the unset top-level argument.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    operator_args_callback = MagicMock()
+    model_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_project.model_a",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("base_path"),
+        original_file_path=Path("models/model_a.sql"),
+        fqn=["my_project", "model_a"],
+    )
+    metadata = create_task_metadata(
+        model_node,
+        execution_mode=ExecutionMode.LOCAL,
+        args={"on_warning_callback": operator_args_callback},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(test_behavior=TestBehavior.BUILD),
+    )
+    assert metadata.operator_class == "cosmos.operators.local.DbtBuildLocalOperator"
+    assert metadata.arguments["on_warning_callback"] is operator_args_callback
 
 
 def test_create_task_metadata_ephemeral_empty_operator_inherits_owner():
@@ -1001,6 +1114,104 @@ def test_create_task_metadata_source_with_rendering_options(
     if metadata:
         assert metadata.id == expected_id
         assert metadata.operator_class == expected_operator_class
+
+
+@pytest.mark.parametrize(
+    "has_freshness, has_test, expected_operator_class",
+    [
+        (True, False, "cosmos.operators.local.DbtSourceLocalOperator"),
+        (True, True, "cosmos.operators.local.DbtSourceLocalOperator"),
+        (False, True, EMPTY_OPERATOR_CLASS_PATH),
+        (False, False, None),
+    ],
+)
+def test_create_task_metadata_source_with_tests_or_freshness(has_freshness, has_test, expected_operator_class):
+    """Sources with tests but no freshness are rendered as EmptyOperator under WITH_TESTS_OR_FRESHNESS."""
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        has_freshness=has_freshness,
+        has_test=has_test,
+    )
+
+    metadata = create_task_metadata(
+        source_node,
+        execution_mode=ExecutionMode.LOCAL,
+        render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS),
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+
+    if expected_operator_class is None:
+        assert metadata is None
+    else:
+        assert metadata.id == "my_source_source"
+        assert metadata.operator_class == expected_operator_class
+
+
+@pytest.mark.parametrize(
+    "source_rendering_behavior", [SourceRenderingBehavior.ALL, SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS]
+)
+@pytest.mark.parametrize("enable_owner_inheritance, expected_owner", [(True, "dbt-owner"), (False, "")])
+def test_create_task_metadata_source_empty_operator_owner(
+    source_rendering_behavior, enable_owner_inheritance, expected_owner
+):
+    """The source EmptyOperator inherits the dbt owner when owner inheritance is enabled (default)."""
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        config={"meta": {"owner": "dbt-owner"}},
+        has_freshness=False,
+        has_test=True,
+    )
+
+    metadata = create_task_metadata(
+        source_node,
+        execution_mode=ExecutionMode.LOCAL,
+        render_config=RenderConfig(
+            source_rendering_behavior=source_rendering_behavior,
+            enable_owner_inheritance=enable_owner_inheritance,
+        ),
+        args={},
+        dbt_dag_task_group_identifier="",
+    )
+
+    assert metadata.operator_class == EMPTY_OPERATOR_CLASS_PATH
+    assert metadata.owner == expected_owner
+
+
+def test_create_task_metadata_source_honors_on_warning_callback_from_task_args():
+    """``dbt source freshness`` tasks accept ``on_warning_callback``, so one passed through ``operator_args``
+    must not be dropped by the unset top-level argument.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    operator_args_callback = MagicMock()
+    source_node = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.my_folder.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+        has_freshness=True,
+    )
+    metadata = create_task_metadata(
+        source_node,
+        execution_mode=ExecutionMode.LOCAL,
+        args={"on_warning_callback": operator_args_callback},
+        dbt_dag_task_group_identifier="",
+        render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL),
+    )
+    assert metadata.operator_class == "cosmos.operators.local.DbtSourceLocalOperator"
+    assert metadata.arguments["on_warning_callback"] is operator_args_callback
 
 
 @pytest.mark.parametrize("use_task_group", (None, True, False))
@@ -1412,6 +1623,84 @@ def test_create_test_task_metadata(node_type, node_unique_id, test_indirect_sele
     }
 
 
+def test_create_test_task_metadata_honors_on_warning_callback_from_task_args():
+    """An ``on_warning_callback`` passed through ``operator_args`` (and therefore already inside ``task_args``)
+    must not be dropped by an unset top-level ``on_warning_callback``.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    operator_args_callback = MagicMock()
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"on_warning_callback": operator_args_callback},
+        node=sample_node,
+    )
+    assert metadata.arguments["on_warning_callback"] is operator_args_callback
+
+
+def test_create_test_task_metadata_top_level_on_warning_callback_takes_precedence():
+    """When ``on_warning_callback`` is given both top-level and through ``operator_args``, the top-level
+    DbtDag / DbtTaskGroup argument wins.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    operator_args_callback = MagicMock()
+    top_level_callback = MagicMock()
+    sample_node = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.my_folder.node_name",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("."),
+        tags=[],
+        config={},
+    )
+    metadata = create_test_task_metadata(
+        test_task_name="test",
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={"on_warning_callback": operator_args_callback},
+        on_warning_callback=top_level_callback,
+        node=sample_node,
+    )
+    assert metadata.arguments["on_warning_callback"] is top_level_callback
+
+
+@pytest.mark.parametrize(
+    "task_args_callback,top_level_callback,expected_callback",
+    [
+        pytest.param("task_args", None, "task_args", id="only-operator-args"),
+        pytest.param(None, "top_level", "top_level", id="only-top-level"),
+        pytest.param("task_args", "top_level", "top_level", id="top-level-wins"),
+        pytest.param(None, None, None, id="neither-set"),
+    ],
+)
+def test_honor_on_warning_callback(task_args_callback, top_level_callback, expected_callback):
+    """The key is always set, so the operator is handed an explicit ``None`` when neither form is used, but a
+    ``task_args`` value is only overwritten when the top-level argument is set.
+
+    See https://github.com/astronomer/astronomer-cosmos/issues/2869.
+    """
+    callbacks = {"task_args": MagicMock(), "top_level": MagicMock(), None: None}
+    task_args = {} if task_args_callback is None else {"on_warning_callback": callbacks[task_args_callback]}
+
+    _honor_on_warning_callback(task_args, callbacks[top_level_callback])
+
+    assert "on_warning_callback" in task_args
+    assert task_args["on_warning_callback"] is callbacks[expected_callback]
+
+
 @pytest.mark.parametrize(
     "exclude,expected_exclude",
     [
@@ -1676,6 +1965,64 @@ def test_watcher_producer_uses_resource_type_flag_to_exclude_tests(test_behavior
     actual_resource_types = [flags[i + 1] for i in range(len(flags)) if flags[i] == "--resource-type"]
     assert actual_resource_types == expected_resource_types
     assert "resource_type:test" not in (producer_task.exclude or "")
+
+
+def _build_watcher_graph_with_render_config(render_config):
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": SAMPLE_PROJ_PATH,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+
+    build_airflow_graph(
+        nodes=sample_nodes,
+        dag=dag,
+        execution_mode=ExecutionMode.WATCHER,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args=task_args,
+        render_config=render_config,
+        dbt_project_name="astro_shop",
+    )
+    return next(task for task in dag.tasks if isinstance(task, DbtProducerWatcherOperator))
+
+
+@pytest.mark.parametrize("argument", ["select", "exclude"])
+@pytest.mark.parametrize(
+    "selector",
+    [
+        "resource_type:semantic_metric_view",
+        "+resource_type:semantic_metric_view",
+        "tag:a,resource_type:semantic_metric_view",
+    ],
+)
+def test_watcher_producer_rejects_semantic_metric_view_resource_type_selector(argument, selector):
+    """dbt rejects ``resource_type:semantic_metric_view``, so the watcher producer can't be given it."""
+    render_config = RenderConfig(**{argument: [selector]})
+
+    with pytest.raises(CosmosValueError, match=rf"RenderConfig.{argument} uses 'resource_type:semantic_metric_view'"):
+        _build_watcher_graph_with_render_config(render_config)
+
+
+@pytest.mark.parametrize("selector", ["config.materialized:metric_view", "config.materialized:semantic_view"])
+def test_watcher_producer_forwards_materialization_selector_for_semantic_metric_views(selector):
+    producer_task = _build_watcher_graph_with_render_config(RenderConfig(select=[selector]))
+
+    assert producer_task.select == selector
+
+
+def test_watcher_producer_resource_types_are_all_known_to_dbt():
+    """The producer passes SUPPORTED_BUILD_RESOURCES to dbt as ``--resource-type``. dbt rejects ``semantic_metric_view``
+    (a Cosmos-only type), and it does not need it: dbt still sees metric views as ``model``, which is already built."""
+    assert DbtResourceType.MODEL in SUPPORTED_BUILD_RESOURCES
+    assert DbtResourceType.SEMANTIC_METRIC_VIEW not in SUPPORTED_BUILD_RESOURCES
 
 
 @pytest.mark.parametrize("test_behavior", [TestBehavior.NONE, TestBehavior.AFTER_ALL])
@@ -2797,3 +3144,176 @@ def test_create_task_metadata_seed_rendering_always_no_flag():
     )
     assert metadata.operator_class == "cosmos.operators.local.DbtSeedLocalOperator"
     assert "should_run_if_seed_changed" not in metadata.extra_context
+
+
+def _model_with_node_retries(retries):
+    return DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.proj.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=Path("."),
+        original_file_path=Path("models/my_model.sql"),
+        tags=[],
+        config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": {"retries": retries}}}},
+        has_test=True,
+    )
+
+
+def test_retries_after_all_separates_model_and_test():
+    """Per-node ``retries`` reaches the model task, while the AFTER_ALL test task (node=None) keeps the DAG default.
+
+    This is the supported way to retry model runs but not tests (issue #2130).
+    """
+    node = _model_with_node_retries(2)
+    model_meta = create_task_metadata(
+        node, execution_mode=ExecutionMode.LOCAL, args={"retries": 0}, dbt_dag_task_group_identifier="dag"
+    )
+    test_meta = create_test_task_metadata(
+        "proj_test",
+        ExecutionMode.LOCAL,
+        TestIndirectSelection.EAGER,
+        task_args={"retries": 0},
+        render_config=RenderConfig(test_behavior=TestBehavior.AFTER_ALL, select=[], exclude=[]),
+    )
+    assert model_meta.arguments["retries"] == 2
+    assert test_meta.arguments["retries"] == 0
+
+
+def test_retries_after_each_test_inherits_model_operator_kwargs():
+    """AFTER_EACH builds the test task from the model node, so per-node ``retries`` also applies to the test,
+    unless the test itself declares an override (see ``test_test_node_operator_kwargs_override_the_ones_inherited_from_the_model``).
+    """
+    node = _model_with_node_retries(2)
+    test_meta = create_test_task_metadata(
+        "test",
+        ExecutionMode.LOCAL,
+        TestIndirectSelection.EAGER,
+        task_args={"retries": 0},
+        node=node,
+    )
+    assert test_meta.arguments["retries"] == 2
+
+
+def _model_and_test_nodes(model_kwargs, test_kwargs, second_test_kwargs=None):
+    model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/my_model.sql"),
+        config={"materialized": "table", "meta": {"cosmos": {"operator_kwargs": model_kwargs}}},
+        has_test=True,
+        has_non_detached_test=True,
+    )
+    nodes = {model.unique_id: model}
+    for index, kwargs in enumerate([test_kwargs, second_test_kwargs]):
+        if kwargs is None:
+            continue
+        test = DbtNode(
+            unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.my_test_{index}",
+            resource_type=DbtResourceType.TEST,
+            depends_on=[model.unique_id],
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("models/schema.yml"),
+            config={"meta": {"cosmos": {"operator_kwargs": kwargs}}},
+        )
+        nodes[test.unique_id] = test
+    return nodes
+
+
+def _render_after_each(dag_id, nodes, retries=3):
+    with DAG(dag_id, start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn", profile_args={"schema": "public"}
+                    ),
+                ),
+                "retries": retries,
+            },
+            render_config=RenderConfig(test_behavior=TestBehavior.AFTER_EACH),
+            dbt_project_name="astro_shop",
+        )
+    return dag
+
+
+def test_test_node_operator_kwargs_override_the_ones_inherited_from_the_model():
+    """A test declaring `retries` overrides the value it would inherit from the model it tests (#2130)."""
+    nodes = _model_and_test_nodes(model_kwargs={"retries": 2}, test_kwargs={"retries": 0})
+    dag = _render_after_each("test-test-node-kwargs", nodes)
+    assert dag.task_dict["my_model.run"].retries == 2
+    assert dag.task_dict["my_model.test"].retries == 0
+
+
+def test_test_node_operator_kwargs_are_merged_with_the_ones_inherited_from_the_model():
+    """Arguments the test does not declare are still inherited from the model it tests."""
+    nodes = _model_and_test_nodes(model_kwargs={"retries": 2, "pool": "model_pool"}, test_kwargs={"retries": 0})
+    dag = _render_after_each("test-test-node-kwargs-merge", nodes)
+    assert dag.task_dict["my_model.test"].retries == 0
+    assert dag.task_dict["my_model.test"].pool == "model_pool"
+
+
+def test_conflicting_test_node_operator_kwargs_log_warning(caplog):
+    """Tests of a node run in a single task, so conflicting values are resolved as last-one-wins, with a warning."""
+    nodes = _model_and_test_nodes(model_kwargs={}, test_kwargs={"retries": 1}, second_test_kwargs={"retries": 0})
+    dag = _render_after_each("test-conflicting-test-node-kwargs", nodes)
+    assert dag.task_dict["my_model.test"].retries == 0
+    assert "declare conflicting values for the operator_kwarg <retries>" in caplog.text
+
+
+def test_detached_test_node_operator_kwargs_are_not_applied_to_the_parent_test_task():
+    """Detached tests run in their own task, so their kwargs do not leak into their parents' test tasks."""
+    parent = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.my_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/my_model.sql"),
+        config={"materialized": "table"},
+        has_test=True,
+    )
+    detached_test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.my_detached_test",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[parent.unique_id, "model.other"],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/schema.yml"),
+        config={"meta": {"cosmos": {"operator_kwargs": {"retries": 0}}}},
+    )
+    nodes = {parent.unique_id: parent, detached_test.unique_id: detached_test}
+    assert calculate_test_operator_kwargs(nodes, detached_nodes={detached_test.unique_id: detached_test}) == {}
+
+
+def test_test_node_operator_kwargs_do_not_apply_to_after_all_test_task():
+    """The TestBehavior.AFTER_ALL task is not associated with any node, so it keeps the DAG-level arguments."""
+    nodes = _model_and_test_nodes(model_kwargs={"retries": 2}, test_kwargs={"retries": 0})
+    with DAG("test-test-node-kwargs-after-all", start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn", profile_args={"schema": "public"}
+                    ),
+                ),
+                "retries": 3,
+            },
+            render_config=RenderConfig(test_behavior=TestBehavior.AFTER_ALL),
+            dbt_project_name="astro_shop",
+        )
+    assert dag.task_dict["my_model_run"].retries == 2
+    assert dag.task_dict["astro_shop_test"].retries == 3

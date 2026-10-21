@@ -128,11 +128,230 @@ my_profile:
         profile_config.target_name = "dev"
         assert get_dataset_namespace(profile_config) == "postgres://dbhost:5433"
 
+    def test_profiles_yml_filepath_renders_env_var(self, tmp_path, monkeypatch):
+        """profiles.yml may use dbt's env_var() Jinja; it must be rendered, not passed through literally."""
+        monkeypatch.setenv("DB_HOST", "dbhost")
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST') }}"
+      port: 5433
+      user: user
+      pass: pass
+      dbname: mydb
+      schema: public
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://dbhost:5433"
+
+    def test_profiles_yml_filepath_env_var_default(self, tmp_path, monkeypatch):
+        """env_var()'s dbt-style default argument is honored when the variable is unset."""
+        monkeypatch.delenv("DB_HOST", raising=False)
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST', 'db.prod.internal') }}"
+      port: 5433
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://db.prod.internal:5433"
+
+    def test_profiles_yml_filepath_env_var_with_jinja_filters(self, tmp_path, monkeypatch):
+        """env_var() used inside other Jinja constructs (concatenation, filters) renders correctly,
+        matching dbt's own rendering semantics rather than a bare env_var(...) substitution."""
+        monkeypatch.setenv("DB_HOST", "dbhost")
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST') ~ '.internal' }}"
+      port: 5433
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://dbhost.internal:5433"
+
+    def test_profiles_yml_filepath_unrenderable_namespace_field_returns_none(self, tmp_path, caplog):
+        """An unrenderable resolver-read field must not leak literal Jinja into the namespace."""
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "db-{{ this.is_not_env_var }}.prod.internal"
+      port: 5433
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        with caplog.at_level(logging.WARNING):
+            assert get_dataset_namespace(profile_config) is None
+        assert "unrendered Jinja" in caplog.text
+
+    def test_profiles_yml_filepath_empty_namespace_field_returns_none(self, tmp_path, caplog, monkeypatch):
+        """A missing env_var without a default must not emit an empty namespace component."""
+        monkeypatch.delenv("COSMOS_MISSING_NAMESPACE_HOST", raising=False)
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('COSMOS_MISSING_NAMESPACE_HOST') }}"
+      port: 5433
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        with caplog.at_level(logging.WARNING):
+            assert get_dataset_namespace(profile_config) is None
+        assert "empty host" in caplog.text
+
+    def test_profiles_yml_filepath_glue_empty_role_arn_with_account_id(self, tmp_path):
+        """role_arn is never read when account_id is set, so an empty role_arn is irrelevant
+        to the namespace and must not disable dataset emission."""
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: glue
+      region: us-east-1
+      account_id: "123456789012"
+      role_arn: "{{ env_var('GLUE_ROLE_ARN', '') }}"
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "arn:aws:glue:us-east-1:123456789012"
+
+    def test_profiles_yml_filepath_glue_empty_account_id_falls_through_to_role_arn(self, tmp_path):
+        """An empty account_id falls through to the role_arn fallback in the glue resolver."""
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: glue
+      region: us-east-1
+      account_id: "{{ env_var('GLUE_ACCOUNT_ID', '') }}"
+      role_arn: "arn:aws:iam::999888777666:role/my-role"
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "arn:aws:glue:us-east-1:999888777666"
+
+    def test_profiles_yml_filepath_spark_empty_method_with_port(self, tmp_path):
+        """method is only used for the default port; an empty method must not disable emission
+        when port is explicitly set."""
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: spark
+      host: sparkhost
+      port: 10000
+      method: "{{ env_var('SPARK_METHOD', '') }}"
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "spark://sparkhost:10000"
+
+    def test_profiles_yml_filepath_with_dbt_jinja_filters(self, tmp_path, monkeypatch):
+        """Regression test for #2948: dbt's documented profiles.yml filters (as_number, as_bool)
+        on fields the namespace resolvers never read must not disable dataset emission."""
+        monkeypatch.setenv("DB_HOST", "dbhost")
+        monkeypatch.setenv("DBT_THREADS", "8")
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST') }}"
+      port: 5433
+      user: user
+      pass: pass
+      dbname: mydb
+      schema: public
+      threads: "{{ env_var('DBT_THREADS', 4) | as_number }}"
+      connect_timeout: "{{ env_var('DBT_CONNECT_TIMEOUT', 10) | as_number }}"
+      use_ssl: "{{ env_var('DBT_USE_SSL', 'true') | as_bool }}"
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://dbhost:5433"
+
+    def test_profiles_yml_filepath_unknown_filter_on_irrelevant_field(self, tmp_path):
+        """A field using a Jinja filter this renderer does not know keeps its raw value; the
+        namespace is still derived from the remaining fields (#2948)."""
+        profiles_yml = tmp_path / "profiles.yml"
+        profiles_yml.write_text("""
+my_profile:
+  outputs:
+    dev:
+      type: postgres
+      host: dbhost
+      port: 5433
+      threads: "{{ env_var('DBT_THREADS', 4) | no_such_filter }}"
+""")
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = str(profiles_yml)
+        profile_config.profile_name = "my_profile"
+        profile_config.target_name = "dev"
+        assert get_dataset_namespace(profile_config) == "postgres://dbhost:5433"
+
     def test_returns_none_on_error(self):
         profile_config = MagicMock()
         profile_config.profile_mapping = None
         profile_config.profiles_yml_filepath = "/nonexistent/path.yml"
         assert get_dataset_namespace(profile_config) is None
+
+    def test_returns_none_on_error_logs_warning(self, caplog):
+        """A profile that cannot be read at all must surface as a WARNING, not a DEBUG line (#2948)."""
+        profile_config = MagicMock()
+        profile_config.profile_mapping = None
+        profile_config.profiles_yml_filepath = "/nonexistent/path.yml"
+        with caplog.at_level(logging.WARNING):
+            assert get_dataset_namespace(profile_config) is None
+        assert "Unable to extract profile info for dataset namespace derivation" in caplog.text
 
     def test_returns_none_when_no_profile_info(self):
         """When neither profile_mapping nor profiles_yml_filepath is set, returns None."""
@@ -378,6 +597,23 @@ class TestComputeModelOutletUris:
     def test_missing_manifest_returns_empty(self):
         result = compute_model_outlet_uris("/nonexistent/manifest.json", "postgres://host:5432")
         assert result == {}
+
+    def test_reads_manifest_via_object_storage_path(self, tmp_path):
+        """A manifest given as an Airflow ``ObjectStoragePath`` is read via ``.open()`` -- the same
+        path type ``ProjectConfig.manifest_path`` stores for remote manifests (``s3://``, ...)."""
+        try:
+            from airflow.sdk import ObjectStoragePath
+        except ImportError:
+            from airflow.io.path import ObjectStoragePath
+
+        manifest_path = tmp_path / "manifest.json"
+        manifest_path.write_text(json.dumps(self._manifest_with_two_emitting_nodes()))
+        object_storage_path = ObjectStoragePath(manifest_path.as_uri())
+
+        result = compute_model_outlet_uris(object_storage_path, "postgres://host:5432")
+
+        assert "model.jaffle_shop.customers" in result
+        assert "seed.jaffle_shop.raw_orders" in result
 
     def test_skips_nodes_with_missing_fields(self, tmp_path):
         manifest = {

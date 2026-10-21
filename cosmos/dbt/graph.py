@@ -49,6 +49,7 @@ from cosmos.constants import (
     DBT_LOG_DIR_NAME,
     DBT_LOG_FILENAME,
     DBT_LOG_PATH_ENVVAR,
+    DBT_SEMANTIC_METRIC_VIEW_MATERIALIZATIONS,
     DBT_TARGET_DIR_NAME,
     DBT_TARGET_PATH_ENVVAR,
     DbtResourceType,
@@ -65,6 +66,7 @@ from cosmos.dbt.project import (
     get_dbt_packages_subpath,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
+    remove_dags_folder_from_pythonpath,
 )
 from cosmos.dbt.selector import YamlSelectors, select_nodes
 from cosmos.fs import _calculate_file_checksum
@@ -81,6 +83,22 @@ def _normalize_path(path: str | None) -> str:
         return ""
     else:
         return Path(path.replace("\\", "/")).as_posix()
+
+
+def _relative_dirs(paths: list[Path], project_path: Path | None) -> list[str] | None:
+    """Returns each path's location relative to project_path, preserving nested subdirectories."""
+    # None (not []) triggers LegacyDbtProject's own default; only do that when project_path is unset,
+    # so an explicitly empty `paths` list isn't confused with "unspecified".
+    if project_path is None:
+        return None
+    result = []
+    for p in paths:
+        try:
+            result.append(p.relative_to(project_path).as_posix())
+        except ValueError:
+            # p falls outside project_path (e.g. an absolute models_relative_paths entry).
+            result.append(p.stem)
+    return result
 
 
 class CosmosLoadDbtException(Exception):
@@ -286,8 +304,21 @@ def is_freshness_effective(freshness: dict[str, Any] | None) -> bool:
     return False
 
 
+def _classify_resource_type(resource_type: DbtResourceType, config: dict[str, Any]) -> DbtResourceType:
+    """Reclassify adapter-native semantic metric view materializations as DbtResourceType.SEMANTIC_METRIC_VIEW."""
+    if not settings.enable_semantic_metric_view_reclassification:
+        return resource_type
+    materialization = str(config.get("materialized") or "").lower()
+    if resource_type == DbtResourceType.MODEL and materialization in DBT_SEMANTIC_METRIC_VIEW_MATERIALIZATIONS:
+        return DbtResourceType.SEMANTIC_METRIC_VIEW  # type: ignore[return-value]
+    return resource_type
+
+
 def run_command_with_subprocess(command: list[str], tmp_dir: Path, env_vars: dict[str, str]) -> str:
     """Run a command in a subprocess, returning the stdout."""
+    # Keep the Airflow DAGs folder off the dbt subprocess's PYTHONPATH so dbt's dbt_* plugin
+    # discovery does not import DAG files. See https://github.com/astronomer/astronomer-cosmos/issues/1673
+    env_vars = remove_dags_folder_from_pythonpath(env_vars)
     process = Popen(
         command,
         stdout=PIPE,
@@ -358,6 +389,12 @@ def run_command(
     """Run a command either with dbtRunner or Python subprocess, returning the stdout."""
 
     use_dbt_runner = invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_available()
+    if use_dbt_runner and command[1] == "ls" and dbt_runner.is_dbt_v2():
+        logger.info(
+            "dbt 2 does not return JSON records for `dbt ls` through dbtRunner; "
+            "running it with Python subprocess instead of InvocationMode.DBT_RUNNER."
+        )
+        use_dbt_runner = False
     runner = "dbt Runner" if use_dbt_runner else "Python subprocess"
     command = [str(arg) if arg is not None else "<None>" for arg in command]
     logger.info("Running command with %s: `%s`", runner, " ".join(command))
@@ -410,18 +447,20 @@ def parse_dbt_ls_output(project_path: Path | None, ls_stdout: str) -> dict[str, 
                 continue
 
             try:
+                node_config = node_dict.get("config") or {}
+                node_resource_type = _classify_resource_type(DbtResourceType(node_dict["resource_type"]), node_config)
                 node = DbtNode(
                     unique_id=node_dict["unique_id"],
                     package_name=node_dict.get("package_name"),
-                    resource_type=DbtResourceType(node_dict["resource_type"]),
+                    resource_type=node_resource_type,
                     depends_on=node_dict.get("depends_on", {}).get("nodes", []),
                     path_base=base_path,
                     original_file_path=Path(_normalize_path(node_file_path)),
                     tags=node_dict.get("tags") or [],
-                    config=node_dict.get("config") or {},
+                    config=node_config,
                     has_freshness=(
                         is_freshness_effective(node_dict.get("freshness"))
-                        if DbtResourceType(node_dict["resource_type"]) == DbtResourceType.SOURCE
+                        if node_resource_type == DbtResourceType.SOURCE
                         else False
                     ),
                     fqn=node_dict.get("fqn"),
@@ -461,15 +500,16 @@ def _build_dbt_node_from_manifest_resource(
         path_base = project_path
 
     resource_type = DbtResourceType(node_dict["resource_type"])
+    config = node_dict.get("config") or {}
     return DbtNode(
         unique_id=unique_id,
         package_name=package_name,
-        resource_type=resource_type,
+        resource_type=_classify_resource_type(resource_type, config),
         depends_on=node_dict.get("depends_on", {}).get("nodes", []),
         path_base=path_base,
         original_file_path=Path(_normalize_path(original_file_path)),
         tags=node_dict.get("tags") or [],
-        config=node_dict.get("config") or {},
+        config=config,
         has_freshness=(
             is_freshness_effective(node_dict.get("freshness")) if resource_type == DbtResourceType.SOURCE else False
         ),
@@ -1105,8 +1145,9 @@ class DbtGraph:
         project = LegacyDbtProject(
             project_name=self.render_config.project_path.stem,
             dbt_root_path=self.render_config.project_path.parent.as_posix(),
-            dbt_models_dir=self.project.models_path.stem if self.project.models_path else "models",
-            dbt_seeds_dir=self.project.seeds_path.stem if self.project.seeds_path else "seeds",
+            dbt_models_dir=_relative_dirs(self.project.models_paths, self.project.dbt_project_path),
+            dbt_seeds_dir=_relative_dirs(self.project.seeds_paths, self.project.dbt_project_path),
+            dbt_snapshots_dir=_relative_dirs(self.project.snapshots_paths, self.project.dbt_project_path),
             dbt_vars=self.dbt_vars,
         )
         nodes = {}
@@ -1118,7 +1159,7 @@ class DbtGraph:
             tags = [selector for selector in model.config.config_selectors if selector.startswith("tags:")]
             node = DbtNode(
                 unique_id=f"{model.type.value}.{self.project.project_name}.{model_name}",
-                resource_type=DbtResourceType(model.type.value),
+                resource_type=_classify_resource_type(DbtResourceType(model.type.value), config),
                 depends_on=list(model.config.upstream_models),
                 path_base=self.execution_config.project_path,
                 original_file_path=model.path.relative_to(self.render_config.project_path),

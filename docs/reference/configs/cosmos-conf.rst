@@ -37,12 +37,29 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 `enable_dag_versioning`_:
     **Airflow 3+ only:** when enabled (default), Cosmos computes a hash of the dbt project directory and appends
     it to the DAG's ``doc_md`` so that Airflow 3's DAG versioning can detect when dbt project files change.
+    Under ``LoadMode.DBT_MANIFEST``, the manifest file's own content checksum is folded into this hash as well,
+    since the manifest conventionally lives under ``target/``, which is excluded from the directory walk.
     On Airflow 2.x, ``doc_md`` is not modified for this purpose (the setting has no effect there).
     When disabled on Airflow 3+, the hash is not computed (faster DAG parsing) and DAG versioning will not
     reflect dbt project content changes from this mechanism.
 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_DAG_VERSIONING``
+
+.. _project_hash_excluded_dirs:
+
+`project_hash_excluded_dirs`_:
+    Comma-separated list of additional directory names that Cosmos skips when hashing the dbt project
+    directory (used by ``enable_dag_versioning`` and the partial-parse/dbt-ls cache keys). Generated
+    folders such as ``target/`` and ``dbt_packages/`` can be large, and reading them on every DAG parse
+    is expensive on network-backed storage. This setting is additive: ``.git``, ``target``,
+    ``dbt_packages`` and ``logs`` are always excluded, regardless of this value. A matching directory
+    name is skipped wherever it appears in the project tree. Cosmos emits a ``UserWarning`` (but does not
+    block) if this includes a dbt project content directory, such as ``models`` or ``macros``, since
+    excluding one means real changes there won't be detected.
+
+    - Default: unset (only the always-excluded ``.git, target, dbt_packages, logs`` apply)
+    - Environment Variable: ``AIRFLOW__COSMOS__PROJECT_HASH_EXCLUDED_DIRS``
 
 .. _enable_cache_dbt_ls:
 
@@ -73,6 +90,23 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING``
 
+.. _enable_dags_folder_exclusion_from_dbt:
+
+`enable_dags_folder_exclusion_from_dbt`_:
+    dbt-core discovers plugins by importing every top-level ``dbt_*`` module reachable from ``sys.path`` /
+    ``PYTHONPATH``. Airflow puts its DAGs folder on that path, so a DAG file named ``dbt_*.py`` gets imported
+    as a side effect of Cosmos running dbt, leaking or duplicating DAGs (in-process) or crashing the dbt
+    command (subprocess). When enabled, Cosmos removes the Airflow DAGs folder from dbt's import path for the
+    duration of each dbt invocation. Genuinely installed dbt plugins (which live in site-packages, not the
+    DAGs folder) are unaffected.
+
+    .. note::
+        Disable this only if you intentionally keep a real dbt plugin named ``dbt_*`` inside the DAGs folder
+        and need dbt to keep discovering it. While this setting is enabled, such a plugin will not be found.
+
+    - Default: ``True``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_DAGS_FOLDER_EXCLUSION_FROM_DBT``
+
 .. _enable_hierarchical_naming_for_group_nodes_by_folder:
 
 `enable_hierarchical_naming_for_group_nodes_by_folder`_:
@@ -88,6 +122,22 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_HIERARCHICAL_NAMING_FOR_GROUP_NODES_BY_FOLDER``
+
+.. _enable_semantic_metric_view_reclassification:
+
+`enable_semantic_metric_view_reclassification`_:
+    Opt-in. Reclassifies adapter-native semantic metric views (``config.materialized: metric_view`` on Databricks,
+    ``semantic_view`` on Snowflake) from a plain ``model`` node to ``DbtResourceType.SEMANTIC_METRIC_VIEW``. This
+    changes the task's id (adds a ``_semantic_metric_run`` suffix) and operator class (a ``DbtSemanticMetricView*``
+    operator instead of ``DbtRun*``; the underlying dbt command is unchanged), and makes ``resource_type:model``
+    selectors stop matching the node in favor of ``resource_type:semantic_metric_view``.
+
+    .. note::
+        Enabling this changes the task ids of existing ``metric_view`` and ``semantic_view`` models. See
+        :doc:`Managing semantic metric views </guides/translate_dbt_to_airflow/managing-semantic-metric-views>`.
+
+    - Default: ``False``
+    - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION``
 
 .. _enable_cache_partial_parse:
 
@@ -404,16 +454,41 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
     - Default: ``False``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_ORJSON_PARSER``
 
+.. _watcher_dbt_producer_queue:
+
+`watcher_dbt_producer_queue`_:
+    (Introduced in Cosmos 1.16.0) When using watcher execution mode, specifies the Airflow worker queue that ``DbtProducerWatcherOperator`` tasks are assigned to. Producer tasks execute a full ``dbt build`` and typically require high-memory workers. This setting takes precedence over any ``queue`` set directly on the operator (e.g. via ``setup_operator_args``).
+
+    If unset, falls back to the deprecated :ref:`watcher_dbt_execution_queue` for backwards compatibility.
+
+    - Default: ``None``
+    - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_PRODUCER_QUEUE``
+
+.. _watcher_dbt_consumer_queue:
+
+`watcher_dbt_consumer_queue`_:
+    (Introduced in Cosmos 1.16.0) When using watcher execution mode, specifies the Airflow worker queue that ``DbtConsumerWatcherSensor`` tasks are assigned to on their initial (sensor) run. On the first attempt, consumer sensors are lightweight — they simply wait for the producer task to complete — so they can run on low-resource workers. This setting takes precedence over any ``queue`` set directly on the operator.
+
+    This is a new queue introduced in Cosmos 1.16.0 and has no equivalent in the deprecated :ref:`watcher_dbt_execution_queue`; there is no backwards-compatible fallback for it.
+
+    - Default: ``None``
+    - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_CONSUMER_QUEUE``
+
+.. _watcher_dbt_retry_queue:
+
+`watcher_dbt_retry_queue`_:
+    (Introduced in Cosmos 1.16.0; previously ``watcher_dbt_execution_queue`` in 1.14.0) When using watcher execution mode, specifies the Airflow worker queue that ``DbtConsumerWatcherSensor`` tasks are assigned to on retries. On retry, consumer sensors execute the dbt command for a failed node and may require significantly more resources than their initial sensor run. The computational cost can vary widely — for example, a Cosmos watcher sensor consumes approximately 200MB on its first attempt, compared to 700MB when running a dbt build for a project with almost 200 models. This behavior is enforced by Cosmos via an `Airflow cluster policy <https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html>`_ (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts.
+
+    If unset, falls back to the deprecated :ref:`watcher_dbt_execution_queue` for backwards compatibility.
+
+    - Default: ``None``
+    - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_RETRY_QUEUE``
+
 .. _watcher_dbt_execution_queue:
 
 `watcher_dbt_execution_queue`_:
-    (Introduced in Cosmos 1.14.0) When using watcher execution mode, tasks may need to run dbt or not, depending on their type (producer vs. consumer) and the retry number. When running the dbt command, tasks use more resources (CPU and memory) than when behaving as sensors. The computational cost of running these tasks can vary widely. For example, a Cosmos watcher sensor consumes approximately 200MB, compared to 700MB consumed by a dbt build task running a project with almost 200 dbt models. This configuration allows users to define which queue to use when dbt commands are run, optimising their Airflow deployment. Internally, Cosmos leverages the [Airflow cluster policy feature](https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/cluster-policies.html). As of now, this configuration will be used:
-    - for watcher producer tasks, during their first execution
-    - for watcher consumer tasks, from their first retry onwards
-    - it will automatically be assigned to the specified queue.
-
-    This behavior is enforced by Cosmos via an Airflow policy (``task_instance_mutation_hook``) that mutates ``task_instance.queue`` at runtime for retry attempts.
-    As a result, the configured ``watcher_dbt_execution_queue`` can overwrite any queue set directly on the operator, but only for retries; the initial run continues to use the operator's original queue.
+    .. deprecated:: 1.16.0
+        Deprecated in favor of the dedicated :ref:`watcher_dbt_producer_queue` and :ref:`watcher_dbt_retry_queue` settings, and will be removed in Cosmos 2.0.0. Previously, this single setting was applied to both the ``DbtProducerWatcherOperator`` task and to ``DbtConsumerWatcherSensor`` retries. If set and either of the new settings is left unset, Cosmos continues to use this value for that task type, so existing configurations keep working without changes. It is not used as a fallback for :ref:`watcher_dbt_consumer_queue`, which has no pre-1.16.0 equivalent.
 
     - Default: ``None``
     - Environment Variable: ``AIRFLOW__COSMOS__WATCHER_DBT_EXECUTION_QUEUE``

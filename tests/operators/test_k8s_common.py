@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from cosmos.constants import _PRODUCER_CMD_FLAGS_XCOM_KEY
 from cosmos.operators._k8s_common import (
     CONTEXT_HOLDER_KEY,
     CONTEXT_KEY,
@@ -54,6 +55,15 @@ def test_build_env_vars_merges_env_and_existing():
 
     existing = convert_env_vars({"EXISTING_KEY": "existing_value"})
     result = _build_env_vars({"NEW_KEY": "new_value"}, existing)
+
+    env_names = {ev.name for ev in result}
+    assert "NEW_KEY" in env_names
+    assert "EXISTING_KEY" in env_names
+
+
+def test_build_env_vars_merges_env_and_existing_dict():
+    """cncf-kubernetes >= 10.23.0 leaves ``operator.env_vars`` as a raw dict after construction."""
+    result = _build_env_vars({"NEW_KEY": "new_value"}, {"EXISTING_KEY": "existing_value"})
 
     env_names = {ev.name for ev in result}
     assert "NEW_KEY" in env_names
@@ -190,6 +200,22 @@ def test_on_pod_completion_test_operator_with_warnings():
         handler.on_pod_completion(pod=MagicMock())
 
     callback.assert_called_once()
+
+
+def test_on_pod_completion_falls_back_to_provider_context():
+    """After a deferral, the resumed operator never ran ``execute``: the handler uses the context from the provider."""
+    callback = MagicMock()
+    task = MagicMock(spec=DbtTestKubernetesOperator)
+    task.pod_manager.read_pod_logs.return_value = [
+        b"10:29:03  Done. PASS=2 WARN=1 ERROR=0 SKIP=0 TOTAL=3",
+    ]
+    context = {"task_instance": MagicMock(task=task)}
+    handler = _make_handler(on_warning_callback=callback, context=None)
+
+    with patch("cosmos.operators._k8s_common.extract_log_issues", return_value=(["test1"], ["warn"])):
+        handler.on_pod_completion(pod=MagicMock(), context=context, operator=task)
+
+    callback.assert_called_once_with(context)
 
 
 def test_on_pod_completion_source_operator_with_freshness_warnings():
@@ -372,6 +398,8 @@ def test_build_watcher_pod_manager_wires_callback_extra_kwargs():
     operator._test_results_per_model = {}
     operator._context_holder = {CONTEXT_KEY: {"ti": MagicMock()}}
     operator._upstream_failure_skipped_ids = set()
+    operator._model_outlet_uris = {}
+    operator._should_generate_model_uris = True
 
     with patch("cosmos.operators._k8s_common.CosmosKubernetesPodManager") as mock_manager_cls:
         build_watcher_pod_manager(operator)
@@ -384,6 +412,8 @@ def test_build_watcher_pod_manager_wires_callback_extra_kwargs():
             "test_results_per_model": operator._test_results_per_model,
             CONTEXT_HOLDER_KEY: operator._context_holder,
             "upstream_failure_skipped_ids": operator._upstream_failure_skipped_ids,
+            "model_outlet_uris": operator._model_outlet_uris,
+            "should_generate_model_uris": operator._should_generate_model_uris,
         },
     )
 
@@ -525,6 +555,23 @@ def test_execute_watcher_producer_sets_context_before_parent_execute(mock_init, 
 
     assert captured["context"] is context
     operator._upstream_failure_skipped_ids.clear.assert_called_once_with()
+
+
+@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._init_xcom_backup")
+def test_execute_watcher_producer_publishes_own_cmd_flags_to_xcom(mock_init, mock_delete):
+    """The producer must publish its own rendered ``add_cmd_flags()`` so consumer fallback runs can
+    reuse it instead of re-deriving flags from a possibly different consumer operator_args.
+    """
+    operator = MagicMock()
+    operator.add_cmd_flags.return_value = ["--full-refresh"]
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti, "run_id": "test_run"}
+
+    execute_watcher_producer(operator, context, MagicMock(return_value="result"))
+
+    ti.xcom_push.assert_any_call(key=_PRODUCER_CMD_FLAGS_XCOM_KEY, value=["--full-refresh"])
 
 
 # ---------------------------------------------------------------------------

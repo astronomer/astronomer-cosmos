@@ -23,11 +23,13 @@ from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, Render
 from cosmos.config import InvocationMode
 from cosmos.constants import (
     _DBT_STARTUP_EVENTS_XCOM_KEY,
+    _PRODUCER_CMD_FLAGS_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     ExecutionMode,
     SourceRenderingBehavior,
 )
 from cosmos.dbt.graph import DbtNode
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
@@ -129,26 +131,53 @@ def test_dbt_producer_watcher_operator_priority_weight_default():
 
 
 @pytest.mark.parametrize(
-    "queue_override, expected_queue",
+    "queue_override, kwarg_queue, expected_queue",
     [
-        ("custom_retry_queue", "custom_retry_queue"),
-        (None, DEFAULT_QUEUE),
+        ("custom_watcher_queue", None, "custom_watcher_queue"),
+        (None, None, DEFAULT_QUEUE),
+        ("custom_watcher_queue", "explicit_kwarg_queue", "custom_watcher_queue"),
+        (None, "explicit_kwarg_queue", "explicit_kwarg_queue"),
     ],
 )
-def test_dbt_producer_watcher_operator_queue(queue_override, expected_queue):
-    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", queue_override):
-        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+def test_dbt_producer_watcher_operator_queue(queue_override, kwarg_queue, expected_queue):
+    with patch("cosmos.operators.watcher.watcher_dbt_producer_queue", queue_override):
+        op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, queue=kwarg_queue)
 
         assert op.queue == expected_queue
+
+
+@pytest.mark.parametrize(
+    "queue_override, kwarg_queue, expected_queue",
+    [
+        ("custom_watcher_queue", None, "custom_watcher_queue"),
+        (None, None, DEFAULT_QUEUE),
+        ("custom_watcher_queue", "explicit_kwarg_queue", "custom_watcher_queue"),
+        (None, "explicit_kwarg_queue", "explicit_kwarg_queue"),
+    ],
+)
+def test_dbt_consumer_watcher_sensor_queue(queue_override, kwarg_queue, expected_queue):
+    with patch("cosmos.operators.watcher.watcher_dbt_consumer_queue", queue_override):
+        sensor = DbtConsumerWatcherSensor(
+            project_dir=".",
+            profiles_dir=".",
+            profile_config=profile_config,
+            model_unique_id="model.pkg.my_model",
+            poke_interval=1,
+            producer_task_id="dbt_producer_watcher_operator",
+            task_id="consumer_sensor",
+            queue=kwarg_queue,
+        )
+
+        assert sensor.queue == expected_queue
 
 
 @pytest.mark.integration
 def test_producer_queue_from_setup_operator_args_when_both_set():
     """
-    When both setup_operator_args queue and watcher_dbt_execution_queue are set,
-    producer should use queue from watcher_dbt_execution_queue.
+    When both setup_operator_args queue and watcher_dbt_producer_queue are set,
+    producer should use queue from watcher_dbt_producer_queue.
     """
-    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", "watcher_queue"):
+    with patch("cosmos.operators.watcher.watcher_dbt_producer_queue", "watcher_queue"):
         watcher_dag = DbtDag(
             project_config=project_config,
             profile_config=profile_config,
@@ -167,10 +196,10 @@ def test_producer_queue_from_setup_operator_args_when_both_set():
 @pytest.mark.integration
 def test_producer_queue_from_setup_operator_args():
     """
-    When only setup_operator_args is set (no queue in watcher_dbt_execution_queue),
+    When only setup_operator_args is set (no queue in watcher_dbt_producer_queue),
     producer should use queue from setup_operator_args.
     """
-    with patch("cosmos.operators.watcher.watcher_dbt_execution_queue", None):
+    with patch("cosmos.operators.watcher.watcher_dbt_producer_queue", None):
         watcher_dag = DbtDag(
             project_config=project_config,
             profile_config=profile_config,
@@ -233,6 +262,25 @@ def test_dbt_producer_watcher_operator_pushes_completion_status_on_failure(
 
     assert mock_ti.store.get("task_status") == "completed"
     mock_execute.assert_called_once()
+
+
+@patch("cosmos.operators._watcher.xcom.delete_variable")
+@patch("cosmos.operators._watcher.xcom._persist_backup")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_publishes_own_cmd_flags_to_xcom(
+    mock_execute, mock_persist, mock_delete_variable
+):
+    """The producer must publish its own rendered ``add_cmd_flags()`` so consumer fallback runs can
+    reuse it (see BaseConsumerSensor._fallback_to_non_watcher_run) instead of re-deriving flags from
+    a possibly different consumer operator_args -- e.g. a full_refresh set only via setup_operator_args.
+    """
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, full_refresh=True)
+    mock_ti = _MockTI()
+    context = {"ti": mock_ti, "run_id": "test_run"}
+
+    op.execute(context=context)
+
+    assert mock_ti.store.get(_PRODUCER_CMD_FLAGS_XCOM_KEY) == ["--full-refresh", "--log-format", "json"]
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
@@ -482,13 +530,57 @@ class TestConsumerEmitDatasets:
         # Should not raise
         sensor._emit_datasets(ctx)
 
+    @pytest.mark.parametrize(
+        "emit_datasets, expected_emission",
+        [
+            (True, True),
+            ("True", True),
+            (" true ", True),
+            (False, False),
+            ("False", False),
+            ("false", False),
+            ("0", False),
+            (" false ", False),
+        ],
+    )
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_resolves_rendered_template_value(self, mock_register, emit_datasets, expected_emission):
+        sensor = self._make_sensor(emit_datasets=emit_datasets)
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
+        sensor._emit_datasets({"ti": _MockTI()})
+        assert mock_register.called is expected_emission
+
+    @pytest.mark.parametrize("rendered_value, expected_emission", [("True", True), ("False", False)])
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_honours_rendering_on_deferred_resume(
+        self, mock_register, mock_fallback, rendered_value, expected_emission
+    ):
+        """Goes through execute_complete so the URIs come from the trigger event, as on a real resume."""
+        from airflow import DAG
+
+        sensor = self._make_sensor(emit_datasets="{{ params.emit }}")
+        sensor.dag = DAG("test_emit_datasets_render", start_date=datetime(2024, 1, 1))
+        sensor.render_template_fields({"params": {"emit": rendered_value}})
+        assert sensor.emit_datasets == rendered_value
+
+        ti = MagicMock()
+        ti.xcom_pull.return_value = None
+        event = {"status": "success", "outlet_uris": ["postgres://host:5432/db/schema/table"]}
+        sensor.execute_complete({"dag_run": MagicMock(), "ti": ti}, event)
+
+        assert mock_register.called is expected_emission
+
+    def test_emit_datasets_is_a_template_field_on_consumer(self):
+        assert "emit_datasets" in DbtConsumerWatcherSensor.template_fields
+
     def test_emit_datasets_skipped_when_no_uris(self):
         sensor = self._make_sensor()
         sensor._outlet_uris = []
         ctx = {"ti": _MockTI()}
         sensor._emit_datasets(ctx)
 
-    @patch.object(DbtConsumerWatcherSensor, "register_dataset")
+    @patch("cosmos.dataset.register_dataset_on_task")
     def test_emit_datasets_calls_register(self, mock_register):
         sensor = self._make_sensor()
         sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
@@ -496,11 +588,13 @@ class TestConsumerEmitDatasets:
         ctx = {"ti": ti}
         sensor._emit_datasets(ctx)
         mock_register.assert_called_once()
+        # register_dataset_on_task(task, new_inlets, new_outlets, context): outlets is the 3rd arg.
         args = mock_register.call_args
-        assert len(args[0][1]) == 1  # one outlet
+        assert args[0][0] is sensor
+        assert len(args[0][2]) == 1  # one outlet
 
     @patch("cosmos.settings.enable_uri_xcom", True)
-    @patch.object(DbtConsumerWatcherSensor, "register_dataset")
+    @patch("cosmos.dataset.register_dataset_on_task")
     def test_emit_datasets_pushes_xcom_when_enabled(self, mock_register):
         sensor = self._make_sensor()
         sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
@@ -1077,6 +1171,34 @@ def test_producer_respects_explicit_invocation_mode():
 
 
 @pytest.mark.parametrize(
+    "is_dbt_v2, expected_mode", [(True, InvocationMode.SUBPROCESS), (False, InvocationMode.DBT_RUNNER)]
+)
+@patch("cosmos.dbt.runner.is_available", return_value=True)
+def test_producer_discovery_falls_back_to_subprocess_on_dbt_v2(mock_is_available, is_dbt_v2, expected_mode):
+    """dbt-core 2.x's dbtRunner has no event callbacks, so discovery picks subprocess for the producer (#2993)."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2):
+        op._discover_invocation_mode()
+    assert op.invocation_mode == expected_mode
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
+def test_run_dbt_runner_rejects_dbt_v2(mock_is_dbt_v2):
+    """An explicit InvocationMode.DBT_RUNNER on dbt-core 2.x fails before dbt is invoked."""
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=InvocationMode.DBT_RUNNER)
+    context = {"ti": _MockTI(), "run_id": "run-1"}
+
+    with (
+        patch("cosmos.operators.local.DbtLocalBaseOperator.run_dbt_runner") as mock_run,
+        pytest.raises(CosmosValueError, match="Use InvocationMode.SUBPROCESS"),
+    ):
+        op.run_dbt_runner(command=["dbt", "build"], env={}, cwd="/tmp/proj", context=context)
+
+    mock_run.assert_not_called()
+    assert not op._dbt_runner_callbacks
+
+
+@pytest.mark.parametrize(
     "should_generate_model_uris, expected_namespace_calls",
     [
         (True, 1),
@@ -1419,10 +1541,31 @@ class TestDbtConsumerWatcherSensor:
         assert result is False
         assert sensor.poke_retry_number == 1
 
-    def test_fallback_to_non_watcher_run(self):
+    @patch("cosmos.operators._watcher.base._log_dbt_event")
+    def test_poke_keeps_polling_when_node_failed_but_producer_running(self, mock_log_dbt_event):
+        """#2947: a failed node must not raise (burning a retry) while the producer is still running.
+        poke returns False to keep polling, does not fall back yet, and does not re-log the failure
+        event (poke runs every interval, so logging here would repeat the ERROR line on each poke)."""
         sensor = self.make_sensor()
+        sensor._get_producer_task_status.return_value = "running"
+        sensor._fallback_to_non_watcher_run = MagicMock()
         ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--select", "some_model", "--threads", "2"]
+        ti.try_number = 2
+        # xcom_pull: _log_startup_events=None, _get_node_status=error dict, compiled_sql=None
+        ti.xcom_pull.side_effect = [None, {"status": "error", "outlet_uris": []}, None]
+        context = self.make_context(ti)
+
+        result = sensor.poke(context)
+        assert result is False
+        sensor._fallback_to_non_watcher_run.assert_not_called()
+        mock_log_dbt_event.assert_not_called()
+
+    def test_fallback_to_non_watcher_run(self):
+        """When the producer hasn't published its flags to XCom, fall back to this consumer's own."""
+        sensor = self.make_sensor()
+        sensor.add_cmd_flags = MagicMock(return_value=["--full-refresh"])
+        ti = MagicMock()
+        ti.xcom_pull.return_value = None
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
@@ -1431,8 +1574,43 @@ class TestDbtConsumerWatcherSensor:
         assert result is True
         sensor.build_and_run_cmd.assert_called_once()
         args, kwargs = sensor.build_and_run_cmd.call_args
-        assert "--select" in kwargs["cmd_flags"]
+        assert "--full-refresh" in kwargs["cmd_flags"]
         assert DbtNode.get_resource_name_from_unique_id(MODEL_UNIQUE_ID) in kwargs["cmd_flags"]
+
+    @patch("cosmos.operators._watcher.base.get_xcom_val")
+    def test_fallback_prefers_producer_published_flags(self, mock_get_xcom_val):
+        """Regression for #2908 / setup_operator_args: the producer's own rendered flags (published to
+        XCom as it starts) must win over this consumer's own ``add_cmd_flags()`` -- e.g. when the
+        producer is given ``full_refresh=True`` only via ``ExecutionConfig.setup_operator_args`` while
+        the consumer's own ``full_refresh`` is left at its default of ``False``.
+        """
+        sensor = self.make_sensor(full_refresh=False)
+        sensor.add_cmd_flags = MagicMock(return_value=[])
+        mock_get_xcom_val.return_value = ["--full-refresh"]
+        context = self.make_context(MagicMock())
+        sensor.build_and_run_cmd = MagicMock()
+
+        sensor._fallback_to_non_watcher_run(2, context)
+
+        cmd_flags = sensor.build_and_run_cmd.call_args.kwargs["cmd_flags"]
+        assert "--full-refresh" in cmd_flags
+        mock_get_xcom_val.assert_called_once_with(context["ti"], sensor.producer_task_id, _PRODUCER_CMD_FLAGS_XCOM_KEY)
+
+    def test_fallback_uses_own_rendered_full_refresh_when_producer_xcom_missing(self):
+        """Regression for #2908: when the producer never published its flags (e.g. it errored before
+        reaching that point), fall back to this consumer's own (already-rendered) ``add_cmd_flags()``
+        instead of silently dropping a templated ``full_refresh`` (e.g. ``"{{ params.full_refresh }}"``).
+        """
+        sensor = self.make_sensor(full_refresh=True)
+        ti = MagicMock()
+        ti.xcom_pull.return_value = None
+        context = self.make_context(ti)
+        sensor.build_and_run_cmd = MagicMock()
+
+        sensor._fallback_to_non_watcher_run(2, context)
+
+        cmd_flags = sensor.build_and_run_cmd.call_args.kwargs["cmd_flags"]
+        assert "--full-refresh" in cmd_flags
 
     def test_fallback_strips_producer_log_format_by_default(self):
         """Producer's ``--log-format json`` (internal, used for event-stream parsing) must not leak into
@@ -1440,7 +1618,7 @@ class TestDbtConsumerWatcherSensor:
         """
         sensor = self.make_sensor()
         ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--log-format", "json", "--threads", "2"]
+        ti.xcom_pull.return_value = ["--log-format", "json"]
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
@@ -1460,7 +1638,7 @@ class TestDbtConsumerWatcherSensor:
         """
         sensor = self.make_sensor(dbt_cmd_flags=["--log-format", "json"])
         ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = ["--log-format", "json", "--threads", "2"]
+        ti.xcom_pull.return_value = ["--log-format", "json"]
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
@@ -1475,7 +1653,7 @@ class TestDbtConsumerWatcherSensor:
         sensor = self.make_sensor()
         sensor.model_unique_id = "model.jaffle_shop.stg_orders.v1"
         ti = MagicMock()
-        ti.task.dag.get_task.return_value.add_cmd_flags.return_value = []
+        ti.xcom_pull.return_value = []
         context = self.make_context(ti)
         sensor.build_and_run_cmd = MagicMock()
 
@@ -3105,6 +3283,37 @@ class TestDefaultFreshnessCallback:
             context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
         )
         # Only model nodes, not test nodes
+        assert result == [("model.pkg.m1", "skipped")]
+
+    def test_includes_semantic_metric_view_nodes(self):
+        """Semantic metric view nodes (Databricks metric views, Snowflake semantic views) downstream of a
+        stale source must be skipped/excluded like any other model — regression test for
+        DbtResourceType.SEMANTIC_METRIC_VIEW previously being omitted from _excludable_resource_types,
+        which would have let dbt build them against stale upstream data in WATCHER mode."""
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "source.pkg.src1": DbtNode(
+                unique_id="source.pkg.src1",
+                resource_type=DbtResourceType.SOURCE,
+                depends_on=[],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+            ),
+            "model.pkg.m1": DbtNode(
+                unique_id="model.pkg.m1",
+                resource_type=DbtResourceType.SEMANTIC_METRIC_VIEW,
+                depends_on=["source.pkg.src1"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+                config={"materialized": "metric_view"},
+            ),
+        }
+        sources_json = {"results": [{"unique_id": "source.pkg.src1", "status": "error"}]}
+        result = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
         assert result == [("model.pkg.m1", "skipped")]
 
     def test_node_with_clean_upstream_not_skipped(self):

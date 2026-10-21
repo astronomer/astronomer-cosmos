@@ -100,8 +100,11 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
 
     test_names = []
     test_results = []
-    pattern1 = re.compile(r"\d{2}:\d{2}:\d{2}\s+Warning in test ([\w_]+).*")
-    pattern2 = re.compile(r"\d{2}:\d{2}:\d{2}\s+(.*)")
+    # dbt <= 1.11 prints "HH:MM:SS  Warning in test <name> (<path>)"; dbt 1.12 reworded this to
+    # "HH:MM:SS  [WARNING]: in test <name> (<path>)" (and the result line gains the same
+    # "[WARNING]: " prefix). Match both so the parser keeps working across dbt versions.
+    pattern1 = re.compile(r"\d{2}:\d{2}:\d{2}\s+(?:\[WARNING\]:\s*)?(?:Warning )?in test ([\w_]+).*")
+    pattern2 = re.compile(r"\d{2}:\d{2}:\d{2}\s+(?:\[WARNING\]:\s*)?(.*)")
 
     for line_index, line in enumerate(reversed(log_list)):
         cleaned_line = clean_line(line)
@@ -110,8 +113,9 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
             # No need to keep checking the log lines once all warnings are found
             break
 
-        if "Warning in test" in cleaned_line:
-            test_name = pattern1.sub(r"\1", cleaned_line)
+        match = pattern1.match(cleaned_line)
+        if match:
+            test_name = match.group(1)
             # test_result is on the next line by default
             test_result = pattern2.sub(r"\1", clean_line(log_list[-(line_index + 1) + 1]))
 
@@ -119,6 +123,36 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
             test_results.append(test_result)
 
     return test_names, test_results
+
+
+def extract_dbt_failure_details(log_list: list[str]) -> list[str]:
+    """
+    Extract failing dbt nodes and their messages from subprocess output.
+
+    Counterpart of :func:`extract_log_issues`, which handles warnings.
+
+    :param log_list: List of strings, where each string is a log line from a dbt command.
+    :return: A list of formatted ``"<failure line> <detail>"`` strings, one per failing node.
+    """
+    # dbt <= 1.11 prints "Failure in test <name> (<path>)"; dbt 1.12 reworded this to
+    # "[ERROR]: in test <name> (<path>)" (also used for errored models) and prefixes the detail line the same way.
+    ansi = re.compile(r"\x1b\[[0-9;]*m")
+    timestamp = re.compile(r"^\d{2}:\d{2}:\d{2}\s+")
+    error_prefix = re.compile(r"^\[ERROR\]:\s*")
+    marker = re.compile(r"^(?:(?:Failure|Error) in |\[ERROR\]:\s*in )(.*)")
+
+    def clean_line(line: str) -> str:
+        return timestamp.sub("", ansi.sub("", line).strip())
+
+    cleaned = [clean_line(line) for line in log_list]
+    details: list[str] = []
+    for index, line in enumerate(cleaned):
+        match = marker.match(line)
+        if match:
+            failure = line if not error_prefix.match(line) else f"Error in {match.group(1)}"
+            detail = error_prefix.sub("", cleaned[index + 1]) if index + 1 < len(cleaned) else ""
+            details.append(f"{failure} {detail}".strip())
+    return details
 
 
 # Python 3.13 exposes a deprecated operator, we can replace it in the future

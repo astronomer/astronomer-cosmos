@@ -7,7 +7,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 
 from cosmos.operators._watcher.aggregation import ResultsTestsPerModel, TestsPerModel
 
@@ -17,15 +17,20 @@ try:
 except ImportError:
     from airflow.utils.task_group import TaskGroup
 
+import cosmos.dbt.runner as dbt_runner
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
+    _PRODUCER_CMD_FLAGS_XCOM_KEY,
     PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
     DbtResourceType,
+    InvocationMode,
 )
 from cosmos.dataset import get_dataset_namespace
 from cosmos.dbt.graph import DbtNode
+from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.base import (
@@ -47,6 +52,7 @@ from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
 )
 from cosmos.operators.local import (
@@ -54,7 +60,7 @@ from cosmos.operators.local import (
     DbtRunLocalOperator,
     DbtSourceLocalOperator,
 )
-from cosmos.settings import watcher_dbt_execution_queue
+from cosmos.settings import watcher_dbt_consumer_queue, watcher_dbt_producer_queue
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -110,7 +116,12 @@ def _default_freshness_callback(
     # nodes that have at least one clean upstream path: they may succeed and should not be
     # preemptively excluded.  When a new node is added to visited its own dependents are queued
     # so they can be re-evaluated with the updated skip set.
-    _excludable_resource_types = {DbtResourceType.MODEL, DbtResourceType.SEED, DbtResourceType.SNAPSHOT}
+    _excludable_resource_types = {
+        DbtResourceType.MODEL,
+        DbtResourceType.SEED,
+        DbtResourceType.SNAPSHOT,
+        DbtResourceType.SEMANTIC_METRIC_VIEW,
+    }
     visited: set[str] = set()
     queue = list(stale_source_ids)
     while queue:
@@ -233,7 +244,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         kwargs["should_store_compiled_sql"] = False
         kwargs.setdefault("priority_weight", PRODUCER_WATCHER_DEFAULT_PRIORITY_WEIGHT)
         kwargs.setdefault("weight_rule", WATCHER_TASK_WEIGHT_RULE)
-        kwargs["queue"] = watcher_dbt_execution_queue or kwargs.get("queue") or DEFAULT_QUEUE
+        kwargs["queue"] = watcher_dbt_producer_queue or kwargs.get("queue") or DEFAULT_QUEUE
         # invocation_mode is intentionally NOT forced here; the parent's _discover_invocation_mode()
         # picks DBT_RUNNER when available and falls back to SUBPROCESS otherwise.
         # An explicit invocation_mode passed by the caller is preserved as-is.
@@ -269,6 +280,16 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             should_generate_model_uris=self._should_generate_model_uris,
             upstream_failure_skipped_ids=self._upstream_failure_skipped_ids,
         )
+
+    def _discover_invocation_mode(self) -> None:
+        """Fall back to subprocess on dbt-core 2.x, whose dbtRunner has no event callbacks to stream node status."""
+        super()._discover_invocation_mode()
+        if self.invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_dbt_v2():
+            self.invocation_mode = InvocationMode.SUBPROCESS
+            self.log.info(
+                "dbt-core 2.x does not support dbtRunner event callbacks, which the watcher producer needs. "
+                "Falling back to subprocess for invoking dbt."
+            )
 
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> Any:
         """Wire up per-line JSON log parsing before delegating to the subprocess runner.
@@ -315,6 +336,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 with contextlib.redirect_stdout(_StdoutFilter()):
                     return super().run_dbt_runner(command, env, cwd, **kwargs)
 
+            if dbt_runner.is_dbt_v2():
+                raise CosmosValueError(
+                    "ExecutionMode.WATCHER streams node status through dbtRunner event callbacks, which dbt-core 2.x "
+                    "does not support. Use InvocationMode.SUBPROCESS, or leave invocation_mode unset."
+                )
             extra_kwargs: dict[str, Any] = {"project_dir": cwd, "context": context}
             parse = self._make_parse_callable()
             # Collect callback errors rather than raising inside the callback: dbt catches
@@ -438,7 +464,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             if self._sources_json is None:
                 raise
             self.log.warning(
-                "dbt source freshness completed with non-zero exit code: %s. " "Proceeding with freshness results.",
+                "dbt source freshness completed with non-zero exit code: %s. Proceeding with freshness results.",
                 exc,
             )
 
@@ -497,6 +523,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         if self._check_source_freshness:
             self._apply_source_freshness(context)
 
+        safe_xcom_push(task_instance=task_instance, key=_PRODUCER_CMD_FLAGS_XCOM_KEY, value=self.add_cmd_flags())
+
         try:
             return_value = super().execute(context=context, **kwargs)
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
@@ -525,6 +553,9 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):
         deferrable: bool = True,
         **kwargs: Any,
     ) -> None:
+        # Set the Worker queue for lightweight "watcher" tasks to run on (similar to config for producer tasks)
+        kwargs["queue"] = watcher_dbt_consumer_queue or kwargs.get("queue") or DEFAULT_QUEUE
+
         super().__init__(
             poke_interval=poke_interval,
             profile_config=profile_config,
@@ -534,41 +565,6 @@ class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):
             deferrable=deferrable,
             **kwargs,
         )
-
-    def _emit_datasets(self, context: Context) -> None:
-        """Emit Airflow datasets for this consumer task's model using outlet URIs from the producer."""
-        if not getattr(self, "emit_datasets", False):
-            return
-        outlet_uris = getattr(self, "_outlet_uris", [])
-        if not outlet_uris:
-            return
-
-        from cosmos import settings
-        from cosmos.constants import AIRFLOW_VERSION
-
-        if AIRFLOW_VERSION.major >= 3:
-            from airflow.sdk.definitions.asset import Asset
-        else:
-            from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
-
-        outlets = [Asset(uri=uri) for uri in outlet_uris]
-        logger.info("Emitting %d dataset(s) for model '%s': %s", len(outlets), self.model_unique_id, outlet_uris)
-        self.register_dataset([], outlets, context)
-
-        if settings.enable_uri_xcom:
-            context["ti"].xcom_push(key="uri", value=outlet_uris)
-
-    def execute(self, context: Context, **kwargs: Any) -> None:
-        super().execute(context, **kwargs)
-        # If we reach here without deferring, the model succeeded — emit datasets
-        self._emit_datasets(context)
-
-    def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
-        # Extract outlet URIs from trigger event before parent handles status
-        self._outlet_uris = event.get("outlet_uris", [])
-        super().execute_complete(context, event)
-        # If we reach here without raising, the model succeeded — emit datasets
-        self._emit_datasets(context)
 
 
 # This Operator does not seem to make sense for this particular execution mode, since build is executed by the producer task.
@@ -637,6 +633,18 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
     """
 
     template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticMetricViewWatcherOperator(DbtSemanticMetricViewMixin, DbtConsumerWatcherSensor):
+    """
+    Watches for the progress of an adapter-native semantic metric view, run by the producer task
+    (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

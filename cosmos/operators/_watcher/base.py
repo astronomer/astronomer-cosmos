@@ -6,13 +6,15 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 
 from cosmos import settings
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     _DATASET_EMITTING_RESOURCE_TYPES,
     _DBT_STARTUP_EVENTS_XCOM_KEY,
+    _PRODUCER_CMD_FLAGS_XCOM_KEY,
     AIRFLOW_VERSION,
     CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
@@ -38,15 +40,18 @@ from cosmos.operators._watcher.state import (
     get_dbt_event_xcom_key,
     get_status_xcom_key,
     get_xcom_val,
+    is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
     is_dbt_upstream_failure_skip_event,
+    is_producer_task_still_running,
     is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
 )
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
+from cosmos.operators.base import resolve_templated_bool
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
@@ -524,12 +529,13 @@ class BaseConsumerSensor(BaseSensorOperator):
                 self.__class__.__name__,
             )
 
-        upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)
-
-        extra_flags: list[str] = []
-        if upstream_task and hasattr(upstream_task, "add_cmd_flags"):
-            raw_flags = upstream_task.add_cmd_flags()
-            extra_flags = self._filter_flags(raw_flags)
+        # Prefer the producer's own rendered flags (published to XCom as it starts) so
+        # setup_operator_args overrides survive; fall back to this consumer's own flags.
+        raw_flags = get_xcom_val(context["ti"], self.producer_task_id, _PRODUCER_CMD_FLAGS_XCOM_KEY)
+        if raw_flags is None:
+            add_cmd_flags = getattr(self, "add_cmd_flags", None)
+            raw_flags = add_cmd_flags() if callable(add_cmd_flags) else []
+        extra_flags = self._filter_flags(raw_flags)
 
         model_selector = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = extra_flags + ["--select", model_selector]
@@ -606,8 +612,50 @@ class BaseConsumerSensor(BaseSensorOperator):
                 stop_memory_tracking(context)
         else:
             self._execute_core(context)
+        # Reaching here means the sensor resolved without deferring (the deferred path emits in
+        # execute_complete) and the model succeeded, so emit its datasets. _emit_datasets no-ops
+        # when the sensor has no outlets or dataset emission is disabled.
+        self._emit_datasets(context)
+
+    def _emit_datasets(self, context: Context) -> None:
+        """Emit one Airflow Asset per outlet URI resolved for this consumer's model.
+
+        Shared by every ``ExecutionMode.WATCHER*`` consumer (SUBPROCESS, Kubernetes, GCP GKE).
+        Delegates to ``cosmos.dataset.register_dataset_on_task`` rather than the local operator's
+        ``register_dataset``, so it works for consumers that don't inherit from the local operator.
+
+        No-ops when ``emit_datasets`` is False (user disabled emission) or when no outlet URIs were
+        resolved for this model (e.g. no manifest available or the adapter has no OL namespace).
+        """
+        if not resolve_templated_bool(getattr(self, "emit_datasets", False)):
+            return
+        outlet_uris = getattr(self, "_outlet_uris", [])
+        if not outlet_uris:
+            return
+
+        from cosmos.constants import AIRFLOW_VERSION
+        from cosmos.dataset import register_dataset_on_task
+
+        if AIRFLOW_VERSION.major >= 3:
+            from airflow.sdk.definitions.asset import Asset
+        else:
+            from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
+
+        outlets = [Asset(uri=uri) for uri in outlet_uris]
+        logger.info("Emitting %d dataset(s) for model '%s': %s", len(outlets), self.model_unique_id, outlet_uris)
+        register_dataset_on_task(self, [], outlets, context)
+
+        if settings.enable_uri_xcom:
+            context["ti"].xcom_push(key="uri", value=outlet_uris)
 
     def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
+        # Extract outlet URIs from the trigger event before handling status.
+        self._outlet_uris = event.get("outlet_uris", [])
+        self._process_completion_event(context, event)
+        # Reaching here without raising means the model succeeded, so emit its datasets.
+        self._emit_datasets(context)
+
+    def _process_completion_event(self, context: Context, event: dict[str, Any]) -> None:
         status = event.get("status")
         reason = event.get("reason")
 
@@ -816,6 +864,13 @@ class BaseConsumerSensor(BaseSensorOperator):
         if status is None:
             return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
 
+        # A failed node while the producer is still building is not terminal for the sensor yet: keep
+        # polling (in deferrable mode this defers back to the trigger) so the retry path can fall back
+        # once the producer terminates, instead of burning a retry on an instant re-raise. Return before
+        # logging so the ERROR dbt event is not repeated on every poke. See #2947.
+        if is_dbt_node_status_failed(status) and is_producer_task_still_running(producer_task_state):
+            return False
+
         # Log the dbt event only once the node is terminal; poke runs every interval, so logging before
         # this point would repeat the line on each poke.
         dbt_events = get_xcom_val(
@@ -829,14 +884,11 @@ class BaseConsumerSensor(BaseSensorOperator):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
-        elif is_dbt_node_status_success(status):
-            if self.is_test_sensor and self._test_result_summary:
-                self._log_test_result_summary(self._test_result_summary)
+        if self.is_test_sensor and self._test_result_summary:
+            self._log_test_result_summary(self._test_result_summary)
+        if is_dbt_node_status_success(status):
             return True
-        else:
-            if self.is_test_sensor and self._test_result_summary:
-                self._log_test_result_summary(self._test_result_summary)
-            raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
+        raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
 
 
 def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> EmptyOperator:

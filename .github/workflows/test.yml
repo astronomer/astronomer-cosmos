@@ -42,7 +42,7 @@ jobs:
       # pull_request_target the changed-file list comes from the GitHub API, so we must NOT
       # check out untrusted fork code in this ungated job — that is the pull_request_target
       # "pwn request" risk actions/checkout v7 refuses by default.
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: github.event_name == 'push'
         with:
           fetch-depth: 0
@@ -131,9 +131,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
-        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3"]
-        dbt-version: [ "1.11" ]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3", "3.4"]
+        dbt-version: [ "1.12" ]
         split-group: [1, 2, 3]
         exclude:
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
@@ -145,6 +145,20 @@ jobs:
             airflow-version: "2.11"
           - python-version: "3.13"
             airflow-version: "3.0"
+          # Python 3.14 is only pinned in the Airflow 3.2/3.3 dbt-1.12 lockfiles.
+          - python-version: "3.14"
+            airflow-version: "2.9"
+          - python-version: "3.14"
+            airflow-version: "2.10"
+          - python-version: "3.14"
+            airflow-version: "2.11"
+          - python-version: "3.14"
+            airflow-version: "3.0"
+          - python-version: "3.14"
+            airflow-version: "3.1"
+          # Apache Airflow 3.4 requires Python >=3.11.
+          - python-version: "3.10"
+            airflow-version: "3.4"
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
@@ -158,7 +172,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -166,17 +180,23 @@ jobs:
           # owner-review environment gate approves the run (see the Authorize job above).
           allow-unsafe-pr-checkout: true
 
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/pip
-            .local/share/hatch/
-          key: integration-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}--${{ matrix.dbt-version }}${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+            ~/.cache/uv
+          key: integration-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}--${{ matrix.dbt-version }}${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Install libxml2/libxslt headers for lxml sdist build
+        # lxml==5.4.0 (pinned in the dbt-1.12 lockfiles) has no cp314 wheel and must build
+        # from source on Python 3.14; ubuntu-latest doesn't ship the dev headers it needs.
+        if: matrix.python-version == '3.14'
+        run: sudo apt-get update && sudo apt-get install -y libxml2-dev libxslt1-dev
 
       - name: Install packages and dependencies
         run: |
@@ -220,7 +240,7 @@ jobs:
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
       - name: Upload coverage to GitHub
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-split${{ matrix.split-group }}
           path: .coverage
@@ -252,7 +272,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -260,15 +280,15 @@ jobs:
           # owner-review environment gate approves the run (see the Authorize job above).
           allow-unsafe-pr-checkout: true
 
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/pip
-            .local/share/hatch/
-          key: integration-expensive-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+            ~/.cache/uv
+          key: integration-expensive-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -303,7 +323,7 @@ jobs:
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
 
       - name: Upload coverage to GitHub
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-integration-expensive-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -316,7 +336,7 @@ jobs:
       AIRFLOW_CONN_DATABRICKS_DEFAULT: ${{ secrets.AIRFLOW_CONN_DATABRICKS_DEFAULT }}
       DATABRICKS_CLUSTER_ID: ${{ secrets.DATABRICKS_CLUSTER_ID }}
 
-  Run-Integration-Tests-DBT-1-5-4:
+  Run-Integration-Tests-DBT-1-8:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
@@ -327,7 +347,7 @@ jobs:
       matrix:
         python-version: [ "3.11" ]
         airflow-version: [ "2.10", "3.0" ]
-        dbt-version: [ "1.5" ]
+        dbt-version: [ "1.8" ]
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
@@ -342,7 +362,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -350,15 +370,15 @@ jobs:
           # owner-review environment gate approves the run (see the Authorize job above).
           allow-unsafe-pr-checkout: true
 
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/pip
-            .local/share/hatch/
-          key: integration-dbt-1-5-4-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+            ~/.cache/uv
+          key: integration-dbt-1-8-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -368,9 +388,9 @@ jobs:
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
-      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.5.4
+      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt 1.8 (min supported)
         run: |
-          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-1-5-4
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-1-8
         env:
           AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@0.0.0.0:5432/postgres
@@ -393,7 +413,7 @@ jobs:
           POSTGRES_PORT: 5432
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: "s3://cosmos-remote-cache/target_compiled/"
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
-          DBT_PROJECT_NAME: "altered_jaffle_shop"  # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
+          DBT_PROJECT_NAME: "altered_jaffle_shop"  # The syntax of jaffle_shop is not supported in dbt 1.8, only in dbt >= 1.10
           TEST_SINGLE_DAG: "basic_cosmos_task_group.py"  # There are circumstances when we only need to run a single DAG, but we were parsing all the DAGs. This change is to avoid parsing all the DAGs.
 
   Run-Integration-Tests-DBT-Async:
@@ -407,7 +427,7 @@ jobs:
       matrix:
         python-version: [ "3.11" ]
         airflow-version: [ "2.11", "3.0" ]
-        dbt-version: ["1.6", "1.7", "1.8", "1.9", "1.10", "1.11"]
+        dbt-version: ["1.8", "1.9", "1.10", "1.11"]
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
@@ -422,7 +442,7 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -430,15 +450,15 @@ jobs:
           # owner-review environment gate approves the run (see the Authorize job above).
           allow-unsafe-pr-checkout: true
 
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/pip
-            .local/share/hatch/
-          key: integration-dbt-async-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+            ~/.cache/uv
+          key: integration-dbt-async-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -453,7 +473,7 @@ jobs:
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-dbt-async
 
       - name: Upload coverage to GitHub
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-integration-dbt-async-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -463,7 +483,7 @@ jobs:
       AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
       PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
 
-      DBT_PROJECT_NAME: "altered_jaffle_shop" # The syntax of jaffle_shop is not supported in dbt 1.5.4, only in dbt >= 1.10
+      DBT_PROJECT_NAME: "altered_jaffle_shop" # The syntax of jaffle_shop is not supported in dbt < 1.10
       AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS: 0 # The altered_jaffle_shop project has non-ASCII characters which raise an exception in earlier versions of Airflow, as documented in https://github.com/astronomer/astronomer-cosmos/issues/1802
       AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
       AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
@@ -486,6 +506,7 @@ jobs:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
     strategy:
@@ -496,7 +517,7 @@ jobs:
         dbt-version: ["2.0"]  # dbt Fusion
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -504,15 +525,15 @@ jobs:
           # owner-review environment gate approves the run (see the Authorize job above).
           allow-unsafe-pr-checkout: true
 
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/pip
-            .local/share/hatch/
-          key: integration-dbtf-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}--${{ matrix.dbt-version }}${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+            ~/.cache/uv
+          key: integration-dbtf-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}--${{ matrix.dbt-version }}${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -544,7 +565,8 @@ jobs:
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
@@ -552,7 +574,7 @@ jobs:
           RESOURCE_PREFIX: ${{ steps.set-resource-prefix.outputs.prefix }}
 
       - name: Upload coverage to GitHub
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-integration-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -567,7 +589,8 @@ jobs:
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
@@ -587,7 +610,7 @@ jobs:
         airflow-version: [ "2.10", "3.0" ]
         dbt-version: [ "1.11" ]
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -595,15 +618,15 @@ jobs:
           # owner-review environment gate approves the run (see the Authorize job above).
           allow-unsafe-pr-checkout: true
 
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/pip
-            .local/share/hatch/
-          key: coverage-integration-kubernetes-test-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('cosmos/__init__.py') }}
+            ~/.cache/uv
+          key: coverage-integration-kubernetes-test-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -639,7 +662,7 @@ jobs:
           POSTGRES_PORT: 5432
 
       - name: Upload coverage to GitHub
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-integration-kubernetes-test-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}
           path: .coverage
@@ -660,7 +683,7 @@ jobs:
       # Required to read artifacts from the sibling test-unprivileged.yml run.
       actions: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
@@ -669,14 +692,14 @@ jobs:
           allow-unsafe-pr-checkout: true
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
       - name: Install coverage
         run: |
           pip3 install coverage
       - name: Download coverage artifacts from this run
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           path: ./coverage
           pattern: coverage-*
@@ -734,7 +757,7 @@ jobs:
           echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
 
       - name: Download unit, telemetry and dbt-loom coverage from the unprivileged run
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           path: ./coverage
           pattern: coverage-*
@@ -747,7 +770,7 @@ jobs:
           coverage report
           coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v6.0.2
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}

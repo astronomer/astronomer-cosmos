@@ -111,6 +111,20 @@ def test_upload_artifacts_to_gcp_gs_tarball(dummy_kwargs):
         assert "filename" not in call_kwargs
 
 
+def test_upload_artifacts_to_gcp_gs_forwards_num_max_attempts(dummy_kwargs):
+    """Test upload_to_gcp_gs forwards num_max_attempts to every GCSHook.upload call."""
+    with (
+        patch("airflow.providers.google.cloud.hooks.gcs.GCSHook") as mock_hook,
+        patch("os.walk") as mock_walk,
+    ):
+        mock_walk.return_value = [("/project_dir/target", [], ["file1.txt", "file2.txt"])]
+
+        upload_to_gcp_gs("/project_dir", use_tarball=False, num_max_attempts=3, **dummy_kwargs)
+
+        upload_calls = mock_hook.return_value.upload.call_args_list
+        assert [call.kwargs["num_max_attempts"] for call in upload_calls] == [3, 3]
+
+
 def test_upload_artifacts_to_azure_wasb_no_tarball(dummy_kwargs):
     """Test upload_to_azure_wasb with use_tarball=False."""
     with (

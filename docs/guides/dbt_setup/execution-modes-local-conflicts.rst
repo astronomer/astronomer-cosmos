@@ -8,39 +8,33 @@ When using the :ref:`local-execution` without defining a custom ``ExecutionConfi
 
 If you find errors, we recommend users isolating the installation of dbt from the Airflow installation.
 With the ``local`` execution mode, this can be accomplished by installing dbt in a separate
-Python virtualenv and setting the :doc:`ExecutionConfig.dbt_executable_path </reference/configs/execution-config>`  and
-:doc:`RenderConfig.dbt_executable_path </guides/translate_dbt_to_airflow/render-config>` parameters.
+Python virtualenv and setting the :ref:`ExecutionConfig.dbt_executable_path <execution-config>`  and
+:ref:`RenderConfig.dbt_executable_path <render-config>` parameters.
 
 The page, :ref:`execution-modes` describes many other methods that support isolating dbt from Airflow.
 
 In the following table, ``x`` represents combinations that lead to conflicts (vanilla ``apache-airflow`` and ``dbt-core`` packages):
 
-+---------------+-----+-----+-----+-----+-----+------+------+
-| Airflow / DBT | 1.5 | 1.6 | 1.7 | 1.8 | 1.9 | 1.10 | 1.11 |
-+===============+=====+=====+=====+=====+=====+======+======+
-| 2.9           |     |     |     |     |     |      |      |
-+---------------+-----+-----+-----+-----+-----+------+------+
-| 2.10          |     |     |     |     |     |      |      |
-+---------------+-----+-----+-----+-----+-----+------+------+
-| 2.11          |     |     |     |     |     |      |      |
-+---------------+-----+-----+-----+-----+-----+------+------+
-| 3.0           | x   | x   | x   |     |     |  x   |      |
-+---------------+-----+-----+-----+-----+-----+------+------+
-| 3.1           | x   | x   | x   | x   |     |  x   |      |
-+---------------+-----+-----+-----+-----+-----+------+------+
-| 3.2           | x   | x   | x   | x   |     |  x   |      |
-+---------------+-----+-----+-----+-----+-----+------+------+
++---------------+-----+-----+------+------+------+
+| Airflow / DBT | 1.8 | 1.9 | 1.10 | 1.11 | 1.12 |
++===============+=====+=====+======+======+======+
+| 2.9           |     |     |      |      |      |
++---------------+-----+-----+------+------+------+
+| 2.10          |     |     |      |      |      |
++---------------+-----+-----+------+------+------+
+| 2.11          |     |     |      |      |      |
++---------------+-----+-----+------+------+------+
+| 3.0           |     |     |  x   |      |      |
++---------------+-----+-----+------+------+------+
+| 3.1           | x   |     |  x   |      |      |
++---------------+-----+-----+------+------+------+
+| 3.2           | x   |     |  x   |      |      |
++---------------+-----+-----+------+------+------+
+| 3.3           |     |     |  x   |      |      |
++---------------+-----+-----+------+------+------+
 
 Examples of errors
 ~~~~~~~~~~~~~~~~~~
-
-.. code-block:: bash
-
-  ERROR: Cannot install apache-airflow==3.1 and dbt-core==1.5 because these package versions have conflicting dependencies.
-
-  The conflict is caused by:
-      dbt-core 1.5.0 depends on Jinja2==3.1.2
-      apache-airflow-core 3.1.0 depends on jinja2>=3.1.5
 
 .. code-block:: bash
 
@@ -68,7 +62,7 @@ The table was created by running  `nox <https://nox.thea.codes/en/stable/>`__ wi
     @nox.session(python=["3.10"])
     @nox.parametrize(
         "dbt_version",
-        ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11"],
+        ["1.8", "1.9", "1.10", "1.11", "1.12"],
     )
     @nox.parametrize(
         "airflow_version",

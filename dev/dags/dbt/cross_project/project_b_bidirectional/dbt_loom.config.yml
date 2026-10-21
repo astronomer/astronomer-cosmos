@@ -1,0 +1,9 @@
+manifests:
+  - name: project_a
+    type: file
+    config:
+      # dbt-loom substitutes ${VAR} from the process environment (shell-style; it does NOT
+      # render dbt Jinja and has no fallback). The DAG injects PROJECT_A_MANIFEST_PATH via
+      # ProjectConfig.env_vars so this resolves the same way locally and in CI.
+      path: ${PROJECT_A_MANIFEST_PATH}
+enable_telemetry: false

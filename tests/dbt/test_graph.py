@@ -33,8 +33,10 @@ from cosmos.dbt.graph import (
     DbtNode,
     LoadMode,
     _normalize_path,
+    _relative_dirs,
     parse_dbt_ls_output,
     run_command,
+    run_command_with_subprocess,
 )
 from cosmos.dbt.selector import YamlSelectors
 from cosmos.profiles import PostgresUserPasswordProfileMapping
@@ -46,7 +48,7 @@ SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_SMALL_MANIFEST = Path(__file__).parent.parent / "sample/small_manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
-SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
+ALTERED_DBT_PROJECT_MANIFEST = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME / "target/manifest.json"
 SAMPLE_MANIFEST_SELECTORS = Path(__file__).parent.parent / "sample/manifest_selectors.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
@@ -447,6 +449,66 @@ def test_load_via_manifest_skips_dbt_loom_external_nodes(tmp_path, caplog):
     assert "Skipping node `model.upstream_project.external_model` because it has no file path" in caplog.text
 
 
+@pytest.mark.parametrize("statement", ["config.group:customer_mart", "group:customer_mart"])
+def test_load_via_manifest_with_group_selectors(tmp_path, statement):
+    """Both group selector spellings filter manifest nodes, as reported in issue #1784."""
+    manifest_content = {
+        "nodes": {
+            "model.my_project.customer_mart_model": {
+                "resource_type": "model",
+                "original_file_path": "models/customer_mart_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "table", "group": "customer_mart"},
+            },
+            "model.my_project.finance_model": {
+                "resource_type": "model",
+                "original_file_path": "models/finance_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "table", "group": "finance"},
+            },
+            "model.my_project.ungrouped_model": {
+                "resource_type": "model",
+                "original_file_path": "models/ungrouped_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "table"},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_content))
+
+    project_path = tmp_path / "my_project"
+    project_path.mkdir()
+
+    project_config = ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=RenderConfig(select=[statement]),
+    )
+
+    dbt_graph.load_from_dbt_manifest()
+
+    assert len(dbt_graph.nodes) == 3
+    assert set(dbt_graph.filtered_nodes) == {"model.my_project.customer_mart_model"}
+
+
 @pytest.mark.parametrize(
     "project_name,manifest_filepath,model_filepath",
     [(DBT_PROJECT_NAME, SAMPLE_MANIFEST, "customers.sql"), ("jaffle_shop_python", SAMPLE_MANIFEST_PY, "customers.py")],
@@ -638,6 +700,83 @@ def test_load_from_dbt_manifest_resolves_package_path(tmp_path):
     assert "dbt_packages" in str(node.file_path)
     assert "some_package" in node.file_path.parts
     assert node.file_path.name == "foo.sql"
+
+
+@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
+def test_load_from_dbt_manifest_reclassifies_semantic_metric_view_materializations(
+    tmp_path, monkeypatch, materialization
+):
+    """Model nodes materialized as an adapter-native semantic metric view (Databricks metric views,
+    Snowflake semantic views) are reclassified to DbtResourceType.SEMANTIC_METRIC_VIEW, since dbt itself
+    models them as plain `model` nodes distinguished only by `config.materialized`."""
+    monkeypatch.setattr("cosmos.settings.enable_semantic_metric_view_reclassification", True)
+    manifest = {
+        "metadata": {"project_name": "my_project"},
+        "nodes": {
+            "model.my_project.foo": {
+                "original_file_path": "models/foo.sql",
+                "package_name": "my_project",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": materialization},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_file = tmp_path / "manifest.json"
+    manifest_file.write_text(json.dumps(manifest))
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="my_project")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+    assert dbt_graph.nodes["model.my_project.foo"].resource_type == DbtResourceType.SEMANTIC_METRIC_VIEW
+
+
+def test_load_from_dbt_manifest_reclassification_is_opt_in(tmp_path):
+    """Reclassification is opt-in: unless `enable_semantic_metric_view_reclassification` is enabled,
+    adapter-native semantic metric view models stay plain MODEL nodes."""
+    manifest = {
+        "metadata": {"project_name": "my_project"},
+        "nodes": {
+            "model.my_project.foo": {
+                "original_file_path": "models/foo.sql",
+                "package_name": "my_project",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "metric_view"},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_file = tmp_path / "manifest.json"
+    manifest_file.write_text(json.dumps(manifest))
+    project_config = ProjectConfig(manifest_path=manifest_file, project_name="my_project")
+    execution_config = ExecutionConfig(dbt_project_path=tmp_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profile_mapping=PostgresUserPasswordProfileMapping(conn_id="test", profile_args={}),
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+    assert dbt_graph.nodes["model.my_project.foo"].resource_type == DbtResourceType.MODEL
 
 
 def test_load_via_manifest_with_selectors_and_missing_definitions():
@@ -1179,7 +1318,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            manifest_path=SAMPLE_MANIFEST_SOURCE if load_method == "load_from_dbt_manifest" else None,
+            manifest_path=ALTERED_DBT_PROJECT_MANIFEST if load_method == "load_from_dbt_manifest" else None,
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
@@ -1197,6 +1336,42 @@ def test_load_via_dbt_ls_with_sources(load_method):
     assert len(dbt_graph.nodes) >= 4
     assert "source.altered_jaffle_shop.postgres_db.raw_customers" in dbt_graph.nodes
     assert "exposure.altered_jaffle_shop.weekly_metrics" in dbt_graph.nodes
+
+
+@pytest.mark.integration
+def test_altered_jaffle_shop_manifest_is_in_sync_with_project():
+    """
+    The checked-in manifest must describe the same graph as the dbt project next to it.
+
+    If this fails, the project changed without regenerating the manifest. Run `dbt parse`
+    in dev/dags/dbt/altered_jaffle_shop and commit the updated target/manifest.json.
+    """
+    project_path = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME
+
+    def build_graph(manifest_path):
+        return DbtGraph(
+            project=ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path),
+            render_config=RenderConfig(
+                dbt_project_path=project_path,
+                dbt_deps=True,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            ),
+            execution_config=ExecutionConfig(dbt_project_path=project_path),
+            profile_config=ProfileConfig(
+                profile_name="postgres_profile",
+                target_name="dev",
+                profiles_yml_filepath=project_path / "profiles.yml",
+            ),
+        )
+
+    dbt_ls_graph = build_graph(manifest_path=None)
+    dbt_ls_graph.load_via_dbt_ls()
+    manifest_graph = build_graph(manifest_path=ALTERED_DBT_PROJECT_MANIFEST)
+    manifest_graph.load_from_dbt_manifest()
+
+    assert set(manifest_graph.nodes) == set(dbt_ls_graph.nodes)
+    for unique_id, node in dbt_ls_graph.nodes.items():
+        assert sorted(manifest_graph.nodes[unique_id].depends_on) == sorted(node.depends_on), unique_id
 
 
 @pytest.mark.integration
@@ -1471,6 +1646,93 @@ def test_load_via_load_via_custom_parser(project_name, nodes_count):
     assert len(dbt_graph.nodes) == nodes_count
 
 
+def test_load_via_custom_parser_with_nested_model_dir(tmp_path):
+    """
+    A nested models_relative_paths dir (e.g. "custom/models") should still be crawled under
+    LoadMode.CUSTOM, not silently dropped by truncating the configured path to its last component.
+    """
+    project_dir = tmp_path / "nested_project"
+    (project_dir / "custom" / "models").mkdir(parents=True)
+    (project_dir / "custom" / "models" / "my_model.sql").write_text("select 1")
+    (project_dir / "profiles.yml").write_text(
+        "test:\n"
+        "  target: test\n"
+        "  outputs:\n"
+        "    test:\n"
+        "      type: postgres\n"
+        "      host: localhost\n"
+        "      user: user\n"
+        "      password: pass\n"
+        "      port: 5432\n"
+        "      dbname: db\n"
+        "      schema: public\n"
+        "      threads: 1\n"
+    )
+
+    project_config = ProjectConfig(dbt_project_path=project_dir, models_relative_paths="custom/models")
+    execution_config = ExecutionConfig(dbt_project_path=project_dir)
+    render_config = RenderConfig(dbt_project_path=project_dir, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=project_dir / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_via_custom_parser()
+
+    assert "my_model" in dbt_graph.nodes
+    assert dbt_graph.nodes["my_model"].unique_id == "model.nested_project.my_model"
+
+
+def test_load_via_custom_parser_with_explicit_empty_models_relative_paths(tmp_path):
+    """
+    models_relative_paths=[] means "no model directories" and must not fall back to crawling the
+    default "models" dir under LoadMode.CUSTOM, even if one happens to exist on disk.
+    """
+    project_dir = tmp_path / "empty_list_project"
+    (project_dir / "models").mkdir(parents=True)
+    (project_dir / "models" / "should_not_be_found.sql").write_text("select 1")
+    (project_dir / "profiles.yml").write_text(
+        "test:\n"
+        "  target: test\n"
+        "  outputs:\n"
+        "    test:\n"
+        "      type: postgres\n"
+        "      host: localhost\n"
+        "      user: user\n"
+        "      password: pass\n"
+        "      port: 5432\n"
+        "      dbname: db\n"
+        "      schema: public\n"
+        "      threads: 1\n"
+    )
+
+    project_config = ProjectConfig(dbt_project_path=project_dir, models_relative_paths=[])
+    execution_config = ExecutionConfig(dbt_project_path=project_dir)
+    render_config = RenderConfig(dbt_project_path=project_dir, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=project_dir / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_via_custom_parser()
+
+    assert dbt_graph.nodes == {}
+
+
 @pytest.mark.parametrize("project_name", [("altered_jaffle_shop"), ("jaffle_shop_python")])
 def test_validate_load_via_load_via_custom_parser_deprecated(project_name):
     """Deprecating warnings should be raised when using load_mode CUSTOM."""
@@ -1623,6 +1885,39 @@ def test_tests_per_model_populated():
     customers_tests = dbt_graph.tests_per_model[customers_id]
     assert any("not_null_customers_customer_id" in t for t in customers_tests)
     assert any("unique_customers_customer_id" in t for t in customers_tests)
+
+
+def test_tests_per_model_lists_multi_parent_test_under_every_parent():
+    """A test with multiple parents (e.g. a relationships test) is listed under each parent.
+
+    This is the graph-level fact the watcher test-aggregation logic relies on: a shared
+    test must be recorded/aggregated for every parent model, not just one. Asserting it
+    against a real loaded graph keeps the aggregation unit tests honest — they hand-build
+    ``tests_per_model``, and this guards that the builder actually produces that shape.
+    """
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+    )
+    dbt_graph.load()
+
+    # jaffle_shop's relationships test on orders.customer_id depends on both orders and
+    # customers, so it must appear in tests_per_model under BOTH.
+    shared_test_id = "test.jaffle_shop.relationships_orders_customer_id__customer_id__ref_customers_.c6ec7f58f2"
+    orders_id = "model.jaffle_shop.orders"
+    customers_id = "model.jaffle_shop.customers"
+    assert shared_test_id in dbt_graph.tests_per_model[orders_id]
+    assert shared_test_id in dbt_graph.tests_per_model[customers_id]
 
 
 def test_tests_per_model_empty_when_no_tests():
@@ -1789,6 +2084,26 @@ def test_run_command(mock_popen, stdout, returncode):
     assert return_value == stdout
 
 
+def test_run_command_with_subprocess_strips_dags_folder_from_pythonpath(tmp_path):
+    """run_command_with_subprocess must strip the Airflow DAGs folder from the subprocess's
+    PYTHONPATH so dbt's dbt_* plugin discovery does not import (and crash on) DAG files.
+    See https://github.com/astronomer/astronomer-cosmos/issues/1673"""
+    dags_folder = str(tmp_path)
+    other_entry = "/usr/local/astronomer-cosmos"
+    env_vars = {"PYTHONPATH": os.pathsep.join([other_entry, dags_folder])}
+
+    with patch("cosmos.dbt.graph.Popen") as mock_popen, patch("airflow.settings.DAGS_FOLDER", dags_folder):
+        mock_popen.return_value.communicate.return_value = ("all good", "")
+        mock_popen.return_value.returncode = 0
+
+        run_command_with_subprocess(["dbt", "ls"], Path("fake_dir"), env_vars)
+
+    passed_env = mock_popen.call_args.kwargs["env"]
+    assert passed_env["PYTHONPATH"] == other_entry
+    # the caller's env dict must not be mutated in place
+    assert env_vars["PYTHONPATH"] == os.pathsep.join([other_entry, dags_folder])
+
+
 @pytest.mark.integration
 @patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_run_command_success_with_log(tmp_dbt_project_dir):
@@ -1833,6 +2148,66 @@ def test_run_command_forcing_dbt_runner(mock_dbt_runner, mock_subprocess, tmp_db
     )
     assert not mock_subprocess.called
     assert mock_dbt_runner.called
+
+
+@patch("cosmos.dbt.graph.run_command_with_subprocess", return_value='{"unique_id": "model.probe.a"}')
+@patch("cosmos.dbt.graph.dbt_runner.run_command")
+@patch("cosmos.dbt.graph.dbt_runner.is_dbt_v2", return_value=True)
+@patch("cosmos.dbt.graph.dbt_runner.is_available", return_value=True)
+def test_run_command_uses_subprocess_for_dbt_v2_ls(
+    mock_is_available, mock_is_dbt_v2, mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir, caplog
+):
+    command = ["dbt", "ls", "--output", "json"]
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+    caplog.set_level(logging.INFO)
+
+    response = run_command(command, project_dir, {}, InvocationMode.DBT_RUNNER)
+
+    assert response == '{"unique_id": "model.probe.a"}'
+    mock_is_available.assert_called_once_with()
+    mock_is_dbt_v2.assert_called_once_with()
+    assert not mock_dbt_runner.called
+    mock_subprocess.assert_called_once_with(command, project_dir, {})
+    assert "dbt 2 does not return JSON records for `dbt ls` through dbtRunner" in caplog.text
+    assert "Running command with Python subprocess: `dbt ls --output json`" in caplog.text
+    assert "dbt Runner" not in caplog.text
+
+
+@patch("cosmos.dbt.graph.run_command_with_subprocess")
+@patch("cosmos.dbt.graph.run_command_with_dbt_runner", return_value="")
+@patch("cosmos.dbt.graph.dbt_runner.is_dbt_v2", return_value=True)
+@patch("cosmos.dbt.graph.dbt_runner.is_available", return_value=True)
+def test_run_command_uses_dbt_runner_for_dbt_v2_deps(
+    mock_is_available, mock_is_dbt_v2, mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir
+):
+    command = ["dbt", "deps"]
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+
+    run_command(command, project_dir, {}, InvocationMode.DBT_RUNNER)
+
+    mock_is_available.assert_called_once_with()
+    assert not mock_is_dbt_v2.called
+    mock_dbt_runner.assert_called_once_with(command, project_dir, {})
+    assert not mock_subprocess.called
+
+
+@patch("cosmos.dbt.graph.run_command_with_subprocess")
+@patch("cosmos.dbt.graph.run_command_with_dbt_runner", return_value='{"unique_id": "model.probe.a"}')
+@patch("cosmos.dbt.graph.dbt_runner.is_dbt_v2", return_value=False)
+@patch("cosmos.dbt.graph.dbt_runner.is_available", return_value=True)
+def test_run_command_uses_dbt_runner_for_dbt_v1_ls(
+    mock_is_available, mock_is_dbt_v2, mock_dbt_runner, mock_subprocess, tmp_dbt_project_dir
+):
+    command = ["dbt", "ls", "--output", "json"]
+    project_dir = tmp_dbt_project_dir / DBT_PROJECT_NAME
+
+    response = run_command(command, project_dir, {}, InvocationMode.DBT_RUNNER)
+
+    assert response == '{"unique_id": "model.probe.a"}'
+    mock_is_available.assert_called_once_with()
+    mock_is_dbt_v2.assert_called_once_with()
+    mock_dbt_runner.assert_called_once_with(command, project_dir, {})
+    assert not mock_subprocess.called
 
 
 @pytest.mark.integration
@@ -2010,6 +2385,66 @@ def test_parse_dbt_ls_output_with_json_without_tags_or_config():
     nodes = parse_dbt_ls_output(Path("some-project"), some_ls_stdout)
 
     assert expected_nodes == nodes
+
+
+@pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
+def test_parse_dbt_ls_output_reclassifies_semantic_metric_view_materializations(monkeypatch, materialization):
+    """Model nodes materialized as an adapter-native semantic metric view (Databricks metric views,
+    Snowflake semantic views) are reclassified to DbtResourceType.SEMANTIC_METRIC_VIEW, since dbt itself
+    models them as plain `model` nodes distinguished only by `config.materialized`."""
+    monkeypatch.setattr("cosmos.settings.enable_semantic_metric_view_reclassification", True)
+    fake_ls_stdout = json.dumps(
+        {
+            "resource_type": "model",
+            "name": "fake-name",
+            "package_name": "fake-project",
+            "original_file_path": "fake-file-path.sql",
+            "unique_id": "fake-unique-id",
+            "tags": [],
+            "config": {"materialized": materialization},
+        }
+    )
+
+    nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert nodes["fake-unique-id"].resource_type == DbtResourceType.SEMANTIC_METRIC_VIEW
+
+
+def test_parse_dbt_ls_output_does_not_reclassify_regular_materializations(monkeypatch):
+    monkeypatch.setattr("cosmos.settings.enable_semantic_metric_view_reclassification", True)
+    fake_ls_stdout = json.dumps(
+        {
+            "resource_type": "model",
+            "name": "fake-name",
+            "package_name": "fake-project",
+            "original_file_path": "fake-file-path.sql",
+            "unique_id": "fake-unique-id",
+            "tags": [],
+            "config": {"materialized": "view"},
+        }
+    )
+
+    nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert nodes["fake-unique-id"].resource_type == DbtResourceType.MODEL
+
+
+def test_parse_dbt_ls_output_reclassification_is_opt_in():
+    fake_ls_stdout = json.dumps(
+        {
+            "resource_type": "model",
+            "name": "fake-name",
+            "package_name": "fake-project",
+            "original_file_path": "fake-file-path.sql",
+            "unique_id": "fake-unique-id",
+            "tags": [],
+            "config": {"materialized": "metric_view"},
+        }
+    )
+
+    nodes = parse_dbt_ls_output(Path("fake-project"), fake_ls_stdout)
+
+    assert nodes["fake-unique-id"].resource_type == DbtResourceType.MODEL
 
 
 def test_parse_dbt_ls_output_skips_dbt_loom_external_nodes(caplog):
@@ -2495,12 +2930,11 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     hash_dir, hash_args = version.split(",")
     assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
     if sys.platform == "darwin":
-        # Different macOS versions have produced different hashes for this directory. The first value below is a
-        # historical macOS-specific hash, while the second matches the Linux hash asserted in the else-branch. We
-        # allow both here so that the test is stable across macOS versions and when macOS hashing matches Linux.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "39a5f27ad840d837ca9f86515e605ed6")
+        # macOS has historically produced a different directory hash than Linux; the hash below is the
+        # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
+        assert hash_dir in ("0eb95968fa13de21119a3538620f3860",)
     else:
-        assert hash_dir == "39a5f27ad840d837ca9f86515e605ed6"
+        assert hash_dir == "0eb95968fa13de21119a3538620f3860"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2534,15 +2968,14 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     hash_dir, hash_selectors, hash_impl = version.split(",")
 
     assert hash_selectors == "43303af03e84e3b51fbfcf598261fae4"
-    assert hash_impl == "86424c8b70c2e9b6d1f595c7ec9a8291"
+    assert hash_impl == "a1e31b091e296f4a3884016e52333dc2"
 
     if sys.platform == "darwin":
-        # Some macOS versions compute a different directory hash than Linux, while others match the Linux behavior.
-        # The first value is the macOS-specific hash; the second value is the Linux hash, which certain macOS versions also produce.
-        # We allow both here to keep the test stable across macOS releases, while non-macOS platforms assert only the Linux hash.
-        assert hash_dir in ("9d95cbf6529e2ab51fadd6a3f0a3971f", "39a5f27ad840d837ca9f86515e605ed6")
+        # macOS has historically produced a different directory hash than Linux; the hash below is the
+        # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
+        assert hash_dir in ("0eb95968fa13de21119a3538620f3860",)
     else:
-        assert hash_dir == "39a5f27ad840d837ca9f86515e605ed6"
+        assert hash_dir == "0eb95968fa13de21119a3538620f3860"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")
@@ -3068,6 +3501,39 @@ def test__normalize_path():
     original_value = "seeds\\seed_ifs_util_manual_event_id.csv"
     expected_value = "seeds/seed_ifs_util_manual_event_id.csv"
     assert _normalize_path(original_value) == expected_value
+
+
+def test__relative_dirs_preserves_nested_subdirectories():
+    """
+    _relative_dirs should return each path's location relative to project_path, not just Path.stem -
+    otherwise a nested dir like "custom/models" collapses to "models" and LegacyDbtProject crawls the
+    wrong directory.
+    """
+    project_path = Path("/usr/local/airflow/dags/dbt/my_project")
+    paths = [project_path / "custom" / "models", project_path / "models_v2"]
+
+    assert _relative_dirs(paths, project_path) == ["custom/models", "models_v2"]
+
+
+def test__relative_dirs_empty_and_no_project_path():
+    """
+    An explicitly empty paths list (project_path set) must stay [] rather than falling back to
+    LegacyDbtProject's default - only an unset project_path itself should trigger that fallback (via
+    None), since ProjectConfig always pairs a set project_path with a non-empty paths list otherwise.
+    """
+    assert _relative_dirs([], Path("/some/project")) == []
+    assert _relative_dirs([Path("/some/project/custom/models")], None) is None
+
+
+def test__relative_dirs_falls_back_when_path_outside_project():
+    """
+    A path outside project_path (e.g. an absolute models_relative_paths entry) should fall back to
+    Path.stem instead of raising ValueError from Path.relative_to.
+    """
+    project_path = Path("/some/project")
+    outside_path = Path("/some/other/models")
+
+    assert _relative_dirs([outside_path], project_path) == ["models"]
 
 
 @pytest.mark.parametrize(

@@ -8,10 +8,12 @@ scheme = ["http", "https"]
 
 # Give slow or occasionally throttling hosts a few chances before failing, so a
 # transient network hiccup doesn't make this blocking check flaky. A lower
-# concurrency keeps us from tripping per-host rate limiters.
+# concurrency keeps us from tripping per-host rate limiters. The 60s timeout
+# gives occasionally-slow docs CDNs enough headroom to respond before a request
+# is counted as a (job-failing) timeout on shared CI runners.
 max_retries = 4
 retry_wait_time = 3
-timeout = 30
+timeout = 60
 max_concurrency = 8
 
 # Fail only on genuinely broken links. A 429 (rate limited) or 503/504
@@ -27,12 +29,22 @@ exclude_loopback = true
 # URLs an automated checker cannot verify, plus intentional placeholders.
 # Genuinely broken links are fixed in the docs, not excluded here.
 exclude = [
-    # Auth wall — Slack invite links return 403 to unauthenticated requests.
-    'https://join\.slack\.com',
+    # Auth wall — Slack links return 403 to unauthenticated requests.
+    'https://[a-z0-9-]+\.slack\.com',
     # Flaky / rate-limited from CI — intermittent TLS failures.
     'https://ossrank\.com',
     # Bot-blocked — the Bitnami Helm chart repo returns 403 to non-Helm clients.
     'https://charts\.bitnami\.com',
+    # Bot-blocked / rate-limited from CI — AWS docs intermittently return 403 to
+    # automated requests (they resolve fine in a browser), causing flaky linkcheck failures.
+    'https://docs\.aws\.amazon\.com',
+    # Flaky from CI — this astronomer.io docs page intermittently drops the connection
+    # ("Connection reset by peer") during link checking, though it resolves fine in a browser.
+    'https://www\.astronomer\.io/docs/learn/airflow-ui',
     # Intentional placeholder in example snippets, not a real repository.
     'https://github\.com/your-org/',
+    # Bot-blocked — Stack Exchange / Stack Overflow return 403 to automated
+    # clients (even with a browser UA); pages resolve fine in a real browser.
+    'https://[a-z0-9-]+\.stackexchange\.com',
+    'https://([a-z0-9-]+\.)?stackoverflow\.com',
 ]

@@ -77,12 +77,12 @@ Parsing generally refers to the processes and configurations that Cosmos uses to
 Invocation Mode
 ~~~~~~~~~~~~~~~
 
-The method that Cosmos uses to parse the dbt object, whether its by using the Python ``subprocess`` module or with a ``dbt_runner``. See `Invocation modes <https://astronomer.github.io/astronomer-cosmos/guides/translate_dbt_to_airflow/render-config.html#how-to-run-dbt-ls-invocation-mode>`_.
+The method that Cosmos uses to parse the dbt object, whether its by using the Python ``subprocess`` module or with a ``dbt_runner``. See :ref:`Invocation modes <how-to-run-dbt-ls-invocation-mode>`.
 
 Rendering
 ~~~~~~~~~
 
-After parsing your dbt project, Cosmos *renders* the project as an Airflow Dag or Task Group. Depending on the specifics of your dbt project, you can choose customizations that speed up overall performance. You can find more information about rendering options in the :doc:`RenderConfig </guides/translate_dbt_to_airflow/render-config>`.
+After parsing your dbt project, Cosmos *renders* the project as an Airflow Dag or Task Group. Depending on the specifics of your dbt project, you can choose customizations that speed up overall performance. You can find more information about rendering options in the :ref:`RenderConfig <render-config>`.
 
 
 Testing Strategy

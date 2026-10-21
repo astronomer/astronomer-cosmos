@@ -16,11 +16,11 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 import jinja2
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
-from airflow.utils.strings import to_boolean
 from packaging.version import Version
 
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.io import _construct_dest_file_path
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -58,8 +58,9 @@ from cosmos.dbt.project import (
     copy_manifest_file_if_exists,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
+    remove_dags_folder_from_pythonpath,
 )
-from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
+from cosmos.exceptions import CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
     remote_target_path,
     remote_target_path_conn_id,
@@ -93,6 +94,7 @@ from cosmos.constants import (
     OPENLINEAGE_PRODUCER,
 )
 from cosmos.dbt.parser.output import (
+    extract_dbt_failure_details,
     extract_freshness_warn_msg,
     extract_log_issues,
     parse_number_of_warnings_subprocess,
@@ -112,10 +114,12 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
     _sanitize_xcom_key,
+    resolve_templated_bool,
 )
 
 logger = get_logger(__name__)
@@ -255,11 +259,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """Resolve the effective ``install_deps`` flag, normalizing a rendered template string to a bool."""
         if not self._has_dependencies_file:
             return False
-        value = self.install_deps
-        if isinstance(value, str):
-            # ``to_boolean`` does not strip whitespace, so a rendered " true " would otherwise be False.
-            return bool(to_boolean(value.strip()))
-        return bool(value)
+        return resolve_templated_bool(self.install_deps)
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -301,7 +301,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             raise AirflowSkipException(f"dbt command returned exit code {self.skip_exit_code}. Skipping.")
         elif result.exit_code != 0:
             self.log.error("\n".join(result.full_output))
-            raise AirflowException(f"dbt command failed. The command returned a non-zero exit code {result.exit_code}.")
+            message = f"dbt command failed. The command returned a non-zero exit code {result.exit_code}."
+            failure_details = extract_dbt_failure_details(result.full_output)
+            if failure_details:
+                message += " Details:\n" + "\n".join(failure_details)
+            raise AirflowException(message)
 
     def handle_exception_dbt_runner(self, result: dbtRunnerResult) -> None:
         """dbtRunnerResult has an attribute `success` that is False if the command failed."""
@@ -479,6 +483,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any
     ) -> FullOutputSubprocessResult:
         self.log.info("Trying to run the command:\n %s\nFrom %s", command, cwd)
+        # Keep the Airflow DAGs folder off the dbt subprocess's PYTHONPATH so dbt's dbt_* plugin
+        # discovery does not import (and crash on) DAG files. See https://github.com/astronomer/astronomer-cosmos/issues/1673
+        env = remove_dags_folder_from_pythonpath(env)
         subprocess_result: FullOutputSubprocessResult = self.subprocess_hook.run_command(
             command=command,
             env=env,
@@ -493,7 +500,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """Invokes the dbt command programmatically."""
         if not dbt_runner.is_available():
             raise CosmosDbtRunError(
-                "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
+                "Could not import dbt core. Ensure that dbt-core is installed and available in the environment where the operator is running."
             )
 
         return dbt_runner.run_command(command, env, cwd, callbacks=self._dbt_runner_callbacks, **kwargs)
@@ -551,16 +558,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.profile_config.target_name,
         ]
         if self.invocation_mode == InvocationMode.DBT_RUNNER:
-            from dbt.version import __version__ as dbt_version
-
-            if Version(dbt_version) >= Version("1.5.6"):
-                # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
-                # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
-                # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
-                # directories, and the use of different temp paths between parsing and execution appears to interfere
-                # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
-                # hangs and ensures reliable task execution.
-                dbt_flags.append("--no-static-parser")
+            # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
+            # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
+            # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
+            # directories, and the use of different temp paths between parsing and execution appears to interfere
+            # with dbt's static parsing behavior. As a workaround, passing the --no-static-parser flag avoids these
+            # hangs and ensures reliable task execution.
+            dbt_flags.append("--no-static-parser")
         return dbt_flags
 
     def _install_dependencies(
@@ -733,7 +737,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     # in that case we're storing as self.openlineage_events_completes
                     context["task_instance"].openlineage_events_completes = self.openlineage_events_completes  # type: ignore[attr-defined]
 
-                if self.emit_datasets:
+                if resolve_templated_bool(self.emit_datasets):
                     self._handle_datasets(context)
 
                 if self.partial_parse:
@@ -843,67 +847,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """
         Register a list of datasets as outlets of the current task, when possible.
 
-        Until Airflow 2.7, there was not a better interface to associate outlets to a task during execution.
-        This works in Cosmos with versions before Airflow 2.10 with a few limitations, as described in the ticket:
-        https://github.com/astronomer/astronomer-cosmos/issues/522
-
-        Since Airflow 2.10, Cosmos uses DatasetAlias by default, to generate datasets. This resolved the limitations
-        described before.
-
-        The only limitation is that with Airflow 2.10.0 and 2.10.1, the `airflow dags test` command will not work
-        with DatasetAlias:
-        https://github.com/apache/airflow/issues/42495
+        Thin wrapper around ``cosmos.dataset.register_dataset_on_task`` so other
+        execution modes (e.g. ``WATCHER_KUBERNETES``) can reuse the same logic
+        without inheriting from this operator.
         """
-        try:
-            from airflow.sdk import DAG
-        except ImportError:
-            from airflow.models.dag import DAG  # type: ignore[assignment]
+        from cosmos.dataset import register_dataset_on_task
 
-        if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
-            self.log.error(
-                "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
-            )
-            raise AirflowCompatibilityError(
-                "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
-            )
-        elif AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
-            from airflow.utils.session import create_session
-
-            self.log.info("Assigning inlets/outlets without DatasetAlias")
-            with create_session() as session:
-                self.outlets.extend(new_outlets)  # type: ignore[attr-defined]
-                self.inlets.extend(new_inlets)  # type: ignore[attr-defined]
-                for task in self.dag.tasks:  # type: ignore[attr-defined]
-                    if task.task_id == self.task_id:
-                        task.outlets.extend(new_outlets)
-                        task.inlets.extend(new_inlets)
-                DAG.bulk_write_to_db([self.dag], session=session)  # type: ignore[attr-defined]
-                session.commit()
-        else:
-            dataset_alias_name = get_dataset_alias_name(self.dag, self.task_group, self.task_id)  # type: ignore[attr-defined]
-
-            if AIRFLOW_VERSION.major == 2:
-                self.log.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
-                from airflow.datasets import DatasetAlias
-
-                alias_names = {dataset_alias_name} | {
-                    outlet.name
-                    for outlet in self.outlets  # type: ignore[attr-defined]
-                    if isinstance(outlet, DatasetAlias) and outlet.name != dataset_alias_name
-                }
-
-                for alias_name in alias_names:
-                    for outlet in new_outlets:
-                        context["outlet_events"][alias_name].add(outlet)  # type: ignore[index]
-
-            else:  # AIRFLOW_VERSION.major == 3
-                self.log.info("Assigning outlets with DatasetAlias in Airflow 3")
-                from airflow.sdk.definitions.asset import AssetAlias
-
-                # This line was necessary in Airflow 3.0.0, but this may become automatic in newer versions
-                self.outlets.append(AssetAlias(dataset_alias_name))  # type: ignore[attr-defined]
-                for outlet in new_outlets:
-                    context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)
+        register_dataset_on_task(self, list(new_inlets), list(new_outlets), context)
 
     def get_openlineage_facets_on_complete(self, task_instance: TaskInstance) -> OperatorLineage:
         """
@@ -1161,10 +1111,7 @@ class DbtSeedLocalOperator(DbtSeedMixin, DbtLocalBaseOperator):
 
     def _is_full_refresh(self) -> bool:
         """Return whether --full-refresh is requested, mirroring DbtSeedMixin.add_cmd_flags handling."""
-        if isinstance(self.full_refresh, str):
-            # `to_boolean` does not strip whitespace, so a rendered " true " would otherwise be False.
-            return bool(to_boolean(self.full_refresh.strip()))
-        return bool(self.full_refresh)
+        return resolve_templated_bool(self.full_refresh)
 
 
 class DbtSnapshotLocalOperator(DbtSnapshotMixin, DbtLocalBaseOperator):
@@ -1223,6 +1170,17 @@ class DbtRunLocalOperator(DbtRunMixin, DbtLocalBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticMetricViewLocalOperator(DbtSemanticMetricViewMixin, DbtLocalBaseOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic metric view.
+    """
+
+    template_fields: Sequence[str] = DbtLocalBaseOperator.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

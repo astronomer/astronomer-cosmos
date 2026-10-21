@@ -63,7 +63,7 @@ repos:
         types: [text]
         args:
           - --exclude-file=tests/sample/manifest_model_version.json
-          - --skip=**/manifest.json,**.min.js,**/manifest_source.json
+          - --skip=**/manifest.json,**.min.js
           - -L connexion,aci
           - --ignore-words=.codespell-ignore-words
   - repo: https://github.com/pre-commit/pygrep-hooks
@@ -92,7 +92,7 @@ repos:
           - --py310-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: f12be1ebaa5351c1fc76472de98db2c3446c8253  # v0.16.10
+    rev: 44b5042edab9382aba712eed4f9c7bab7a3d6a3e  # v0.17.0
     hooks:
       - id: ruff-check
         args: [ --fix ]

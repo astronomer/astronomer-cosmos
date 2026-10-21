@@ -1,4 +1,5 @@
 name: test-runtime-alpha
+run-name: test-runtime-alpha ${{ inputs.runtime_version }}
 
 # Run the Cosmos test suites (from this checkout / latest main) AGAINST a published Astronomer
 # Runtime alpha image, to validate that cosmos still works on that exact Airflow build before the
@@ -314,11 +315,17 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions) }}
-        dbt-version: ["1.8"]
-        # dbt 1.8 has no Python 3.14 wheels, so this suite's forced-old dbt cannot install on 3.14.
-        # Mirrors test-unprivileged.yml's exclude.
+        dbt-version: ["1.8", "1.9", "1.12"]
+        # dbt 1.8 and 1.9 fail on Python 3.14 (mashumaro and dbt-semantic-interfaces pydantic.v1),
+        # so 1.12 is the only dbt minor that covers 3.14. dbt-databricks 1.8.x also pins pandas<2.2,
+        # which has no Python 3.13 wheel, so 1.8 cannot install on 3.13 either.
         exclude:
           - python-version: "3.14"
+            dbt-version: "1.8"
+          - python-version: "3.14"
+            dbt-version: "1.9"
+          - python-version: "3.13"
+            dbt-version: "1.8"
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
       # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
@@ -341,9 +348,10 @@ jobs:
       - uses: ./.github/actions/setup-cosmos-runtime # zizmor: ignore[self-repository]
         with:
           extras: ${{ env.COSMOS_TEST_EXTRAS }}
-      - name: Run dbt 1.8 integration tests
-        run: bash scripts/test/integration-dbt-1-8.sh
+      - name: Run dbt ${{ matrix.dbt-version }} integration tests
+        run: bash scripts/test/integration-dbt-1-8.sh "$DBT_VERSION"
         env:
+          DBT_VERSION: ${{ matrix.dbt-version }}
           AIRFLOW_HOME: ${{ github.workspace }}
           AIRFLOW_CONN_EXAMPLE_CONN: postgres://postgres:postgres@postgres:5432/postgres
           AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
@@ -542,7 +550,8 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
@@ -556,7 +565,8 @@ jobs:
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
@@ -670,6 +680,8 @@ jobs:
         # Job results arrive via env (never interpolated into the run body) so the summary cannot be
         # shell-injected. A `skipped` result means the suite did not run on this dispatch.
         env:
+          REGISTRY: ${{ inputs.registry }}
+          RUNTIME_VERSION: ${{ inputs.runtime_version }}
           UNIT: ${{ needs.Run-Unit-Tests.result }}
           INTEGRATION: ${{ needs.Run-Integration-Tests.result }}
           TELEMETRY: ${{ needs.Run-Telemetry-Tests.result }}
@@ -684,6 +696,8 @@ jobs:
           {
             echo "## Runtime alpha suite coverage"
             echo ""
+            echo "Image: \`${REGISTRY}:${RUNTIME_VERSION}-python-<version>\`"
+            echo ""
             echo "A result of \`skipped\` means the suite did not run on this dispatch (disabled, or paid and not opted in), so a green check does not cover it."
             echo ""
             echo "| Suite | Result |"
@@ -693,7 +707,7 @@ jobs:
             echo "| Telemetry | $TELEMETRY |"
             echo "| Performance | $PERFORMANCE |"
             echo "| dbt-loom | $LOOM |"
-            echo "| dbt-1.8 | $DBT18 |"
+            echo "| dbt-1.8 / 1.9 / 1.12 | $DBT18 |"
             echo "| dbt-async | $ASYNC |"
             echo "| Expensive (Databricks) | $EXPENSIVE |"
             echo "| dbt-Fusion (Snowflake) | $FUSION |"

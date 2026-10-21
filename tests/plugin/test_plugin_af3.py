@@ -181,6 +181,23 @@ def test_external_view_href_no_base_path():
 
 
 @skip_pre_airflow_31
+def test_external_views_not_duplicated_across_instances():
+    # Airflow 3's core and SDK plugin managers each instantiate the plugin
+    _reload_af3_module(api_base="")
+
+    from cosmos.plugin.airflow3 import CosmosAF3Plugin
+
+    with patch(
+        "cosmos.plugin.airflow3._load_projects_from_conf",
+        return_value={"core": {"dir": "/x", "index": "index.html"}},
+    ):
+        CosmosAF3Plugin()
+        plugin = CosmosAF3Plugin()
+    assert len(plugin.external_views) == 1
+    assert CosmosAF3Plugin.external_views == []
+
+
+@skip_pre_airflow_31
 def test_not_configured_routes():
     af3, app = _app_with_projects({"core": {}})
     client = TestClient(app)

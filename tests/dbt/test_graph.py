@@ -48,7 +48,7 @@ SAMPLE_MANIFEST = Path(__file__).parent.parent / "sample/manifest.json"
 SAMPLE_SMALL_MANIFEST = Path(__file__).parent.parent / "sample/small_manifest.json"
 SAMPLE_MANIFEST_PY = Path(__file__).parent.parent / "sample/manifest_python.json"
 SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_model_version.json"
-SAMPLE_MANIFEST_SOURCE = Path(__file__).parent.parent / "sample/manifest_source.json"
+ALTERED_DBT_PROJECT_MANIFEST = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME / "target/manifest.json"
 SAMPLE_MANIFEST_SELECTORS = Path(__file__).parent.parent / "sample/manifest_selectors.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
@@ -447,6 +447,66 @@ def test_load_via_manifest_skips_dbt_loom_external_nodes(tmp_path, caplog):
 
     # Verify the skip message was logged
     assert "Skipping node `model.upstream_project.external_model` because it has no file path" in caplog.text
+
+
+@pytest.mark.parametrize("statement", ["config.group:customer_mart", "group:customer_mart"])
+def test_load_via_manifest_with_group_selectors(tmp_path, statement):
+    """Both group selector spellings filter manifest nodes, as reported in issue #1784."""
+    manifest_content = {
+        "nodes": {
+            "model.my_project.customer_mart_model": {
+                "resource_type": "model",
+                "original_file_path": "models/customer_mart_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "table", "group": "customer_mart"},
+            },
+            "model.my_project.finance_model": {
+                "resource_type": "model",
+                "original_file_path": "models/finance_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "table", "group": "finance"},
+            },
+            "model.my_project.ungrouped_model": {
+                "resource_type": "model",
+                "original_file_path": "models/ungrouped_model.sql",
+                "package_name": "my_project",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {"materialized": "table"},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_content))
+
+    project_path = tmp_path / "my_project"
+    project_path.mkdir()
+
+    project_config = ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=RenderConfig(select=[statement]),
+    )
+
+    dbt_graph.load_from_dbt_manifest()
+
+    assert len(dbt_graph.nodes) == 3
+    assert set(dbt_graph.filtered_nodes) == {"model.my_project.customer_mart_model"}
 
 
 @pytest.mark.parametrize(
@@ -1258,7 +1318,7 @@ def test_load_via_dbt_ls_with_sources(load_method):
     dbt_graph = DbtGraph(
         project=ProjectConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
-            manifest_path=SAMPLE_MANIFEST_SOURCE if load_method == "load_from_dbt_manifest" else None,
+            manifest_path=ALTERED_DBT_PROJECT_MANIFEST if load_method == "load_from_dbt_manifest" else None,
         ),
         render_config=RenderConfig(
             dbt_project_path=DBT_PROJECTS_ROOT_DIR / project_name,
@@ -1276,6 +1336,42 @@ def test_load_via_dbt_ls_with_sources(load_method):
     assert len(dbt_graph.nodes) >= 4
     assert "source.altered_jaffle_shop.postgres_db.raw_customers" in dbt_graph.nodes
     assert "exposure.altered_jaffle_shop.weekly_metrics" in dbt_graph.nodes
+
+
+@pytest.mark.integration
+def test_altered_jaffle_shop_manifest_is_in_sync_with_project():
+    """
+    The checked-in manifest must describe the same graph as the dbt project next to it.
+
+    If this fails, the project changed without regenerating the manifest. Run `dbt parse`
+    in dev/dags/dbt/altered_jaffle_shop and commit the updated target/manifest.json.
+    """
+    project_path = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME
+
+    def build_graph(manifest_path):
+        return DbtGraph(
+            project=ProjectConfig(dbt_project_path=project_path, manifest_path=manifest_path),
+            render_config=RenderConfig(
+                dbt_project_path=project_path,
+                dbt_deps=True,
+                source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
+            ),
+            execution_config=ExecutionConfig(dbt_project_path=project_path),
+            profile_config=ProfileConfig(
+                profile_name="postgres_profile",
+                target_name="dev",
+                profiles_yml_filepath=project_path / "profiles.yml",
+            ),
+        )
+
+    dbt_ls_graph = build_graph(manifest_path=None)
+    dbt_ls_graph.load_via_dbt_ls()
+    manifest_graph = build_graph(manifest_path=ALTERED_DBT_PROJECT_MANIFEST)
+    manifest_graph.load_from_dbt_manifest()
+
+    assert set(manifest_graph.nodes) == set(dbt_ls_graph.nodes)
+    for unique_id, node in dbt_ls_graph.nodes.items():
+        assert sorted(manifest_graph.nodes[unique_id].depends_on) == sorted(node.depends_on), unique_id
 
 
 @pytest.mark.integration
@@ -2836,9 +2932,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
+        assert hash_dir in ("0eb95968fa13de21119a3538620f3860",)
     else:
-        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
+        assert hash_dir == "0eb95968fa13de21119a3538620f3860"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2872,14 +2968,14 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     hash_dir, hash_selectors, hash_impl = version.split(",")
 
     assert hash_selectors == "43303af03e84e3b51fbfcf598261fae4"
-    assert hash_impl == "86424c8b70c2e9b6d1f595c7ec9a8291"
+    assert hash_impl == "a1e31b091e296f4a3884016e52333dc2"
 
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("d41b4e9b7a78b09bcfc85d79b108886d",)
+        assert hash_dir in ("0eb95968fa13de21119a3538620f3860",)
     else:
-        assert hash_dir == "d41b4e9b7a78b09bcfc85d79b108886d"
+        assert hash_dir == "0eb95968fa13de21119a3538620f3860"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")

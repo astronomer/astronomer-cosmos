@@ -302,12 +302,18 @@ def _cosmos_settings():
 
 
 def drop_test_objects() -> None:
+    failures: list[str] = []
     for warehouse_class in (Snowflake, Databricks):
-        with pytest.MonkeyPatch.context() as monkeypatch:
-            instance = warehouse_class(monkeypatch)
-            instance.configure()
-            with instance.connect() as connection, connection.cursor() as cursor:
-                instance.tear_down(cursor)
+        try:
+            with pytest.MonkeyPatch.context() as monkeypatch:
+                instance = warehouse_class(monkeypatch)
+                instance.configure()
+                with instance.connect() as connection, connection.cursor() as cursor:
+                    instance.tear_down(cursor)
+        except (Exception, pytest.fail.Exception) as error:
+            failures.append(f"{warehouse_class.name}: {error!r}")
+    if failures:
+        raise RuntimeError(f"could not drop the warehouse test objects: {failures}")
 
 
 @pytest.fixture(scope="module", params=[Snowflake, Databricks], ids=["snowflake", "databricks"])
@@ -371,13 +377,13 @@ def make_watcher_consumers_wait_for_producer(dag: DbtDag) -> None:
             task.trigger_rule = TriggerRule.ALL_SUCCESS
 
 
-def run_dag(dag: DbtDag) -> dict[str, str]:
+def run_dag(dag: DbtDag) -> str:
     dag_run = test_utils.new_test_dag(dag)
     with create_session() as session:
         states = {ti.task_id: ti.state for ti in dag_run.get_task_instances(session=session)}
     assert dag_run.state == DagRunState.SUCCESS
     assert all(state == TaskInstanceState.SUCCESS for state in states.values()), states
-    return states
+    return dag_run.run_id
 
 
 def assert_warehouse_objects(warehouse: Warehouse) -> None:
@@ -387,12 +393,15 @@ def assert_warehouse_objects(warehouse: Warehouse) -> None:
         assert warehouse.revenue_from_downstream_table(cursor) == SEEDED_REVENUE_BY_STATUS
 
 
-def asset_event_uris_by_task(dag_id: str) -> dict[str, list[str]]:
+def asset_event_uris_by_task(dag_id: str, run_id: str) -> dict[str, list[str]]:
     from airflow.models.asset import AssetEvent
 
     uris: dict[str, list[str]] = defaultdict(list)
     with create_session() as session:
-        for event in session.query(AssetEvent).filter(AssetEvent.source_dag_id == dag_id).all():
+        events = session.query(AssetEvent).filter(
+            AssetEvent.source_dag_id == dag_id, AssetEvent.source_run_id == run_id
+        )
+        for event in events.all():
             uris[event.source_task_id].append(event.asset.uri)
     return dict(uris)
 
@@ -417,13 +426,14 @@ def recreate_test_objects(warehouse: Warehouse) -> None:
         warehouse.set_up(cursor)
 
 
-def run_full_refresh_then_rerun(dag: DbtDag, warehouse: Warehouse) -> None:
+def run_full_refresh_then_rerun(dag: DbtDag, warehouse: Warehouse) -> list[str]:
     recreate_test_objects(warehouse)
-    run_dag(dag)
+    full_refresh_run_id = run_dag(dag)
     assert_warehouse_objects(warehouse)
     disable_full_refresh(dag)
-    run_dag(dag)
+    rerun_id = run_dag(dag)
     assert_warehouse_objects(warehouse)
+    return [full_refresh_run_id, rerun_id]
 
 
 def semantic_task_id_in(chain: list[str]) -> str:
@@ -431,17 +441,22 @@ def semantic_task_id_in(chain: list[str]) -> str:
 
 
 @pytest.fixture(scope="module")
-def local_dag(warehouse: Warehouse) -> DbtDag:
+def run_ids_by_dag_id() -> dict[str, list[str]]:
+    return {}
+
+
+@pytest.fixture(scope="module")
+def local_dag(warehouse: Warehouse, run_ids_by_dag_id: dict[str, list[str]]) -> DbtDag:
     dag = load_example_dag(warehouse, "local")
-    run_full_refresh_then_rerun(dag, warehouse)
+    run_ids_by_dag_id[dag.dag_id] = run_full_refresh_then_rerun(dag, warehouse)
     return dag
 
 
 @pytest.fixture(scope="module")
-def watcher_dag(warehouse: Warehouse) -> DbtDag:
+def watcher_dag(warehouse: Warehouse, run_ids_by_dag_id: dict[str, list[str]]) -> DbtDag:
     dag = load_example_dag(warehouse, "watcher")
     make_watcher_consumers_wait_for_producer(dag)
-    run_full_refresh_then_rerun(dag, warehouse)
+    run_ids_by_dag_id[dag.dag_id] = run_full_refresh_then_rerun(dag, warehouse)
     return dag
 
 
@@ -496,10 +511,14 @@ def test_dbt_dag_with_watcher_execution(warehouse: Warehouse, watcher_dag: DbtDa
 )
 @pytest.mark.parametrize("dag_fixture", ["local_dag", "watcher_dag"])
 def test_semantic_metric_view_task_emits_asset_events(
-    warehouse: Warehouse, dag_fixture: str, request: pytest.FixtureRequest
+    warehouse: Warehouse,
+    dag_fixture: str,
+    run_ids_by_dag_id: dict[str, list[str]],
+    request: pytest.FixtureRequest,
 ):
     dag = request.getfixturevalue(dag_fixture)
     chain = expected_task_chain(warehouse)
-    events = asset_event_uris_by_task(dag.dag_id)
-    assert events.get(chain[1]), events
-    assert events.get(semantic_task_id_in(chain)), events
+    for run_id in run_ids_by_dag_id[dag.dag_id]:
+        events = asset_event_uris_by_task(dag.dag_id, run_id)
+        assert events.get(chain[1]), (run_id, events)
+        assert events.get(semantic_task_id_in(chain)), (run_id, events)

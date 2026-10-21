@@ -26,6 +26,7 @@ from cosmos import telemetry
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
 from cosmos.listeners import dag_run_listener, task_instance_listener
 from cosmos.log import get_logger
+from cosmos.plugin import airflow3_auth
 from cosmos.plugin.snippets import IFRAME_SCRIPT
 from cosmos.plugin.storage import get_storage_type_from_path
 
@@ -132,7 +133,7 @@ def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
 
 def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     ensure_airflow_version_supported()
-    app = FastAPI()
+    app = FastAPI(dependencies=airflow3_auth.dbt_docs_auth_dependencies())
 
     projects = _load_projects_from_conf()
 
@@ -317,6 +318,12 @@ class CosmosAF3Plugin(AirflowPlugin):
             }
         ]
         projects = _load_projects_from_conf()
+        if projects and AIRFLOW_VERSION == Version("3.1.0"):
+            # The Airflow 3.1.0 UI deletes its session cookie after login, so the browser cannot authenticate to plugin routes.
+            logger.warning(
+                "Cosmos dbt docs require an authenticated user, which the Airflow 3.1.0 UI cannot provide to plugin "
+                "views; upgrade to Airflow >= 3.1.1 to open dbt docs from the Airflow UI."
+            )
         # Instance-level list: Airflow 3 can instantiate the plugin more than once per process
         self.external_views = []
         for slug, cfg in projects.items():

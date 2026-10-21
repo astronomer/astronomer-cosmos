@@ -28,7 +28,7 @@ The dbt docs are available in the Airflow menu under ``Browse``:
 For Airflow 3, Cosmos exposes the docs under a FastAPI sub-app and external view entries under **Browse**.
 
 .. important::
-   The Airflow 3 plugin support in Cosmos requires Airflow >= 3.1.
+   The Airflow 3 plugin support in Cosmos requires Airflow >= 3.1. Opening the docs from the Airflow UI requires Airflow >= 3.1.1.
 
 You can configure one or more projects via ``[cosmos].dbt_docs_projects``:
 
@@ -92,6 +92,9 @@ Notes and behavior
 - Missing artifacts return HTTP 404 with the attempted path; other IO errors return HTTP 500 and are logged.
 - The docs iframe page (``/cosmos/<slug>/dbt_docs``) links to the index and shows within the Airflow UI; the index adds a small inline script to keep browser back/forward behavior intuitive.
 - If you deploy behind a path prefix (e.g. Astronomer hosted Airflow deployments), menu links include the prefix automatically using ``AIRFLOW__API__BASE_URL``.
+- Every ``/cosmos`` route requires an authenticated Airflow user with read access to the ``Website`` view, the same permission the Airflow 2 plugin checks. Unauthenticated requests receive HTTP 401 and users without that permission receive HTTP 403. Both the Airflow UI session and an ``Authorization: Bearer`` token are accepted.
+- Opening dbt docs from the Airflow UI requires Airflow >= 3.1.1. The Airflow 3.1.0 UI discards its session cookie after login, so the browser cannot authenticate to plugin views and the docs return HTTP 401; bearer-token API access still works on 3.1.0.
+- Whether the ``Browse`` menu entry is shown is decided by Airflow, which lists plugin views only for users who can read ``Plugins``. With the FAB auth manager this means the ``Op`` and ``Admin`` roles; ``Viewer`` and ``User`` can still open the docs by URL.
 
 Apache Airflow® 2
 ~~~~~~~~~~~~~~~~~~

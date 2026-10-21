@@ -22,6 +22,7 @@ from cosmos.operators.kubernetes import (
     DbtRunKubernetesOperator,
     DbtRunOperationKubernetesOperator,
     DbtSeedKubernetesOperator,
+    DbtSemanticMetricViewKubernetesOperator,
     DbtSnapshotKubernetesOperator,
     DbtSourceKubernetesOperator,
     DbtTestKubernetesOperator,
@@ -71,7 +72,7 @@ class DbtAwsEksBaseOperator(DbtKubernetesBaseOperator):
         if self.config_file:
             raise AirflowException("The config_file is not an allowed parameter for the EksPodOperator.")
 
-    def execute(self, context: Context) -> Any | None:  # type: ignore
+    def execute(self, context: Context) -> Any | None:  # type: ignore[override]
         eks_hook = EksHook(
             aws_conn_id=self.aws_conn_id,
             region_name=self.region,
@@ -158,6 +159,19 @@ class DbtRunAwsEksOperator(DbtAwsEksBaseOperator, DbtRunKubernetesOperator):
 
     template_fields: Sequence[str] = (
         DbtAwsEksBaseOperator.template_fields + DbtRunKubernetesOperator.template_fields  # type: ignore[operator]
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticMetricViewAwsEksOperator(DbtAwsEksBaseOperator, DbtSemanticMetricViewKubernetesOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic metric view.
+    """
+
+    template_fields: Sequence[str] = (
+        DbtAwsEksBaseOperator.template_fields + DbtSemanticMetricViewKubernetesOperator.template_fields  # type: ignore[operator]
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

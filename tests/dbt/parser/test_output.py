@@ -1,14 +1,9 @@
-import logging
 from unittest.mock import MagicMock
 
 import pytest
 
-try:  # For Airflow 3
-    from airflow.providers.standard.hooks.subprocess import SubprocessResult
-except ImportError:  # For Airflow 2
-    from airflow.hooks.subprocess import SubprocessResult
-
 from cosmos.dbt.parser.output import (
+    extract_dbt_failure_details,
     extract_dbt_runner_issues,
     extract_freshness_warn_msg,
     extract_log_issues,
@@ -18,30 +13,73 @@ from cosmos.dbt.parser.output import (
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
 
+def _subprocess_result(full_output: list[str]) -> FullOutputSubprocessResult:
+    """Build a FullOutputSubprocessResult whose ``output`` is the last line, mirroring how
+    FullOutputSubprocessHook.run_command populates it in production."""
+    return FullOutputSubprocessResult(exit_code=0, output=full_output[-1], full_output=full_output)
+
+
 @pytest.mark.parametrize(
-    "output_str, expected_warnings",
+    "full_output, expected_warnings",
     [
-        ("Done. PASS=15 WARN=1 ERROR=0 SKIP=0 TOTAL=16", 1),
-        ("Done. PASS=15 WARN=0 ERROR=0 SKIP=0 TOTAL=16", 0),
-        ("Done. PASS=15 WARN=2 ERROR=0 SKIP=0 TOTAL=16", 2),
-        ("Nothing to do. Exiting without running tests.", 0),
+        (["Done. PASS=15 WARN=1 ERROR=0 SKIP=0 TOTAL=16"], 1),
+        (["Done. PASS=15 WARN=0 ERROR=0 SKIP=0 TOTAL=16"], 0),
+        (["Done. PASS=15 WARN=2 ERROR=0 SKIP=0 TOTAL=16"], 2),
+        (["Nothing to do. Exiting without running tests."], 0),
     ],
 )
-def test_parse_number_of_warnings_subprocess(output_str: str, expected_warnings):
-    result = SubprocessResult(exit_code=0, output=output_str)
-    num_warns = parse_number_of_warnings_subprocess(result)
+def test_parse_number_of_warnings_subprocess(full_output: list[str], expected_warnings: int):
+    num_warns = parse_number_of_warnings_subprocess(_subprocess_result(full_output))
     assert num_warns == expected_warnings
 
 
-def test_parse_number_of_warnings_subprocess_error_logged(caplog):
-    output_str = "WARN= should log an error."
-    with caplog.at_level(logging.ERROR):
-        result = SubprocessResult(exit_code=0, output=output_str)
-        parse_number_of_warnings_subprocess(result)
-    expected_error_log = (
-        "Could not parse number of WARNs. Check your dbt/airflow version or if --quiet is not being used"
-    )
-    assert expected_error_log in caplog.text
+def test_parse_number_of_warnings_subprocess_summary_not_last_line():
+    """Regression for issues #1951, #2492 and #2014.
+
+    Newer dbt versions print a deprecation summary, a ``--debug`` resource report and a
+    "Flushing usage events" line *after* the ``Done. ... WARN=N ...`` summary, so the summary is
+    no longer the last stdout line. The previous implementation inspected only the last line and
+    silently returned 0, so on_warning_callback was never invoked.
+    """
+    full_output = [
+        "13:52:42  1 of 1 WARN 1 not_null_my_model_my_column .................. [WARN 1 in 2.53s]",
+        "13:52:44  Done. PASS=0 WARN=1 ERROR=0 SKIP=0 NO-OP=0 TOTAL=1",
+        "13:52:44  [WARNING][DeprecationsSummary]: Deprecated functionality",
+        "Summary of encountered deprecations:",
+        "- PropertyMovedToConfigDeprecation: 12 occurrences",
+        '13:52:44  Resource report: {"command_name": "test", "command_success": true}',
+        "13:52:44  Command `dbt test` succeeded at 13:52:44 after 39.75 seconds",
+        "13:52:44  Flushing usage events",
+    ]
+    assert parse_number_of_warnings_subprocess(_subprocess_result(full_output)) == 1
+
+
+def test_parse_number_of_warnings_subprocess_without_summary_returns_zero():
+    """A run without a ``WARN=<count>`` summary line (e.g. dbt ``--quiet``) parses as 0 and does
+    not raise, even when a line contains the bare substring ``WARN=``."""
+    full_output = ["Running with dbt=1.11.8", "WARN= is not a valid summary token"]
+    assert parse_number_of_warnings_subprocess(_subprocess_result(full_output)) == 0
+
+
+def test_parse_number_of_warnings_subprocess_only_counts_summary_line():
+    """Only the ``Done. ... WARN=N ... TOTAL=N`` summary line is counted. Because the full output is
+    scanned in reverse, a later non-summary line that happens to contain a ``WARN=<digits>`` token
+    (e.g. a ``--debug`` resource/usage report printed after the summary) must not override the real
+    summary, nor be counted when there is no summary line at all (PR #2832 review)."""
+    # A trailing WARN=<digits> emitted after the real summary is ignored; the summary's count wins.
+    after_summary = [
+        "13:52:44  Done. PASS=0 WARN=1 ERROR=0 SKIP=0 NO-OP=0 TOTAL=1",
+        "13:52:45  Resource report: emitted WARN=99 internal-metric events",
+        "13:52:45  Flushing usage events",
+    ]
+    assert parse_number_of_warnings_subprocess(_subprocess_result(after_summary)) == 1
+
+    # A stray WARN=<digits> with no Done./TOTAL= summary line counts as 0 (callback not triggered).
+    no_summary = [
+        "Running with dbt=1.11.8",
+        "13:52:45  Resource report: emitted WARN=99 internal-metric events",
+    ]
+    assert parse_number_of_warnings_subprocess(_subprocess_result(no_summary)) == 0
 
 
 def test_parse_number_of_warnings_dbt_runner_with_warnings():
@@ -78,6 +116,39 @@ def test_extract_log_issues() -> None:
     test_names_no_warns, test_results_no_warns = extract_log_issues(log_list_no_warning)
     assert test_names_no_warns == []
     assert test_results_no_warns == []
+
+
+def test_extract_log_issues_dbt_1_12_format() -> None:
+    """dbt 1.12 reworded "Warning in test <name> (<path>)" to "[WARNING]: in test <name>
+    (<path>)", and the result line gained the same "[WARNING]: " prefix. Regression for the
+    dbt-1.12 CI failure where on_warning_callback fired with empty test_names/test_results."""
+    log_list = [
+        "11:17:43  Finished running 1 test in 0 hours 0 minutes and 0.13 seconds (0.13s).",
+        "11:17:43  \x1b[33mCompleted with 1 warning:\x1b[0m",
+        "11:17:43  [\x1b[33mWARNING\x1b[0m]: in test accepted_values_mini_orders_status__placed (models/schema.yml)",
+        "11:17:43  [\x1b[33mWARNING\x1b[0m]: Got 4 results, configured to warn if >1",
+        "11:17:43  Done. PASS=0 WARN=1 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=1",
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["accepted_values_mini_orders_status__placed"]
+    assert test_results == ["Got 4 results, configured to warn if >1"]
+
+
+def test_extract_dbt_failure_details() -> None:
+    log_list = [
+        "20:30:01  \x1b[31mRunning with dbt=1.3.0\x1b[0m",
+        "20:30:02  \x1b[31mFailure in test not_null_my_model_id (models/schema.yml)\x1b[0m",
+        "20:30:02  \x1b[31m  Got 5 results, configured to fail if != 0\x1b[0m",
+        "20:30:03  \x1b[31mError in model my_model (models/my_model.sql)\x1b[0m",
+        "20:30:03  \x1b[31m  Database Error: relation does not exist\x1b[0m",
+    ]
+    details = extract_dbt_failure_details(log_list)
+    assert details == [
+        "Failure in test not_null_my_model_id (models/schema.yml) Got 5 results, configured to fail if != 0",
+        "Error in model my_model (models/my_model.sql) Database Error: relation does not exist",
+    ]
+
+    assert extract_dbt_failure_details(["20:30:01  Running with dbt=1.3.0", "20:30:02  Completed successfully"]) == []
 
 
 def test_extract_dbt_runner_issues():

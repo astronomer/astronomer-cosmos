@@ -125,9 +125,37 @@ The following operator args support templating, and are accessible both through 
 - ``vars``
 - ``full_refresh`` (for the ``build``, ``seed``, and ``run`` operators since Cosmos 1.4.)
 - ``dbt_cmd_flags``
+- ``emit_datasets``
 
 .. note::
     Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.
+
+Example usage of templated ``emit_datasets`` to stop backfills from triggering downstream
+asset-scheduled DAGs:
+
+.. code-block:: python
+
+    DbtDag(
+        # ... other parameters
+        operator_args={"emit_datasets": "{{ dag_run.run_type != 'backfill' }}"},
+        render_template_as_native_obj=True,
+    )
+
+Setting ``render_template_as_native_obj=True`` is recommended so the rendered value is a real
+boolean. Without it Airflow renders the template to a string (e.g. ``"False"``); Cosmos normalizes
+both forms to a boolean.
+
+Note that ``operator_args`` wins over ``RenderConfig.emit_datasets``, which stays the parse-time
+default. Two caveats on the Airflow Dataset alias, neither of which affects whether downstream DAGs
+are triggered, because a suppressed run emits no events:
+
+- On Airflow 2.10 and 2.11, ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and
+  ``ExecutionMode.WATCHER`` tasks register a ``DatasetAlias`` when the task is built, before the
+  template is rendered. A run that renders to false therefore leaves the alias registered, but adds
+  no events to it. ``ExecutionMode.WATCHER_KUBERNETES`` and ``ExecutionMode.WATCHER_GCP_GKE`` are
+  not affected: their consumers build on the container operators, which register no alias.
+- ``ExecutionMode.AIRFLOW_ASYNC`` registers the alias on Airflow 2.10 and later, including Airflow
+  3, regardless of ``emit_datasets``, even when it is a plain ``False``.
 
 Example usage of templated ``dbt_cmd_flags`` for microbatch models with event-time ranges:
 
@@ -161,6 +189,16 @@ The following template fields are only selectable when using the operators in a 
 
 Since Airflow resolves template fields during Airflow DAG execution and not DAG parsing, the args above cannot be templated via ``DbtDag`` and ``DbtTaskGroup`` because both need to select dbt nodes during DAG parsing.
 
-Additionally, the SQL for compiled dbt models is stored in the template fields, which is viewable in the Airflow UI for each task run.
-This is provided for telemetry on task execution, and is not an operator arg.
-For more information about this, see the `Compiled SQL <../../cosmos_devex/compiled-sql.html>`_ docs.
+Output-only template fields
++++++++++++++++++++++++++++
+
+A small number of template fields on the local execution mode operators are
+*output-only*: Cosmos populates them as the task runs so the values appear in the
+Airflow UI, but any value passed in via ``operator_args`` is silently
+overwritten and has no effect.
+
+- ``compiled_sql`` — the SQL Cosmos compiled for a model. See the
+  :ref:`Compiled SQL <compiled-sql>` docs for how it
+  is populated and how to disable it via ``should_store_compiled_sql``.
+- ``freshness`` — the JSON Cosmos captures from ``dbt source freshness`` when
+  source nodes run, reset on every task instance.

@@ -8,12 +8,14 @@ on:
       - "docs/**"
       - "cosmos/**"
       - ".github/workflows/docs-build.yml"
+      - "lychee.toml"
   pull_request:
     branches: [main, 'release-*']
     paths:
       - "docs/**"
       - "cosmos/**"
       - ".github/workflows/docs-build.yml"
+      - "lychee.toml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -25,12 +27,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
 
@@ -41,3 +43,22 @@ jobs:
 
       - name: Build Sphinx documentation
         run: sphinx-build -b html docs docs/_build --fail-on-warning --fresh-env
+
+  linkcheck:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
+      - name: Check links in documentation
+        # Uses the lychee link checker. Behaviour (which hosts to skip, retries,
+        # accepted status codes for throttling hosts) is configured in the
+        # repo-root lychee.toml. Fails the job on genuinely broken links.
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: "--no-progress --config lychee.toml 'docs/**/*.rst'"
+          fail: true

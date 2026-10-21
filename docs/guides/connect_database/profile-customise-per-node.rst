@@ -33,7 +33,7 @@ But that for a specific node or group of nodes, the user would like to replace:
 
 They could apply this different configuration to all the project seeds by doing:
 
-.. code-block::
+.. code-block:: yaml
 
     seeds:
       my_dbt_project:
@@ -55,7 +55,7 @@ Dbt profile config variables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. versionadded:: 1.4.0
 
-The parts of ``profiles.yml``, which aren't specific to a particular data platform `dbt docs <https://docs.getdbt.com/docs/core/connect-data-platform/profiles.yml>`_
+The parts of ``profiles.yml`` that aren't specific to a particular data platform are documented in the `dbt docs <https://docs.getdbt.com/docs/local/profiles.yml>`_.
 
 .. code-block:: python
 

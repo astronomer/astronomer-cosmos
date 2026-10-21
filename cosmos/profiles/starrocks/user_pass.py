@@ -10,7 +10,7 @@ from ..base import BaseProfileMapping
 class StarrocksUserPasswordProfileMapping(BaseProfileMapping):
     """
     Maps Airflow MySQL connections using user + password authentication to dbt profiles.
-    https://docs.getdbt.com/docs/core/connect-data-platform/starrocks-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/starrocks-setup
     """
 
     airflow_connection_type: str = "mysql"  # StarRocks support mysql protocol

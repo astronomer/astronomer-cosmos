@@ -71,7 +71,7 @@ There are four execution mode options that run on the Airflow worker:
   - **No isolation**: dbt is installed in the same Python virtual environment as Airflow. In this case, Cosmos can invoke dbt commands as a library rather than as a subprocess, leading to performance gains.
   - **Partial isolation**: Create a dedicated Python virtual environment in the Airflow deployment, install dbt there, and configure Cosmos to use it by setting ``ExecutionConfig.dbt_executable_path``. This provides a good solution for dependency conflicts.
 
-- :ref:`watcher <watcher-execution-mode>`: (Experimental since Cosmos 1.11.0) Optimized for execution speed. Run a single ``dbt build`` command from a producer task and have sensor tasks to watch the progress of the producer, with improved DAG run time while maintaining the tasks lineage in the Airflow UI, and ability to retry failed tasks.
+- :ref:`watcher <watcher-execution-mode>`: (Stable since Cosmos 1.15.0) Optimized for execution speed. Run a single ``dbt build`` command from a producer task and have sensor tasks to watch the progress of the producer, with improved DAG run time while maintaining the tasks lineage in the Airflow UI, and ability to retry failed tasks.
 - :ref:`virtualenv <cosmos-managed-venv>`: Runs dbt commands from Python virtual environments created and managed by Cosmos. This mode removes the need to create a virtual environment at build time, unlike ``ExecutionMode.LOCAL``, while avoiding package conflicts. It is intended for cases where:
 
   - **Can't install dbt directly**: If you can't install dbt in the Airflow environment (either in the same environment or a dedicated one).
@@ -93,7 +93,7 @@ If you want to use an execution mode that can run in the Airflow worker node, us
 
       A([Execution on Airflow Worker Node])
 
-      B[Try experimental high-performance mode?]
+      B[Try high-performance mode?]
       C[ExecutionMode.WATCHER]
 
       D[Long running dbt commands and BigQuery?]
@@ -142,11 +142,12 @@ You can also execute dbt commands in a container. Choosing these kinds of execut
 
 - :ref:`docker <docker>` : Run ``dbt`` commands via Docker containers inside the Airflow worker node.
 - :ref:`kubernetes <kubernetes>`: Run ``dbt`` commands within Kubernetes Pods managed by Cosmos.
-- :ref:`watcher_kubernetes <watcher-kubernetes-execution-mode>`: (experimental since Cosmos 1.13.0) Combines the speed of the watcher execution mode with the isolation of Kubernetes.
+- :ref:`watcher_kubernetes <watcher-kubernetes-execution-mode>`: (Stable since Cosmos 1.15.0) Combines the speed of the watcher execution mode with the isolation of Kubernetes.
 - :ref:`aws_ecs <aws-container-run-job>`: Run ``dbt`` commands in containers via AWS ECS.
 - :ref:`aws_eks <aws-eks>`: Run ``dbt`` commands via Kubernetes Pods in AWS EKS.
 - :ref:`azure_container_instance <azure-container-instance>`: Run ``dbt`` commands in Azure Container Instances.
 - :ref:`gcp_cloud_run_job <gcp-cloud-run-job>`: Run ``dbt`` commands via a container managed by GCP Cloud Run Job.
+- :ref:`gcp_gke <gcp-gke>`: (experimental since Cosmos 1.15.0) Run ``dbt`` commands via Kubernetes Pods on GCP GKE using ``GKEStartPodOperator``. Includes a watcher variant, ``ExecutionMode.WATCHER_GCP_GKE``.
 
 Choose your container execution mode type
 +++++++++++++++++++++++++++++++++++++++++
@@ -165,7 +166,7 @@ If you want to use a container execution mode, use the following decision tree t
 
     D[Do you have a Kubernetes cluster?]
 
-    E[Try experimental high-performance mode?]
+    E[Try high-performance mode?]
     F[ExecutionMode.WATCHER_KUBERNETES]
 
     G[ExecutionMode.KUBERNETES]
@@ -179,9 +180,13 @@ If you want to use a container execution mode, use the following decision tree t
     M[ExecutionMode.AZURE_CONTAINER_INSTANCE]
 
     N[Are you a GCP user?]
-    O[ExecutionMode.GCP_CLOUD_RUN_JOB]
+    O[Use GKE Kubernetes cluster?]
+    P[Try experimental high-performance GKE mode?]
+    Q[ExecutionMode.WATCHER_GCP_GKE]
+    R[ExecutionMode.GCP_GKE]
+    S[ExecutionMode.GCP_CLOUD_RUN_JOB]
 
-    P[Review container execution options]
+    T[Review container execution options]
 
     A --> B
     B -->|Yes| C
@@ -203,15 +208,21 @@ If you want to use a container execution mode, use the following decision tree t
     L -->|No| N
 
     N -->|Yes| O
-    N -->|No| P
+    N -->|No| T
+
+    O -->|Yes| P
+    O -->|No| S
+
+    P -->|Yes| Q
+    P -->|No| R
 
     classDef decision fill:#fff3cd,stroke:#b58900,color:#333
     classDef action fill:#e8f5e9,stroke:#2e7d32,color:#333
     classDef result fill:#e3f2fd,stroke:#1565c0,color:#333
 
-    class B,D,E,H,I,L,N decision
-    class J,K,M,O action
-    class C,F,G,P result
+    class B,D,E,H,I,L,N,O,P decision
+    class J,K,M,R,S action
+    class C,F,G,Q,T result
 
 .. _execution-modes-comparison:
 
@@ -270,5 +281,13 @@ The type of execution mode that you choose directly affects how fast your Cosmos
      - No
    * - GCP Cloud Run Job Instance
      - Slow
+     - High
+     - No
+   * - GCP GKE
+     - Slow
+     - High
+     - No
+   * - Watcher GCP GKE
+     - Fast
      - High
      - No

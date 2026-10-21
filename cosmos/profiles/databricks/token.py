@@ -5,13 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from ..base import BaseProfileMapping
+from .host import normalize_host
 
 
 class DatabricksTokenProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Databricks connections with a token to dbt profiles.
 
-    https://docs.getdbt.com/reference/warehouse-setups/databricks-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/databricks-setup
     https://airflow.apache.org/docs/apache-airflow-providers-databricks/stable/connections/databricks.html
     """
 
@@ -47,5 +48,4 @@ class DatabricksTokenProfileMapping(BaseProfileMapping):
         }
 
     def transform_host(self, host: str) -> str:
-        """Removes the https:// prefix."""
-        return host.replace("https://", "")
+        return normalize_host(host)

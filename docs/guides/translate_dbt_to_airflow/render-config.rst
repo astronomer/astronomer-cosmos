@@ -9,37 +9,40 @@ It does this by exposing a ``cosmos.config.RenderConfig`` class that you can use
 
 The ``RenderConfig`` class takes the following arguments:
 
-- ``emit_datasets``: whether or not to emit Airflow datasets to be used for data-aware scheduling. Defaults to True. This feature is only available for ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV``, ``ExecutionMode.WATCHER`` and ``ExecutionMode.AIRFLOW_ASYNC``.
-- ``test_behavior``: how to run tests. Defaults to running a model's tests immediately after the model is run. For more information, see the `Testing Behavior <testing-behavior.html>`_ section.
-- ``load_method``: how to load your dbt project. See `Parsing Methods <parsing-methods.html>`_ for more information.
+- ``emit_datasets``: whether or not to emit Airflow datasets to be used for data-aware scheduling. Defaults to True. This feature is only available for ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV``, ``ExecutionMode.WATCHER``, ``ExecutionMode.WATCHER_KUBERNETES``, ``ExecutionMode.WATCHER_GCP_GKE`` and ``ExecutionMode.AIRFLOW_ASYNC``. This is the parse-time default; to decide per DAG run, pass a templated ``emit_datasets`` via ``operator_args`` instead (see :ref:`operator-args`).
+- ``test_behavior``: how to run tests. Defaults to running a model's tests immediately after the model is run. For more information, see the :ref:`Testing Behavior <testing-behavior>` section.
+- ``load_method``: how to load your dbt project. See :ref:`Parsing Methods <parsing-methods>` for more information.
 - ``invocation_mode``: (new in v1.9) how to run ``dbt ls``, when using ``LoadMode.DBT_LS``. Learn more about this below.
-- ``select`` and ``exclude``: which models to include or exclude from your DAGs. See `Selecting & Excluding <selecting-excluding.html>`_ for more information.
-- ``selector``: (new in v1.3) name of a dbt YAML selector to use for DAG parsing. Only supported when using ``load_method=LoadMode.DBT_LS``. See `Selecting & Excluding <selecting-excluding.html>`_ for more information.
+- ``select`` and ``exclude``: which models to include or exclude from your DAGs. See :ref:`Selecting & Excluding <selecting-excluding>` for more information.
+- ``selector``: (new in v1.3) name of a dbt YAML selector to use for DAG parsing. Only supported when using ``load_method=LoadMode.DBT_LS``. See :ref:`Selecting & Excluding <selecting-excluding>` for more information.
 - ``dbt_deps``: (deprecated in v1.9, use ``ProjectConfig.install_dbt_deps`` onwards) A Boolean to run dbt deps when using dbt ls for dag parsing. Default True
 - ``node_converters``: a dictionary mapping a ``DbtResourceType`` into a callable. Users can control how to render dbt nodes in Airflow. Only supported when using ``load_method=LoadMode.DBT_MANIFEST`` or ``LoadMode.DBT_LS``. Find more information below.
 - ``node_conversion_by_task_group``: (new in v1.12.0) A boolean to control if node_converters are used at the task group level (ex. converting models with test_behavior=AFTER_EACH means the entire task group is converted including the run task and the test task), or the individual task level (gives more granularity for converting just the run tasks or just the test tasks).  Defaults to True.
 - ``dbt_executable_path``: The path to the dbt executable for dag generation. Defaults to dbt if available on the path.
 - ``dbt_ls_path``:  Should be set when using ``load_method=LoadMode.DBT_LS_OUTPUT``. Path of the user-managed output of ``dbt ls``.
-- ``enable_mock_profile``: When using ``LoadMode.DBT_LS`` with a ``ProfileMapping`` class, by default, Cosmos mocks the values of the profile. Defaults to True. In order to leverage partial parsing, this argument should be set to ``False``. Read `Partial parsing <./partial-parsing.html#profile-configuration.html>`_ for more information.
+- ``enable_mock_profile``: When using ``LoadMode.DBT_LS`` with a ``ProfileMapping`` class, by default, Cosmos mocks the values of the profile. Defaults to True. In order to leverage partial parsing, this argument should be set to ``False``. Read :ref:`Partial parsing <partial-parsing-profile-configuration>` for more information.
 - ``env_vars``: (available in v1.2.5, use``ProjectConfig.env_vars`` for v1.3.0 onwards) A dictionary of environment variables for rendering. Only supported when using ``load_method=LoadMode.DBT_LS``.
 - ``dbt_project_path``: Configures the DBT project location accessible on their airflow controller for DAG rendering - Required when using ``load_method=LoadMode.DBT_LS`` or ``load_method=LoadMode.CUSTOM``
-- ``airflow_vars_to_purge_dbt_ls_cache``: (new in v1.5) Specify Airflow variables that will affect the ``LoadMode.DBT_LS`` cache. See `Caching <./caching.html>`_ for more information.
-- ``airflow_vars_to_purge_dbt_yaml_selectors_cache``: (new in v1.13) Specify Airflow variables that will affect the YAML selectors cache when using selectors with ``LoadMode.DBT_MANIFEST``. See `Caching <./caching.html>`_ for more information.
-- ``source_rendering_behavior``: Determines how source nodes are rendered when using cosmos default source node rendering (ALL, NONE, WITH_TESTS_OR_FRESHNESS). Defaults to "NONE" (since Cosmos 1.6). See `Source Nodes Rendering <./source-nodes-rendering.html>`_ for more information.
-- ``source_pruning``: When set to ``True``, automatically removes (or "prunes") any dbt source nodes from your Airflow DAG that do not have any downstream dependencies within the selected portion of the dbt graph. Defaults to ``False``. See `Source Nodes Rendering <./source-nodes-rendering.html>`_ for more information.
-- ``normalize_task_id``: A callable that takes a dbt node as input and returns the task ID. This function allows users to set a custom task_id independently of the model name, which can be specified as the task's display_name. This way, task_id can be modified using a user-defined function, while the model name remains as the task's display name. The display_name parameter is available in Airflow 2.9 and above. See `Task display name <./task-display-name.html>`_ for more information.
+- ``airflow_vars_to_purge_dbt_ls_cache``: (new in v1.5) Specify Airflow variables that will affect the ``LoadMode.DBT_LS`` cache. See :ref:`Caching <caching>` for more information.
+- ``airflow_vars_to_purge_dbt_yaml_selectors_cache``: (new in v1.13) Specify Airflow variables that will affect the YAML selectors cache when using selectors with ``LoadMode.DBT_MANIFEST``. See :ref:`Caching <caching>` for more information.
+- ``source_rendering_behavior``: Determines how source nodes are rendered when using cosmos default source node rendering (ALL, NONE, WITH_TESTS_OR_FRESHNESS). Defaults to "NONE" (since Cosmos 1.6). See :ref:`Source Nodes Rendering <managing-sources>` for more information.
+- ``source_pruning``: When set to ``True``, automatically removes (or "prunes") any dbt source nodes from your Airflow DAG that do not have any downstream dependencies within the selected portion of the dbt graph. Defaults to ``False``. See :ref:`Source Nodes Rendering <managing-sources>` for more information.
+- ``seed_rendering_behavior``: Determines how seed nodes are rendered and run (ALWAYS, WHEN_SEED_CHANGES, RENDER_ONLY, NONE). Defaults to "ALWAYS". See :ref:`Managing seeds <managing-seeds>` for more information.
+- ``normalize_task_id``: A callable that takes a dbt node as input and returns the task ID. This function allows users to set a custom task_id independently of the model name, which can be specified as the task's display_name. This way, task_id can be modified using a user-defined function, while the model name remains as the task's display name. The display_name parameter is available in Airflow 2.9 and above. See :ref:`Task display name <task-display-name>` for more information.
 - ``normalize_task_display_name``: This function allows users to set a custom user-defined function to alter the display name independently of the model name. This way, the task_id can be preserved while the model display name is modified.
-- ``should_detach_multiple_parents_tests``: A boolean to control if tests that depend on multiple parents should be run as standalone tasks. See `Testing Behavior <testing-behavior.html>`_ for more information.
+- ``should_detach_multiple_parents_tests``: A boolean to control if tests that depend on multiple parents should be run as standalone tasks. See :ref:`Testing Behavior <testing-behavior>` for more information.
 - ``enable_owner_inheritance``: (introduced in 1.10.2) A boolean to control if dbt owners should be imported as part of the airflow DAG owners. Defaults to True.
-- ``node_conversion_by_task_group``: A boolean to control if node_converters are used at the task group level (ex. converting models with test_behavior=AFTER_EACH means the entire task group is converted including the run task and the test task), or the individual task level (gives more granularity for converting just the run tasks or just the test tasks).  Defaults to True.
-- ``group_nodes_by_folder``: When enabled, groups nodes by folder structure, creating a ``TaskGroup`` per resource type and folder. Disabled by default.
+- ``ephemeral_models_as_empty_operator``: (new in v1.15.0) A boolean to control how ephemeral models are rendered. Ephemeral models are inlined as CTEs into downstream models and never written to the warehouse, so running them via a dbt operator is effectively a no-op. When ``True`` (default), they are rendered as ``EmptyOperator`` tasks, which preserves the dependency chain that passes through them while avoiding wasted dbt invocations and decluttering the DAG. Because the ``EmptyOperator`` does not run dbt, behaviour tied to the ephemeral model's run task no longer occurs: no Airflow Dataset/Asset is emitted for it (so dataset-scheduled DAGs keyed on it are not triggered), task callbacks are not invoked, no OpenLineage events are produced, and per-node operator arguments (e.g. ``profile_args``) do not apply. Set to ``False`` to render them as regular dbt run tasks.
+- ``group_nodes_by_folder``: When enabled, groups nodes by folder structure, creating a ``TaskGroup`` per resource type and folder. Disabled by default. By default, folders that share a leaf name under different parents (e.g. ``staging/aurora`` and ``marts/aurora``) collapse into a single task group; set the :ref:`enable_hierarchical_naming_for_group_nodes_by_folder` Cosmos config (or the ``AIRFLOW__COSMOS__ENABLE_HIERARCHICAL_NAMING_FOR_GROUP_NODES_BY_FOLDER`` environment variable) to ``True`` to render them as distinct task groups. It is disabled by default because enabling it changes task-group ids, which is a breaking change for DAGs that reference Cosmos task groups by id, and is expected to become the default in Cosmos 2.0.
+
+.. _how-to-run-dbt-ls-invocation-mode:
 
 How to run dbt ls (invocation mode)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When using ``LoadMode.DBT_LS``, Cosmos runs ``dbt ls`` to parse the dbt project.
 
-Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__. This mode requires dbt version 1.5.0 or higher.
+Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__.
 This mode,  named ``InvocationMode.DBT_RUNNER``, also depends on dbt being installed in the same Python virtual environment as Airflow.
 In previous Cosmos versions, Cosmos would always run ``dbt ls`` using the  Python ``subprocess`` module, which can lead to significant CPU and memory usage (including OOM errors), both in the scheduler and worker nodes.
 
@@ -49,7 +52,7 @@ Although ``InvocationMode.DBT_RUNNER`` is the default behaviour in Cosmos 1.9, u
 
 2. ``InvocationMode.DBT_RUNNER``: (default since Cosmos 1.9) In this mode, Cosmos uses the ``dbtRunner`` available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__ to run dbt commands. \
    In order to use this mode, dbt must be installed in the same local environment. This mode does not have the overhead of spawning new subprocesses or parsing the output of dbt commands and is faster than ``InvocationMode.SUBPROCESS``. \
-   This mode requires dbt version 1.5.0 or higher. It is up to the user to resolve :ref:`execution-modes-local-conflicts` when using this mode.
+   It is up to the user to resolve :ref:`execution-modes-local-conflicts` when using this mode.
 
 Users may opt to use ``InvocationMode.SUBPROCESS`` when they have multiple Python virtual environments with different versions of dbt and its adaptors,
 and do not want Cosmos to use the dbt version installed in the same Python Virtualenv as Airflow to parse the DAG.

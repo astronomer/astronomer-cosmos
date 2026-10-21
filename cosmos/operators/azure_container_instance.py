@@ -23,6 +23,7 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
@@ -38,7 +39,7 @@ except ImportError:
     )
 
 
-class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInstancesOperator):  # type: ignore
+class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInstancesOperator):  # type: ignore[misc]
     """
     Executes a dbt core cli command in an Azure Container Instance
     """
@@ -57,7 +58,7 @@ class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInsta
         profile_config: ProfileConfig | None = None,
         remove_on_error: bool = False,
         fail_if_exists: bool = False,
-        registry_conn_id: str | None = None,  # need to add a default for Airflow 2.3 support
+        registry_conn_id: str | None = None,
         **kwargs: Any,
     ) -> None:
         self.profile_config = profile_config
@@ -115,7 +116,7 @@ class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInsta
     ) -> Any:
         self.invoke_interceptors(context)
         self.build_command(context, cmd_flags)
-        self.log.info(f"Running command: {self.command}")
+        self.log.info("Running command: %s", self.command)
         result = AzureContainerInstancesOperator.execute(self, context)
         self.log.info(result)
 
@@ -129,7 +130,7 @@ class DbtAzureContainerInstanceBaseOperator(AbstractDbtBase, AzureContainerInsta
         self.command: list[str] = dbt_cmd
 
 
-class DbtBuildAzureContainerInstanceOperator(DbtBuildMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtBuildAzureContainerInstanceOperator(DbtBuildMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core build command.
     """
@@ -140,7 +141,7 @@ class DbtBuildAzureContainerInstanceOperator(DbtBuildMixin, DbtAzureContainerIns
         super().__init__(*args, **kwargs)
 
 
-class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core ls command.
     """
@@ -149,7 +150,7 @@ class DbtLSAzureContainerInstanceOperator(DbtLSMixin, DbtAzureContainerInstanceB
         super().__init__(*args, **kwargs)
 
 
-class DbtSeedAzureContainerInstanceOperator(DbtSeedMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtSeedAzureContainerInstanceOperator(DbtSeedMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core seed command.
 
@@ -162,7 +163,7 @@ class DbtSeedAzureContainerInstanceOperator(DbtSeedMixin, DbtAzureContainerInsta
         super().__init__(*args, **kwargs)
 
 
-class DbtSnapshotAzureContainerInstanceOperator(DbtSnapshotMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtSnapshotAzureContainerInstanceOperator(DbtSnapshotMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core snapshot command.
 
@@ -181,7 +182,7 @@ class DbtSourceAzureContainerInstanceOperator(DbtSourceMixin, DbtAzureContainerI
         super().__init__(*args, **kwargs)
 
 
-class DbtRunAzureContainerInstanceOperator(DbtRunMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtRunAzureContainerInstanceOperator(DbtRunMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core run command.
     """
@@ -192,7 +193,22 @@ class DbtRunAzureContainerInstanceOperator(DbtRunMixin, DbtAzureContainerInstanc
         super().__init__(*args, **kwargs)
 
 
-class DbtTestAzureContainerInstanceOperator(DbtTestMixin, DbtAzureContainerInstanceBaseOperator):  # type: ignore
+class DbtSemanticMetricViewAzureContainerInstanceOperator(
+    DbtSemanticMetricViewMixin, DbtAzureContainerInstanceBaseOperator
+):
+    """
+    Executes a dbt core run command against an adapter-native semantic metric view.
+    """
+
+    template_fields: Sequence[str] = (
+        DbtAzureContainerInstanceBaseOperator.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtTestAzureContainerInstanceOperator(DbtTestMixin, DbtAzureContainerInstanceBaseOperator):
     """
     Executes a dbt core test command.
     """

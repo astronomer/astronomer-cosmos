@@ -19,11 +19,11 @@ def __getattr__(name: str) -> _CosmosPluginType | _CosmosAF3PluginType | None:
         global _CosmosPlugin
         if _CosmosPlugin is None:
             if version.parse(airflow_version).major < _AIRFLOW3_MAJOR_VERSION:
-                from .airflow2 import CosmosPlugin  # type: ignore[assignment]  # noqa: F401
+                from .airflow2 import CosmosPlugin
 
                 _CosmosPlugin = CosmosPlugin  # type: ignore[assignment]
             else:
-                from .airflow3 import CosmosAF3Plugin  # type: ignore[assignment]  # noqa: F401
+                from .airflow3 import CosmosAF3Plugin
 
                 _CosmosPlugin = CosmosAF3Plugin  # type: ignore[assignment]
         return _CosmosPlugin

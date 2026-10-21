@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib.util
 import os
+import subprocess
 from functools import cache
 from pathlib import Path
 from unittest.mock import patch
@@ -9,7 +11,6 @@ import pytest
 from airflow.models.dagbag import DagBag
 from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
-from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION, PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS
@@ -18,21 +19,28 @@ from . import utils as test_utils
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
-DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
-# DAGs that require seeds to be loaded first (run via dedicated ordered tests below)
-DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag"]
+# DAGs whose source tables must be seeded first; run via the dedicated tests below.
+DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag", "source_pruning_dag"]
 IGNORED_DAG_FILES = [
     "performance_dag.py",
     "jaffle_shop_kubernetes.py",
     "jaffle_shop_watcher_kubernetes.py",
-    "cross_project_dbt_ls_dag.py",
 ]
+
+# cross_project_manifest_dag.py, cross_project_dbt_ls_dag.py, and
+# cross_project_bidirectional_dag.py exercise dbt-loom cross-project references and
+# need dbt-loom installed. When it isn't, the dedicated Run-Integration-Tests-dbt-Loom
+# CI job covers these DAGs instead.
+if importlib.util.find_spec("dbt_loom") is None:
+    IGNORED_DAG_FILES.append("cross_project_manifest_dag.py")
+    IGNORED_DAG_FILES.append("cross_project_dbt_ls_dag.py")
+    IGNORED_DAG_FILES.append("cross_project_bidirectional_dag.py")
 
 
 @provide_session
 def get_session(session=None):
-    create_default_connections(session)
+    create_default_connections(session=session)
     return session
 
 
@@ -46,22 +54,26 @@ def get_dag_bag() -> DagBag:  # noqa: C901
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
 
     if AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS:
-        return DagBag(dag_folder=None, include_examples=False)
+        return test_utils.make_dag_bag(dag_folder=None, include_examples=False)
 
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:
         for dagfile in IGNORED_DAG_FILES:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
 
-        if DBT_VERSION < Version("1.6.0"):
-            file.writelines(["example_model_version.py\n"])
-            file.writelines(["example_operators.py\n"])
-
-        if DBT_VERSION < Version("1.5.0"):
-            file.writelines(["example_source_rendering.py\n"])
-
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.writelines("example_cosmos_cleanup_dag.py\n")
+
+        if Version("3.0.0") <= AIRFLOW_VERSION < Version("3.1.0"):
+            # `dag.test()` on Airflow 3.0 runs the WatcherTrigger inline. The trigger calls
+            # `airflow.sdk.execution_time.xcom.XCom.get_one`, which imports `SUPERVISOR_COMMS`
+            # from `airflow.sdk.execution_time.task_runner`. That symbol does not exist until
+            # Airflow 3.1, so the import fails, `dag.test()` re-queues the deferred task
+            # forever, and the integration job hangs until GH Actions kills it. The watcher
+            # path works on AF 3.0 in a real triggerer process; this skip only excludes the
+            # `dag.test()` exerciser. Drop once we either depend on AF >= 3.1 or rework the
+            # trigger's XCom fetch to not need `SUPERVISOR_COMMS`.
+            file.writelines("watcher_with_freshness_check.py\n")
 
         if AIRFLOW_VERSION == Version("2.9.0"):
             # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9
@@ -71,7 +83,7 @@ def get_dag_bag() -> DagBag:  # noqa: C901
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
-    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    db = test_utils.make_dag_bag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert db.dags
     assert not db.import_errors
     return db
@@ -88,7 +100,7 @@ def get_dag_bag_single_dag(single_dag: str) -> DagBag:
                     f.write(f"{file.name}\n")
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
-    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    db = test_utils.make_dag_bag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert db.dags
     assert not db.import_errors
     return db
@@ -137,6 +149,26 @@ def test_watcher_source_rendering_dag(session):
     """Run source_rendering_dag first to load seeds, then watcher_source_rendering_dag."""
     run_dag("source_rendering_dag")
     run_dag("watcher_source_rendering_dag")
+
+
+@pytest.fixture()
+def seeded_altered_jaffle_shop():
+    """Seed altered_jaffle_shop so source_pruning_dag's raw_orders source-freshness check has its
+    table regardless of task order. dbt deps first: the project depends on dbt_utils."""
+    project_dir = EXAMPLE_DAGS_DIR / "dbt" / "altered_jaffle_shop"
+    dbt_args = ["--project-dir", str(project_dir), "--profiles-dir", str(project_dir)]
+    subprocess.run(["dbt", "deps", *dbt_args], check=True)
+    subprocess.run(["dbt", "seed", "--full-refresh", *dbt_args], check=True)
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
+    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
+)
+@pytest.mark.integration
+def test_source_pruning_dag(session, seeded_altered_jaffle_shop):
+    """Seeded by the fixture so the raw_orders source-freshness check is order-independent."""
+    run_dag("source_pruning_dag")
 
 
 @pytest.mark.skipif(

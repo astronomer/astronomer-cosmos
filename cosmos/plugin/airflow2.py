@@ -120,10 +120,10 @@ def open_file(path: str, conn_id: str | None = None) -> str:
     else:
         with open(path) as f:
             content = f.read()
-        return content  # type: ignore[no-any-return]
+        return content
 
 
-class DbtDocsView(AirflowBaseView):  # type: ignore
+class DbtDocsView(AirflowBaseView):  # type: ignore[misc]
     default_view = "dbt_docs"
     route_base = "/cosmos"
     template_folder = op.join(op.dirname(__file__), "templates")
@@ -153,18 +153,21 @@ class DbtDocsView(AirflowBaseView):  # type: ignore
         )
 
         if dbt_docs_dir is None:
-            return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return,no-untyped-call]
-        return self.render_template("dbt_docs.html")  # type: ignore[no-any-return,no-untyped-call]
+            return self.render_template("dbt_docs_not_set_up.html")  # type: ignore[no-any-return]
+        return self.render_template("dbt_docs.html")  # type: ignore[no-any-return]
 
     @expose("/dbt_docs_index.html")  # type: ignore[untyped-decorator]
     @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
-    def dbt_docs_index(self) -> tuple[str, int, dict[str, Any]]:
+    def dbt_docs_index(self) -> Any:
+        # The response is rendered inside the dbt_docs.html iframe, so a 404 here is also iframed.
+        # We serve a Cosmos-owned template whose "Return to the main page" link uses target="_top"
+        # to break out of the iframe (Airflow's default 404 link does not).
         if dbt_docs_dir is None:
-            abort(404)
+            return self.render_template("dbt_docs_iframe_404.html"), 404
         try:
             html = open_file(op.join(dbt_docs_dir, dbt_docs_index_file_name), conn_id=dbt_docs_conn_id)
         except FileNotFoundError:
-            abort(404)
+            return self.render_template("dbt_docs_iframe_404.html"), 404
         else:
             html = html.replace("</head>", f"{IFRAME_SCRIPT}</head>")
             return html, 200, {"Content-Security-Policy": "frame-ancestors 'self'"}

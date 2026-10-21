@@ -81,6 +81,7 @@ def upload_to_gcp_gs(
     gcp_conn_id: str | None = None,
     source_subpath: str = DEFAULT_TARGET_PATH,
     use_tarball: bool = False,
+    num_max_attempts: int = 1,
     **kwargs: Any,
 ) -> None:
     """
@@ -91,6 +92,7 @@ def upload_to_gcp_gs(
     :param gcp_conn_id: GCP connection ID to use when uploading files.
     :param source_subpath: Path of the source directory sub-path to upload files from.
     :param use_tarball: If True, uploads a single tar.gz archive instead of individual files.
+    :param num_max_attempts: Number of upload attempts. Defaults to 1.
     """
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
 
@@ -116,6 +118,7 @@ def upload_to_gcp_gs(
             object_name=f"{run_prefix}/{source_subpath}.tar.gz",
             data=buf.read(),
             mime_type="application/gzip",
+            num_max_attempts=num_max_attempts,
         )
     else:
         # Iterate over the files in the target dir and upload them to GCP GS
@@ -126,6 +129,7 @@ def upload_to_gcp_gs(
                     filename=f"{dirpath}/{filename}",
                     bucket_name=bucket_name,
                     object_name=object_name,
+                    num_max_attempts=num_max_attempts,
                 )
 
 
@@ -197,13 +201,13 @@ def _configure_remote_target_path() -> tuple[Path | ObjectStoragePath, str] | tu
     remote_conn_id = settings.remote_target_path_conn_id
     if not remote_conn_id:
         target_path_schema = urlparse(target_path_str).scheme
-        remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)  # type: ignore[assignment]
+        remote_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(target_path_schema, None)
     if remote_conn_id is None:
         return None, None
 
     _configured_target_path = ObjectStoragePath(target_path_str, conn_id=remote_conn_id)
 
-    if not _configured_target_path.exists():  # type: ignore[no-untyped-call]
+    if not _configured_target_path.exists():
         _configured_target_path.mkdir(parents=True, exist_ok=True)
 
     return _configured_target_path, remote_conn_id

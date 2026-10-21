@@ -10,7 +10,7 @@ from ..base import BaseProfileMapping
 class MysqlUserPasswordProfileMapping(BaseProfileMapping):
     """
     Maps Airflow MySQL connections using user + password authentication to dbt profiles.
-    https://docs.getdbt.com/reference/warehouse-setups/mysql-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/mysql-setup
     https://airflow.apache.org/docs/apache-airflow-providers-mysql/stable/connections/mysql.html
     """
 

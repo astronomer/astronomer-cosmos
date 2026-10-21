@@ -59,7 +59,7 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **What it does**: Uses ``dbtRunner`` (dbt programmatic API) instead of Python subprocess, reducing memory and CPU overhead.
 
-**Requirements**: dbt version 1.5.0+ and dbt installed in the same Python environment as Airflow.
+**Requirements**: dbt installed in the same Python environment as Airflow.
 
 **Default**: default behaviour for ``ExecutionMode.LOCAL`` since 1.4.0, default behaviour for ``RenderConfig.DBT_LS`` since Cosmos 1.9.0
 
@@ -97,8 +97,8 @@ Cosmos provides various configuration options and execution modes to optimize me
 
 **Configuration**
 
-- `Getting Started with ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html>`_
-- `Configure a Custom Queue for Producer and Watcher Tasks in ExecutionMode.WATCHER <https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html#watcher-dbt-execution-queue>`_
+- :ref:`Getting Started with ExecutionMode.WATCHER <watcher-execution-mode>`
+- :ref:`Configure a Custom Queue for Producer and Watcher Tasks in ExecutionMode.WATCHER <watcher-dbt-execution-queue>`
 
 
 5. Control DAG-level concurrency with ``concurrency`` parameter

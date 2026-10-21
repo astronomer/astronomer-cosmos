@@ -3,9 +3,9 @@
 Generating Docs
 ===============
 
-dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official dbt documentation <https://docs.getdbt.com/docs/building-a-dbt-project/documentation>`_. For an example of what the docs look like with the ``jaffle_shop`` project, check out `this site <http://cosmos-demo-dbt-docs.s3-website.eu-north-1.amazonaws.com/>`_.
+dbt allows you to generate static documentation on your models, tables, and more. You can read more about it in the `official dbt documentation <https://docs.getdbt.com/docs/build/documentation>`_. For an example of what the docs look like with the ``jaffle_shop`` project, check out `this site <http://cosmos-demo-dbt-docs.s3-website.eu-north-1.amazonaws.com/>`_.
 
-After generating the dbt docs, you can host them natively within `Apache Airflow® <https://airflow.apache.org/>`_ via the Cosmos Airflow plugin; see `Hosting Docs <hosting-docs.html>`__ for more information.
+After generating the dbt docs, you can host them natively within `Apache Airflow® <https://airflow.apache.org/>`_ via the Cosmos Airflow plugin; see :ref:`Hosting Docs <hosting-docs>` for more information.
 
 Alternatively, many users choose to serve these docs on a separate static website. This is a great way to share your data models with a broad array of stakeholders.
 
@@ -26,7 +26,7 @@ Examples
 Upload to S3
 ++++++++++++
 
-S3 supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official S3 documentation <https://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteHosting.html>`_.
+S3 supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official S3 documentation <https://docs.aws.amazon.com/AmazonS3/latest/userguide/WebsiteHosting.html>`_.
 
 You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upload docs to a S3 bucket. The following code snippet shows how to do this with the default jaffle_shop project:
 
@@ -44,6 +44,87 @@ You can use the :class:`~cosmos.operators.DbtDocsS3Operator` to generate and upl
         bucket_name="test_bucket",
     )
 
+Before this Task can be executed, there are a handful of additional steps that need to be completed. These include:
+
+- Creating an S3 bucket
+- Creating (or updating) an AWS IAM role that has access to write docs
+- Allowing that AWS IAM role to be "assumed"
+- Creating an Airflow Connection pointing towards the new role
+
+Creating the S3 bucket should be quite straightforward. This can be done manually in the AWS Console, using the AWS CLI, or programmatically with a tool like Terraform. Once this is complete, a new (or existing IAM role) should be created/updated with permission to write to that S3 bucket.
+
+Creating/Updating an IAM Role
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+These steps below assume that a bucket named ``dbt-docs-bucket`` already exists.
+
+1. In the AWS Console, create a new IAM Policy. This can be named whatever you'd like, but for this example, we'll use ``generate-dbt-docs-policy``.
+2. Add the permissions below to that policy.
+3. Once the Policy has been created, create a new IAM role with the name ``generate-dbt-docs-role``.
+4. Attach the ``generate-dbt-docs-policy`` to the ``generate-dbt-docs-role``.
+
+.. code-block:: json
+
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "AllowS3ListBucket",
+                "Effect": "Allow",
+                "Action": [
+                    "s3:ListBucket"
+                ],
+                "Resource": "arn:aws:s3:::dbt-docs-bucket"
+            },
+            {
+                "Sid": "AllowS3ObjectRW",
+                "Effect": "Allow",
+                "Action": [
+                    "s3:PutObject",
+                    "s3:GetObject",
+                    "s3:DeleteObject"
+                ],
+                "Resource": "arn:aws:s3:::dbt-docs-bucket/*"
+            }
+        ]
+    }
+
+Allowing the IAM Role to be Assumed
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Once the IAM role has been created, it can only be used if it allows another role/user to "assume" it. This is only required if the IAM role that is being created/updated is not the IAM role being used as the workload identity for your Airflow instance. For example, if your Airflow environment has a workload identity ``arn:aws:iam::123456789:role/airflow-production-environment``, your new ``generate-dbt-docs-role`` needs to allow it to be assumed by that workload identity.
+
+This can be done by adding the below JSON to the trust policy for ``generate-dbt-docs-role``.
+
+.. code-block:: json
+
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": {
+            "AWS": ["arn:aws:iam::123456789:role/airflow-production-environment"]
+          },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }
+
+Creating the Airflow Connection
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The final step is to create an Airflow Connection that points to the newly created ``generate-dbt-docs-role``. To do that, follow the list of steps below.
+
+1. Find the ARN for the ``generate-dbt-docs-role``. This should be something like: ``arn:aws:iam::123456789:role/generate-dbt-docs-role``.
+2. Create an AWS "Assume Role" Connection.
+3. Name the connection something like ``test_aws`` (to match the example above).
+4. Copy-and-paste the ``arn:aws:iam::123456789:role/generate-dbt-docs-role`` into the "IAM Role ARN" section.
+5. Save the Connection.
+
+Now, your ``DbtDocsS3Operator`` should point to the ``test_aws`` Connection and have the proper permissions to upload generated docs to your S3 bucket.
+
+
 Upload to S3 from Kubernetes
 ++++++++++++++++++++++++++++
 
@@ -57,8 +138,8 @@ This is important because the dbt ``target`` directory is created inside the Pod
 Requirements specific to Kubernetes:
 
 - The container image must include your dbt project files.
-- The container image or mounted files must include a ``profiles.yml`` file, because Kubernetes execution mode does not support :doc:`../connect_database/use-profile-mapping`.
-- The container image must have the AWS CLI available because Cosmos uploads the generated docs with ``aws s3 sync``.
+- The container image or mounted files must include a ``profiles.yml`` file, because Kubernetes execution mode does not support :ref:`use-profile-mapping`.
+- The container image must have ``boto3`` available because Cosmos uploads the generated docs from inside the Pod with a small Python uploader.
 - The Pod still needs the database credentials and any other secrets required to run ``dbt docs generate``.
 
 The following example extends the Kubernetes example DAG and uploads the generated docs to S3:
@@ -68,7 +149,7 @@ The following example extends the Kubernetes example DAG and uploads the generat
    :start-after: [START kubernetes_docs_to_s3_example]
    :end-before: [END kubernetes_docs_to_s3_example]
 
-The ``connection_id`` is resolved from Airflow and translated into AWS environment variables that are injected into the Pod before ``aws s3 sync`` runs.
+The ``connection_id`` is resolved from Airflow with ``AwsBaseHook`` and translated into AWS environment variables that are injected into the Pod before the ``boto3`` uploader runs.
 
 .. note::
     This Kubernetes integration currently supports S3 only. If you need another storage backend, use one of the local operators or extend Cosmos with another Kubernetes docs operator.
@@ -76,7 +157,7 @@ The ``connection_id`` is resolved from Airflow and translated into AWS environme
 Upload to Azure Blob Storage
 ++++++++++++++++++++++++++++
 
-Azure Blob Storage supports serving static files directly from a container. To learn more (and to set it up), check out the `official documentation <https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website>`_.
+Azure Blob Storage supports serving static files directly from a container. To learn more (and to set it up), check out the `official documentation <https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website>`_.
 
 You can use the :class:`~cosmos.operators.DbtDocsAzureStorageOperator` to generate and upload docs to an Azure Blob Storage. The following code snippet shows how to do this with the default jaffle_shop project:
 
@@ -97,7 +178,7 @@ You can use the :class:`~cosmos.operators.DbtDocsAzureStorageOperator` to genera
 Upload to GCS
 +++++++++++++
 
-GCS supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official GCS documentation <https://cloud.google.com/appengine/docs/standard/serving-static-files?tab=python>`_.
+GCS supports serving static files directly from a bucket. To learn more (and to set it up), check out the `official GCS documentation <https://docs.cloud.google.com/appengine/docs/standard/serving-static-files?tab=python>`_.
 
 You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and upload docs to a GCS bucket. The following code snippet shows how to do this with the default jaffle_shop project:
 
@@ -127,9 +208,6 @@ Static flag
 All of the DbtDocsOperator accept the ``--static`` flag. To learn more about the static flag, check out the `original PR on dbt-core <https://github.com/dbt-labs/dbt-docs/pull/465>`_.
 The static flag is used to generate a single doc file that can be hosted directly from cloud storage.
 By having a single documentation file, you can make use of Access control can be configured through Identity-Aware Proxy (IAP), and making it easy to host.
-
-.. note::
-    The static flag is only available from dbt-core >=1.7
 
 The following code snippet shows how to provide this flag with the default jaffle_shop project:
 

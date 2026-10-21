@@ -10,7 +10,7 @@ from ..base import BaseProfileMapping
 class DuckDBUserPasswordProfileMapping(BaseProfileMapping):
     """
     Maps Airflow DuckDB connections using local path mapping to dbt profiles.
-    https://docs.getdbt.com/docs/core/connect-data-platform/duckdb-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/duckdb-setup
     https://github.com/astronomer/airflow-provider-duckdb
     """
 

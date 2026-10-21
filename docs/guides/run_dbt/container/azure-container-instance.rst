@@ -19,7 +19,7 @@ Setup
 
 This tutorial guides you through the steps required to use Azure Container Instance as the execution mode for your dbt code with Astronomer Cosmos. Schematically, the guide demonstrates how to build the following architecture:
 
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/cosmos_aci_schematic.png
+.. figure:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos_aci_schematic.png
     :width: 800
 
 Prerequisites
@@ -27,7 +27,7 @@ Prerequisites
 
 1. Docker with docker daemon (Docker Desktop on MacOS). Follow the `Docker installation guide <https://docs.docker.com/engine/install/>`_.
 2. `Apache Airflow® <https://airflow.apache.org/>`_
-3. Azure CLI (install guide here: `Azure CLI <https://docs.microsoft.com/en-us/cli/azure/install-azure-cli>`_)
+3. Azure CLI (install guide here: `Azure CLI <https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest>`_)
 4. Astronomer-cosmos package containing the dbt Azure Container Instance operators
 5. Azure account with:
     1. A resource group
@@ -148,5 +148,5 @@ Log in to Airflow through a web browser ``http://localhost:8080/``, using the us
 
 Enable and trigger a run of the `jaffle_shop_azure_container_instance <https://github.com/astronomer/cosmos-example/blob/main/dags/jaffle_shop_azure_container_instance.py>`_ DAG. You will be able to see the following successful DAG run.
 
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_azure_container_instance.png
+.. figure:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_azure_container_instance.png
     :width: 800

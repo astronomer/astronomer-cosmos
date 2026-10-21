@@ -18,7 +18,7 @@ Known limitations
 ~~~~~~~~~~~~~~~~~
 
 This feature is only available for the local
-and virtualenv execution methods (read `execution modes <../run_dbt/execution-modes.html>`_ for more information).
+and virtualenv execution methods (read :ref:`execution modes <execution-modes>` for more information).
 
 Additionally, since Cosmos uses the open-source `openlineage-integration-common <https://github.com/OpenLineage/OpenLineage/tree/main/integration/common>`_, it relies on this library to support specific dbt adapters. As of 27 December 2024, the version 1.26.0 of this package supports:
 
@@ -33,7 +33,7 @@ Additionally, since Cosmos uses the open-source `openlineage-integration-common 
 - Spark
 - SQLServer
 
-Contributions are also welcome in the `OpenLineage project <https://github.com/OpenLineage/OpenLineage/blob/main/integration/common/openlineage/common/provider/dbt/processor.py#L36C1-L47C22>`_ to support more adaptors.
+Contributions are also welcome in the `OpenLineage project <https://github.com/OpenLineage/OpenLineage/tree/main/integration/dbt>`_ to support more adaptors.
 
 Installation
 ~~~~~~~~~~~~

@@ -10,6 +10,7 @@ if version.parse(airflow_version).major >= _AIRFLOW3_MAJOR_VERSION:
 
     pytest.skip("Skipping Cache tests on Airflow 3.0+", allow_module_level=True)
 
+import errno
 import logging
 import shutil
 import tempfile
@@ -25,10 +26,12 @@ from airflow.utils.db import create_session
 from airflow.utils.task_group import TaskGroup
 
 from cosmos.cache import (
+    VAR_KEY_SEED_CHECKSUM_PREFIX,
     _calculate_yaml_selectors_cache_current_version,
     _configure_remote_cache_dir,
     _copy_partial_parse_to_project,
     _create_cache_identifier,
+    _create_seed_checksum_key,
     _get_latest_cached_package_lockfile,
     _get_latest_partial_parse,
     _get_or_create_profile_cache_dir,
@@ -36,17 +39,21 @@ from cosmos.cache import (
     _update_partial_parse_cache,
     create_cache_profile,
     delete_unused_dbt_cache,
+    get_cache_seed_checksum,
     get_cached_profile,
     is_cache_package_lockfile_enabled,
     is_profile_cache_enabled,
+    store_cache_seed_checksum,
     were_yaml_selectors_modified,
 )
 from cosmos.constants import (
+    DBT_MANIFEST_FILE_NAME,
     DBT_PARTIAL_PARSE_FILE_NAME,
     DBT_TARGET_DIR_NAME,
     DEFAULT_PROFILES_FILE_NAME,
     _default_s3_conn,
 )
+from cosmos.dbt.project import get_partial_parse_path
 from cosmos.settings import dbt_profile_cache_dir_name
 
 START_DATE = datetime(2024, 4, 16)
@@ -126,13 +133,113 @@ def test__copy_partial_parse_to_project_msg_fails_msgpack(mock_unpack, tmp_path,
     assert "Unable to patch the partial_parse.msgpack file due to ValueError()" in caplog.text
 
 
-@patch("cosmos.cache.shutil.copyfile")
+# ``errno.ESTALE`` is not defined on every platform, so referencing it directly in the parametrize
+# list would break test collection where it is missing. Look it up safely and skip that case instead.
+_ESTALE = getattr(errno, "ESTALE", None)
+
+
+@pytest.mark.parametrize(
+    "errno_value, expected_level, expected_message",
+    [
+        # ESTALE is an expected transient race (a concurrent task atomically replaced the cache on a
+        # shared network filesystem mid-copy); info.
+        pytest.param(
+            _ESTALE,
+            logging.INFO,
+            "Partial parse cache was replaced concurrently",
+            marks=pytest.mark.skipif(_ESTALE is None, reason="errno.ESTALE is not available on this platform"),
+        ),
+        # A non-transient error (e.g. EACCES on a misconfigured cache_dir) likely persists and
+        # should not silently disable partial parse — surface it at warning.
+        (errno.EACCES, logging.WARNING, "Skipping partial parse"),
+    ],
+)
+@patch("cosmos.cache.safe_copy")
+def test__copy_partial_parse_to_project_falls_back_on_oserror(
+    mock_safe_copy, tmp_path, caplog, errno_value, expected_level, expected_message
+):
+    # Partial parse is a best-effort optimisation, so any OSError copying the cache must be swallowed
+    # (letting dbt do a full parse) instead of raising — but the log level distinguishes the cause.
+    caplog.set_level(logging.INFO)
+    mock_safe_copy.side_effect = OSError(errno_value, "boom")
+
+    source_dir = tmp_path / DBT_TARGET_DIR_NAME
+    source_dir.mkdir()
+    partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    partial_parse_filepath.write_bytes(b"")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        # Must not raise.
+        _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
+
+    matching = [r for r in caplog.records if expected_message in r.getMessage()]
+    assert matching, f"expected a log containing {expected_message!r}"
+    assert matching[0].levelno == expected_level
+
+
+@patch("cosmos.cache.patch_partial_parse_content")
+@patch("cosmos.cache.safe_copy")
+def test__copy_partial_parse_to_project_removes_leftover_msgpack_on_oserror(
+    mock_safe_copy, mock_patch_content, tmp_path
+):
+    # If the partial_parse copy succeeds but a later step fails (e.g. the manifest copy), the target would
+    # otherwise be left holding a lone partial_parse.msgpack and dbt would still partial-parse despite the
+    # "full parse" fallback message. The msgpack must be removed so the advertised fallback really happens.
+    # The target manifest must be left untouched: it may be a pre-existing user manifest copied by
+    # ``_clone_project`` that this function never wrote.
+    def fake_safe_copy(src, dst):
+        if src.name == DBT_MANIFEST_FILE_NAME:
+            raise OSError(errno.ENOSPC, "no space")
+        Path(dst).write_bytes(b"copied")
+
+    mock_safe_copy.side_effect = fake_safe_copy
+
+    source_dir = tmp_path / DBT_TARGET_DIR_NAME
+    source_dir.mkdir()
+    partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    partial_parse_filepath.write_bytes(b"")
+    (source_dir / DBT_MANIFEST_FILE_NAME).write_bytes(b"")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        project_path = Path(tmp_dir)
+        target_partial_parse_file = get_partial_parse_path(project_path)
+        target_manifest_file = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
+        # Simulate the user manifest that _clone_project copies into the tmp project before this call.
+        target_manifest_file.parent.mkdir(parents=True)
+        target_manifest_file.write_bytes(b"user-manifest")
+
+        # Must not raise.
+        _copy_partial_parse_to_project(partial_parse_filepath, project_path)
+
+        assert not target_partial_parse_file.exists()
+        assert target_manifest_file.read_bytes() == b"user-manifest"
+
+
+@patch("cosmos.cache.safe_copy")
+def test__copy_partial_parse_to_project_cleanup_is_best_effort(mock_safe_copy, tmp_path):
+    # The error-path cleanup must not itself fail the task: if unlink raises something other than a
+    # missing file (e.g. a permission error or a concurrent process), it must be suppressed so the
+    # cleanup error cannot mask the original OSError and crash the task.
+    mock_safe_copy.side_effect = OSError(errno.EACCES, "denied")
+
+    source_dir = tmp_path / DBT_TARGET_DIR_NAME
+    source_dir.mkdir()
+    partial_parse_filepath = source_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    partial_parse_filepath.write_bytes(b"")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        with patch("cosmos.cache.Path.unlink", side_effect=OSError(errno.EACCES, "denied")):
+            # Must not raise, even though the cleanup unlink itself fails.
+            _copy_partial_parse_to_project(partial_parse_filepath, Path(tmp_dir))
+
+
+@patch("cosmos.cache.safe_copy")
 @patch("cosmos.cache.get_partial_parse_path")
-def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
+def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_safe_copy, tmp_path):
     mock_get_partial_parse_path.side_effect = lambda cache_dir: cache_dir / "partial_parse.yml"
 
-    latest_partial_parse_filepath = Path("/path/to/latest_partial_parse.yml")
-    cache_dir = Path("/tmp/path/to/cache_directory")
+    latest_partial_parse_filepath = tmp_path / "latest" / "latest_partial_parse.yml"
+    cache_dir = tmp_path / "cache_directory"
 
     # Expected paths
     cache_path = cache_dir / "partial_parse.yml"
@@ -140,12 +247,41 @@ def test_update_partial_parse_cache(mock_get_partial_parse_path, mock_copyfile):
 
     _update_partial_parse_cache(latest_partial_parse_filepath, cache_dir)
 
-    # Assert shutil.copyfile was called twice with the correct arguments
+    # Assert safe_copy was called twice with the correct Path arguments
     calls = [
-        call(str(latest_partial_parse_filepath), str(cache_path)),
-        call(str(latest_partial_parse_filepath.parent / "manifest.json"), str(manifest_path)),
+        call(latest_partial_parse_filepath, cache_path),
+        call(latest_partial_parse_filepath.parent / "manifest.json", manifest_path),
     ]
-    mock_copyfile.assert_has_calls(calls)
+    mock_safe_copy.assert_has_calls(calls)
+
+
+def test_update_partial_parse_cache_writes_files_atomically(tmp_path):
+    """End-to-end regression: cache files end up with the expected content and no
+    temp artefacts are left behind, exercising the safe_copy (temp-file + rename)
+    path that protects concurrent readers from observing partial writes
+    (see #971/#972).
+    """
+    src_target_dir = tmp_path / "src" / DBT_TARGET_DIR_NAME
+    src_target_dir.mkdir(parents=True)
+    src_partial = src_target_dir / DBT_PARTIAL_PARSE_FILE_NAME
+    src_manifest = src_target_dir / DBT_MANIFEST_FILE_NAME
+    src_partial.write_bytes(b"partial-content")
+    src_manifest.write_bytes(b"manifest-content")
+
+    cache_dir = tmp_path / "cache"
+
+    _update_partial_parse_cache(src_partial, cache_dir)
+
+    cached_partial = get_partial_parse_path(cache_dir)
+    cached_manifest = cached_partial.parent / DBT_MANIFEST_FILE_NAME
+
+    assert cached_partial.read_bytes() == b"partial-content"
+    assert cached_manifest.read_bytes() == b"manifest-content"
+    # safe_copy must clean up its temp files even on the happy path.
+    assert sorted(p.name for p in cached_partial.parent.iterdir()) == [
+        DBT_MANIFEST_FILE_NAME,
+        DBT_PARTIAL_PARSE_FILE_NAME,
+    ]
 
 
 @pytest.fixture
@@ -476,3 +612,47 @@ def test_were_yaml_selectors_modified_false():
     previous_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
     current_version = "dbt_project_hash_v1, yamlselectors_hash_v1, impl_hash_v1"
     assert were_yaml_selectors_modified(previous_version, current_version) is False
+
+
+def test_create_seed_checksum_key_is_bounded_prefixed_and_scoped():
+    key = _create_seed_checksum_key("a" * 500, "seed.pkg." + "b" * 500)
+    assert key.startswith(VAR_KEY_SEED_CHECKSUM_PREFIX)
+    assert len(key) <= 250
+    # Different DAG/task-group identifier or seed -> different key.
+    assert key != _create_seed_checksum_key("other_dag", "seed.pkg.b" * 500)
+    assert _create_seed_checksum_key("dag", "seed.pkg.a") != _create_seed_checksum_key("dag", "seed.pkg.b")
+    # Stable across calls for the same inputs.
+    assert _create_seed_checksum_key("dag", "seed.pkg.a") == _create_seed_checksum_key("dag", "seed.pkg.a")
+
+
+@patch("cosmos.cache.Variable")
+def test_get_cache_seed_checksum_returns_stored_value(mock_variable):
+    mock_variable.get.return_value = "stored-checksum"
+    assert get_cache_seed_checksum("my_dag", "seed.pkg.my_seed") == "stored-checksum"
+    mock_variable.get.assert_called_once_with(_create_seed_checksum_key("my_dag", "seed.pkg.my_seed"), default_var=None)
+
+
+@patch("cosmos.cache.Variable")
+def test_get_cache_seed_checksum_swallows_backend_errors(mock_variable, caplog):
+    from sqlalchemy.exc import SQLAlchemyError
+
+    mock_variable.get.side_effect = SQLAlchemyError("db down")
+    caplog.set_level(logging.WARNING)
+    assert get_cache_seed_checksum("my_dag", "seed.pkg.my_seed") is None
+    assert "Failed to read seed checksum" in caplog.text
+
+
+@patch("cosmos.cache.Variable")
+def test_store_cache_seed_checksum_persists_value(mock_variable):
+    store_cache_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")
+    mock_variable.set.assert_called_once_with(_create_seed_checksum_key("my_dag", "seed.pkg.my_seed"), "new-checksum")
+
+
+@patch("cosmos.cache.Variable")
+def test_store_cache_seed_checksum_swallows_backend_errors(mock_variable, caplog):
+    from airflow.exceptions import AirflowException
+
+    mock_variable.set.side_effect = AirflowException("cannot write")
+    caplog.set_level(logging.WARNING)
+    store_cache_seed_checksum("my_dag", "seed.pkg.my_seed", "new-checksum")  # must not raise
+    assert "Failed to persist seed checksum" in caplog.text

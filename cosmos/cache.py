@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import contextlib
+import errno
 import functools
 import hashlib
 import json
-import os
-import shutil
-import tempfile
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -14,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 import msgpack
 import yaml
+from airflow.exceptions import AirflowException
 from airflow.models import DagRun, Variable
 
 try:
@@ -22,9 +22,11 @@ except ImportError:
     from airflow.models.dag import DAG  # type: ignore[assignment]
 from airflow.utils.session import provide_session
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from cosmos import settings
+from cosmos.fs import safe_copy
 
 if TYPE_CHECKING:
     try:
@@ -57,6 +59,10 @@ from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
 VAR_KEY_CACHE_PREFIX = "cosmos_cache__"
+# Seeds rendered with ``SeedRenderingBehavior.WHEN_SEED_CHANGES`` persist the last-run CSV checksum as an
+# Airflow Variable, scoped per ``DbtDag``/``DbtTaskGroup`` and seed, so the same seed rendered in different
+# DAGs tracks its state independently (a DAG never wrongly skips a seed because a different DAG ran it).
+VAR_KEY_SEED_CHECKSUM_PREFIX = "cosmos_seed_checksum__"
 
 
 def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
@@ -71,7 +77,7 @@ def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
     remote_cache_conn_id = remote_cache_dir_conn_id
     if not remote_cache_conn_id:
         cache_dir_schema = cache_dir_str.split("://")[0]
-        remote_cache_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(cache_dir_schema, None)  # type: ignore[assignment]
+        remote_cache_conn_id = FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP.get(cache_dir_schema, None)
     if remote_cache_conn_id is None:
         return _configured_cache_dir
 
@@ -82,7 +88,7 @@ def _configure_remote_cache_dir() -> Path | ObjectStoragePath | None:
 
     _configured_cache_dir = ObjectStoragePath(cache_dir_str, conn_id=remote_cache_conn_id)
 
-    if not _configured_cache_dir.exists():  # type: ignore[no-untyped-call]
+    if not _configured_cache_dir.exists():
         # TODO: Check if we should raise an error instead in case the provided path does not exist.
         _configured_cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -139,6 +145,45 @@ def _create_cache_identifier(dag: DAG, task_group: TaskGroup | None) -> str:
 
 def create_cache_key(cache_identifier: str) -> str:
     return f"{VAR_KEY_CACHE_PREFIX}{cache_identifier}"
+
+
+def _create_seed_checksum_key(dag_task_group_identifier: str, unique_id: str) -> str:
+    """Return a bounded, stable Airflow Variable key scoped to a DbtDag/DbtTaskGroup and seed.
+
+    Airflow Variable keys are length-bounded (the ``variable.key`` column is commonly 250 chars), so we
+    store the checksum under a fixed-length key: a readable prefix plus a stable hash of the full
+    identifier, ensuring long DAG ids / nested task groups / package+resource names never overflow it.
+    """
+    digest = hashlib.md5(f"{dag_task_group_identifier}:{unique_id}".encode()).hexdigest()
+    return f"{VAR_KEY_SEED_CHECKSUM_PREFIX}{digest}"
+
+
+def get_cache_seed_checksum(dag_task_group_identifier: str, unique_id: str) -> str | None:
+    """Return the seed's last persisted checksum, or ``None`` when none is stored or it cannot be read.
+
+    Best-effort: change detection must never fail a seed task, so a missing value or a transient
+    metadatabase/Variable backend error is logged and treated as "no stored checksum" (the seed runs).
+    """
+    key = _create_seed_checksum_key(dag_task_group_identifier, unique_id)
+    try:
+        checksum: str | None = Variable.get(key, default_var=None)
+    except (AirflowException, SQLAlchemyError) as exc:
+        logger.warning("Failed to read seed checksum from Variable `%s`: %s", key, exc)
+        return None
+    return checksum
+
+
+def store_cache_seed_checksum(dag_task_group_identifier: str, unique_id: str, checksum: str) -> None:
+    """Persist a seed's checksum after a successful run.
+
+    Best-effort: a failure to store the checksum must never fail a seed that already loaded successfully,
+    so storage errors are logged and swallowed rather than raised.
+    """
+    key = _create_seed_checksum_key(dag_task_group_identifier, unique_id)
+    try:
+        Variable.set(key, checksum)
+    except (AirflowException, SQLAlchemyError) as exc:
+        logger.warning("Failed to persist seed checksum under Variable `%s`: %s", key, exc)
 
 
 def _obtain_cache_dir_path(cache_identifier: str, base_dir: Path = settings.cache_dir) -> Path:
@@ -206,11 +251,16 @@ def _update_partial_parse_cache(latest_partial_parse_filepath: Path, cache_dir: 
     """
     cache_path = get_partial_parse_path(cache_dir)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path = get_partial_parse_path(cache_dir).parent / DBT_MANIFEST_FILE_NAME
+    manifest_path = cache_path.parent / DBT_MANIFEST_FILE_NAME
     latest_manifest_filepath = latest_partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
 
-    shutil.copyfile(str(latest_partial_parse_filepath), str(cache_path))
-    shutil.copyfile(str(latest_manifest_filepath), str(manifest_path))
+    # Use safe_copy (atomic temp-file + rename) so concurrent readers of these cache files
+    # never observe a partially-written state. The shared cache_dir is typically read by
+    # parallel DbtLocalBaseOperator tasks (one task often runs while another is writing
+    # the cache back); a non-atomic copyfile can leave the destination half-written and
+    # cause msgpack to fail when the next task tries to load it (see #971/#972).
+    safe_copy(latest_partial_parse_filepath, cache_path)
+    safe_copy(latest_manifest_filepath, manifest_path)
 
 
 def patch_partial_parse_content(partial_parse_filepath: Path, project_path: Path) -> bool:
@@ -236,7 +286,7 @@ def patch_partial_parse_content(partial_parse_filepath: Path, project_path: Path
             # it may be due a race condition of multiple processes trying to read/write this file
             data = msgpack.unpack(f)
     except ValueError as e:
-        logger.info("Unable to patch the partial_parse.msgpack file due to %s" % repr(e))
+        logger.info("Unable to patch the partial_parse.msgpack file due to %r", e)
     else:
         for node in data["nodes"].values():
             expected_filepath = node.get("root_path")
@@ -267,12 +317,28 @@ def _copy_partial_parse_to_project(partial_parse_filepath: Path, project_path: P
 
     source_manifest_filepath = partial_parse_filepath.parent / DBT_MANIFEST_FILE_NAME
     target_manifest_filepath = target_partial_parse_file.parent / DBT_MANIFEST_FILE_NAME
-    shutil.copy(str(partial_parse_filepath), str(target_partial_parse_file))
 
-    patch_partial_parse_content(target_partial_parse_file, project_path)
+    try:
+        safe_copy(partial_parse_filepath, target_partial_parse_file)
 
-    if source_manifest_filepath.exists():
-        shutil.copy(str(source_manifest_filepath), str(target_manifest_filepath))
+        patch_partial_parse_content(target_partial_parse_file, project_path)
+
+        if source_manifest_filepath.exists():
+            safe_copy(source_manifest_filepath, target_manifest_filepath)
+    except OSError as err:
+        # Best-effort: never fail the task over the partial parse cache — fall back to a full dbt parse.
+        # ESTALE means a concurrent task replaced the cache mid-copy on a shared filesystem (NFS/EFS,
+        # see #2867): transient, so info; other OSErrors likely persist, so warning.
+        # Remove the possibly half-written msgpack, but leave the manifest — it may be the user's,
+        # copied earlier by ``_clone_project``. Suppress cleanup errors so they cannot mask ``err``.
+        with contextlib.suppress(OSError):
+            target_partial_parse_file.unlink(missing_ok=True)
+        # ``errno.ESTALE`` is not defined on every platform.
+        estale = getattr(errno, "ESTALE", None)
+        if estale is not None and getattr(err, "errno", None) == estale:
+            logger.info("Partial parse cache was replaced concurrently (%r); falling back to a full dbt parse", err)
+        else:
+            logger.warning("Skipping partial parse due to %r; falling back to a full dbt parse", err)
 
 
 def _calculate_yaml_selectors_cache_current_version(
@@ -306,7 +372,9 @@ def _calculate_yaml_selectors_cache_current_version(
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
-        f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
+        "Cosmos performance: time to calculate cache identifier %s for current version: %s",
+        cache_identifier,
+        elapsed_time,
     )
     return f"{dbt_project_hash},{yaml_selector_hash},{cache_key_hash}"
 
@@ -331,7 +399,9 @@ def _calculate_dbt_ls_cache_current_version(cache_identifier: str, project_dir: 
 
     elapsed_time = time.perf_counter() - start_time
     logger.info(
-        f"Cosmos performance: time to calculate cache identifier {cache_identifier} for current version: {elapsed_time}"
+        "Cosmos performance: time to calculate cache identifier %s for current version: %s",
+        cache_identifier,
+        elapsed_time,
     )
     return f"{dbt_project_hash},{hash_args}"
 
@@ -406,7 +476,7 @@ def delete_unused_dbt_cache(
     if session is None:
         return 0
 
-    logger.info(f"Delete the Cosmos cache stored in Airflow Variables that hasn't been used for  {max_age_last_usage}")
+    logger.info("Delete the Cosmos cache stored in Airflow Variables that hasn't been used for %s", max_age_last_usage)
     cosmos_dags_ids = defaultdict(list)
     all_variables = session.scalars(select(Variable)).all()
     total_cosmos_variables = 0
@@ -431,12 +501,14 @@ def delete_unused_dbt_cache(
         )
         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
             for var_key in vars_keys:
-                logger.info(f"Removing the {cache_type} cache {var_key}")
+                logger.info("Removing the %s cache %s", cache_type, var_key)
                 Variable.delete(var_key)
                 deleted_cosmos_variables += 1
 
     logger.info(
-        f"Deleted {deleted_cosmos_variables}/{total_cosmos_variables} Airflow Variables used to store  Cosmos cache. "
+        "Deleted %s/%s Airflow Variables used to store Cosmos cache.",
+        deleted_cosmos_variables,
+        total_cosmos_variables,
     )
     return deleted_cosmos_variables
 
@@ -460,13 +532,14 @@ def delete_unused_dbt_remote_cache_files(  # pragma: no cover
     if session is None:
         return 0
 
-    logger.info(f"Delete the Cosmos cache stored remotely that hasn't been used for  {max_age_last_usage}")
+    logger.info("Delete the Cosmos cache stored remotely that hasn't been used for %s", max_age_last_usage)
     cosmos_dags_ids_remote_cache_files = defaultdict(list)
 
     configured_remote_cache_dir = _configure_remote_cache_dir()
     if not configured_remote_cache_dir:
         logger.info(
-            f"No remote cache directory configured. Skipping the deletion of the {cache_type} cache files in remote storage."
+            "No remote cache directory configured. Skipping the deletion of the %s cache files in remote storage.",
+            cache_type,
         )
         return 0
 
@@ -495,7 +568,7 @@ def delete_unused_dbt_remote_cache_files(  # pragma: no cover
         )
         if last_dag_run and last_dag_run.execution_date < (datetime.now(timezone.utc) - max_age_last_usage):
             for file in files:
-                logger.info(f"Removing the {cache_type} cache remote file {file}")
+                logger.info("Removing the %s cache remote file %s", cache_type, file)
                 file.unlink()
                 deleted_cosmos_remote_cache_files += 1
     logger.info(
@@ -657,35 +730,11 @@ def _get_latest_cached_package_lockfile(project_dir: Path) -> Path | None:
             return cached_package_lockfile
     cached_lockfile_dir = cache_dir / cache_identifier
     cached_lockfile_dir.mkdir(parents=True, exist_ok=True)
-    _safe_copy(package_lockfile, cached_package_lockfile)
+    safe_copy(package_lockfile, cached_package_lockfile)
     return cached_package_lockfile
 
 
 def _copy_cached_package_lockfile_to_project(cached_package_lockfile: Path, project_dir: Path) -> None:
     """Copy the cached package-lock.yml to tmp project dir"""
     package_lockfile = project_dir / PACKAGE_LOCKFILE_YML
-    _safe_copy(cached_package_lockfile, package_lockfile)
-
-
-# TODO: Move this function to a different location
-def _safe_copy(src: Path, dst: Path) -> None:
-    """
-    Safely copies a file from a source path to a destination path.
-
-    This function ensures that the copy operation is atomic by first
-    copying the file to a temporary file in the same directory as the
-    destination and then renaming the temporary file to the destination
-    file. This approach minimizes the risk of file corruption or partial
-    writes in case of a failure or interruption during the copy process.
-
-    See the blog for atomic file operations:
-    https://alexwlchan.net/2019/atomic-cross-filesystem-moves-in-python/
-    """
-    # Create a temporary file in the same directory as the destination
-    dir_name, base_name = os.path.split(dst)
-    temp_fd, temp_path = tempfile.mkstemp(dir=dir_name)
-
-    shutil.copyfile(src, temp_path)
-
-    # Rename the temporary file to the destination file
-    os.rename(temp_path, dst)
+    safe_copy(cached_package_lockfile, package_lockfile)

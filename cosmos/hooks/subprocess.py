@@ -34,7 +34,7 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
 
     def __init__(self) -> None:
         self.sub_process: Popen[str] | None = None
-        super().__init__()  # type: ignore[no-untyped-call]
+        super().__init__()
 
     def run_command(
         self,

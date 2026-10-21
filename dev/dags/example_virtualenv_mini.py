@@ -29,7 +29,7 @@ with DAG("example_virtualenv_mini", start_date=datetime(2022, 1, 1)) as dag:
         install_deps=True,
         append_env=True,
         py_system_site_packages=False,
-        py_requirements=["dbt-postgres"],
+        py_requirements=["dbt-postgres", "dbt-core<2.0"],
         virtualenv_dir=Path("/tmp/persistent-venv2"),
     )
     seed_operator

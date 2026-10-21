@@ -11,7 +11,6 @@ if TYPE_CHECKING:  # pragma: no cover
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos.config import ProfileConfig
-from cosmos.log import get_logger
 from cosmos.operators.base import (
     AbstractDbtBase,
     DbtBuildMixin,
@@ -19,12 +18,11 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
 )
-
-logger = get_logger(__name__)
 
 DEFAULT_CONN_ID = "aws_default"
 DEFAULT_CONTAINER_NAME = "dbt"
@@ -44,7 +42,7 @@ except ImportError:  # pragma: no cover
     )  # pragma: no cover
 
 
-class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignore
+class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignore[misc]
     """
     Executes a dbt core cli command in an ECS Task instance with dbt installed in it.
 
@@ -125,11 +123,11 @@ class DbtAwsEcsBaseOperator(AbstractDbtBase, EcsRunTaskOperator):  # type: ignor
     ) -> Any:
         self.invoke_interceptors(context)
         self.build_command(context, cmd_flags)
-        self.log.info(f"Running command: {self.command}")
+        self.log.info("Running command: %s", self.command)
 
         result = EcsRunTaskOperator.execute(self, context)
 
-        logger.info(result)
+        self.log.info("%s", result)
 
     def build_command(self, context: Context, cmd_flags: list[str] | None = None) -> None:
         # For the first round, we're going to assume that the command is dbt
@@ -208,6 +206,17 @@ class DbtRunAwsEcsOperator(DbtRunMixin, DbtAwsEcsBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtAwsEcsBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticMetricViewAwsEcsOperator(DbtSemanticMetricViewMixin, DbtAwsEcsBaseOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic metric view.
+    """
+
+    template_fields: Sequence[str] = DbtAwsEcsBaseOperator.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

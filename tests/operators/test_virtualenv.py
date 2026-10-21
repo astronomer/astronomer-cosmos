@@ -423,9 +423,9 @@ def test_integration_virtualenv_operator(caplog):
     """
     Confirm we're using the correct dbt command to run with virtualenv.
     """
-    from airflow.models.dagbag import DagBag
+    from tests.utils import make_dag_bag
 
-    dag_bag = DagBag(dag_folder=DAGS_FOLDER, include_examples=False)
+    dag_bag = make_dag_bag(dag_folder=DAGS_FOLDER, include_examples=False)
     dag = dag_bag.get_dag("example_virtualenv_mini")
 
     dag_run = run_test_dag(dag)
@@ -469,7 +469,7 @@ def test_build_and_run_cmd_invokes_interceptors(mock_run_command):
         project_dir="my/dir",
         vars=None,
         env=None,
-        py_requirements=["dbt-postgres==1.5.0"],
+        py_requirements=["dbt-postgres==1.8.0"],
         interceptors=[interceptor_modify_vars_and_env],
     )
 

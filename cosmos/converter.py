@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import inspect
 import os
 import platform
@@ -44,6 +45,7 @@ from cosmos.constants import (
     ExecutionMode,
     InvocationMode,
     LoadMode,
+    SeedRenderingBehavior,
 )
 from cosmos.dbt.executable import get_system_dbt, is_dbt_installed_in_same_environment
 from cosmos.dbt.graph import DbtGraph
@@ -58,6 +60,12 @@ from cosmos.telemetry import _compress_telemetry_metadata, should_emit
 from cosmos.versioning import _create_folder_version_hash
 
 logger = get_logger(__name__)
+
+
+def _calculate_manifest_version_hash(manifest_path: Any) -> str:
+    """Content checksum of a dbt manifest file."""
+    with manifest_path.open("rb") as fp:
+        return hashlib.md5(fp.read()).hexdigest()
 
 
 def migrate_to_new_interface(
@@ -130,6 +138,19 @@ def validate_arguments(
         if profile_config.profile_mapping:
             profile_config.profile_mapping.profile_args["schema"] = task_args["schema"]
 
+    # SeedRenderingBehavior.WHEN_SEED_CHANGES decides at task runtime whether to run `dbt seed`, which
+    # requires Cosmos to run dbt directly on the Airflow worker with filesystem access to the seed files.
+    if render_config.seed_rendering_behavior == SeedRenderingBehavior.WHEN_SEED_CHANGES and (
+        execution_config.execution_mode
+        not in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV, ExecutionMode.AIRFLOW_ASYNC)
+    ):
+        raise CosmosValueError(
+            "SeedRenderingBehavior.WHEN_SEED_CHANGES is only supported with ExecutionMode.LOCAL, "
+            "ExecutionMode.VIRTUALENV or ExecutionMode.AIRFLOW_ASYNC, which run dbt directly on the "
+            f"Airflow worker. The configured execution_mode is {execution_config.execution_mode}. Use "
+            "SeedRenderingBehavior.ALWAYS, or switch to a supported execution mode."
+        )
+
     if execution_config.execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV]:
         profile_config.validate_profiles_yml()
         has_non_empty_dependencies = execution_config.project_path and has_non_empty_dependencies_file(
@@ -141,6 +162,9 @@ def validate_arguments(
                 render_config.load_method == LoadMode.DBT_LS
                 or (render_config.load_method == LoadMode.AUTOMATIC and not project_config.is_manifest_available())
             )
+            # ExecutionConfig.install_dbt_deps intentionally overrides the parse-time value for execution only,
+            # so the parse-time consistency check does not apply when it is set.
+            and execution_config.install_dbt_deps is None
             and (render_config.dbt_deps != task_args.get("install_deps", True))
         ):
             err_msg = f"When using `LoadMode.DBT_LS` and `{execution_config.execution_mode}`, the value of `dbt_deps` in `RenderConfig` should be the same as the `operator_args['install_deps']` value."
@@ -256,7 +280,11 @@ def override_configuration(
         operator_args["invocation_mode"] = execution_config.invocation_mode
 
     if execution_config.execution_mode in (ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV, ExecutionMode.WATCHER):
-        if "install_deps" not in operator_args:
+        # ExecutionConfig.install_dbt_deps overrides ProjectConfig.install_dbt_deps and the deprecated
+        # operator_args value for execution only; otherwise fall back to those existing values.
+        if execution_config.install_dbt_deps is not None:
+            operator_args["install_deps"] = execution_config.install_dbt_deps
+        elif "install_deps" not in operator_args:
             operator_args["install_deps"] = project_config.install_dbt_deps
         if "copy_dbt_packages" not in operator_args:
             operator_args["copy_dbt_packages"] = project_config.copy_dbt_packages
@@ -313,6 +341,9 @@ class DbtToAirflowConverter:
         if settings.enable_cache:
             cache_identifier = cache._create_cache_identifier(dag, task_group)
             cache_dir = cache._obtain_cache_dir_path(cache_identifier=cache_identifier)
+            # Surface the resolved cache dir so a silent env var override of the config block
+            # (see #2857) is visible in the parse logs
+            logger.info("Cosmos cache dir resolved to %s", cache_dir)
 
         # Store the initial load method before it gets resolved by dbt_graph.load()
         initial_load_method = render_config.load_method
@@ -338,7 +369,12 @@ class DbtToAirflowConverter:
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
         logger.info(
-            f"Cosmos performance ({cache_identifier}) -  [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to parse the dbt project for DAG using {self.dbt_graph.load_method}"
+            "Cosmos performance (%s) - [%s|%s]: It took %.3gs to parse the dbt project for DAG using %s",
+            cache_identifier,
+            platform.node(),
+            os.getpid(),
+            elapsed_time,
+            self.dbt_graph.load_method,
         )
         previous_time = current_time
 
@@ -349,7 +385,7 @@ class DbtToAirflowConverter:
             "project_dir": execution_config.project_path,
             "partial_parse": project_config.partial_parse,
             "profile_config": profile_config,
-            "emit_datasets": render_config.emit_datasets,
+            "emit_datasets": operator_args.get("emit_datasets", render_config.emit_datasets),
             "env": env_vars,
             "vars": dbt_vars,
             "cache_dir": cache_dir,
@@ -385,7 +421,11 @@ class DbtToAirflowConverter:
         current_time = time.perf_counter()
         elapsed_time = current_time - previous_time
         logger.info(
-            f"Cosmos performance ({cache_identifier}) - [{platform.node()}|{os.getpid()}]: It took {elapsed_time:.3}s to build the Airflow DAG."
+            "Cosmos performance (%s) - [%s|%s]: It took %.3gs to build the Airflow DAG.",
+            cache_identifier,
+            platform.node(),
+            os.getpid(),
+            elapsed_time,
         )
         logger.info("::endgroup::Cosmos DAG parsing logs")
 
@@ -407,6 +447,16 @@ class DbtToAirflowConverter:
 
         try:
             dbt_project_hash = _create_folder_version_hash(self.dbt_graph.project_path)
+
+            manifest_path = self.dbt_graph.project.manifest_path
+            if self.dbt_graph.load_method == LoadMode.DBT_MANIFEST and manifest_path is not None:
+                # target/ is pruned from the folder walk above, so fold in the manifest's own checksum.
+                try:
+                    manifest_checksum = _calculate_manifest_version_hash(manifest_path)
+                    dbt_project_hash = hashlib.md5(f"{dbt_project_hash}\0{manifest_checksum}".encode()).hexdigest()
+                except Exception as e:
+                    logger.warning("Failed to fold dbt manifest checksum into the DAG version hash: %s", e)
+
             hash_suffix = f"\n\n**dbt project hash:** `{dbt_project_hash}`"
 
             if dag.doc_md:
@@ -414,9 +464,9 @@ class DbtToAirflowConverter:
             else:
                 dag.doc_md = f"**dbt project hash:** `{dbt_project_hash}`"
 
-            logger.debug(f"Appended dbt project hash {dbt_project_hash} to DAG {dag.dag_id} documentation")
+            logger.debug("Appended dbt project hash %s to DAG %s documentation", dbt_project_hash, dag.dag_id)
         except Exception as e:
-            logger.warning(f"Failed to append dbt project hash to DAG documentation: {e}")
+            logger.warning("Failed to append dbt project hash to DAG documentation: %s", e)
 
     def _store_cosmos_telemetry_metadata_on_dag(  # noqa: C901
         self,
@@ -480,9 +530,12 @@ class DbtToAirflowConverter:
             )
             stored_metadata = True
         except ParamValidationError as e:
-            logger.warning(f"Failed to store compressed Cosmos telemetry metadata in DAG {dag.dag_id} params: {e}")
+            logger.warning("Failed to store compressed Cosmos telemetry metadata in DAG %s params: %s", dag.dag_id, e)
 
         if stored_metadata:
             logger.debug(
-                f"Stored compressed Cosmos telemetry metadata in DAG {dag.dag_id} params (original size: {len(str(metadata))} bytes, compressed: {len(compressed_metadata)} bytes)"
+                "Stored compressed Cosmos telemetry metadata in DAG %s params (original size: %s bytes, compressed: %s bytes)",
+                dag.dag_id,
+                len(str(metadata)),
+                len(compressed_metadata),
             )

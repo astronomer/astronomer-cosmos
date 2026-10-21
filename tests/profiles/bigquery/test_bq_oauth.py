@@ -28,6 +28,26 @@ def mock_bigquery_conn(request):
         yield conn
 
 
+@pytest.fixture()
+def mock_bigquery_conn_extra_gcp():
+    """
+    Mocks and returns an Airflow BigQuery connection with:
+        - extra__google_cloud_platform__dataset
+        - extra__google_cloud_platform__project
+    """
+    extra = {
+        "extra__google_cloud_platform__project": "my_project",
+        "extra__google_cloud_platform__dataset": "my_dataset",
+    }
+    conn = Connection(
+        conn_id="my_bigquery_connection",
+        conn_type="google_cloud_platform",
+        extra=json.dumps(extra),
+    )
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        yield conn
+
+
 def test_bigquery_mapping_selected(mock_bigquery_conn: Connection):
     profile_mapping = get_automatic_profile_mapping(mock_bigquery_conn.conn_id, {})
     assert isinstance(profile_mapping, GoogleCloudOauthProfileMapping)
@@ -51,6 +71,21 @@ def test_connection_claiming_succeeds(mock_bigquery_conn: Connection):
 
 def test_profile(mock_bigquery_conn: Connection):
     profile_mapping = GoogleCloudOauthProfileMapping(mock_bigquery_conn, {})
+    expected = {
+        "type": "bigquery",
+        "method": "oauth",
+        "project": "my_project",
+        "dataset": "my_dataset",
+        "threads": 1,
+    }
+    assert profile_mapping.profile == expected
+
+
+def test_extra_gcp_fields(mock_bigquery_conn_extra_gcp: Connection):
+    """
+    Validate that using extra__google_cloud_platform__project properly sets the project and dataset fields.
+    """
+    profile_mapping = GoogleCloudOauthProfileMapping(mock_bigquery_conn_extra_gcp, {})
     expected = {
         "type": "bigquery",
         "method": "oauth",

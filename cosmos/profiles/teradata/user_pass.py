@@ -10,7 +10,7 @@ from ..base import BaseProfileMapping
 class TeradataUserPasswordProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Teradata connections using user + password authentication to dbt profiles.
-    https://docs.getdbt.com/docs/core/connect-data-platform/teradata-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/teradata-setup
     https://airflow.apache.org/docs/apache-airflow-providers-teradata/stable/connections/teradata.html
     """
 

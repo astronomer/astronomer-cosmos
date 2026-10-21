@@ -10,7 +10,7 @@ from .base import TrinoBaseProfileMapping
 class TrinoCertificateProfileMapping(TrinoBaseProfileMapping):
     """
     Maps Airflow Trino connections to Certificate Trino dbt profiles.
-    https://docs.getdbt.com/reference/warehouse-setups/trino-setup#certificate
+    https://docs.getdbt.com/docs/local/connect-data-platform/trino-setup#example-profilesyml-for-certificate
     https://airflow.apache.org/docs/apache-airflow-providers-trino/stable/connections.html
     """
 

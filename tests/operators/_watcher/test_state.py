@@ -9,9 +9,11 @@ import zlib
 from unittest.mock import MagicMock, patch
 
 import pytest
+from packaging.version import Version
 
 from cosmos.operators._watcher.state import (
     _log_dbt_event,
+    build_producer_state_fetcher,
     get_compiled_sql_xcom_key,
     get_dbt_event_xcom_key,
     get_status_xcom_key,
@@ -19,6 +21,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_producer_task_still_running,
     is_producer_task_terminated,
     safe_xcom_push,
 )
@@ -104,6 +107,40 @@ class TestProducerTaskTerminated:
     @pytest.mark.parametrize("state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule", None, ""])
     def test_non_terminal_states(self, state: str | None):
         assert is_producer_task_terminated(state) is False
+
+
+class TestProducerTaskStillRunning:
+    """Tests for is_producer_task_still_running helper (#2947)."""
+
+    @pytest.mark.parametrize("state", ["running", "deferred", "queued", "scheduled", "up_for_reschedule"])
+    def test_running_states(self, state: str):
+        assert is_producer_task_still_running(state) is True
+
+    @pytest.mark.parametrize("state", ["success", "failed", "skipped", "upstream_failed", "removed", None, ""])
+    def test_terminated_or_unknown_states(self, state: str | None):
+        # Terminal states and an unknown/unfetchable state (None or empty) are both "not still running".
+        assert is_producer_task_still_running(state) is False
+
+
+class TestBuildProducerStateFetcherAirflow2:
+    """The Airflow 2 fetcher normalises a null TaskInstance.state to None, not the string "None" (#2947)."""
+
+    @pytest.mark.parametrize("ti_state, expected", [("running", "running"), (None, None)])
+    def test_null_state_normalised_to_none(self, ti_state, expected):
+        mock_ti = MagicMock(state=ti_state)
+        session = MagicMock()
+        session.query.return_value.filter_by.return_value.one_or_none.return_value = mock_ti
+        session_cm = MagicMock()
+        session_cm.__enter__.return_value = session
+        with patch("airflow.utils.session.create_session", return_value=session_cm):
+            fetch_state = build_producer_state_fetcher(
+                airflow_version=Version("2.9.0"),
+                dag_id="d",
+                run_id="r",
+                producer_task_id="p",
+                logger=logging.getLogger(__name__),
+            )
+            assert fetch_state() == expected
 
 
 @pytest.mark.parametrize(
@@ -198,33 +235,78 @@ class TestInitXcomBackup:
         assert isinstance(ti._cosmos_xcom_backup_var_key, str)
         assert "test_dag" in ti._cosmos_xcom_backup_var_key
         assert ti._cosmos_xcom_backup_buffer == {}
+        assert ti._cosmos_xcom_persist_incrementally is True
 
     def test_includes_task_group_id_when_present(self):
         ti = _MockTI()
-        ti.task = MagicMock(task_group_id="my_group")
+        # Airflow operators expose the enclosing group via task.task_group, and
+        # the canonical id is TaskGroup.group_id -- not task.task_group_id,
+        # which does not exist on operators. Regression for issue #2625.
+        ti.task = MagicMock(task_group=MagicMock(group_id="my_group"))
         context = {"ti": ti, "run_id": "manual__2026-01-01"}
 
         _init_xcom_backup(context)
 
         assert "my_group" in ti._cosmos_xcom_backup_var_key
 
+    def test_rejects_task_without_task_group_attribute(self):
+        # Regression for issue #2625: the previous implementation read
+        # ``task.task_group_id`` via ``getattr`` with a ``None`` default, an
+        # attribute that does not exist on real operators -- so it silently
+        # dropped the task-group discriminator and every concurrent watcher
+        # producer in the same DAG run collided on one Variable key. The
+        # fixed helper uses direct attribute access on ``task.task_group``,
+        # so a task that lacks the canonical attribute raises loudly rather
+        # than producing a colliding key.
+        ti = _MockTI()
+        task = MagicMock(spec=["task_group_id"])
+        task.task_group_id = "my_group"
+        ti.task = task
+        context = {"ti": ti, "run_id": "manual__2026-01-01"}
+
+        with pytest.raises(AttributeError, match="task_group"):
+            _init_xcom_backup(context)
+
+    def test_persist_false_sets_buffer_and_key_but_not_incremental(self):
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "manual__2026-01-01"}
+
+        _init_xcom_backup(context, persist=False)
+
+        assert ti._cosmos_xcom_backup_buffer == {}
+        assert isinstance(ti._cosmos_xcom_backup_var_key, str)
+        assert ti._cosmos_xcom_persist_incrementally is False
+
+
+def test_compose_backup_callback():
+    from cosmos.operators._watcher.xcom import _backup_xcom_to_variable, _compose_backup_callback
+
+    def _user(context):
+        pass
+
+    assert _compose_backup_callback(None) is _backup_xcom_to_variable
+    assert _compose_backup_callback(_user) == [_user, _backup_xcom_to_variable]
+    assert _compose_backup_callback([_user]) == [_user, _backup_xcom_to_variable]
+    # idempotent: does not double-add when already present
+    assert _compose_backup_callback([_user, _backup_xcom_to_variable]) == [_user, _backup_xcom_to_variable]
+
 
 class TestPersistBackup:
-    @patch("airflow.models.Variable")
-    def test_writes_compressed_data_to_variable(self, mock_variable):
+    @patch("cosmos.operators._watcher.xcom.set_variable")
+    def test_writes_compressed_data_to_variable(self, mock_set_variable):
         _persist_backup("my_var_key", {"key1": "value1", "key2": "value2"})
 
-        mock_variable.set.assert_called_once()
-        var_key, compressed = mock_variable.set.call_args[0]
+        mock_set_variable.assert_called_once()
+        var_key, compressed = mock_set_variable.call_args[0]
         assert var_key == "my_var_key"
         data = json.loads(zlib.decompress(base64.b64decode(compressed.encode("utf-8"))).decode("utf-8"))
         assert data == {"key1": "value1", "key2": "value2"}
 
-    @patch("airflow.models.Variable")
-    def test_skips_empty_buffer(self, mock_variable):
+    @patch("cosmos.operators._watcher.xcom.set_variable")
+    def test_skips_empty_buffer(self, mock_set_variable):
         _persist_backup("my_var_key", {})
 
-        mock_variable.set.assert_not_called()
+        mock_set_variable.assert_not_called()
 
 
 class TestSafeXcomPushBackup:
@@ -249,6 +331,18 @@ class TestSafeXcomPushBackup:
         assert ti.store["key"] == "value"
         mock_persist.assert_not_called()
 
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
+    def test_accumulates_in_buffer_without_persisting_when_not_reliable(self, mock_persist):
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run"}
+        _init_xcom_backup(context, persist=False)
+
+        safe_xcom_push(ti, "status_key", "success")
+
+        assert ti.store["status_key"] == "success"
+        assert ti._cosmos_xcom_backup_buffer["status_key"] == "success"
+        mock_persist.assert_not_called()
+
 
 class TestBackupXcomToVariable:
     @patch("cosmos.operators._watcher.xcom._persist_backup")
@@ -263,6 +357,21 @@ class TestBackupXcomToVariable:
         mock_persist.assert_called_once_with(ti._cosmos_xcom_backup_var_key, {"k": "v"})
 
     @patch("cosmos.operators._watcher.xcom._persist_backup")
+    def test_lazy_mode_callback_flushes_buffer_populated_by_safe_xcom_push(self, mock_persist):
+        # In-memory (lazy) mode: safe_xcom_push only buffers (no per-push persist); the on-failure
+        # callback (_backup_xcom_to_variable) then flushes the accumulated buffer to the Variable once.
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run"}
+        _init_xcom_backup(context, persist=False)
+
+        safe_xcom_push(ti, "model__a_status", {"status": "success"})
+        mock_persist.assert_not_called()
+
+        _backup_xcom_to_variable(context)
+
+        mock_persist.assert_called_once_with(ti._cosmos_xcom_backup_var_key, {"model__a_status": {"status": "success"}})
+
+    @patch("cosmos.operators._watcher.xcom._persist_backup")
     def test_noop_without_init(self, mock_persist):
         ti = _MockTI()
         context = {"ti": ti}
@@ -273,43 +382,44 @@ class TestBackupXcomToVariable:
 
 
 class TestDeleteXcomBackupVariable:
-    @patch("airflow.models.Variable")
-    def test_deletes_variable(self, mock_variable):
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    def test_deletes_variable(self, mock_delete_variable):
         ti = _MockTI()
         context = {"ti": ti, "run_id": "test_run"}
         _init_xcom_backup(context)
 
         _delete_xcom_backup_variable(context)
 
-        mock_variable.delete.assert_called_once_with(ti._cosmos_xcom_backup_var_key)
+        mock_delete_variable.assert_called_once_with(ti._cosmos_xcom_backup_var_key)
 
-    @patch("airflow.models.Variable")
-    def test_noop_without_init(self, mock_variable):
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    def test_noop_without_init(self, mock_delete_variable):
         ti = _MockTI()
         context = {"ti": ti}
 
         _delete_xcom_backup_variable(context)
 
-        mock_variable.delete.assert_not_called()
+        mock_delete_variable.assert_not_called()
 
-    @patch("airflow.models.Variable")
-    def test_ignores_key_error(self, mock_variable):
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    def test_ignores_key_error(self, mock_delete_variable):
         ti = _MockTI()
         context = {"ti": ti, "run_id": "test_run"}
         _init_xcom_backup(context)
-        mock_variable.delete.side_effect = KeyError("not found")
+        mock_delete_variable.side_effect = KeyError("not found")
 
         _delete_xcom_backup_variable(context)  # should not raise
 
 
 class TestRestoreXcomFromVariable:
     @patch("cosmos.operators._watcher.xcom._persist_backup")
-    @patch("airflow.models.Variable")
-    def test_restores_entries(self, mock_variable, mock_persist):
+    @patch("cosmos.operators._watcher.xcom.get_variable")
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    def test_restores_entries(self, mock_delete_variable, mock_get_variable, mock_persist):
         ti = _MockTI()
         backup = {"key1": "val1", "key2": "val2"}
         compressed = base64.b64encode(zlib.compress(json.dumps(backup).encode("utf-8"))).decode("utf-8")
-        mock_variable.get.return_value = compressed
+        mock_get_variable.return_value = compressed
         context = {"ti": ti, "run_id": "test_run"}
 
         result = _restore_xcom_from_variable(context)
@@ -317,12 +427,12 @@ class TestRestoreXcomFromVariable:
         assert result is True
         assert ti.store["key1"] == "val1"
         assert ti.store["key2"] == "val2"
-        mock_variable.delete.assert_called_once()
+        mock_delete_variable.assert_called_once()
 
-    @patch("airflow.models.Variable")
-    def test_returns_false_when_no_backup(self, mock_variable):
+    @patch("cosmos.operators._watcher.xcom.get_variable")
+    def test_returns_false_when_no_backup(self, mock_get_variable):
         ti = _MockTI()
-        mock_variable.get.return_value = None
+        mock_get_variable.return_value = None
         context = {"ti": ti, "run_id": "test_run"}
 
         result = _restore_xcom_from_variable(context)

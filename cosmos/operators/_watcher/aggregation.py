@@ -9,7 +9,7 @@ from cosmos.operators._watcher.state import DbtTestStatus, is_dbt_node_status_su
 logger = get_logger(__name__)
 
 # Protects all mutations of ``test_results_per_model`` so that concurrent
-# dbt threads cannot interleave ``setdefault`` / ``append`` / ``len`` checks.
+# dbt threads cannot interleave ``setdefault`` / item assignment / ``len`` checks.
 _test_results_lock = Lock()
 
 
@@ -22,23 +22,32 @@ def accumulate_test_result(
     test_unique_id: str,
     status: str,
     tests_per_model: dict[str, list[str]],
-    test_results_per_model: dict[str, list[str]],
-) -> str | None:
-    """Accumulate a test's terminal status into test_results_per_model for its parent model.
+    test_results_per_model: dict[str, dict[str, str]],
+) -> list[str]:
+    """Record a test's terminal status into test_results_per_model for every parent model.
 
-    Returns the parent model's unique_id if found, else None.
+    A test can belong to more than one model (e.g. a ``relationships`` test depends on
+    both the model it is defined on and the model it references), so it may appear under
+    several keys in ``tests_per_model``; its status is recorded under each.
+
+    Results are keyed by ``test_unique_id`` so that a duplicated or replayed log line for
+    the same test (the Kubernetes log reader can replay recent lines after an interruption)
+    overwrites its entry instead of being counted as another distinct test.
+
+    Returns the unique_ids of all parent models the test was recorded for (empty if none).
     """
+    matched_model_uids: list[str] = []
     for model_uid, test_uids in tests_per_model.items():
         if test_unique_id in test_uids:
-            test_results_per_model.setdefault(model_uid, []).append(status)
-            return model_uid
-    return None
+            test_results_per_model.setdefault(model_uid, {})[test_unique_id] = status
+            matched_model_uids.append(model_uid)
+    return matched_model_uids
 
 
 def get_aggregated_test_status(
     model_uid: str,
     tests_per_model: dict[str, list[str]],
-    test_results_per_model: dict[str, list[str]],
+    test_results_per_model: dict[str, dict[str, str]],
 ) -> str | None:
     """
     Check if all tests for a model have finished and return aggregated status.
@@ -50,7 +59,7 @@ def get_aggregated_test_status(
     expected = tests_per_model.get(model_uid)
     if not expected:
         return None
-    collected = test_results_per_model.get(model_uid, [])
+    collected = test_results_per_model.get(model_uid, {})
     if len(collected) < len(expected):
         logger.debug(
             "Model '%s' has %s tests, but only %s have reported results so far.",
@@ -60,7 +69,7 @@ def get_aggregated_test_status(
         )
         return None
     aggregated_test_result = (
-        DbtTestStatus.PASS if all(is_dbt_node_status_success(s) for s in collected) else DbtTestStatus.FAIL
+        DbtTestStatus.PASS if all(is_dbt_node_status_success(s) for s in collected.values()) else DbtTestStatus.FAIL
     )
     logger.debug("Model '%s' has all tests reported. Aggregated result: %s", model_uid, aggregated_test_result)
     return aggregated_test_result
@@ -70,7 +79,7 @@ def push_test_result_or_aggregate(
     test_unique_id: str,
     status: str,
     tests_per_model: dict[str, list[str]],
-    test_results_per_model: dict[str, list[str]],
+    test_results_per_model: dict[str, dict[str, str]],
     task_instance: Any,
 ) -> None:
     """Accumulate a test result and, when all tests for the parent model have reported, push aggregated XCom.
@@ -82,8 +91,8 @@ def push_test_result_or_aggregate(
     :param task_instance: The Airflow task instance used for XCom push.
     """
     with _test_results_lock:
-        model_uid = accumulate_test_result(test_unique_id, status, tests_per_model, test_results_per_model)
-        if model_uid is not None:
+        model_uids = accumulate_test_result(test_unique_id, status, tests_per_model, test_results_per_model)
+        for model_uid in model_uids:
             aggregated = get_aggregated_test_status(model_uid, tests_per_model, test_results_per_model)
             if aggregated is not None:
                 safe_xcom_push(

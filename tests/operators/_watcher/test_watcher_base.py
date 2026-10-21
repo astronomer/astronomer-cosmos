@@ -91,6 +91,31 @@ class TestBaseConsumerSensor:
             _process_dbt_log_event(task_instance, dbt_log)
             mock_push.assert_not_called()
 
+    def test_process_dbt_log_event_captures_error_from_run_result_message(self):
+        """dbt-runner mode: the error text lives in NodeFinished.data.run_result.message (data.msg/info.msg
+        are empty there). It must reach the consumer's _dbt_event."""
+        task_instance = Mock()
+        dbt_log = {
+            "data": {
+                "node_info": {
+                    "unique_id": "model.test.bad_model",
+                    "node_status": "error",
+                    "node_started_at": "2024-01-01T00:00:00",
+                    "node_finished_at": "2024-01-01T00:01:00",
+                },
+                "run_result": {"status": "error", "message": "Runtime Error ... Catalog Error: Table does not exist!"},
+                "msg": "",
+            },
+            "info": {"name": "NodeFinished", "msg": ""},
+        }
+
+        with patch("cosmos.operators._watcher.base.safe_xcom_push") as mock_push:
+            _process_dbt_log_event(task_instance, dbt_log)
+
+        value = mock_push.call_args.kwargs["value"]
+        assert value["status"] == "error"
+        assert value["msg"] == "Runtime Error ... Catalog Error: Table does not exist!"
+
     def test_execute_complete_raises_airflow_skip_exception_when_status_is_skipped(self):
         """execute_complete raises AirflowSkipException when the trigger sends status='skipped'."""
 
@@ -104,9 +129,32 @@ class TestBaseConsumerSensor:
             project_dir="/tmp/sample_project",
             extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
         )
-        context = Mock()
+        context = {"ti": Mock()}
         with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
             sensor.execute_complete(context, {"status": "skipped", "reason": "source_not_fresh"})
+
+    def test_execute_complete_logs_dbt_event_on_success(self):
+        """Deferrable path: execute_complete logs the per-node dbt event once on success, not only on failure.
+
+        Regression for #2456 - removing the per-poll trigger log must not drop the single terminal log line."""
+
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+        )
+        context = {"ti": Mock()}
+        with (
+            patch("cosmos.operators._watcher.base.get_xcom_val", return_value={"status": "success", "msg": "ok"}),
+            patch("cosmos.operators._watcher.base._log_dbt_event") as mock_log,
+        ):
+            sensor.execute_complete(context, {"status": "success"})
+        mock_log.assert_called_once()
 
     def test_poke_raises_airflow_skip_exception_when_status_is_skipped(self):
         """poke raises AirflowSkipException when node status is 'skipped'."""
@@ -132,6 +180,44 @@ class TestBaseConsumerSensor:
         ):
             with pytest.raises(AirflowSkipException, match="was skipped by the dbt command"):
                 sensor.poke(context)
+
+    def test_poke_logs_dbt_event_only_at_terminal(self):
+        """poke must not log the per-node dbt event while the node is still running (status None); it logs
+        once the node is terminal. Regression for #2456 on the non-deferrable path."""
+
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+        )
+        mock_ti = Mock()
+        mock_ti.try_number = 1
+        context = {"ti": mock_ti, "run_id": "run_123"}
+
+        with (
+            patch.object(sensor, "_get_producer_task_status", return_value="running"),
+            patch.object(sensor, "_log_startup_events"),
+            patch.object(sensor, "_cache_compiled_sql"),
+            patch("cosmos.operators._watcher.base.get_xcom_val", return_value={"status": "success", "msg": "ok"}),
+            patch("cosmos.operators._watcher.base._log_dbt_event") as mock_log,
+        ):
+            # Node still running: must not log (it would duplicate on each poke).
+            with (
+                patch.object(sensor, "_get_node_status", return_value=None),
+                patch.object(sensor, "_handle_no_dbt_node_status", return_value=False),
+            ):
+                assert sensor.poke(context) is False
+            mock_log.assert_not_called()
+
+            # Node terminal: logs exactly once.
+            with patch.object(sensor, "_get_node_status", return_value="success"):
+                assert sensor.poke(context) is True
+            mock_log.assert_called_once()
 
 
 class TestHandleNoDbtNodeStatus:
@@ -188,3 +274,105 @@ class TestHandleNoDbtNodeStatus:
 
         assert result is False
         assert sensor.poke_retry_number == 1
+
+
+class TestBaseConsumerSensorEmitDatasets:
+    """Tests for the dataset-emission logic hoisted into BaseConsumerSensor and shared by every
+    ExecutionMode.WATCHER* consumer (SUBPROCESS, Kubernetes, GCP GKE)."""
+
+    def _make_sensor(self, emit_datasets=True):
+        class SubclassBaseConsumerSensor(BaseConsumerSensor, DbtRunLocalOperator):
+            something_to_be_implemented = True
+
+        sensor = SubclassBaseConsumerSensor(
+            task_id="test_sensor",
+            producer_task_id="dbt_run_local",
+            profile_config=None,
+            project_dir="/tmp/sample_project",
+            extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+            deferrable=False,
+        )
+        sensor.emit_datasets = emit_datasets
+        return sensor
+
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_skipped_when_disabled(self, mock_register):
+        sensor = self._make_sensor(emit_datasets=False)
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
+        sensor._emit_datasets({"ti": MagicMock()})
+        mock_register.assert_not_called()
+
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_skipped_when_no_uris(self, mock_register):
+        sensor = self._make_sensor()
+        sensor._outlet_uris = []
+        sensor._emit_datasets({"ti": MagicMock()})
+        mock_register.assert_not_called()
+
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_calls_register_dataset_on_task(self, mock_register):
+        sensor = self._make_sensor()
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
+        context = {"ti": MagicMock()}
+        sensor._emit_datasets(context)
+
+        mock_register.assert_called_once()
+        task_arg, inlets, outlets, ctx = mock_register.call_args[0]
+        assert task_arg is sensor
+        assert inlets == []
+        assert [o.uri for o in outlets] == ["postgres://host:5432/db/schema/table"]
+        assert ctx is context
+
+    @patch("cosmos.settings.enable_uri_xcom", True)
+    @patch("cosmos.dataset.register_dataset_on_task")
+    def test_emit_datasets_pushes_uri_xcom_when_enabled(self, mock_register):
+        sensor = self._make_sensor()
+        sensor._outlet_uris = ["postgres://host:5432/db/schema/table"]
+        ti = MagicMock()
+        sensor._emit_datasets({"ti": ti})
+        ti.xcom_push.assert_called_once_with(key="uri", value=["postgres://host:5432/db/schema/table"])
+
+    @patch.object(BaseConsumerSensor, "_emit_datasets")
+    @patch.object(BaseConsumerSensor, "_execute_core")
+    def test_execute_emits_after_core_resolves(self, mock_core, mock_emit):
+        """The non-deferred execute path emits datasets after the sensor loop resolves."""
+        sensor = self._make_sensor()
+        context = {"ti": MagicMock()}
+        sensor.execute(context)
+        mock_core.assert_called_once_with(context)
+        mock_emit.assert_called_once_with(context)
+
+    @patch.object(BaseConsumerSensor, "_emit_datasets")
+    @patch.object(BaseConsumerSensor, "_execute_core")
+    def test_execute_does_not_emit_when_deferred(self, mock_core, mock_emit):
+        """When the sensor defers (TaskDeferred), datasets are emitted later in execute_complete."""
+        from airflow.exceptions import TaskDeferred
+
+        mock_core.side_effect = TaskDeferred(trigger=MagicMock(), method_name="execute_complete")
+        sensor = self._make_sensor()
+        with pytest.raises(TaskDeferred):
+            sensor.execute({"ti": MagicMock()})
+        mock_emit.assert_not_called()
+
+    @patch.object(BaseConsumerSensor, "_emit_datasets")
+    @patch.object(BaseConsumerSensor, "_process_completion_event")
+    def test_execute_complete_extracts_outlets_and_emits(self, mock_process, mock_emit):
+        sensor = self._make_sensor()
+        context = {"ti": MagicMock()}
+        event = {"status": "success", "outlet_uris": ["postgres://host:5432/db/schema/table"]}
+
+        sensor.execute_complete(context, event)
+
+        assert sensor._outlet_uris == ["postgres://host:5432/db/schema/table"]
+        mock_process.assert_called_once_with(context, event)
+        mock_emit.assert_called_once_with(context)
+
+    @patch.object(BaseConsumerSensor, "_emit_datasets")
+    @patch.object(BaseConsumerSensor, "_process_completion_event")
+    def test_execute_complete_does_not_emit_when_status_raises(self, mock_process, mock_emit):
+        """A failed/skipped model raises during status handling, so no datasets are emitted."""
+        mock_process.side_effect = AirflowException("model failed")
+        sensor = self._make_sensor()
+        with pytest.raises(AirflowException):
+            sensor.execute_complete({"ti": MagicMock()}, {"status": "failed", "outlet_uris": ["x"]})
+        mock_emit.assert_not_called()

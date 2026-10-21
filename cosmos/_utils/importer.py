@@ -7,7 +7,7 @@ def load_method_from_module(module_path: str, method_name: str) -> Callable[...,
     try:
         module = importlib.import_module(module_path)
         method = getattr(module, method_name)
-        return method  # type: ignore
+        return method  # type: ignore[no-any-return]
     except ModuleNotFoundError:
         raise ModuleNotFoundError(f"Module {module_path} not found")
     except AttributeError:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import warnings
 from pathlib import Path
 
 import airflow
@@ -12,8 +13,10 @@ except ImportError:
     from airflow.configuration import conf
 
 from cosmos.constants import (
+    DBT_PROJECT_CONTENT_DIRS,
     DEFAULT_COSMOS_CACHE_DIR_NAME,
     DEFAULT_OPENLINEAGE_NAMESPACE,
+    DEFAULT_PROJECT_HASH_EXCLUDED_DIRS,
 )
 
 # In MacOS users may want to set the envvar `TMPDIR` if they do not want the value of the temp directory to change
@@ -21,6 +24,20 @@ DEFAULT_CACHE_DIR = Path(tempfile.gettempdir(), DEFAULT_COSMOS_CACHE_DIR_NAME)
 cache_dir: Path = Path(conf.get("cosmos", "cache_dir", fallback=DEFAULT_CACHE_DIR) or DEFAULT_CACHE_DIR)
 enable_cache: bool = conf.getboolean("cosmos", "enable_cache", fallback=True)
 enable_dag_versioning = conf.getboolean("cosmos", "enable_dag_versioning", fallback=True)
+# Additive on top of DEFAULT_PROJECT_HASH_EXCLUDED_DIRS, which are always pruned. See #2857.
+_project_hash_excluded_dirs_conf = conf.get("cosmos", "project_hash_excluded_dirs", fallback="")
+_project_hash_excluded_dirs_extra = frozenset(
+    dirname.strip() for dirname in _project_hash_excluded_dirs_conf.split(",") if dirname.strip()
+)
+_suspicious_project_hash_excluded_dirs = _project_hash_excluded_dirs_extra & DBT_PROJECT_CONTENT_DIRS
+if _suspicious_project_hash_excluded_dirs:
+    warnings.warn(
+        f"`project_hash_excluded_dirs` includes {sorted(_suspicious_project_hash_excluded_dirs)}, which look like "
+        "dbt project content directories. Excluding them means real project changes there won't be detected by "
+        "DAG versioning or the partial-parse/dbt-ls caches.",
+        UserWarning,
+    )
+project_hash_excluded_dirs: frozenset[str] = DEFAULT_PROJECT_HASH_EXCLUDED_DIRS | _project_hash_excluded_dirs_extra
 enable_dataset_alias = conf.getboolean("cosmos", "enable_dataset_alias", fallback=True)
 enable_uri_xcom = conf.getboolean("cosmos", "enable_uri_xcom", fallback=False)
 use_dataset_airflow3_uri_standard = conf.getboolean(
@@ -33,6 +50,28 @@ enable_cache_package_lockfile = conf.getboolean("cosmos", "enable_cache_package_
 enable_cache_dbt_ls = conf.getboolean("cosmos", "enable_cache_dbt_ls", fallback=True)
 enable_cache_dbt_yaml_selectors = conf.getboolean("cosmos", "enable_cache_dbt_yaml_selectors", fallback=True)
 enable_lax_selector_parsing = conf.getboolean("cosmos", "enable_lax_selector_parsing", fallback=False)
+# dbt-core discovers plugins by importing every top-level ``dbt_*`` module on ``sys.path``/``PYTHONPATH``.
+# Airflow puts its DAGs folder there, so a DAG file named ``dbt_*.py`` gets imported as a side effect of
+# Cosmos running dbt (see #1673). Enabled by default, Cosmos strips the DAGs folder from dbt's import path
+# for the duration of each dbt invocation. Disabling this restores the previous behaviour -- useful if a
+# genuine dbt plugin lives inside the DAGs folder and must stay discoverable.
+enable_dags_folder_exclusion_from_dbt = conf.getboolean(
+    "cosmos", "enable_dags_folder_exclusion_from_dbt", fallback=True
+)
+# When RenderConfig.group_nodes_by_folder is enabled, key folder task groups by their full path so
+# that folders sharing a leaf name under different parents render as distinct task groups. Defaults
+# to False to preserve existing task-group ids (enabling it is a breaking change for DAGs that
+# reference Cosmos task groups by id); expected to become the default in Cosmos 2.0. See #2824.
+enable_hierarchical_naming_for_group_nodes_by_folder = conf.getboolean(
+    "cosmos", "enable_hierarchical_naming_for_group_nodes_by_folder", fallback=False
+)
+# Opt-in: reclassifies adapter-native semantic metric view models (materialized as metric_view or
+# semantic_view) as DbtResourceType.SEMANTIC_METRIC_VIEW instead of a plain model. Defaults to False
+# to preserve existing task_ids and resource_type:model selectors; enabling it is a breaking change
+# for DAGs that already render these models. See the "Managing semantic metric views" guide.
+enable_semantic_metric_view_reclassification = conf.getboolean(
+    "cosmos", "enable_semantic_metric_view_reclassification", fallback=False
+)
 rich_logging = conf.getboolean("cosmos", "rich_logging", fallback=False)
 dbt_docs_dir = conf.get("cosmos", "dbt_docs_dir", fallback=None)
 dbt_docs_conn_id = conf.get("cosmos", "dbt_docs_conn_id", fallback=None)
@@ -62,20 +101,44 @@ enable_memory_optimised_imports = conf.getboolean("cosmos", "enable_memory_optim
 enable_setup_async_task = conf.getboolean("cosmos", "enable_setup_async_task", fallback=True)
 enable_teardown_async_task = conf.getboolean("cosmos", "enable_teardown_async_task", fallback=True)
 
-# DBT Watcher Execution Mode Watcher Task Retry Queue
-# in watcher mode, if the producer watcher fails, the consumer tasks run the individual models on retry.
-# since these tasks are sensors that require low memory/cpu on their first try,
-# this setting allows retries to run on a queue with larger resources, which is often necessary for larger dbt projects
-# this would also be used to run the producer task
-watcher_dbt_execution_queue = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
+# Deprecated: previously used for both the producer task and consumer retries. Kept for backwards
+# compatibility as a fallback for watcher_dbt_producer_queue and watcher_dbt_retry_queue below.
+watcher_dbt_execution_queue: str | None = conf.get("cosmos", "watcher_dbt_execution_queue", fallback=None)
+if watcher_dbt_execution_queue:
+    warnings.warn(
+        "The `watcher_dbt_execution_queue` config is deprecated since Cosmos 1.16.0 and will be removed in "
+        "Cosmos 2.0.0. Use `watcher_dbt_producer_queue` and/or `watcher_dbt_retry_queue` instead.",
+        DeprecationWarning,
+    )
+
+# Separate queue configuration for each watcher task type:
+# - watcher_dbt_producer_queue: queue for the DbtProducerWatcherOperator task
+# - watcher_dbt_consumer_queue: queue for DbtConsumerWatcherSensor tasks on their initial run
+# - watcher_dbt_retry_queue: queue for DbtConsumerWatcherSensor tasks on retries (typically needs more resources)
+# watcher_dbt_producer_queue and watcher_dbt_retry_queue fall back to the deprecated
+# watcher_dbt_execution_queue if set, preserving pre-1.16.0 behavior for existing users.
+watcher_dbt_producer_queue: str | None = (
+    conf.get("cosmos", "watcher_dbt_producer_queue", fallback=None) or watcher_dbt_execution_queue
+)
+watcher_dbt_consumer_queue: str | None = conf.get("cosmos", "watcher_dbt_consumer_queue", fallback=None)
+watcher_dbt_retry_queue: str | None = (
+    conf.get("cosmos", "watcher_dbt_retry_queue", fallback=None) or watcher_dbt_execution_queue
+)
+
+enable_watcher_reliable_retry = conf.getboolean("cosmos", "enable_watcher_reliable_retry", fallback=True)
 
 # The following environment variable is populated in Astro Cloud
 in_astro_cloud = os.getenv("ASTRONOMER_ENVIRONMENT") == "cloud"
 
+# ASTRONOMER_ENVIRONMENT is set by the Astronomer Runtime image on every Astro deployment (e.g. "cloud"
+# on hosted deployments, "local" for local dev). We only key on its presence -- not its value -- so the
+# check keeps working if Astronomer introduces new values; it is an undocumented platform variable.
+in_astro = bool(os.getenv("ASTRONOMER_ENVIRONMENT"))
+
 try:
     from airflow.sdk._shared.configuration.exceptions import AirflowConfigException as SdkConfigException
 except ImportError:
-    SdkConfigException = airflow.exceptions.AirflowConfigException  # type: ignore[misc]
+    SdkConfigException = airflow.exceptions.AirflowConfigException
 
 try:
     LINEAGE_NAMESPACE = conf.get("openlineage", "namespace")

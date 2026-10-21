@@ -30,7 +30,7 @@ def collect_standard_usage_metrics() -> dict[str, object]:
     Return standard telemetry metrics.
     """
     metrics: dict[str, object] = {
-        "cosmos_version": cosmos.__version__,  # type: ignore[attr-defined]
+        "cosmos_version": cosmos.__version__,
         "airflow_version": parse.quote(airflow_version),
         "python_version": platform.python_version(),
         "platform_system": platform.system(),

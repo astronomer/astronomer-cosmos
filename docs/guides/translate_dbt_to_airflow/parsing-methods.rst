@@ -36,6 +36,8 @@ When you don't supply an argument to the ``load_mode`` parameter (or you supply 
 To use this method, you don't need to supply any additional config. This is the default.
 
 
+.. _parsing-methods-dbt-manifest:
+
 ``dbt_manifest``
 ~~~~~~~~~~~~~~~~
 
@@ -97,6 +99,8 @@ from your project directory. If the manifest was built before a package was adde
 appear in the DAG until you regenerate the manifest.
 
 
+.. _parsing-methods-dbt-ls:
+
 ``dbt_ls``
 ~~~~~~~~~~
 
@@ -120,9 +124,9 @@ To use this:
     )
 
 Starting in Cosmos 1.5, Cosmos will cache the output of the ``dbt ls`` command, to improve the performance of this
-parsing method. Learn more `here <./caching.html>`_.
+parsing method. Learn more :ref:`here <caching>`.
 
-Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__. This mode requires dbt version 1.5.0 or higher.
+Since Cosmos 1.9, it will attempt to use dbt as a library, and run ``dbt ls`` using the ``dbtRunner``  that is available for `dbt programmatic invocations <https://docs.getdbt.com/reference/programmatic-invocations>`__.
 This mode,  named ``InvocationMode.DBT_RUNNER``, also depends on dbt being installed in the same Python virtual environment as Airflow.
 In previous Cosmos versions, Cosmos would always run ``dbt ls`` using the  Python ``subprocess`` module, which can lead to significant CPU and memory usage.
 
@@ -138,7 +142,7 @@ Users can force Cosmos to run ``dbt ls`` with subprocess and not ``dbtRunner``, 
     )
 
 
-For more information, check the `RenderConfig docs <./render-config.html>`_.
+For more information, check the :ref:`RenderConfig docs <render-config>`.
 
 
 ``dbt_ls_file``

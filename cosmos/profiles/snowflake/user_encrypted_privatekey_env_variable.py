@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class SnowflakeEncryptedPrivateKeyPemProfileMapping(SnowflakeBaseProfileMapping):
     """
     Maps Airflow Snowflake connections to dbt profiles if they use a user/private key.
-    https://docs.getdbt.com/docs/core/connect-data-platform/snowflake-setup#key-pair-authentication
+    https://docs.getdbt.com/docs/local/connect-data-platform/snowflake-setup
     https://airflow.apache.org/docs/apache-airflow-providers-snowflake/stable/connections/snowflake.html
     """
 
@@ -42,9 +42,14 @@ class SnowflakeEncryptedPrivateKeyPemProfileMapping(SnowflakeBaseProfileMapping)
         "warehouse": "extra.warehouse",
         "schema": "schema",
         "role": "extra.role",
+        "authenticator": "extra.authenticator",
+        "host": "extra.host",
+        "port": "extra.port",
         "private_key": "extra.private_key_content",
         "private_key_passphrase": "password",
         "query_tag": "extra.query_tag",
+        "insecure_mode": "extra.insecure_mode",
+        "client_session_keep_alive": "extra.client_session_keep_alive",
     }
 
     def can_claim_connection(self) -> bool:

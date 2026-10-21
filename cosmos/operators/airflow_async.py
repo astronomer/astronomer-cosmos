@@ -16,6 +16,7 @@ from cosmos.operators.local import (
     DbtLSLocalOperator,
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
+    DbtSemanticMetricViewLocalOperator,
     DbtSnapshotLocalOperator,
     DbtSourceLocalOperator,
     DbtTestLocalOperator,
@@ -44,6 +45,13 @@ class DbtSourceAirflowAsyncOperator(DbtSourceLocalOperator):
     pass
 
 
+class DbtSemanticMetricViewAirflowAsyncOperator(DbtSemanticMetricViewLocalOperator):
+    """
+    Runs on the worker like ``ExecutionMode.LOCAL``, as every non-model resource does in this mode. There is no
+    async operator to compose with: only ``DbtRun`` has one, and only for BigQuery, which has no metric views.
+    """
+
+
 class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):
 
     def __init__(
@@ -53,6 +61,10 @@ class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):
         extra_context: dict[str, object] | None = None,
         **kwargs: Any,
     ) -> None:
+
+        # Reject output-only template fields up front: the split below routes them into
+        # clean_kwargs, bypassing the inner operator's dbt_kwargs guard.
+        AbstractDbtLocalBase._reject_output_only_template_fields(kwargs)
 
         # Cosmos attempts to pass many kwargs that async operator simply does not accept.
         # We need to pop them.

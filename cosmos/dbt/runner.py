@@ -3,10 +3,15 @@ from __future__ import annotations
 import gc
 import sys
 from collections.abc import Callable
+from functools import cache as functools_cache
 from functools import lru_cache
+from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any
 
-from cosmos.dbt.project import change_working_directory, environ
+from packaging.version import InvalidVersion, Version
+
+from cosmos.constants import DBT_DISTRIBUTION_NAMES
+from cosmos.dbt.project import change_working_directory, environ, exclude_dags_folder_from_sys_path
 from cosmos.exceptions import CosmosDbtRunError
 from cosmos.log import get_logger
 
@@ -15,11 +20,7 @@ if "pytest" in sys.modules:
     # running tests
     cache = lru_cache(maxsize=0)
 else:  # pragma: no cover
-    try:
-        # Available since Python 3.9
-        from functools import cache
-    except ImportError:
-        cache = lru_cache(maxsize=None)
+    cache = functools_cache
 
 
 logger = get_logger(__name__)
@@ -38,6 +39,24 @@ def is_available() -> bool:
     except ImportError:
         return False
     return True
+
+
+@cache
+def is_dbt_v2() -> bool:
+    """
+    Return whether dbt 2 is installed in the Python environment Airflow runs in.
+
+    dbt 2 is published as ``dbt-core``, ``dbt-oss`` and ``dbt``. All three ship the same ``dbt.cli.main`` module,
+    so any of them at major version 2 replaces the dbtRunner that dbt-core 1.x provides, even when installed next to
+    it. ``RenderConfig.dbt_executable_path`` may point to a different dbt installation and is not inspected.
+    """
+    for distribution_name in DBT_DISTRIBUTION_NAMES:
+        try:
+            if Version(version(distribution_name)).major == 2:
+                return True
+        except (PackageNotFoundError, InvalidVersion):
+            continue
+    return False
 
 
 @cache
@@ -94,7 +113,10 @@ def run_command(
     # command that is used by `InvocationMode.SUBPROCESS`, and in that scenario the first command is necessarily the path
     # to the dbt executable.
     cli_args = command[1:]
-    with change_working_directory(cwd), environ(env):
+    # ``exclude_dags_folder_from_sys_path`` must enter *before* ``change_working_directory`` so it
+    # resolves ``DAGS_FOLDER`` against the Airflow process cwd. A relative ``DAGS_FOLDER`` resolved
+    # after the chdir would point at the dbt project dir and fail to strip the real DAGs folder.
+    with exclude_dags_folder_from_sys_path(), change_working_directory(cwd), environ(env):
         logger.info("Trying to run dbtRunner with:\n %s\n in %s", cli_args, cwd)
         runner = get_runner(callbacks=callbacks)
         try:
@@ -105,6 +127,12 @@ def run_command(
             _cleanup_dbt_adapters()
 
     return result
+
+
+def _node_label(node_result: Any) -> str:
+    """``run-operation`` yields ``RunResultOutput``, which has no ``node`` (#2982)."""
+    node = getattr(node_result, "node", None)
+    return str(getattr(node, "name", None) or getattr(node_result, "unique_id", None) or "unknown")
 
 
 def extract_message_by_status(
@@ -126,9 +154,9 @@ def extract_message_by_status(
     node_names = []
     node_results = []
 
-    for node_result in result.result.results:  # type: ignore
+    for node_result in result.result.results:
         if node_result.status in status_levels:
-            node_names.append(str(node_result.node.name))
+            node_names.append(_node_label(node_result))
             node_results.append(str(node_result.message))
 
     return node_names, node_results
@@ -139,7 +167,7 @@ def parse_number_of_warnings(result: dbtRunnerResult) -> int:
     from invoking dbt build, compile, run, seed, snapshot, test, or run-operation.
     """
     num = 0
-    for run_result in result.result.results:  # type: ignore
+    for run_result in result.result.results:
         if run_result.status == "warn":
             num += 1
     return num

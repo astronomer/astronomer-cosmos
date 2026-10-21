@@ -1,22 +1,14 @@
 from __future__ import annotations
 
-import inspect
-import re
+import json
+import shlex
+import textwrap
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from os import PathLike
 from typing import TYPE_CHECKING, Any
 
-import kubernetes.client as k8s
-from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import (
-    convert_env_vars,
-)
+from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import convert_env_vars
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-
-try:
-    from airflow.sdk.definitions.context import context_merge  # type: ignore[attr-defined]
-except ImportError:
-    from airflow.utils.context import context_merge
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -24,21 +16,8 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
-try:
-    # apache-airflow-providers-cncf-kubernetes >= 7.14.0
-    from airflow.providers.cncf.kubernetes.callbacks import (
-        KubernetesPodOperatorCallback,
-    )
-except ImportError:
-
-    class KubernetesPodOperatorCallback:  # type: ignore[no-redef]
-        """Mock fallback for older versions. Should not be used in practice."""
-
-        pass
-
-
+import cosmos.operators._k8s_common as _k8s_common
 from cosmos.config import ProfileConfig
-from cosmos.dbt.parser.output import extract_log_issues
 from cosmos.operators.base import (
     AbstractDbtBase,
     DbtBuildMixin,
@@ -47,26 +26,16 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
 )
 
-try:
-    from airflow.sdk.bases.operator import BaseOperator  # Airflow 3
-except ImportError:
-    from airflow.models import BaseOperator  # Airflow 2
 
-try:
-    from airflow.sdk.bases.hook import BaseHook
-except ImportError:  # Since Airflow 3.1, BaseHook is in the airflow.sdk.bases.hook module
-    from airflow.hooks.base import BaseHook
-
-
-class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type: ignore
+class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type: ignore[misc]
     """
     Executes a dbt core cli command in a Kubernetes Pod.
-
     """
 
     template_fields: Sequence[str] = tuple(
@@ -76,53 +45,7 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
     intercept_flag = False
 
     def __init__(self, profile_config: ProfileConfig | None = None, **kwargs: Any) -> None:
-        self.profile_config = profile_config
-
-        # In PR #1474, we refactored cosmos.operators.base.AbstractDbtBase to remove its inheritance from BaseOperator
-        # and eliminated the super().__init__() call. This change was made to resolve conflicts in parent class
-        # initializations while adding support for ExecutionMode.AIRFLOW_ASYNC. Operators under this mode inherit
-        # Airflow provider operators that enable deferrable SQL query execution. Since super().__init__() was removed
-        # from AbstractDbtBase and different parent classes require distinct initialization arguments, we explicitly
-        # initialize them (including the BaseOperator) here by segregating the required arguments for each parent class.
-        default_args = kwargs.get("default_args", {})
-        operator_kwargs = {}
-        operator_args: set[str] = set()
-        for clazz in KubernetesPodOperator.__mro__:
-            operator_args.update(inspect.signature(clazz.__init__).parameters.keys())
-            if clazz == BaseOperator:
-                break
-        for arg in operator_args:
-            try:
-                operator_kwargs[arg] = kwargs[arg]
-            except KeyError:
-                pass
-
-        base_kwargs = {}
-        for arg in {*inspect.signature(AbstractDbtBase.__init__).parameters.keys()}:
-            try:
-                base_kwargs[arg] = kwargs[arg]
-            except KeyError:
-                try:
-                    base_kwargs[arg] = default_args[arg]
-                except KeyError:
-                    pass
-
-        AbstractDbtBase.__init__(self, **base_kwargs)
-
-        container_resources = operator_kwargs.get("container_resources")
-        if isinstance(container_resources, dict):
-            operator_kwargs["container_resources"] = k8s.V1ResourceRequirements(**container_resources)
-        KubernetesPodOperator.__init__(self, **operator_kwargs)
-
-    def build_env_args(self, env: dict[str, str | bytes | PathLike[Any]]) -> None:
-        env_vars_dict: dict[str, str] = dict()
-
-        for env_var_key, env_var_value in env.items():
-            env_vars_dict[env_var_key] = str(env_var_value)
-        for env_var in self.env_vars:
-            env_vars_dict[env_var.name] = env_var.value
-
-        self.env_vars: list[Any] = convert_env_vars(env_vars_dict)
+        _k8s_common.init_k8s_operator(self, KubernetesPodOperator, profile_config, kwargs)
 
     def build_and_run_cmd(
         self,
@@ -132,32 +55,10 @@ class DbtKubernetesBaseOperator(AbstractDbtBase, KubernetesPodOperator):  # type
         async_context: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Any:
-        self.invoke_interceptors(context)
-        self.build_kube_args(context, cmd_flags)
-        self.log.info(f"Running command: {self.arguments}")
-        result = KubernetesPodOperator.execute(self, context)
-        self.log.info(result)
+        _k8s_common.build_and_run_cmd(self, KubernetesPodOperator, context, cmd_flags)
 
     def build_kube_args(self, context: Context, cmd_flags: list[str] | None = None) -> None:
-        # For the first round, we're going to assume that the command is dbt
-        # This means that we don't have openlineage support, but we will create a ticket
-        # to add that in the future
-        self.dbt_executable_path = "dbt"
-        dbt_cmd, env_vars = self.build_cmd(context=context, cmd_flags=cmd_flags)
-
-        # Parse ProfileConfig and add additional arguments to the dbt_cmd
-        if self.profile_config:
-            if self.profile_config.profile_name:
-                dbt_cmd.extend(["--profile", self.profile_config.profile_name])
-            if self.profile_config.target_name:
-                dbt_cmd.extend(["--target", self.profile_config.target_name])
-
-        if self.project_dir:
-            dbt_cmd.extend(["--project-dir", str(self.project_dir)])
-
-        # set env vars
-        self.build_env_args(env_vars)
-        self.arguments = dbt_cmd
+        _k8s_common.build_kube_args(self, context, cmd_flags)
 
 
 class DbtBuildKubernetesOperator(DbtBuildMixin, DbtKubernetesBaseOperator):
@@ -200,171 +101,16 @@ class DbtSnapshotKubernetesOperator(DbtSnapshotMixin, DbtKubernetesBaseOperator)
         super().__init__(*args, **kwargs)
 
 
-class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc]
-    """
-    This handler can detect warnings from:
-    1. Regular dbt tests (using the standard "Done. PASS=X WARN=Y" pattern)
-    2. Source freshness tests (using "WARN freshness of..." pattern)
-    """
-
-    def __init__(
-        self,
-        on_warning_callback: Callable[..., Any],
-        operator: KubernetesPodOperator,
-        context: Context | None = None,
-    ) -> None:
-        self.on_warning_callback = on_warning_callback
-        self.operator = operator
-        self.context = context
-
-    def on_pod_completion(  # type: ignore[override]
-        self,
-        *,
-        pod: k8s.V1Pod,
-        **kwargs: Any,
-    ) -> None:
-        """
-        Handles warnings by extracting log issues, creating additional context, and calling the
-        on_warning_callback with the updated context.
-
-        Note that the signature of the interface method changed in `cncf.kubernetes` provider version 10.2.0, where the
-        `operator` and `context` parameters were added to all operator callbacks. To maintain forward compatibility
-        with `cncf.kubernetes` provider version 7.14.0 and later, we pass these parameters via instance variables.
-
-        :param pod: the created pod.
-        """
-        if not self.context:
-            self.operator.log.warning("No context provided to the DbtTestWarningHandler.")
-            return
-
-        task = self.context["task_instance"].task
-        if not (isinstance(task, DbtTestKubernetesOperator) or isinstance(task, DbtSourceKubernetesOperator)):
-            self.operator.log.warning(f"Cannot handle dbt warnings for task of type {type(task)}.")
-            return
-
-        # Get the logs from the pod
-        logs = []
-        for log in task.pod_manager.read_pod_logs(pod, "base"):
-            decoded_log = log.decode("utf-8")
-            if decoded_log != "":
-                logs.append(decoded_log)
-
-        logs_text = "\n".join(logs)
-
-        # Check for warnings
-        warning_detected = False
-        if isinstance(task, DbtTestKubernetesOperator):
-            warn_count = self._detect_standard_warnings(logs_text)
-            if warn_count:
-                self.operator.log.info(f"Detected {warn_count} warnings using standard pattern")
-                warning_detected = True
-        elif isinstance(task, DbtSourceKubernetesOperator):
-            source_freshness_warnings = self._detect_source_freshness_warnings(logs_text)
-            if source_freshness_warnings:
-                self.operator.log.info(f"Detected {len(source_freshness_warnings)} source freshness warnings")
-                warning_detected = True
-
-        if not warning_detected:
-            self.operator.log.warning(
-                "Failed to scrape warning count from the pod logs."
-                "Potential warning callbacks could not be triggered."
-            )
-            return
-
-        test_names, test_results = extract_log_issues(logs)
-        context_merge(self.context, test_names=test_names, test_results=test_results)
-        self.on_warning_callback(self.context)
-
-    def _detect_standard_warnings(self, log_text: str) -> int | None:
-        """
-        Detect warnings using the standard dbt summary pattern.
-
-        Pattern: "Done. PASS=X WARN=Y ERROR=Z SKIP=W"
-
-        :param log_text: Complete log text from the pod
-        :return: Number of warnings detected, or None if pattern not found
-        """
-        warn_count_pattern = re.compile(r"Done\. (?:\w+=\d+ )*WARN=(\d+)(?: \w+=\d+)*")
-        match = warn_count_pattern.search(log_text)
-
-        if match:
-            return int(match.group(1))
-        return None
-
-    def _detect_source_freshness_warnings(self, log_text: str) -> list[dict[str, Any]]:
-        """
-        Detect source freshness warnings from dbt logs.
-
-        Pattern examples:
-        - "15:49:21 1 of 1 WARN freshness of auction_net.auction_net_raw ... [WARN in 0.90s]"
-        - "WARN freshness of source_name.table_name"
-
-        :param log_text: Complete log text from the pod
-        :return: List of warning dictionaries
-        """
-        warnings = []
-
-        # Primary pattern for source freshness warnings
-        # Matches: "HH:MM:SS X of Y WARN freshness of source.table ... [WARN in Xs]"
-        freshness_pattern = re.compile(
-            r"(\d{2}:\d{2}:\d{2})\s+"  # timestamp
-            r"\d+\s+of\s+\d+\s+"  # "X of Y"
-            r"WARN\s+freshness\s+of\s+"  # "WARN freshness of"
-            r"([^\s]+)"  # source name
-            r".*?\[WARN\s+in\s+([\d.]+)s\]"  # execution time
-        )
-
-        for match in freshness_pattern.finditer(log_text):
-            timestamp = match.group(1)
-            source_name = match.group(2)
-            execution_time = match.group(3)
-
-            warnings.append(
-                {
-                    "name": f"source_freshness_{source_name}",
-                    "status": "WARN",
-                    "type": "source_freshness",
-                    "source": source_name,
-                    "timestamp": timestamp,
-                    "execution_time": execution_time,
-                }
-            )
-
-        # Secondary pattern for simpler source freshness warnings
-        # Matches: "WARN freshness of source_name"
-        simple_freshness_pattern = re.compile(r"WARN\s+freshness\s+of\s+([^\s]+)")
-
-        for match in simple_freshness_pattern.finditer(log_text):
-            source_name = match.group(1)
-            # Only add if not already captured by primary pattern
-            if not any(w["source"] == source_name for w in warnings):
-                warnings.append(
-                    {
-                        "name": f"source_freshness_{source_name}",
-                        "status": "WARN",
-                        "type": "source_freshness",
-                        "source": source_name,
-                    }
-                )
-
-        return warnings
-
-
 class DbtWarningKubernetesOperator(DbtKubernetesBaseOperator, ABC):
     """
-    Executes a dbt core test command.
+    Base for dbt operators that detect and handle test/source freshness warnings.
     """
 
     def __init__(self, *args: Any, on_warning_callback: Callable[..., Any] | None = None, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.warning_handler = None
-        if on_warning_callback:
-            self.warning_handler = DbtTestWarningHandler(on_warning_callback, operator=self)
-            # Support for handling multiple operator callbacks via self.callbacks was added in provider version 10.2.0
-            if isinstance(self.callbacks, list):  # type: ignore[has-type]
-                self.callbacks.append(self.warning_handler)  # type: ignore[has-type,arg-type]
-            else:
-                self.callbacks = self.warning_handler  # type: ignore[assignment]
+        self.warning_handler = _k8s_common.setup_warning_handler(
+            self, on_warning_callback, DbtTestKubernetesOperator, DbtSourceKubernetesOperator
+        )
 
     def build_and_run_cmd(
         self,
@@ -410,6 +156,17 @@ class DbtRunKubernetesOperator(DbtRunMixin, DbtKubernetesBaseOperator):
         super().__init__(*args, **kwargs)
 
 
+class DbtSemanticMetricViewKubernetesOperator(DbtSemanticMetricViewMixin, DbtKubernetesBaseOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic metric view.
+    """
+
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
 class DbtRunOperationKubernetesOperator(DbtRunOperationMixin, DbtKubernetesBaseOperator):
     """
     Executes a dbt core run-operation command.
@@ -434,7 +191,7 @@ class DbtDocsKubernetesOperator(DbtKubernetesBaseOperator):
     Use the `callback` parameter to specify a callback function to run after the command completes.
     """
 
-    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtKubernetesBaseOperator.template_fields
 
     ui_color = "#8194E0"
     required_files = ["index.html", "manifest.json", "catalog.json"]
@@ -460,24 +217,32 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
     the generated documentation to cloud storage *also inside the Pod*.
     """
 
-    template_fields: Sequence[str] = DbtDocsKubernetesOperator.template_fields  # type: ignore[operator]
+    template_fields: Sequence[str] = DbtDocsKubernetesOperator.template_fields
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
         # In Kubernetes mode, we do NOT use callback-based upload on the Airflow worker.
-        self.callback = None  # type: ignore[assignment]
+        self.callback = None
 
     @abstractmethod
     def build_upload_shell_command(self, docs_target: str) -> str:
         """
-        Build the shell command that will upload the generated docs from
-        `docs_target` to cloud storage. Implemented by subclasses.
+        Build the shell command that uploads generated docs from `docs_target`
+        to cloud storage inside the Kubernetes Pod.
         """
 
     @abstractmethod
     def get_upload_env_vars(self) -> dict[str, str]:
         """Return env vars required by the upload command."""
+
+    @staticmethod
+    def _command_parts(command: Any) -> list[str]:
+        if not command:
+            return []
+        if isinstance(command, (list, tuple)):
+            return [str(part) for part in command]
+        return [str(command)]
 
     def build_and_run_cmd(
         self,
@@ -492,29 +257,30 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
         # Build base Kubernetes pod args (incl. dbt CLI command)
         self.build_kube_args(context, cmd_flags)
 
-        # self.arguments holds the dbt CLI command as list or string
-        if isinstance(self.arguments, list):
-            dbt_cmd = [str(part) for part in self.arguments]
-        else:
-            dbt_cmd = [str(self.arguments)]
-
-        dbt_cmd_str = " ".join(dbt_cmd)
+        # build_kube_args may place the executable in either self.cmds (when cmds is explicitly
+        # ["dbt"]) or self.arguments (the default, where cmds is left unset); recombine both so
+        # the leading "dbt" is not dropped when folded into the bash -c string below (see PR #2488).
+        cmds: Any = self.cmds  # type: ignore[has-type]
+        arguments: Any = self.arguments  # type: ignore[has-type]
+        cmd_parts = self._command_parts(cmds) + self._command_parts(arguments)
+        dbt_cmd_str = shlex.join(cmd_parts)
         docs_target = f"{self.project_dir}/target"
 
         upload_cmd = self.build_upload_shell_command(docs_target)
         shell_cmd = f"{dbt_cmd_str} && {upload_cmd}"
 
-        # Override container command and arguments
         self.cmds = ["/bin/bash", "-c"]
         self.arguments = [shell_cmd]
 
         self.log.info("Running command in Kubernetes Pod: %s", self.arguments)
         result = KubernetesPodOperator.execute(self, context)
         self.log.info(result)
+
         return result
 
     def inject_upload_env_vars(self, env_vars: dict[str, str]) -> None:
-        declared_env_var_names = {env_var.name for env_var in self.env_vars or [] if getattr(env_var, "name", None)} | {
+        existing_env_vars: list[Any] = list(self.env_vars or [])  # type: ignore[has-type]
+        declared_env_var_names = {env_var.name for env_var in existing_env_vars if getattr(env_var, "name", None)} | {
             secret.deploy_target
             for secret in self.secrets or []
             if getattr(secret, "deploy_type", None) == "env" and getattr(secret, "deploy_target", None)
@@ -527,13 +293,13 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
         if not missing_env_vars:
             return
 
-        self.env_vars = list(self.env_vars or []) + convert_env_vars(missing_env_vars)
+        self.env_vars = existing_env_vars + convert_env_vars(missing_env_vars)
 
 
 class DbtDocsS3KubernetesOperator(DbtDocsCloudKubernetesOperator):
     """
     Executes `dbt docs generate` inside a Kubernetes Pod and uploads the generated
-    documentation to S3 *also inside that Pod* using `aws s3 sync`.
+    documentation to S3 also inside that Pod using ``boto3``.
         - The Kubernetes Pod receives AWS credentials resolved from the supplied
           Airflow `connection_id`.
     """
@@ -553,45 +319,97 @@ class DbtDocsS3KubernetesOperator(DbtDocsCloudKubernetesOperator):
         self.folder_dir = folder_dir
 
     def build_upload_shell_command(self, docs_target: str) -> str:
-        if self.folder_dir:
-            s3_prefix = f"s3://{self.bucket_name}/{self.folder_dir}".rstrip("/")
-        else:
-            s3_prefix = f"s3://{self.bucket_name}"
+        folder_dir = self.folder_dir.rstrip("/") if self.folder_dir else ""
+        upload_script = textwrap.dedent(f"""
+            import json
+            import mimetypes
+            import os
+            from pathlib import Path
 
-        return f"aws s3 sync {docs_target} {s3_prefix}"
+            try:
+                import boto3
+            except ImportError as exc:
+                raise SystemExit("boto3 is required in the Kubernetes image to upload dbt docs to S3.") from exc
+
+            target_dir = Path({json.dumps(docs_target)})
+            bucket_name = {json.dumps(self.bucket_name)}
+            folder_dir = {json.dumps(folder_dir)}
+
+            client_kwargs = dict()
+            endpoint_url = os.environ.get("AWS_ENDPOINT_URL_S3")
+            if endpoint_url:
+                client_kwargs["endpoint_url"] = endpoint_url
+
+            client_config = json.loads(os.environ.get("COSMOS_AWS_CLIENT_CONFIG", "{{}}"))
+            if "verify" in client_config:
+                client_kwargs["verify"] = client_config["verify"]
+
+            config_kwargs = client_config.get("config_kwargs")
+            if config_kwargs:
+                from botocore.config import Config
+
+                client_kwargs["config"] = Config(**config_kwargs)
+
+            s3 = boto3.client("s3", **client_kwargs)
+            for file_path in target_dir.rglob("*"):
+                if not file_path.is_file():
+                    continue
+
+                relative_path = file_path.relative_to(target_dir).as_posix()
+                key = f"{{folder_dir}}/{{relative_path}}" if folder_dir else relative_path
+                content_type, _ = mimetypes.guess_type(str(file_path))
+                extra_args = {{"ContentType": content_type}} if content_type else None
+                print(f"Uploading {{file_path}} to s3://{{bucket_name}}/{{key}}")
+                if extra_args:
+                    s3.upload_file(str(file_path), bucket_name, key, ExtraArgs=extra_args)
+                else:
+                    s3.upload_file(str(file_path), bucket_name, key)
+            """).strip()
+        return f"$(command -v python3 || command -v python) - <<'PY'\n{upload_script}\nPY"
 
     def get_upload_env_vars(self) -> dict[str, str]:
         return self.aws_env_vars_from_connection(self.connection_id)
 
     def aws_env_vars_from_connection(self, connection_id: str) -> dict[str, str]:
-        conn = BaseHook.get_connection(connection_id)
-        conn_extra = conn.extra_dejson
+        try:
+            from airflow.providers.amazon.aws.hooks.base_aws import AwsBaseHook
+        except ImportError:
+            from cosmos.operators.lazy_load import MissingPackage
 
-        access_key = conn.login or conn_extra.get("aws_access_key_id")
-        secret_key = conn.password or conn_extra.get("aws_secret_access_key")
-        session_token = conn_extra.get("aws_session_token") or conn_extra.get("session_token")
+            AwsBaseHook = MissingPackage(
+                "airflow.providers.amazon.aws.hooks.base_aws.AwsBaseHook",
+                "amazon",
+            )
 
-        session_kwargs = conn_extra.get("session_kwargs", {})
-        config_kwargs = conn_extra.get("config_kwargs", {})
-        if not isinstance(session_kwargs, dict):
-            session_kwargs = {}
-        if not isinstance(config_kwargs, dict):
-            config_kwargs = {}
-        region_name = (
-            conn_extra.get("region_name")
-            or conn_extra.get("region")
-            or session_kwargs.get("region_name")
-            or config_kwargs.get("region_name")
-        )
+        hook = AwsBaseHook(aws_conn_id=connection_id, client_type="s3")
+        conn_config = hook.conn_config
+        conn_extra = conn_config.extra_config
+
+        config_kwargs = conn_extra.get("config_kwargs") or {}
+
+        region_name = hook.region_name or conn_extra.get("region") or config_kwargs.get("region_name")
+        endpoint_url = conn_config.get_service_endpoint_url("s3")
+        verify = hook.verify
 
         env_vars = {}
-        if access_key:
-            env_vars["AWS_ACCESS_KEY_ID"] = access_key
-        if secret_key:
-            env_vars["AWS_SECRET_ACCESS_KEY"] = secret_key
-        if session_token:
-            env_vars["AWS_SESSION_TOKEN"] = session_token
+        if conn_config.aws_access_key_id:
+            env_vars["AWS_ACCESS_KEY_ID"] = conn_config.aws_access_key_id
+        if conn_config.aws_secret_access_key:
+            env_vars["AWS_SECRET_ACCESS_KEY"] = conn_config.aws_secret_access_key
+        if conn_config.aws_session_token:
+            env_vars["AWS_SESSION_TOKEN"] = conn_config.aws_session_token
+        if endpoint_url:
+            env_vars["AWS_ENDPOINT_URL_S3"] = endpoint_url
         if region_name:
             env_vars["AWS_DEFAULT_REGION"] = region_name
+            env_vars["AWS_REGION"] = region_name
+
+        client_config = {}
+        if verify is not None:
+            client_config["verify"] = verify
+        if config_kwargs:
+            client_config["config_kwargs"] = config_kwargs
+        if client_config:
+            env_vars["COSMOS_AWS_CLIENT_CONFIG"] = json.dumps(client_config)
 
         return env_vars

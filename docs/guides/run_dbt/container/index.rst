@@ -12,3 +12,4 @@ Run dbt in a container
    aws-eks
    azure-container-instance
    gcp-cloud-run-job
+   gcp-gke

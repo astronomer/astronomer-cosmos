@@ -30,7 +30,9 @@ def get_dag_bag() -> DagBag:
 
     print(AIRFLOW_IGNORE_FILE.read_text())
 
-    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    from tests.utils import make_dag_bag
+
+    db = make_dag_bag(EXAMPLE_DAGS_DIR, include_examples=False)
 
     assert db.dags
     assert not db.import_errors
@@ -101,6 +103,11 @@ def test_perf_dag():
 
         # verify the integrity of the dag
         assert len(dag.tasks) == num_models
+
+        # Airflow 3.1+ requires the DAG serialized before dag.test(); do it outside the timed region.
+        from tests.utils import serialize_dag_to_db
+
+        serialize_dag_to_db(dag)
 
         # measure the time before and after the dag is run
 

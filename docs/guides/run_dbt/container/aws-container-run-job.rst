@@ -21,7 +21,7 @@ In this guide, you’ll learn how to deploy and run a Cosmos job on AWS Elastic 
 
 Schematically, the guide will walk you through the steps required to build the following architecture:
 
-.. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/cosmos_aws_ecs_schematic.png
+.. figure:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos_aws_ecs_schematic.png
     :width: 800
 
 Prerequisites
@@ -34,7 +34,7 @@ Before you begin, ensure you have the following:
 - **Docker** installed for building your container image.
 - Access to your container registry (for example, **Amazon ECR**) where your job image is stored.
 - Basic familiarity with AWS ECS concepts (clusters, task definitions, services, and Fargate).
-- An existing installation of **Astronomer Cosmos** (refer to the `Cosmos documentation <https://docs.astronomer.io/cosmos/>`_ for more details).
+- An existing installation of **Astronomer Cosmos** (refer to the `Cosmos documentation <https://www.astronomer.io/docs/learn/airflow-dbt>`_ for more details).
 
 
 
@@ -170,10 +170,10 @@ For example:
 
    Once the test is ok, we are able to run the dbt commands in our Cosmos DAG:
 
-   .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_aws_ecs_dag_run.png
+   .. figure:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_aws_ecs_dag_run.png
     :width: 800
 
-   .. figure:: https://github.com/astronomer/astronomer-cosmos/raw/main/docs/_static/jaffle_shop_aws_ecs_dag_run_logs.png
+   .. figure:: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/jaffle_shop_aws_ecs_dag_run_logs.png
     :width: 800
 
    Remember to config your DAG for connecting to AWS ECS and the database connection where you are performing your SQL queries!

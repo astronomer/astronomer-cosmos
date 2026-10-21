@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 from airflow.models.dagbag import DagBag
-from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION
 
+from . import utils as test_utils
+
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
-DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 
 IGNORED_DAG_FILES = [
     "performance_dag.py",
@@ -31,16 +31,6 @@ def get_dag_bag() -> DagBag:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
 
-        # Ignore Async DAG for dbt <=1.5
-        if DBT_VERSION <= Version("1.5.0"):
-            file.writelines(["simple_dag_async.py\n"])
-
-        if DBT_VERSION < Version("1.5.0"):
-            file.writelines(["example_source_rendering.py\n"])
-
-        if DBT_VERSION < Version("1.6.0"):
-            file.writelines(["example_model_version.py\n"])
-            file.writelines(["example_operators.py\n"])
         # cosmos_profile_mapping uses the automatic profile rendering from an Airflow connection.
         # so we can't parse that without live connections
         for file_name in ["cosmos_profile_mapping.py"]:
@@ -56,9 +46,13 @@ def get_dag_bag() -> DagBag:
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.write("example_cosmos_cleanup_dag.py\n")
 
+        if AIRFLOW_VERSION < Version("2.10.0"):
+            # DatasetAlias was introduced in Airflow 2.10
+            file.write("example_outlets.py\n")
+
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
-    db = DagBag(EXAMPLE_DAGS_DIR, include_examples=False)
+    db = test_utils.make_dag_bag(EXAMPLE_DAGS_DIR, include_examples=False)
     assert db.dags
     assert not db.import_errors
     return db

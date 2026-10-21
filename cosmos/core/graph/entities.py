@@ -46,7 +46,7 @@ class Group(CosmosEntity):
 
         :param entity: The entity to add
         """
-        logger.info(f"Adding entity {entity.id} to group {self.id}...")
+        logger.info("Adding entity %s to group %s...", entity.id, self.id)
 
         self.entities.append(entity)
 

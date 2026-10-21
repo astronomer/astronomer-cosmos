@@ -67,7 +67,7 @@ redirects = {
     "configuration/compiled-sql": "../guides/cosmos-devex/compiled-sql.html",
     "configuration/cosmos-conf": "../reference/configs/cosmos-conf.html",
     "configuration/dag-customization": "../guides/translate_dbt_to_airflow/dag-customization.html",
-    "configuration/dbt-fusion": "..guides/dbt_setup/dbt-fusion.html",
+    "configuration/dbt-fusion": "../guides/dbt_setup/dbt-fusion.html",
     "configuration/execution-config": "../reference/configs/execution-config.html",
     "configuration/generating-docs": "../guides/dbt_docs/generating-docs.html",
     "configuration/hosting-docs": "../guides/dbt_docs/hosting-docs.html",

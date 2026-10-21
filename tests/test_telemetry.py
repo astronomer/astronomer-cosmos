@@ -46,11 +46,16 @@ def test_compress_decompress_telemetry_metadata_roundtrip():
     assert decompressed == original_metadata
 
 
+@patch("cosmos.settings.enable_telemetry", True)
+@patch("cosmos.settings.do_not_track", False)
+@patch("cosmos.settings.no_analytics", False)
 def test_should_emit_is_true_by_default():
     assert telemetry.should_emit()
 
 
 @patch("cosmos.settings.enable_telemetry", True)
+@patch("cosmos.settings.do_not_track", False)
+@patch("cosmos.settings.no_analytics", False)
 def test_should_emit_is_true_when_only_enable_telemetry_is_true():
     assert telemetry.should_emit()
 

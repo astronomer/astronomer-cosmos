@@ -10,7 +10,7 @@ from ..base import BaseProfileMapping
 class ClickhouseUserPasswordProfileMapping(BaseProfileMapping):
     """
     Maps Airflow generic connections using user + password authentication to dbt Clickhouse profiles.
-    https://docs.getdbt.com/docs/core/connect-data-platform/clickhouse-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/clickhouse-setup
     """
 
     airflow_connection_type: str = "generic"

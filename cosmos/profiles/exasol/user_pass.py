@@ -10,7 +10,7 @@ from ..base import BaseProfileMapping
 class ExasolUserPasswordProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Exasol connections with a username and password to dbt profiles.
-    https://docs.getdbt.com/reference/warehouse-setups/exasol-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/exasol-setup
     """
 
     airflow_connection_type: str = "exasol"

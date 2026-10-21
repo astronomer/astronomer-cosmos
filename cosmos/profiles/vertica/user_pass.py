@@ -16,7 +16,7 @@ class VerticaUserPasswordProfileMapping(BaseProfileMapping):
        This seems to be a common approach also for `Postgres <https://github.com/apache/airflow/blob/0953e0f844fa5db81c2b461ec2433de1935260b3/airflow/providers/postgres/hooks/postgres.py#L138>`_, \
        Redshift and Exasol since there is no ``database`` field in Airflow connection and ``schema`` is not required for the database connection.
     .. seealso::
-       https://docs.getdbt.com/reference/warehouse-setups/vertica-setup
+       https://docs.getdbt.com/docs/local/connect-data-platform/vertica-setup
        https://airflow.apache.org/docs/apache-airflow-providers-vertica/stable/connections/vertica.html
     """
 

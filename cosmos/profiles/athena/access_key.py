@@ -24,7 +24,7 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
     Information about the dbt Athena profile that is generated can be found here:
 
     https://github.com/dbt-athena/dbt-athena?tab=readme-ov-file#configuring-your-profile
-    https://docs.getdbt.com/docs/core/connect-data-platform/athena-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/athena-setup
     """
 
     airflow_connection_type: str = "aws"
@@ -60,7 +60,7 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
     def profile(self) -> dict[str, Any | None]:
         """Gets profile. The password is stored in an environment variable."""
 
-        self.temporary_credentials = self._get_temporary_credentials()  # type: ignore
+        self.temporary_credentials = self._get_temporary_credentials()  # type: ignore[no-untyped-call]
 
         profile = {
             **self.mapped_params,
@@ -91,13 +91,13 @@ class AthenaAccessKeyProfileMapping(BaseProfileMapping):
 
         return env_vars
 
-    def _get_temporary_credentials(self):  # type: ignore
+    def _get_temporary_credentials(self):  # type: ignore[no-untyped-def]
         """
         Helper function to retrieve temporary short lived credentials
         Returns an object including access_key, secret_key and token
         """
         from airflow.providers.amazon.aws.hooks.base_aws import AwsGenericHook
 
-        hook = AwsGenericHook(self.conn_id)  # type: ignore
+        hook = AwsGenericHook(self.conn_id)
         credentials = hook.get_credentials()
         return credentials

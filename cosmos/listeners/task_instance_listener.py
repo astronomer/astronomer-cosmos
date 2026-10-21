@@ -182,7 +182,7 @@ def _build_task_metrics(task_instance: TaskInstance, status: str) -> dict[str, o
 
 
 @hookimpl
-def on_task_instance_success(previous_state: Any, task_instance: TaskInstance, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
+def on_task_instance_success(previous_state: Any, task_instance: TaskInstance, *args: Any, **kwargs: Any) -> None:
     """Handle task instance success for both Airflow 2 (with session) and Airflow 3 (without session)."""
     if not _is_cosmos_task(task_instance):
         return
@@ -193,7 +193,7 @@ def on_task_instance_success(previous_state: Any, task_instance: TaskInstance, *
 
 
 @hookimpl
-def on_task_instance_failed(previous_state: Any, task_instance: TaskInstance, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
+def on_task_instance_failed(previous_state: Any, task_instance: TaskInstance, *args: Any, **kwargs: Any) -> None:
     """Handle task instance failure for both Airflow 2 (with session) and Airflow 3 (with error and without session)."""
     if not _is_cosmos_task(task_instance):
         return

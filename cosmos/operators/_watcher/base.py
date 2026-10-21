@@ -6,22 +6,27 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException
 
 from cosmos import settings
+from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
     _DATASET_EMITTING_RESOURCE_TYPES,
     _DBT_STARTUP_EVENTS_XCOM_KEY,
+    _PRODUCER_CMD_FLAGS_XCOM_KEY,
     AIRFLOW_VERSION,
     CONSUMER_WATCHER_DEFAULT_PRIORITY_WEIGHT,
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
 )
+from cosmos.dbt.graph import DbtNode
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
 from cosmos.operators._watcher.state import (
+    DbtNodeStatus,
+    ProducerTaskState,
     _iso_to_string,
     _log_dbt_event,
     build_producer_state_fetcher,
@@ -29,14 +34,18 @@ from cosmos.operators._watcher.state import (
     get_dbt_event_xcom_key,
     get_status_xcom_key,
     get_xcom_val,
+    is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_dbt_upstream_failure_skip_event,
+    is_producer_task_still_running,
     is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
 )
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
+from cosmos.operators.base import resolve_templated_bool
 
 try:
     from airflow.sdk.bases.sensor import BaseSensorOperator
@@ -50,7 +59,7 @@ if TYPE_CHECKING:
         from airflow.sdk import DAG
     except ImportError:
         from airflow.models.dag import DAG  # type: ignore[assignment]
-    from airflow.operators.empty import EmptyOperator
+    from cosmos.airflow.compatibility import EmptyOperator
 
     try:
         from airflow.sdk import TaskGroup
@@ -111,7 +120,10 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
     unique_id = node_info.get("unique_id")
     start_time = node_info.get("node_started_at")
     finish_time = node_info.get("node_finished_at")
-    msg = data.get("msg") or info.get("msg")
+    # The error text lives in different places depending on the invocation mode: ``run_result.message`` on
+    # ``NodeFinished`` (dbt-runner mode) and ``data.msg`` on ``RunResultError`` (subprocess mode).
+    run_result = data.get("run_result") or {}
+    msg = run_result.get("message") or data.get("msg") or info.get("msg")
 
     if unique_id:
         dbt_event = {
@@ -250,7 +262,42 @@ def _ensure_subprocess_model_outlet_uris(
         manifest_path = Path(project_dir) / "target" / "manifest.json"
         if manifest_path.exists():
             model_outlet_uris.update(compute_model_outlet_uris(manifest_path, dataset_namespace))
-        model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []  # type: ignore[assignment]
+        model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []
+
+
+def _rewrite_upstream_failure_skip_status(
+    log_line: dict[str, Any],
+    unique_id: str | None,
+    dbt_node_status: Any,
+    upstream_failure_skipped_ids: set[str] | None,
+) -> Any:
+    """Track upstream-failure-skipped nodes and rewrite their status from "skipped" to "failed".
+
+    dbt emits two events for a node that it skipped because of an upstream
+    failure: ``SkippingDetails``/``LogSkipBecauseError`` during ``on_skip()``,
+    and a later ``NodeFinished`` from the runnable ``finally``-block -- both
+    carry ``node_status="skipped"``. The first identifies the upstream-failure
+    cause (those events are reached only via ``do_skip(cause=...)``, exclusively
+    on upstream-node failure); the second would otherwise overwrite the
+    rewritten XCom with the original ``"skipped"``. Tracking affected
+    ``unique_id``\\ s in a per-execution set lets the parser rewrite both. See
+    #2698.
+    """
+    if not unique_id or upstream_failure_skipped_ids is None:
+        return dbt_node_status
+    if is_dbt_upstream_failure_skip_event(log_line.get("info", {}).get("name")):
+        upstream_failure_skipped_ids.add(unique_id)
+    if is_dbt_node_status_skipped(dbt_node_status) and unique_id in upstream_failure_skipped_ids:
+        return DbtNodeStatus.FAILED
+    return dbt_node_status
+
+
+def _surface_non_json_stdout(line: str) -> None:
+    """Forward non-JSON stdout (e.g. Snowflake connector's "Going to open: <URL>" prompt
+    during externalbrowser auth) to the task log instead of silently dropping it.
+    """
+    if line:
+        logger.info("%s", line)
 
 
 def store_dbt_resource_status_from_log(
@@ -258,9 +305,11 @@ def store_dbt_resource_status_from_log(
     extra_kwargs: Any,
     *,
     tests_per_model: dict[str, list[str]] | None = None,
-    test_results_per_model: dict[str, list[str]] | None = None,
+    test_results_per_model: dict[str, dict[str, str]] | None = None,
     model_outlet_uris: dict[str, list[str]] | None = None,
     dataset_namespace: str | None = None,
+    should_generate_model_uris: bool = True,
+    upstream_failure_skipped_ids: set[str] | None = None,
 ) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
@@ -276,11 +325,21 @@ def store_dbt_resource_status_from_log(
         Empty dict when no tests exist.
     :param test_results_per_model: Mutable accumulator dict. For each model that has
         tests, collects the terminal statuses of those tests as they finish.
-        Keyed by model unique_id, values are lists of test statuses (e.g. ``["pass", "pass"]``).
-        Mutated in place by this function.
+        Keyed by model unique_id; values are dicts mapping each test's unique_id to its
+        status (e.g. ``{"test.pkg.not_null_orders_id": "pass"}``), so a replayed log line
+        for the same test is idempotent. Mutated in place by this function.
     :param model_outlet_uris: Mutable dict mapping unique_id to outlet URIs.
         Populated lazily from the manifest on first terminal status detection.
     :param dataset_namespace: The OL-compatible dataset namespace for URI construction.
+    :param should_generate_model_uris: Explicit control for whether per-model outlet URIs are
+        computed from the manifest. When ``False`` (e.g. consumers won't emit datasets), URI
+        generation is skipped regardless of ``dataset_namespace``.
+    :param upstream_failure_skipped_ids: Mutable accumulator set of node unique_ids
+        that dbt skipped because of an upstream-node failure. Populated when this
+        function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event; later
+        ``NodeFinished`` events with ``node_status="skipped"`` for these unique_ids
+        are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
+        retry it) rather than going SKIPPED. See #2698.
     """
     try:
         log_line = json.loads(line)
@@ -290,7 +349,7 @@ def store_dbt_resource_status_from_log(
         if ti:
             _process_dbt_log_event(ti, log_line)
     except json.JSONDecodeError:
-        logger.debug("Failed to parse log: %s", line)
+        _surface_non_json_stdout(line)
         log_line = {}
     else:
         context = extra_kwargs.get("context")
@@ -301,10 +360,14 @@ def store_dbt_resource_status_from_log(
         dbt_node_resource_type = node_info.get("resource_type")
         unique_id = node_info.get("unique_id")
 
+        # Rewrite "skipped" to "failed" when dbt skipped the node because an
+        # upstream node failed (#2698). See _rewrite_upstream_failure_skip_status.
+        dbt_node_status = _rewrite_upstream_failure_skip_status(
+            log_line, unique_id, dbt_node_status, upstream_failure_skipped_ids
+        )
+
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
-        # Handle terminal statuses for both models (success/failed) and tests (pass/fail)
-        # TODO: handle all possible statuses including skipped, warn, etc.
         if is_dbt_node_status_terminal(dbt_node_status):
             context = extra_kwargs.get("context")
             if context is None:
@@ -320,10 +383,11 @@ def store_dbt_resource_status_from_log(
                     unique_id, dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
                 )
             else:
-                # Lazily populate per-model outlet URIs from the manifest, but only for
-                # resource types that can emit datasets (models/seeds/snapshots).
+                # Lazily populate per-model outlet URIs from the manifest, but only when the
+                # producer is configured to generate them and the resource type can emit datasets
+                # (models/seeds/snapshots).
                 outlet_uris: list[str] = []
-                if dbt_node_resource_type in _DATASET_EMITTING_RESOURCE_TYPES:
+                if should_generate_model_uris and dbt_node_resource_type in _DATASET_EMITTING_RESOURCE_TYPES:
                     project_dir = extra_kwargs.get("project_dir")
                     _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
                     outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
@@ -350,8 +414,17 @@ def store_dbt_resource_status_from_log(
     _log_dbt_msg(log_line)
 
 
-class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
-    template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")  # type: ignore[operator]
+# dbt flags set by the producer that must not propagate into the consumer's
+# retry command. ``--select`` / ``--exclude`` are dropped because the consumer
+# targets a single model and re-applies its own selector; ``--log-format`` is
+# dropped because the consumer's retry is a user-facing dbt run and should
+# default to text. Each entry consumes the following token as its value (e.g.
+# ``--log-format json``).
+_PRODUCER_ONLY_FLAGS: tuple[str, ...] = ("--select", "--exclude", "--log-format")
+
+
+class BaseConsumerSensor(BaseSensorOperator):
+    template_fields: tuple[str, ...] = ("model_unique_id", "compiled_sql")
     poke_retry_number: int = 0
 
     def __init__(
@@ -399,7 +472,11 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
     @staticmethod
     def _filter_flags(flags: list[str]) -> list[str]:
-        """Filters out dbt flags that are incompatible with retry (e.g., --select, --exclude)."""
+        """Filter out dbt flags that should not propagate from the producer to the consumer's retry.
+
+        The set of stripped flags is defined by ``_PRODUCER_ONLY_FLAGS`` at module
+        scope; see that constant's docstring for the rationale per flag.
+        """
         filtered = []
         skip_next = False
         for token in flags:
@@ -408,7 +485,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                     skip_next = False
                 else:
                     continue  # skip value of previous flag
-            if token in ("--select", "--exclude"):
+            if token in _PRODUCER_ONLY_FLAGS:
                 skip_next = True
                 continue
             filtered.append(token)
@@ -418,33 +495,42 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         """
         Handles logic for retrying a failed dbt model execution.
         Reconstructs the dbt command by cloning the project and re-running the model
-        with appropriate flags, while ensuring flags like `--select` or `--exclude` are excluded.
+        with appropriate flags, while ensuring flags like ``--select``, ``--exclude``,
+        and ``--log-format`` (the producer-only JSON event stream) are excluded.
+
+        Users who want JSON-formatted dbt output on retry can opt in by passing
+        ``operator_args={"dbt_cmd_flags": ["--log-format", "json"]}`` to their
+        ``DbtDag`` / ``DbtTaskGroup``; ``dbt_cmd_flags`` is appended automatically
+        by ``build_cmd`` and is not filtered here.
 
         Subclasses may override to issue a different dbt subcommand (e.g. ``dbt test``
         for test sensors or ``dbt source freshness`` for source sensors).
         """
         if try_number > 1:
             logger.info(
-                f"Retry attempt #%s – Running model '%s' from project '%s' using {self.__class__.__name__}",
+                "Retry attempt #%s – Running model '%s' from project '%s' using %s",
                 try_number - 1,
                 self.model_unique_id,
                 self.project_dir,
+                self.__class__.__name__,
             )
         else:
             logger.info(
-                f"Falling back to running model '%s' from project '%s' using {self.__class__.__name__}",
+                "Falling back to running model '%s' from project '%s' using %s",
                 self.model_unique_id,
                 self.project_dir,
+                self.__class__.__name__,
             )
 
-        upstream_task = context["ti"].task.dag.get_task(self.producer_task_id)
+        # Prefer the producer's own rendered flags (published to XCom as it starts) so
+        # setup_operator_args overrides survive; fall back to this consumer's own flags.
+        raw_flags = get_xcom_val(context["ti"], self.producer_task_id, _PRODUCER_CMD_FLAGS_XCOM_KEY)
+        if raw_flags is None:
+            add_cmd_flags = getattr(self, "add_cmd_flags", None)
+            raw_flags = add_cmd_flags() if callable(add_cmd_flags) else []
+        extra_flags = self._filter_flags(raw_flags)
 
-        extra_flags: list[str] = []
-        if upstream_task and hasattr(upstream_task, "add_cmd_flags"):
-            raw_flags = upstream_task.add_cmd_flags()
-            extra_flags = self._filter_flags(raw_flags)
-
-        model_selector = self.model_unique_id.split(".")[-1]
+        model_selector = DbtNode.get_resource_name_from_unique_id(self.model_unique_id)
         cmd_flags = extra_flags + ["--select", model_selector]
 
         self.build_and_run_cmd(context, cmd_flags=cmd_flags)  # type: ignore[attr-defined]
@@ -519,17 +605,67 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 stop_memory_tracking(context)
         else:
             self._execute_core(context)
+        # Reaching here means the sensor resolved without deferring (the deferred path emits in
+        # execute_complete) and the model succeeded, so emit its datasets. _emit_datasets no-ops
+        # when the sensor has no outlets or dataset emission is disabled.
+        self._emit_datasets(context)
+
+    def _emit_datasets(self, context: Context) -> None:
+        """Emit one Airflow Asset per outlet URI resolved for this consumer's model.
+
+        Shared by every ``ExecutionMode.WATCHER*`` consumer (SUBPROCESS, Kubernetes, GCP GKE).
+        Delegates to ``cosmos.dataset.register_dataset_on_task`` rather than the local operator's
+        ``register_dataset``, so it works for consumers that don't inherit from the local operator.
+
+        No-ops when ``emit_datasets`` is False (user disabled emission) or when no outlet URIs were
+        resolved for this model (e.g. no manifest available or the adapter has no OL namespace).
+        """
+        if not resolve_templated_bool(getattr(self, "emit_datasets", False)):
+            return
+        outlet_uris = getattr(self, "_outlet_uris", [])
+        if not outlet_uris:
+            return
+
+        from cosmos.constants import AIRFLOW_VERSION
+        from cosmos.dataset import register_dataset_on_task
+
+        if AIRFLOW_VERSION.major >= 3:
+            from airflow.sdk.definitions.asset import Asset
+        else:
+            from airflow.datasets import Dataset as Asset  # type: ignore[no-redef]
+
+        outlets = [Asset(uri=uri) for uri in outlet_uris]
+        logger.info("Emitting %d dataset(s) for model '%s': %s", len(outlets), self.model_unique_id, outlet_uris)
+        register_dataset_on_task(self, [], outlets, context)
+
+        if settings.enable_uri_xcom:
+            context["ti"].xcom_push(key="uri", value=outlet_uris)
 
     def execute_complete(self, context: Context, event: dict[str, Any]) -> None:
+        # Extract outlet URIs from the trigger event before handling status.
+        self._outlet_uris = event.get("outlet_uris", [])
+        self._process_completion_event(context, event)
+        # Reaching here without raising means the model succeeded, so emit its datasets.
+        self._emit_datasets(context)
+
+    def _process_completion_event(self, context: Context, event: dict[str, Any]) -> None:
         status = event.get("status")
         reason = event.get("reason")
+
+        # Log the node's dbt event once at terminal (poke() does the same for the non-deferrable path).
+        dbt_events = get_xcom_val(
+            task_instance=context["ti"],
+            key=get_dbt_event_xcom_key(self.model_unique_id),
+            task_ids=self.producer_task_id,
+        )
+        _log_dbt_event(dbt_events)
 
         if status == EventStatus.SKIPPED:
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
 
-        if status == "success" and reason == WatcherEventReason.NODE_NOT_RUN:
+        if status == EventStatus.SUCCESS and reason == WatcherEventReason.NODE_NOT_RUN:
             logger.info(
                 "%s '%s' was skipped by the dbt command. This may happen if it is an ephemeral model or if the model sql file is empty.",
                 self._resource_label,
@@ -543,15 +679,9 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
             if hasattr(self, "_override_rtif"):
                 self._override_rtif(context)
 
-        if status != "failed":
+        if status != EventStatus.FAILED:
             return
 
-        dbt_events = get_xcom_val(
-            task_instance=context["ti"],
-            key=get_dbt_event_xcom_key(self.model_unique_id),
-            task_ids=self.producer_task_id,
-        )
-        _log_dbt_event(dbt_events)
         if reason == WatcherEventReason.NODE_FAILED:
             raise AirflowException(
                 f"dbt {self._resource_label.lower()} '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
@@ -632,7 +762,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
 
     def _handle_no_dbt_node_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
         """Handle the case where no dbt node status has been reported yet."""
-        if producer_task_state == "failed":
+        if producer_task_state == ProducerTaskState.FAILED:
             if self.poke_retry_number > 0:
                 raise AirflowException(
                     f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
@@ -641,7 +771,7 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
                 # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
                 return self._fallback_to_non_watcher_run(try_number, context)
 
-        if producer_task_state == "skipped":
+        if producer_task_state == ProducerTaskState.SKIPPED:
             return self._fallback_to_non_watcher_run(try_number, context)
 
         self.poke_retry_number += 1
@@ -685,6 +815,18 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         if status is not None:
             self._cache_compiled_sql(ti, context)
 
+        if status is None:
+            return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
+
+        # A failed node while the producer is still building is not terminal for the sensor yet: keep
+        # polling (in deferrable mode this defers back to the trigger) so the retry path can fall back
+        # once the producer terminates, instead of burning a retry on an instant re-raise. Return before
+        # logging so the ERROR dbt event is not repeated on every poke. See #2947.
+        if is_dbt_node_status_failed(status) and is_producer_task_still_running(producer_task_state):
+            return False
+
+        # Log the dbt event only once the node is terminal; poke runs every interval, so logging before
+        # this point would repeat the line on each poke.
         dbt_events = get_xcom_val(
             task_instance=context["ti"],
             key=get_dbt_event_xcom_key(self.model_unique_id),
@@ -692,16 +834,13 @@ class BaseConsumerSensor(BaseSensorOperator):  # type: ignore[misc]
         )
         _log_dbt_event(dbt_events)
 
-        if status is None:
-            return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
-        elif is_dbt_node_status_skipped(status):
+        if is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
-        elif is_dbt_node_status_success(status):
+        if is_dbt_node_status_success(status):
             return True
-        else:
-            raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
+        raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
 
 
 def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> EmptyOperator:
@@ -711,17 +850,14 @@ def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> 
     is skipped on retry, this task still succeeds (trigger_rule=NONE_FAILED), preventing
     the skip from propagating to tasks downstream of the group.
     """
-    try:
-        from airflow.providers.standard.operators.empty import EmptyOperator
-    except ImportError:
-        from airflow.operators.empty import EmptyOperator  # type: ignore[no-redef]
+    from cosmos.airflow.compatibility import EmptyOperator
 
     try:
         from airflow.task.trigger_rule import TriggerRule
     except ImportError:
-        from airflow.utils.trigger_rule import TriggerRule  # type: ignore[no-redef]
+        from airflow.utils.trigger_rule import TriggerRule
 
-    return EmptyOperator(  # type: ignore[no-untyped-call]
+    return EmptyOperator(
         task_id=task_id,
         dag=dag,
         task_group=task_group,

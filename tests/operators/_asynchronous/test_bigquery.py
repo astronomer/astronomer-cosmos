@@ -45,11 +45,14 @@ def test_dbt_run_airflow_async_bigquery_operator_init(profile_config_mock):
     assert operator.full_refresh is False  # Default value should be False
 
 
-def test_dbt_run_airflow_async_bigquery_operator_init_with_deferrable_false_warns(profile_config_mock, caplog):
+def test_dbt_run_airflow_async_bigquery_operator_init_with_deferrable_false_warns(profile_config_mock):
     """Passing deferrable=False must not raise TypeError, be overridden to True, and log a warning."""
-    import logging
+    from unittest.mock import PropertyMock
 
-    with caplog.at_level(logging.WARNING, logger="cosmos.operators._asynchronous.bigquery"):
+    # The operator now logs through ``self.log``. On Airflow 3 that resolves to a non-propagating
+    # structlog logger that pytest's ``caplog`` cannot capture, so assert on the logger directly.
+    mock_log = MagicMock()
+    with patch.object(DbtRunAirflowAsyncBigqueryOperator, "log", new_callable=PropertyMock, return_value=mock_log):
         operator = DbtRunAirflowAsyncBigqueryOperator(
             task_id="test_task",
             project_dir="/path/to/project",
@@ -58,7 +61,8 @@ def test_dbt_run_airflow_async_bigquery_operator_init_with_deferrable_false_warn
             deferrable=False,
         )
     assert operator.deferrable is True
-    assert "deferrable=True" in caplog.text
+    warning_messages = " ".join(str(call.args[0]) for call in mock_log.warning.call_args_list)
+    assert "deferrable=True" in warning_messages
 
 
 def test_dbt_run_airflow_async_bigquery_operator_init_deferrable_defaults_true(profile_config_mock):
@@ -70,6 +74,19 @@ def test_dbt_run_airflow_async_bigquery_operator_init_deferrable_defaults_true(p
         dbt_kwargs={"task_id": "test_task"},
     )
     assert operator.deferrable is True
+
+
+@pytest.mark.parametrize("field", ["compiled_sql", "freshness"])
+def test_dbt_run_airflow_async_bigquery_operator_rejects_output_only_template_fields(profile_config_mock, field):
+    """The async BigQuery path forwards ``dbt_kwargs`` raw and bypasses the sync
+    guard, so it must reject output-only template fields on its own."""
+    with pytest.raises(CosmosValueError, match=field):
+        DbtRunAirflowAsyncBigqueryOperator(
+            task_id="test_task",
+            project_dir="/path/to/project",
+            profile_config=profile_config_mock,
+            dbt_kwargs={"task_id": "test_task", field: "value-the-user-tried-to-set"},
+        )
 
 
 def test_dbt_run_airflow_async_bigquery_operator_base_cmd(profile_config_mock):
@@ -355,3 +372,139 @@ def test_register_event_with_uri(mock_register_dataset, profile_config_mock):
         assert args[1][0].uri == "bigquery://my_project/my_dataset/my_complex_table_name"
     else:
         assert args[1][0].uri == "bigquery://my_project.my_dataset.my_complex_table_name/"
+
+
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), reason="DatasetAlias outlets require Airflow >= 2.10")
+@patch("cosmos.operators._asynchronous.bigquery.settings.enable_dataset_alias", True)
+def test_init_sets_outlets_when_dataset_alias_enabled(profile_config_mock):
+    """When ``settings.enable_dataset_alias`` is True and Airflow >= 2.10, ``__init__`` populates
+    ``kwargs['outlets']`` with a DatasetAlias derived from the task_id (and optional task_group)."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+    assert operator.outlets, "Expected outlets to be populated when dataset_alias is enabled"
+    assert len(operator.outlets) == 1
+    outlet = operator.outlets[0]
+    assert outlet.__class__.__name__ in {"DatasetAlias", "AssetAlias"}
+    assert "test_task" in outlet.name
+
+
+@patch("cosmos.operators._asynchronous.bigquery.settings.enable_dataset_alias", False)
+def test_init_skips_outlets_when_dataset_alias_disabled(profile_config_mock):
+    """When ``settings.enable_dataset_alias`` is False the outlets branch in ``__init__`` is skipped."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+    assert not operator.outlets
+
+
+def _object_storage_path_target() -> str:
+    """``get_remote_sql`` imports ``ObjectStoragePath`` from one of two locations depending on the
+    installed Airflow version. Return the patch target that exists in the current environment."""
+    try:
+        import airflow.sdk  # noqa: F401
+
+        return "airflow.sdk.ObjectStoragePath"
+    except ImportError:
+        return "airflow.io.path.ObjectStoragePath"
+
+
+def test_get_remote_sql_reads_from_object_storage(profile_config_mock):
+    """``get_remote_sql`` builds the remote path from the project / run / file path triple and
+    reads the SQL via ``ObjectStoragePath.open``. This test exercises the real body of the method
+    (previous tests only patched it out)."""
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/tmp/myproject/subdir",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+    operator.async_context = {
+        "dbt_node_config": {"file_path": "/tmp/myproject/target/run/models/foo.sql"},
+        "dbt_dag_task_group_identifier": "tg1",
+        "run_id": "rid123",
+    }
+
+    fake_file = MagicMock()
+    fake_file.read.return_value = "SELECT 1;"
+    fake_path = MagicMock()
+    fake_path.open.return_value.__enter__.return_value = fake_file
+
+    with (
+        patch("cosmos.operators._asynchronous.bigquery.remote_target_path", "s3://bucket/cosmos-async/"),
+        patch("cosmos.operators._asynchronous.bigquery.remote_target_path_conn_id", "aws_default"),
+        patch(_object_storage_path_target(), return_value=fake_path),
+    ):
+        result = operator.get_remote_sql()
+
+    assert result == "SELECT 1;"
+    fake_file.read.assert_called_once()
+    fake_path.open.assert_called_once()
+
+
+ASYNC_EMIT_DATASETS_VALUES = [
+    (True, True),
+    ("True", True),
+    (" true ", True),
+    (False, False),
+    ("False", False),
+    ("false", False),
+    ("0", False),
+    (" false ", False),
+]
+
+
+@pytest.mark.parametrize("emit_datasets, expected_emission", ASYNC_EMIT_DATASETS_VALUES)
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "build_and_run_cmd")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
+@patch("cosmos.operators._asynchronous.bigquery.settings.enable_setup_async_task", False)
+def test_execute_resolves_rendered_emit_datasets(
+    mock_register_event,
+    mock_store_template_fields,
+    mock_build_and_run_cmd,
+    profile_config_mock,
+    emit_datasets,
+    expected_emission,
+):
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+    operator.emit_datasets = emit_datasets
+    operator.gcp_project = "test_project"
+    operator.dataset = "test_dataset"
+
+    operator.execute(MagicMock())
+
+    assert mock_register_event.called is expected_emission
+
+
+@pytest.mark.parametrize("emit_datasets, expected_emission", ASYNC_EMIT_DATASETS_VALUES)
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
+@patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
+def test_execute_complete_resolves_rendered_emit_datasets(
+    mock_register_event, mock_store_template_fields, profile_config_mock, emit_datasets, expected_emission
+):
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="test_task",
+        project_dir="/path/to/project",
+        profile_config=profile_config_mock,
+        dbt_kwargs={"task_id": "test_task"},
+    )
+    operator.emit_datasets = emit_datasets
+    operator.gcp_project = "test_project"
+    operator.dataset = "test_dataset"
+
+    with patch.object(BigQueryInsertJobOperator, "execute_complete"):
+        operator.execute_complete(MagicMock(), {"job_id": "job", "status": "success"})
+
+    assert mock_register_event.called is expected_emission

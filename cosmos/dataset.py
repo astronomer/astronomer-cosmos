@@ -2,27 +2,35 @@ from __future__ import annotations
 
 import json
 import urllib.parse
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
+from jinja2.exceptions import TemplateError
 from packaging.version import Version
 
 from cosmos import settings
 from cosmos.constants import _DATASET_EMITTING_RESOURCE_TYPES, AIRFLOW_VERSION
+from cosmos.dbt.project import _resolve_profiles_yml_env_var
 from cosmos.log import get_logger
 
 if TYPE_CHECKING:
     from cosmos.config import ProfileConfig
 
     try:
-        from airflow.sdk import DAG  # type: ignore[assignment]
+        from airflow.sdk import DAG
 
         # Airflow 3.1 onwards
         from airflow.utils.task_group import TaskGroup
     except ImportError:
         from airflow import DAG  # type: ignore[assignment]
         from airflow.utils.task_group import TaskGroup
+
+    try:
+        from airflow.sdk import ObjectStoragePath
+    except ImportError:
+        from airflow.io.path import ObjectStoragePath
 
 logger = get_logger(__name__)
 
@@ -122,6 +130,21 @@ def get_dataset_alias_name(dag: DAG | None, task_group: TaskGroup | None, task_i
     return "__".join(identifiers_list)
 
 
+def _render_profile_field(field: str, value: str) -> str:
+    """Render one profiles.yml field, falling back to the raw value on unsupported Jinja.
+
+    Every field gets the raw-value fallback so that one unrenderable field cannot
+    abort derivation for the whole profile.  Validation of the final namespace
+    string in ``get_dataset_namespace`` catches any residual problems (unrendered
+    Jinja, empty components) in a single place.
+    """
+    try:
+        return _resolve_profiles_yml_env_var(value)
+    except TemplateError:
+        logger.debug("Could not render Jinja in profiles.yml field '%s'; using the raw value", field, exc_info=True)
+        return value
+
+
 def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any]]:
     """
     Extract the adapter type and profile dict from a ProfileConfig.
@@ -139,7 +162,20 @@ def _get_profile_dict(profile_config: ProfileConfig) -> tuple[str, dict[str, Any
         with open(profile_config.profiles_yml_filepath) as f:
             profiles = yaml.safe_load(f)
         target = profiles[profile_config.profile_name]["outputs"][profile_config.target_name]
-        adapter_type = target.get("type", "")
+        raw_adapter_type = target.get("type", "")
+        adapter_type = (
+            _render_profile_field("type", raw_adapter_type) if isinstance(raw_adapter_type, str) else raw_adapter_type
+        )
+        # dbt renders env_var() Jinja in profiles.yml; replicate that since we read the file directly.
+        # Render per field so one unrenderable field cannot abort the whole profile (#2948).
+        target = {
+            key: (
+                (adapter_type if key == "type" else _render_profile_field(key, value))
+                if isinstance(value, str)
+                else value
+            )
+            for key, value in target.items()
+        }
         return adapter_type, target
 
     return "", {}
@@ -162,8 +198,12 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     """
     try:
         adapter_type, profile_dict = _get_profile_dict(profile_config)
-    except (AttributeError, KeyError, TypeError, OSError, yaml.YAMLError):
-        logger.debug("Unable to extract profile info for dataset namespace derivation", exc_info=True)
+    except (AttributeError, KeyError, TypeError, OSError, yaml.YAMLError, TemplateError) as error:
+        logger.warning(
+            "Unable to extract profile info for dataset namespace derivation (%s); dataset emission will be skipped.",
+            error,
+            exc_info=True,
+        )
         return None
 
     if not adapter_type:
@@ -181,6 +221,27 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
                 adapter_type,
             )
             return None
+        # Reject namespaces that still contain unrendered Jinja syntax.  Individual
+        # fields fall back to their raw value when the renderer does not support the
+        # Jinja they use, so the final namespace is the single place to catch this.
+        if "{{" in namespace or "{%" in namespace:
+            logger.warning(
+                "Resolved namespace '%s' for adapter '%s' contains unrendered Jinja; skipping dataset emission.",
+                namespace,
+                adapter_type,
+            )
+            return None
+        # Reject namespaces with an empty host component (e.g. "postgres://:5432"
+        # from a missing or empty host field).
+        if "://" in namespace:
+            authority = namespace.split("://", 1)[1].split("/")[0]
+            if authority and ":" in authority and not authority.rsplit(":", 1)[0]:
+                logger.warning(
+                    "Resolved namespace '%s' for adapter '%s' has an empty host; skipping dataset emission.",
+                    namespace,
+                    adapter_type,
+                )
+                return None
         return namespace
 
     # Unknown adapters: return None so dataset emission is skipped.
@@ -193,7 +254,7 @@ def get_dataset_namespace(profile_config: ProfileConfig) -> str | None:
     return None
 
 
-def construct_dataset_uri(namespace: str, name: str) -> str:
+def construct_dataset_uri(namespace: str, name: str, warn_uri_migration: bool = True) -> str:
     """
     Construct an Airflow Asset/Dataset URI from an OL-compatible namespace and
     dataset name.
@@ -204,6 +265,9 @@ def construct_dataset_uri(namespace: str, name: str) -> str:
 
     :param namespace: The OL-compatible dataset namespace (e.g. ``postgres://host:5432``).
     :param name: The dot-delimited dataset name (e.g. ``database.schema.table``).
+    :param warn_uri_migration: Whether to emit the Airflow 3 URI migration warning for this URI.
+        Callers that create multiple URIs in one task run should pass ``False`` after
+        the first generated URI.
     """
     airflow_2_uri = namespace + "/" + urllib.parse.quote(name)
     airflow_3_uri = namespace + "/" + urllib.parse.quote(name).replace(".", "/")
@@ -211,45 +275,80 @@ def construct_dataset_uri(namespace: str, name: str) -> str:
     if AIRFLOW_VERSION < Version("3.0.0"):
         if settings.use_dataset_airflow3_uri_standard:
             return airflow_3_uri
+        if warn_uri_migration:
+            logger.warning(
+                "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs "
+                "(standard used by Cosmos) will no longer be valid. "
+                "Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to <%s>. "
+                "Previously, with Airflow 2.x, the URI was <%s>. "
+                "If you want to use the Airflow 3 URI standard while still using Airflow 2, please set: "
+                "export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1 "
+                "Remember to update any DAGs that are scheduled using this dataset.",
+                airflow_3_uri,
+                airflow_2_uri,
+            )
+        return airflow_2_uri
+
+    if warn_uri_migration and not settings.use_dataset_airflow3_uri_standard:
         logger.warning(
             "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs "
-            "(standard used by Cosmos) will no longer be valid. "
-            "Therefore, if using Cosmos with Airflow 3, the Airflow Dataset URIs will be changed to <%s>. "
-            "Previously, with Airflow 2.x, the URI was <%s>. "
-            "If you want to use the Airflow 3 URI standard while still using Airflow 2, please set: "
-            "export AIRFLOW__COSMOS__USE_DATASET_AIRFLOW3_URI_STANDARD=1 "
-            "Remember to update any DAGs that are scheduled using this dataset.",
+            "(standard used by Cosmos) are no longer accepted. "
+            "Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <%s>. "
+            "Before, with Airflow 2.x, the URI used to be <%s>. "
+            "Please, change any DAGs that were scheduled using the old standard to the new one.",
             airflow_3_uri,
             airflow_2_uri,
         )
-        return airflow_2_uri
-
-    logger.warning(
-        "Airflow 3.0.0 Asset (Dataset) URIs validation rules changed and OpenLineage URIs "
-        "(standard used by Cosmos) are no longer accepted. "
-        "Therefore, if using Cosmos with Airflow 3, the Airflow Asset (Dataset) URI is now <%s>. "
-        "Before, with Airflow 2.x, the URI used to be <%s>. "
-        "Please, change any DAGs that were scheduled using the old standard to the new one.",
-        airflow_3_uri,
-        airflow_2_uri,
-    )
     return airflow_3_uri
 
 
-def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict[str, list[str]]:
+def make_dataset_uri_builder() -> Callable[[str, str], str]:
+    """Return a :func:`construct_dataset_uri` wrapper that emits the Airflow 3 URI
+    migration warning only for the first URI it builds.
+
+    A single task run can generate many dataset URIs -- one per dbt
+    model/seed/snapshot, plus OpenLineage inputs/outputs -- and emitting the
+    migration warning for every one floods the logs (#2778). Callers that build
+    URIs in bulk should route them all through one builder so the guidance is
+    logged once instead of once per dataset.
+
+    The "already warned" state lives in the returned closure rather than at
+    module level, so each new builder (i.e. each task run) warns once again
+    instead of being silenced permanently for the lifetime of the worker process.
+    """
+    warned = False
+
+    def build(namespace: str, name: str) -> str:
+        nonlocal warned
+        uri = construct_dataset_uri(namespace, name, warn_uri_migration=not warned)
+        warned = True
+        return uri
+
+    return build
+
+
+def compute_model_outlet_uris(manifest_path: str | Path | ObjectStoragePath, namespace: str) -> dict[str, list[str]]:
     """
     Read a dbt manifest and compute per-model outlet URIs.
 
-    :param manifest_path: Path to the ``manifest.json`` file.
+    :param manifest_path: Path to the ``manifest.json`` file. May be a local ``str``/``Path`` or an
+        Airflow ``ObjectStoragePath`` pointing at a remote manifest (e.g. ``s3://``, ``gs://``).
     :param namespace: The OL-compatible dataset namespace (e.g. ``postgres://host:5432``).
     :returns: Mapping of ``{unique_id: [uri]}`` for model, seed, and snapshot nodes.
     """
+    # A plain ``str`` is only ever a local path (the subprocess watcher and tests); remote manifests
+    # arrive as an ObjectStoragePath. Normalising str -> Path lets us read every case via ``.open()``,
+    # mirroring DbtGraph._load_manifest_from_file and preserving remote schemes (s3://, gs://, ...).
+    path = Path(manifest_path) if isinstance(manifest_path, str) else manifest_path
+
     # The manifest may not exist if dbt failed before completing compilation,
     # or if the temp project directory was cleaned up before this function ran.
     # In those cases we gracefully return an empty dict — consumers simply
     # won't emit datasets for the affected run.
     try:
-        with open(manifest_path) as f:
+        # json.load accepts both text and binary streams, so Path.open() ("r") and
+        # ObjectStoragePath.open() ("rb") defaults are both fine.
+        with path.open() as f:
             manifest = json.load(f)
     except (OSError, json.JSONDecodeError):
         logger.warning(
@@ -260,6 +359,7 @@ def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict
         return {}
 
     result: dict[str, list[str]] = {}
+    build_uri = make_dataset_uri_builder()
     for unique_id, node in manifest.get("nodes", {}).items():
         resource_type = node.get("resource_type", "")
         if resource_type not in _DATASET_EMITTING_RESOURCE_TYPES:
@@ -272,7 +372,108 @@ def compute_model_outlet_uris(manifest_path: str | Path, namespace: str) -> dict
         if not all([database, schema, alias]):
             continue
 
-        uri = construct_dataset_uri(namespace, f"{database}.{schema}.{alias}")
-        result[unique_id] = [uri]
+        result[unique_id] = [build_uri(namespace, f"{database}.{schema}.{alias}")]
 
     return result
+
+
+def register_dataset_on_task(
+    task: Any,
+    new_inlets: list[Any],
+    new_outlets: list[Any],
+    context: Any,
+) -> None:
+    """
+    Register a list of datasets as outlets of the given task at execution time.
+
+    Extracted from ``LocalDbtBaseOperator.register_dataset`` so operators in
+    other execution modes (e.g. ``WATCHER_KUBERNETES``) can reuse the same
+    logic without inheriting from the local operator class.
+
+    Picks one of three code paths based on Airflow version and the
+    ``enable_dataset_alias`` Cosmos setting:
+
+    1. **Airflow 3 with ``enable_dataset_alias=True`` (default)** — uses
+       ``AssetAlias`` with ``context["outlet_events"]``. This is the
+       recommended path and the one Cosmos tests against.
+    2. **Airflow 2.10+ with ``enable_dataset_alias=True``** — uses the
+       Airflow 2 ``DatasetAlias`` equivalent with ``context["outlet_events"]``.
+    3. **Airflow < 2.10 OR ``enable_dataset_alias=False``** — mutates
+       ``task.outlets`` / ``task.inlets`` directly and persists the DAG.
+       Carries the limitations described in
+       https://github.com/astronomer/astronomer-cosmos/issues/522.
+
+    Raises
+    ------
+    AirflowCompatibilityError
+        When running on Airflow 3 with ``enable_dataset_alias=False``. That
+        configuration isn't supported by Airflow 3's asset model.
+
+    Parameters
+    ----------
+    task
+        The Airflow task (operator or sensor instance) to attach outlets to.
+        Typed as ``Any`` because the Airflow 2 and 3 operator base classes
+        diverge and Cosmos supports both.
+    new_inlets
+        Airflow ``Asset`` / ``Dataset`` instances to add as inlets. Unused on
+        the ``outlet_events`` path (Airflow 2.10+ / 3); used by the legacy
+        direct-mutation path.
+    new_outlets
+        Airflow ``Asset`` / ``Dataset`` instances to add as outlets.
+    context
+        The Airflow task execution context. Must contain ``outlet_events``
+        on the 2.10+ / 3 path.
+    """
+    try:
+        from airflow.sdk import DAG
+    except ImportError:
+        from airflow.models.dag import DAG  # type: ignore[assignment]
+
+    from cosmos.exceptions import AirflowCompatibilityError
+
+    if AIRFLOW_VERSION.major >= 3 and not settings.enable_dataset_alias:
+        logger.error("To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default).")
+        raise AirflowCompatibilityError(
+            "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
+        )
+    if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
+        from airflow.utils.session import create_session
+
+        logger.info("Assigning inlets/outlets without DatasetAlias")
+        with create_session() as session:
+            task.outlets.extend(new_outlets)
+            task.inlets.extend(new_inlets)
+            for dag_task in task.dag.tasks:
+                if dag_task.task_id == task.task_id:
+                    dag_task.outlets.extend(new_outlets)
+                    dag_task.inlets.extend(new_inlets)
+            DAG.bulk_write_to_db([task.dag], session=session)  # type: ignore[attr-defined]
+            session.commit()
+        return
+
+    dataset_alias_name = get_dataset_alias_name(task.dag, task.task_group, task.task_id)
+
+    if AIRFLOW_VERSION.major == 2:
+        logger.info("Assigning inlets/outlets with DatasetAlias in Airflow 2")
+        from airflow.datasets import DatasetAlias
+
+        alias_names = {dataset_alias_name} | {
+            outlet.name
+            for outlet in task.outlets
+            if isinstance(outlet, DatasetAlias) and outlet.name != dataset_alias_name
+        }
+
+        for alias_name in alias_names:
+            for outlet in new_outlets:
+                context["outlet_events"][alias_name].add(outlet)
+    else:  # Airflow 3
+        logger.info("Assigning outlets with DatasetAlias in Airflow 3")
+        from airflow.sdk.definitions.asset import AssetAlias
+
+        # AssetAlias is registered on the task outlets as well as the
+        # outlet_events. This was required in Airflow 3.0.0; later releases
+        # may make it automatic, at which point this line becomes a no-op.
+        task.outlets.append(AssetAlias(dataset_alias_name))
+        for outlet in new_outlets:
+            context["outlet_events"][AssetAlias(dataset_alias_name)].add(outlet)

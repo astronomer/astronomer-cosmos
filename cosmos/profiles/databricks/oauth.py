@@ -5,13 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from ..base import BaseProfileMapping
+from .host import normalize_host
 
 
 class DatabricksOauthProfileMapping(BaseProfileMapping):
     """
     Maps Airflow Databricks connections with the client auth to dbt profiles.
 
-    https://docs.getdbt.com/reference/warehouse-setups/databricks-setup
+    https://docs.getdbt.com/docs/local/connect-data-platform/databricks-setup
     https://airflow.apache.org/docs/apache-airflow-providers-databricks/stable/connections/databricks.html
     """
 
@@ -54,3 +55,6 @@ class DatabricksOauthProfileMapping(BaseProfileMapping):
             "client_secret": self.get_env_var_format("client_secret"),
             "client_id": self.get_env_var_format("client_id"),
         }
+
+    def transform_host(self, host: str) -> str:
+        return normalize_host(host)

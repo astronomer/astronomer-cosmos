@@ -102,7 +102,10 @@ _DBT_ERROR_EVENTS_TYPES = frozenset(
     }
 )
 
-_DBT_NODE_STATUS_EVENT_TYPES = frozenset({"NodeStart", "NodeCompiling", "NodeExecuting", "NodeFinished"})
+# SkippingDetails is the only event an info-level log (subprocess, Kubernetes) prints for a node dbt skipped.
+_DBT_NODE_STATUS_EVENT_TYPES = frozenset(
+    {"NodeStart", "NodeCompiling", "NodeExecuting", "NodeFinished", "SkippingDetails"}
+)
 
 _DBT_EVENT_ALLOWLIST = _DBT_ERROR_EVENTS_TYPES | _DBT_NODE_STATUS_EVENT_TYPES
 

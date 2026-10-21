@@ -680,6 +680,21 @@ class TestStoreDbtStatusFromLog:
         # The consumer tells an upstream-failure skip from a real failure by this raw event status (#3023).
         assert ti.store.get("model__pkg__downstream_model_dbt_event")["status"] == "skipped"
 
+    def test_store_dbt_resource_status_from_log_keeps_skipped_event_without_node_finished(self):
+        """Subprocess and Kubernetes producers print no ``NodeFinished`` at dbt's default log level (#3023)."""
+        ti = _MockTI()
+
+        store_dbt_resource_status_from_log(
+            self._node_log_line("model.pkg.downstream_model", "skipped", "SkippingDetails"),
+            {"context": {"ti": ti}},
+            tests_per_model={},
+            test_results_per_model={},
+            upstream_failure_skipped_ids=set(),
+        )
+
+        assert ti.store.get("model__pkg__downstream_model_status") == {"status": "failed", "outlet_uris": []}
+        assert ti.store.get("model__pkg__downstream_model_dbt_event")["status"] == "skipped"
+
     def test_store_dbt_resource_status_from_log_keeps_plain_skips_as_skipped(self):
         """Plain skips are unchanged, including when no rewrite accumulator is passed."""
         ti = _MockTI()
@@ -3036,7 +3051,18 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
     ),
 )
 @pytest.mark.integration
-def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(reset_fail_once_sequence):
+@pytest.mark.parametrize(
+    "execution_args",
+    [
+        {"invocation_mode": InvocationMode.DBT_RUNNER},
+        # Prints only info-level dbt events, like the Kubernetes producers.
+        {"invocation_mode": InvocationMode.SUBPROCESS, "dbt_executable_path": DBT_EXECUTABLE_PATH},
+    ],
+    ids=["dbt_runner", "subprocess"],
+)
+def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(
+    reset_fail_once_sequence, execution_args
+):
     """With ``AFTER_EACH``, every run and test that dbt skipped below a failed model ends on attempt 1 (#3023).
 
     Before, each of them failed on attempt 1 and waited one ``retry_delay``, so every level added a delay.
@@ -3055,7 +3081,7 @@ def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(r
     ) as dag:
         dbt_group = DbtTaskGroup(
             group_id="watcher_upstream_failure_recovery",
-            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER, **execution_args),
             project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_UPSTREAM_FAILURE_RECOVERY_PATH),
             profile_config=profile_config,
             render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.AFTER_EACH),

@@ -770,6 +770,10 @@ class BaseConsumerSensor(BaseSensorOperator):
         """
         if not self.retries:
             return False
+        # The cluster policy moves only retries to the retry queue, so leave the build to the retry.
+        retry_queue = settings.watcher_dbt_retry_queue
+        if retry_queue and self.queue != retry_queue:
+            return False
         if self.is_test_sensor:
             # dbt never runs a model's tests when the model did not succeed.
             model_status = (

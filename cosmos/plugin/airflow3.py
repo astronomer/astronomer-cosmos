@@ -21,6 +21,7 @@ from airflow.sdk import ObjectStoragePath
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from packaging.version import Version
+from starlette.types import Receive, Scope, Send
 
 from cosmos import telemetry
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
@@ -303,6 +304,23 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     return app
 
 
+class LazyDbtDocsApp:
+    """
+    ASGI app that builds the Cosmos FastAPI app on its first request.
+
+    Airflow instantiates plugins in every component, but only the API server receives requests, so the scheduler,
+    triggerer and task runner never import Airflow's API auth helpers.
+    """
+
+    def __init__(self) -> None:
+        self._app: FastAPI | None = None
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if self._app is None:
+            self._app = create_cosmos_fastapi_app()
+        await self._app(scope, receive, send)
+
+
 def _warn_once_that_airflow_310_cannot_open_dbt_docs() -> None:
     global _airflow_310_docs_warning_logged
     if _airflow_310_docs_warning_logged:
@@ -336,11 +354,10 @@ class CosmosAF3Plugin(AirflowPlugin):
         projects = _load_projects_from_conf()
         if not projects:
             return
-        # Initialize FastAPI app only after version support is confirmed
         self.fastapi_apps = [
             {
                 "name": "cosmos",
-                "app": create_cosmos_fastapi_app(),
+                "app": LazyDbtDocsApp(),
                 "url_prefix": "/cosmos",
             }
         ]

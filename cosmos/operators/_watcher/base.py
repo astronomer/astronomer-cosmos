@@ -683,7 +683,11 @@ class BaseConsumerSensor(BaseSensorOperator):
             return
 
         if reason == WatcherEventReason.NODE_FAILED:
-            if self._fall_back_for_upstream_failure_skip(context, dbt_events):
+            if (
+                self._should_fall_back_for_upstream_failure_skip(context["ti"], dbt_events)
+                and is_producer_task_terminated(self._get_producer_task_status(context))
+                and self._fall_back_for_upstream_failure_skip(context)
+            ):
                 return
             raise AirflowException(
                 f"dbt {self._resource_label.lower()} '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
@@ -762,11 +766,12 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         return None
 
-    def _fall_back_for_upstream_failure_skip(self, context: Context, dbt_event: dict[str, Any] | None) -> bool:
-        """Build the node now if dbt skipped it for an upstream failure, and return whether it did.
+    def _should_fall_back_for_upstream_failure_skip(self, ti: Any, dbt_event: dict[str, Any] | None) -> bool:
+        """Whether to build now a failed node that dbt skipped for an upstream failure, instead of on a retry.
 
-        Only when a retry would fall back anyway (retries left, producer terminated), so this saves the retry_delay
-        without changing the outcome. See #3023.
+        Only when the task has ``retries`` configured, so a retry would fall back too. The node then gets
+        ``retries + 1`` real dbt runs, like a node that failed inside the producer, instead of losing try 1.
+        The caller must also check that the producer has terminated. See #3023.
         """
         if not self.retries:
             return False
@@ -776,18 +781,14 @@ class BaseConsumerSensor(BaseSensorOperator):
             return False
         if self.is_test_sensor:
             # dbt never runs a model's tests when the model did not succeed.
-            model_status = (
-                get_xcom_val(context["ti"], self.producer_task_id, get_status_xcom_key(self.model_unique_id)) or {}
-            )
-            dbt_never_ran_node = bool(model_status) and not is_dbt_node_status_success(model_status.get("status"))
-        else:
-            # The status XCom of an upstream-failure skip says "failed", but its dbt event still says "skipped".
-            dbt_never_ran_node = is_dbt_node_status_skipped((dbt_event or {}).get("status"))
-        if not dbt_never_ran_node:
-            return False
-        if not is_producer_task_terminated(self._get_producer_task_status(context)):
-            return False
-        logger.info(
+            model_status = get_xcom_val(ti, self.producer_task_id, get_status_xcom_key(self.model_unique_id)) or {}
+            return bool(model_status) and not is_dbt_node_status_success(model_status.get("status"))
+        # The status XCom of an upstream-failure skip says "failed", but its dbt event still says "skipped".
+        return is_dbt_node_status_skipped((dbt_event or {}).get("status"))
+
+    def _fall_back_for_upstream_failure_skip(self, context: Context) -> bool:
+        """Build the node that dbt skipped for an upstream failure now, instead of on a retry."""
+        self.log.info(
             "dbt skipped %s '%s' for an upstream failure, so it never ran. Running it now instead of on a retry.",
             self._resource_label.lower(),
             self.model_unique_id,
@@ -868,7 +869,12 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         _log_dbt_event(dbt_events)
 
-        if is_dbt_node_status_failed(status) and self._fall_back_for_upstream_failure_skip(context, dbt_events):
+        if (
+            is_dbt_node_status_failed(status)
+            and is_producer_task_terminated(producer_task_state)
+            and self._should_fall_back_for_upstream_failure_skip(ti, dbt_events)
+            and self._fall_back_for_upstream_failure_skip(context)
+        ):
             return True
         if is_dbt_node_status_skipped(status):
             raise AirflowSkipException(

@@ -1581,6 +1581,7 @@ class TestDbtConsumerWatcherSensor:
 
         assert sensor.poke(context) is True
         sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
+        sensor._get_producer_task_status.assert_called_once()
 
     @pytest.mark.parametrize(
         "retries, xcoms, producer_state",
@@ -1871,6 +1872,7 @@ class TestDbtConsumerWatcherSensor:
                 context=context, event={"status": "failed", "reason": WatcherEventReason.NODE_FAILED}
             )
         sensor._fallback_to_non_watcher_run.assert_not_called()
+        sensor._get_producer_task_status.assert_not_called()
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
     def test_execute_complete_extracts_compiled_sql(self, mock_override_rtif):

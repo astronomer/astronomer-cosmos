@@ -513,7 +513,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python_versions) }}
-        dbt-version: ["2.0"]
+        dbt-version: ["2.0-dbt-fusion"]
     container:
       # The Runtime image tag is a workflow input (an arbitrary alpha version), so it cannot be
       # digest-pinned. Suppress zizmor's unpinned-images finding for these container images.
@@ -536,6 +536,7 @@ jobs:
         run: |
           PREFIX="COSMOS_${RUN_ID}_PY${PY_VERSION}_RT${RT_VERSION}_DBT${DBT_VERSION}"
           PREFIX="${PREFIX//[^A-Za-z0-9_]/_}"
+          PREFIX=$(echo "$PREFIX" | tr '[:lower:]' '[:upper:]')
           echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
       - name: Run dbt Fusion integration tests
         run: |

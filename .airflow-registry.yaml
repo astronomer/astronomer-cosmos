@@ -4,7 +4,7 @@
 
 package-name: astronomer-cosmos
 display-name: Cosmos (dbt)
-description: Run dbt projects as Airflow DAGs and Task Groups. Supports both dbt Core and dbt v2.
+description: Run dbt projects as Airflow DAGs and Task Groups. Supports both dbt Core and dbt Fusion.
 logo: https://raw.githubusercontent.com/astronomer/astronomer-cosmos/main/docs/_static/cosmos-logo.svg
 docs-url: https://astronomer.github.io/astronomer-cosmos
 source-url: https://github.com/astronomer/astronomer-cosmos

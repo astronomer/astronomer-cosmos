@@ -1,15 +1,10 @@
 .. _dbt_fusion:
 
-dbt v2 support
-==============
+dbt Fusion support
+==================
 
 .. note::
     Available since Cosmos 1.11.0 when using ``ExecutionMode.LOCAL``.
-
-.. note::
-    As part of releasing dbt v2 to general availability, dbt Labs renamed the dbt Fusion engine to "dbt", and dbt Core v2 to "dbt OSS"
-    (see `Comparing dbt and dbt OSS <https://docs.getdbt.com/blog/comparing-dbt-and-dbt-oss>`_).
-    "dbt Fusion" in this page refers to what is now the ``dbt`` distribution.
 
 Context
 ~~~~~~~
@@ -31,7 +26,7 @@ Some reported dbt Fusion features include:
  - **Multi-dialect support:** Instant error detection across Snowflake, Databricks, BigQuery, and Redshift SQL dialects
 
 .. note::
-    dbt v2 (formerly dbt Fusion) has reached general availability. Check the `dbt documentation <https://docs.getdbt.com/docs/supported-data-platforms>`_ for the data platforms it currently supports.
+    dbt Fusion is in public beta with current support for Snowflake and Databricks projects, with additional data platforms coming soon.
 
 Support
 ~~~~~~~
@@ -75,6 +70,7 @@ Limitations
 ~~~~~~~~~~~
 
 - This feature is available since Cosmos 1.11.0
+- Currently (23 June 2025) dbt Fusion is still in beta
 - dbt Fusion only supports Snowflake
 - Cosmos does not support dbt Fusion when using ``ExecutionMode.AIRFLOW_ASYNC``
 

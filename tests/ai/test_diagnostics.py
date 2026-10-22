@@ -511,6 +511,7 @@ def fake_sql_toolset_module(monkeypatch):
         sys.modules, "airflow.providers.common.ai.toolsets.sql", SimpleNamespace(SQLToolset=FakeSQLToolset)
     )
     monkeypatch.setitem(sys.modules, "pydantic_ai.toolsets", SimpleNamespace(WrapperToolset=FakeWrapperToolset))
+    monkeypatch.setitem(sys.modules, "pydantic_ai.exceptions", SimpleNamespace(ModelRetry=FakeModelRetry))
     return created
 
 

@@ -135,7 +135,7 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3", "3.4"]
-        dbt-version: ["1.11", "1.12"]
+        dbt-version: ["1.11", "1.12", "2.0-dbt-oss"]
         exclude:
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
           - python-version: "3.13"
@@ -163,6 +163,9 @@ jobs:
           # Apache Airflow 3.4 requires Python >=3.11.
           - python-version: "3.10"
             airflow-version: "3.4"
+          # Python 3.10 has reached end of life, so it is not tested with dbt-oss.
+          - python-version: "3.10"
+            dbt-version: "2.0-dbt-oss"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -192,6 +195,11 @@ jobs:
           python -m pip install uv
           uv pip install --system "hatch>=1.14.2"
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
+
+      - name: Install dbt-oss ${{ matrix.dbt-version }}
+        if: contains(matrix.dbt-version, 'dbt-oss')
+        run: |
+          hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-dbt-oss-setup
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
         run: |

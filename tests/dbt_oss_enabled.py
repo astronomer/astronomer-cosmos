@@ -57,6 +57,10 @@ _VIEW_OVER_TABLE = (
     "dbt-oss's BigQuery view materialization will not replace a table that an earlier test left in the job's dataset"
 )
 _ERROR_NOT_IN_CAPLOG = "the dbt-oss error text does not reach caplog in some cells (cause inferred, not investigated)"
+_NEEDS_SEEDED_TABLE = (
+    "needs the raw_orders table, which a seed task in the DAG creates but its source freshness check can run before, so it "
+    "only passes when an earlier test has already seeded the job's dataset (the test order varies between runs)"
+)
 _UNKNOWN = "fails in the dbt-oss job for a cause not yet identified"
 
 # Tests that fail in the dbt-oss job for a known reason, keyed by pytest node id. Each one is skipped there with its
@@ -108,6 +112,8 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/test_example_dags.py::test_example_dag[example_model_version]": _MODEL_VERSION_ALIAS,
     # dbt-oss view over a table left by an earlier test (1)
     "tests/test_example_dags.py::test_example_dag[example_multiple_parents_test]": _VIEW_OVER_TABLE,
+    # Depends on a table that an earlier test seeds in the job's dataset (1)
+    "tests/test_example_dags.py::test_example_dag[source_rendering_dag]": _NEEDS_SEEDED_TABLE,
     # dbt-oss error text not in caplog (1)
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_failing_model": _ERROR_NOT_IN_CAPLOG,
     # Unknown, needs investigation (4)

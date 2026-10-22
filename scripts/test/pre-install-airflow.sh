@@ -42,11 +42,16 @@ if [ "$AIRFLOW_VERSION" = "2.9" ] || [ "$AIRFLOW_VERSION" = "2.10" ] || [ "$AIRF
       echo "::error::No pinned lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION ($REQUIREMENTS_FILE). Add one."
       exit 1
     fi
-    # Other dbt minors (1.8-1.10) and the dbt 2 lane (2.0-dbt-fusion) have no per-Airflow lockfile; jobs needing
-    # them re-pin dbt in their own setup step, so this is just a throwaway baseline.
-    echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-1.11 baseline (this job must re-pin dbt itself)."
-    REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-1.11.txt"
-    EFFECTIVE_DBT_VERSION="1.11"
+    # Other dbt versions (1.8-1.10, 2.0-dbt-fusion, 2.0-dbt-oss) have no per-Airflow lockfile; jobs needing them re-pin dbt
+    # in their own setup step, so this is just a throwaway baseline. dbt v2 values start from the dbt-1.12
+    # baseline, whose lockfiles support Python 3.14.
+    case "$DBT_VERSION" in
+      *-dbt-oss) BASELINE_DBT_VERSION="1.12" ;;
+      *) BASELINE_DBT_VERSION="1.11" ;;
+    esac
+    echo "::warning::No lockfile for airflow $AIRFLOW_VERSION + dbt $DBT_VERSION; falling back to the dbt-$BASELINE_DBT_VERSION baseline (this job must re-pin dbt itself)."
+    REQUIREMENTS_FILE="requirements/requirements-airflow-${AIRFLOW_VERSION}-dbt-${BASELINE_DBT_VERSION}.txt"
+    EFFECTIVE_DBT_VERSION="$BASELINE_DBT_VERSION"
   fi
   echo "Installing pinned requirements from $REQUIREMENTS_FILE"
   uv pip install -r "$REQUIREMENTS_FILE"
@@ -78,10 +83,15 @@ elif [ "$AIRFLOW_VERSION" = "3.4" ] ; then
   # TEMP curation: `-U` floats importlib-metadata to 9.x, but the Airflow 3.4 core
   # tree (litellm) requires <9, so hold it on the 8.x line the constraints pin.
   # `~=$DBT_VERSION.0` pins the minor: a bare `~=1.11` would float to dbt-core 1.12.
-  # The dbt 2 lane (2.0-dbt-fusion, the standalone dbt Fusion binary) is installed separately
-  # from dbt-core, so bootstrap with the 1.11 baseline, as the lockfile fallback above does.
+  # The dbt 2 lanes (2.0-dbt-fusion, the standalone dbt Fusion binary, and 2.0-dbt-oss) are installed
+  # separately from dbt-core, so bootstrap with a 1.x baseline, as the lockfile fallback above does: 1.12 for
+  # dbt-oss, since dbt-core 1.11 does not work on Python 3.14, and 1.11 otherwise.
   INSTALL_DBT_VERSION="$DBT_VERSION"
   case "$DBT_VERSION" in
+    *-dbt-oss)
+      INSTALL_DBT_VERSION="1.12"
+      EFFECTIVE_DBT_VERSION="1.12"
+      ;;
     2.*)
       INSTALL_DBT_VERSION="1.11"
       EFFECTIVE_DBT_VERSION="1.11"
@@ -138,7 +148,7 @@ else
 fi
 
 # EFFECTIVE_DBT_VERSION differs from DBT_VERSION only when the fallback above
-# substituted the dbt-1.11 baseline.
+# substituted a baseline (dbt-1.11, or dbt-1.12 for dbt v2).
 actual_dbt_version=$(dbt --version 2>/dev/null | awk '/installed:/ { split($3, v, "."); print v[1]"."v[2] }')
 if [ "$actual_dbt_version" = "$EFFECTIVE_DBT_VERSION" ]; then
     echo "dbt version is as expected: $EFFECTIVE_DBT_VERSION"

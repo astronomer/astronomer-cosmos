@@ -1322,6 +1322,14 @@ def test_run_subprocess_sets_process_log_line_callable():
     assert op._process_log_line_callable is not None
 
 
+@pytest.fixture
+def dbt_v1():
+    """Pretend dbt-core 1.x is installed: ``run_dbt_runner`` rejects dbt 2.x, which these tests do not exercise."""
+    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=False):
+        yield
+
+
+@pytest.mark.usefixtures("dbt_v1")
 def test_run_dbt_runner_registers_event_callback():
     """run_dbt_runner appends an EventMsg→JSON→parse callback to _dbt_runner_callbacks."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -1336,6 +1344,7 @@ def test_run_dbt_runner_registers_event_callback():
     assert len(op._dbt_runner_callbacks) == 1
 
 
+@pytest.mark.usefixtures("dbt_v1")
 def test_run_dbt_runner_event_callback_calls_store_from_log():
     """The registered callback converts an EventMsg to JSON and passes it to store_dbt_resource_status_from_log."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -1364,6 +1373,7 @@ def test_run_dbt_runner_event_callback_calls_store_from_log():
     assert call_args[0][1]["context"] is context
 
 
+@pytest.mark.usefixtures("dbt_v1")
 def test_run_dbt_runner_callback_error_fails_producer_after_run(caplog):
     """A callback error must not surface as GenericExceptionOnRun inside dbt; instead it must be
     re-raised after the dbt run so it propagates through execute() and triggers the task_status

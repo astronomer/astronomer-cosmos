@@ -13,6 +13,9 @@ from cosmos.airflow import compatibility
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.operators._watcher.state import safe_xcom_push
 from cosmos.operators._watcher.xcom import (
+    TASK_STATE_STORE_TI_ATTRIBUTE,
+    _backup_xcom_to_variable,
+    _decode_backup,
     _init_xcom_backup,
     _persist_backup,
     _restore_xcom_backup,
@@ -89,5 +92,53 @@ def test_xcom_backup_survives_retry_in_task_state_store():
     dag_run = new_test_dag(dag)
 
     assert observed == {"persisted": True, "restored": True, "status": "success", "leftover": None}
+    variable_key = _xcom_backup_variable_key(dag.dag_id, None, dag_run.run_id)
+    assert compatibility.get_variable(variable_key, default=None) is None
+
+
+class _StoreFailingTheLastWrite:
+    def __init__(self, store, last_key: str):
+        self._store = store
+        self._last_key = last_key
+
+    def __getattr__(self, name):
+        return getattr(self._store, name)
+
+    def set(self, key, value):
+        if self._last_key in _decode_backup(value):
+            raise RuntimeError("store unavailable")
+        self._store.set(key, value)
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(AIRFLOW_VERSION < Version("3.3.0"), reason="The Airflow task store was added in Airflow 3.3")
+def test_xcom_backup_falls_back_to_the_variable_when_the_last_write_fails():
+    from airflow.sdk import DAG, task
+
+    from tests.utils import new_test_dag
+
+    statuses = ("model__a_status", "model__b_status", "model__c_status")
+    observed = {}
+
+    @task(retries=1, retry_delay=timedelta(seconds=0), on_retry_callback=_backup_xcom_to_variable)
+    def producer(**context):
+        ti = context["ti"]
+        if ti.try_number == 1:
+            _init_xcom_backup(context)
+            setattr(
+                ti, TASK_STATE_STORE_TI_ATTRIBUTE, _StoreFailingTheLastWrite(context["task_state_store"], statuses[-1])
+            )
+            for key in statuses:
+                safe_xcom_push(ti, key, "success")
+        observed["restored"] = _restore_xcom_backup(context)
+        observed["statuses"] = {key: ti.xcom_pull(task_ids=ti.task_id, key=key) for key in statuses}
+        observed["leftover"] = context["task_state_store"].get(_task_state_store_row_key(0))
+
+    with DAG("cosmos_xcom_backup_variable_fallback", start_date=datetime(2024, 1, 1), schedule=None) as dag:
+        producer()
+
+    dag_run = new_test_dag(dag)
+
+    assert observed == {"restored": True, "statuses": dict.fromkeys(statuses, "success"), "leftover": None}
     variable_key = _xcom_backup_variable_key(dag.dag_id, None, dag_run.run_id)
     assert compatibility.get_variable(variable_key, default=None) is None

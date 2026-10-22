@@ -156,7 +156,7 @@ When at least one WARN message is present, the function passed to ``on_warning_c
     top-level argument remains the recommended form.
 
 Failure notifications
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 Tests configured with ``severity: error`` fail the task when they fail. To send notifications on failure, use
 Airflow's standard ``on_failure_callback``. Airflow exposes the raised exception to the callback as

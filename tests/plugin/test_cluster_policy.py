@@ -250,6 +250,17 @@ class TestTaskInstanceMutationHook:
         assert task_instance.queue == "retry_queue"
 
 
+@pytest.mark.parametrize("first_import", ["import cosmos.constants", "from cosmos.dbt import runner"])
+def test_importing_cosmos_before_airflow_does_not_hit_an_import_cycle(tmp_path, first_import):
+    result = subprocess.run(
+        [sys.executable, "-c", f"{first_import}\nprint('OK')\n"],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AIRFLOW_HOME": str(tmp_path)},
+    )
+    assert result.returncode == 0 and "OK" in result.stdout, result.stderr
+
+
 def test_cluster_policy_load_does_not_break_airflow_sentry_init(tmp_path):
     """Regression for #2620: importing cosmos.plugin.cluster_policy must not
     transitively load airflow.sentry. If it does, [sentry] before_send is

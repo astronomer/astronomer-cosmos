@@ -1520,13 +1520,18 @@ def select_nodes(
     if not select and not exclude:
         return nodes
     validate_filters(exclude, select)
-    subset_ids = apply_select_filter(nodes, project_dir, select)
-    if select:
-        nodes = get_nodes_from_subset(nodes, subset_ids)
-    exclude_ids = apply_exclude_filter(nodes, project_dir, exclude)
-    subset_ids = set(nodes.keys()) - exclude_ids
 
-    return get_nodes_from_subset(nodes, subset_ids)
+    # Resolve `exclude` against the full graph, not the `select`-narrowed subset, so graph
+    # operators (`+tag:x`) still find their root nodes. This matches dbt. `select` must run
+    # first: the selector rewrites test-node tags in place as it walks the graph.
+    if select:
+        subset_ids = apply_select_filter(nodes, project_dir, select)
+    else:
+        subset_ids = set(nodes.keys())
+
+    exclude_ids = apply_exclude_filter(nodes, project_dir, exclude)
+
+    return get_nodes_from_subset(nodes, subset_ids - exclude_ids)
 
 
 def get_nodes_from_subset(nodes: dict[str, DbtNode], subset_ids: set[str]) -> dict[str, DbtNode]:

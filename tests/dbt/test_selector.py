@@ -547,6 +547,67 @@ def test_select_nodes_by_child_and_precursors_exclude_tags():
     assert sorted(selected.keys()) == expected
 
 
+@pytest.mark.parametrize(
+    "select,exclude,expected",
+    [
+        # `+tag:test` must drop sibling1 and its ancestors (shared with child) even though sibling1 is not in `+child`.
+        (["+child"], ["+tag:test"], [child_node.unique_id]),
+        # Descendant and `@` operators rooted outside the subset: grandparent is not in `tag:nightly`.
+        (["tag:nightly", "+orphaned"], ["grandparent+"], [orphaned_node.unique_id]),
+        (["tag:nightly", "+orphaned"], ["@grandparent"], [orphaned_node.unique_id]),
+        # Non-graph excludes: a match outside the subset changes nothing, one inside is removed.
+        (
+            ["+child"],
+            ["tag:test"],
+            [
+                another_grandparent_node.unique_id,
+                child_node.unique_id,
+                grandparent_node.unique_id,
+                parent_node.unique_id,
+            ],
+        ),
+        (
+            ["+child"],
+            ["path:gen3/models"],
+            [another_grandparent_node.unique_id, grandparent_node.unique_id, parent_node.unique_id],
+        ),
+    ],
+)
+def test_select_nodes_exclude_graph_selector_resolves_against_full_graph(select, exclude, expected):
+    """`exclude` graph operators resolve against the full graph, not the `select` subset."""
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=select, exclude=exclude)
+    assert sorted(selected.keys()) == sorted(expected)
+
+
+def _multi_parent_test_graph():
+    base = Path("/tmp/proj")
+
+    def node(name, resource_type, depends_on, tags):
+        return DbtNode(
+            unique_id=f"{resource_type.value}.p.{name}",
+            resource_type=resource_type,
+            depends_on=depends_on,
+            path_base=base,
+            original_file_path=Path(f"models/{name}.sql"),
+            tags=tags,
+            config={},
+        )
+
+    upstream = node("up", DbtResourceType.MODEL, [], [])
+    tagged = node("m", DbtResourceType.MODEL, [upstream.unique_id], ["a"])
+    other = node("other", DbtResourceType.MODEL, [upstream.unique_id], ["b"])
+    shared_test = node("t", DbtResourceType.TEST, [tagged.unique_id, other.unique_id], [])
+    return base, {n.unique_id: n for n in (upstream, tagged, other, shared_test)}
+
+
+@pytest.mark.parametrize("exclude", [[], ["tag:zzz"], ["tag:b"]])
+def test_select_nodes_exclude_does_not_change_what_select_sees(exclude):
+    """The selector rewrites test-node tags in place, so `exclude` must not run before `select`."""
+    base, nodes = _multi_parent_test_graph()
+    selected = select_nodes(project_dir=base, nodes=nodes, select=["+tag:a"], exclude=exclude)
+    assert sorted(selected) == ["model.p.m", "model.p.up"]
+
+
 def test_select_node_by_child_and_precursors_partial_tree():
     selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=sample_nodes, select=["+parent"])
     expected = [another_grandparent_node.unique_id, grandparent_node.unique_id, parent_node.unique_id]

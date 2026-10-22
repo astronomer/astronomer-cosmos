@@ -15,9 +15,9 @@ from cosmos.config import AiConfig
 SAMPLE_ARTIFACTS = Path(__file__).parent.parent / "sample" / "ai_diagnosis"
 
 
-def build_failure_context(project_dir, output="", **limits):
+def build_failure_context(project_dir, output="", redact=lambda text: text, **limits):
     """Build the context with the default limits of ``AiConfig``, or with the ones given."""
-    return build(project_dir, output, AiConfig(llm_conn_id="my_llm_conn", **limits))
+    return build(project_dir, output, AiConfig(llm_conn_id="my_llm_conn", **limits), redact)
 
 
 @pytest.fixture
@@ -357,3 +357,26 @@ def test_allowed_tables_are_capped_and_keep_the_node_s_own_table_first():
 
     assert len(tables) == _MAX_TABLES
     assert tables[:2] == ["s.m", "s.parent_0"]
+
+
+def test_secrets_are_hidden_before_the_texts_are_cut(tmp_path):
+    """A cut through a secret leaves a fragment of it that no masker matches anymore."""
+    secret = "SUPER-SECRET-VALUE"
+    text = "a" * 10 + secret + "b" * 10
+    _write_artifacts(
+        tmp_path,
+        run_results={
+            "results": [{"status": "error", "unique_id": "model.p.m", "message": text, "compiled_code": text}]
+        },
+    )
+
+    def redact(text):
+        return text.replace(secret, "***")
+
+    # The limit is the length of the text, halved: both cut right through the middle of the secret.
+    node = build_failure_context(tmp_path, redact=redact, max_message_chars=30, max_sql_chars=30).failed_nodes[0]
+    no_failed_node = build_failure_context(tmp_path / "other", text, redact=redact, max_output_chars=20)
+
+    assert "SUPER" not in node.message and "***" in node.message
+    assert "SUPER" not in node.compiled_code and "***" in node.compiled_code
+    assert "SUPER" not in no_failed_node.output and "***" in no_failed_node.output

@@ -142,7 +142,8 @@ def diagnose_dbt_failure(
 
 def redact(text: str, ai_config: AiConfig) -> str:
     """Mask the secrets Airflow knows about, then apply ``AiConfig.redactor``: what Airflow can't know is up to it."""
-    text = mask_secrets(text)
+    # Without the provider nothing is sent, so there is nothing to mask: ``diagnose_dbt_failure`` returns before that.
+    text = mask_secrets(text) if mask_secrets else text
     return ai_config.redactor(text) if ai_config.redactor else text
 
 
@@ -205,19 +206,18 @@ def _build_toolsets(
     if not _is_dbapi_connection(profile_mapping.conn_id, DbApiHook):
         return []
 
-    try:
-        allowed_tables = failure_context.allowed_tables
-        toolset = SQLToolset(db_conn_id=profile_mapping.conn_id, allowed_tables=allowed_tables)
-        metadata_tools = toolset.filtered(lambda _ctx, tool_def: tool_def.name in _SCHEMA_ONLY_TOOLS)
-        return [_redacting(metadata_tools, ai_config, allowed_tables)]
-    except Exception:  # a warehouse hook runs its own code here: losing introspection beats losing the diagnosis
-        logger.warning("Could not set up schema introspection; skipping it.", exc_info=True)
-        return []
+    allowed_tables = failure_context.allowed_tables
+    # The toolset only reads the connection when a tool runs, so nothing here depends on the warehouse.
+    toolset = SQLToolset(db_conn_id=profile_mapping.conn_id, allowed_tables=allowed_tables)
+    metadata_tools = toolset.filtered(lambda _ctx, tool_def: tool_def.name in _SCHEMA_ONLY_TOOLS)
+    return [_redacting(metadata_tools, ai_config, allowed_tables)]
 
 
 def _redacting(toolset: Any, ai_config: AiConfig, allowed_tables: list[str]) -> Any:
     """Wrap ``toolset`` to log what the agent asks of its tools, and to redact what they return like the prompt."""
-    from pydantic_ai.toolsets import WrapperToolset  # the provider, so pydantic-ai, is there by now
+    # The provider, so pydantic-ai, is there by now.
+    from pydantic_ai.exceptions import ModelRetry
+    from pydantic_ai.toolsets import WrapperToolset
 
     allowed = {table.casefold() for table in allowed_tables}
 
@@ -231,7 +231,12 @@ def _redacting(toolset: Any, ai_config: AiConfig, allowed_tables: list[str]) -> 
                 logger.info("AI diagnosis tool call: %s %s", name, table)
             else:
                 logger.warning("AI diagnosis asked for a table that is not one of the tables of the failed node.")
-            result = await self.wrapped.call_tool(name, tool_args, ctx, tool)
+            try:
+                result = await self.wrapped.call_tool(name, tool_args, ctx, tool)
+            except ModelRetry as retry:
+                # The provider turns the error of a tool into a retry for the model, such as a database error with a
+                # host and a user. It is not a result, so it is redacted here.
+                raise ModelRetry(redact(retry.message, ai_config)) from retry
             return redact(result if isinstance(result, str) else json.dumps(result, default=str), ai_config)
 
     return RedactingToolset(wrapped=toolset)
@@ -242,7 +247,9 @@ def _is_dbapi_connection(conn_id: str, dbapi_hook_class: type) -> bool:
     try:
         hook = BaseHook.get_connection(conn_id).get_hook()
     except Exception as exc:
-        # E.g. ``Unknown hook type "postgres"`` when the Airflow provider of the warehouse is not installed.
+        # Deliberately broad, as it is Airflow loading code of a provider: a missing connection and a missing Airflow
+        # provider are an ``AirflowException`` ("Unknown hook type"), but a ``generic`` connection is an
+        # ``AttributeError``. Introspection is optional, so none of them should lose the diagnosis.
         logger.warning(
             "Could not load a hook for connection %r (%s); schema introspection needs the Airflow provider of your "
             "warehouse, such as apache-airflow-providers-postgres. Skipping schema introspection.",

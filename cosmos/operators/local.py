@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 import jinja2
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowTaskTimeout
 from airflow.models.taskinstance import TaskInstance
 from packaging.version import Version
 
@@ -695,15 +695,20 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             self.handle_exception(result)
         except AirflowSkipException:
             raise
-        except Exception as exc:
+        except (AirflowException, CosmosDbtRunError) as exc:  # the subprocess and the dbt runner invocation modes
             ai_config = self.ai_config
             try:
                 if ai_config and ai_config.diagnose_on_failure and self._is_last_attempt(context):
                     self._append_ai_diagnosis(ai_config, exc, result, tmp_project_dir)
+            except AirflowTaskTimeout:
+                # ``execution_timeout`` is a ``BaseException``. The task failed because of dbt, so callbacks should see
+                # that and not a timeout of the diagnosis.
+                self.log.warning("execution_timeout was reached during the AI diagnosis; raising the dbt error.")
             except Exception:
-                # The diagnosis handles the failures it expects, so this is a bug in Cosmos, a version of the provider
-                # it doesn't support, or an error of the model SDK, such as missing cloud credentials. Log it loudly,
-                # but never let it replace the dbt failure.
+                # Deliberately broad. The diagnosis handles the failures it expects, so this is a bug in Cosmos, a
+                # version of the provider it doesn't support, or an error of the model SDK that has no common base
+                # class, such as the ``DefaultCredentialsError`` of Google or the ``NoCredentialsError`` of boto. Log it
+                # loudly, but never let it replace the dbt failure.
                 self.log.error(
                     "AI diagnosis failed unexpectedly (see the error below: a bug, an unsupported provider version "
                     "or a credentials error of the model SDK); falling back to the standard error message.",
@@ -733,7 +738,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         try:
             # Imported only here: ``cosmos.ai`` needs pydantic, which Airflow 2 and Cosmos themselves don't require.
             from cosmos.ai.context import build_failure_context
-            from cosmos.ai.diagnostics import DiagnosisHandle, diagnose_dbt_failure
+            from cosmos.ai.diagnostics import DiagnosisHandle, diagnose_dbt_failure, redact
         except ImportError:
             self.log.warning(
                 "AI diagnosis requires pydantic and apache-airflow-providers-common-ai>=1.0.0; skipping. "
@@ -747,7 +752,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         diagnosis = diagnose_dbt_failure(
             ai_config=ai_config,
             profile_config=self.profile_config,
-            failure_context=build_failure_context(tmp_project_dir, output, ai_config),
+            failure_context=build_failure_context(
+                tmp_project_dir, output, ai_config, lambda text: redact(text, ai_config)
+            ),
             handle=self._ai_diagnosis_handle,
         )
         if diagnosis and exc.args and isinstance(exc.args[0], str):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -81,7 +81,9 @@ class FailureContext:
         return "\n\n".join(parts)
 
 
-def build_failure_context(project_dir: str | Path, output: str, ai_config: AiConfig) -> FailureContext:
+def build_failure_context(
+    project_dir: str | Path, output: str, ai_config: AiConfig, redact: Callable[[str], str]
+) -> FailureContext:
     """
     Build the context of a failed dbt invocation from the ``target`` folder of ``project_dir``.
 
@@ -89,21 +91,27 @@ def build_failure_context(project_dir: str | Path, output: str, ai_config: AiCon
 
     :param project_dir: dbt project directory where the failed command ran.
     :param output: dbt output or exception message, used when the artifacts do not describe the failure.
+    :param redact: hides the secrets of a text. It runs before a text is cut, because a cut through a secret leaves a
+        fragment that no longer matches it.
     """
     target_dir = Path(project_dir) / "target"
     max_bytes = ai_config.max_artifact_mb << 20
     run_results = _load_json(target_dir / "run_results.json", max_bytes)
     failed = [result for result in (run_results or {}).get("results", []) if result.get("status") in _FAILED_STATUSES]
     if not failed:
-        return FailureContext(output=output[-ai_config.max_output_chars :])
+        return FailureContext(output=redact(output)[-ai_config.max_output_chars :])
 
     manifest = _load_json(target_dir / "manifest.json", max_bytes) or {}
     entries = {**(manifest.get("sources") or {}), **(manifest.get("nodes") or {})}
-    nodes = tuple(_to_failed_node(result, entries, ai_config) for result in failed[: ai_config.max_failed_nodes])
+    nodes = tuple(
+        _to_failed_node(result, entries, ai_config, redact) for result in failed[: ai_config.max_failed_nodes]
+    )
     return FailureContext(failed_nodes=nodes, omitted_nodes=max(len(failed) - ai_config.max_failed_nodes, 0))
 
 
-def _to_failed_node(result: dict[str, Any], entries: dict[str, Any], ai_config: AiConfig) -> FailedNode:
+def _to_failed_node(
+    result: dict[str, Any], entries: dict[str, Any], ai_config: AiConfig, redact: Callable[[str], str]
+) -> FailedNode:
     unique_id = result.get("unique_id", "")
     node = entries.get(unique_id) or {}
     related_ids = (node.get("depends_on") or {}).get("nodes") or []
@@ -112,8 +120,8 @@ def _to_failed_node(result: dict[str, Any], entries: dict[str, Any], ai_config: 
     return FailedNode(
         unique_id=unique_id,
         status=result.get("status", ""),
-        message=_truncate_middle(result.get("message") or "", ai_config.max_message_chars),
-        compiled_code=_truncate_middle(result.get("compiled_code") or "", ai_config.max_sql_chars),
+        message=_truncate_middle(redact(result.get("message") or ""), ai_config.max_message_chars),
+        compiled_code=_truncate_middle(redact(result.get("compiled_code") or ""), ai_config.max_sql_chars),
         relations=tuple(dict.fromkeys(relation for relation in relations if relation)),
     )
 

@@ -14,18 +14,21 @@ Airflow and is configured with ``cosmos.config.AiConfig``. It is off by default.
 Requirements
 ~~~~~~~~~~~~
 
-Install Cosmos with the ``ai`` extra, which installs ``apache-airflow-providers-common-ai>=1.0.0``. The provider needs
-Python 3.11+ and Airflow 2.11+.
+Install Cosmos with the ``ai`` extra, which installs ``apache-airflow-providers-common-ai[sql]>=1.0.0``. The provider
+needs Python 3.11+ and Airflow 2.11+.
 
 .. code-block:: bash
 
     pip install "astronomer-cosmos[ai]"
 
-Also install:
+.. note::
 
-- The SDK of your model vendor, with an extra of the provider: ``[openai]`` (also for Azure), ``[anthropic]``,
-  ``[bedrock]`` or ``[google]`` (also for Vertex). Without it, Cosmos logs a warning and skips the diagnosis.
-- ``apache-airflow-providers-common-ai[sql]``, only to use ``introspect_schema``.
+    The provider needs newer versions than the constraint files of Airflow pin, such as ``pydantic-ai-slim`` and
+    ``apache-airflow-providers-common-compat``. Install it without the constraint file, or with one you updated.
+
+Also install the SDK of your model vendor, with an extra of the provider: ``[openai]`` (also for Azure),
+``[anthropic]``, ``[bedrock]`` or ``[google]`` (also for Vertex). Without it, Cosmos logs a warning and skips the
+diagnosis.
 
 Then create an Airflow connection for your LLM, of type ``pydanticai``, ``pydanticai_azure``, ``pydanticai_bedrock`` or
 ``pydanticai_vertex``.
@@ -72,7 +75,8 @@ When it runs, and what it costs
 - It makes at most ``max_requests`` requests, each with the whole prompt, and is cancelled after ``timeout_seconds``.
 - Many tasks that fail for the same reason mean many calls. To limit the cost, set ``ai_config`` only on the
   ``DbtTaskGroup`` that needs it.
-- It runs inside the task, so its time counts toward the ``execution_timeout`` of the task.
+- It runs inside the task, so its time counts toward the ``execution_timeout`` of the task. If that is reached during
+  the diagnosis, the task still fails with the dbt error.
 - A diagnosis that fails never hides the dbt error: Cosmos logs why and raises the original error.
 - Killing the task cancels the diagnosis.
 
@@ -115,7 +119,8 @@ Protect sensitive data
 ~~~~~~~~~~~~~~~~~~~~~~
 
 Before anything is sent, Cosmos masks every secret that Airflow knows, such as connection passwords, and then applies
-your ``redactor``. This also covers what the schema tools return to the agent, and the diagnosis itself.
+your ``redactor``. This also covers what the schema tools return to the agent, their errors included, and the
+diagnosis itself.
 
 Airflow can't know a secret that only exists as a dbt variable. The error text of dbt and of the database can also
 repeat the values of the rows involved, as in a unique key violation, and names such as hosts and users. Use

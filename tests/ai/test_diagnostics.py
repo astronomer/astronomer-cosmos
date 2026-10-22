@@ -575,6 +575,12 @@ def _tool_result(returned, config, tool_args=None):
     return asyncio.run(toolset.call_tool("get_schema", tool_args or {}, None, None))
 
 
+class FakeModelRetry(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+
 @pytest.fixture
 def fake_wrapper_toolset(monkeypatch):
     @dataclass
@@ -582,6 +588,7 @@ def fake_wrapper_toolset(monkeypatch):
         wrapped: object
 
     monkeypatch.setitem(sys.modules, "pydantic_ai.toolsets", SimpleNamespace(WrapperToolset=FakeWrapperToolset))
+    monkeypatch.setitem(sys.modules, "pydantic_ai.exceptions", SimpleNamespace(ModelRetry=FakeModelRetry))
 
 
 @pytest.mark.parametrize(
@@ -653,21 +660,22 @@ def test_redacting_toolset_returns_nothing_if_the_redactor_fails(fake_provider, 
         _tool_result("anything", config)
 
 
-def test_build_toolsets_skips_introspection_if_the_toolset_cannot_be_set_up(monkeypatch, caplog):
-    class BrokenSQLToolset:
-        def __init__(self, db_conn_id, allowed_tables):
-            raise ValueError("allowed_tables must name at least one table")
+def test_redacting_toolset_redacts_the_error_of_a_tool(fake_provider, fake_wrapper_toolset):
+    """The provider turns the error of a tool, such as a database error, into a retry that the model reads."""
 
-    monkeypatch.setitem(
-        sys.modules, "airflow.providers.common.ai.toolsets.sql", SimpleNamespace(SQLToolset=BrokenSQLToolset)
+    class FailingTools:
+        async def call_tool(self, name, tool_args, ctx, tool):
+            raise FakeModelRetry("The get_schema tool failed: host db.corp-internal-42.example.com, SECRET-VALUE")
+
+    config = AiConfig(
+        llm_conn_id="c", diagnose_on_failure=True, redactor=lambda text: text.replace("corp-internal-42", "<host>")
     )
-    _sql_connection(monkeypatch)
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+    toolset = diagnostics._redacting(FailingTools(), config, ["raw.orders"])
 
-    with caplog.at_level(logging.WARNING):
-        assert diagnostics._build_toolsets(config, _profile_config(), FAILURE_CONTEXT) == []
+    with pytest.raises(FakeModelRetry) as exc_info:
+        asyncio.run(toolset.call_tool("get_schema", {}, None, None))
 
-    assert "Could not set up schema introspection" in caplog.text
+    assert exc_info.value.message == "The get_schema tool failed: host db.<host>.example.com, ***"
 
 
 def test_build_toolsets_skips_introspection_for_connections_that_are_not_sql(
@@ -852,6 +860,40 @@ def test_real_agent_never_sees_an_unredacted_tool_result(monkeypatch):
     agent.run_sync("prompt")
 
     assert seen == ['{"columns": [{"name": "***"}]}']
+
+
+@requires_provider
+def test_real_agent_never_sees_an_unredacted_tool_error():
+    from pydantic_ai.exceptions import ModelRetry
+    from pydantic_ai.toolsets import FunctionToolset
+
+    config = AiConfig(
+        llm_conn_id="c", diagnose_on_failure=True, redactor=lambda text: text.replace("corp-internal-42", "<host>")
+    )
+    tools = FunctionToolset()
+
+    @tools.tool_plain
+    def get_schema(table_name: str) -> str:
+        raise ModelRetry("could not connect to host db.corp-internal-42.example.com user=svc_etl")
+
+    seen = []
+
+    def handler(messages, info):
+        retries = [p for m in messages for p in m.parts if p.part_kind == "retry-prompt"]
+        if not retries:
+            return ModelResponse(parts=[ToolCallPart("get_schema", {"table_name": "raw.orders"})])
+        seen.extend(str(p.content) for p in retries)
+        return _answer(info)
+
+    agent = Agent(
+        FunctionModel(handler),
+        output_type=DbtFailureDiagnosis,
+        toolsets=[diagnostics._redacting(tools, config, ["raw.orders"])],
+    )
+    agent.run_sync("prompt")
+
+    assert len(seen) == 1
+    assert "db.<host>.example.com user=svc_etl" in seen[0] and "corp-internal-42" not in seen[0]
 
 
 @requires_provider

@@ -9,13 +9,13 @@ import tempfile
 import threading
 import zlib
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock, call, mock_open, patch
+from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 from urllib.parse import urlparse
 
 import pytest
 from airflow import DAG
 from airflow import __version__ as airflow_version
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException, AirflowSkipException, AirflowTaskTimeout
 
 try:  # For Airflow 3
     from airflow.providers.standard.hooks.subprocess import SubprocessResult
@@ -3280,10 +3280,23 @@ def test_ai_diagnosis_is_given_the_artifacts_of_the_project_and_the_output(mock_
             _failed_subprocess_result(["line 1", "line 2"]), "/tmp/project", FINAL_ATTEMPT_CONTEXT
         )
 
-    mock_build_context.assert_called_once_with("/tmp/project", "line 1\nline 2", AI_CONFIG)
+    mock_build_context.assert_called_once_with("/tmp/project", "line 1\nline 2", AI_CONFIG, ANY)
     kwargs = mock_diagnose.call_args.kwargs
     assert kwargs["ai_config"] is AI_CONFIG
     assert kwargs["failure_context"] is mock_build_context.return_value
+
+
+@patch("cosmos.ai.context.build_failure_context")
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=None)
+def test_ai_diagnosis_redacts_the_texts_of_the_failure_with_the_redactor_of_the_user(mock_diagnose, mock_build_context):
+    config = AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True, redactor=lambda t: t.replace("pw", "***"))
+    operator = _ai_operator(config)
+
+    with pytest.raises(AirflowException):
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    redact = mock_build_context.call_args.args[3]
+    assert redact("password=pw") == "password=***"
 
 
 @patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=None)
@@ -3404,6 +3417,21 @@ def test_a_crash_deciding_whether_to_diagnose_never_hides_the_dbt_failure(caplog
 
     assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
     assert "failed unexpectedly" in caplog.text
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", side_effect=AirflowTaskTimeout("Timeout, PID: 1"))
+def test_execution_timeout_during_the_ai_diagnosis_still_raises_the_dbt_failure(mock_diagnose, caplog):
+    """``AirflowTaskTimeout`` is a ``BaseException``: callbacks would otherwise see it and not the dbt failure."""
+    operator = _ai_operator()
+
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(AirflowException) as exc_info:
+            operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert not isinstance(exc_info.value, AirflowTaskTimeout)
+    assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
+    assert "execution_timeout was reached during the AI diagnosis" in caplog.text
+    assert operator._ai_diagnosis_handle is None
 
 
 @patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)

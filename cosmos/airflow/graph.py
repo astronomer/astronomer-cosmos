@@ -1381,27 +1381,48 @@ def _task_or_group_id(task_or_group: TaskGroup | BaseOperator) -> str:
     return str(task_or_group.group_id) if isinstance(task_or_group, TaskGroup) else task_or_group.task_id
 
 
-def _reachable(graph: dict[str, set[str]], start: str) -> set[str]:
-    seen: set[str] = set()
-    pending = [start]
-    while pending:
-        for successor in graph.get(pending.pop(), ()):
-            if successor not in seen:
-                seen.add(successor)
-                pending.append(successor)
-    return seen
+def _depth_first_finish_order(graph: dict[str, set[str]]) -> list[str]:
+    finished: list[str] = []
+    visited: set[str] = set()
+    for start in sorted(graph):
+        if start in visited:
+            continue
+        visited.add(start)
+        work = [(start, iter(sorted(graph[start])))]
+        while work:
+            vertex, successors = work[-1]
+            successor = next((unit for unit in successors if unit not in visited), None)
+            if successor is None:
+                work.pop()
+                finished.append(vertex)
+                continue
+            visited.add(successor)
+            work.append((successor, iter(sorted(graph.get(successor, ())))))
+    return finished
 
 
 def _cyclic_unit_sets(graph: dict[str, set[str]]) -> list[set[str]]:
-    reachable = {unit: _reachable(graph, unit) for unit in graph}
-    cycles: list[set[str]] = []
+    """Return the strongly connected components with more than one unit (Kosaraju, linear in the graph size)."""
+    reversed_graph: dict[str, set[str]] = defaultdict(set)
+    for unit, successors in graph.items():
+        for successor in successors:
+            reversed_graph[successor].add(unit)
     assigned: set[str] = set()
-    for unit in sorted(graph):
-        if unit in assigned or unit not in reachable[unit]:
+    cycles: list[set[str]] = []
+    for start in reversed(_depth_first_finish_order(graph)):
+        if start in assigned:
             continue
-        members = {other for other in reachable[unit] if unit in reachable[other]}
-        assigned |= members
-        cycles.append(members)
+        component = {start}
+        pending = [start]
+        assigned.add(start)
+        while pending:
+            for predecessor in reversed_graph.get(pending.pop(), ()):
+                if predecessor not in assigned:
+                    assigned.add(predecessor)
+                    component.add(predecessor)
+                    pending.append(predecessor)
+        if len(component) > 1:
+            cycles.append(component)
     return cycles
 
 
@@ -1429,8 +1450,6 @@ def warn_about_folder_task_group_cycles(
             depth = 0
             while depth < min(len(parent_path), len(child_path)) and parent_path[depth] == child_path[depth]:
                 depth += 1
-            if depth == len(parent_path) and depth == len(child_path):
-                continue
             scope = parent_path[depth - 1] if depth else None
             parent_unit = (
                 parent_path[depth] if depth < len(parent_path) else _task_or_group_id(tasks_map[parent_node_id])
@@ -1452,7 +1471,7 @@ def warn_about_folder_task_group_cycles(
                 "The folder TaskGroups %s depend on each other in a cycle through these dbt dependencies: %s. "
                 "The dbt graph is acyclic, but Airflow 3.3.1 and later order TaskGroups as units: the Grid and "
                 "Graph views fail on Airflow 3.3.x, Airflow 3.4 warns, and Airflow 3.5 is expected to reject the "
-                "DAG. Move these models so the folders depend on each other in one direction only, or disable "
+                "DAG. Move these models so the folder task groups no longer depend on each other in a cycle, or disable "
                 "RenderConfig.group_nodes_by_folder. See https://github.com/astronomer/astronomer-cosmos/issues/3082.",
                 ", ".join(unit_names),
                 "; ".join(edges),

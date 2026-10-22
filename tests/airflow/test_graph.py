@@ -3386,3 +3386,39 @@ def test_build_airflow_graph_does_not_warn_when_folder_task_groups_are_acyclic(h
         _build_cross_folder_dag(nodes)
 
     assert not [record for record in caplog.records if "depend on each other in a cycle" in record.getMessage()]
+
+
+def test_build_airflow_graph_warns_when_a_folder_cycle_passes_through_ancestor_folder_tasks(
+    hierarchical_naming_disabled, caplog
+):
+    model_a = _cross_folder_model("a", "g", [])
+    model_x = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.x",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[model_a.unique_id],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/x.sql"),
+        tags=[],
+        config={"materialized": "view"},
+    )
+    model_y = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.y",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[model_x.unique_id],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/y.sql"),
+        tags=[],
+        config={"materialized": "view"},
+    )
+    model_b = _cross_folder_model("b", "g", [model_y.unique_id])
+    nodes = {node.unique_id: node for node in (model_a, model_x, model_y, model_b)}
+
+    with caplog.at_level(logging.WARNING, logger="cosmos.airflow.graph"):
+        _build_cross_folder_dag(nodes)
+
+    warnings = [
+        record.getMessage() for record in caplog.records if "depend on each other in a cycle" in record.getMessage()
+    ]
+    assert len(warnings) == 1
+    assert "models.g, models.x_run, models.y_run" in warnings[0]
+    assert f"{model_x.unique_id} -> {model_y.unique_id}" in warnings[0]

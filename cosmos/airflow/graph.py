@@ -1460,13 +1460,16 @@ def warn_about_folder_task_group_cycles(
             model_edges[scope].append((parent_unit, child_unit, parent_node_id, node_id))
 
     for scope, graph in graphs.items():
-        for members in _cyclic_unit_sets(graph):
+        cycles = _cyclic_unit_sets(graph)
+        cycle_of_unit = {unit: index for index, members in enumerate(cycles) for unit in members}
+        edges_by_cycle: dict[int, list[str]] = defaultdict(list)
+        for parent_unit, child_unit, parent_node_id, node_id in model_edges[scope]:
+            cycle_index = cycle_of_unit.get(parent_unit)
+            if cycle_index is not None and cycle_of_unit.get(child_unit) == cycle_index:
+                edges_by_cycle[cycle_index].append(f"{parent_node_id} -> {node_id}")
+        for cycle_index, members in enumerate(cycles):
             unit_names = sorted(members)
-            edges = sorted(
-                f"{parent_node_id} -> {node_id}"
-                for parent_unit, child_unit, parent_node_id, node_id in model_edges[scope]
-                if parent_unit in members and child_unit in members
-            )
+            edges = sorted(edges_by_cycle[cycle_index])
             logger.warning(
                 "The folder TaskGroups %s depend on each other in a cycle through these dbt dependencies: %s. "
                 "The dbt graph is acyclic, but Airflow 3.3.1 and later order TaskGroups as units: the Grid and "

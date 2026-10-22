@@ -134,7 +134,8 @@ def _persist_backup_row(ti: Any, key: str, value: Any) -> None:
     through ``[workers] state_store_backend``, and splitting it here would need matching reassembly on restore.
 
     A row whose last write failed is written again before the rollover, since a retry reads the rows in order and
-    stops at the first missing one.
+    stops at the first missing one. If that write fails too, the new entry joins the pending row, so nothing is
+    lost while the store is unavailable.
     """
     task_state_store = getattr(ti, TASK_STATE_STORE_TI_ATTRIBUTE)
     open_row: dict[str, Any] = ti._cosmos_xcom_backup_open_row
@@ -142,7 +143,11 @@ def _persist_backup_row(ti: Any, key: str, value: Any) -> None:
     encoded = _encode_backup({**open_row, key: value})
     if open_row and len(encoded) >= MAX_BACKUP_ROW_BYTES:
         if not ti._cosmos_xcom_backup_open_row_persisted:
-            task_state_store.set(_task_state_store_row_key(row_index), _encode_backup(open_row))
+            try:
+                task_state_store.set(_task_state_store_row_key(row_index), _encode_backup(open_row))
+            except Exception:
+                open_row[key] = value
+                raise
         row_index += 1
         ti._cosmos_xcom_backup_rows_written = row_index
         open_row = ti._cosmos_xcom_backup_open_row = {}
@@ -174,12 +179,13 @@ def _read_task_state_store_rows(task_state_store: Any) -> tuple[dict[str, Any], 
 
 
 def _delete_task_state_store_rows(task_state_store: Any, row_count: int) -> None:
-    """Delete the backup rows, best effort and from the last row down.
+    """Delete the backup rows, best effort and from the first row up.
 
-    A failure leaves rows 0..n in place, which a later retry can still read in full; the rest expires through the
-    task store retention. Raising here would fail a producer that has already succeeded or restored its backup.
+    A restore reads from row 0, so a failure leaves no readable backup rather than a prefix that may hold a stale
+    value; the remaining rows expire through the task store retention. Raising here would fail a producer that has
+    already succeeded or restored its backup.
     """
-    for row_index in reversed(range(row_count)):
+    for row_index in range(row_count):
         try:
             task_state_store.delete(_task_state_store_row_key(row_index))
         except Exception as error:  # noqa: BLE001

@@ -68,7 +68,7 @@ from cosmos.dbt.project import (
     has_non_empty_dependencies_file,
     remove_dags_folder_from_pythonpath,
 )
-from cosmos.dbt.selector import YamlSelectors, apply_exclude_filter, select_nodes
+from cosmos.dbt.selector import YamlSelectors, get_nodes_from_subset, select_node_ids, select_nodes
 from cosmos.fs import _calculate_file_checksum
 from cosmos.log import get_logger
 
@@ -1398,10 +1398,14 @@ class DbtGraph:
         else:
             select, exclude = self.render_config.select, self.render_config.exclude
         self.nodes = nodes
-        self.filtered_nodes = select_nodes(project_dir=project_dir, nodes=nodes, select=select, exclude=exclude)
-        # select_nodes already drops the excluded nodes it reached. Tests that select never reached (for example with
-        # ``select path:models``) would be added back by update_node_dependency, so record them from the full graph.
-        self.excluded_node_ids = apply_exclude_filter(nodes, project_dir, exclude) if exclude else set()
+        if not select and not exclude:
+            self.filtered_nodes = nodes
+            self.excluded_node_ids = set()
+            return
+        selected_ids, self.excluded_node_ids = select_node_ids(project_dir, nodes, select or [], exclude or [])
+        # update_node_dependency adds a test back next to every rendered parent, so it also needs the excluded tests
+        # that select never reached (for example with ``select path:models``).
+        self.filtered_nodes = get_nodes_from_subset(nodes, selected_ids - self.excluded_node_ids)
 
     def _load_manifest_from_file(self, manifest_path: Path | ObjectStoragePath) -> dict[str, Any]:
         """

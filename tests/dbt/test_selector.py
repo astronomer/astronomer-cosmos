@@ -2654,3 +2654,35 @@ def test_tag_selector_matches_a_test_through_any_of_its_parents(depends_on):
 
     selected = select_nodes(project_dir=base, nodes=nodes, select=["tag:x"])
     assert sorted(selected) == ["model.p.tagged", "test.p.shared_test"]
+
+
+@pytest.mark.parametrize("depends_on", [["model.p.tagged", "model.p.plain"], ["model.p.plain", "model.p.tagged"]])
+@pytest.mark.parametrize("exclude", [["+tag:x"], ["tag:x"], ["tagged"]])
+def test_exclude_drops_the_tests_of_an_excluded_parent_but_keeps_its_other_parents(exclude, depends_on):
+    """Only nodes carrying a tag are graph roots, and a test goes with any excluded parent, as in dbt."""
+    base = Path("/tmp/proj")
+
+    def node(name, resource_type, node_depends_on, tags):
+        return DbtNode(
+            unique_id=f"{resource_type.value}.p.{name}",
+            resource_type=resource_type,
+            depends_on=node_depends_on,
+            path_base=base,
+            original_file_path=Path(f"models/{name}.sql"),
+            tags=tags,
+            config={},
+        )
+
+    nodes = {
+        n.unique_id: n
+        for n in (
+            node("tagged", DbtResourceType.MODEL, [], ["x"]),
+            node("plain", DbtResourceType.MODEL, [], []),
+            node("shared_test", DbtResourceType.TEST, depends_on, []),
+        )
+    }
+
+    selected = select_nodes(project_dir=base, nodes=nodes, exclude=exclude)
+
+    assert sorted(selected) == ["model.p.plain"]
+    assert nodes["test.p.shared_test"].tags == []

@@ -45,9 +45,11 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 .. note::
 
     Test nodes match a tag selector by their own tags or by the tags of any of their parents, so ``tag:my_tag``
-    also selects or excludes the tests of a tagged model, as dbt's default indirect selection does. dbt only
-    looks at the test's own tags for an intersection, so ``tag:a,tag:b`` can match a test in Cosmos that dbt
-    would not. A test selected without its model is not rendered.
+    also selects the tests of a tagged model. Graph operators such as ``+tag:my_tag`` start only from the nodes
+    that carry the tag themselves. An ``exclude`` also removes every test that depends on an excluded node, as
+    dbt's default indirect selection does. dbt only looks at the test's own tags for an intersection, so
+    ``tag:a,tag:b`` can match a test in Cosmos that dbt would not. A test selected without its model is not
+    rendered.
 
 .. note::
 

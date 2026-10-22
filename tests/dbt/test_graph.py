@@ -352,8 +352,10 @@ def test_load_via_manifest_with_exclude(project_name, manifest_filepath, model_f
     dbt_graph.load_from_dbt_manifest()
 
     assert len(dbt_graph.nodes) == 28
-    assert len(dbt_graph.filtered_nodes) == 26
+    assert len(dbt_graph.filtered_nodes) == 14
     assert "model.jaffle_shop.orders" not in dbt_graph.filtered_nodes
+    excluded_models = {"model.jaffle_shop.orders", "model.jaffle_shop.customers"}
+    assert not [node for node in dbt_graph.filtered_nodes.values() if excluded_models & set(node.depends_on)]
 
     sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
     assert sample_node.name == "customers"
@@ -2004,6 +2006,7 @@ def test_apply_manifest_node_selection_exclude_does_not_widen_select():
 
     assert set(dbt_graph.filtered_nodes) == {"model.p.a"}
     assert dbt_graph.excluded_node_ids == set()
+    assert nodes["test.p.t"].tags == []
 
 
 def test_tests_per_model_populated():
@@ -2116,7 +2119,10 @@ def test_tag_selected_node_test_exist():
     assert len(dbt_graph.filtered_nodes) > 0
 
     for _, node in dbt_graph.filtered_nodes.items():
-        assert node.tags == ["test_tag"]
+        if node.resource_type == DbtResourceType.TEST:
+            assert any("test_tag" in dbt_graph.nodes[parent_id].tags for parent_id in node.depends_on)
+        else:
+            assert node.tags == ["test_tag"]
         if node.resource_type == DbtResourceType.MODEL:
             assert node.has_test is True
             assert node.has_non_detached_test is True

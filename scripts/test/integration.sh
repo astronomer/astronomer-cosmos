@@ -34,6 +34,7 @@ pytest -vv \
     --ignore=tests/operators/test_watcher_kubernetes_integration.py \
     --ignore=dev/dags/cross_project_dbt_ls_dag.py \
     --ignore=tests/test_telemetry.py \
-    -k 'not (simple_dag_async or example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes or jaffle_shop_watcher_kubernetes)' \
+    --ignore=tests/test_warehouse_metric_and_semantic_views.py \
+    -k 'not (simple_dag_async or example_cosmos_python_models or example_virtualenv or jaffle_shop_kubernetes or jaffle_shop_watcher_kubernetes or databricks_metric_view or snowflake_semantic_view)' \
     $SPLIT_ARGS \
     "$@"

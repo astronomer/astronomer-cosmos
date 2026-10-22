@@ -209,9 +209,6 @@ All of the DbtDocsOperator accept the ``--static`` flag. To learn more about the
 The static flag is used to generate a single doc file that can be hosted directly from cloud storage.
 By having a single documentation file, you can make use of Access control can be configured through Identity-Aware Proxy (IAP), and making it easy to host.
 
-.. note::
-    The static flag is only available from dbt-core >=1.7
-
 The following code snippet shows how to provide this flag with the default jaffle_shop project:
 
 

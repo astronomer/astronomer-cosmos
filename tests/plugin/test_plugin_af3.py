@@ -35,6 +35,13 @@ def _isolate_env():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _bypass_dbt_docs_auth():
+    # Authentication is covered by test_plugin_af3_auth.py; these tests exercise the routes themselves.
+    with patch("cosmos.plugin.airflow3_auth.dbt_docs_auth_dependencies", return_value=[]):
+        yield
+
+
 def _reload_af3_module(api_base: str | None = None):
     # Reload module to recompute API_BASE_PATH under patched env
     with patch.dict(os.environ, {"AIRFLOW__API__BASE_URL": api_base or ""}, clear=False):
@@ -181,6 +188,23 @@ def test_external_view_href_no_base_path():
 
 
 @skip_pre_airflow_31
+def test_external_views_not_duplicated_across_instances():
+    # Airflow 3's core and SDK plugin managers each instantiate the plugin
+    _reload_af3_module(api_base="")
+
+    from cosmos.plugin.airflow3 import CosmosAF3Plugin
+
+    with patch(
+        "cosmos.plugin.airflow3._load_projects_from_conf",
+        return_value={"core": {"dir": "/x", "index": "index.html"}},
+    ):
+        CosmosAF3Plugin()
+        plugin = CosmosAF3Plugin()
+    assert len(plugin.external_views) == 1
+    assert CosmosAF3Plugin.external_views == []
+
+
+@skip_pre_airflow_31
 def test_not_configured_routes():
     af3, app = _app_with_projects({"core": {}})
     client = TestClient(app)
@@ -268,17 +292,19 @@ def test_version_gate_raises_on_pre_31():
         af3.create_cosmos_fastapi_app()
 
 
-def test_plugin_init_raises_on_pre_31():
+def test_plugin_init_warns_and_skips_views_on_pre_31(caplog):
     af3 = _reload_af3_with_version("3.0.9")
-    with patch("cosmos.plugin.airflow3._load_projects_from_conf", return_value={}):
-        with pytest.raises(RuntimeError):
-            af3.CosmosAF3Plugin()
+    with patch("cosmos.plugin.airflow3._load_projects_from_conf", return_value={"proj": {}}):
+        plugin = af3.CosmosAF3Plugin()
+    assert plugin.fastapi_apps == []
+    assert "require Airflow >= 3.1" in caplog.text
 
 
 @pytest.mark.parametrize(
     "af_ver, should_use_ctx",
     [
         ("3.1.0", True),
+        ("3.1.0+astro.2", True),
         ("3.1.1", False),
         ("3.1.2", False),
         ("3.2.0", False),

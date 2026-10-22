@@ -45,7 +45,7 @@ Prerequisites
 +++++++++++++
 
 - `Astro CLI <https://www.astronomer.io/docs/astro/cli/install-cli>`_
-- Airflow>=2.9
+- Airflow>=3.0 (from Cosmos 1.16.0, ``AIRFLOW_ASYNC`` is no longer supported on Airflow 2.x, so stay on Cosmos 1.15.x or older if you cannot upgrade)
 
 1. Create Astro-CLI project
 +++++++++++++++++++++++++++

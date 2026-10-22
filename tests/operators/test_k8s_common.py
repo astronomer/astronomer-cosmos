@@ -202,6 +202,22 @@ def test_on_pod_completion_test_operator_with_warnings():
     callback.assert_called_once()
 
 
+def test_on_pod_completion_falls_back_to_provider_context():
+    """After a deferral, the resumed operator never ran ``execute``: the handler uses the context from the provider."""
+    callback = MagicMock()
+    task = MagicMock(spec=DbtTestKubernetesOperator)
+    task.pod_manager.read_pod_logs.return_value = [
+        b"10:29:03  Done. PASS=2 WARN=1 ERROR=0 SKIP=0 TOTAL=3",
+    ]
+    context = {"task_instance": MagicMock(task=task)}
+    handler = _make_handler(on_warning_callback=callback, context=None)
+
+    with patch("cosmos.operators._k8s_common.extract_log_issues", return_value=(["test1"], ["warn"])):
+        handler.on_pod_completion(pod=MagicMock(), context=context, operator=task)
+
+    callback.assert_called_once_with(context)
+
+
 def test_on_pod_completion_source_operator_with_freshness_warnings():
     callback = MagicMock()
     task = MagicMock(spec=DbtSourceKubernetesOperator)
@@ -361,6 +377,26 @@ def test_progress_callback_delegates_with_correct_args():
     assert call_kwargs["tests_per_model"] is tests_per_model
     assert call_kwargs["test_results_per_model"] is test_results
     assert call_kwargs["upstream_failure_skipped_ids"] is None
+
+
+def test_progress_callback_marks_upstream_failure_skip_in_status_xcom():
+    """#3023: a pod's info-level dbt log has no ``NodeFinished``, so ``SkippingDetails`` alone marks the status XCom."""
+    ti = MagicMock(spec=["xcom_push"])
+
+    WatcherK8sCallback.progress_callback(
+        line=_make_dbt_log_line("model.pkg.downstream", "skipped", "SkippingDetails"),
+        **_CALLBACK_KWARGS,
+        context_holder={CONTEXT_KEY: {"ti": ti}},
+        tests_per_model={},
+        test_results_per_model={},
+        upstream_failure_skipped_ids=set(),
+    )
+
+    # The only XCom written for the node is its status.
+    ti.xcom_push.assert_called_once_with(
+        key="model__pkg__downstream_status",
+        value={"status": "failed", "outlet_uris": [], "upstream_failure_skip": True},
+    )
 
 
 def test_callback_opts_in_to_cosmos_callback_kwargs():

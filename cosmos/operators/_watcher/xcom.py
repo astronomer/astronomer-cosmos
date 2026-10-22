@@ -93,7 +93,7 @@ def _init_xcom_backup(context: Any, *, persist: bool = True) -> None:
     ti = context["ti"]
     ti._cosmos_xcom_backup_buffer = {}
     # Writes to the task store from the retry callback are rejected, so it only serves the per-push backup.
-    task_state_store = context.get(TASK_STATE_STORE_CONTEXT_KEY) if persist else None
+    task_state_store = None  # bench: Cosmos 1.15 behaviour, the per-push backup goes to an Airflow Variable
     setattr(ti, TASK_STATE_STORE_TI_ATTRIBUTE, task_state_store)
     ti._cosmos_xcom_backup_open_row = {}
     ti._cosmos_xcom_backup_rows_written = 0

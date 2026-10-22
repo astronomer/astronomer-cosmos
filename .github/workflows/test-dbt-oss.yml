@@ -1,6 +1,6 @@
 name: test-dbt-oss
 
-# Integration tests for dbt-oss. dbt-oss treats the Postgres adapter that the tests in test.yml use as experimental, so
+# Integration tests for dbt-oss. dbt-oss does not support the Postgres adapter that the tests in test.yml use, so
 # this workflow runs the same integration tests (the ones marked ``integration``) against BigQuery instead. It loads the
 # tests/dbt_oss_plugin.py pytest plugin, which replaces the Postgres profile mapping used by the tests and the example
 # DAGs with a BigQuery one and skips the tests that need Postgres itself. tests/dbt_oss_enabled.py lists what runs here
@@ -143,9 +143,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-          # Safe under pull_request_target: fork PRs need approval in the Authorize job's `external` environment.
-          # Same-repo PRs and pushes use `internal`, which has no reviewers, so write access is the gate (same as
-          # test.yml).
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
           allow-unsafe-pr-checkout: true
 
       - name: Set up Python ${{ matrix.python-version }}

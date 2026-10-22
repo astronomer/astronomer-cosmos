@@ -565,6 +565,71 @@ class TestXcomBackupWithTaskStateStore:
         assert task_state_store.values == {}
         mock_delete_variable.assert_not_called()
 
+    def test_row_rolls_over_before_the_write_that_would_exceed_the_bound(self):
+        task_state_store = _FakeTaskStateStore()
+        ti = _MockTI()
+        _init_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
+        with patch("cosmos.operators._watcher.xcom.MAX_BACKUP_ROW_BYTES", 300):
+            safe_xcom_push(ti, "model__a_compiled_sql", os.urandom(60).hex())
+            safe_xcom_push(ti, "model__b_compiled_sql", os.urandom(90).hex())
+
+        assert sorted(task_state_store.values) == ["cosmos_xcom_backup_0", "cosmos_xcom_backup_1"]
+        for row_index, expected_keys in enumerate((["model__a_compiled_sql"], ["model__b_compiled_sql"])):
+            stored = task_state_store.values[f"cosmos_xcom_backup_{row_index}"]
+            assert len(stored) < 300
+            assert (
+                list(json.loads(zlib.decompress(base64.b64decode(stored.encode("utf-8"))).decode("utf-8")))
+                == expected_keys
+            )
+
+    def test_oversized_entry_gets_a_row_of_its_own(self, caplog: pytest.LogCaptureFixture):
+        task_state_store = _FakeTaskStateStore()
+        ti = _MockTI()
+        _init_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
+        with patch("cosmos.operators._watcher.xcom.MAX_BACKUP_ROW_BYTES", 300), caplog.at_level(logging.WARNING):
+            safe_xcom_push(ti, "model__a_status", "success")
+            safe_xcom_push(ti, "model__big_compiled_sql", os.urandom(400).hex())
+            safe_xcom_push(ti, "model__b_status", "success")
+
+        rows = [
+            list(
+                json.loads(
+                    zlib.decompress(
+                        base64.b64decode(task_state_store.values[f"cosmos_xcom_backup_{index}"].encode("utf-8"))
+                    ).decode("utf-8")
+                )
+            )
+            for index in range(3)
+        ]
+        assert rows == [["model__a_status"], ["model__big_compiled_sql"], ["model__b_status"]]
+        assert "model__big_compiled_sql" in caplog.text and "stored unsplit" in caplog.text
+
+    def test_delete_is_best_effort_and_keeps_a_readable_prefix(self, caplog: pytest.LogCaptureFixture):
+        task_state_store = _FakeTaskStateStore()
+        for row_index in range(3):
+            task_state_store.values[f"cosmos_xcom_backup_{row_index}"] = base64.b64encode(
+                zlib.compress(json.dumps({f"key{row_index}": row_index}).encode("utf-8"))
+            ).decode("utf-8")
+        deletes: list[str] = []
+
+        def failing_delete(key):
+            deletes.append(key)
+            if len(deletes) == 2:
+                raise RuntimeError("store unavailable")
+            task_state_store.values.pop(key, None)
+
+        task_state_store.delete = failing_delete
+        ti = _MockTI()
+
+        with caplog.at_level(logging.WARNING):
+            result = _restore_xcom_from_variable({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
+
+        assert result is True
+        assert ti.store == {"key0": 0, "key1": 1, "key2": 2}
+        assert deletes == ["cosmos_xcom_backup_2", "cosmos_xcom_backup_1"]
+        assert sorted(task_state_store.values) == ["cosmos_xcom_backup_0", "cosmos_xcom_backup_1"]
+        assert "Could not delete XCom backup row 1" in caplog.text
+
     def test_rows_close_at_the_size_limit_and_keep_every_entry(self):
         task_state_store = _FakeTaskStateStore()
         ti = _MockTI()

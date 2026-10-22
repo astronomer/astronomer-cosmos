@@ -126,12 +126,29 @@ def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
 
 
 def _persist_backup_row(ti: Any, key: str, value: Any) -> None:
-    """Add one pushed entry to the open task store row, starting a new row once it reaches MAX_BACKUP_ROW_BYTES."""
+    """Add one pushed entry to the open task store row.
+
+    The row rolls over before a write that would take it past MAX_BACKUP_ROW_BYTES, so a row only exceeds the bound
+    when a single entry does. Such an entry gets a row of its own and is written as it is: Airflow can offload it
+    through ``[workers] state_store_backend``, and splitting it here would need matching reassembly on restore.
+    """
     task_state_store = getattr(ti, TASK_STATE_STORE_TI_ATTRIBUTE)
     open_row: dict[str, Any] = ti._cosmos_xcom_backup_open_row
-    open_row[key] = value
-    encoded = _encode_backup(open_row)
     row_index = ti._cosmos_xcom_backup_rows_written
+    encoded = _encode_backup({**open_row, key: value})
+    if open_row and len(encoded) >= MAX_BACKUP_ROW_BYTES:
+        row_index += 1
+        ti._cosmos_xcom_backup_rows_written = row_index
+        open_row = ti._cosmos_xcom_backup_open_row = {}
+        encoded = _encode_backup({key: value})
+    open_row[key] = value
+    if len(encoded) >= MAX_BACKUP_ROW_BYTES:
+        logger.warning(
+            "XCom backup entry '%s' is %d bytes on its own, above the %d byte row bound; it is stored unsplit.",
+            key,
+            len(encoded),
+            MAX_BACKUP_ROW_BYTES,
+        )
     task_state_store.set(_task_state_store_row_key(row_index), encoded)
     if len(encoded) >= MAX_BACKUP_ROW_BYTES:
         ti._cosmos_xcom_backup_rows_written = row_index + 1
@@ -149,8 +166,17 @@ def _read_task_state_store_rows(task_state_store: Any) -> tuple[dict[str, Any], 
 
 
 def _delete_task_state_store_rows(task_state_store: Any, row_count: int) -> None:
-    for row_index in range(row_count):
-        task_state_store.delete(_task_state_store_row_key(row_index))
+    """Delete the backup rows, best effort and from the last row down.
+
+    A failure leaves rows 0..n in place, which a later retry can still read in full; the rest expires through the
+    task store retention. Raising here would fail a producer that has already succeeded or restored its backup.
+    """
+    for row_index in reversed(range(row_count)):
+        try:
+            task_state_store.delete(_task_state_store_row_key(row_index))
+        except Exception as error:  # noqa: BLE001
+            logger.warning("Could not delete XCom backup row %d from the task store: %s", row_index, error)
+            return
 
 
 def _backup_xcom_to_variable(context: Any) -> None:

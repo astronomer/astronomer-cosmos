@@ -315,10 +315,13 @@ instead of a Variable (`#2771 <https://github.com/astronomer/astronomer-cosmos/i
   metadata database; the numbers are in `#3076 <https://github.com/astronomer/astronomer-cosmos/pull/3076>`_).
   Without an external backend both cost about the same.
 - The backup is split across task store keys (``cosmos_xcom_backup_0``, ``_1``, ...): each push rewrites only
-  the open key, and the key rolls over once its encoded size reaches 8 KB, so the per-push payload does not grow
-  with the project, unlike the single Variable. A single entry is never split, so one compiled SQL entry larger
-  than ``[state_store] max_value_storage_bytes`` (65535 bytes by default) still makes Airflow log its size
-  warning for that key.
+  the open key, and a key rolls over before a push that would take it past 8 KB, so the per-push payload does
+  not grow with the project, unlike the single Variable. A single entry is never split: one larger than 8 KB
+  gets a key of its own and Cosmos logs a warning naming it, and one larger than
+  ``[state_store] max_value_storage_bytes`` (65535 bytes by default) also makes Airflow log its size warning.
+  Configure ``[workers] state_store_backend`` to offload such values. Deleting the keys after a restore or a
+  successful run is best effort: a failure leaves the first keys in place for a later retry, and retention
+  removes them.
 - Writes to the task store from the retry callback are rejected, so the task store only serves the per-node
   backup. With ``enable_watcher_reliable_retry = False`` the producer behaves as described above: no per-node
   writes, one Variable flush from the retry callback, and the task store is not used.

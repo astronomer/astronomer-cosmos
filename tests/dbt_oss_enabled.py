@@ -47,7 +47,7 @@ _NO_BQ_ADAPTER_MODULE = "needs dbt-bigquery's dbt.adapters.bigquery, which canno
 _NO_CALLBACKS = "dbt-oss dbtRunner does not support callbacks, and dbt does not plan to (https://github.com/dbt-labs/dbt/issues/13102)"
 _NO_DATASETS = (
     "dbt-oss writes no datasets: its run_results.json has no args.profiles_dir, so the OpenLineage artifact parser raises "
-    "KeyError (logged at debug level) and the inlets and outlets stay empty"
+    "KeyError (logged at debug level) and the inlets and outlets stay empty (reproduced locally with dbt-oss 2.0.8)"
 )
 _NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"

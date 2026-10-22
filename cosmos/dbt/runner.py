@@ -27,7 +27,7 @@ else:  # pragma: no cover
 logger = get_logger(__name__)
 
 # dbt events carrying the macro error text of a failed ``run-operation``.
-MACRO_ERROR_EVENTS = ("RunningOperationCaughtError", "RunningOperationUncaughtError")
+_MACRO_ERROR_EVENTS = ("RunningOperationCaughtError", "RunningOperationUncaughtError")
 
 if TYPE_CHECKING:  # pragma: no cover
     from dbt.cli.main import dbtRunner, dbtRunnerResult
@@ -126,7 +126,7 @@ def _collect_macro_errors(collected: list[str]) -> Callable[[Any], None]:
         # the dbt error this callback exists to surface with the callback's own failure.
         try:
             info = json.loads(dbt_event_to_json(event)).get("info", {})
-            if info.get("name") not in MACRO_ERROR_EVENTS:
+            if info.get("name") not in _MACRO_ERROR_EVENTS:
                 return
             msg = info.get("msg")
             if msg:

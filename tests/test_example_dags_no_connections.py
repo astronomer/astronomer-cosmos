@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 from airflow.models.dagbag import DagBag
-from dbt.version import get_installed_version as get_dbt_version
 from packaging.version import Version
 
 from cosmos.constants import AIRFLOW_VERSION
@@ -14,7 +13,6 @@ from . import utils as test_utils
 
 EXAMPLE_DAGS_DIR = Path(__file__).parent.parent / "dev/dags"
 AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
-DBT_VERSION = Version(get_dbt_version().to_version_string()[1:])
 
 IGNORED_DAG_FILES = [
     "performance_dag.py",
@@ -33,16 +31,6 @@ def get_dag_bag() -> DagBag:
             print(f"Adding {dagfile} to .airflowignore")
             file.writelines([f"{dagfile}\n"])
 
-        # Ignore Async DAG for dbt <=1.5
-        if DBT_VERSION <= Version("1.5.0"):
-            file.writelines(["simple_dag_async.py\n"])
-
-        if DBT_VERSION < Version("1.5.0"):
-            file.writelines(["example_source_rendering.py\n"])
-
-        if DBT_VERSION < Version("1.6.0"):
-            file.writelines(["example_model_version.py\n"])
-            file.writelines(["example_operators.py\n"])
         # cosmos_profile_mapping uses the automatic profile rendering from an Airflow connection.
         # so we can't parse that without live connections
         for file_name in ["cosmos_profile_mapping.py"]:
@@ -54,6 +42,10 @@ def get_dag_bag() -> DagBag:
             file.write("cosmos_example_manifest_dag.py\n")
             # This DAG is taking too long to run in the CI (https://github.com/astronomer/astronomer-cosmos/actions/runs/21902660682/job/63234728594)
             file.write("example_cosmos_python_models.py\n")
+            # The Airflow 2.9 lockfiles pin databricks-sql-connector 3.7.4, whose generated Thrift module takes over
+            # two minutes to import on Python 3.12 and exceeds the DagBag import timeout
+            # (https://github.com/astronomer/astronomer-cosmos/actions/runs/39240346293/job/118019428362)
+            file.write("example_databricks_metric_view.py\n")
 
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.write("example_cosmos_cleanup_dag.py\n")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,14 @@ DBT_FRESHNESS_WARN_MSG = "WARN freshness of"
 # line that happens to contain a "WARN=<digits>" token (e.g. a --debug resource/usage report printed
 # after the summary) is not mistaken for the warning count.
 DBT_SUMMARY_WARN_RE = re.compile(r"Done\..*\bWARN=(\d+)\b.*\bTOTAL=\d+")
+
+
+def _dbt_log_message(line: str) -> str:
+    """Return ``info.msg`` of a dbt ``--log-format json`` line, or the line unchanged for text output."""
+    try:
+        return str(json.loads(line)["info"]["msg"])
+    except (ValueError, TypeError, KeyError):
+        return line
 
 
 def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> int:
@@ -73,8 +82,7 @@ def extract_freshness_warn_msg(result: FullOutputSubprocessResult) -> tuple[list
     node_names = []
     node_results = []
 
-    for line in log_list:
-
+    for line in map(_dbt_log_message, log_list):
         if DBT_FRESHNESS_WARN_MSG in line:
             node_name = line.split(DBT_FRESHNESS_WARN_MSG)[1].split(" ")[1]
             node_names.append(node_name)
@@ -103,8 +111,11 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
     # dbt <= 1.11 prints "HH:MM:SS  Warning in test <name> (<path>)"; dbt 1.12 reworded this to
     # "HH:MM:SS  [WARNING]: in test <name> (<path>)" (and the result line gains the same
     # "[WARNING]: " prefix). Match both so the parser keeps working across dbt versions.
-    pattern1 = re.compile(r"\d{2}:\d{2}:\d{2}\s+(?:\[WARNING\]:\s*)?(?:Warning )?in test ([\w_]+).*")
-    pattern2 = re.compile(r"\d{2}:\d{2}:\d{2}\s+(?:\[WARNING\]:\s*)?(.*)")
+    # The timestamp is optional because ``--log-format json`` messages (``info.msg``) do not carry one.
+    pattern1 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?(?:\[WARNING\]:\s*)?(?:Warning )?in test ([\w_]+).*")
+    pattern2 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?(?:\[WARNING\]:\s*)?(.*)")
+
+    log_list = [_dbt_log_message(line) for line in log_list]
 
     for line_index, line in enumerate(reversed(log_list)):
         cleaned_line = clean_line(line)
@@ -123,6 +134,36 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
             test_results.append(test_result)
 
     return test_names, test_results
+
+
+def extract_dbt_failure_details(log_list: list[str]) -> list[str]:
+    """
+    Extract failing dbt nodes and their messages from subprocess output.
+
+    Counterpart of :func:`extract_log_issues`, which handles warnings.
+
+    :param log_list: List of strings, where each string is a log line from a dbt command.
+    :return: A list of formatted ``"<failure line> <detail>"`` strings, one per failing node.
+    """
+    # dbt <= 1.11 prints "Failure in test <name> (<path>)"; dbt 1.12 reworded this to
+    # "[ERROR]: in test <name> (<path>)" (also used for errored models) and prefixes the detail line the same way.
+    ansi = re.compile(r"\x1b\[[0-9;]*m")
+    timestamp = re.compile(r"^\d{2}:\d{2}:\d{2}\s+")
+    error_prefix = re.compile(r"^\[ERROR\]:\s*")
+    marker = re.compile(r"^(?:(?:Failure|Error) in |\[ERROR\]:\s*in )(.*)")
+
+    def clean_line(line: str) -> str:
+        return timestamp.sub("", ansi.sub("", line).strip())
+
+    cleaned = [clean_line(_dbt_log_message(line)) for line in log_list]
+    details: list[str] = []
+    for index, line in enumerate(cleaned):
+        match = marker.match(line)
+        if match:
+            failure = line if not error_prefix.match(line) else f"Error in {match.group(1)}"
+            detail = error_prefix.sub("", cleaned[index + 1]) if index + 1 < len(cleaned) else ""
+            details.append(f"{failure} {detail}".strip())
+    return details
 
 
 # Python 3.13 exposes a deprecated operator, we can replace it in the future

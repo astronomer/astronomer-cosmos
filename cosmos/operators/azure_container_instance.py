@@ -23,6 +23,7 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
@@ -187,6 +188,21 @@ class DbtRunAzureContainerInstanceOperator(DbtRunMixin, DbtAzureContainerInstanc
     """
 
     template_fields: Sequence[str] = DbtAzureContainerInstanceBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticMetricViewAzureContainerInstanceOperator(
+    DbtSemanticMetricViewMixin, DbtAzureContainerInstanceBaseOperator
+):
+    """
+    Executes a dbt core run command against an adapter-native semantic metric view.
+    """
+
+    template_fields: Sequence[str] = (
+        DbtAzureContainerInstanceBaseOperator.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
+    )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

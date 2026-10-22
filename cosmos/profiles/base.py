@@ -235,7 +235,15 @@ class BaseProfileMapping(ABC):
             value = self.get_dbt_value(field)
 
             if value is None:
-                raise CosmosValueError(f"Could not find a value for secret field {field}.")
+                airflow_fields = self.airflow_param_mapping.get(field, [])
+                if isinstance(airflow_fields, str):
+                    airflow_fields = [airflow_fields]
+                connection_fields = ", ".join(repr(item) for item in airflow_fields) or "none"
+                raise CosmosValueError(
+                    f"{type(self).__name__} could not resolve required dbt profile field {field!r} from profile_args "
+                    f"or Airflow connection {self.conn_id!r} (connection fields: {connection_fields}). "
+                    "Check that the connection uses the authentication method expected by this profile mapping."
+                )
 
             env_vars[env_var_name] = str(value)
 

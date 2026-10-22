@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from airflow.triggers.base import BaseTrigger, TriggerEvent
 from asgiref.sync import sync_to_async
@@ -24,6 +24,9 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_terminal,
     is_producer_task_still_running,
 )
+
+if TYPE_CHECKING:
+    from cosmos.operators._watcher.aggregation import TestResultSummary
 
 logger = get_logger(__name__)
 
@@ -61,6 +64,7 @@ class WatcherTrigger(BaseTrigger):
         self.map_index = map_index
         self.poke_interval = poke_interval
         self.is_test_sensor = is_test_sensor
+        self._test_result_summary: TestResultSummary | None = None
 
     def serialize(self) -> tuple[str, dict[str, Any]]:
         return (
@@ -125,13 +129,16 @@ class WatcherTrigger(BaseTrigger):
     async def _get_node_status(self) -> Any | None:
         """Return the dbt node status from XCom.
 
-        The XCom value is always a dict with ``status`` and ``outlet_uris`` keys.
-        Stores outlet URIs on ``self._outlet_uris`` for later dataset emission.
+        The XCom value is always a dict with ``status`` and ``outlet_uris`` keys, plus
+        ``upstream_failure_skip`` for a node that dbt skipped for an upstream failure.
+        Stores outlet URIs on ``self._outlet_uris`` for later dataset emission, and the
+        upstream-failure-skip mark on ``self._upstream_failure_skip``.
         """
         xcom_val = await self.get_xcom_val(get_status_xcom_key(self.model_unique_id))
         if xcom_val is None:
             return None
         self._outlet_uris = xcom_val.get("outlet_uris", [])
+        self._upstream_failure_skip = bool(xcom_val.get("upstream_failure_skip"))
         return xcom_val.get("status")
 
     async def _parse_dbt_node_status_and_compiled_sql(self) -> tuple[str | None, str | None]:
@@ -149,10 +156,16 @@ class WatcherTrigger(BaseTrigger):
         compiled_sql is always read from the canonical per-model ``*_compiled_sql`` key.
         """
         if self.is_test_sensor:
-            from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key
+            from cosmos.operators._watcher.aggregation import TestResultSummary, get_tests_status_xcom_key
 
-            status = await self.get_xcom_val(get_tests_status_xcom_key(self.model_unique_id))
-            return status, None
+            xcom_val = await self.get_xcom_val(get_tests_status_xcom_key(self.model_unique_id))
+            if xcom_val is None:
+                return None, None
+            if isinstance(xcom_val, dict):
+                self._test_result_summary = TestResultSummary.from_dict(xcom_val)
+                return self._test_result_summary.status, None
+            # Backward compatibility: plain string value
+            return xcom_val, None
 
         status = await self._get_node_status()
         compiled_sql = (
@@ -222,6 +235,19 @@ class WatcherTrigger(BaseTrigger):
         outlet_uris = getattr(self, "_outlet_uris", [])
         if outlet_uris:
             event_data["outlet_uris"] = outlet_uris
+        if self._test_result_summary:
+            event_data["test_result_summary"] = self._test_result_summary.to_dict()
+        return event_data
+
+    def _build_node_failed_event(self, compiled_sql: str | None) -> dict[str, Any]:
+        """Build the TriggerEvent payload for a failed dbt node."""
+        event_data: dict[str, Any] = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
+        if compiled_sql:
+            event_data["compiled_sql"] = compiled_sql
+        if getattr(self, "_upstream_failure_skip", False):
+            event_data["upstream_failure_skip"] = True
+        if self._test_result_summary:
+            event_data["test_result_summary"] = self._test_result_summary.to_dict()
         return event_data
 
     async def run(self) -> AsyncIterator[TriggerEvent]:
@@ -243,10 +269,7 @@ class WatcherTrigger(BaseTrigger):
                 # Surface a node failure only once the producer has terminated. While it is still
                 # running, fall through to the sleep below and keep polling. See #2947.
                 logger.warning("dbt node '%s' failed", self.model_unique_id)
-                event_data = {"status": EventStatus.FAILED, "reason": WatcherEventReason.NODE_FAILED}
-                if compiled_sql:
-                    event_data["compiled_sql"] = compiled_sql
-                yield TriggerEvent(event_data)  # type: ignore[no-untyped-call]
+                yield TriggerEvent(self._build_node_failed_event(compiled_sql))  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == ProducerTaskState.FAILED:
                 logger.error(

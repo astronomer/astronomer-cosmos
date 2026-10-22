@@ -21,6 +21,7 @@ except ImportError:
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, InvocationMode, SourceRenderingBehavior
 from cosmos.dbt.graph import DbtNode
+from cosmos.dbt.runner import is_dbt_v2
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -58,12 +59,16 @@ def freshness_callback(
     return [("model.altered_jaffle_shop.orders", "skipped")]
 
 
+# The dbtRunner of dbt 2 has no event callbacks, which the watcher needs, so on dbt 2 the mode is left unset and Cosmos
+# falls back to subprocess.
+WATCHER_INVOCATION_MODE = None if is_dbt_v2() else InvocationMode.DBT_RUNNER
+
 # [START example_watcher_with_freshness]
 example_watcher_with_freshness = DbtDag(
     # dbt/cosmos-specific parameters
     execution_config=ExecutionConfig(
         execution_mode=ExecutionMode.WATCHER,
-        invocation_mode=InvocationMode.DBT_RUNNER,
+        invocation_mode=WATCHER_INVOCATION_MODE,
         setup_operator_args={"freshness_callback": freshness_callback},
     ),
     render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL),

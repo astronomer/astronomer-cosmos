@@ -249,6 +249,9 @@ def _restore_xcom_backup(context: Any) -> bool:
     The Variable holds the whole backup on Airflow before 3.3 and with ``enable_watcher_reliable_retry=False``, and
     only the entries the task store missed otherwise, so its entries win on merge.
 
+    Cleanup is best effort, Variable first: a failure leaves the whole backup in place for the next retry, and
+    raising would fail an attempt that has already restored it.
+
     Returns True if the restore succeeded, False if no backup was found.
     """
     ti = context["ti"]
@@ -267,14 +270,19 @@ def _restore_xcom_backup(context: Any) -> bool:
         return False
 
     _push_entries(ti, entries)
-    if row_count:
-        _delete_task_state_store_rows(task_state_store, row_count)
     if compressed is not None:
         try:
             delete_variable(var_key)
             logger.debug("Deleted XCom backup Variable '%s' after restore", var_key)
         except KeyError:
             logger.debug("XCom backup Variable '%s' already deleted", var_key)
+        except Exception as error:  # noqa: BLE001
+            logger.warning(
+                "Could not delete XCom backup Variable '%s', leaving the backup in place: %s", var_key, error
+            )
+            return True
+    if row_count:
+        _delete_task_state_store_rows(task_state_store, row_count)
     return True
 
 

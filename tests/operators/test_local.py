@@ -2,7 +2,6 @@ import base64
 import json
 import logging
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -831,17 +830,10 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
     # The Asset URI host, port, and database name come from the example_conn connection, which
     # differs between setups (0.0.0.0 on a runner, the service hostname inside a container). Derive
     # them all so the assertion is host-agnostic.
-    if os.environ.get("COSMOS_TEST_ADAPTER") == "bigquery":
-        # The dbt-oss job runs against BigQuery, so the URI is a bigquery:// one that ends in the model name.
-        assert re.search(
-            r"Outlets: \[Asset\(name='bigquery://[^']*/stg_customers', uri='bigquery://[^']*/stg_customers'",
-            caplog.text,
-        )
-    else:
-        conn = urlparse(os.environ.get("AIRFLOW_CONN_EXAMPLE_CONN", "postgres://user:pass@0.0.0.0:5432/postgres"))
-        db_name = conn.path.lstrip("/") or "postgres"
-        expected_asset = f"postgres://{conn.hostname}:{conn.port or 5432}/{db_name}/public/stg_customers"
-        assert f"Outlets: [Asset(name='{expected_asset}', uri='{expected_asset}'" in caplog.text
+    conn = urlparse(os.environ.get("AIRFLOW_CONN_EXAMPLE_CONN", "postgres://user:pass@0.0.0.0:5432/postgres"))
+    db_name = conn.path.lstrip("/") or "postgres"
+    expected_asset = f"postgres://{conn.hostname}:{conn.port or 5432}/{db_name}/public/stg_customers"
+    assert f"Outlets: [Asset(name='{expected_asset}', uri='{expected_asset}'" in caplog.text
 
 
 @pytest.mark.integration

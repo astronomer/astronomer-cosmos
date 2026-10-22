@@ -35,6 +35,17 @@ The ``RenderConfig`` class takes the following arguments:
 - ``ephemeral_models_as_empty_operator``: (new in v1.15.0) A boolean to control how ephemeral models are rendered. Ephemeral models are inlined as CTEs into downstream models and never written to the warehouse, so running them via a dbt operator is effectively a no-op. When ``True`` (default), they are rendered as ``EmptyOperator`` tasks, which preserves the dependency chain that passes through them while avoiding wasted dbt invocations and decluttering the DAG. Because the ``EmptyOperator`` does not run dbt, behaviour tied to the ephemeral model's run task no longer occurs: no Airflow Dataset/Asset is emitted for it (so dataset-scheduled DAGs keyed on it are not triggered), task callbacks are not invoked, no OpenLineage events are produced, and per-node operator arguments (e.g. ``profile_args``) do not apply. Set to ``False`` to render them as regular dbt run tasks.
 - ``group_nodes_by_folder``: When enabled, groups nodes by folder structure, creating a ``TaskGroup`` per resource type and folder. Disabled by default. By default, folders that share a leaf name under different parents (e.g. ``staging/aurora`` and ``marts/aurora``) collapse into a single task group; set the :ref:`enable_hierarchical_naming_for_group_nodes_by_folder` Cosmos config (or the ``AIRFLOW__COSMOS__ENABLE_HIERARCHICAL_NAMING_FOR_GROUP_NODES_BY_FOLDER`` environment variable) to ``True`` to render them as distinct task groups. It is disabled by default because enabling it changes task-group ids, which is a breaking change for DAGs that reference Cosmos task groups by id, and is expected to become the default in Cosmos 2.0.
 
+  .. note::
+
+     Each folder becomes a ``TaskGroup``, so models that reference each other across two folders in both
+     directions (a model in ``folder_a`` refs one in ``folder_b``, and another model in ``folder_b`` refs one in
+     ``folder_a``) make the two task groups depend on each other in a cycle, even though the dbt graph itself is
+     acyclic. Airflow 3.3.1 and later order task groups as units, so for such DAGs the Grid and Graph views fail on
+     Airflow 3.3.x, Airflow 3.4 shows a DAG warning (``TaskGroupCycleDeprecationWarning``), and Airflow 3.5 is
+     expected to reject the DAG at parse time (`apache/airflow#73678 <https://github.com/apache/airflow/issues/73678>`__).
+     To avoid it, move the models so that dependencies between any two folders go in one direction only, or disable
+     ``group_nodes_by_folder``. See `#3082 <https://github.com/astronomer/astronomer-cosmos/issues/3082>`__.
+
 .. _how-to-run-dbt-ls-invocation-mode:
 
 How to run dbt ls (invocation mode)

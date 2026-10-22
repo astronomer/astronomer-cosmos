@@ -35,6 +35,10 @@ Bug Fixes
 * Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn, so ``<folder>+`` and ``<package>+`` behave like their ``path:`` and ``package:`` equivalents and like ``dbt ls``. Previously the graph selector resolved its root by exact node name only, and bare-identifier matching keyed off the absolute file path. See #2962.
 * ``LoadMode.DBT_LS`` now runs ``dbt ls`` through a Python subprocess when dbt 2 (``dbt-core``, ``dbt-oss`` or ``dbt`` 2.x) is installed in the Airflow environment, even under the default ``InvocationMode.DBT_RUNNER``. dbt 2's ``dbtRunner`` returns only node names for ``dbt ls --output json``, which previously rendered an empty DAG. The fallback runs ``dbt_executable_path`` and is logged at INFO level; ``dbt deps`` still runs through ``dbtRunner``. See #2992 and #3060.
 
+Docs
+
+* Document that ``RenderConfig.group_nodes_by_folder`` can produce task groups that depend on each other in a cycle, which Airflow 3.3.1 and later cannot render, and how to reorganise the folders. See #3082.
+
 1.15.1 (2026-08-04)
 -------------------
 

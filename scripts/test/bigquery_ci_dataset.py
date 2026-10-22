@@ -70,6 +70,8 @@ def _client() -> bigquery.Client:
     keyfile = extra.get("keyfile_dict") or extra.get("extra__google_cloud_platform__keyfile_dict")
     if isinstance(keyfile, str):
         keyfile = json.loads(keyfile)
+    if not keyfile:
+        raise SystemExit("AIRFLOW_CONN_GCP_GS_CONN has no keyfile_dict")
     credentials = service_account.Credentials.from_service_account_info(keyfile)
     return bigquery.Client(project=os.environ["BIGQUERY_PROJECT"], credentials=credentials)
 
@@ -104,9 +106,11 @@ def create(dataset: str, max_start_jitter: float = MAX_START_JITTER_SECONDS) -> 
 def delete(dataset: str) -> None:
     """Delete the dataset. A failure is a warning, not an error: the tables expire on their own."""
     print(f"Deleting BigQuery dataset {dataset}")
+    # A bad connection is a setup mistake and fails the step; only the API call is allowed to fail quietly.
+    client = _client()
     try:
-        _client().delete_dataset(dataset, delete_contents=True, not_found_ok=True, retry=RETRY)
-    except Exception as exc:  # the job's result must not depend on the cleanup
+        client.delete_dataset(dataset, delete_contents=True, not_found_ok=True, retry=RETRY)
+    except (exceptions.GoogleAPICallError, exceptions.RetryError) as exc:  # the job's result must not depend on cleanup
         print(f"::warning::Could not delete BigQuery dataset {dataset}: {exc}")
 
 

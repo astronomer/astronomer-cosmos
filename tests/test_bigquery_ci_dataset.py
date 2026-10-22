@@ -67,8 +67,9 @@ def test_create_labels_the_dataset_and_makes_its_tables_expire(monkeypatch):
     assert dataset.dataset_id == "cosmos_ci_42_1_oss_0"
     assert dataset.project == "my-project"
     assert dataset.labels == {"ci": "cosmos", "workflow": "test-dbt-oss", "run-id": "42"}
-    assert dataset.default_table_expiration_ms == bigquery_ci_dataset.TABLE_EXPIRATION_MS
+    assert dataset.default_table_expiration_ms == 6 * 60 * 60 * 1000
     assert client.create_dataset.call_args.kwargs["exists_ok"] is True
+    assert client.create_dataset.call_args.kwargs["retry"] is bigquery_ci_dataset.RETRY
     client.get_dataset.assert_called_once_with("cosmos_ci_42_1_oss_0")
 
 
@@ -105,6 +106,7 @@ def test_delete_removes_the_dataset_and_its_contents(monkeypatch):
     assert client.delete_dataset.call_args.args == ("cosmos_ci_42_1_oss_0",)
     assert kwargs["delete_contents"] is True
     assert kwargs["not_found_ok"] is True
+    assert kwargs["retry"] is bigquery_ci_dataset.RETRY
 
 
 def test_delete_failure_is_a_warning_not_an_error(monkeypatch, capsys):
@@ -115,3 +117,32 @@ def test_delete_failure_is_a_warning_not_an_error(monkeypatch, capsys):
     bigquery_ci_dataset.delete("cosmos_ci_42_1_oss_0")
 
     assert "::warning::Could not delete BigQuery dataset cosmos_ci_42_1_oss_0" in capsys.readouterr().out
+
+
+def test_delete_retry_error_is_a_warning_not_an_error(monkeypatch, capsys):
+    client = MagicMock()
+    client.delete_dataset.side_effect = exceptions.RetryError("gave up", cause=exceptions.ServiceUnavailable("down"))
+    monkeypatch.setattr(bigquery_ci_dataset, "_client", lambda: client)
+
+    bigquery_ci_dataset.delete("cosmos_ci_42_1_oss_0")
+
+    assert "::warning::Could not delete BigQuery dataset cosmos_ci_42_1_oss_0" in capsys.readouterr().out
+
+
+def test_delete_does_not_hide_a_bad_connection(monkeypatch):
+    def broken_client():
+        raise KeyError("AIRFLOW_CONN_GCP_GS_CONN")
+
+    monkeypatch.setattr(bigquery_ci_dataset, "_client", broken_client)
+
+    with pytest.raises(KeyError):
+        bigquery_ci_dataset.delete("cosmos_ci_42_1_oss_0")
+
+
+def test_client_without_a_keyfile_dict_says_so(monkeypatch):
+    monkeypatch.setenv(
+        "AIRFLOW_CONN_GCP_GS_CONN", '{"conn_type": "google_cloud_platform", "extra": {"key_path": "/k"}}'
+    )
+
+    with pytest.raises(SystemExit, match="no keyfile_dict"):
+        bigquery_ci_dataset._client()

@@ -24,6 +24,8 @@ except ImportError:  # pragma: no cover
     orjson = None
 
 if TYPE_CHECKING:
+    from cosmos.operators._watcher.aggregation import TestsPerModel
+
     try:
         # Airflow 3 onwards
         from airflow.sdk import ObjectStoragePath
@@ -534,7 +536,7 @@ class DbtGraph:
 
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
-    tests_per_model: dict[str, list[str]] = dict()
+    tests_per_model: TestsPerModel = dict()
     load_method: LoadMode = LoadMode.AUTOMATIC
 
     def __init__(
@@ -1474,7 +1476,7 @@ class DbtGraph:
         * self.filtered_nodes
         * self.tests_per_model
         """
-        tests_per_model: dict[str, list[str]] = {}
+        tests_per_model: TestsPerModel = {}
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
                 for node_id in node.depends_on:

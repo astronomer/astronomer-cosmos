@@ -97,6 +97,10 @@ class DbtTestStatus(str, Enum):
     PASS = "pass"
     FAIL = "fail"
 
+    def __str__(self) -> str:
+        # Render as the raw dbt value (e.g. "fail") in logs/XCom rather than "DbtTestStatus.FAIL".
+        return str(self.value)
+
 
 def is_dbt_node_status_success(status: str | None) -> bool:
     """Check if the dbt node status indicates success (works for both models and tests)."""

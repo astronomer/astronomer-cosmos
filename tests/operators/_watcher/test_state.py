@@ -604,6 +604,37 @@ class TestXcomBackupWithTaskStateStore:
         assert rows == [["model__a_status"], ["model__big_compiled_sql"], ["model__b_status"]]
         assert "model__big_compiled_sql" in caplog.text and "stored unsplit" in caplog.text
 
+    def test_rollover_rewrites_a_row_whose_last_write_failed(self):
+        task_state_store = _FakeTaskStateStore()
+        writes: list[str] = []
+        store_set = task_state_store.set
+
+        def flaky_set(key, value):
+            writes.append(key)
+            if writes.count("cosmos_xcom_backup_1") == 1 and key == "cosmos_xcom_backup_1":
+                raise RuntimeError("store unavailable")
+            store_set(key, value)
+
+        task_state_store.set = flaky_set
+        ti = _MockTI()
+        _init_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
+        with patch("cosmos.operators._watcher.xcom.MAX_BACKUP_ROW_BYTES", 300):
+            safe_xcom_push(ti, "model__a_compiled_sql", os.urandom(60).hex())
+            with pytest.raises(RuntimeError, match="store unavailable"):
+                safe_xcom_push(ti, "model__b_compiled_sql", os.urandom(90).hex())
+            safe_xcom_push(ti, "model__c_compiled_sql", os.urandom(90).hex())
+
+        assert sorted(task_state_store.values) == [f"cosmos_xcom_backup_{index}" for index in range(3)]
+        restored_ti = _MockTI()
+        assert _restore_xcom_from_variable(
+            {"ti": restored_ti, "run_id": "test_run", "task_state_store": task_state_store}
+        )
+        assert sorted(restored_ti.store) == [
+            "model__a_compiled_sql",
+            "model__b_compiled_sql",
+            "model__c_compiled_sql",
+        ]
+
     def test_delete_is_best_effort_and_keeps_a_readable_prefix(self, caplog: pytest.LogCaptureFixture):
         task_state_store = _FakeTaskStateStore()
         for row_index in range(3):

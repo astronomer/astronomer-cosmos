@@ -96,6 +96,7 @@ def _init_xcom_backup(context: Any, *, persist: bool = True) -> None:
     task_state_store = context.get(TASK_STATE_STORE_CONTEXT_KEY) if persist else None
     setattr(ti, TASK_STATE_STORE_TI_ATTRIBUTE, task_state_store)
     ti._cosmos_xcom_backup_open_row = {}
+    ti._cosmos_xcom_backup_open_row_persisted = True
     ti._cosmos_xcom_backup_rows_written = 0
     ti._cosmos_xcom_persist_incrementally = persist
     dag_id = ti.dag_id
@@ -131,17 +132,23 @@ def _persist_backup_row(ti: Any, key: str, value: Any) -> None:
     The row rolls over before a write that would take it past MAX_BACKUP_ROW_BYTES, so a row only exceeds the bound
     when a single entry does. Such an entry gets a row of its own and is written as it is: Airflow can offload it
     through ``[workers] state_store_backend``, and splitting it here would need matching reassembly on restore.
+
+    A row whose last write failed is written again before the rollover, since a retry reads the rows in order and
+    stops at the first missing one.
     """
     task_state_store = getattr(ti, TASK_STATE_STORE_TI_ATTRIBUTE)
     open_row: dict[str, Any] = ti._cosmos_xcom_backup_open_row
     row_index = ti._cosmos_xcom_backup_rows_written
     encoded = _encode_backup({**open_row, key: value})
     if open_row and len(encoded) >= MAX_BACKUP_ROW_BYTES:
+        if not ti._cosmos_xcom_backup_open_row_persisted:
+            task_state_store.set(_task_state_store_row_key(row_index), _encode_backup(open_row))
         row_index += 1
         ti._cosmos_xcom_backup_rows_written = row_index
         open_row = ti._cosmos_xcom_backup_open_row = {}
         encoded = _encode_backup({key: value})
     open_row[key] = value
+    ti._cosmos_xcom_backup_open_row_persisted = False
     if len(encoded) >= MAX_BACKUP_ROW_BYTES:
         logger.warning(
             "XCom backup entry '%s' is %d bytes on its own, above the %d byte row bound; it is stored unsplit.",
@@ -150,6 +157,7 @@ def _persist_backup_row(ti: Any, key: str, value: Any) -> None:
             MAX_BACKUP_ROW_BYTES,
         )
     task_state_store.set(_task_state_store_row_key(row_index), encoded)
+    ti._cosmos_xcom_backup_open_row_persisted = True
     if len(encoded) >= MAX_BACKUP_ROW_BYTES:
         ti._cosmos_xcom_backup_rows_written = row_index + 1
         ti._cosmos_xcom_backup_open_row = {}

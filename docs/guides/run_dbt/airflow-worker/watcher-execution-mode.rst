@@ -319,9 +319,10 @@ instead of a Variable (`#2771 <https://github.com/astronomer/astronomer-cosmos/i
   not grow with the project, unlike the single Variable. A single entry is never split: one larger than 8 KB
   gets a key of its own and Cosmos logs a warning naming it, and one larger than
   ``[state_store] max_value_storage_bytes`` (65535 bytes by default) also makes Airflow log its size warning.
-  Configure ``[workers] state_store_backend`` to offload such values. Deleting the keys after a restore or a
-  successful run is best effort and starts from the first key, so a failure leaves no readable backup rather
-  than a stale one; retention removes the rest.
+  Configure ``[workers] state_store_backend`` to offload such values. Deleting the backup after a restore or a
+  successful run is best effort: the keys go first, from the first key up, and the Variable only once every key
+  is gone, so a failure leaves the whole backup, no readable backup, or only the Variable's newest entries, never
+  a stale value; retention removes the rest.
 - Writes to the task store from the retry callback are rejected, so the task store only serves the per-node
   backup. If the last task store write failed, the retry callback flushes the entries it missed to the backup
   Variable, and the restore merges them on top of the task store keys. With ``enable_watcher_reliable_retry = False`` the producer behaves as described above: no per-node

@@ -178,8 +178,8 @@ def _read_task_state_store_rows(task_state_store: Any) -> tuple[dict[str, Any], 
     return entries, row_index
 
 
-def _delete_task_state_store_rows(task_state_store: Any, row_count: int) -> None:
-    """Delete the backup rows, best effort and from the first row up.
+def _delete_task_state_store_rows(task_state_store: Any, row_count: int) -> bool:
+    """Delete the backup rows, best effort and from the first row up; return whether every row is gone.
 
     A restore reads from row 0, so a failure leaves no readable backup rather than a prefix that may hold a stale
     value; the remaining rows expire through the task store retention. Raising here would fail a producer that has
@@ -190,7 +190,8 @@ def _delete_task_state_store_rows(task_state_store: Any, row_count: int) -> None
             task_state_store.delete(_task_state_store_row_key(row_index))
         except Exception as error:  # noqa: BLE001
             logger.warning("Could not delete XCom backup row %d from the task store: %s", row_index, error)
-            return
+            return False
+    return True
 
 
 def _backup_xcom_to_variable(context: Any) -> None:
@@ -250,8 +251,9 @@ def _restore_xcom_backup(context: Any, *, read_task_state_store: bool = True) ->
     only the entries the task store missed otherwise, so its entries win on merge. With the setting off the task
     store is not read at all, so an outage there cannot block a Variable-only restore.
 
-    Cleanup is best effort, Variable first: a failure leaves the whole backup in place for the next retry, and
-    raising would fail an attempt that has already restored it.
+    Cleanup is best effort, rows first, and the Variable goes only once every row is gone: a failure leaves the
+    whole backup, no readable backup, or only the Variable's newest entries, never a stale value. Raising would
+    fail an attempt that has already restored its backup.
 
     Returns True if the restore succeeded, False if no backup was found.
     """
@@ -271,19 +273,19 @@ def _restore_xcom_backup(context: Any, *, read_task_state_store: bool = True) ->
         return False
 
     _push_entries(ti, entries)
-    if compressed is not None:
-        try:
-            delete_variable(var_key)
-            logger.debug("Deleted XCom backup Variable '%s' after restore", var_key)
-        except KeyError:
-            logger.debug("XCom backup Variable '%s' already deleted", var_key)
-        except Exception as error:  # noqa: BLE001
-            logger.warning(
-                "Could not delete XCom backup Variable '%s', leaving the backup in place: %s", var_key, error
-            )
-            return True
-    if row_count:
-        _delete_task_state_store_rows(task_state_store, row_count)
+    rows_deleted = _delete_task_state_store_rows(task_state_store, row_count) if row_count else True
+    if compressed is None:
+        return True
+    if not rows_deleted:
+        logger.warning("Keeping XCom backup Variable '%s': not every task store row could be deleted", var_key)
+        return True
+    try:
+        delete_variable(var_key)
+        logger.debug("Deleted XCom backup Variable '%s' after restore", var_key)
+    except KeyError:
+        logger.debug("XCom backup Variable '%s' already deleted", var_key)
+    except Exception as error:  # noqa: BLE001
+        logger.warning("Could not delete XCom backup Variable '%s': %s", var_key, error)
     return True
 
 

@@ -739,7 +739,7 @@ class TestXcomBackupWithTaskStateStore:
 
     @patch("cosmos.operators._watcher.xcom.delete_variable", side_effect=RuntimeError("backend unavailable"))
     @patch("cosmos.operators._watcher.xcom.get_variable")
-    def test_restore_keeps_the_backup_when_the_variable_delete_fails(
+    def test_restore_tolerates_a_failed_variable_delete(
         self, mock_get_variable, mock_delete_variable, caplog: pytest.LogCaptureFixture
     ):
         task_state_store = _FakeTaskStateStore()
@@ -756,8 +756,37 @@ class TestXcomBackupWithTaskStateStore:
 
         assert result is True
         assert ti.store == {"model__a_status": "success", "model__b_status": "success"}
-        assert sorted(task_state_store.values) == ["cosmos_xcom_backup_0"]
+        assert task_state_store.values == {}
         assert "Could not delete XCom backup Variable" in caplog.text
+
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    @patch("cosmos.operators._watcher.xcom.get_variable")
+    def test_restore_keeps_the_variable_until_every_row_is_deleted(
+        self, mock_get_variable, mock_delete_variable, caplog: pytest.LogCaptureFixture
+    ):
+        task_state_store = _FakeTaskStateStore()
+        task_state_store.values["cosmos_xcom_backup_0"] = base64.b64encode(
+            zlib.compress(json.dumps({"model__a_status": "fail"}).encode("utf-8"))
+        ).decode("utf-8")
+        mock_get_variable.return_value = base64.b64encode(
+            zlib.compress(json.dumps({"model__a_status": "success"}).encode("utf-8"))
+        ).decode("utf-8")
+
+        def failing_delete(key):
+            raise RuntimeError("store unavailable")
+
+        task_state_store.delete = failing_delete
+
+        with caplog.at_level(logging.WARNING):
+            first_ti = _MockTI()
+            assert _restore_xcom_backup({"ti": first_ti, "run_id": "test_run", "task_state_store": task_state_store})
+        second_ti = _MockTI()
+        assert _restore_xcom_backup({"ti": second_ti, "run_id": "test_run", "task_state_store": task_state_store})
+
+        assert first_ti.store == {"model__a_status": "success"}
+        assert second_ti.store == {"model__a_status": "success"}
+        mock_delete_variable.assert_not_called()
+        assert "Keeping XCom backup Variable" in caplog.text
 
     @patch("cosmos.operators._watcher.xcom.get_variable", return_value=None)
     def test_entry_survives_a_failed_rewrite_of_the_pending_row(self, mock_get_variable):

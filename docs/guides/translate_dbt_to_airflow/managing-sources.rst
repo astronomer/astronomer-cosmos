@@ -15,6 +15,8 @@ You can control this behavior using the ``source_rendering_behavior`` field in t
     - ``EmptyOperator``: For sources that do not have tests or freshness checks.
     - ``DbtSourceOperator``: For sources that have freshness checks.
     - ``DbtTestOperator``: For sources that have tests.
+      The test task is rendered under ``TestBehavior.AFTER_EACH`` and ``TestBehavior.BUILD`` (the latter since Cosmos 1.16.0):
+      ``dbt build`` is only used for models, seeds and snapshots, so source tests always run in their own task.
 
   This approach aims to create a comprehensive DAG that aligns with dbt documentation, allowing for the rendering of both sources and models for a more detailed visual representation.
   It also ensures that model dependencies do not run if their sources are not fresh, thus preventing the execution of stale or incomplete data.

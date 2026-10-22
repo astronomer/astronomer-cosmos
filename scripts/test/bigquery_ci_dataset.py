@@ -18,7 +18,9 @@ import random
 import sys
 import time
 
+import requests
 from airflow.models.connection import Connection
+from google import auth
 from google.api_core import exceptions, retry
 from google.cloud import bigquery
 from google.oauth2 import service_account
@@ -42,6 +44,17 @@ def _is_transient(exc: BaseException) -> bool:
             exceptions.BadGateway,
             exceptions.ServiceUnavailable,
             exceptions.GatewayTimeout,
+        ),
+    ):
+        return True
+    # Passing ``retry=`` replaces the library's default retry, which also retries a dropped connection.
+    if isinstance(
+        exc,
+        (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.ReadTimeout,
+            auth.exceptions.TransportError,
+            ConnectionResetError,
         ),
     ):
         return True
@@ -104,13 +117,19 @@ def create(dataset: str, max_start_jitter: float = MAX_START_JITTER_SECONDS) -> 
 
 
 def delete(dataset: str) -> None:
-    """Delete the dataset. A failure is a warning, not an error: the tables expire on their own."""
+    """Delete the dataset. A failure to reach the API is a warning, not an error: the tables expire on their own."""
     print(f"Deleting BigQuery dataset {dataset}")
-    # A bad connection is a setup mistake and fails the step; only the API call is allowed to fail quietly.
+    # A bad connection is a setup mistake and fails the step; only the API call, including a network or token
+    # failure while making it, is allowed to fail quietly.
     client = _client()
     try:
         client.delete_dataset(dataset, delete_contents=True, not_found_ok=True, retry=RETRY)
-    except (exceptions.GoogleAPICallError, exceptions.RetryError) as exc:  # the job's result must not depend on cleanup
+    except (
+        exceptions.GoogleAPICallError,
+        exceptions.RetryError,
+        requests.exceptions.RequestException,
+        auth.exceptions.GoogleAuthError,
+    ) as exc:  # the job's result must not depend on cleanup
         print(f"::warning::Could not delete BigQuery dataset {dataset}: {exc}")
 
 

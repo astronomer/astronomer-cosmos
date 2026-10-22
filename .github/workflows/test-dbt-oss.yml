@@ -159,6 +159,7 @@ jobs:
           hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
 
       - name: Create the BigQuery dataset
+        id: create-bigquery-dataset
         # Retries rate-limit errors, waits a random few seconds first so the jobs of a run do not all call the API at once,
         # and waits until the dataset can be read: BigQuery does not always make it visible straight away, which made the
         # first seed fail with "Not found: Dataset". Run in isolated mode (-I), and only for names that start with cosmos_ci_.
@@ -215,10 +216,11 @@ jobs:
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
       - name: Delete the BigQuery dataset
-        # Runs on success, failure and cancellation. A failure to delete is only a warning: the dataset's tables expire
-        # after a few hours anyway. Isolated mode (-I), and it only touches datasets named cosmos_ci_*. The credentials
+        # Runs on success, failure and cancellation, but not when the create step never ran (for example when checkout or
+        # the install failed): there is no dataset to delete. A failure to delete is only a warning: the dataset's tables
+        # expire after a few hours anyway. Isolated mode (-I), and it only touches datasets named cosmos_ci_*. The credentials
         # need to be able to delete only the datasets they created (not a project-wide delete).
-        if: always()
+        if: always() && steps.create-bigquery-dataset.outcome != 'skipped'
         env:
           AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
           BIGQUERY_PROJECT: astronomer-dag-authoring

@@ -5,6 +5,8 @@ from unittest.mock import MagicMock
 import pytest
 
 pytest.importorskip("google.cloud.bigquery")
+import requests  # noqa: E402
+from google import auth  # noqa: E402
 from google.api_core import exceptions  # noqa: E402
 
 SCRIPT = Path(__file__).parent.parent / "scripts/test/bigquery_ci_dataset.py"
@@ -37,6 +39,10 @@ def test_dataset_name_with_the_ci_prefix_is_accepted(monkeypatch):
         exceptions.ServiceUnavailable("try later"),
         exceptions.InternalServerError("oops"),
         exceptions.Forbidden("rate limited", errors=[{"reason": "rateLimitExceeded"}]),
+        requests.exceptions.ConnectionError("connection dropped"),
+        requests.exceptions.ReadTimeout("timed out"),
+        auth.exceptions.TransportError("transport failed"),
+        ConnectionResetError("reset by peer"),
     ],
 )
 def test_transient_errors_are_retried(exc):
@@ -117,6 +123,33 @@ def test_delete_failure_is_a_warning_not_an_error(monkeypatch, capsys):
     bigquery_ci_dataset.delete("cosmos_ci_42_1_oss_0")
 
     assert "::warning::Could not delete BigQuery dataset cosmos_ci_42_1_oss_0" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        requests.exceptions.ConnectionError("connection dropped"),
+        auth.exceptions.TransportError("transport failed"),
+        auth.exceptions.RefreshError("token refresh failed"),
+    ],
+)
+def test_delete_network_or_token_failure_is_a_warning_not_an_error(monkeypatch, capsys, exc):
+    client = MagicMock()
+    client.delete_dataset.side_effect = exc
+    monkeypatch.setattr(bigquery_ci_dataset, "_client", lambda: client)
+
+    bigquery_ci_dataset.delete("cosmos_ci_42_1_oss_0")
+
+    assert "::warning::Could not delete BigQuery dataset cosmos_ci_42_1_oss_0" in capsys.readouterr().out
+
+
+def test_delete_does_not_hide_an_unexpected_error(monkeypatch):
+    client = MagicMock()
+    client.delete_dataset.side_effect = ValueError("not an API or network error")
+    monkeypatch.setattr(bigquery_ci_dataset, "_client", lambda: client)
+
+    with pytest.raises(ValueError):
+        bigquery_ci_dataset.delete("cosmos_ci_42_1_oss_0")
 
 
 def test_delete_retry_error_is_a_warning_not_an_error(monkeypatch, capsys):

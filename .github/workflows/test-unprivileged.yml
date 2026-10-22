@@ -212,6 +212,51 @@ jobs:
           path: .coverage
           include-hidden-files: true
 
+  Run-AI-Tests:
+    # The provider of the AI diagnosis needs newer versions than the pinned lockfiles of the unit tests (and than the
+    # constraint files of Airflow), so they never run its tests. This job installs it unconstrained, on its own.
+    needs: Check-changed-files
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.11"
+            airflow-version: "2.11"
+          - python-version: "3.12"
+            airflow-version: "3.1"
+          - python-version: "3.13"
+            airflow-version: "3.3"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Cosmos with the ai extra on Airflow ${{ matrix.airflow-version }}
+        run: |
+          python -m pip install uv
+          uv pip install --system "apache-airflow==${{ matrix.airflow-version }}.*" ".[ai]" \
+            pytest pytest-asyncio pytest-describe pytest-dotenv pytest-timeout requests-mock
+          uv pip freeze | grep -iE "^(apache-airflow|pydantic-ai|sqlglot)"
+
+      - name: Check that the provider is usable, so its tests can't be skipped
+        run: python -c "import airflow.providers.common.ai.toolsets.sql, pydantic_ai"
+
+      - name: Test the AI diagnosis against the real provider
+        env:
+          AIRFLOW__CORE__UNIT_TEST_MODE: "True"
+          AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+        run: pytest -vv -rs tests/ai
+
   Run-Telemetry-Tests:
     needs: Check-changed-files
     if: needs.Check-changed-files.outputs.code_changed == 'true'

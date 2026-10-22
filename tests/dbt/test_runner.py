@@ -445,7 +445,8 @@ def _dbt_event(event_class: str, **kwargs):
     The collector goes through dbt's protobuf event shape, so a hand-rolled stand-in would not
     exercise the path that actually breaks when dbt changes its event fields.
     """
-    from dbt.events import types as dbt_event_types
+    # dbt 2 ships neither ``dbt.events`` nor ``dbt_common``, and its ``dbtRunner`` has no event callbacks.
+    dbt_event_types = pytest.importorskip("dbt.events.types", reason="dbt 2 has no Python event types")
     from dbt_common.events.base_types import msg_from_base_event
 
     return msg_from_base_event(getattr(dbt_event_types, event_class)(**kwargs))
@@ -544,6 +545,17 @@ def test_run_command_fills_message_when_flags_surround_run_operation():
     )
 
     assert "Database Error in boom" in entry.message
+
+
+@patch.object(dbt_runner, "is_dbt_v2", return_value=True)
+def test_run_command_registers_no_callbacks_for_run_operation_on_dbt_2(mock_is_dbt_v2):
+    """dbt 2's ``dbtRunner`` raises ``NotImplementedError`` when given ``callbacks=``."""
+    fake_result = SimpleNamespace(success=True, exception=None, result=SimpleNamespace(results=[]))
+    seen = []
+
+    _patched_run_command(_run_operation_runner(None, fake_result, seen), ["dbt", "run-operation", "boom"])
+
+    assert seen == [None]
 
 
 def test_dbt_event_to_json_exposes_the_event_info_fields():

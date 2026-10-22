@@ -26,6 +26,7 @@ Behaviour Changes
 
 Features
 
+* With ``RenderConfig.group_nodes_by_folder``, log a warning naming the folders and the dbt dependencies when folder task groups depend on each other in a cycle, which Airflow 3.3.1 and later cannot render and Airflow 3.5 is expected to reject. See #3082.
 * Log a per-model test summary (passed and failed counts, and the failing test unique_ids) in the ``ExecutionMode.WATCHER`` test sensors by @michal-mrazek in #2750
 * Add opt-in support for adapter-native semantic metric views (``config.materialized: metric_view`` on Databricks, ``semantic_view`` on Snowflake). When ``enable_semantic_metric_view_reclassification`` is set (env var ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION``), these models are reclassified from ``model`` to ``DbtResourceType.SEMANTIC_METRIC_VIEW`` and rendered via a dedicated ``DbtSemanticMetricView*`` operator with a ``semantic_metric_run`` task suffix. Disabled by default. See the "Managing semantic metric views" guide and #2885.
 

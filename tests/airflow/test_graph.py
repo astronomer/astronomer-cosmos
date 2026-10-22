@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -3317,3 +3318,71 @@ def test_test_node_operator_kwargs_do_not_apply_to_after_all_test_task():
         )
     assert dag.task_dict["my_model_run"].retries == 2
     assert dag.task_dict["astro_shop_test"].retries == 3
+
+
+def _cross_folder_model(name: str, folder: str, depends_on: list[str]) -> DbtNode:
+    return DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.{name}",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=depends_on,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path(f"models/{folder}/{name}.sql"),
+        tags=[],
+        config={"materialized": "view"},
+    )
+
+
+def _build_cross_folder_dag(nodes: dict[str, DbtNode]) -> DAG:
+    with DAG("test-folder-cycle", start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "conn_id": "fake_conn",
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn",
+                        profile_args={"schema": "public"},
+                    ),
+                ),
+            },
+            dbt_project_name="astro_shop",
+            render_config=RenderConfig(group_nodes_by_folder=True, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR),
+        )
+    return dag
+
+
+def test_build_airflow_graph_warns_when_folder_task_groups_form_a_cycle(hierarchical_naming_disabled, caplog):
+    model_2 = _cross_folder_model("model_2", "folder_a", [])
+    model_3 = _cross_folder_model("model_3", "folder_b", [])
+    model_1 = _cross_folder_model("model_1", "folder_a", [model_3.unique_id])
+    model_4 = _cross_folder_model("model_4", "folder_b", [model_2.unique_id])
+    nodes = {node.unique_id: node for node in (model_1, model_2, model_3, model_4)}
+
+    with caplog.at_level(logging.WARNING, logger="cosmos.airflow.graph"):
+        _build_cross_folder_dag(nodes)
+
+    warnings = [
+        record.getMessage() for record in caplog.records if "depend on each other in a cycle" in record.getMessage()
+    ]
+    assert len(warnings) == 1
+    assert "models.folder_a, models.folder_b" in warnings[0]
+    assert f"{model_2.unique_id} -> {model_4.unique_id}" in warnings[0]
+    assert f"{model_3.unique_id} -> {model_1.unique_id}" in warnings[0]
+
+
+def test_build_airflow_graph_does_not_warn_when_folder_task_groups_are_acyclic(hierarchical_naming_disabled, caplog):
+    model_2 = _cross_folder_model("model_2", "folder_a", [])
+    model_3 = _cross_folder_model("model_3", "folder_b", [model_2.unique_id])
+    model_4 = _cross_folder_model("model_4", "folder_b", [model_2.unique_id])
+    nodes = {node.unique_id: node for node in (model_2, model_3, model_4)}
+
+    with caplog.at_level(logging.WARNING, logger="cosmos.airflow.graph"):
+        _build_cross_folder_dag(nodes)
+
+    assert not [record for record in caplog.records if "depend on each other in a cycle" in record.getMessage()]

@@ -1333,6 +1333,8 @@ def build_airflow_graph(
     )
 
     create_airflow_task_dependencies(nodes, tasks_map)
+    if group_nodes_by_folder:
+        warn_about_folder_task_group_cycles(nodes, tasks_map)
 
     if producer_task:
         _add_watcher_dependencies(
@@ -1364,6 +1366,97 @@ def build_airflow_graph(
             async_py_requirements=async_py_requirements,
         )
     return tasks_map
+
+
+def _folder_task_group_path(task_or_group: TaskGroup | BaseOperator) -> list[str]:
+    group = task_or_group.parent_group if isinstance(task_or_group, TaskGroup) else task_or_group.task_group
+    path: list[str] = []
+    while group is not None and group.group_id is not None:
+        path.append(group.group_id)
+        group = group.parent_group
+    return path[::-1]
+
+
+def _task_or_group_id(task_or_group: TaskGroup | BaseOperator) -> str:
+    return str(task_or_group.group_id) if isinstance(task_or_group, TaskGroup) else task_or_group.task_id
+
+
+def _reachable(graph: dict[str, set[str]], start: str) -> set[str]:
+    seen: set[str] = set()
+    pending = [start]
+    while pending:
+        for successor in graph.get(pending.pop(), ()):
+            if successor not in seen:
+                seen.add(successor)
+                pending.append(successor)
+    return seen
+
+
+def _cyclic_unit_sets(graph: dict[str, set[str]]) -> list[set[str]]:
+    reachable = {unit: _reachable(graph, unit) for unit in graph}
+    cycles: list[set[str]] = []
+    assigned: set[str] = set()
+    for unit in sorted(graph):
+        if unit in assigned or unit not in reachable[unit]:
+            continue
+        members = {other for other in reachable[unit] if unit in reachable[other]}
+        assigned |= members
+        cycles.append(members)
+    return cycles
+
+
+def warn_about_folder_task_group_cycles(
+    nodes: dict[str, DbtNode],
+    tasks_map: dict[str, TaskGroup | BaseOperator],
+) -> None:
+    """
+    Log a warning for every set of folder TaskGroups whose dependencies form a cycle.
+
+    ``RenderConfig.group_nodes_by_folder`` creates one TaskGroup per folder, so models that reference each other
+    across two folders in both directions make the groups depend on each other in a cycle, even though the model
+    graph is acyclic. Airflow 3.3.1 and later order TaskGroups as units: the Grid and Graph views fail for such DAGs
+    on 3.3.x, Airflow 3.4 issues a deprecation warning, and Airflow 3.5 is expected to reject them at parse time.
+    See https://github.com/astronomer/astronomer-cosmos/issues/3082.
+    """
+    graphs: dict[str | None, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    model_edges: dict[str | None, list[tuple[str, str, str, str]]] = defaultdict(list)
+    for node_id, node in nodes.items():
+        for parent_node_id in node.depends_on:
+            if node_id not in tasks_map or parent_node_id not in tasks_map:
+                continue
+            parent_path = _folder_task_group_path(tasks_map[parent_node_id])
+            child_path = _folder_task_group_path(tasks_map[node_id])
+            depth = 0
+            while depth < min(len(parent_path), len(child_path)) and parent_path[depth] == child_path[depth]:
+                depth += 1
+            if depth == len(parent_path) and depth == len(child_path):
+                continue
+            scope = parent_path[depth - 1] if depth else None
+            parent_unit = (
+                parent_path[depth] if depth < len(parent_path) else _task_or_group_id(tasks_map[parent_node_id])
+            )
+            child_unit = child_path[depth] if depth < len(child_path) else _task_or_group_id(tasks_map[node_id])
+            graphs[scope][parent_unit].add(child_unit)
+            graphs[scope].setdefault(child_unit, set())
+            model_edges[scope].append((parent_unit, child_unit, parent_node_id, node_id))
+
+    for scope, graph in graphs.items():
+        for members in _cyclic_unit_sets(graph):
+            unit_names = sorted(members)
+            edges = sorted(
+                f"{parent_node_id} -> {node_id}"
+                for parent_unit, child_unit, parent_node_id, node_id in model_edges[scope]
+                if parent_unit in members and child_unit in members
+            )
+            logger.warning(
+                "The folder TaskGroups %s depend on each other in a cycle through these dbt dependencies: %s. "
+                "The dbt graph is acyclic, but Airflow 3.3.1 and later order TaskGroups as units: the Grid and "
+                "Graph views fail on Airflow 3.3.x, Airflow 3.4 warns, and Airflow 3.5 is expected to reject the "
+                "DAG. Move these models so the folders depend on each other in one direction only, or disable "
+                "RenderConfig.group_nodes_by_folder. See https://github.com/astronomer/astronomer-cosmos/issues/3082.",
+                ", ".join(unit_names),
+                "; ".join(edges),
+            )
 
 
 def create_airflow_task_dependencies(

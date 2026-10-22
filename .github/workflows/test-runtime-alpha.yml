@@ -52,6 +52,9 @@ concurrency:
 
 env:
   SCARF_NO_ANALYTICS: "true"
+  # The default C tracer on Python 3.12 takes ~150s to trace the generated databricks thrift module
+  # that `dbt ls` imports in-process, exceeding Airflow's 120s DagBag import timeout.
+  COVERAGE_CORE: sysmon
   # Provider + dbt-adapter extras the test modules import. Without these, pytest collection fails to
   # import modules like tests/operators/test_kubernetes.py. Mirrors the provider set cosmos's own
   # integration environment installs. Validated to resolve under the Runtime image's pinned Airflow.

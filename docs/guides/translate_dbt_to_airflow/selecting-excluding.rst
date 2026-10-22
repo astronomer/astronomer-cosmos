@@ -48,8 +48,10 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
     also selects the tests of a tagged model. Graph operators such as ``+tag:my_tag`` start only from the nodes
     that carry the tag themselves. An ``exclude`` also removes every test that depends on an excluded node, as
     dbt's default indirect selection does. dbt only looks at the test's own tags for an intersection, so
-    ``tag:a,tag:b`` can match a test in Cosmos that dbt would not. A test selected without its model is not
-    rendered.
+    ``tag:a,tag:b`` can match a test in Cosmos that dbt would not. With ``TestBehavior.AFTER_EACH`` or ``BUILD``,
+    a test selected without its model is not rendered, except a test with several parents, which still gets its own
+    task when ``should_detach_multiple_parents_tests=True``. With ``TestBehavior.AFTER_ALL``, any selected test
+    creates the single test task.
 
 .. note::
 

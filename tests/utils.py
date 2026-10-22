@@ -323,7 +323,12 @@ def _get_or_create_dagrun(
 
 
 def get_dbt_version() -> Version:
-    """Return the installed dbt version, for dbt-core 1.x and dbt-oss (dbt-oss has no ``dbt.version`` module)."""
+    """Return the installed dbt version, for dbt-core 1.x and dbt-oss (dbt-oss has no ``dbt.version`` module).
+
+    Assumes a single dbt install: it returns the first of dbt-core, dbt-oss and dbt that is installed, while
+    ``is_dbt_v2()`` treats any of them at major version 2 as dbt 2, so the two disagree if dbt-core 1.x is installed
+    next to dbt-oss.
+    """
     for distribution in DBT_DISTRIBUTION_NAMES:
         try:
             return Version(importlib.metadata.version(distribution))

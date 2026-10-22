@@ -124,12 +124,12 @@ SKIPPED_TESTS: dict[str, str] = {
 }
 
 
-def is_dbt_oss_job() -> bool:
+def is_bigquery_test_adapter() -> bool:
     return os.getenv("COSMOS_TEST_ADAPTER") == "bigquery"
 
 
 def dag_files_to_ignore(dags_dir: Path) -> list[str]:
     """Names of the example DAG files to add to ``.airflowignore``; empty outside the dbt-oss job."""
-    if not is_dbt_oss_job():
+    if not is_bigquery_test_adapter():
         return []
     return sorted(path.name for path in dags_dir.glob("*.py") if path.name not in ENABLED_DAG_FILES)

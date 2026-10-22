@@ -1158,7 +1158,9 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    dbt_graph.load_via_dbt_ls()
+    # dbt 2 runs `dbt ls` through a subprocess, which would bypass the dbtRunner this test mocks.
+    with patch("cosmos.dbt.graph.dbt_runner.is_dbt_v2", return_value=False):
+        dbt_graph.load_via_dbt_ls()
     assert not (tmp_dbt_project_dir / "target").exists()
     assert not (tmp_dbt_project_dir / "logs").exists()
 

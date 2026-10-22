@@ -45,13 +45,12 @@ ENABLED_DAG_FILES = frozenset(
 _POSTGRES_ENV = "uses a profiles.yml or sources.yml that reads POSTGRES_* variables, which this job does not set"
 _NO_BQ_ADAPTER_MODULE = "needs dbt-bigquery's dbt.adapters.bigquery, which cannot be installed next to dbt-oss (both provide the dbt package)"
 _NO_CALLBACKS = "dbt-oss dbtRunner does not support callbacks, and dbt does not plan to (https://github.com/dbt-labs/dbt/issues/13102)"
-_NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
-_PG_URIS = "asserts on Postgres dataset URIs (cause inferred, not checked against the test)"
-_NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
-_SCHEMA_ARG = (
-    "reads profile_args['schema'], which the BigQuery swap drops (cause inferred, not checked against the test)"
+_NO_DATASETS = (
+    "dbt-oss writes no datasets: its run_results.json has no args.profiles_dir, so the OpenLineage artifact parser raises "
+    "KeyError (logged at debug level) and the inlets and outlets stay empty (reproduced locally with dbt-oss 2.0.8)"
 )
-_LS_SUBPROCESS = "dbt-oss runs dbt ls through a subprocess, which bypasses the dbtRunner this test mocks"
+_NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
+_NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _MODEL_VERSION_ALIAS = "dbt-oss fails on this project with 'Template not found: jaffle_shop.generate_alias_name'"
 _VIEW_OVER_TABLE = (
     "dbt-oss's BigQuery view materialization will not replace a table that an earlier test left in the job's dataset"
@@ -92,20 +91,15 @@ SKIPPED_TESTS: dict[str, str] = {
     # dbt 2 behaves differently: expected load error not raised (2)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[dbt_runner]": _NO_LOAD_ERROR,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[subprocess]": _NO_LOAD_ERROR,
-    # Dataset/asset assertions use Postgres URIs (3)
-    "tests/operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_210": _PG_URIS,
-    "tests/operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards": _PG_URIS,
-    "tests/operators/test_local.py::test_run_operator_dataset_manual_outlets_airflow_210": _PG_URIS,
     # dbt-oss has no partial parsing artifact (4)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[False]": _NO_PARTIAL_PARSE,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[True]": _NO_PARTIAL_PARSE,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_uses_partial_parse_when_cache_is_disabled": _NO_PARTIAL_PARSE,
     "tests/operators/test_local.py::test_run_operator_caches_partial_parsing": _NO_PARTIAL_PARSE,
-    # Test reads profile_args['schema'], which the BigQuery swap drops (1)
-    "tests/airflow/test_graph.py::test_build_airflow_graph_with_override_profile_config": _SCHEMA_ARG,
-    # dbt 2 runs dbt ls through a subprocess (2)
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder[dbt_runner-False]": _LS_SUBPROCESS,
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder[dbt_runner-True]": _LS_SUBPROCESS,
+    # dbt-oss writes no datasets (3)
+    "tests/operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_210": _NO_DATASETS,
+    "tests/operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards": _NO_DATASETS,
+    "tests/operators/test_local.py::test_run_operator_dataset_manual_outlets_airflow_210": _NO_DATASETS,
     # dbt-bigquery module cannot be installed next to dbt-oss (1)
     "tests/operators/_asynchronous/test_bigquery.py::test_mock_bigquery_adapter": _NO_BQ_ADAPTER_MODULE,
     # dbt-oss fails on the model_version project (1)

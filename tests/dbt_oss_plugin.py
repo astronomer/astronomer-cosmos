@@ -33,7 +33,7 @@ def _use_bigquery_in_place_of_postgres() -> None:
 
     class BigQueryInPlaceOfPostgresProfileMapping(GoogleCloudServiceAccountDictProfileMapping):
         def __init__(self, conn_id, profile_args=None, disable_event_tracking=None, dbt_config_vars=None):
-            bigquery_profile_args = {k: v for k, v in (profile_args or {}).items() if k != "schema"}
+            bigquery_profile_args = dict(profile_args or {})
             bigquery_profile_args["dataset"] = os.environ["COSMOS_TEST_BIGQUERY_DATASET"]
             bigquery_profile_args["project"] = os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", "astronomer-dag-authoring")
             super().__init__(
@@ -42,6 +42,12 @@ def _use_bigquery_in_place_of_postgres() -> None:
                 disable_event_tracking=disable_event_tracking,
                 dbt_config_vars=dbt_config_vars,
             )
+
+        @property
+        def profile(self):
+            # BigQuery has no schema: the job's dataset is used instead. The caller's `schema` stays in `profile_args`
+            # so the tests that read it still see it, but it never reaches the dbt profile.
+            return {key: value for key, value in super().profile.items() if key != "schema"}
 
     cosmos.profiles.PostgresUserPasswordProfileMapping = BigQueryInPlaceOfPostgresProfileMapping
     cosmos.profiles.postgres.PostgresUserPasswordProfileMapping = BigQueryInPlaceOfPostgresProfileMapping

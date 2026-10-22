@@ -1,7 +1,7 @@
 """Pytest plugin for the dbt-oss integration job, ``.github/workflows/test-dbt-oss.yml``.
 
-dbt-oss does not support the Postgres adapter the integration tests are written for, so that job runs them against
-BigQuery. It loads this plugin through ``PYTEST_PLUGINS=tests.dbt_oss_plugin``, so no other job imports it: every
+dbt-oss treats the Postgres adapter the integration tests are written for as experimental, so that job runs them
+against BigQuery. It loads this plugin through ``PYTEST_PLUGINS=tests.dbt_oss_plugin``, so no other job imports it: every
 ``PostgresUserPasswordProfileMapping`` built by the tests and the example DAGs becomes a BigQuery mapping that writes
 to ``COSMOS_TEST_BIGQUERY_DATASET``, and the tests that need Postgres itself are skipped.
 

@@ -13,7 +13,9 @@ variables that should be used for rendering and execution. It takes the followin
   ``(Path(__file__).parent / "dbt/my_dbt_project").absolute().as_posix()``. See :doc:`/getting_started/astro`.
 - ``models_relative_paths``: (new in v1.16) The path(s) to your models directories, relative to the ``dbt_project_path``. Accepts a
   single path or a list of paths, mirroring dbt's own support for multiple ``model-paths``. This defaults to ``["models"]``.
-  Replaces ``models_relative_path``, deprecated since v1.16 and will be removed in Cosmos 2.0.
+  Replaces ``models_relative_path``, deprecated since v1.16 and will be removed in Cosmos 2.0. The relative paths are
+  also honoured when the project root is supplied through ``RenderConfig`` or ``ExecutionConfig`` instead of
+  ``dbt_project_path``.
 - ``seeds_relative_paths``: (new in v1.16) The path(s) to your seeds directories, relative to the ``dbt_project_path``. Accepts a
   single path or a list of paths. This defaults to ``["seeds"]``. Replaces ``seeds_relative_path``, deprecated since v1.16
   and will be removed in Cosmos 2.0.

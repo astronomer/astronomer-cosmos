@@ -7,7 +7,7 @@ name: test-dbt-oss
 # while dbt-oss is rolled out one group at a time. test.yml is unchanged.
 on:
   push: # Run on pushes to the default branch
-    branches: [main, ci/enable-watcher-dbt-oss-tests] # TEMPORARY: revert before merge
+    branches: [main]
   # Uses secrets, so it depends on the Authorize job, which requires manually approving the workflow run for external PRs
   # (same as test.yml). Pull requests use the workflow file from the base branch.
   pull_request_target:

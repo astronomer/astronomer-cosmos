@@ -545,7 +545,7 @@ class TestXcomBackupWithTaskStateStore:
         assert ti.store == {}
         mock_get_variable.assert_called_once()
 
-    @patch("cosmos.operators._watcher.xcom.MAX_BACKUP_ROW_BYTES", 1)
+    @patch("cosmos.operators._watcher.xcom.TASK_STATE_STORE_BACKUP_ROW_BYTES", 1)
     @patch("cosmos.operators._watcher.xcom.delete_variable")
     def test_delete_removes_every_task_state_store_row(self, mock_delete_variable):
         task_state_store = _FakeTaskStateStore()
@@ -565,7 +565,7 @@ class TestXcomBackupWithTaskStateStore:
         task_state_store = _FakeTaskStateStore()
         ti = _MockTI()
         _init_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
-        with patch("cosmos.operators._watcher.xcom.MAX_BACKUP_ROW_BYTES", 300):
+        with patch("cosmos.operators._watcher.xcom.TASK_STATE_STORE_BACKUP_ROW_BYTES", 300):
             safe_xcom_push(ti, "model__a_compiled_sql", os.urandom(60).hex())
             safe_xcom_push(ti, "model__b_compiled_sql", os.urandom(90).hex())
 
@@ -582,7 +582,10 @@ class TestXcomBackupWithTaskStateStore:
         task_state_store = _FakeTaskStateStore()
         ti = _MockTI()
         _init_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
-        with patch("cosmos.operators._watcher.xcom.MAX_BACKUP_ROW_BYTES", 300), caplog.at_level(logging.WARNING):
+        with (
+            patch("cosmos.operators._watcher.xcom.TASK_STATE_STORE_BACKUP_ROW_BYTES", 300),
+            caplog.at_level(logging.WARNING),
+        ):
             safe_xcom_push(ti, "model__a_status", "success")
             safe_xcom_push(ti, "model__big_compiled_sql", os.urandom(400).hex())
             safe_xcom_push(ti, "model__b_status", "success")
@@ -614,7 +617,7 @@ class TestXcomBackupWithTaskStateStore:
         task_state_store.set = flaky_set
         ti = _MockTI()
         _init_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
-        with patch("cosmos.operators._watcher.xcom.MAX_BACKUP_ROW_BYTES", 300):
+        with patch("cosmos.operators._watcher.xcom.TASK_STATE_STORE_BACKUP_ROW_BYTES", 300):
             safe_xcom_push(ti, "model__a_compiled_sql", os.urandom(60).hex())
             with pytest.raises(RuntimeError, match="store unavailable"):
                 safe_xcom_push(ti, "model__b_compiled_sql", os.urandom(90).hex())
@@ -681,7 +684,7 @@ class TestXcomBackupWithTaskStateStore:
         task_state_store.set = flaky_set
         ti = _MockTI()
         _init_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
-        with patch("cosmos.operators._watcher.xcom.MAX_BACKUP_ROW_BYTES", 300):
+        with patch("cosmos.operators._watcher.xcom.TASK_STATE_STORE_BACKUP_ROW_BYTES", 300):
             safe_xcom_push(ti, "model__a_compiled_sql", os.urandom(60).hex())
             for model in ("b", "c"):
                 with pytest.raises(RuntimeError, match="store unavailable"):
@@ -696,7 +699,7 @@ class TestXcomBackupWithTaskStateStore:
         task_state_store = _FakeTaskStateStore()
         ti = _MockTI()
         _init_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
-        with patch("cosmos.operators._watcher.xcom.MAX_BACKUP_ROW_BYTES", 300):
+        with patch("cosmos.operators._watcher.xcom.TASK_STATE_STORE_BACKUP_ROW_BYTES", 300):
             for index in range(6):
                 safe_xcom_push(ti, f"model__m{index}_compiled_sql", os.urandom(60).hex())
 

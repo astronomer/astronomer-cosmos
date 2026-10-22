@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 XCOM_BACKUP_VARIABLE_PREFIX = "cosmos_xcom_backup"
 TASK_STATE_STORE_BACKUP_KEY = "cosmos_xcom_backup"
 # Airflow warns about task store values above [state_store] max_value_storage_bytes (65535 by default).
-MAX_BACKUP_ROW_BYTES = 8 * 1024
+TASK_STATE_STORE_BACKUP_ROW_BYTES = 8 * 1024
 TASK_STATE_STORE_CONTEXT_KEY = "task_state_store"
 TASK_STATE_STORE_TI_ATTRIBUTE = "_cosmos_task_state_store"
 
@@ -129,7 +129,7 @@ def _persist_backup(var_key: str, backup_buffer: dict[str, Any]) -> None:
 def _persist_backup_row(ti: Any, key: str, value: Any) -> None:
     """Add one pushed entry to the open task store row.
 
-    The row rolls over before a write that would take it past MAX_BACKUP_ROW_BYTES, so a row only exceeds the bound
+    The row rolls over before a write that would take it past TASK_STATE_STORE_BACKUP_ROW_BYTES, so a row only exceeds the bound
     when a single entry does. Such an entry gets a row of its own and is written as it is: Airflow can offload it
     through ``[workers] state_store_backend``, and splitting it here would need matching reassembly on restore.
 
@@ -141,7 +141,7 @@ def _persist_backup_row(ti: Any, key: str, value: Any) -> None:
     open_row: dict[str, Any] = ti._cosmos_xcom_backup_open_row
     row_index = ti._cosmos_xcom_backup_rows_written
     encoded = _encode_backup({**open_row, key: value})
-    if open_row and len(encoded) >= MAX_BACKUP_ROW_BYTES:
+    if open_row and len(encoded) >= TASK_STATE_STORE_BACKUP_ROW_BYTES:
         if not ti._cosmos_xcom_backup_open_row_persisted:
             try:
                 task_state_store.set(_task_state_store_row_key(row_index), _encode_backup(open_row))
@@ -154,16 +154,16 @@ def _persist_backup_row(ti: Any, key: str, value: Any) -> None:
         encoded = _encode_backup({key: value})
     open_row[key] = value
     ti._cosmos_xcom_backup_open_row_persisted = False
-    if len(encoded) >= MAX_BACKUP_ROW_BYTES:
+    if len(encoded) >= TASK_STATE_STORE_BACKUP_ROW_BYTES:
         logger.warning(
             "XCom backup entry '%s' is %d bytes on its own, above the %d byte row bound; it is stored unsplit.",
             key,
             len(encoded),
-            MAX_BACKUP_ROW_BYTES,
+            TASK_STATE_STORE_BACKUP_ROW_BYTES,
         )
     task_state_store.set(_task_state_store_row_key(row_index), encoded)
     ti._cosmos_xcom_backup_open_row_persisted = True
-    if len(encoded) >= MAX_BACKUP_ROW_BYTES:
+    if len(encoded) >= TASK_STATE_STORE_BACKUP_ROW_BYTES:
         ti._cosmos_xcom_backup_rows_written = row_index + 1
         ti._cosmos_xcom_backup_open_row = {}
 

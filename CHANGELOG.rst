@@ -38,8 +38,9 @@ Bug Fixes
 * Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn, so ``<folder>+`` and ``<package>+`` behave like their ``path:`` and ``package:`` equivalents and like ``dbt ls``. Previously the graph selector resolved its root by exact node name only, and bare-identifier matching keyed off the absolute file path. See #2962.
 * ``LoadMode.DBT_LS`` now runs ``dbt ls`` through a Python subprocess when dbt 2 (``dbt-core``, ``dbt-oss`` or ``dbt`` 2.x) is installed in the Airflow environment, even under the default ``InvocationMode.DBT_RUNNER``. dbt 2's ``dbtRunner`` returns only node names for ``dbt ls --output json``, which previously rendered an empty DAG. The fallback runs ``dbt_executable_path`` and is logged at INFO level; ``dbt deps`` still runs through ``dbtRunner``. See #2992 and #3060.
 * Run the tests defined on dbt sources under ``TestBehavior.BUILD``: a source with tests is rendered as a task group
-  with a dedicated test task, as under ``TestBehavior.AFTER_EACH``. ``dbt build`` is only used for models, seeds and
-  snapshots, and ``dbt source freshness`` does not run tests, so source tests were silently skipped. See #1683.
+  with a dedicated test task, as under ``TestBehavior.AFTER_EACH``. Sources are rendered as ``dbt source freshness``
+  tasks and the build tasks of models, seeds and snapshots select only their own node, so source tests were never
+  selected by any task. See #1683.
 
 1.15.1 (2026-08-04)
 -------------------

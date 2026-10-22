@@ -341,7 +341,7 @@ def test_build_airflow_graph_renders_source_tests_with_build_test_behavior():
         path_base=SAMPLE_PROJ_PATH,
         original_file_path=Path("gen2/models/sources.yml"),
         tags=[],
-        config={},
+        config={"meta": {"cosmos": {"operator_kwargs": {"pool": "source_tests_pool"}}}},
         depends_on=[source_node.unique_id],
     )
     nodes = {node.unique_id: node for node in (source_node, test_node)}
@@ -369,7 +369,61 @@ def test_build_airflow_graph_renders_source_tests_with_build_test_behavior():
             ),
         )
     assert sorted(task.task_id for task in dag.tasks) == ["my_source.source", "my_source.test"]
-    assert dag.get_task("my_source.test").__class__.__name__ == "DbtTestLocalOperator"
+    test_task = dag.get_task("my_source.test")
+    assert test_task.__class__.__name__ == "DbtTestLocalOperator"
+    assert test_task.pool == "source_tests_pool"
+
+
+def test_calculate_test_operator_kwargs_only_collects_requested_parent_types():
+    """
+    Under TestBehavior.BUILD only source tests get a task of their own, so the kwargs declared by the tests of
+    models, seeds and snapshots must be left alone: their tests run inside the parent's ``dbt build`` task.
+    """
+    model_node = DbtNode(
+        unique_id="model.astro_shop.customers",
+        resource_type=DbtResourceType.MODEL,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/customers.sql"),
+        tags=[],
+        config={},
+        depends_on=[],
+    )
+    source_node = DbtNode(
+        unique_id="source.astro_shop.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/sources.yml"),
+        tags=[],
+        config={},
+        depends_on=[],
+    )
+    model_test = DbtNode(
+        unique_id="test.astro_shop.not_null_customers_id",
+        resource_type=DbtResourceType.TEST,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/schema.yml"),
+        tags=[],
+        config={"meta": {"cosmos": {"operator_kwargs": {"retries": 3}}}},
+        depends_on=[model_node.unique_id],
+    )
+    source_test = DbtNode(
+        unique_id="test.astro_shop.not_null_my_source_id",
+        resource_type=DbtResourceType.TEST,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/sources.yml"),
+        tags=[],
+        config={"meta": {"cosmos": {"operator_kwargs": {"pool": "source_tests_pool"}}}},
+        depends_on=[source_node.unique_id],
+    )
+    nodes = {node.unique_id: node for node in (model_node, source_node, model_test, source_test)}
+
+    assert calculate_test_operator_kwargs(nodes, {}, RenderConfig(test_behavior=TestBehavior.BUILD)) == {
+        source_node.unique_id: {"pool": "source_tests_pool"}
+    }
+    assert calculate_test_operator_kwargs(nodes, {}, RenderConfig(test_behavior=TestBehavior.AFTER_EACH)) == {
+        model_node.unique_id: {"retries": 3},
+        source_node.unique_id: {"pool": "source_tests_pool"},
+    }
 
 
 def test_generate_task_or_group_with_dynamic_node_type_and_converter():

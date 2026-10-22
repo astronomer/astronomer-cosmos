@@ -142,3 +142,39 @@ def test_xcom_backup_falls_back_to_the_variable_when_the_last_write_fails():
     assert observed == {"restored": True, "statuses": dict.fromkeys(statuses, "success"), "leftover": None}
     variable_key = _xcom_backup_variable_key(dag.dag_id, None, dag_run.run_id)
     assert compatibility.get_variable(variable_key, default=None) is None
+
+
+@pytest.mark.integration
+def test_xcom_backup_survives_retry_in_the_variable_when_not_persisting():
+    try:
+        from airflow.sdk import DAG, task
+    except ImportError:
+        from airflow import DAG
+        from airflow.decorators import task
+
+    from tests.utils import new_test_dag
+
+    observed = {}
+
+    @task(retries=1, retry_delay=timedelta(seconds=0), on_retry_callback=_backup_xcom_to_variable)
+    def producer(**context):
+        ti = context["ti"]
+        if ti.try_number == 1:
+            _init_xcom_backup(context, persist=False)
+            safe_xcom_push(ti, "model__a_status", "success")
+            raise RuntimeError("fail the first attempt")
+        task_state_store = context.get("task_state_store")
+        observed["store_untouched"] = (
+            task_state_store is None or task_state_store.get(_task_state_store_row_key(0)) is None
+        )
+        observed["restored"] = _restore_xcom_backup(context, read_task_state_store=False)
+        observed["status"] = ti.xcom_pull(task_ids=ti.task_id, key="model__a_status")
+
+    with DAG("cosmos_xcom_backup_variable_only", start_date=datetime(2024, 1, 1), schedule=None) as dag:
+        producer()
+
+    dag_run = new_test_dag(dag)
+
+    assert observed == {"store_untouched": True, "restored": True, "status": "success"}
+    variable_key = _xcom_backup_variable_key(dag.dag_id, None, dag_run.run_id)
+    assert compatibility.get_variable(variable_key, default=None) is None

@@ -24,6 +24,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_terminal,
     is_producer_task_still_running,
     is_producer_task_terminated,
+    normalize_dbt_node_status,
     safe_xcom_push,
 )
 from cosmos.operators._watcher.xcom import (
@@ -40,7 +41,7 @@ from cosmos.operators._watcher.xcom import (
 class TestNodeStatusHelpers:
     """Tests for node status helper functions."""
 
-    @pytest.mark.parametrize("status", ["success", "pass", "warn"])
+    @pytest.mark.parametrize("status", ["success", "pass", "warn", "Warn", "Success", "PASS"])
     def test_is_dbt_node_status_success_true(self, status: str):
         assert is_dbt_node_status_success(status) is True
 
@@ -48,7 +49,7 @@ class TestNodeStatusHelpers:
     def test_is_dbt_node_status_success_false(self, status: str | None):
         assert is_dbt_node_status_success(status) is False
 
-    @pytest.mark.parametrize("status", ["failed", "fail", "error"])
+    @pytest.mark.parametrize("status", ["failed", "fail", "error", "Error", "Fail", "Runtime Error"])
     def test_is_dbt_node_status_failed_true(self, status: str):
         assert is_dbt_node_status_failed(status) is True
 
@@ -56,7 +57,7 @@ class TestNodeStatusHelpers:
     def test_is_dbt_node_status_failed_false(self, status: str | None):
         assert is_dbt_node_status_failed(status) is False
 
-    @pytest.mark.parametrize("status", ["skipped"])
+    @pytest.mark.parametrize("status", ["skipped", "Skipped"])
     def test_is_dbt_node_status_skipped_true(self, status: str):
         assert is_dbt_node_status_skipped(status) is True
 
@@ -64,13 +65,21 @@ class TestNodeStatusHelpers:
     def test_is_dbt_node_status_skipped_false(self, status: str | None):
         assert is_dbt_node_status_skipped(status) is False
 
-    @pytest.mark.parametrize("status", ["success", "pass", "warn", "failed", "fail", "error", "skipped"])
+    @pytest.mark.parametrize(
+        "status", ["success", "pass", "warn", "failed", "fail", "error", "skipped", "Warn", "Error"]
+    )
     def test_is_dbt_node_status_terminal_true(self, status: str):
         assert is_dbt_node_status_terminal(status) is True
 
-    @pytest.mark.parametrize("status", ["running", None, ""])
+    @pytest.mark.parametrize("status", ["running", "Running", None, ""])
     def test_is_dbt_node_status_terminal_false(self, status: str | None):
         assert is_dbt_node_status_terminal(status) is False
+
+    @pytest.mark.parametrize(
+        "status, expected", [("Warn", "warn"), ("warn", "warn"), ("RUNTIME ERROR", "runtime error"), (None, None)]
+    )
+    def test_normalize_dbt_node_status(self, status: str | None, expected: str | None):
+        assert normalize_dbt_node_status(status) == expected
 
 
 class TestXcomKeyHelpers:

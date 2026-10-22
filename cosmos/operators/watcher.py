@@ -42,6 +42,7 @@ from cosmos.operators._watcher.state import (
     DBT_SOURCE_FRESHNESS_STALE_STATUSES,
     DBT_SUCCESS_STATUSES,
     DbtNodeStatus,
+    normalize_dbt_node_status,
 )
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
@@ -102,7 +103,7 @@ def _default_freshness_callback(
     stale_source_ids = {
         r["unique_id"]
         for r in sources_json.get("results", [])
-        if r.get("status") in DBT_SOURCE_FRESHNESS_STALE_STATUSES
+        if normalize_dbt_node_status(r.get("status")) in DBT_SOURCE_FRESHNESS_STALE_STATUSES
     }
     if not stale_source_ids:
         return []

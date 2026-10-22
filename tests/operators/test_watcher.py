@@ -3721,6 +3721,26 @@ class TestDefaultFreshnessCallback:
         )
         assert result == []
 
+    @pytest.mark.parametrize("status", ["warn", "error", "Warn", "Error"])
+    def test_stale_source_status_is_case_insensitive(self, status):
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "model.pkg.m1": DbtNode(
+                unique_id="model.pkg.m1",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.src1"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+            ),
+        }
+        sources_json = {"results": [{"unique_id": "source.pkg.src1", "status": status}]}
+        result = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        assert [unique_id for unique_id, _state in result] == ["model.pkg.m1"]
+
     def test_returns_transitive_dependents_of_stale_source(self):
         from cosmos.constants import DbtResourceType
         from cosmos.dbt.graph import DbtNode

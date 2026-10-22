@@ -102,19 +102,28 @@ class DbtTestStatus(str, Enum):
         return str(self.value)
 
 
+def normalize_dbt_node_status(status: Any) -> Any:
+    """Lowercase a dbt status string so that ``"Warn"`` and ``"warn"`` mean the same thing.
+
+    dbt 1.x reports lowercase statuses, while dbt 2 (dbt-oss) reports some of them capitalised, for example ``Warn``
+    for a source freshness check. Anything that is not a string (``None``) is returned unchanged.
+    """
+    return status.lower() if isinstance(status, str) else status
+
+
 def is_dbt_node_status_success(status: str | None) -> bool:
     """Check if the dbt node status indicates success (works for both models and tests)."""
-    return status in DBT_SUCCESS_STATUSES
+    return normalize_dbt_node_status(status) in DBT_SUCCESS_STATUSES
 
 
 def is_dbt_node_status_failed(status: str | None) -> bool:
     """Check if the dbt node status indicates failure (works for both models and tests)."""
-    return status in DBT_FAILED_STATUSES
+    return normalize_dbt_node_status(status) in DBT_FAILED_STATUSES
 
 
 def is_dbt_node_status_skipped(status: str | None) -> bool:
     """Check if the dbt node status indicates it was skipped (e.g. stale upstream source, upstream failure)."""
-    return status in DBT_SKIPPED_STATUSES
+    return normalize_dbt_node_status(status) in DBT_SKIPPED_STATUSES
 
 
 def is_dbt_node_status_terminal(status: str | None) -> bool:

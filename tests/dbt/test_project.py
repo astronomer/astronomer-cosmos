@@ -1,4 +1,3 @@
-import importlib.metadata
 import os
 import sys
 from pathlib import Path
@@ -25,6 +24,7 @@ from cosmos.dbt.project import (
     has_non_empty_dependencies_file,
     remove_dags_folder_from_pythonpath,
 )
+from cosmos.dbt.runner import is_dbt_v2
 from cosmos.exceptions import CosmosValueError
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -502,18 +502,7 @@ def _reset_dbt_plugin_discovery_cache():
     sys.modules.pop("dbt_victim", None)
 
 
-def _is_dbt_v2() -> bool:
-    """dbt v2 is distributed as ``dbt`` or ``dbt-oss`` (https://docs.getdbt.com/blog/comparing-dbt-and-dbt-oss)."""
-    for distribution in ("dbt", "dbt-oss"):
-        try:
-            importlib.metadata.version(distribution)
-        except importlib.metadata.PackageNotFoundError:
-            continue
-        return True
-    return False
-
-
-@pytest.mark.skipif(_is_dbt_v2(), reason="Uses the dbt-core 1.x dbt.plugins module")
+@pytest.mark.skipif(is_dbt_v2(), reason="Uses the dbt-core 1.x dbt.plugins module")
 def test_run_command_dbt_runner_excludes_dags_folder_dbt_module(tmp_path):
     """#1673, in-process ``InvocationMode.DBT_RUNNER`` path.
 
@@ -553,7 +542,7 @@ def test_run_command_dbt_runner_excludes_dags_folder_dbt_module(tmp_path):
             sys.path.remove(str(dags_folder))
 
 
-@pytest.mark.skipif(_is_dbt_v2(), reason="Uses a Postgres profile (dbt1005 on dbt v2)")
+@pytest.mark.skipif(is_dbt_v2(), reason="dbt-oss has no dbt_* plugin discovery, so the #1673 leak does not apply")
 def test_run_command_with_subprocess_excludes_dags_folder_dbt_module(tmp_path):
     """#1673, ``InvocationMode.SUBPROCESS`` path.
 

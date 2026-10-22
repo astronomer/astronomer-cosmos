@@ -172,7 +172,8 @@ def run_command(
     macro_errors: list[str] = []
     # ``build_cmd`` puts flags on both sides of the subcommand — dbt global flags before it,
     # ``add_global_flags()``/``dbt_cmd_flags`` after it — so a positional check is not safe here.
-    if "run-operation" in cli_args:
+    # dbt 2's ``dbtRunner`` rejects ``callbacks=`` with ``NotImplementedError`` and has no protobuf events to read.
+    if "run-operation" in cli_args and not is_dbt_v2():
         callbacks = [*(callbacks or []), _collect_macro_errors(macro_errors)]
     # ``exclude_dags_folder_from_sys_path`` must enter *before* ``change_working_directory`` so it
     # resolves ``DAGS_FOLDER`` against the Airflow process cwd. A relative ``DAGS_FOLDER`` resolved

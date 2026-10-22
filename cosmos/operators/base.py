@@ -476,6 +476,13 @@ class DbtRunMixin:
         return flags
 
 
+class DbtSemanticMetricViewMixin(DbtRunMixin):
+    """Mixin for dbt run command on adapter-native semantic metric views. Same command and flags
+    as DbtRunMixin, but its own type so these tasks render distinctly in the Airflow UI."""
+
+    ui_color = "#E8A33D"
+
+
 class DbtTestMixin:
     """Mixin for dbt test command."""
 

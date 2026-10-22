@@ -1,8 +1,10 @@
+import json
 from unittest.mock import MagicMock
 
 import pytest
 
 from cosmos.dbt.parser.output import (
+    extract_dbt_failure_details,
     extract_dbt_runner_issues,
     extract_freshness_warn_msg,
     extract_log_issues,
@@ -133,6 +135,73 @@ def test_extract_log_issues_dbt_1_12_format() -> None:
     assert test_results == ["Got 4 results, configured to warn if >1"]
 
 
+def _json_log_line(msg: str) -> str:
+    """A dbt ``--log-format json`` line."""
+    return json.dumps({"data": {}, "info": {"level": "info", "msg": msg, "ts": "2026-10-19T10:00:00.000000Z"}})
+
+
+def test_extract_log_issues_json_log_format() -> None:
+    log_list = [
+        _json_log_line("Finished running 2 data tests, 1 view model in 0 hours 0 minutes and 0.24 seconds (0.24s)."),
+        _json_log_line("\x1b[33mWarning in test unique_m_id (models/schema.yml)\x1b[0m"),
+        _json_log_line("Got 1 result, configured to warn if != 0"),
+        _json_log_line("Done. PASS=1 WARN=1 ERROR=0 SKIP=0 NO-OP=0 TOTAL=2"),
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["unique_m_id"]
+    assert test_results == ["Got 1 result, configured to warn if != 0"]
+
+
+def test_extract_log_issues_json_log_format_dbt_1_12() -> None:
+    log_list = [
+        _json_log_line("Finished running 1 test in 0 hours 0 minutes and 0.13 seconds (0.13s)."),
+        _json_log_line("[WARNING]: in test accepted_values_mini_orders_status__placed (models/schema.yml)"),
+        _json_log_line("[WARNING]: Got 4 results, configured to warn if >1"),
+        _json_log_line("Done. PASS=0 WARN=1 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=1"),
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["accepted_values_mini_orders_status__placed"]
+    assert test_results == ["Got 4 results, configured to warn if >1"]
+
+
+def test_extract_dbt_failure_details() -> None:
+    log_list = [
+        "20:30:01  \x1b[31mRunning with dbt=1.3.0\x1b[0m",
+        "20:30:02  \x1b[31mFailure in test not_null_my_model_id (models/schema.yml)\x1b[0m",
+        "20:30:02  \x1b[31m  Got 5 results, configured to fail if != 0\x1b[0m",
+        "20:30:03  \x1b[31mError in model my_model (models/my_model.sql)\x1b[0m",
+        "20:30:03  \x1b[31m  Database Error: relation does not exist\x1b[0m",
+    ]
+    details = extract_dbt_failure_details(log_list)
+    assert details == [
+        "Failure in test not_null_my_model_id (models/schema.yml) Got 5 results, configured to fail if != 0",
+        "Error in model my_model (models/my_model.sql) Database Error: relation does not exist",
+    ]
+
+    assert extract_dbt_failure_details(["20:30:01  Running with dbt=1.3.0", "20:30:02  Completed successfully"]) == []
+
+
+def test_extract_dbt_failure_details_json_log_format() -> None:
+    log_list = [
+        _json_log_line("\x1b[31mFailure in test not_null_m_id (models/schema.yml)\x1b[0m"),
+        _json_log_line("  Got 1 result, configured to fail if != 0"),
+        "not a json line",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Failure in test not_null_m_id (models/schema.yml) Got 1 result, configured to fail if != 0"
+    ]
+
+
+def test_extract_dbt_failure_details_json_log_format_dbt_1_12() -> None:
+    log_list = [
+        _json_log_line("[ERROR]: in test not_null_m_id (models/schema.yml)"),
+        _json_log_line("[ERROR]: Got 1 result, configured to fail if != 0"),
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Error in test not_null_m_id (models/schema.yml) Got 1 result, configured to fail if != 0"
+    ]
+
+
 def test_extract_dbt_runner_issues():
     """Tests that the function extracts the correct node names and messages from a dbt runner result
     for warnings by default.
@@ -191,3 +260,16 @@ def test_extract_freshness_warn_msg():
     assert node_results == [
         "INFO - 11:50:42  1 of 1 WARN freshness of postgres_db.raw_orders ................................ [WARN in 0.01s]"
     ]
+
+
+def test_extract_freshness_warn_msg_json_log_format():
+    warn_msg = "1 of 1 WARN freshness of postgres_db.raw_orders ................................ [WARN in 0.01s]"
+    result = FullOutputSubprocessResult(
+        full_output=[_json_log_line(warn_msg), _json_log_line("Done.")],
+        output=_json_log_line("Done."),
+        exit_code=0,
+    )
+    node_names, node_results = extract_freshness_warn_msg(result)
+
+    assert node_names == ["postgres_db.raw_orders"]
+    assert node_results == [warn_msg]

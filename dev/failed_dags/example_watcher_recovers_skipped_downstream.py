@@ -22,8 +22,8 @@ With the fix, the producer parser rewrites the ``"skipped"`` status to
 ``"failed"`` for any node that dbt skipped via ``SkippingDetails`` /
 ``LogSkipBecauseError`` (the only paths reached when ``do_skip(cause=...)``
 fires -- i.e. exclusively on upstream-node failure). The downstream consumer
-then fails on attempt 1, Airflow retries it, and the same consumer-fallback
-path that recovers the failing upstream now runs the downstream locally.
+then sees that dbt never ran the node and, once the upstream has recovered,
+runs the same consumer-fallback path locally on attempt 1 (#3023).
 
 Models used (from ``dev/dags/dbt/watcher_upstream_failure_recovery``):
 - ``model_a``: trivial source-style model, succeeds.

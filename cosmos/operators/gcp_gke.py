@@ -28,6 +28,7 @@ from cosmos.operators.base import (
     DbtRunMixin,
     DbtRunOperationMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
     DbtSourceMixin,
     DbtTestMixin,
@@ -152,6 +153,17 @@ class DbtRunGcpGkeOperator(DbtRunMixin, DbtGcpGkeBaseOperator):
     """
 
     template_fields: Sequence[str] = DbtGcpGkeBaseOperator.template_fields + DbtRunMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class DbtSemanticMetricViewGcpGkeOperator(DbtSemanticMetricViewMixin, DbtGcpGkeBaseOperator):
+    """
+    Executes a dbt core run command against an adapter-native semantic metric view.
+    """
+
+    template_fields: Sequence[str] = DbtGcpGkeBaseOperator.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

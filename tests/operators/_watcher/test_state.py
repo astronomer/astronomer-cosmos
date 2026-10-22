@@ -28,6 +28,7 @@ from cosmos.operators._watcher.state import (
 )
 from cosmos.operators._watcher.xcom import (
     _backup_xcom_to_variable,
+    _decode_backup,
     _delete_xcom_backup,
     _init_xcom_backup,
     _persist_backup,
@@ -489,19 +490,60 @@ class TestXcomBackupWithTaskStateStore:
         assert mock_set_variable.call_args.args[0] == ti._cosmos_xcom_backup_var_key
 
     @patch("cosmos.operators._watcher.xcom._persist_backup")
-    def test_failure_callback_does_not_write_when_the_task_state_store_holds_the_backup(self, mock_persist):
+    def test_failure_callback_does_not_write_when_every_push_reached_the_task_state_store(self, mock_persist):
         ti = _MockTI()
         context = {"ti": ti, "run_id": "test_run", "task_state_store": _FakeTaskStateStore()}
         _init_xcom_backup(context)
-        ti._cosmos_xcom_backup_buffer = {"k": "v"}
+        safe_xcom_push(ti, "model__a_status", "success")
 
         _backup_xcom_to_variable(context)
 
         mock_persist.assert_not_called()
 
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    @patch("cosmos.operators._watcher.xcom.get_variable")
+    @patch("cosmos.operators._watcher.xcom.set_variable")
+    def test_retry_callback_flushes_the_entries_the_task_state_store_missed(
+        self, mock_set_variable, mock_get_variable, mock_delete_variable
+    ):
+        task_state_store = _FakeTaskStateStore()
+        store_set = task_state_store.set
+
+        def fail_the_last_push(key, value):
+            if "model__c_status" in _decode_backup(value):
+                raise RuntimeError("store unavailable")
+            store_set(key, value)
+
+        task_state_store.set = fail_the_last_push
+        ti = _MockTI()
+        context = {"ti": ti, "run_id": "test_run", "task_state_store": task_state_store}
+        _init_xcom_backup(context)
+        safe_xcom_push(ti, "model__a_status", "success")
+        safe_xcom_push(ti, "model__b_status", "success")
+        with pytest.raises(RuntimeError, match="store unavailable"):
+            safe_xcom_push(ti, "model__c_status", "success")
+
+        _backup_xcom_to_variable(context)
+
+        var_key, flushed = mock_set_variable.call_args.args
+        assert var_key == ti._cosmos_xcom_backup_var_key
+        assert "model__c_status" in _decode_backup(flushed)
+
+        mock_get_variable.return_value = flushed
+        restored_ti = _MockTI()
+        assert _restore_xcom_backup({"ti": restored_ti, "run_id": "test_run", "task_state_store": task_state_store})
+        assert restored_ti.store == {
+            "model__a_status": "success",
+            "model__b_status": "success",
+            "model__c_status": "success",
+        }
+        assert task_state_store.values == {}
+        mock_delete_variable.assert_called_once_with(var_key)
+
     @patch("cosmos.operators._watcher.xcom.get_variable")
     @patch("cosmos.operators._watcher.xcom.delete_variable")
     def test_restore_reads_and_deletes_task_state_store_backup(self, mock_delete_variable, mock_get_variable):
+        mock_get_variable.return_value = None
         task_state_store = _FakeTaskStateStore()
         for row_index, row in enumerate(({"key1": "old", "key2": "val2"}, {"key1": "new"})):
             task_state_store.values[f"cosmos_xcom_backup_{row_index}"] = base64.b64encode(
@@ -514,7 +556,6 @@ class TestXcomBackupWithTaskStateStore:
         assert result is True
         assert ti.store == {"key1": "new", "key2": "val2"}
         assert task_state_store.values == {}
-        mock_get_variable.assert_not_called()
         mock_delete_variable.assert_not_called()
 
     @patch("cosmos.operators._watcher.xcom.delete_variable")
@@ -603,7 +644,8 @@ class TestXcomBackupWithTaskStateStore:
         assert rows == [["model__a_status"], ["model__big_compiled_sql"], ["model__b_status"]]
         assert "model__big_compiled_sql" in caplog.text and "stored unsplit" in caplog.text
 
-    def test_rollover_rewrites_a_row_whose_last_write_failed(self):
+    @patch("cosmos.operators._watcher.xcom.get_variable", return_value=None)
+    def test_rollover_rewrites_a_row_whose_last_write_failed(self, mock_get_variable):
         task_state_store = _FakeTaskStateStore()
         writes: list[str] = []
         store_set = task_state_store.set
@@ -670,7 +712,8 @@ class TestXcomBackupWithTaskStateStore:
         assert not _restore_xcom_backup({"ti": second_ti, "run_id": "test_run", "task_state_store": task_state_store})
         assert second_ti.store == {}
 
-    def test_entry_survives_a_failed_rewrite_of_the_pending_row(self):
+    @patch("cosmos.operators._watcher.xcom.get_variable", return_value=None)
+    def test_entry_survives_a_failed_rewrite_of_the_pending_row(self, mock_get_variable):
         task_state_store = _FakeTaskStateStore()
         writes: list[str] = []
         store_set = task_state_store.set

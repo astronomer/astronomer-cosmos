@@ -196,15 +196,21 @@ def _delete_task_state_store_rows(task_state_store: Any, row_count: int) -> None
 def _backup_xcom_to_variable(context: Any) -> None:
     """Flush the producer's backup buffer to an Airflow Variable from the retry or failure callback.
 
-    The buffer is built by ``safe_xcom_push`` (see ``_init_xcom_backup``). Nothing is written when the backup
-    is kept in the task store, which already holds every push.
+    The buffer is built by ``safe_xcom_push`` (see ``_init_xcom_backup``). When the backup is kept in the task
+    store, only the entries its last write failed to persist are written, since the retry callback cannot write
+    the task store; the restore merges them on top of the task store rows.
     """
     ti = context["ti"]
     var_key = getattr(ti, "_cosmos_xcom_backup_var_key", None)
-    if not isinstance(var_key, str) or getattr(ti, TASK_STATE_STORE_TI_ATTRIBUTE, None) is not None:
+    if not isinstance(var_key, str):
         return
 
-    backup_buffer = getattr(ti, "_cosmos_xcom_backup_buffer", {})
+    if getattr(ti, TASK_STATE_STORE_TI_ATTRIBUTE, None) is not None:
+        if ti._cosmos_xcom_backup_open_row_persisted:
+            return
+        backup_buffer = ti._cosmos_xcom_backup_open_row
+    else:
+        backup_buffer = getattr(ti, "_cosmos_xcom_backup_buffer", {})
     _persist_backup(var_key, backup_buffer)
     if backup_buffer:
         logger.debug("Backed up %d XCom entries to Variable '%s'", len(backup_buffer), var_key)
@@ -238,37 +244,37 @@ def _delete_xcom_backup(context: Any) -> None:
 
 
 def _restore_xcom_backup(context: Any) -> bool:
-    """Restore XCom entries from the backup a previous attempt left in the task store or in an Airflow Variable.
+    """Restore XCom entries from the backup a previous attempt left in the task store, in an Airflow Variable, or both.
+
+    The Variable holds the whole backup on Airflow before 3.3 and with ``enable_watcher_reliable_retry=False``, and
+    only the entries the task store missed otherwise, so its entries win on merge.
 
     Returns True if the restore succeeded, False if no backup was found.
     """
     ti = context["ti"]
     task_state_store = context.get(TASK_STATE_STORE_CONTEXT_KEY)
+    entries: dict[str, Any] = {}
+    row_count = 0
     if task_state_store is not None:
         entries, row_count = _read_task_state_store_rows(task_state_store)
-        if row_count:
-            _push_entries(ti, entries)
-            _delete_task_state_store_rows(task_state_store, row_count)
-            return True
-        logger.info("No XCom backup found in the task store, checking the backup Variable")
 
-    dag_id = ti.dag_id
-    run_id = context["run_id"]
-    task_group_id = _get_task_group_id(ti)
-
-    var_key = _xcom_backup_variable_key(dag_id, task_group_id, run_id)
+    var_key = _xcom_backup_variable_key(ti.dag_id, _get_task_group_id(ti), context["run_id"])
     compressed = get_variable(var_key, default=None)
-    if compressed is None:
-        logger.info("No XCom backup Variable found at '%s'", var_key)
+    if compressed is not None:
+        entries.update(_decode_backup(compressed))
+    if not row_count and compressed is None:
+        logger.info("No XCom backup found in the task store or at Variable '%s'", var_key)
         return False
 
-    _push_entries(ti, _decode_backup(compressed))
-
-    try:
-        delete_variable(var_key)
-        logger.debug("Deleted XCom backup Variable '%s' after restore", var_key)
-    except KeyError:
-        logger.debug("XCom backup Variable '%s' already deleted", var_key)
+    _push_entries(ti, entries)
+    if row_count:
+        _delete_task_state_store_rows(task_state_store, row_count)
+    if compressed is not None:
+        try:
+            delete_variable(var_key)
+            logger.debug("Deleted XCom backup Variable '%s' after restore", var_key)
+        except KeyError:
+            logger.debug("XCom backup Variable '%s' already deleted", var_key)
     return True
 
 

@@ -323,7 +323,8 @@ instead of a Variable (`#2771 <https://github.com/astronomer/astronomer-cosmos/i
   successful run is best effort and starts from the first key, so a failure leaves no readable backup rather
   than a stale one; retention removes the rest.
 - Writes to the task store from the retry callback are rejected, so the task store only serves the per-node
-  backup. With ``enable_watcher_reliable_retry = False`` the producer behaves as described above: no per-node
+  backup. If the last task store write failed, the retry callback flushes the entries it missed to the backup
+  Variable, and the restore merges them on top of the task store keys. With ``enable_watcher_reliable_retry = False`` the producer behaves as described above: no per-node
   writes, one Variable flush from the retry callback, and the task store is not used.
 - Backups left by a failed producer are removed by ``airflow state-store clean`` or ``airflow db clean`` once
   they are older than ``[state_store] default_retention_days`` (default 30; 0 disables expiry), or when the DAG

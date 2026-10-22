@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -533,15 +534,29 @@ def test_execute_watcher_producer_in_memory_mode_skips_variable_backup(mock_init
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
 @patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
-def test_execute_watcher_producer_deletes_task_state_store_backup_on_success(mock_init, mock_delete):
-    """With a task store the backup is always persisted, so a successful producer deletes it even when not reliable (#2771)."""
+def test_execute_watcher_producer_not_reliable_keeps_the_variable_flush_with_a_task_state_store(mock_init, mock_delete):
+    """With enable_watcher_reliable_retry=False the task store is left alone and nothing is deleted on success (#2771)."""
     ti = MagicMock()
     ti.try_number = 1
     context = {"ti": ti, "run_id": "test_run", "task_state_store": MagicMock()}
 
     execute_watcher_producer(MagicMock(), context, MagicMock(return_value="result"))
 
-    mock_delete.assert_called_once_with(context)
+    mock_init.assert_called_once_with(context, persist=False)
+    mock_delete.assert_not_called()
+
+
+@patch("cosmos.operators._k8s_common._restore_xcom_from_variable", return_value=False)
+def test_execute_watcher_producer_warns_when_no_backup_is_found_on_retry(mock_restore, caplog):
+    from airflow.exceptions import AirflowSkipException
+
+    ti = MagicMock()
+    ti.try_number = 2
+
+    with caplog.at_level(logging.WARNING), pytest.raises(AirflowSkipException):
+        execute_watcher_producer(MagicMock(), {"ti": ti, "run_id": "test_run"}, MagicMock())
+
+    assert "No XCom backup found for attempt #2" in caplog.text
 
 
 def test_execute_watcher_producer_raises_when_ti_missing():

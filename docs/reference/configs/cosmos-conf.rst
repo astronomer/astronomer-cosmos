@@ -502,7 +502,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 
     When ``False``, the backup is written once, when the producer is retried, via the producer's ``on_retry_callback`` (a graceful failure with retries left is ``UP_FOR_RETRY``, not ``FAILED``). This removes the per-node Variable I/O and improves producer performance. A graceful producer failure (for example a dbt model error) still flushes the backup, so consumers recover as in the reliable mode; only a hard kill (``SIGKILL``/OOM, where Airflow cannot run the callback) loses the in-memory statuses, in which case the affected consumer sensors re-run their dbt node locally. Results stay correct.
 
-    On Airflow 3.3 and later (Cosmos 1.16.0+), the backup uses the Airflow task store and is always written after every dbt node, so this setting has no effect. See :ref:`producer-status-backup-task-store`.
+    On Airflow 3.3 and later (Cosmos 1.16.0+), ``True`` keeps the per-node backup in the Airflow task store instead of a Variable, which makes no secrets-backend calls; ``False`` behaves as described above. See :ref:`producer-status-backup-task-store`.
 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_WATCHER_RELIABLE_RETRY``

@@ -13,10 +13,10 @@ from cosmos.airflow import compatibility
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.operators._watcher.state import safe_xcom_push
 from cosmos.operators._watcher.xcom import (
-    TASK_STATE_STORE_BACKUP_KEY,
     _init_xcom_backup,
     _persist_backup,
     _restore_xcom_from_variable,
+    _task_state_store_row_key,
     _xcom_backup_variable_key,
 )
 
@@ -77,16 +77,17 @@ def test_xcom_backup_survives_retry_in_task_state_store():
         if ti.try_number == 1:
             _init_xcom_backup(context)
             safe_xcom_push(ti, "model__a_status", "success")
+            observed["persisted"] = context["task_state_store"].get(_task_state_store_row_key(0)) is not None
             raise RuntimeError("fail the first attempt")
         observed["restored"] = _restore_xcom_from_variable(context)
         observed["status"] = ti.xcom_pull(task_ids=ti.task_id, key="model__a_status")
-        observed["leftover"] = context["task_state_store"].get(TASK_STATE_STORE_BACKUP_KEY)
+        observed["leftover"] = context["task_state_store"].get(_task_state_store_row_key(0))
 
     with DAG("cosmos_xcom_backup_task_state_store", start_date=datetime(2024, 1, 1), schedule=None) as dag:
         producer()
 
     dag_run = new_test_dag(dag)
 
-    assert observed == {"restored": True, "status": "success", "leftover": None}
+    assert observed == {"persisted": True, "restored": True, "status": "success", "leftover": None}
     variable_key = _xcom_backup_variable_key(dag.dag_id, None, dag_run.run_id)
     assert compatibility.get_variable(variable_key, default=None) is None

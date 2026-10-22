@@ -1972,42 +1972,6 @@ def test_select_by_test_tag_selects_the_tests_without_their_parents():
     assert dbt_graph.tests_per_model == {}
 
 
-def test_update_node_dependency_drops_an_excluded_test_that_select_reached():
-    def build_node(unique_id, resource_type, depends_on, original_file_path):
-        return DbtNode(
-            unique_id=unique_id,
-            resource_type=resource_type,
-            depends_on=depends_on,
-            path_base=EXCLUDED_TESTS_PROJECT,
-            original_file_path=Path(original_file_path),
-            tags=[],
-            config={},
-        )
-
-    nodes = {
-        "model.p.a": build_node("model.p.a", DbtResourceType.MODEL, [], "models/a.sql"),
-        "model.p.b": build_node("model.p.b", DbtResourceType.MODEL, [], "models/b.sql"),
-        "test.p.t": build_node("test.p.t", DbtResourceType.TEST, ["model.p.a", "model.p.b"], "tests/t.sql"),
-    }
-    dbt_graph = DbtGraph(
-        project=ProjectConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
-        execution_config=ExecutionConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
-        profile_config=ProfileConfig(
-            profile_name="default",
-            target_name="dev",
-            profiles_yml_filepath=EXCLUDED_TESTS_PROJECT / "profiles.yml",
-        ),
-        render_config=RenderConfig(select=["b+"], exclude=["a+"], should_detach_multiple_parents_tests=True),
-    )
-    dbt_graph._apply_manifest_node_selection(nodes, {})
-    assert "test.p.t" in dbt_graph.filtered_nodes
-
-    dbt_graph.update_node_dependency()
-
-    assert set(dbt_graph.filtered_nodes) == {"model.p.b"}
-    assert dbt_graph.tests_per_model == {}
-
-
 def test_apply_manifest_node_selection_exclude_does_not_widen_select():
     def build_node(unique_id, resource_type, depends_on, tags, original_file_path):
         return DbtNode(

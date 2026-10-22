@@ -29,9 +29,6 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``tag:my_tag,+node_name`` (intersection): include/exclude ``node_name`` and its parents if they have the tag ``my_tag`` (`dbt set operator docs <https://docs.getdbt.com/reference/node-selection/set-operators>`_)
 - ``['tag:first_tag', 'tag:second_tag']`` (union): include/exclude nodes that have either ``tag:first_tag`` or ``tag:second_tag``
 
-.. note::
-   Test nodes match a tag selector by their own tags or by the tags of their first parent, so ``tag:my_tag`` also selects or excludes the tests of a tagged model. dbt only looks at the test's own tags, so an intersection such as ``tag:a,tag:b`` can match a test in Cosmos that dbt would not. A test selected without its model is not rendered.
-
 - ``resource_type:<resource>``: include nodes with the resource type ``seed, snapshot, model, test, source, semantic_metric_view``. For example, ``resource_type:source`` returns only nodes where resource_type == SOURCE. ``semantic_metric_view`` matches adapter-native semantic metric views, and only when :ref:`enable_semantic_metric_view_reclassification` is on (see :doc:`Managing semantic metric views <managing-semantic-metric-views>`). It only works when Cosmos applies selection itself (e.g. ``LoadMode.DBT_MANIFEST``). Under ``LoadMode.DBT_LS`` or ``ExecutionMode.WATCHER``, where ``select``/``exclude`` are passed directly to the dbt CLI, use ``config.materialized:metric_view`` or ``config.materialized:semantic_view`` instead (``ExecutionMode.WATCHER`` raises an error for ``resource_type:semantic_metric_view``).
 - ``exclude_resource_type:<resource>``: exclude nodes with the resource type ``analysis, exposure, metric, model, saved_query, seed, semantic_model, snapshot, source, test, unit_test``. For example, ``exclude_resource_type:source`` returns only nodes where resource_type != SOURCE
 - ``source:my_source``: include/exclude nodes that have the source ``my_source`` and are of resource_type ``source``
@@ -44,6 +41,13 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 - ``package:package_name+``: include/exclude all nodes in the package and their descendants (children).
 - ``+package:package_name``: include/exclude all nodes in the package and their ancestors (parents).
 - A bare name without a method prefix (e.g. ``dbt_artifacts`` or ``child``) is resolved like dbt's default fully qualified name (fqn) selector: it matches the package, the model name, or a folder path from the project root (a top-level folder like ``folder_a``, or a dotted path like ``folder_a.sub``). A single middle folder segment on its own does not match, matching dbt. So ``select=['folder_a']`` or ``exclude=['folder_a']`` includes or excludes all models under ``folder_a``, including when using ``LoadMode.DBT_MANIFEST``. Graph operators work on these bare roots too, so ``select=['folder_a+']`` or ``select=['package_name+']`` selects the folder or package nodes and their descendants under ``LoadMode.DBT_MANIFEST``.
+
+.. note::
+
+    Test nodes match a tag selector by their own tags or by the tags of any of their parents, so ``tag:my_tag``
+    also selects or excludes the tests of a tagged model, as dbt's default indirect selection does. dbt only
+    looks at the test's own tags for an intersection, so ``tag:a,tag:b`` can match a test in Cosmos that dbt
+    would not. A test selected without its model is not rendered.
 
 .. note::
 
@@ -158,7 +162,9 @@ How ``exclude`` and ``select`` interact with test tasks
 behavior** (``AFTER_EACH``, ``BUILD`` and ``AFTER_ALL``). This means an exclusion such as
 ``exclude=["resource_type:unit_test"]`` is applied to the ``dbt test`` commands too, so you can
 exclude a specific test or a whole resource type without also having to repeat it in
-``operator_args``. Exclusions are purely additive, which makes this safe to forward.
+``operator_args``. Exclusions are purely additive, which makes this safe to forward. Since Cosmos 1.16, under
+``LoadMode.DBT_MANIFEST`` a test matched by ``exclude`` is also no longer rendered as a task, so a model whose
+tests are all excluded becomes a plain run task.
 
 .. code-block:: python
 

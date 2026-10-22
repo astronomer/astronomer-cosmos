@@ -2622,3 +2622,35 @@ def test_is_empty_config_with_only_groups(selector_config):
     """``groups`` alone must keep a selector config from being treated as empty."""
     selector_config.groups = ["finance"]
     assert selector_config.is_empty is False
+
+
+@pytest.mark.parametrize("depends_on", [["model.p.tagged", "model.p.plain"], ["model.p.plain", "model.p.tagged"]])
+def test_tag_selector_matches_a_test_through_any_of_its_parents(depends_on):
+    """Like dbt's eager indirect selection: a multi-parent test follows a tagged parent whatever its position."""
+    base = Path("/tmp/proj")
+
+    def node(name, resource_type, node_depends_on, tags):
+        return DbtNode(
+            unique_id=f"{resource_type.value}.p.{name}",
+            resource_type=resource_type,
+            depends_on=node_depends_on,
+            path_base=base,
+            original_file_path=Path(f"models/{name}.sql"),
+            tags=tags,
+            config={},
+        )
+
+    nodes = {
+        n.unique_id: n
+        for n in (
+            node("tagged", DbtResourceType.MODEL, [], ["x"]),
+            node("plain", DbtResourceType.MODEL, [], []),
+            node("shared_test", DbtResourceType.TEST, depends_on, []),
+        )
+    }
+
+    excluded = select_nodes(project_dir=base, nodes=nodes, exclude=["tag:x"])
+    assert sorted(excluded) == ["model.p.plain"]
+
+    selected = select_nodes(project_dir=base, nodes=nodes, select=["tag:x"])
+    assert sorted(selected) == ["model.p.tagged", "test.p.shared_test"]

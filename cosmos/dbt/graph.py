@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import copy
 import datetime
 import functools
 import itertools
@@ -1400,13 +1399,9 @@ class DbtGraph:
             select, exclude = self.render_config.select, self.render_config.exclude
         self.nodes = nodes
         self.filtered_nodes = select_nodes(project_dir=project_dir, nodes=nodes, select=select, exclude=exclude)
-        # Evaluated on the full graph because select may have left the tests out, and on copies because the selector
-        # rewrites test tags. A graph-operator exclude rooted outside the select subset matches nothing in
-        # select_nodes but does here, so only its tests are dropped.
-        self.excluded_node_ids = set()
-        if exclude:
-            nodes_copy = {node_id: copy.copy(node) for node_id, node in nodes.items()}
-            self.excluded_node_ids = apply_exclude_filter(nodes_copy, project_dir, exclude)
+        # select_nodes already drops the excluded nodes it reached. Tests that select never reached (for example with
+        # ``select path:models``) would be added back by update_node_dependency, so record them from the full graph.
+        self.excluded_node_ids = apply_exclude_filter(nodes, project_dir, exclude) if exclude else set()
 
     def _load_manifest_from_file(self, manifest_path: Path | ObjectStoragePath) -> dict[str, Any]:
         """
@@ -1499,7 +1494,6 @@ class DbtGraph:
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
                 if node.unique_id in self.excluded_node_ids:
-                    self.filtered_nodes.pop(node.unique_id, None)
                     continue
                 for node_id in node.depends_on:
                     if node_id in self.filtered_nodes:

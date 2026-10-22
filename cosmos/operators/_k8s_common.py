@@ -34,8 +34,8 @@ from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
     _delete_xcom_backup_variable,
     _init_xcom_backup,
+    _log_missing_backup,
     _restore_xcom_from_variable,
-    _uses_task_state_store,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -617,9 +617,9 @@ def execute_watcher_producer(operator: Any, context: Context, parent_execute: Ca
     On retry, restores any XCom backup and raises ``AirflowSkipException`` (the
     producer does not support Airflow retries). On the first attempt, initialises
     an XCom backup, exposes the execution context to the log-parsing callback, runs
-    the parent execute, and deletes the backup on success. On failure the producer's
-    on-failure/on-retry callback (see ``compose_watcher_backup_callbacks``) flushes
-    the backup so the next try can restore it.
+    the parent execute, and deletes the backup on success. On failure, unless the backup
+    is kept in the task store, the producer's on-failure/on-retry callback (see
+    ``compose_watcher_backup_callbacks``) flushes it so the next try can restore it.
     """
     task_instance = context.get("ti")
     if task_instance is None:
@@ -632,7 +632,8 @@ def execute_watcher_producer(operator: Any, context: Context, parent_execute: Ca
     reliable_retry = settings.enable_watcher_reliable_retry
 
     if try_number > 1:
-        _restore_xcom_from_variable(context)
+        if not _restore_xcom_from_variable(context):
+            _log_missing_backup(try_number)
         raise AirflowSkipException(
             f"{type(operator).__name__} does not support Airflow retries. "
             f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
@@ -651,8 +652,8 @@ def execute_watcher_producer(operator: Any, context: Context, parent_execute: Ca
 
     safe_xcom_push(task_instance=task_instance, key=_PRODUCER_CMD_FLAGS_XCOM_KEY, value=operator.add_cmd_flags())
 
-    # On failure parent_execute() raises and the on-failure callback flushes the backup.
+    # On failure parent_execute() raises; without a task store the retry callback flushes the backup to the Variable.
     return_value = parent_execute(context, **kwargs)
-    if reliable_retry or _uses_task_state_store(context):
+    if reliable_retry:
         _delete_xcom_backup_variable(context)
     return return_value

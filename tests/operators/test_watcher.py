@@ -30,6 +30,7 @@ from cosmos.constants import (
 )
 from cosmos.dbt.graph import DbtNode
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
+from cosmos.operators._watcher.state import safe_xcom_push
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
@@ -387,17 +388,90 @@ def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_succes
     mock_delete.assert_not_called()
 
 
-@patch("cosmos.settings.enable_watcher_reliable_retry", False)
-@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+class _FakeTaskStateStore:
+    def __init__(self) -> None:
+        self.values: dict[str, str] = {}
+
+    def get(self, key, default=None):
+        return self.values.get(key, default)
+
+    def set(self, key, value):
+        self.values[key] = value
+
+    def delete(self, key):
+        self.values.pop(key, None)
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
-def test_dbt_producer_watcher_operator_deletes_task_state_store_backup_on_success(mock_execute, mock_delete):
-    """With a task store the backup is always persisted, so a successful producer deletes it even when not reliable (#2771)."""
+def test_dbt_producer_watcher_operator_restores_from_the_task_state_store_on_retry(mock_execute):
+    """A failed first attempt leaves its statuses in the task store; the retry restores them and skips (#2771)."""
+    task_state_store = _FakeTaskStateStore()
+    first_ti = _MockTI()
+    first_context = {"ti": first_ti, "run_id": "test_run", "task_state_store": task_state_store}
+
+    def push_then_fail(context, **_):
+        safe_xcom_push(context["ti"], "model__a_status", "success")
+        raise RuntimeError("dbt build failed")
+
+    mock_execute.side_effect = push_then_fail
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
-    context = {"ti": _MockTI(), "run_id": "test_run", "task_state_store": MagicMock()}
+    with pytest.raises(RuntimeError):
+        op.execute(context=first_context)
+    assert "cosmos_xcom_backup_0" in task_state_store.values
+
+    retry_ti = _MockTI()
+    retry_ti.try_number = 2
+    retry_context = {"ti": retry_ti, "run_id": "test_run", "task_state_store": task_state_store}
+    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+        op.execute(context=retry_context)
+
+    assert retry_ti.store["model__a_status"] == "success"
+    assert task_state_store.values == {}
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_deletes_the_task_state_store_backup_on_success(mock_execute):
+    task_state_store = _FakeTaskStateStore()
+    context = {"ti": _MockTI(), "run_id": "test_run", "task_state_store": task_state_store}
+    mock_execute.side_effect = lambda context, **_: safe_xcom_push(context["ti"], "model__a_status", "success")
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
 
     op.execute(context=context)
 
-    mock_delete.assert_called_once_with(context)
+    assert task_state_store.values == {}
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators._watcher.xcom.set_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_not_reliable_leaves_the_task_state_store_alone(mock_execute, mock_set_variable):
+    """With enable_watcher_reliable_retry=False the task store is not used; the retry callback flushes a Variable (#2771)."""
+    task_state_store = _FakeTaskStateStore()
+    ti = _MockTI()
+    context = {"ti": ti, "run_id": "test_run", "task_state_store": task_state_store}
+    mock_execute.side_effect = lambda context, **_: safe_xcom_push(context["ti"], "model__a_status", "success")
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+    op.execute(context=context)
+
+    assert task_state_store.values == {}
+    assert ti._cosmos_xcom_persist_incrementally is False
+    mock_set_variable.assert_not_called()
+
+
+@patch("cosmos.operators.watcher._restore_xcom_from_variable", return_value=False)
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_warns_when_no_backup_is_found_on_retry(mock_execute, mock_restore, caplog):
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    ti = _MockTI()
+    ti.try_number = 2
+
+    with caplog.at_level(logging.WARNING), pytest.raises(AirflowSkipException):
+        op.execute(context={"ti": ti, "run_id": "test_run"})
+
+    assert "No XCom backup found for attempt #2" in caplog.text
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)

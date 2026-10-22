@@ -1478,18 +1478,15 @@ def select_nodes(
         return nodes
     validate_filters(exclude, select)
 
-    # Resolve `exclude` against the full project graph, before `select` narrows it.
-    # Graph operators (`+tag:x`, `tag:x+`, `+model_name`, ...) traverse outwards from
-    # the nodes matching the selector, so if those root nodes were dropped by `select`
-    # the traversal has nothing to start from and shared ancestors or descendants are
-    # silently kept. dbt evaluates both filters against the whole graph and subtracts
-    # afterwards; this does the same.
-    exclude_ids = apply_exclude_filter(nodes, project_dir, exclude)
-
+    # Resolve `exclude` against the full graph, not the `select`-narrowed subset, so graph
+    # operators (`+tag:x`) still find their root nodes. This matches dbt. `select` must run
+    # first: the selector rewrites test-node tags in place as it walks the graph.
     if select:
         subset_ids = apply_select_filter(nodes, project_dir, select)
     else:
         subset_ids = set(nodes.keys())
+
+    exclude_ids = apply_exclude_filter(nodes, project_dir, exclude)
 
     return get_nodes_from_subset(nodes, subset_ids - exclude_ids)
 

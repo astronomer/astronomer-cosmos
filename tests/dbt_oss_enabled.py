@@ -49,6 +49,7 @@ _NO_DATASETS = (
     "dbt-oss writes no datasets: its run_results.json has no args.profiles_dir, so the OpenLineage artifact parser raises "
     "KeyError (logged at debug level) and the inlets and outlets stay empty (reproduced locally with dbt-oss 2.0.8)"
 )
+_FORCES_DBT_RUNNER = "its example DAG sets invocation_mode=InvocationMode.DBT_RUNNER, which Cosmos rejects on dbt 2 because the dbtRunner has no callbacks"
 _NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _MODEL_VERSION_ALIAS = "dbt-oss fails on this project with 'Template not found: jaffle_shop.generate_alias_name'"
@@ -79,6 +80,9 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
     "tests/test_debug.py::test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled": _POSTGRES_ENV,
     "tests/test_example_dags.py::test_source_pruning_dag": _POSTGRES_ENV,
+    # The example DAG forces dbtRunner, which has no callbacks on dbt 2 (2)
+    "tests/test_example_dags.py::test_example_dag[example_watcher]": _FORCES_DBT_RUNNER,
+    "tests/test_example_dags.py::test_example_dag[example_watcher_with_freshness]": _FORCES_DBT_RUNNER,
     # dbt 2 dbtRunner has no callbacks (3)
     "tests/dbt/test_runner.py::test_dbt_runner_caching_and_callbacks": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_freshness_callback_excludes_model": _NO_CALLBACKS,

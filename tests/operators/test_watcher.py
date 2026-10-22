@@ -2328,15 +2328,20 @@ def test_dbt_dag_with_watcher(caplog):
         not in caplog.text
     )
 
-    # dbt prints the schema before the table: "public" on Postgres, the dataset on BigQuery.
-    log_message = re.compile(r"OK loaded seed file \S+\.raw_orders")
-    assert log_message.search(caplog.text)
+    # dbt 2 (dbt-oss) prints plain text such as "Succeeded seed <dataset>.raw_orders (table)" to stdout and does not
+    # produce the "OK loaded seed file" event that Cosmos re-logs for dbt 1.x, so this check only applies there.
+    from cosmos.dbt.runner import is_dbt_v2
 
-    # Verify that log messages are not duplicated (each dbt message should appear only once)
-    message_count = sum(1 for record in caplog.records if log_message.search(record.message))
-    assert (
-        message_count == 1
-    ), f"Expected '{log_message.pattern}' to be logged exactly once, but found {message_count} times"
+    if not is_dbt_v2():
+        # dbt prints the schema before the table: "public" on Postgres, the dataset on BigQuery.
+        log_message = re.compile(r"OK loaded seed file \S+\.raw_orders")
+        assert log_message.search(caplog.text)
+
+        # Verify that log messages are not duplicated (each dbt message should appear only once)
+        message_count = sum(1 for record in caplog.records if log_message.search(record.message))
+        assert (
+            message_count == 1
+        ), f"Expected '{log_message.pattern}' to be logged exactly once, but found {message_count} times"
 
 
 @pytest.mark.integration

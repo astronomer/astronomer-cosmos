@@ -15,7 +15,7 @@ default behavior, which runs all models and tests, and then reports all failures
 Cosmos supports the following test behaviors:
 
 - ``after_each`` (default): turns each model into a task group with two steps: run the model, and run the tests
-- ``build``: (since Cosmos 1.8) run dbt resources using the ``dbt build`` command, using a single task. This applies to dbt models, seeds and snapshots.
+- ``build``: (since Cosmos 1.8) run dbt resources using the ``dbt build`` command, using a single task. This applies to dbt models, seeds and snapshots. Sources are rendered as ``dbt source freshness`` tasks and the build tasks select only their own node, so tests defined on sources are rendered as a separate test task after the source task, as with ``after_each``.
 - ``after_all``: each model becomes a single task, and the tests only run if all models are run successfully
 - ``none``: don't include tests
 

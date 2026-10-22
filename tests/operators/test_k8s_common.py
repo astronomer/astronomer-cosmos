@@ -512,7 +512,7 @@ def test_execute_watcher_producer_skips_retry(mock_restore):
     with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
         execute_watcher_producer(MagicMock(), context, parent_execute)
 
-    mock_restore.assert_called_once_with(context)
+    mock_restore.assert_called_once_with(context, read_task_state_store=True)
     parent_execute.assert_not_called()
 
 

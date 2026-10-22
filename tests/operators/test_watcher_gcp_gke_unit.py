@@ -79,7 +79,7 @@ def test_skips_retry_attempt(mock_execute, mock_restore):
     with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
         op.execute(context=context)
 
-    mock_restore.assert_called_once_with(context)
+    mock_restore.assert_called_once_with(context, read_task_state_store=True)
     mock_execute.assert_not_called()
 
 

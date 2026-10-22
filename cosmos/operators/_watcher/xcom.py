@@ -243,11 +243,12 @@ def _delete_xcom_backup(context: Any) -> None:
         pass
 
 
-def _restore_xcom_backup(context: Any) -> bool:
+def _restore_xcom_backup(context: Any, *, read_task_state_store: bool = True) -> bool:
     """Restore XCom entries from the backup a previous attempt left in the task store, in an Airflow Variable, or both.
 
     The Variable holds the whole backup on Airflow before 3.3 and with ``enable_watcher_reliable_retry=False``, and
-    only the entries the task store missed otherwise, so its entries win on merge.
+    only the entries the task store missed otherwise, so its entries win on merge. With the setting off the task
+    store is not read at all, so an outage there cannot block a Variable-only restore.
 
     Cleanup is best effort, Variable first: a failure leaves the whole backup in place for the next retry, and
     raising would fail an attempt that has already restored it.
@@ -255,7 +256,7 @@ def _restore_xcom_backup(context: Any) -> bool:
     Returns True if the restore succeeded, False if no backup was found.
     """
     ti = context["ti"]
-    task_state_store = context.get(TASK_STATE_STORE_CONTEXT_KEY)
+    task_state_store = context.get(TASK_STATE_STORE_CONTEXT_KEY) if read_task_state_store else None
     entries: dict[str, Any] = {}
     row_count = 0
     if task_state_store is not None:

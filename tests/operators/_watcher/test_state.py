@@ -712,6 +712,31 @@ class TestXcomBackupWithTaskStateStore:
         assert not _restore_xcom_backup({"ti": second_ti, "run_id": "test_run", "task_state_store": task_state_store})
         assert second_ti.store == {}
 
+    @patch("cosmos.operators._watcher.xcom.delete_variable")
+    @patch("cosmos.operators._watcher.xcom.get_variable")
+    def test_restore_skips_the_task_state_store_when_not_persisting(self, mock_get_variable, mock_delete_variable):
+        task_state_store = _FakeTaskStateStore()
+        reads: list[str] = []
+
+        def unavailable_get(key, default=None):
+            reads.append(key)
+            raise RuntimeError("store unavailable")
+
+        task_state_store.get = unavailable_get
+        mock_get_variable.return_value = base64.b64encode(
+            zlib.compress(json.dumps({"model__a_status": "success"}).encode("utf-8"))
+        ).decode("utf-8")
+        ti = _MockTI()
+
+        result = _restore_xcom_backup(
+            {"ti": ti, "run_id": "test_run", "task_state_store": task_state_store}, read_task_state_store=False
+        )
+
+        assert result is True
+        assert ti.store == {"model__a_status": "success"}
+        assert reads == []
+        mock_delete_variable.assert_called_once()
+
     @patch("cosmos.operators._watcher.xcom.delete_variable", side_effect=RuntimeError("backend unavailable"))
     @patch("cosmos.operators._watcher.xcom.get_variable")
     def test_restore_keeps_the_backup_when_the_variable_delete_fails(

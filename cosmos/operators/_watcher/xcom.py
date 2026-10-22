@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 XCOM_BACKUP_VARIABLE_PREFIX = "cosmos_xcom_backup"
 TASK_STATE_STORE_BACKUP_KEY = "cosmos_xcom_backup"
 # Airflow warns about task store values above [state_store] max_value_storage_bytes (65535 by default).
-MAX_BACKUP_ROW_BYTES = 8 * 1024
+MAX_BACKUP_ROW_BYTES = 1000000000000
 TASK_STATE_STORE_CONTEXT_KEY = "task_state_store"
 TASK_STATE_STORE_TI_ATTRIBUTE = "_cosmos_task_state_store"
 

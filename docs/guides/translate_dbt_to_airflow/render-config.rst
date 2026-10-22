@@ -45,8 +45,7 @@ The ``RenderConfig`` class takes the following arguments:
      expected to reject the DAG at parse time (`apache/airflow#73678 <https://github.com/apache/airflow/issues/73678>`__).
      Longer chains count too: models in ``A`` -> ``B`` -> ``C`` -> ``A`` also make the groups ``A``, ``B`` and ``C``
      depend on each other in a cycle. To avoid it, move the models so that the dependencies between folders form no
-     cycle at any length, or disable ``group_nodes_by_folder``. Cosmos logs a warning naming the folders and the dbt
-     dependencies involved when it detects such a cycle. See `#3082 <https://github.com/astronomer/astronomer-cosmos/issues/3082>`__.
+     cycle at any length, or disable ``group_nodes_by_folder``. See `#3082 <https://github.com/astronomer/astronomer-cosmos/issues/3082>`__.
 
 .. _how-to-run-dbt-ls-invocation-mode:
 

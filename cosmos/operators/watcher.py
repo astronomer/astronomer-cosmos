@@ -44,10 +44,10 @@ from cosmos.operators._watcher.state import (
 )
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
-    _delete_xcom_backup_variable,
+    _delete_xcom_backup,
     _init_xcom_backup,
     _log_missing_backup,
-    _restore_xcom_from_variable,
+    _restore_xcom_backup,
 )
 from cosmos.operators.base import (
     DbtBuildMixin,
@@ -513,7 +513,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         reliable_retry = settings.enable_watcher_reliable_retry
 
         if try_number > 1:
-            if not _restore_xcom_from_variable(context):
+            if not _restore_xcom_backup(context):
                 _log_missing_backup(try_number)
             raise AirflowSkipException(
                 "Dbt WATCHER producer task does not support Airflow retries. "
@@ -531,7 +531,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             return_value = super().execute(context=context, **kwargs)
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             if reliable_retry:
-                _delete_xcom_backup_variable(context)
+                _delete_xcom_backup(context)
             return return_value
 
         except Exception:

@@ -28,10 +28,10 @@ from cosmos.operators._watcher.state import (
 )
 from cosmos.operators._watcher.xcom import (
     _backup_xcom_to_variable,
-    _delete_xcom_backup_variable,
+    _delete_xcom_backup,
     _init_xcom_backup,
     _persist_backup,
-    _restore_xcom_from_variable,
+    _restore_xcom_backup,
     _xcom_backup_variable_key,
 )
 
@@ -389,7 +389,7 @@ class TestDeleteXcomBackupVariable:
         context = {"ti": ti, "run_id": "test_run"}
         _init_xcom_backup(context)
 
-        _delete_xcom_backup_variable(context)
+        _delete_xcom_backup(context)
 
         mock_delete_variable.assert_called_once_with(ti._cosmos_xcom_backup_var_key)
 
@@ -398,7 +398,7 @@ class TestDeleteXcomBackupVariable:
         ti = _MockTI()
         context = {"ti": ti}
 
-        _delete_xcom_backup_variable(context)
+        _delete_xcom_backup(context)
 
         mock_delete_variable.assert_not_called()
 
@@ -409,7 +409,7 @@ class TestDeleteXcomBackupVariable:
         _init_xcom_backup(context)
         mock_delete_variable.side_effect = KeyError("not found")
 
-        _delete_xcom_backup_variable(context)  # should not raise
+        _delete_xcom_backup(context)  # should not raise
 
 
 class TestRestoreXcomFromVariable:
@@ -423,7 +423,7 @@ class TestRestoreXcomFromVariable:
         mock_get_variable.return_value = compressed
         context = {"ti": ti, "run_id": "test_run"}
 
-        result = _restore_xcom_from_variable(context)
+        result = _restore_xcom_backup(context)
 
         assert result is True
         assert ti.store["key1"] == "val1"
@@ -436,7 +436,7 @@ class TestRestoreXcomFromVariable:
         mock_get_variable.return_value = None
         context = {"ti": ti, "run_id": "test_run"}
 
-        result = _restore_xcom_from_variable(context)
+        result = _restore_xcom_backup(context)
 
         assert result is False
 
@@ -509,7 +509,7 @@ class TestXcomBackupWithTaskStateStore:
             ).decode("utf-8")
         ti = _MockTI()
 
-        result = _restore_xcom_from_variable({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
+        result = _restore_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
 
         assert result is True
         assert ti.store == {"key1": "new", "key2": "val2"}
@@ -528,9 +528,7 @@ class TestXcomBackupWithTaskStateStore:
         )
         ti = _MockTI()
 
-        result = _restore_xcom_from_variable(
-            {"ti": ti, "run_id": "test_run", "task_state_store": _FakeTaskStateStore()}
-        )
+        result = _restore_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": _FakeTaskStateStore()})
 
         assert result is True
         assert ti.store == backup
@@ -541,9 +539,7 @@ class TestXcomBackupWithTaskStateStore:
     def test_restore_returns_false_when_neither_backup_exists(self, mock_get_variable):
         ti = _MockTI()
 
-        result = _restore_xcom_from_variable(
-            {"ti": ti, "run_id": "test_run", "task_state_store": _FakeTaskStateStore()}
-        )
+        result = _restore_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": _FakeTaskStateStore()})
 
         assert result is False
         assert ti.store == {}
@@ -560,7 +556,7 @@ class TestXcomBackupWithTaskStateStore:
         safe_xcom_push(ti, "model__b_status", "success")
         assert sorted(task_state_store.values) == ["cosmos_xcom_backup_0", "cosmos_xcom_backup_1"]
 
-        _delete_xcom_backup_variable(context)
+        _delete_xcom_backup(context)
 
         assert task_state_store.values == {}
         mock_delete_variable.assert_not_called()
@@ -626,9 +622,7 @@ class TestXcomBackupWithTaskStateStore:
 
         assert sorted(task_state_store.values) == [f"cosmos_xcom_backup_{index}" for index in range(3)]
         restored_ti = _MockTI()
-        assert _restore_xcom_from_variable(
-            {"ti": restored_ti, "run_id": "test_run", "task_state_store": task_state_store}
-        )
+        assert _restore_xcom_backup({"ti": restored_ti, "run_id": "test_run", "task_state_store": task_state_store})
         assert sorted(restored_ti.store) == [
             "model__a_compiled_sql",
             "model__b_compiled_sql",
@@ -653,7 +647,7 @@ class TestXcomBackupWithTaskStateStore:
         ti = _MockTI()
 
         with caplog.at_level(logging.WARNING):
-            result = _restore_xcom_from_variable({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
+            result = _restore_xcom_backup({"ti": ti, "run_id": "test_run", "task_state_store": task_state_store})
 
         assert result is True
         assert ti.store == {"key0": 0, "key1": 1, "key2": 2}

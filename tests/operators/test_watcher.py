@@ -288,7 +288,7 @@ def test_dbt_producer_watcher_operator_publishes_own_cmd_flags_to_xcom(
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
-@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher._delete_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_deletes_backup_on_success(mock_execute, mock_delete, mock_persist):
     """Test that the XCom backup Variable is deleted after a successful execution."""
@@ -303,7 +303,7 @@ def test_dbt_producer_watcher_operator_deletes_backup_on_success(mock_execute, m
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
-@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher._delete_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_keeps_backup_on_failure(mock_execute, mock_delete, mock_persist):
     """On failure the backup Variable is kept (not deleted) for the retry; the on-failure callback does the flush."""
@@ -356,7 +356,7 @@ def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
-@patch("cosmos.operators.watcher._restore_xcom_from_variable")
+@patch("cosmos.operators.watcher._restore_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_skips_retry_attempt(mock_execute, mock_restore):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -373,7 +373,7 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(mock_execute, mock_re
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
-@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher._delete_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_success(
     mock_execute, mock_delete, mock_persist
@@ -464,7 +464,7 @@ def test_dbt_producer_watcher_operator_not_reliable_leaves_the_task_state_store_
     mock_set_variable.assert_not_called()
 
 
-@patch("cosmos.operators.watcher._restore_xcom_from_variable", return_value=False)
+@patch("cosmos.operators.watcher._restore_xcom_backup", return_value=False)
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_warns_when_no_backup_is_found_on_retry(mock_execute, mock_restore, caplog):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -479,7 +479,7 @@ def test_dbt_producer_watcher_operator_warns_when_no_backup_is_found_on_retry(mo
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
-@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher._delete_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_failure(
     mock_execute, mock_delete, mock_persist
@@ -500,7 +500,7 @@ def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_failur
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
-@patch("cosmos.operators.watcher._restore_xcom_from_variable")
+@patch("cosmos.operators.watcher._restore_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_in_memory_restores_on_retry(mock_execute, mock_restore):
     """In-memory mode still restores on retry: a graceful attempt-1 failure flushes via the on-failure callback (#2776)."""
@@ -1375,7 +1375,7 @@ def test_producer_resolves_namespace_only_when_generating_model_uris(
         patch("cosmos.operators.watcher.get_dataset_namespace", return_value="postgres://host:5432") as mock_namespace,
         patch("cosmos.operators.local.DbtLocalBaseOperator.execute", return_value=None),
         patch("cosmos.operators.watcher.safe_xcom_push"),
-        patch("cosmos.operators.watcher._delete_xcom_backup_variable"),
+        patch("cosmos.operators.watcher._delete_xcom_backup"),
     ):
         op.execute(context)
 

@@ -32,10 +32,10 @@ from cosmos.constants import _PRODUCER_CMD_FLAGS_XCOM_KEY, PRODUCER_WATCHER_TASK
 from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
-    _delete_xcom_backup_variable,
+    _delete_xcom_backup,
     _init_xcom_backup,
     _log_missing_backup,
-    _restore_xcom_from_variable,
+    _restore_xcom_backup,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -632,7 +632,7 @@ def execute_watcher_producer(operator: Any, context: Context, parent_execute: Ca
     reliable_retry = settings.enable_watcher_reliable_retry
 
     if try_number > 1:
-        if not _restore_xcom_from_variable(context):
+        if not _restore_xcom_backup(context):
             _log_missing_backup(try_number)
         raise AirflowSkipException(
             f"{type(operator).__name__} does not support Airflow retries. "
@@ -655,5 +655,5 @@ def execute_watcher_producer(operator: Any, context: Context, parent_execute: Ca
     # On failure parent_execute() raises; without a task store the retry callback flushes the backup to the Variable.
     return_value = parent_execute(context, **kwargs)
     if reliable_retry:
-        _delete_xcom_backup_variable(context)
+        _delete_xcom_backup(context)
     return return_value

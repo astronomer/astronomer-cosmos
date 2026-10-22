@@ -15,7 +15,7 @@ from cosmos.operators._watcher.state import safe_xcom_push
 from cosmos.operators._watcher.xcom import (
     _init_xcom_backup,
     _persist_backup,
-    _restore_xcom_from_variable,
+    _restore_xcom_backup,
     _task_state_store_row_key,
     _xcom_backup_variable_key,
 )
@@ -79,7 +79,7 @@ def test_xcom_backup_survives_retry_in_task_state_store():
             safe_xcom_push(ti, "model__a_status", "success")
             observed["persisted"] = context["task_state_store"].get(_task_state_store_row_key(0)) is not None
             raise RuntimeError("fail the first attempt")
-        observed["restored"] = _restore_xcom_from_variable(context)
+        observed["restored"] = _restore_xcom_backup(context)
         observed["status"] = ti.xcom_pull(task_ids=ti.task_id, key="model__a_status")
         observed["leftover"] = context["task_state_store"].get(_task_state_store_row_key(0))
 

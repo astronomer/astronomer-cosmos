@@ -214,7 +214,7 @@ def _compose_backup_callback(existing: Any) -> Any:
     return callbacks
 
 
-def _delete_xcom_backup_variable(context: Any) -> None:
+def _delete_xcom_backup(context: Any) -> None:
     """Delete the XCom backup, in the task store or the Variable, after a successful producer execution."""
     ti = context["ti"]
     task_state_store = getattr(ti, TASK_STATE_STORE_TI_ATTRIBUTE, None)
@@ -231,7 +231,7 @@ def _delete_xcom_backup_variable(context: Any) -> None:
         pass
 
 
-def _restore_xcom_from_variable(context: Any) -> bool:
+def _restore_xcom_backup(context: Any) -> bool:
     """Restore XCom entries from the backup a previous attempt left in the task store or in an Airflow Variable.
 
     Returns True if the restore succeeded, False if no backup was found.

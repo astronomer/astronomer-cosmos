@@ -160,7 +160,9 @@ Failure notifications
 
 Tests configured with ``severity: error`` fail the task when they fail. To send notifications on failure, use
 Airflow's standard ``on_failure_callback``. Airflow exposes the raised exception to the callback as
-``context["exception"]``, which includes the failing dbt nodes (test names and messages).
+``context["exception"]``. With ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and the ``ExecutionMode.WATCHER``
+producer task, it includes the failing dbt nodes (test names and messages). Before Cosmos 1.16, this applied only to
+``InvocationMode.DBT_RUNNER``.
 
 .. code-block:: python
 

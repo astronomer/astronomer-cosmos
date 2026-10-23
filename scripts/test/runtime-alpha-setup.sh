@@ -57,7 +57,12 @@ pip install -U uv
 # image's own /pyproject.toml constraint-dependencies (the versions the alpha ships), so the suite
 # runs against the alpha's real provider set rather than an overridden one. cosmos only floors
 # apache-airflow>=2.9.0, so uv won't reinstall the image's Airflow.
-uv pip install --system -e "${REPO_ROOT}[${COSMOS_EXTRAS}]"
+#
+# dbt-duckdb>=1.10.1 references Capability.MicrobatchConcurrency, which the dbt-adapters the image
+# pins (1.9.0) lacks, so every `dbt ls` fails. Cap it only here, leaving the published extra unpinned.
+ALPHA_CONSTRAINTS="$(mktemp)"
+echo "dbt-duckdb<1.10.1" > "$ALPHA_CONSTRAINTS"
+uv pip install --system -c "$ALPHA_CONSTRAINTS" -e "${REPO_ROOT}[${COSMOS_EXTRAS}]"
 
 # Pytest tooling needed to collect and run the suite.
 uv pip install --system -r "${SCRIPT_DIR}/requirements-test-tools.txt"

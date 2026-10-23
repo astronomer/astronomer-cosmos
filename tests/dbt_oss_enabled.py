@@ -49,7 +49,10 @@ _NO_DATASETS = (
     "dbt-oss writes no datasets: its run_results.json has no args.profiles_dir, so the OpenLineage artifact parser raises "
     "KeyError (logged at debug level) and the inlets and outlets stay empty (reproduced locally with dbt-oss 2.0.8)"
 )
-_FORCES_DBT_RUNNER = "its example DAG sets invocation_mode=InvocationMode.DBT_RUNNER, which Cosmos rejects on dbt 2 because the dbtRunner has no callbacks"
+_FORCES_DBT_RUNNER = (
+    "its example DAG pins invocation_mode=InvocationMode.DBT_RUNNER, which Cosmos rejects on dbt 2 because the dbtRunner "
+    "has no callbacks (leaving it unset would fall back to subprocess, but the example is included in the docs)"
+)
 _NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _MODEL_VERSION_ALIAS = "dbt-oss fails on this project with 'Template not found: jaffle_shop.generate_alias_name'"

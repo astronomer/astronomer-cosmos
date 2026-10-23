@@ -38,6 +38,7 @@ Features
 
 Bug Fixes
 
+* Preserve explicit false and zero values from Airflow connection extras in generated dbt profiles.
 * Stop rendering tests removed by ``exclude`` under ``LoadMode.DBT_MANIFEST``. In ``ExecutionMode.WATCHER`` their consumer tasks waited for an XCom the producer never pushed, because the producer honoured the exclude. By @tatiana and @ege-arhan in #3080, closes #2981.
 * On Airflow 3.0, the Cosmos plugin now logs a warning and skips the dbt docs views instead of raising ``RuntimeError`` on load. Previously, with ``[core] lazy_load_plugins = False`` (as on Astro Runtime), every Airflow CLI command logged a "Failed to import plugin cosmos" traceback, and the plugin's listeners were never registered.
 * Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn, so ``<folder>+`` and ``<package>+`` behave like their ``path:`` and ``package:`` equivalents and like ``dbt ls``. Previously the graph selector resolved its root by exact node name only, and bare-identifier matching keyed off the absolute file path. See #2962.

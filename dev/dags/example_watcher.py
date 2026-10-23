@@ -8,7 +8,6 @@ from pathlib import Path
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode
-from cosmos.dbt.runner import is_dbt_v2
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
@@ -38,16 +37,10 @@ if os.getenv("CI"):
     operator_args["trigger_rule"] = "all_success"
 
 
-from cosmos.constants import InvocationMode
-
-# The dbtRunner of dbt 2 has no event callbacks, which the watcher needs, so on dbt 2 the mode is left unset and Cosmos
-# falls back to subprocess.
-WATCHER_INVOCATION_MODE = None if is_dbt_v2() else InvocationMode.DBT_RUNNER
-
 # [START example_watcher]
 example_watcher = DbtDag(
     # dbt/cosmos-specific parameters
-    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER, invocation_mode=WATCHER_INVOCATION_MODE),
+    execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
     project_config=ProjectConfig(DBT_PROJECT_PATH),
     profile_config=profile_config,
     render_config=RenderConfig(exclude=["raw_payments"]),

@@ -3,7 +3,9 @@
 dbt-oss does not support the Postgres adapter the integration tests are written for, so that job runs them against
 BigQuery. It loads this plugin through ``PYTEST_PLUGINS=tests.dbt_oss_plugin``, so no other job imports it: every
 ``PostgresUserPasswordProfileMapping`` built by the tests and the example DAGs becomes a BigQuery mapping that writes
-to ``COSMOS_TEST_BIGQUERY_DATASET``, and the tests that need Postgres itself are skipped. The example projects that
+to ``COSMOS_TEST_BIGQUERY_DATASET``, and the tests that need Postgres itself are skipped. ``cosmos_profile_mapping.py``
+looks its mapping up from the Airflow connection ``example_conn``, so ``get_automatic_profile_mapping`` returns that
+same BigQuery mapping for ``example_conn`` and does the real lookup for every other connection. The example projects that
 have their own Postgres ``profiles.yml`` are covered by a second mechanism: the workflow rewrites those files to
 BigQuery with ``scripts/test/bigquery_ci_profiles.py``, which this plugin cannot do because they are not Python mappings.
 The tests in ``PER_TEST_DATASET_TESTS`` get a dataset of their own, named after the job's one, so they do not depend on
@@ -63,7 +65,7 @@ def _use_bigquery_in_place_of_postgres() -> None:
     cosmos.profiles.PostgresUserPasswordProfileMapping = BigQueryInPlaceOfPostgresProfileMapping
     cosmos.profiles.postgres.PostgresUserPasswordProfileMapping = BigQueryInPlaceOfPostgresProfileMapping
 
-    # The example DAGs pick their mapping from the Postgres Airflow connection `example_conn`, which this job does not
+    # `cosmos_profile_mapping.py` picks its mapping from the Airflow connection `example_conn`, which this job does not
     # have. Only that connection is redirected; the tests that look up a mocked connection keep the real lookup.
     get_automatic_profile_mapping = cosmos.profiles.get_automatic_profile_mapping
 

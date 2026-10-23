@@ -62,6 +62,7 @@ class ProducerTaskState(str, Enum):
     SUCCESS = "success"
     FAILED = "failed"
     SKIPPED = "skipped"
+    UP_FOR_RETRY = "up_for_retry"
     UPSTREAM_FAILED = "upstream_failed"
     REMOVED = "removed"
 
@@ -132,14 +133,24 @@ def is_producer_task_terminated(state: str | None) -> bool:
     return state in PRODUCER_TERMINAL_STATES
 
 
+def is_producer_task_awaiting_retry(state: str | None) -> bool:
+    """Return True when the producer is waiting on its own retry attempt.
+
+    A producer retry always self-skips (see ``DbtProducerWatcherOperator.execute``),
+    so in this state the producer is alive but will never deliver new node results.
+    """
+    return state == ProducerTaskState.UP_FOR_RETRY
+
+
 def is_producer_task_still_running(state: str | None) -> bool:
-    """Return True when the producer task is still running (a known, non-terminal state).
+    """Return True when the producer task is still running and able to publish node results.
 
     Not the plain negation of ``is_producer_task_terminated``: an unknown/unfetchable state
     (``None`` or empty) is treated as *not* running, so a failed node with no known producer
-    state still surfaces rather than polling forever.
+    state still surfaces rather than polling forever. A producer awaiting retry is also
+    inactive: its next attempt self-skips without running dbt.
     """
-    return bool(state) and not is_producer_task_terminated(state)
+    return bool(state) and not is_producer_task_terminated(state) and not is_producer_task_awaiting_retry(state)
 
 
 def get_status_xcom_key(unique_id: str) -> str:

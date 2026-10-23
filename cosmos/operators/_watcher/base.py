@@ -46,6 +46,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
     is_dbt_upstream_failure_skip_event,
+    is_producer_task_awaiting_retry,
     is_producer_task_still_running,
     is_producer_task_terminated,
     safe_xcom_push,
@@ -710,10 +711,12 @@ class BaseConsumerSensor(BaseSensorOperator):
                 f"Watcher producer task '{self.producer_task_id}' failed before reporting results for {self._resource_label.lower()} '{self.model_unique_id}'. Check its logs for the underlying error."
             )
 
-        if reason == WatcherEventReason.PRODUCER_SKIPPED:
+        if reason in (WatcherEventReason.PRODUCER_SKIPPED, WatcherEventReason.PRODUCER_UP_FOR_RETRY):
             logger.info(
-                "Watcher producer task '%s' was skipped. Falling back to running dbt for %s '%s'.",
+                "Watcher producer task '%s' cannot deliver a node result (%s). "
+                "Falling back to running dbt for %s '%s'.",
                 self.producer_task_id,
+                reason,
                 self._resource_label.lower(),
                 self.model_unique_id,
             )
@@ -724,7 +727,10 @@ class BaseConsumerSensor(BaseSensorOperator):
         """Build now a node that dbt skipped for an upstream failure (#3023), or raise for the failed node."""
         if (
             self._should_fall_back_for_upstream_failure_skip(context["ti"], bool(event.get("upstream_failure_skip")))
-            and is_producer_task_terminated(self._get_producer_task_status(context))
+            and (
+                is_producer_task_terminated(producer_task_state := self._get_producer_task_status(context))
+                or is_producer_task_awaiting_retry(producer_task_state)
+            )
             and self._fall_back_for_upstream_failure_skip(context)
         ):
             return
@@ -807,11 +813,17 @@ class BaseConsumerSensor(BaseSensorOperator):
                 self._override_rtif(context)
 
     def _handle_retry(self, try_number: int, producer_task_state: str | None, context: Context) -> bool | None:
-        """Handle sensor retry by checking whether the producer is still active.
+        """Handle sensor retry by checking whether the producer can still deliver a node result.
 
-        Returns the fallback result if the producer has terminated, or None if
-        the sensor should continue polling (producer still active).
+        Returns the fallback result if the producer has terminated or is only
+        waiting on its own retry, or None if the sensor should continue polling
+        (producer still active on its current attempt).
         """
+        if is_producer_task_awaiting_retry(producer_task_state):
+            # The producer self-skips on retry, so its next attempt can never
+            # publish a new node result. Fall back now instead of re-poking the
+            # failed attempt's stale XCom until this sensor's retries run out.
+            return self._fallback_to_non_watcher_run(try_number, context)
         if is_producer_task_terminated(producer_task_state):
             # Producer finished — this is either an automatic retry after
             # the producer completed or a manual task clear from the UI.
@@ -833,7 +845,7 @@ class BaseConsumerSensor(BaseSensorOperator):
 
         Only when the task has ``retries`` configured, so a retry would fall back too. The node then gets
         ``retries + 1`` real dbt runs, like a node that failed inside the producer, instead of losing try 1.
-        The caller must also check that the producer has terminated. See #3023.
+        The caller must also check that the producer has terminated or is awaiting its self-skipping retry. See #3023.
         """
         if not self.retries:
             return False
@@ -868,6 +880,11 @@ class BaseConsumerSensor(BaseSensorOperator):
                 return self._fallback_to_non_watcher_run(try_number, context)
 
         if producer_task_state == ProducerTaskState.SKIPPED:
+            return self._fallback_to_non_watcher_run(try_number, context)
+
+        if is_producer_task_awaiting_retry(producer_task_state):
+            # No status can arrive while the producer waits on a retry that
+            # self-skips, so fall back instead of polling until the skip lands.
             return self._fallback_to_non_watcher_run(try_number, context)
 
         self.poke_retry_number += 1
@@ -930,7 +947,9 @@ class BaseConsumerSensor(BaseSensorOperator):
 
         if (
             is_dbt_node_status_failed(status)
-            and is_producer_task_terminated(producer_task_state)
+            and (
+                is_producer_task_terminated(producer_task_state) or is_producer_task_awaiting_retry(producer_task_state)
+            )
             and self._should_fall_back_for_upstream_failure_skip(ti, getattr(self, "_upstream_failure_skip", False))
             and self._fall_back_for_upstream_failure_skip(context)
         ):

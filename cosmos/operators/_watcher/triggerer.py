@@ -22,6 +22,7 @@ from cosmos.operators._watcher.state import (
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
+    is_producer_task_awaiting_retry,
     is_producer_task_still_running,
 )
 
@@ -37,6 +38,7 @@ class WatcherEventReason(str, Enum):
     NODE_FAILED = "node_failed"
     PRODUCER_FAILED = "producer_failed"
     PRODUCER_SKIPPED = "producer_skipped"
+    PRODUCER_UP_FOR_RETRY = "producer_up_for_retry"
     NODE_NOT_RUN = "node_not_run"
 
 
@@ -217,7 +219,7 @@ class WatcherTrigger(BaseTrigger):
             # logging the full list. Also ensures we exit if producer finishes before
             # ever pushing _DBT_STARTUP_EVENTS_XCOM_KEY.
             producer_task_state = await self._get_producer_task_status()
-            if producer_task_state in PRODUCER_FINAL_STATES:
+            if producer_task_state in PRODUCER_FINAL_STATES or is_producer_task_awaiting_retry(producer_task_state):
                 return
 
             # Return if dbt node is in terminal state
@@ -266,8 +268,8 @@ class WatcherTrigger(BaseTrigger):
                 yield TriggerEvent({"status": EventStatus.SKIPPED})  # type: ignore[no-untyped-call]
                 return
             elif is_dbt_node_status_failed(dbt_node_status) and not is_producer_task_still_running(producer_task_state):
-                # Surface a node failure only once the producer has terminated. While it is still
-                # running, fall through to the sleep below and keep polling. See #2947.
+                # Surface a node failure once the producer has terminated or awaits its self-skipping retry.
+                # While it is still running, fall through to the sleep below and keep polling. See #2947.
                 logger.warning("dbt node '%s' failed", self.model_unique_id)
                 yield TriggerEvent(self._build_node_failed_event(compiled_sql))  # type: ignore[no-untyped-call]
                 return
@@ -287,6 +289,17 @@ class WatcherTrigger(BaseTrigger):
                     self.model_unique_id,
                 )
                 yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_SKIPPED})  # type: ignore[no-untyped-call]
+                return
+            elif producer_task_state == ProducerTaskState.UP_FOR_RETRY:
+                # No node status is available and the producer's retry self-skips without running dbt.
+                # End the trigger so the consumer falls back instead of polling until the self-skip lands.
+                logger.info(
+                    "Watcher producer task '%s' is awaiting a retry that will skip. "
+                    "Consumer will fall back to running dbt for node '%s'.",
+                    self.producer_task_id,
+                    self.model_unique_id,
+                )
+                yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_UP_FOR_RETRY})  # type: ignore[no-untyped-call]
                 return
             elif producer_task_state == ProducerTaskState.SUCCESS and dbt_node_status is None:
                 logger.info(

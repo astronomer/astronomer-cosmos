@@ -102,11 +102,14 @@ class DbtTestStatus(str, Enum):
         return str(self.value)
 
 
-def normalize_dbt_node_status(status: Any) -> Any:
+def normalize_dbt_node_status(status: str | None) -> str | None:
     """Lowercase a dbt status string so that ``"Warn"`` and ``"warn"`` mean the same thing.
 
     dbt 1.x reports lowercase statuses, while dbt 2 (dbt-oss) reports some of them capitalised, for example ``Warn``
-    for a source freshness check. Anything that is not a string (``None``) is returned unchanged.
+    for a source freshness check. ``None`` is returned unchanged.
+
+    The ``DBT_*_STATUSES`` sets and ``DBT_SOURCE_FRESHNESS_STALE_STATUSES`` hold lowercase values only, so query them
+    through the ``is_dbt_node_status_*`` helpers or this function, never with a raw ``status in ...`` check.
     """
     return status.lower() if isinstance(status, str) else status
 
@@ -309,7 +312,7 @@ def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
 
     start_str = start_time if start_time else "N/A"
     finish_str = finish_time if finish_time else "N/A"
-    if status in {"None"} | DBT_FAILED_STATUSES:
+    if status == "None" or is_dbt_node_status_failed(status):
         logger.error("%s", msg)
 
     logger.info("[%s] Start: %s, Finish: %s", status.upper(), start_str, finish_str)

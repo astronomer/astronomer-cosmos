@@ -31,6 +31,7 @@ from cosmos.constants import (
     SourceRenderingBehavior,
 )
 from cosmos.dbt.graph import DbtNode
+from cosmos.dbt.runner import is_dbt_v2
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators._watcher.aggregation import TestResultSummary
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
@@ -2329,19 +2330,19 @@ def test_dbt_dag_with_watcher(caplog):
     )
 
     # dbt 2 (dbt-oss) prints plain text such as "Succeeded seed <dataset>.raw_orders (table)" to stdout and does not
-    # produce the "OK loaded seed file" event that Cosmos re-logs for dbt 1.x, so this check only applies there.
-    from cosmos.dbt.runner import is_dbt_v2
-
-    if not is_dbt_v2():
-        # dbt prints the schema before the table: "public" on Postgres, the dataset on BigQuery.
+    # produce the "OK loaded seed file" event that Cosmos re-logs for dbt 1.x, so each dbt version has its own message.
+    # dbt prints the schema before the table: "public" on Postgres, the dataset on BigQuery.
+    if is_dbt_v2():
+        log_message = re.compile(r"Succeeded seed \S+\.raw_orders")
+    else:
         log_message = re.compile(r"OK loaded seed file \S+\.raw_orders")
-        assert log_message.search(caplog.text)
+    assert log_message.search(caplog.text)
 
-        # Verify that log messages are not duplicated (each dbt message should appear only once)
-        message_count = sum(1 for record in caplog.records if log_message.search(record.message))
-        assert (
-            message_count == 1
-        ), f"Expected '{log_message.pattern}' to be logged exactly once, but found {message_count} times"
+    # Verify that log messages are not duplicated (each dbt message should appear only once)
+    message_count = sum(1 for record in caplog.records if log_message.search(record.message))
+    assert (
+        message_count == 1
+    ), f"Expected '{log_message.pattern}' to be logged exactly once, but found {message_count} times"
 
 
 @pytest.mark.integration
@@ -4103,6 +4104,14 @@ class TestProducerSourceFreshness:
         producer._apply_node_state_tokens(context, [("model.pkg.m1", "failed")])
         ti.xcom_push.assert_called_once_with(key="model__pkg__m1_status", value={"status": "failed", "outlet_uris": []})
         assert "m1" in producer.exclude
+
+    @pytest.mark.parametrize("state", ["warn", "Warn", "Success"])
+    def test_apply_node_state_tokens_capitalised_success_state_does_not_update_exclude(self, state):
+        producer = self._make_producer()
+        producer.exclude = None
+        context = {"ti": MagicMock()}
+        producer._apply_node_state_tokens(context, [("model.pkg.m1", state)])
+        assert producer.exclude is None
 
     def test_apply_node_state_tokens_success_state_does_not_update_exclude(self):
         producer = self._make_producer()

@@ -40,8 +40,8 @@ from cosmos.operators._watcher.base import (
 )
 from cosmos.operators._watcher.state import (
     DBT_SOURCE_FRESHNESS_STALE_STATUSES,
-    DBT_SUCCESS_STATUSES,
     DbtNodeStatus,
+    is_dbt_node_status_success,
     normalize_dbt_node_status,
 )
 from cosmos.operators._watcher.xcom import (
@@ -416,7 +416,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # "error") that a custom freshness_callback may return.  Without exclusion,
         # dbt would run the model anyway and either overwrite the pre-set XCom status
         # or trigger a race condition with the consumer sensor.
-        excluded_ids = [uid for uid, state in node_state_pairs if state not in DBT_SUCCESS_STATUSES]
+        excluded_ids = [uid for uid, state in node_state_pairs if not is_dbt_node_status_success(state)]
         if not excluded_ids:
             return
         resource_names = set()

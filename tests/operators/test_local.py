@@ -1703,7 +1703,7 @@ def test_calculate_openlineage_events_completes_adds_the_profiles_dir_before_par
     instance.run_result_path = "/project/target/run_results.json"
 
     def parse():
-        mock_add_profiles_dir.assert_called_once()  # the key must be there before the library reads the file
+        mock_add_profiles_dir.assert_called_once()  # the key is expected before the library reads the file
         return MagicMock(completes=[])
 
     instance.parse.side_effect = parse
@@ -1722,9 +1722,9 @@ def test_calculate_openlineage_events_completes_adds_the_profiles_dir_before_par
     "is_dbt_v2, library_requires_it, expected_call",
     [
         pytest.param(True, True, True, id="dbt_2_and_library_needs_it"),
-        # dbt Fusion used with a dbt 1.x environment keeps not emitting datasets.
+        # dbt Fusion used with a dbt 1.x environment: no change.
         pytest.param(False, True, False, id="not_dbt_2"),
-        # openlineage-integration-common 1.44.0 and later fall back to the --profiles-dir lookup themselves.
+        # openlineage-integration-common 1.44.0 and later use the --profiles-dir lookup themselves.
         pytest.param(True, False, False, id="library_does_not_need_it"),
     ],
 )

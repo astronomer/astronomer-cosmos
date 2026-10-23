@@ -481,6 +481,17 @@ def test_extract_message_by_status_matches_the_warn_status_in_any_case():
     assert messages == ["late", "warned"]
 
 
+def test_extract_message_by_status_handles_results_without_a_message():
+    # dbt-oss source freshness results (``FreshnessResultsNode``) carry a status but no ``message`` attribute.
+    freshness = SimpleNamespace(status=_DbtOssFreshnessStatus.WARN, node=SimpleNamespace(name="source_a"))
+    result = SimpleNamespace(result=SimpleNamespace(results=[freshness]))
+
+    names, messages = dbt_runner.extract_message_by_status(result)
+
+    assert names == ["source_a"]
+    assert messages == ["warn"]
+
+
 def test_extract_message_by_status_matches_the_levels_in_any_case():
     results = [
         SimpleNamespace(status="Error", node=SimpleNamespace(name="model_a"), message="boom"),

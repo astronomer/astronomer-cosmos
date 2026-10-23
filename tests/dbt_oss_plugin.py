@@ -31,9 +31,6 @@ POSTGRES_ONLY_TEST_FILES = {
     "tests/listeners/test_dag_run_listener.py": "asserts on the Postgres profile mapping",
     "tests/operators/test_virtualenv.py": "installs dbt-postgres in a virtualenv",
 }
-POSTGRES_ONLY_FIXTURES = {
-    "reset_fail_once_sequence": "uses psycopg2 and Postgres sequences",
-}
 
 
 def _use_bigquery_in_place_of_postgres() -> None:
@@ -114,9 +111,7 @@ def per_test_bigquery_dataset(request, monkeypatch):
 def pytest_collection_modifyitems(items):
     for item in items:
         file_path = item.nodeid.split("::")[0]
-        reason = POSTGRES_ONLY_TEST_FILES.get(file_path) or next(
-            (why for fixture, why in POSTGRES_ONLY_FIXTURES.items() if fixture in item.fixturenames), None
-        )
+        reason = POSTGRES_ONLY_TEST_FILES.get(file_path)
         if reason:
             reason = f"Requires Postgres: {reason}"
         elif item.nodeid in SKIPPED_TESTS:

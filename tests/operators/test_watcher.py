@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import shutil
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -98,35 +99,16 @@ class _MockContext(dict):
 
 
 @pytest.fixture
-def reset_fail_once_sequence():
-    """Drop a fail-once Postgres sequence on ``example_conn`` so a watcher
-    retry-recovery integration test starts from a clean state.
+def fresh_fail_once_state(monkeypatch):
+    """Give a watcher retry-recovery integration test its own fail-once state.
 
-    The watcher integration tests use a per-project Postgres sequence
-    (created in the dbt project's ``on-run-start``) plus a model ``pre_hook``
-    that ``nextval``s into it and raises if the value is <= 1. That makes the
-    first run of the flaky model fail and any subsequent run succeed -- the
-    minimal recipe for exercising the consumer-fallback retry path. Each test
-    drops its sequence before running so re-runs and CI parallelism don't
-    leak sequence state.
+    The watcher integration projects use the ``fail_once`` macro (in each project's ``macros`` folder) in a model
+    ``pre_hook``. It counts its runs in a table of the target schema, named after ``COSMOS_FAIL_ONCE_TOKEN``, and
+    fails the first run of the flaky model, so any subsequent run succeeds -- the minimal recipe for exercising the
+    consumer-fallback retry path. A token that is new for each test starts it from a clean state, so re-runs and CI
+    parallelism don't leak state, on any warehouse.
     """
-    import psycopg2
-    from airflow.hooks.base import BaseHook
-
-    def _drop(sequence_name: str) -> None:
-        airflow_conn = BaseHook.get_connection("example_conn")
-        with psycopg2.connect(
-            host=airflow_conn.host,
-            port=airflow_conn.port or 5432,
-            dbname=airflow_conn.schema or "postgres",
-            user=airflow_conn.login,
-            password=airflow_conn.password,
-        ) as conn:
-            conn.autocommit = True
-            with conn.cursor() as cur:
-                cur.execute(f"DROP SEQUENCE IF EXISTS public.{sequence_name}")
-
-    return _drop
+    monkeypatch.setenv("COSMOS_FAIL_ONCE_TOKEN", uuid.uuid4().hex[:10])
 
 
 def test_dbt_producer_watcher_operator_priority_weight_default():
@@ -3064,7 +3046,7 @@ def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
     ),
 )
 @pytest.mark.integration
-def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, reset_fail_once_sequence):
+def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, fresh_fail_once_state):
     """
     Verify that the dbt_producer_watcher_done gateway task prevents the producer's skip
     from propagating to tasks downstream of the DbtTaskGroup.
@@ -3077,8 +3059,6 @@ def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, reset_f
         from airflow.providers.standard.operators.empty import EmptyOperator
     except ImportError:
         from airflow.operators.empty import EmptyOperator
-
-    reset_fail_once_sequence("_cosmos_fail_once_seq")
 
     caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
 
@@ -3141,7 +3121,7 @@ def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, reset_f
         "watcher_upstream_failure_recovery.model_downstream_2_run",
     ],
 )
-def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_fail_once_sequence, downstream_task_id):
+def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, fresh_fail_once_state, downstream_task_id):
     """Regression for upstream-failure skips that previously left downstream models skipped (#2698).
 
     When a dbt model fails on the producer's first attempt, dbt emits
@@ -3173,8 +3153,6 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
         from airflow.providers.standard.operators.empty import EmptyOperator
     except ImportError:
         from airflow.operators.empty import EmptyOperator
-
-    reset_fail_once_sequence("_cosmos_recovery_fail_once_seq")
 
     caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
 
@@ -3245,9 +3223,7 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
     ],
     ids=["dbt_runner", "subprocess"],
 )
-def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(
-    reset_fail_once_sequence, execution_args
-):
+def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(fresh_fail_once_state, execution_args):
     """With ``AFTER_EACH``, every run and test that dbt skipped below a failed model ends on attempt 1 (#3023).
 
     Before, each of them failed on attempt 1 and waited one ``retry_delay``, so every level added a delay.
@@ -3255,8 +3231,6 @@ def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(
     from airflow import DAG
 
     from cosmos import DbtTaskGroup
-
-    reset_fail_once_sequence("_cosmos_recovery_fail_once_seq")
 
     with DAG(
         dag_id="watcher_upstream_failure_recovery_after_each_test",
@@ -3310,9 +3284,7 @@ def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(
     ),
 )
 @pytest.mark.integration
-def test_dbt_task_group_watcher_in_memory_retry_recovers_skipped_downstream(
-    caplog, reset_fail_once_sequence, monkeypatch
-):
+def test_dbt_task_group_watcher_in_memory_retry_recovers_skipped_downstream(caplog, fresh_fail_once_state, monkeypatch):
     """In-memory mode (enable_watcher_reliable_retry=False): after a producer retry, consumers fall back to local dbt runs and the DAG still ends SUCCESS (#2776)."""
     from airflow import DAG
 
@@ -3324,7 +3296,6 @@ def test_dbt_task_group_watcher_in_memory_retry_recovers_skipped_downstream(
         from airflow.operators.empty import EmptyOperator
 
     monkeypatch.setattr("cosmos.settings.enable_watcher_reliable_retry", False)
-    reset_fail_once_sequence("_cosmos_recovery_fail_once_seq")
 
     caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
 

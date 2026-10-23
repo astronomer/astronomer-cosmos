@@ -247,5 +247,5 @@ def test_dbt_base_operator_execute_debug_mode_success_stops_memory_tracking(
     [(False, ["--vars", "var: '2'\n"]), (True, ["--vars", '{"var": "2"}'])],
 )
 def test_process_global_flag_dict_format_depends_on_dbt_version(is_dbt_v2, expected):
-    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2):
+    with patch("cosmos.operators.base.is_dbt_v2", return_value=is_dbt_v2):
         assert AbstractDbtBase._process_global_flag("--vars", {"var": "2"}) == expected

@@ -30,8 +30,8 @@ except ImportError:  # pragma: no cover
 from airflow.utils.strings import to_boolean
 
 from cosmos import settings
-from cosmos.dbt import runner as dbt_runner
 from cosmos.dbt.executable import get_system_dbt
+from cosmos.dbt.runner import is_dbt_v2
 from cosmos.log import get_logger
 
 
@@ -297,7 +297,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
             return []
         elif isinstance(flag_value, dict):
             # dbt 2 rejects the single quotes yaml.dump puts around string values, but accepts JSON (flow style) mappings
-            if dbt_runner.is_dbt_v2():
+            if is_dbt_v2():
                 return [flag_name, json.dumps(flag_value)]
             return [flag_name, yaml.dump(flag_value)]
         elif isinstance(flag_value, list) and flag_value:

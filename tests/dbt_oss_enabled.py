@@ -14,9 +14,9 @@ from pathlib import Path
 # example DAG tests fail at collection time, so the files that are not listed are added to .airflowignore.
 # cosmos_profile_mapping.py is left out on purpose: it builds its profile from the Postgres Airflow connection
 # `example_conn`, which this job does not have. dbt_docs.py is left out until dbt-oss handles docs generate.
-# example_cosmos_sources.py (its own Postgres profile) and simple_dag_async.py (async) are left out too.
-# user_defined_profile.py is left out because it is the example of a user-supplied profiles.yml (profiles_yml_filepath),
-# which the BigQuery profile swap cannot cover.
+# simple_dag_async.py (async) is left out too. The DAGs that read an example
+# project's own profiles.yml (user_defined_profile.py, example_cosmos_sources.py) run here because the workflow rewrites
+# those Postgres profiles to BigQuery (scripts/test/bigquery_ci_profiles.py).
 ENABLED_DAG_FILES = frozenset(
     {
         "basic_cosmos_dag.py",
@@ -29,6 +29,7 @@ ENABLED_DAG_FILES = frozenset(
         "cosmos_seed_dag.py",
         "example_cosmos_cleanup_dag.py",
         "example_cosmos_dbt_build.py",
+        "example_cosmos_sources.py",
         "example_dbt_deps.py",
         "example_duckdb_dag.py",
         "example_model_version.py",
@@ -42,48 +43,40 @@ ENABLED_DAG_FILES = frozenset(
         "example_tasks_map.py",
         "example_tests_multiple_parents.py",
         "example_watcher.py",
+        "user_defined_profile.py",
         "watcher_with_freshness_check.py",
     }
 )
 
 # Why a test is skipped in the dbt-oss job.
-_POSTGRES_ENV = "uses a profiles.yml or sources.yml that reads POSTGRES_* variables, which this job does not set"
 _NO_BQ_ADAPTER_MODULE = "needs dbt-bigquery's dbt.adapters.bigquery, which cannot be installed next to dbt-oss (both provide the dbt package)"
+_ASYNC_DAG_NOT_ENABLED = (
+    "its DAG file simple_dag_async.py is not enabled in this job (BOSS-787); once enabled, with the setup task disabled "
+    "the async mock imports dbt-bigquery's BigQueryConnectionManager in the worker process (see _NO_BQ_ADAPTER_MODULE)"
+)
 _NO_CALLBACKS = "dbt-oss dbtRunner does not support callbacks, and dbt does not plan to (https://github.com/dbt-labs/dbt/issues/13102)"
 _NO_DATASETS = (
     "dbt-oss writes no datasets: its run_results.json has no args.profiles_dir, so the OpenLineage artifact parser raises "
     "KeyError (logged at debug level) and the inlets and outlets stay empty (reproduced locally with dbt-oss 2.0.8)"
 )
 _NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
+_AUTO_INSTALLS_DEPS = (
+    "dbt-oss installs the missing dbt_packages itself on dbt ls, so the failure the test expects does not happen "
+    "(reproduced locally with dbt-oss 2.0.8)"
+)
+_TEXT_OUTPUT_NOT_PARSED = (
+    "Cosmos does not parse the text output of dbt 2 in subprocess mode: it has 'Summary: 1 total | 1 warn' and "
+    "'Warned test <name>', not the 'Done. WARN=N TOTAL=N' and 'Failure in test <name>' lines the parsers read "
+    "(reproduced locally with dbt-oss 2.0.8)"
+)
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _MODEL_VERSION_ALIAS = "dbt-oss fails on this project with 'Template not found: jaffle_shop.generate_alias_name'"
-_VIEW_OVER_TABLE = (
-    "dbt-oss's BigQuery view materialization will not replace a table that an earlier test left in the job's dataset"
-)
 _ERROR_NOT_IN_CAPLOG = "the dbt-oss error text does not reach caplog in some cells (cause inferred, not investigated)"
-_NEEDS_SEEDED_TABLE = (
-    "needs the raw_orders table, which a seed task in the DAG creates but its source freshness check can run before, so it "
-    "only passes when an earlier test has already seeded the job's dataset (the test order varies between runs)"
-)
 _UNKNOWN = "fails in the dbt-oss job for a cause not yet identified"
 
 # Tests that fail in the dbt-oss job for a known reason, keyed by pytest node id. Each one is skipped there with its
 # reason until it is fixed or made to work with dbt-oss; remove its entry when it does.
 SKIPPED_TESTS: dict[str, str] = {
-    # Postgres env vars (own profiles.yml/sources) (13)
-    "tests/dbt/test_graph.py::test_altered_jaffle_shop_manifest_is_in_sync_with_project": _POSTGRES_ENV,
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_project_config_vars": _POSTGRES_ENV,
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_sources[load_via_dbt_ls]": _POSTGRES_ENV,
-    "tests/dbt/test_graph.py::test_run_command_with_dbt_runner_exception": _POSTGRES_ENV,
-    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_error": _POSTGRES_ENV,
-    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_exception": _POSTGRES_ENV,
-    "tests/operators/test_local.py::test_run_test_operator_subprocess_failure_exposes_failing_tests": _POSTGRES_ENV,
-    "tests/operators/test_local.py::test_run_test_operator_with_callback[InvocationMode.DBT_RUNNER]": _POSTGRES_ENV,
-    "tests/operators/test_local.py::test_run_test_operator_with_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
-    "tests/operators/test_local.py::test_run_test_operator_with_callback_and_trailing_dbt_output": _POSTGRES_ENV,
-    "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
-    "tests/test_debug.py::test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled": _POSTGRES_ENV,
-    "tests/test_example_dags.py::test_source_pruning_dag": _POSTGRES_ENV,
     # dbt 2 dbtRunner has no callbacks (3)
     "tests/dbt/test_runner.py::test_dbt_runner_caching_and_callbacks": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_freshness_callback_excludes_model": _NO_CALLBACKS,
@@ -91,6 +84,12 @@ SKIPPED_TESTS: dict[str, str] = {
     # dbt 2 behaves differently: expected load error not raised (2)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[dbt_runner]": _NO_LOAD_ERROR,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[subprocess]": _NO_LOAD_ERROR,
+    # dbt 2 subprocess text output is not parsed (2)
+    "tests/operators/test_local.py::test_run_test_operator_with_callback_and_trailing_dbt_output": _TEXT_OUTPUT_NOT_PARSED,
+    "tests/operators/test_local.py::test_run_test_operator_subprocess_failure_exposes_failing_tests": _TEXT_OUTPUT_NOT_PARSED,
+    # dbt-oss installs missing dependencies on dbt ls instead of failing (2)
+    "tests/dbt/test_graph.py::test_run_command_with_dbt_runner_exception": _AUTO_INSTALLS_DEPS,
+    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_exception": _AUTO_INSTALLS_DEPS,
     # dbt-oss has no partial parsing artifact (4)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[False]": _NO_PARTIAL_PARSE,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[True]": _NO_PARTIAL_PARSE,
@@ -102,18 +101,15 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/test_local.py::test_run_operator_dataset_manual_outlets_airflow_210": _NO_DATASETS,
     # dbt-bigquery module cannot be installed next to dbt-oss (1)
     "tests/operators/_asynchronous/test_bigquery.py::test_mock_bigquery_adapter": _NO_BQ_ADAPTER_MODULE,
+    # The async example DAG is not enabled in this job (1)
+    "tests/test_example_dags.py::test_async_example_dag_without_setup_task": _ASYNC_DAG_NOT_ENABLED,
     # dbt-oss fails on the model_version project (1)
     "tests/test_example_dags.py::test_example_dag[example_model_version]": _MODEL_VERSION_ALIAS,
-    # dbt-oss view over a table left by an earlier test (1)
-    "tests/test_example_dags.py::test_example_dag[example_multiple_parents_test]": _VIEW_OVER_TABLE,
-    # Depends on a table that an earlier test seeds in the job's dataset (1)
-    "tests/test_example_dags.py::test_example_dag[source_rendering_dag]": _NEEDS_SEEDED_TABLE,
     # dbt-oss error text not in caplog (1)
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_failing_model": _ERROR_NOT_IN_CAPLOG,
-    # Unknown, needs investigation (3)
+    # Unknown, needs investigation (2)
     "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.DBT_RUNNER]": _UNKNOWN,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_empty_model": _UNKNOWN,
-    "tests/test_example_dags.py::test_async_example_dag_without_setup_task": _UNKNOWN,
 }
 
 

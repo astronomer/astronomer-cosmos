@@ -303,7 +303,10 @@ def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
 
 @pytest.mark.integration
 def test_handle_exception_if_needed_after_exception_invalid_project_file(valid_dbt_project_dir):
-    """Same path as above, with a failure every dbt version raises: ``dbt_project.yml`` is not valid YAML."""
+    """Same path as above, with a failure that dbt 1.x and dbt 2 both raise: ``dbt_project.yml`` is not valid YAML.
+
+    It checks that the exception becomes a CosmosDbtRunError, not the missing-packages message.
+    """
     (valid_dbt_project_dir / "dbt_project.yml").write_text("name: [broken\n")
 
     response = dbt_runner.run_command(command=["dbt", "ls"], env=os.environ, cwd=valid_dbt_project_dir)

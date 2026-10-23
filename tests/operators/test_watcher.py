@@ -4105,23 +4105,14 @@ class TestProducerSourceFreshness:
         ti.xcom_push.assert_called_once_with(key="model__pkg__m1_status", value={"status": "failed", "outlet_uris": []})
         assert "m1" in producer.exclude
 
-    @pytest.mark.parametrize("state", ["warn", "Warn", "Success"])
-    def test_apply_node_state_tokens_capitalised_success_state_does_not_update_exclude(self, state):
-        producer = self._make_producer()
-        producer.exclude = None
-        context = {"ti": MagicMock()}
-        producer._apply_node_state_tokens(context, [("model.pkg.m1", state)])
-        assert producer.exclude is None
-
-    def test_apply_node_state_tokens_success_state_does_not_update_exclude(self):
+    @pytest.mark.parametrize("state", ["success", "Success", "warn", "Warn"])
+    def test_apply_node_state_tokens_success_state_does_not_update_exclude(self, state):
         producer = self._make_producer()
         producer.exclude = None
         ti = MagicMock()
         context = {"ti": ti}
-        producer._apply_node_state_tokens(context, [("model.pkg.m1", "success")])
-        ti.xcom_push.assert_called_once_with(
-            key="model__pkg__m1_status", value={"status": "success", "outlet_uris": []}
-        )
+        producer._apply_node_state_tokens(context, [("model.pkg.m1", state)])
+        ti.xcom_push.assert_called_once_with(key="model__pkg__m1_status", value={"status": state, "outlet_uris": []})
         assert producer.exclude is None
 
     def test_run_dbt_runner_skips_callback_during_source_freshness(self):

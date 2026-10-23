@@ -103,13 +103,10 @@ class DbtTestStatus(str, Enum):
 
 
 def normalize_dbt_node_status(status: str | None) -> str | None:
-    """Lowercase a dbt status string so that ``"Warn"`` and ``"warn"`` mean the same thing.
+    """Lowercase a dbt status so ``"Warn"`` (dbt 2) and ``"warn"`` (dbt 1.x) match. ``None`` passes through.
 
-    dbt 1.x reports lowercase statuses, while dbt 2 (dbt-oss) reports some of them capitalised, for example ``Warn``
-    for a source freshness check. ``None`` is returned unchanged.
-
-    The ``DBT_*_STATUSES`` sets and ``DBT_SOURCE_FRESHNESS_STALE_STATUSES`` hold lowercase values only, so query them
-    through the ``is_dbt_node_status_*`` helpers or this function, never with a raw ``status in ...`` check.
+    The ``DBT_*_STATUSES`` sets are lowercase only, so query them through the ``is_dbt_node_status_*`` helpers
+    or this function.
     """
     return status.lower() if isinstance(status, str) else status
 

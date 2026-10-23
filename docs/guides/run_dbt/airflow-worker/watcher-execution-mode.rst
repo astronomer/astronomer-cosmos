@@ -605,7 +605,7 @@ a list of ``(unique_id, state)`` tuples for any nodes that should be pre-marked;
 list when no nodes need special handling. Each returned node receives a pre-populated XCom entry; nodes
 returned with a non-success state are also added to ``--exclude`` so dbt skips them entirely.
 
-The consumer sensor recognises three state families: ``"skipped"`` raises ``AirflowSkipException``,
+The consumer sensor recognises three state families (matched case-insensitively, since dbt 2 reports some statuses capitalised): ``"skipped"`` raises ``AirflowSkipException``,
 ``"success"`` / ``"pass"`` / ``"warn"`` marks the task as succeeded, and anything else (e.g.
 ``"failed"``, ``"error"``) raises ``AirflowException``.  The default callback always returns
 ``"skipped"`` for stale dependents — a node is skipped only when **all** of its upstream dependencies

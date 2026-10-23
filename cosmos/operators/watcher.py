@@ -88,7 +88,8 @@ def _default_freshness_callback(
 ) -> list[tuple[str, str]]:
     """Return a list of ``(unique_id, state)`` tuples for nodes that must be skipped due to stale sources.
 
-    Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``.
+    Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``, matched
+    case-insensitively because dbt 2 writes ``Warn``.
 
     A node is skipped only when **all** of its upstream dependencies are either stale sources or
     already-skipped nodes.  If a node has at least one clean upstream path it may still execute

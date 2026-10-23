@@ -3,8 +3,9 @@ name: test-dbt-oss
 # Integration tests for dbt-oss. dbt-oss does not support the Postgres adapter that the tests in test.yml use, so
 # this workflow runs the same integration tests (the ones marked ``integration``) against BigQuery instead. It loads the
 # tests/dbt_oss_plugin.py pytest plugin, which replaces the Postgres profile mapping used by the tests and the example
-# DAGs with a BigQuery one and skips the tests that need Postgres itself. tests/dbt_oss_enabled.py lists what runs here
-# while dbt-oss is rolled out one group at a time. test.yml is unchanged.
+# DAGs with a BigQuery one and skips the tests that need Postgres itself. The example projects that have their own
+# Postgres profiles.yml are rewritten to BigQuery on the runner by scripts/test/bigquery_ci_profiles.py. tests/dbt_oss_enabled.py
+# lists what runs here while dbt-oss is rolled out one group at a time. test.yml is unchanged.
 on:
   push: # Run on pushes to the default branch
     branches: [main, enable-postgres-env-tests-dbt-oss] # TEMP: remove the branch before merging

@@ -23,6 +23,8 @@ AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
 # DAGs whose source tables must be seeded first; run via the dedicated tests below.
 DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag", "source_pruning_dag"]
+# DAGs whose source freshness check reads altered_jaffle_shop's raw_orders and can run before the DAG's own seed task.
+DAGS_NEEDING_SEEDED_ALTERED_JAFFLE_SHOP = {"example_watcher_with_freshness"}
 IGNORED_DAG_FILES = [
     "performance_dag.py",
     "jaffle_shop_kubernetes.py",
@@ -137,17 +139,15 @@ def run_dag(dag_id: str):
 
 @pytest.fixture()
 def seeded_altered_jaffle_shop():
-    """Seed altered_jaffle_shop so source_pruning_dag's raw_orders source-freshness check has its
-    table regardless of task order. dbt deps first: the project depends on dbt_utils."""
+    """Seed altered_jaffle_shop so the raw_orders source-freshness check of the DAGs in
+    DAGS_NEEDING_SEEDED_ALTERED_JAFFLE_SHOP has its table regardless of task order. dbt deps first: the project depends
+    on dbt_utils. This runs in every workflow that runs ``test_example_dag`` (an extra ``dbt deps`` and ``dbt seed``).
+    """
     project_dir = EXAMPLE_DAGS_DIR / "dbt" / "altered_jaffle_shop"
     dbt_args = ["--project-dir", str(project_dir), "--profiles-dir", str(project_dir)]
     # cwd: dbt-oss resolves the seed files (seeds/raw_orders.csv) from the working directory, not from --project-dir.
     subprocess.run(["dbt", "deps", *dbt_args], check=True, cwd=project_dir)
     subprocess.run(["dbt", "seed", "--full-refresh", *dbt_args], check=True, cwd=project_dir)
-
-
-# DAGs whose source freshness check reads altered_jaffle_shop's raw_orders and can run before the DAG's own seed task.
-DAGS_NEEDING_SEEDED_ALTERED_JAFFLE_SHOP = {"example_watcher_with_freshness"}
 
 
 @pytest.mark.skipif(

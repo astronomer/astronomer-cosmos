@@ -14,9 +14,9 @@ from pathlib import Path
 # example DAG tests fail at collection time, so the files that are not listed are added to .airflowignore.
 # cosmos_profile_mapping.py is left out on purpose: it builds its profile from the Postgres Airflow connection
 # `example_conn`, which this job does not have. basic_cosmos_task_group.py and dbt_docs.py are left out until dbt-oss
-# handles their --vars and docs generate. example_cosmos_sources.py (its own
-# Postgres profile) and simple_dag_async.py (async) are left out too. user_defined_profile.py is left out because it
-# is the example of a user-supplied profiles.yml (profiles_yml_filepath), which the BigQuery profile swap cannot cover.
+# handles their --vars and docs generate. simple_dag_async.py (async) is left out too. The DAGs that read an example
+# project's own profiles.yml (user_defined_profile.py, example_cosmos_sources.py) run here because the workflow rewrites
+# those Postgres profiles to BigQuery (scripts/test/bigquery_ci_profiles.py).
 ENABLED_DAG_FILES = frozenset(
     {
         "basic_cosmos_dag.py",
@@ -28,6 +28,7 @@ ENABLED_DAG_FILES = frozenset(
         "cosmos_seed_dag.py",
         "example_cosmos_cleanup_dag.py",
         "example_cosmos_dbt_build.py",
+        "example_cosmos_sources.py",
         "example_dbt_deps.py",
         "example_duckdb_dag.py",
         "example_model_version.py",
@@ -41,6 +42,7 @@ ENABLED_DAG_FILES = frozenset(
         "example_tasks_map.py",
         "example_tests_multiple_parents.py",
         "example_watcher.py",
+        "user_defined_profile.py",
         "watcher_with_freshness_check.py",
     }
 )
@@ -54,11 +56,13 @@ _NO_DATASETS = (
 )
 _NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
 _AUTO_INSTALLS_DEPS = (
-    "dbt-oss installs the missing dbt_packages itself on dbt ls, so the failure the test expects does not happen"
+    "dbt-oss installs the missing dbt_packages itself on dbt ls, so the failure the test expects does not happen "
+    "(reproduced locally with dbt-oss 2.0.8)"
 )
 _TEXT_OUTPUT_NOT_PARSED = (
     "Cosmos does not parse the text output of dbt 2 in subprocess mode: it has 'Summary: 1 total | 1 warn' and "
-    "'Warned test <name>', not the 'Done. WARN=N TOTAL=N' and 'Failure in test <name>' lines the parsers read"
+    "'Warned test <name>', not the 'Done. WARN=N TOTAL=N' and 'Failure in test <name>' lines the parsers read "
+    "(reproduced locally with dbt-oss 2.0.8)"
 )
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _MODEL_VERSION_ALIAS = "dbt-oss fails on this project with 'Template not found: jaffle_shop.generate_alias_name'"

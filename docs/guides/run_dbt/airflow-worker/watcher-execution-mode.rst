@@ -309,11 +309,13 @@ On Airflow 3.3 and later, with ``enable_watcher_reliable_retry`` left at ``True`
 backup in the Airflow `task store <https://cwiki.apache.org/confluence/display/AIRFLOW/AIP-103%3A+Task+State+Management>`_
 instead of a Variable (`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_). This means:
 
-- The backup makes no secrets-backend calls. Every Variable write first looks the key up in each configured
-  secrets backend, so with an external backend the task store backup was about 4.5 times faster in our
-  benchmark (500 dbt nodes, one status pushed per node, a secrets backend stubbed at 20 ms per lookup, SQLite
-  metadata database; the numbers are in `#3076 <https://github.com/astronomer/astronomer-cosmos/pull/3076>`_).
-  Without an external backend both cost about the same.
+- The per-node backup writes make no secrets-backend calls. Every Variable write first looks the key up in each
+  configured secrets backend, so the producer task ran between about 3 and 6 times faster in our benchmark,
+  depending on how many backends are configured (500 dbt nodes, one status pushed per node, a secrets backend
+  stubbed at 20 ms per lookup, SQLite metadata database; the numbers are in
+  `#3076 <https://github.com/astronomer/astronomer-cosmos/pull/3076>`_). A retry still reads the backup Variable
+  once, and the retry callback writes it when the last task store write failed. Without an external backend both
+  cost about the same.
 - The backup is split across task store keys (``cosmos_xcom_backup_0``, ``_1``, ...): each push rewrites only
   the open key, and a key rolls over before a push that would take it past 8 KB, so the per-push payload does
   not grow with the project, unlike the single Variable. A single entry is never split: one larger than 8 KB

@@ -464,17 +464,29 @@ def test_dbt_producer_watcher_operator_not_reliable_leaves_the_task_state_store_
     mock_set_variable.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "task_state_store,expected_level",
+    [(MagicMock(), logging.WARNING), (None, logging.INFO)],
+    ids=["task-store-in-use", "variable-only"],
+)
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators.watcher._restore_xcom_backup", return_value=False)
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
-def test_dbt_producer_watcher_operator_warns_when_no_backup_is_found_on_retry(mock_execute, mock_restore, caplog):
+def test_dbt_producer_watcher_operator_logs_when_no_backup_is_found_on_retry(
+    mock_execute, mock_restore, caplog, task_state_store, expected_level
+):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
     ti = _MockTI()
     ti.try_number = 2
+    context = {"ti": ti, "run_id": "test_run"}
+    if task_state_store is not None:
+        context["task_state_store"] = task_state_store
 
-    with caplog.at_level(logging.WARNING), pytest.raises(AirflowSkipException):
-        op.execute(context={"ti": ti, "run_id": "test_run"})
+    with caplog.at_level(logging.INFO), pytest.raises(AirflowSkipException):
+        op.execute(context=context)
 
-    assert "No XCom backup found for attempt #2" in caplog.text
+    record = next(r for r in caplog.records if "No XCom backup found for attempt #2" in r.getMessage())
+    assert record.levelno == expected_level
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)

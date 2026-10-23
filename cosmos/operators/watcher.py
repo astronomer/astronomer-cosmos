@@ -508,7 +508,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
         if try_number > 1:
             if not _restore_xcom_backup(context, read_task_state_store=reliable_retry):
-                _log_missing_backup(try_number)
+                _log_missing_backup(context, try_number, read_task_state_store=reliable_retry)
             raise AirflowSkipException(
                 "Dbt WATCHER producer task does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."

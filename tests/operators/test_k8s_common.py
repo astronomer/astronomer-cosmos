@@ -500,8 +500,10 @@ def test_execute_watcher_producer(mock_init, mock_delete, extra_kwargs: dict):
     mock_delete.assert_called_once_with(context)
 
 
+@pytest.mark.parametrize("reliable_retry", [True, False])
 @patch("cosmos.operators._k8s_common._restore_xcom_backup")
-def test_execute_watcher_producer_skips_retry(mock_restore):
+def test_execute_watcher_producer_skips_retry(mock_restore, reliable_retry):
+    """A retry restores and skips; the task store is read only when enable_watcher_reliable_retry is on (#2771)."""
     from airflow.exceptions import AirflowSkipException
 
     ti = MagicMock()
@@ -509,10 +511,13 @@ def test_execute_watcher_producer_skips_retry(mock_restore):
     context = {"ti": ti, "run_id": "test_run"}
     parent_execute = MagicMock()
 
-    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+    with (
+        patch("cosmos.settings.enable_watcher_reliable_retry", reliable_retry),
+        pytest.raises(AirflowSkipException, match="does not support Airflow retries"),
+    ):
         execute_watcher_producer(MagicMock(), context, parent_execute)
 
-    mock_restore.assert_called_once_with(context, read_task_state_store=True)
+    mock_restore.assert_called_once_with(context, read_task_state_store=reliable_retry)
     parent_execute.assert_not_called()
 
 
@@ -566,17 +571,29 @@ def test_execute_watcher_producer_not_reliable_keeps_the_variable_flush_with_a_t
     mock_delete.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "task_state_store,expected_level",
+    [(MagicMock(), logging.WARNING), (None, logging.INFO)],
+    ids=["task-store-in-use", "variable-only"],
+)
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators._k8s_common._restore_xcom_backup", return_value=False)
-def test_execute_watcher_producer_warns_when_no_backup_is_found_on_retry(mock_restore, caplog):
+def test_execute_watcher_producer_logs_when_no_backup_is_found_on_retry(
+    mock_restore, caplog, task_state_store, expected_level
+):
     from airflow.exceptions import AirflowSkipException
 
     ti = MagicMock()
     ti.try_number = 2
+    context = {"ti": ti, "run_id": "test_run"}
+    if task_state_store is not None:
+        context["task_state_store"] = task_state_store
 
-    with caplog.at_level(logging.WARNING), pytest.raises(AirflowSkipException):
-        execute_watcher_producer(MagicMock(), {"ti": ti, "run_id": "test_run"}, MagicMock())
+    with caplog.at_level(logging.INFO), pytest.raises(AirflowSkipException):
+        execute_watcher_producer(MagicMock(), context, MagicMock())
 
-    assert "No XCom backup found for attempt #2" in caplog.text
+    record = next(r for r in caplog.records if "No XCom backup found for attempt #2" in r.getMessage())
+    assert record.levelno == expected_level
 
 
 def test_execute_watcher_producer_raises_when_ti_missing():

@@ -145,9 +145,8 @@ def _persist_backup_row(ti: Any, key: str, value: Any) -> None:
         if not ti._cosmos_xcom_backup_open_row_persisted:
             try:
                 task_state_store.set(_task_state_store_row_key(row_index), _encode_backup(open_row))
-            except Exception:
+            finally:
                 open_row[key] = value
-                raise
         row_index += 1
         ti._cosmos_xcom_backup_rows_written = row_index
         open_row = ti._cosmos_xcom_backup_open_row = {}
@@ -295,11 +294,15 @@ def _push_entries(ti: Any, entries: dict[str, Any]) -> None:
     logger.info("Restored %d XCom entries from the backup", len(entries))
 
 
-def _log_missing_backup(try_number: int) -> None:
+def _log_missing_backup(context: Any, try_number: int, *, read_task_state_store: bool) -> None:
+    """Warn when the task store held the backup and nothing came back; otherwise an empty backup is routine."""
     message = (
         "No XCom backup found for attempt #%s: the producer skips and the consumers fall back to running their own "
         "dbt nodes."
     )
+    if not (read_task_state_store and context.get(TASK_STATE_STORE_CONTEXT_KEY) is not None):
+        logger.info(message, try_number)
+        return
     if AIRFLOW_VERSION >= Version("3.4.0"):
         message += (
             " Clearing the producer from the Airflow UI or API discards its task store unless 'Keep task state' is "

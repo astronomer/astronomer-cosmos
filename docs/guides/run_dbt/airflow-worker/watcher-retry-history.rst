@@ -213,7 +213,7 @@ Task-level retry — producer
        the producer keeps its per-node backup in the Airflow task store instead of a Variable
        (`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_), which makes no
        secrets-backend calls. With ``False`` the Variable flush from the retry callback is unchanged.
-       A producer that finds no backup on a retry now logs a warning.
+       A producer that finds no backup on a retry logs a warning when the task store was in use.
 
 Automatic retries
 +++++++++++++++++

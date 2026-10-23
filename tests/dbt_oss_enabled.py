@@ -17,6 +17,9 @@ from pathlib import Path
 # (user_defined_profile.py, example_cosmos_sources.py) run here because the workflow rewrites those Postgres profiles to
 # BigQuery (scripts/test/bigquery_ci_profiles.py). cosmos_profile_mapping.py runs here because tests/dbt_oss_plugin.py
 # answers its lookup of the Airflow connection `example_conn` with a BigQuery profile mapping.
+# example_virtualenv_mini.py runs here because the plugin installs dbt-oss in its virtualenv, not dbt-postgres (the
+# other virtualenv DAGs are excluded from the integration job). Only test_virtualenv.py runs it: integration.sh skips it
+# in the example DAG tests.
 ENABLED_DAG_FILES = frozenset(
     {
         "basic_cosmos_dag.py",
@@ -43,6 +46,7 @@ ENABLED_DAG_FILES = frozenset(
         "example_taskflow_project_config.py",
         "example_tasks_map.py",
         "example_tests_multiple_parents.py",
+        "example_virtualenv_mini.py",
         "example_watcher.py",
         "user_defined_profile.py",
         "watcher_with_freshness_check.py",

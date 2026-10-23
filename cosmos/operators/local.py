@@ -857,12 +857,15 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """
         Add ``args.profiles_dir`` to ``run_results.json`` when dbt did not write it.
 
-        dbt 2 (dbt-oss) leaves ``profiles_dir`` out of the run results ``args``, and ``openlineage-integration-common``
-        reads it unconditionally, so the ``KeyError`` left the task with no inlets or outlets. Only called when dbt 2
-        is installed in the Airflow environment (``is_dbt_v2``), so other setups, such as the dbt Fusion binary used
-        with a dbt 1.x environment, keep their behaviour. The directory is the one
-        passed with ``--profiles-dir`` (or ``DBT_PROFILES_DIR``), the same lookup the library falls back to when the
-        profile file is not found in ``profiles_dir``. The file is in the temporary project directory of the task.
+        dbt 2 (dbt-oss) leaves ``profiles_dir`` out of the run results ``args``. ``openlineage-integration-common``
+        1.43.0 and older read it unconditionally, so the ``KeyError`` left the task with no inlets or outlets; 1.44.0
+        and later fall back to the same ``--profiles-dir`` lookup and do not need this.
+
+        Only called when dbt 2 is installed in the Airflow environment (``is_dbt_v2``), which does not inspect
+        ``dbt_executable_path``: a dbt 2 executable next to a dbt 1.x environment is not covered, and the dbt Fusion
+        binary used with a dbt 2 environment is. The directory is the one passed with ``--profiles-dir`` (the last
+        occurrence, as dbt does) or ``DBT_PROFILES_DIR``; nothing is added when neither is set. The file is in the
+        temporary project directory of the task.
         """
         if not isinstance(run_results_path, (str, os.PathLike)):
             return

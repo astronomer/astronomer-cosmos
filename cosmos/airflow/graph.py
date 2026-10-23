@@ -656,6 +656,22 @@ def generate_or_convert_task(
     return task
 
 
+def _should_render_tests_in_task_group(node: DbtNode, render_config: RenderConfig) -> bool:
+    """
+    Decide if a node's non-detached tests should run in a dedicated test task, grouped with the node task.
+
+    Under TestBehavior.AFTER_EACH, this applies to every testable resource. Under TestBehavior.BUILD, the
+    tests of models, seeds and snapshots run as part of the node's own ``dbt build`` task, so they do not
+    need a separate test task. Sources are the exception: Cosmos renders them as ``dbt source freshness``
+    tasks, and the build tasks of models, seeds and snapshots select only their own node, so the tests
+    defined on a source would never be selected by any task unless they get a test task of their own, as
+    with AFTER_EACH.
+    """
+    if render_config.test_behavior == TestBehavior.AFTER_EACH:
+        return True
+    return render_config.test_behavior == TestBehavior.BUILD and node.resource_type == DbtResourceType.SOURCE
+
+
 def generate_task_or_group(
     dag: DAG,
     task_group: TaskGroup | None,
@@ -678,7 +694,7 @@ def generate_task_or_group(
     detached_from_parent = detached_from_parent or {}
     use_task_group = (
         node.resource_type in TESTABLE_DBT_RESOURCES
-        and render_config.test_behavior == TestBehavior.AFTER_EACH
+        and _should_render_tests_in_task_group(node, render_config)
         and node.has_non_detached_test is True
     )
     convert_entire_task_group = render_config.node_conversion_by_task_group and node.resource_type in node_converters
@@ -1007,11 +1023,16 @@ def identify_detached_nodes(
 
 
 def calculate_test_operator_kwargs(
-    nodes: dict[str, DbtNode], detached_nodes: dict[str, DbtNode]
+    nodes: dict[str, DbtNode],
+    detached_nodes: dict[str, DbtNode],
+    render_config: RenderConfig | None = None,
 ) -> dict[str, dict[str, Any]]:
     """
-    Map each tested node ID to the ``operator_kwargs`` declared by the test nodes that run alongside it under
-    TestBehavior.AFTER_EACH. Detached tests are skipped: they run in their own task, using their own kwargs.
+    Map each tested node ID to the ``operator_kwargs`` declared by the test nodes that run alongside it
+    (under TestBehavior.AFTER_EACH, or for source tests under TestBehavior.BUILD). Detached tests are
+    skipped: they run in their own task, using their own kwargs. When ``render_config`` is given, only the
+    parents whose tests get a task of their own (see ``_should_render_tests_in_task_group``) are collected,
+    so the tests that run inside their parent's own ``dbt build`` task are left alone.
 
     Since a node's tests all run in a single Airflow task, when they declare the same kwarg with different values the
     last one wins.
@@ -1024,6 +1045,10 @@ def calculate_test_operator_kwargs(
         if not node_kwargs:
             continue
         for parent_id in node.depends_on:
+            if render_config is not None:
+                parent = nodes.get(parent_id)
+                if parent is None or not _should_render_tests_in_task_group(parent, render_config):
+                    continue
             parent_kwargs = test_operator_kwargs.setdefault(parent_id, {})
             for kwarg, value in node_kwargs.items():
                 if kwarg in parent_kwargs and parent_kwargs[kwarg] != value:
@@ -1259,11 +1284,12 @@ def build_airflow_graph(
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
-    # Operator kwargs declared by the test nodes, so a TestBehavior.AFTER_EACH test task can override the arguments
+    # Operator kwargs declared by the test nodes, so a test task rendered alongside its parent node
+    # (TestBehavior.AFTER_EACH, or source tests under TestBehavior.BUILD) can override the arguments
     # it inherits from the resource being tested
     test_operator_kwargs = (
-        calculate_test_operator_kwargs(nodes, detached_nodes)
-        if render_config.test_behavior == TestBehavior.AFTER_EACH
+        calculate_test_operator_kwargs(nodes, detached_nodes, render_config)
+        if render_config.test_behavior in (TestBehavior.AFTER_EACH, TestBehavior.BUILD)
         else {}
     )
 

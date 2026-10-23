@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import re
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -2439,12 +2440,15 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
         not in caplog.text
     )
 
-    log_message = "OK loaded seed file public.raw_orders"
-    assert log_message in caplog.text
+    # dbt prints the schema before the table: "public" on Postgres, the dataset on BigQuery.
+    log_message = re.compile(r"OK loaded seed file \S+\.raw_orders")
+    assert log_message.search(caplog.text)
 
     # Verify that log messages are not duplicated (each dbt message should appear only once)
-    message_count = sum(1 for record in caplog.records if log_message in record.message)
-    assert message_count == 1, f"Expected '{log_message}' to be logged exactly once, but found {message_count} times"
+    message_count = sum(1 for record in caplog.records if log_message.search(record.message))
+    assert (
+        message_count == 1
+    ), f"Expected '{log_message.pattern}' to be logged exactly once, but found {message_count} times"
 
 
 # Airflow 3.0.0 hangs indefinitely, while Airflow 3.0.6 fails due to this Airflow bug:

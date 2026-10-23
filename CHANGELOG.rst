@@ -13,6 +13,7 @@ Breaking Changes
 Behaviour Changes
 
 * ``RenderConfig.exclude`` is now resolved against the full project graph instead of against the subset ``RenderConfig.select`` already narrowed. Graph operators traverse outwards from the nodes their selector matches, so when ``select`` had already dropped those root nodes the traversal had nothing to start from and shared ancestors or descendants were silently kept. For example, given a ``parent`` tagged ``test`` and its ``child``, ``select=["+child"], exclude=["+tag:test"]`` previously rendered both ``parent`` and ``child``, because ``+tag:test`` was evaluated after ``+child`` had already been applied; it now renders only ``child``. This matches dbt, which evaluates both filters against the whole graph and subtracts afterwards. See #2976.
+* ``ProjectConfig`` now keeps the ``models``/``seeds``/``snapshots`` relative paths it was configured with even when it has no ``dbt_project_path`` of its own, and ``LoadMode.CUSTOM`` falls back to them when the project root is supplied through ``RenderConfig``/``ExecutionConfig`` instead. Previously those relative paths were discarded in that split configuration and ``LegacyDbtProject`` silently crawled its defaults, so a project declaring e.g. ``models_relative_paths="custom/models"`` rendered no models at all; it now crawls ``custom/models`` as configured. Projects that set ``dbt_project_path`` on ``ProjectConfig`` are unaffected. See #2977.
 * ``emit_datasets`` is now a template field on the dbt operators, so emission can be decided per DAG run:
   ``operator_args={"emit_datasets": "{{ dag_run.run_type != 'backfill' }}"}`` stops backfills from triggering downstream
   asset-scheduled DAGs. ``operator_args`` now takes precedence over ``RenderConfig.emit_datasets`` (which remains a
@@ -29,12 +30,19 @@ Features
 
 * Log a per-model test summary (passed and failed counts, and the failing test unique_ids) in the ``ExecutionMode.WATCHER`` test sensors by @michal-mrazek in #2750
 * Add opt-in support for adapter-native semantic metric views (``config.materialized: metric_view`` on Databricks, ``semantic_view`` on Snowflake). When ``enable_semantic_metric_view_reclassification`` is set (env var ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION``), these models are reclassified from ``model`` to ``DbtResourceType.SEMANTIC_METRIC_VIEW`` and rendered via a dedicated ``DbtSemanticMetricView*`` operator with a ``semantic_metric_run`` task suffix. Disabled by default. See the "Managing semantic metric views" guide and #2885.
+* Under ``TestBehavior.BUILD``, a rendered dbt source that has tests is now a task group (``<source>.source`` and
+  ``<source>.test``) instead of a single ``<source>_source`` task, so references to the old task id need updating.
+  The source tests, which this mode never executed before, now run and can fail the DAG. See #1683.
 
 Bug Fixes
 
 * On Airflow 3.0, the Cosmos plugin now logs a warning and skips the dbt docs views instead of raising ``RuntimeError`` on load. Previously, with ``[core] lazy_load_plugins = False`` (as on Astro Runtime), every Airflow CLI command logged a "Failed to import plugin cosmos" traceback, and the plugin's listeners were never registered.
 * Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn, so ``<folder>+`` and ``<package>+`` behave like their ``path:`` and ``package:`` equivalents and like ``dbt ls``. Previously the graph selector resolved its root by exact node name only, and bare-identifier matching keyed off the absolute file path. See #2962.
 * ``LoadMode.DBT_LS`` now runs ``dbt ls`` through a Python subprocess when dbt 2 (``dbt-core``, ``dbt-oss`` or ``dbt`` 2.x) is installed in the Airflow environment, even under the default ``InvocationMode.DBT_RUNNER``. dbt 2's ``dbtRunner`` returns only node names for ``dbt ls --output json``, which previously rendered an empty DAG. The fallback runs ``dbt_executable_path`` and is logged at INFO level; ``dbt deps`` still runs through ``dbtRunner``. See #2992 and #3060.
+* Run the tests defined on dbt sources under ``TestBehavior.BUILD``: a source with tests is rendered as a task group
+  with a dedicated test task, as under ``TestBehavior.AFTER_EACH``. Sources are rendered as ``dbt source freshness``
+  tasks and the build tasks of models, seeds and snapshots select only their own node, so source tests were never
+  selected by any task. See #1683.
 
 1.15.1 (2026-08-04)
 -------------------

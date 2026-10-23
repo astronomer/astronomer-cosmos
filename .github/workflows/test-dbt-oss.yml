@@ -1,0 +1,228 @@
+name: test-dbt-oss
+
+# Integration tests for dbt-oss. dbt-oss does not support the Postgres adapter that the tests in test.yml use, so
+# this workflow runs the same integration tests (the ones marked ``integration``) against BigQuery instead. It loads the
+# tests/dbt_oss_plugin.py pytest plugin, which replaces the Postgres profile mapping used by the tests and the example
+# DAGs with a BigQuery one and skips the tests that need Postgres itself. tests/dbt_oss_enabled.py lists what runs here
+# while dbt-oss is rolled out one group at a time. test.yml is unchanged.
+on:
+  push: # Run on pushes to the default branch
+    branches: [main]
+  # Uses secrets, so it depends on the Authorize job, which requires manually approving the workflow run for external PRs
+  # (same as test.yml). Pull requests use the workflow file from the base branch.
+  pull_request_target:
+    branches: [main, 'release-*'] # zizmor: ignore[dangerous-triggers]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  SCARF_NO_ANALYTICS: "true"
+
+jobs:
+  Authorize:
+    environment: ${{ github.event_name == 'pull_request_target' &&
+      github.event.pull_request.head.repo.full_name != github.repository &&
+      'external' || 'internal' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: true
+
+  Check-changed-files:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code_changed: ${{ steps.check.outputs.code_changed }}
+    steps:
+      # Only the `push` branch below uses the working tree (`git diff`). For pull_request /
+      # pull_request_target the changed-file list comes from the GitHub API, so we must NOT
+      # check out untrusted fork code in this ungated job — that is the pull_request_target
+      # "pwn request" risk actions/checkout v7 refuses by default.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'push'
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.event_name }}" == "pull_request_target" ]; then
+            # Use GitHub API to list changed files — works reliably for fork PRs
+            # where git diff may fail because the fork's commits aren't in local history.
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            if ! FILES=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename' 2>/tmp/gh_api_err); then
+              echo "::warning::Failed to list PR changed files via GitHub API, falling back to running all tests. Error: $(cat /tmp/gh_api_err)"
+              echo "code_changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            # Handle cases where BASE is missing or all zeros (e.g., first push, force push)
+            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              echo "code_changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            # Compute changed files; if git diff fails, assume code changed to be safe
+            if ! FILES=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null); then
+              echo "code_changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          CODE_CHANGED=false
+          # If we can't determine changed files, run tests to be safe
+          if [ -z "$FILES" ]; then
+            CODE_CHANGED=true
+          fi
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              # Documentation and metadata
+              README.rst|README.md) ;;
+              CHANGELOG.rst) ;;
+              CODE_OF_CONDUCT.md) ;;
+              CONTRIBUTING.md) ;;
+              LICENSE) ;;
+              SECURITY.rst) ;;
+              PRIVACY_NOTICE.rst) ;;
+              CODEOWNERS) ;;
+              CLAUDE.md) ;;
+              AGENTS.md) ;;
+              docs/*) ;;
+              # GitHub and CI config unrelated to tests
+              .github/pull_request_template.md) ;;
+              .github/ISSUE_TEMPLATE/*) ;;
+              .github/dependabot.yml) ;;
+              .github/workflows/docs.yml) ;;
+              .github/workflows/docs-build.yml) ;;
+              .github/workflows/stale.yml) ;;
+              .github/workflows/actionlint.yml) ;;
+              .github/workflows/codeql.yml) ;;
+              .github/workflows/zizmor.yml) ;;
+              .github/workflows/deploy.yml) ;;
+              # Tooling config that does not affect test outcomes
+              .gitignore) ;;
+              .tiltignore) ;;
+              Tiltfile) ;;
+              .codespell-ignore-words) ;;
+              .pre-commit-config.yaml) ;;
+              .airflow-registry.yaml) ;;
+              *) CODE_CHANGED=true; break ;;
+            esac
+          done <<< "$FILES"
+          echo "code_changed=$CODE_CHANGED" >> "$GITHUB_OUTPUT"
+
+  Run-dbt-oss-Tests:
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+        airflow-version: ["2.10", "3.0", "3.1"]
+        dbt-version: ["2.0-dbt-oss"]
+        split-group: [1, 2, 3]
+    env:
+      # One BigQuery dataset per job, so concurrent jobs do not write to the same tables. The tests read it, and the last
+      # step deletes it. The name only has ids, so it is a valid dataset name (no dots, unlike the matrix).
+      COSMOS_TEST_BIGQUERY_DATASET: cosmos_ci_${{ github.run_id }}_${{ github.run_attempt }}_oss_${{ strategy.job-index }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install uv
+          uv pip install --system "hatch>=1.14.2"
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
+
+      - name: Create the BigQuery dataset
+        id: create-bigquery-dataset
+        # Retries rate-limit errors, waits a random few seconds first so the jobs of a run do not all call the API at once,
+        # and waits until the dataset can be read: BigQuery does not always make it visible straight away, which made the
+        # first seed fail with "Not found: Dataset". Run in isolated mode (-I), and only for names that start with cosmos_ci_.
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+          BIGQUERY_PROJECT: astronomer-dag-authoring
+        run: |
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_dataset.py create
+
+      - name: Make the example dbt projects compatible with dbt-oss
+        # dbt-oss rejects what dbt 1.x accepts in these projects (materialized without +, test arguments outside
+        # arguments:), so the DAGs and tests that use them cannot even parse. dbt-autofix, pinned, rewrites the checked out
+        # files on this runner only; the repository and the other workflows are not touched.
+        run: |
+          for project in altered_jaffle_shop jaffle_shop_python model_version multiple_parents_test simple; do
+            uv tool run --python ${{ matrix.python-version }} --from "dbt-autofix==0.22.6" dbt-autofix deprecations --path "dev/dags/dbt/$project"
+          done
+          git diff --stat
+
+      - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
+        run: |
+          HATCH_ENV="tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}"
+          hatch run "$HATCH_ENV:test-integration-dbt-oss-setup"
+          hatch run "$HATCH_ENV:test-integration"
+        env:
+          COSMOS_TEST_ADAPTER: bigquery
+          # altered_jaffle_shop/models/staging/sources.yml reads these two: point them at this job's BigQuery dataset.
+          POSTGRES_DB: astronomer-dag-authoring
+          POSTGRES_SCHEMA: ${{ env.COSMOS_TEST_BIGQUERY_DATASET }}
+          # Loaded only by this job; swaps the Postgres profile mapping for BigQuery and applies tests/dbt_oss_enabled.py.
+          PYTEST_PLUGINS: tests.dbt_oss_plugin
+          # Summary of the failed, errored and skipped tests at the end of the run.
+          PYTEST_ADDOPTS: -rfEs
+          PYTEST_SPLITS: 3
+          PYTEST_SPLIT_GROUP: ${{ matrix.split-group }}
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_YAML_SELECTORS: 0
+          AIRFLOW__COSMOS__ENABLE_LAX_SELECTOR_PARSING: 0
+          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
+          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 120
+          AIRFLOW__CORE__DAG_FILE_PROCESSOR_TIMEOUT: 120
+          AIRFLOW__DAG_PROCESSOR__DAGBAG_IMPORT_TIMEOUT: 120
+          AIRFLOW__DAG_PROCESSOR__DAG_FILE_PROCESSOR_TIMEOUT: 120
+          AIRFLOW_CONN_AWS_S3_CONN: ${{ secrets.AIRFLOW_CONN_AWS_S3_CONN }}
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+          AIRFLOW_CONN_AZURE_ABFS_CONN: ${{ secrets.AIRFLOW_CONN_AZURE_ABFS_CONN }}
+          DATABRICKS_HOST: mock
+          DATABRICKS_WAREHOUSE_ID: mock
+          DATABRICKS_TOKEN: mock
+          DATABRICKS_CLUSTER_ID: mock
+          PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
+          AIRFLOW__COSMOS__REMOTE_TARGET_PATH: s3://cosmos-remote-cache/target_compiled/
+          AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
+          AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
+
+      - name: Delete the BigQuery dataset
+        # Runs on success, failure and cancellation, but not when the create step never ran (for example when checkout or
+        # the install failed): there is no dataset to delete. A failure to delete is only a warning: the dataset's tables
+        # expire after a few hours anyway. Isolated mode (-I), and it only touches datasets named cosmos_ci_*. The credentials
+        # need to be able to delete only the datasets they created (not a project-wide delete).
+        if: always() && steps.create-bigquery-dataset.outcome != 'skipped'
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+          BIGQUERY_PROJECT: astronomer-dag-authoring
+        run: |
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_dataset.py delete

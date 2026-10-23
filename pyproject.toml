@@ -86,6 +86,8 @@ amazon = [
 # Due to issue https://github.com/fsspec/gcsfs/issues/664
 google = ["apache-airflow-providers-google>=10.17.0", "gcsfs<2025.3.0"]
 microsoft = ["apache-airflow-providers-microsoft-azure>=8.5.0"]
+# Not part of ``all``: the provider needs Python 3.11+ and Airflow 2.11+, while Cosmos supports older versions.
+ai = ["apache-airflow-providers-common-ai[sql]>=1.0.0"]
 all = [
     "astronomer-cosmos[dbt-all]",
     "astronomer-cosmos[openlineage]",

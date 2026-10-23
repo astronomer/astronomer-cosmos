@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 import jinja2
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowTaskTimeout
 from airflow.models.taskinstance import TaskInstance
 from packaging.version import Version
 
@@ -24,6 +24,8 @@ from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.io import _construct_dest_file_path
 
 if TYPE_CHECKING:  # pragma: no cover
+    from cosmos.ai.diagnostics import DiagnosisHandle
+
     try:
         from airflow.sdk.definitions.context import Context
     except ImportError:
@@ -89,7 +91,7 @@ if TYPE_CHECKING:  # pragma: no cover
 from sqlalchemy.orm import Session
 
 import cosmos.dbt.runner as dbt_runner
-from cosmos.config import ProfileConfig
+from cosmos.config import AIConfig, ProfileConfig
 from cosmos.constants import (
     OPENLINEAGE_PRODUCER,
 )
@@ -220,10 +222,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
         dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]
+        ai_config: AIConfig | None = None,
         **kwargs: Any,
     ) -> None:
         self.task_id = task_id
         self.profile_config = profile_config
+        self.ai_config = ai_config
+        # Set while an AI diagnosis runs, so ``on_kill`` can cancel it.
+        self._ai_diagnosis_handle: DiagnosisHandle | None = None
         self.callback = callback
         self.callback_args = callback_args or {}
         self.compiled_sql = ""
@@ -677,6 +683,83 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             async_op_configurator(self, sql=sql)
             async_context["async_operator"].execute(self, context)
 
+    def _handle_exception_and_diagnose(self, result: Any, tmp_project_dir: str, context: Context) -> None:
+        """
+        Raise the dbt failure, if any, enriched with an AI diagnosis when ``AIConfig`` asks for it.
+
+        This runs while the temporary project is still there, so the diagnosis can read the dbt artifacts. The
+        original exception is re-raised, with the diagnosis added after its message, so its type, traceback and the
+        failing node details come first, as the retry policies and callbacks expect.
+        """
+        try:
+            self.handle_exception(result)
+        except AirflowSkipException:
+            raise
+        except (AirflowException, CosmosDbtRunError) as exc:  # the subprocess and the dbt runner invocation modes
+            ai_config = self.ai_config
+            try:
+                if ai_config and ai_config.diagnose_on_failure and self._is_last_attempt(context):
+                    self._append_ai_diagnosis(ai_config, exc, result, tmp_project_dir)
+            except AirflowTaskTimeout:
+                # ``execution_timeout`` is a ``BaseException``. The task failed because of dbt, so callbacks should see
+                # that and not a timeout of the diagnosis.
+                self.log.warning("execution_timeout was reached during the AI diagnosis; raising the dbt error.")
+            except Exception:
+                # Deliberately broad. The diagnosis handles the failures it expects, so this is a bug in Cosmos, a
+                # version of the provider it doesn't support, or an error of the model SDK that has no common base
+                # class, such as the ``DefaultCredentialsError`` of Google or the ``NoCredentialsError`` of boto. Log it
+                # loudly, but never let it replace the dbt failure.
+                self.log.error(
+                    "AI diagnosis failed unexpectedly (see the error below: a bug, an unsupported provider version "
+                    "or a credentials error of the model SDK); falling back to the standard error message.",
+                    exc_info=True,
+                )
+            finally:
+                self._ai_diagnosis_handle = None
+            raise
+
+    def _is_last_attempt(self, context: Context) -> bool:
+        """Diagnose only on the final attempt: every attempt would pay for an LLM call, and retries may fix it."""
+        task_instance = context.get("ti")
+        try_number = getattr(task_instance, "try_number", None)
+        max_tries = getattr(task_instance, "max_tries", None)
+        if not (isinstance(try_number, int) and isinstance(max_tries, int)):
+            return True
+        # Same rule Airflow uses to decide whether a failed task is retried.
+        if try_number <= max_tries:
+            self.log.info(
+                "Skipping AI diagnosis: attempt %s of %s, the task will be retried.", try_number, max_tries + 1
+            )
+            return False
+        return True
+
+    def _append_ai_diagnosis(self, ai_config: AIConfig, exc: Exception, result: Any, tmp_project_dir: str) -> None:
+        """Add the AI diagnosis to the message of ``exc``."""
+        try:
+            # Imported only here: ``cosmos.ai`` needs pydantic, which Airflow 2 and Cosmos themselves don't require.
+            from cosmos.ai.context import build_failure_context
+            from cosmos.ai.diagnostics import DiagnosisHandle, diagnose_dbt_failure, redact
+        except ImportError:
+            self.log.warning(
+                "AI diagnosis requires pydantic and apache-airflow-providers-common-ai>=1.0.0; skipping. "
+                "Install them with: pip install 'astronomer-cosmos[ai]'",
+                exc_info=True,
+            )
+            return
+
+        output = "\n".join(getattr(result, "full_output", [])) or str(exc)
+        self._ai_diagnosis_handle = DiagnosisHandle()
+        diagnosis = diagnose_dbt_failure(
+            ai_config=ai_config,
+            profile_config=self.profile_config,
+            failure_context=build_failure_context(
+                tmp_project_dir, output, ai_config, lambda text: redact(text, ai_config)
+            ),
+            handle=self._ai_diagnosis_handle,
+        )
+        if diagnosis and exc.args and isinstance(exc.args[0], str):
+            exc.args = (f"{exc.args[0]}\n\n{diagnosis}", *exc.args[1:])
+
     def run_command(  # noqa: C901
         self,
         cmd: list[str],
@@ -744,7 +827,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                     self._update_partial_parse_cache(tmp_dir_path)
 
                 self._handle_post_execution(tmp_project_dir, context, push_run_results_to_xcom)
-                self.handle_exception(result)
+                self._handle_exception_and_diagnose(result, tmp_project_dir, context)
 
                 if run_as_async and async_context:
                     self._handle_async_execution(tmp_project_dir, context, async_context)
@@ -925,7 +1008,13 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         )
         return result
 
+    def _cancel_ai_diagnosis(self) -> None:
+        """Cancel the AI diagnosis in flight, if any. Operators that override ``on_kill`` must call it."""
+        if self._ai_diagnosis_handle is not None:
+            self._ai_diagnosis_handle.cancel()
+
     def on_kill(self) -> None:
+        self._cancel_ai_diagnosis()
         if self.invocation_mode == InvocationMode.SUBPROCESS:
             if self.cancel_query_on_kill:
                 self.subprocess_hook.send_sigint()

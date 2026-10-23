@@ -177,7 +177,7 @@ Applies to every `logger.{debug,info,warning,error,exception}` call. f-strings a
 
 | Module | Purpose |
 |---|---|
-| `cosmos/config.py` | `ProjectConfig`, `ProfileConfig`, `RenderConfig`, `ExecutionConfig` — the four user-facing config classes |
+| `cosmos/config.py` | `ProjectConfig`, `ProfileConfig`, `RenderConfig`, `ExecutionConfig`, `AIConfig` — the five user-facing config classes |
 | `cosmos/constants.py` | Enums: `ExecutionMode`, `LoadMode`, `TestBehavior`, `SourceRenderingBehavior`, etc. |
 | `cosmos/converter.py` | Entry point: converts dbt project config into Airflow graph |
 | `cosmos/dbt/graph.py` | Parses dbt manifest/runs `dbt ls`; builds `DbtGraph` with nodes and edges |
@@ -185,6 +185,7 @@ Applies to every `logger.{debug,info,warning,error,exception}` call. f-strings a
 | `cosmos/airflow/graph.py` | Converts `DbtGraph` nodes into Airflow `BaseOperator` instances and task dependencies |
 | `cosmos/operators/` | One operator class per execution mode (`local.py`, `docker.py`, `kubernetes.py`, `virtualenv.py`, cloud variants) |
 | `cosmos/profiles/` | Database-specific dbt profile generators (Postgres, Snowflake, BigQuery, Databricks, etc.) |
+| `cosmos/ai/` | Optional LLM-assisted diagnosis of failed dbt tasks (`AIConfig`): failure context from dbt artifacts, agent run, output formatting |
 | `cosmos/cache.py` | Caches manifest parsing and `dbt ls` results to speed up DAG generation |
 | `cosmos/listeners/` | Airflow event listeners for DAG run and task instance lifecycle events |
 | `cosmos/plugin/` | Registers Cosmos as an Airflow provider plugin; includes cluster retry policy, dbt docs plugin etc |

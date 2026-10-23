@@ -8,6 +8,7 @@ import sys
 import tempfile
 import threading
 import zlib
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 from urllib.parse import urlparse
@@ -1689,11 +1690,14 @@ def test_add_missing_profiles_dir_to_run_results_without_a_path():
     DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(None, ["dbt", "run", "--profiles-dir", "/x"])
 
 
+@patch(
+    "cosmos.operators.local.DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results", return_value=True
+)
 @patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
 @patch("cosmos.operators.local.DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results")
 @patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
 def test_calculate_openlineage_events_completes_adds_the_profiles_dir_before_parsing(
-    mock_get_processor, mock_add_profiles_dir, mock_is_dbt_v2
+    mock_get_processor, mock_add_profiles_dir, mock_is_dbt_v2, mock_requires_profiles_dir
 ):
     instance = mock_get_processor.return_value.return_value
     instance.run_result_path = "/project/target/run_results.json"
@@ -1714,14 +1718,21 @@ def test_calculate_openlineage_events_completes_adds_the_profiles_dir_before_par
     assert instance.parse.called
 
 
-@pytest.mark.parametrize("is_dbt_v2", [True, False])
+@pytest.mark.parametrize(
+    "is_dbt_v2, library_requires_it, expected_call",
+    [
+        pytest.param(True, True, True, id="dbt_2_and_library_needs_it"),
+        # dbt Fusion used with a dbt 1.x environment keeps not emitting datasets.
+        pytest.param(False, True, False, id="not_dbt_2"),
+        # openlineage-integration-common 1.44.0 and later fall back to the --profiles-dir lookup themselves.
+        pytest.param(True, False, False, id="library_does_not_need_it"),
+    ],
+)
 @patch("cosmos.operators.local.DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results")
 @patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
-def test_calculate_openlineage_events_completes_adds_the_profiles_dir_only_with_dbt_v2(
-    mock_get_processor, mock_add_profiles_dir, is_dbt_v2
+def test_calculate_openlineage_events_completes_adds_the_profiles_dir_only_when_needed(
+    mock_get_processor, mock_add_profiles_dir, is_dbt_v2, library_requires_it, expected_call
 ):
-    """Only dbt 2 installed in the Airflow environment gets the profiles dir added, so the dbt Fusion binary used
-    with a dbt 1.x environment keeps not emitting datasets."""
     instance = mock_get_processor.return_value.return_value
     instance.run_result_path = "/project/target/run_results.json"
     instance.parse.return_value = MagicMock(completes=[])
@@ -1730,16 +1741,36 @@ def test_calculate_openlineage_events_completes_adds_the_profiles_dir_only_with_
     )
     command = ["dbt", "run", "--profiles-dir", "/profiles"]
 
-    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2):
+    with (
+        patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2),
+        patch(
+            "cosmos.operators.local.DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results",
+            return_value=library_requires_it,
+        ),
+    ):
         dbt_base_operator.calculate_openlineage_events_completes(
             env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=command
         )
 
-    if is_dbt_v2:
+    if expected_call:
         mock_add_profiles_dir.assert_called_once_with("/project/target/run_results.json", command)
     else:
         mock_add_profiles_dir.assert_not_called()
     assert instance.parse.called
+
+
+@pytest.mark.parametrize(
+    "installed_version, expected",
+    [("1.40.0", True), ("1.43.0", True), ("1.44.0", False), ("1.54.0", False), ("not a version", True)],
+)
+def test_openlineage_requires_profiles_dir_in_run_results(installed_version, expected):
+    with patch("cosmos.operators.local.version", return_value=installed_version):
+        assert DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results() is expected
+
+
+def test_openlineage_requires_profiles_dir_in_run_results_when_the_library_is_not_found():
+    with patch("cosmos.operators.local.version", side_effect=PackageNotFoundError):
+        assert DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results() is True
 
 
 def test_dbt_local_artifact_processor_imported_lazily():

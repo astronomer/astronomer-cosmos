@@ -31,6 +31,7 @@ from cosmos.constants import (
     SourceRenderingBehavior,
 )
 from cosmos.dbt.graph import DbtNode
+from cosmos.dbt.runner import is_dbt_v2
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators._watcher.aggregation import TestResultSummary
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
@@ -2328,12 +2329,20 @@ def test_dbt_dag_with_watcher(caplog):
         not in caplog.text
     )
 
-    log_message = "OK loaded seed file public.raw_orders"
-    assert log_message in caplog.text
+    # dbt 2 (dbt-oss) prints plain text such as "Succeeded seed <dataset>.raw_orders (table)" to stdout and does not
+    # produce the "OK loaded seed file" event that Cosmos re-logs for dbt 1.x, so each dbt version has its own message.
+    # dbt prints the schema before the table: "public" on Postgres, the dataset on BigQuery.
+    if is_dbt_v2():
+        log_message = re.compile(r"Succeeded seed\s+\S+\.raw_orders")
+    else:
+        log_message = re.compile(r"OK loaded seed file \S+\.raw_orders")
+    assert log_message.search(caplog.text)
 
     # Verify that log messages are not duplicated (each dbt message should appear only once)
-    message_count = caplog.text.count(log_message)
-    assert message_count == 1, f"Expected '{log_message}' to be logged exactly once, but found {message_count} times"
+    message_count = sum(1 for record in caplog.records if log_message.search(record.message))
+    assert (
+        message_count == 1
+    ), f"Expected '{log_message.pattern}' to be logged exactly once, but found {message_count} times"
 
 
 @pytest.mark.integration
@@ -3718,6 +3727,26 @@ class TestDefaultFreshnessCallback:
         )
         assert result == []
 
+    @pytest.mark.parametrize("status", ["warn", "error", "Warn", "Error"])
+    def test_stale_source_status_is_case_insensitive(self, status):
+        from cosmos.constants import DbtResourceType
+        from cosmos.dbt.graph import DbtNode
+
+        nodes = {
+            "model.pkg.m1": DbtNode(
+                unique_id="model.pkg.m1",
+                resource_type=DbtResourceType.MODEL,
+                depends_on=["source.pkg.src1"],
+                path_base=Path("/tmp"),
+                original_file_path=Path("models/m.sql"),
+            ),
+        }
+        sources_json = {"results": [{"unique_id": "source.pkg.src1", "status": status}]}
+        result = _default_freshness_callback(
+            context=MagicMock(), dag=None, task_group=None, nodes=nodes, sources_json=sources_json
+        )
+        assert [unique_id for unique_id, _state in result] == ["model.pkg.m1"]
+
     def test_returns_transitive_dependents_of_stale_source(self):
         from cosmos.constants import DbtResourceType
         from cosmos.dbt.graph import DbtNode
@@ -4076,15 +4105,14 @@ class TestProducerSourceFreshness:
         ti.xcom_push.assert_called_once_with(key="model__pkg__m1_status", value={"status": "failed", "outlet_uris": []})
         assert "m1" in producer.exclude
 
-    def test_apply_node_state_tokens_success_state_does_not_update_exclude(self):
+    @pytest.mark.parametrize("state", ["success", "Success", "warn", "Warn"])
+    def test_apply_node_state_tokens_success_state_does_not_update_exclude(self, state):
         producer = self._make_producer()
         producer.exclude = None
         ti = MagicMock()
         context = {"ti": ti}
-        producer._apply_node_state_tokens(context, [("model.pkg.m1", "success")])
-        ti.xcom_push.assert_called_once_with(
-            key="model__pkg__m1_status", value={"status": "success", "outlet_uris": []}
-        )
+        producer._apply_node_state_tokens(context, [("model.pkg.m1", state)])
+        ti.xcom_push.assert_called_once_with(key="model__pkg__m1_status", value={"status": state, "outlet_uris": []})
         assert producer.exclude is None
 
     def test_run_dbt_runner_skips_callback_during_source_freshness(self):

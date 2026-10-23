@@ -49,6 +49,10 @@ _NO_DATASETS = (
     "dbt-oss writes no datasets: its run_results.json has no args.profiles_dir, so the OpenLineage artifact parser raises "
     "KeyError (logged at debug level) and the inlets and outlets stay empty (reproduced locally with dbt-oss 2.0.8)"
 )
+_FORCES_DBT_RUNNER = (
+    "its example DAG pins invocation_mode=InvocationMode.DBT_RUNNER, which Cosmos rejects on dbt 2 because the dbtRunner "
+    "has no callbacks (leaving it unset would fall back to subprocess, but the example is included in the docs)"
+)
 _NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _MODEL_VERSION_ALIAS = "dbt-oss fails on this project with 'Template not found: jaffle_shop.generate_alias_name'"
@@ -79,15 +83,13 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
     "tests/test_debug.py::test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled": _POSTGRES_ENV,
     "tests/test_example_dags.py::test_source_pruning_dag": _POSTGRES_ENV,
-    # dbt 2 dbtRunner has no callbacks (8)
+    # The example DAG forces dbtRunner, which has no callbacks on dbt 2 (2)
+    "tests/test_example_dags.py::test_example_dag[example_watcher]": _FORCES_DBT_RUNNER,
+    "tests/test_example_dags.py::test_example_dag[example_watcher_with_freshness]": _FORCES_DBT_RUNNER,
+    # dbt 2 dbtRunner has no callbacks (3)
     "tests/dbt/test_runner.py::test_dbt_runner_caching_and_callbacks": _NO_CALLBACKS,
-    "tests/operators/test_watcher.py::test_dbt_dag_with_watcher": _NO_CALLBACKS,
-    "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_group_nodes_by_folder": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_freshness_callback_excludes_model": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event": _NO_CALLBACKS,
-    "tests/test_example_dags.py::test_example_dag[example_watcher]": _NO_CALLBACKS,
-    "tests/test_example_dags.py::test_example_dag[example_watcher_synchronous]": _NO_CALLBACKS,
-    "tests/test_example_dags.py::test_example_dag[example_watcher_with_freshness]": _NO_CALLBACKS,
     # dbt 2 behaves differently: expected load error not raised (2)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[dbt_runner]": _NO_LOAD_ERROR,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[subprocess]": _NO_LOAD_ERROR,
@@ -110,11 +112,10 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/test_example_dags.py::test_example_dag[source_rendering_dag]": _NEEDS_SEEDED_TABLE,
     # dbt-oss error text not in caplog (1)
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_failing_model": _ERROR_NOT_IN_CAPLOG,
-    # Unknown, needs investigation (4)
+    # Unknown, needs investigation (3)
     "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.DBT_RUNNER]": _UNKNOWN,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_empty_model": _UNKNOWN,
     "tests/test_example_dags.py::test_async_example_dag_without_setup_task": _UNKNOWN,
-    "tests/test_example_dags.py::test_watcher_source_rendering_dag": _UNKNOWN,
 }
 
 

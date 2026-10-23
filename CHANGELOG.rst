@@ -35,6 +35,7 @@ Features
   ``<source>.test``) instead of a single ``<source>_source`` task, so references to the old task id need updating.
   The source tests, which this mode never executed before, now run and can fail the DAG. See #1683.
 * Add ``AIConfig`` (experimental, it may change without a deprecation period), an opt-in diagnosis of failed dbt tasks: on their last attempt, an LLM is asked for the root cause and a fix, which are added after the dbt error. It uses ``apache-airflow-providers-common-ai`` (``pip install astronomer-cosmos[ai]``, for Python 3.11+ and Airflow 2.11+), works with ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``, masks secrets, and lets you set what is sent and how much it can spend. See the :doc:`AI config reference </reference/configs/ai-config>` and #3018.
+* ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` now upload the docs site written by dbt 2 (dbt-oss), which has no ``catalog.json``: ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/`` are uploaded, and on S3 and Azure each file gets its own content type. The files uploaded for dbt 1 are unchanged. The layout is detected from the generated ``target/`` folder. See #3101.
 
 Bug Fixes
 

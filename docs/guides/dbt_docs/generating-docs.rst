@@ -202,6 +202,13 @@ Choosing a folder
 All the DbtDocsOperators support specification of a custom folder (prefix) to place documentation in on the target cloud storage. This can be done by
 adding a ``folder_dir`` parameter to the operator definition.
 
+dbt 2 (dbt-oss)
++++++++++++++++
+
+``dbt docs generate`` of dbt 2 writes a different site: there is no ``catalog.json``, and ``index.html`` loads the ``assets/`` and ``info_schema/`` folders next to it.
+When the operators find that layout in the ``target`` folder, they upload ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``, keeping the folder structure, and set the content type of each file on S3 and Azure Blob Storage.
+The files uploaded for dbt 1 are the same as before. The ``--static`` flag is not used with dbt 2.
+
 Static flag
 +++++++++++
 

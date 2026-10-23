@@ -3126,6 +3126,36 @@ def test_add_watcher_producer_task_sets_check_source_freshness_flag(source_rende
             assert "_check_source_freshness" not in task_metadata.arguments
 
 
+@pytest.mark.parametrize(
+    "execution_mode, children_per_node, expected",
+    [
+        (ExecutionMode.WATCHER, {"model.pkg.a": ["model.pkg.b"]}, {"model.pkg.a": ["model.pkg.b"]}),
+        (ExecutionMode.WATCHER, None, None),
+        (ExecutionMode.WATCHER, {}, None),
+        # The Kubernetes producers do not take it.
+        (ExecutionMode.WATCHER_KUBERNETES, {"model.pkg.a": ["model.pkg.b"]}, None),
+    ],
+)
+def test_add_watcher_producer_task_passes_children_per_node(execution_mode, children_per_node, expected):
+    task_args = {"project_dir": "/tmp/sample_project", "profile_config": None}
+
+    with patch("cosmos.airflow.graph.create_airflow_task") as mock_create_task:
+        mock_create_task.return_value = MagicMock()
+
+        _add_watcher_producer_task(
+            dag=MagicMock(),
+            task_group=None,
+            tasks_map={},
+            render_config=RenderConfig(),
+            task_args=task_args,
+            execution_mode=execution_mode,
+            children_per_node=children_per_node,
+        )
+
+    arguments = mock_create_task.call_args[0][0].arguments
+    assert arguments.get("children_per_node") == expected
+
+
 @pytest.mark.parametrize("emit_datasets", [True, False])
 def test_add_watcher_producer_task_preserves_consumer_emit_datasets_flag(emit_datasets):
     """The producer does not emit datasets, but it needs to know whether consumers will."""

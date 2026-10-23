@@ -47,6 +47,7 @@ Bug Fixes
   with a dedicated test task, as under ``TestBehavior.AFTER_EACH``. Sources are rendered as ``dbt source freshness``
   tasks and the build tasks of models, seeds and snapshots select only their own node, so source tests were never
   selected by any task. See #1683.
+* ``ExecutionMode.WATCHER`` now recognises the nodes that dbt 2 (``dbt-oss``) skips because an upstream node failed. dbt 2 does not emit ``SkippingDetails`` or ``LogSkipBecauseError`` for them, only ``MarkSkippedChildren`` naming the failed parent, so their consumers ended SKIPPED and were never built after the upstream recovered on a retry (#2698, #3023). Cosmos now finds the skipped children from the dbt graph it loaded (``DbtGraph.children_per_node``, in every load mode) and treats them as it does for dbt 1. This is only done when dbt 2 is installed; the dbt 1 behaviour is unchanged. The Kubernetes watcher is not covered. See #3101.
 
 1.15.1 (2026-08-04)
 -------------------

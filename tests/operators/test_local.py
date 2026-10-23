@@ -834,10 +834,12 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
     conn = urlparse(os.environ.get("AIRFLOW_CONN_EXAMPLE_CONN", "postgres://user:pass@0.0.0.0:5432/postgres"))
     db_name = conn.path.lstrip("/") or "postgres"
     expected_asset = f"postgres://{conn.hostname}:{conn.port or 5432}/{db_name}/public/stg_customers"
-    if bigquery_dataset := os.getenv("COSMOS_TEST_BIGQUERY_DATASET"):
+    if "tests.dbt_oss_plugin" in os.getenv("PYTEST_PLUGINS", ""):
         # The dbt-oss job runs the Postgres profile mapping above on BigQuery (tests/dbt_oss_plugin.py).
-        bigquery_project = os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", "astronomer-dag-authoring")
-        expected_asset = f"bigquery/{bigquery_project}/{bigquery_dataset}/stg_customers"
+        from tests.dbt_oss_plugin import DEFAULT_BIGQUERY_PROJECT
+
+        bigquery_project = os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", DEFAULT_BIGQUERY_PROJECT)
+        expected_asset = f"bigquery/{bigquery_project}/{os.environ['COSMOS_TEST_BIGQUERY_DATASET']}/stg_customers"
     assert f"Outlets: [Asset(name='{expected_asset}', uri='{expected_asset}'" in caplog.text
 
 
@@ -1655,37 +1657,36 @@ def test_add_missing_profiles_dir_to_run_results(tmp_path, dbt_command_line, env
     assert args == {"command": "build", "which": "build", "profiles_dir": expected}
 
 
-def test_add_missing_profiles_dir_to_run_results_keeps_the_value_dbt_wrote(tmp_path):
-    run_results = tmp_path / "run_results.json"
-    _write_run_results(run_results, {"which": "run", "profiles_dir": "/written/by/dbt"})
-
-    DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, ["dbt", "run", "--profiles-dir", "/x"])
-
-    assert json.loads(run_results.read_text())["args"]["profiles_dir"] == "/written/by/dbt"
-
-
-@pytest.mark.parametrize("content", [None, "not json", json.dumps({"results": []}), json.dumps({"args": "text"})])
-def test_add_missing_profiles_dir_to_run_results_ignores_unusable_files(tmp_path, content):
+@pytest.mark.parametrize(
+    "content, dbt_command_line, env",
+    [
+        pytest.param(
+            json.dumps({"args": {"which": "run", "profiles_dir": "/written/by/dbt"}}),
+            ["dbt", "run", "--profiles-dir", "/x"],
+            {},
+            id="keeps_the_value_dbt_wrote",
+        ),
+        pytest.param(None, ["dbt", "run", "--profiles-dir", "/x"], {}, id="missing_file"),
+        pytest.param("not json", ["dbt", "run", "--profiles-dir", "/x"], {}, id="invalid_json"),
+        pytest.param(json.dumps({"results": []}), ["dbt", "run", "--profiles-dir", "/x"], {}, id="no_args"),
+        pytest.param(json.dumps({"args": "text"}), ["dbt", "run", "--profiles-dir", "/x"], {}, id="args_not_a_dict"),
+        pytest.param(json.dumps({"args": {"which": "run"}}), ["dbt", "run"], {}, id="no_profiles_dir_to_add"),
+    ],
+)
+def test_add_missing_profiles_dir_to_run_results_leaves_the_file_alone(tmp_path, content, dbt_command_line, env):
     run_results = tmp_path / "run_results.json"
     if content is not None:
         run_results.write_text(content)
 
-    DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, ["dbt", "run", "--profiles-dir", "/x"])
+    with patch.dict(os.environ, env):
+        os.environ.pop("DBT_PROFILES_DIR", None)
+        DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, dbt_command_line)
 
     assert (run_results.read_text() if content is not None else None) == content
 
 
-def test_add_missing_profiles_dir_to_run_results_without_a_profiles_dir_or_path(tmp_path):
-    run_results = tmp_path / "run_results.json"
-    _write_run_results(run_results, {"which": "run"})
-    before = run_results.read_text()
-
-    with patch.dict(os.environ, {}, clear=False) as env:
-        env.pop("DBT_PROFILES_DIR", None)
-        DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, ["dbt", "run"])
-        DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(None, ["dbt", "run", "--profiles-dir", "/x"])
-
-    assert run_results.read_text() == before
+def test_add_missing_profiles_dir_to_run_results_without_a_path():
+    DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(None, ["dbt", "run", "--profiles-dir", "/x"])
 
 
 @patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
@@ -1713,25 +1714,31 @@ def test_calculate_openlineage_events_completes_adds_the_profiles_dir_before_par
     assert instance.parse.called
 
 
-@patch("cosmos.dbt.runner.is_dbt_v2", return_value=False)
+@pytest.mark.parametrize("is_dbt_v2", [True, False])
 @patch("cosmos.operators.local.DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results")
 @patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
-def test_calculate_openlineage_events_completes_leaves_run_results_alone_without_dbt_v2(
-    mock_get_processor, mock_add_profiles_dir, mock_is_dbt_v2
+def test_calculate_openlineage_events_completes_adds_the_profiles_dir_only_with_dbt_v2(
+    mock_get_processor, mock_add_profiles_dir, is_dbt_v2
 ):
     """Only dbt 2 installed in the Airflow environment gets the profiles dir added, so the dbt Fusion binary used
     with a dbt 1.x environment keeps not emitting datasets."""
     instance = mock_get_processor.return_value.return_value
+    instance.run_result_path = "/project/target/run_results.json"
     instance.parse.return_value = MagicMock(completes=[])
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, should_store_compiled_sql=False
     )
+    command = ["dbt", "run", "--profiles-dir", "/profiles"]
 
-    dbt_base_operator.calculate_openlineage_events_completes(
-        env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=["dbt", "run", "--profiles-dir", "/profiles"]
-    )
+    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2):
+        dbt_base_operator.calculate_openlineage_events_completes(
+            env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=command
+        )
 
-    mock_add_profiles_dir.assert_not_called()
+    if is_dbt_v2:
+        mock_add_profiles_dir.assert_called_once_with("/project/target/run_results.json", command)
+    else:
+        mock_add_profiles_dir.assert_not_called()
     assert instance.parse.called
 
 

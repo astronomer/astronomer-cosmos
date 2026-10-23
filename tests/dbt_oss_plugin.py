@@ -26,6 +26,8 @@ import pytest
 
 from tests.dbt_oss_enabled import SKIPPED_TESTS
 
+DEFAULT_BIGQUERY_PROJECT = "astronomer-dag-authoring"
+
 # Tests that depend on Postgres itself (and not only on the profile) and so cannot run against BigQuery.
 POSTGRES_ONLY_TEST_FILES = {
     "tests/listeners/test_dag_run_listener.py": "asserts on the Postgres profile mapping",
@@ -45,7 +47,7 @@ def _use_bigquery_in_place_of_postgres() -> None:
         def __init__(self, conn_id, profile_args=None, disable_event_tracking=None, dbt_config_vars=None):
             bigquery_profile_args = dict(profile_args or {})
             bigquery_profile_args["dataset"] = os.environ["COSMOS_TEST_BIGQUERY_DATASET"]
-            bigquery_profile_args["project"] = os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", "astronomer-dag-authoring")
+            bigquery_profile_args["project"] = os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", DEFAULT_BIGQUERY_PROJECT)
             super().__init__(
                 conn_id="gcp_gs_conn",
                 profile_args=bigquery_profile_args,

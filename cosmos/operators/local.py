@@ -11,6 +11,7 @@ import zlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from functools import cached_property
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
@@ -18,7 +19,7 @@ from urllib.parse import urlparse
 import jinja2
 from airflow.exceptions import AirflowException, AirflowTaskTimeout
 from airflow.models.taskinstance import TaskInstance
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 
 from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.io import _construct_dest_file_path
@@ -853,6 +854,20 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             return None
 
     @staticmethod
+    def _openlineage_requires_profiles_dir_in_run_results() -> bool:
+        """
+        Return whether the installed ``openlineage-integration-common`` fails when ``args.profiles_dir`` is missing.
+
+        1.43.0 and older read it unconditionally; 1.44.0 and later catch the ``KeyError`` and fall back to the
+        ``--profiles-dir`` lookup. Airflow's constraints pin older releases (1.43.0 with Airflow 2.10, 1.40.0 with
+        Airflow 3.1). An unknown version is treated as affected, as adding the key is harmless.
+        """
+        try:
+            return Version(version("openlineage-integration-common")) < Version("1.44.0")
+        except (PackageNotFoundError, InvalidVersion):
+            return True
+
+    @staticmethod
     def _add_missing_profiles_dir_to_run_results(run_results_path: Any, dbt_command_line: list[str] | None) -> None:
         """
         Add ``args.profiles_dir`` to ``run_results.json`` when dbt did not write it.
@@ -861,7 +876,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         1.43.0 and older read it unconditionally, so the ``KeyError`` left the task with no inlets or outlets; 1.44.0
         and later fall back to the same ``--profiles-dir`` lookup and do not need this.
 
-        Only called when dbt 2 is installed in the Airflow environment (``is_dbt_v2``), which does not inspect
+        Only called when dbt 2 is installed in the Airflow environment (``is_dbt_v2``) and the library needs it
+        (``_openlineage_requires_profiles_dir_in_run_results``). ``is_dbt_v2`` does not inspect
         ``dbt_executable_path``: a dbt 2 executable next to a dbt 1.x environment is not covered, and the dbt Fusion
         binary used with a dbt 2 environment is. The directory is the one passed with ``--profiles-dir`` (the last
         occurrence, as dbt does) or ``DBT_PROFILES_DIR``; nothing is added when neither is set. The file is in the
@@ -932,7 +948,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # Do not raise exception if a command is unsupported, following the openlineage-dbt processor:
         # https://github.com/OpenLineage/OpenLineage/blob/bdcaf828ebc117e0e5ffc5fab44ff8886eb7836b/integration/common/openlineage/common/provider/dbt/processor.py#L141
         openlineage_processor.should_raise_on_unsupported_command = False
-        if dbt_runner.is_dbt_v2():
+        if dbt_runner.is_dbt_v2() and self._openlineage_requires_profiles_dir_in_run_results():
             self._add_missing_profiles_dir_to_run_results(
                 getattr(openlineage_processor, "run_result_path", None), dbt_command_line
             )

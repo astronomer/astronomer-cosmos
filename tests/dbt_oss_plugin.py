@@ -3,7 +3,9 @@
 dbt-oss does not support the Postgres adapter the integration tests are written for, so that job runs them against
 BigQuery. It loads this plugin through ``PYTEST_PLUGINS=tests.dbt_oss_plugin``, so no other job imports it: every
 ``PostgresUserPasswordProfileMapping`` built by the tests and the example DAGs becomes a BigQuery mapping that writes
-to ``COSMOS_TEST_BIGQUERY_DATASET``, and the tests that need Postgres itself are skipped.
+to ``COSMOS_TEST_BIGQUERY_DATASET``, and the tests that need Postgres itself are skipped. The example projects that
+have their own Postgres ``profiles.yml`` are covered by a second mechanism: the workflow rewrites those files to
+BigQuery with ``scripts/test/bigquery_ci_profiles.py``, which this plugin cannot do because they are not Python mappings.
 
 Which example DAGs run, and which tests are skipped for dbt-oss, is listed in ``tests/dbt_oss_enabled.py``.
 """

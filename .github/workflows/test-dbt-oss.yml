@@ -3,8 +3,9 @@ name: test-dbt-oss
 # Integration tests for dbt-oss. dbt-oss does not support the Postgres adapter that the tests in test.yml use, so
 # this workflow runs the same integration tests (the ones marked ``integration``) against BigQuery instead. It loads the
 # tests/dbt_oss_plugin.py pytest plugin, which replaces the Postgres profile mapping used by the tests and the example
-# DAGs with a BigQuery one and skips the tests that need Postgres itself. tests/dbt_oss_enabled.py lists what runs here
-# while dbt-oss is rolled out one group at a time. test.yml is unchanged.
+# DAGs with a BigQuery one and skips the tests that need Postgres itself. The example projects that have their own
+# Postgres profiles.yml are rewritten to BigQuery on the runner by scripts/test/bigquery_ci_profiles.py. tests/dbt_oss_enabled.py
+# lists what runs here while dbt-oss is rolled out one group at a time. test.yml is unchanged.
 on:
   push: # Run on pushes to the default branch
     branches: [main]
@@ -177,7 +178,23 @@ jobs:
           for project in altered_jaffle_shop jaffle_shop_python model_version multiple_parents_test simple; do
             uv tool run --python ${{ matrix.python-version }} --from "dbt-autofix==0.22.6" dbt-autofix deprecations --path "dev/dags/dbt/$project"
           done
+          # tests/sample/mini is the project of the local operator tests. The tests copy schema_failing_test.yml, which
+          # dbt-autofix does not scan, into the models folder of a copy of the project: rewrite it in place from there.
+          cp tests/sample/mini/schema_failing_test.yml tests/sample/mini/models/schema.yml
+          uv tool run --python ${{ matrix.python-version }} --from "dbt-autofix==0.22.6" dbt-autofix deprecations --path tests/sample/mini
+          mv tests/sample/mini/models/schema.yml tests/sample/mini/schema_failing_test.yml
           git diff --stat
+
+      - name: Point the Postgres profiles of the example dbt projects at BigQuery
+        # dbt-oss has no Postgres adapter, so the tests that read these projects' own profiles.yml cannot run with them.
+        # Like the step above, this rewrites the checked out files on this runner only (the service account key ends up
+        # in them), and the profiles read the project and dataset from POSTGRES_DB and POSTGRES_SCHEMA (set below).
+        # tests/sample/mini is the project of the local operator tests (and of the failing-test copies they make).
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+        run: |
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_profiles.py \
+            dev/dags/dbt/jaffle_shop/profiles.yml dev/dags/dbt/altered_jaffle_shop/profiles.yml tests/sample/mini/profiles.yml
 
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
@@ -186,7 +203,8 @@ jobs:
           hatch run "$HATCH_ENV:test-integration"
         env:
           COSMOS_TEST_ADAPTER: bigquery
-          # altered_jaffle_shop/models/staging/sources.yml reads these two: point them at this job's BigQuery dataset.
+          # altered_jaffle_shop/models/staging/sources.yml reads these two, and so do the BigQuery profiles that the step above
+          # writes in place of the Postgres ones: point them at this job's BigQuery project and dataset.
           POSTGRES_DB: astronomer-dag-authoring
           POSTGRES_SCHEMA: ${{ env.COSMOS_TEST_BIGQUERY_DATASET }}
           # Loaded only by this job; swaps the Postgres profile mapping for BigQuery and applies tests/dbt_oss_enabled.py.

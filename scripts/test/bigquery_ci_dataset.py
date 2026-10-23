@@ -117,13 +117,18 @@ def create(dataset: str, max_start_jitter: float = MAX_START_JITTER_SECONDS) -> 
 
 
 def delete(dataset: str) -> None:
-    """Delete the dataset. A failure to reach the API is a warning, not an error: the tables expire on their own."""
-    print(f"Deleting BigQuery dataset {dataset}")
+    """Delete the dataset and the per-test ones named after it (``<dataset>_<test>``).
+
+    A failure to reach the API is a warning, not an error: the tables of the job's dataset expire on their own.
+    """
     # A bad connection is a setup mistake and fails the step; only the API call, including a network or token
     # failure while making it, is allowed to fail quietly.
     client = _client()
     try:
-        client.delete_dataset(dataset, delete_contents=True, not_found_ok=True, retry=RETRY)
+        per_test = [d.dataset_id for d in client.list_datasets(retry=RETRY) if d.dataset_id.startswith(f"{dataset}_")]
+        for name in [dataset, *per_test]:
+            print(f"Deleting BigQuery dataset {name}")
+            client.delete_dataset(name, delete_contents=True, not_found_ok=True, retry=RETRY)
     except (
         exceptions.GoogleAPICallError,
         exceptions.RetryError,

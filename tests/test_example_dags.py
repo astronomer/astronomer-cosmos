@@ -24,7 +24,7 @@ KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
 # DAGs whose source tables must be seeded first; run via the dedicated tests below.
 DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag", "source_pruning_dag"]
 # DAGs whose source freshness check reads altered_jaffle_shop's raw_orders and can run before the DAG's own seed task.
-DAGS_NEEDING_SEEDED_ALTERED_JAFFLE_SHOP = {"example_watcher_with_freshness"}
+DAGS_NEEDING_SEEDED_ALTERED_JAFFLE_SHOP = {"example_watcher_with_freshness", "source_rendering_dag"}
 IGNORED_DAG_FILES = [
     "performance_dag.py",
     "jaffle_shop_kubernetes.py",
@@ -169,8 +169,11 @@ def test_example_dag(session, request, dag_id: str):
     reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
 )
 @pytest.mark.integration
-def test_watcher_source_rendering_dag(session):
-    """Run source_rendering_dag first to load seeds, then watcher_source_rendering_dag."""
+def test_watcher_source_rendering_dag(session, seeded_altered_jaffle_shop):
+    """Run source_rendering_dag first to load seeds, then watcher_source_rendering_dag.
+
+    Seeded by the fixture so the raw_orders source-freshness check is order-independent.
+    """
     run_dag("source_rendering_dag")
     run_dag("watcher_source_rendering_dag")
 

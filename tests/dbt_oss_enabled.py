@@ -46,7 +46,6 @@ ENABLED_DAG_FILES = frozenset(
 )
 
 # Why a test is skipped in the dbt-oss job.
-_POSTGRES_ENV = "uses a profiles.yml or sources.yml that reads POSTGRES_* variables, which this job does not set"
 _NO_BQ_ADAPTER_MODULE = "needs dbt-bigquery's dbt.adapters.bigquery, which cannot be installed next to dbt-oss (both provide the dbt package)"
 _NO_CALLBACKS = "dbt-oss dbtRunner does not support callbacks, and dbt does not plan to (https://github.com/dbt-labs/dbt/issues/13102)"
 _NO_DATASETS = (
@@ -69,20 +68,6 @@ _UNKNOWN = "fails in the dbt-oss job for a cause not yet identified"
 # Tests that fail in the dbt-oss job for a known reason, keyed by pytest node id. Each one is skipped there with its
 # reason until it is fixed or made to work with dbt-oss; remove its entry when it does.
 SKIPPED_TESTS: dict[str, str] = {
-    # Postgres env vars (own profiles.yml/sources) (13)
-    "tests/dbt/test_graph.py::test_altered_jaffle_shop_manifest_is_in_sync_with_project": _POSTGRES_ENV,
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_project_config_vars": _POSTGRES_ENV,
-    "tests/dbt/test_graph.py::test_load_via_dbt_ls_with_sources[load_via_dbt_ls]": _POSTGRES_ENV,
-    "tests/dbt/test_graph.py::test_run_command_with_dbt_runner_exception": _POSTGRES_ENV,
-    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_error": _POSTGRES_ENV,
-    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_exception": _POSTGRES_ENV,
-    "tests/operators/test_local.py::test_run_test_operator_subprocess_failure_exposes_failing_tests": _POSTGRES_ENV,
-    "tests/operators/test_local.py::test_run_test_operator_with_callback[InvocationMode.DBT_RUNNER]": _POSTGRES_ENV,
-    "tests/operators/test_local.py::test_run_test_operator_with_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
-    "tests/operators/test_local.py::test_run_test_operator_with_callback_and_trailing_dbt_output": _POSTGRES_ENV,
-    "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
-    "tests/test_debug.py::test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled": _POSTGRES_ENV,
-    "tests/test_example_dags.py::test_source_pruning_dag": _POSTGRES_ENV,
     # dbt 2 dbtRunner has no callbacks (3)
     "tests/dbt/test_runner.py::test_dbt_runner_caching_and_callbacks": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_freshness_callback_excludes_model": _NO_CALLBACKS,

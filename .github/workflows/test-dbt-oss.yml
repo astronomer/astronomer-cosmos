@@ -179,6 +179,17 @@ jobs:
           done
           git diff --stat
 
+      - name: Point the Postgres profiles of the example dbt projects at BigQuery
+        # dbt-oss has no Postgres adapter, so the tests that read these projects' own profiles.yml cannot run with them.
+        # Like the step above, this rewrites the checked out files on this runner only (the service account key ends up
+        # in them), and the profiles read the project and dataset from POSTGRES_DB and POSTGRES_SCHEMA (set below).
+        # tests/sample/mini is the project of the local operator tests (and of the failing-test copies they make).
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+        run: |
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_profiles.py \
+            dev/dags/dbt/jaffle_shop/profiles.yml dev/dags/dbt/altered_jaffle_shop/profiles.yml tests/sample/mini/profiles.yml
+
       - name: Test Cosmos against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }} (split ${{ matrix.split-group }}/3)
         run: |
           HATCH_ENV="tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}"
@@ -186,7 +197,8 @@ jobs:
           hatch run "$HATCH_ENV:test-integration"
         env:
           COSMOS_TEST_ADAPTER: bigquery
-          # altered_jaffle_shop/models/staging/sources.yml reads these two: point them at this job's BigQuery dataset.
+          # altered_jaffle_shop/models/staging/sources.yml reads these two, and so do the BigQuery profiles that the step above
+          # writes in place of the Postgres ones: point them at this job's BigQuery project and dataset.
           POSTGRES_DB: astronomer-dag-authoring
           POSTGRES_SCHEMA: ${{ env.COSMOS_TEST_BIGQUERY_DATASET }}
           # Loaded only by this job; swaps the Postgres profile mapping for BigQuery and applies tests/dbt_oss_enabled.py.

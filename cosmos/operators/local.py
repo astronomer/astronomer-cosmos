@@ -858,7 +858,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         Add ``args.profiles_dir`` to ``run_results.json`` when dbt did not write it.
 
         dbt 2 (dbt-oss) leaves ``profiles_dir`` out of the run results ``args``, and ``openlineage-integration-common``
-        reads it unconditionally, so the ``KeyError`` left the task with no inlets or outlets. The directory is the one
+        reads it unconditionally, so the ``KeyError`` left the task with no inlets or outlets. Only called when dbt 2
+        is installed in the Airflow environment (``is_dbt_v2``), so other setups, such as the dbt Fusion binary used
+        with a dbt 1.x environment, keep their behaviour. The directory is the one
         passed with ``--profiles-dir`` (or ``DBT_PROFILES_DIR``), the same lookup the library falls back to when the
         profile file is not found in ``profiles_dir``. The file is in the temporary project directory of the task.
         """
@@ -927,9 +929,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # Do not raise exception if a command is unsupported, following the openlineage-dbt processor:
         # https://github.com/OpenLineage/OpenLineage/blob/bdcaf828ebc117e0e5ffc5fab44ff8886eb7836b/integration/common/openlineage/common/provider/dbt/processor.py#L141
         openlineage_processor.should_raise_on_unsupported_command = False
-        self._add_missing_profiles_dir_to_run_results(
-            getattr(openlineage_processor, "run_result_path", None), dbt_command_line
-        )
+        if dbt_runner.is_dbt_v2():
+            self._add_missing_profiles_dir_to_run_results(
+                getattr(openlineage_processor, "run_result_path", None), dbt_command_line
+            )
         try:
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes

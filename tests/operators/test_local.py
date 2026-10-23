@@ -834,6 +834,10 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
     conn = urlparse(os.environ.get("AIRFLOW_CONN_EXAMPLE_CONN", "postgres://user:pass@0.0.0.0:5432/postgres"))
     db_name = conn.path.lstrip("/") or "postgres"
     expected_asset = f"postgres://{conn.hostname}:{conn.port or 5432}/{db_name}/public/stg_customers"
+    if bigquery_dataset := os.getenv("COSMOS_TEST_BIGQUERY_DATASET"):
+        # The dbt-oss job runs the Postgres profile mapping above on BigQuery (tests/dbt_oss_plugin.py).
+        bigquery_project = os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", "astronomer-dag-authoring")
+        expected_asset = f"bigquery/{bigquery_project}/{bigquery_dataset}/stg_customers"
     assert f"Outlets: [Asset(name='{expected_asset}', uri='{expected_asset}'" in caplog.text
 
 
@@ -1684,10 +1688,11 @@ def test_add_missing_profiles_dir_to_run_results_without_a_profiles_dir_or_path(
     assert run_results.read_text() == before
 
 
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
 @patch("cosmos.operators.local.DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results")
 @patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
 def test_calculate_openlineage_events_completes_adds_the_profiles_dir_before_parsing(
-    mock_get_processor, mock_add_profiles_dir
+    mock_get_processor, mock_add_profiles_dir, mock_is_dbt_v2
 ):
     instance = mock_get_processor.return_value.return_value
     instance.run_result_path = "/project/target/run_results.json"
@@ -1705,6 +1710,28 @@ def test_calculate_openlineage_events_completes_adds_the_profiles_dir_before_par
     dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=command)
 
     mock_add_profiles_dir.assert_called_once_with("/project/target/run_results.json", command)
+    assert instance.parse.called
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=False)
+@patch("cosmos.operators.local.DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
+def test_calculate_openlineage_events_completes_leaves_run_results_alone_without_dbt_v2(
+    mock_get_processor, mock_add_profiles_dir, mock_is_dbt_v2
+):
+    """Only dbt 2 installed in the Airflow environment gets the profiles dir added, so the dbt Fusion binary used
+    with a dbt 1.x environment keeps not emitting datasets."""
+    instance = mock_get_processor.return_value.return_value
+    instance.parse.return_value = MagicMock(completes=[])
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, should_store_compiled_sql=False
+    )
+
+    dbt_base_operator.calculate_openlineage_events_completes(
+        env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=["dbt", "run", "--profiles-dir", "/profiles"]
+    )
+
+    mock_add_profiles_dir.assert_not_called()
     assert instance.parse.called
 
 

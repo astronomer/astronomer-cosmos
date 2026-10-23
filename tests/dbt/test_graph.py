@@ -1396,6 +1396,10 @@ def test_altered_jaffle_shop_manifest_is_in_sync_with_project():
         assert sorted(manifest_graph.nodes[unique_id].depends_on) == sorted(node.depends_on), unique_id
 
 
+@pytest.mark.skipif(
+    is_dbt_v2(),
+    reason="dbt 2 installs the missing dbt_packages itself on dbt ls, so the missing-packages error never occurs",
+)
 @pytest.mark.integration
 @pytest.mark.parametrize("runner", ("subprocess", "dbt_runner"))
 def test_load_via_dbt_ls_without_dbt_deps(runner, postgres_profile_config):

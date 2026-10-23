@@ -56,6 +56,10 @@ _NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
 _AUTO_INSTALLS_DEPS = (
     "dbt-oss installs the missing dbt_packages itself on dbt ls, so the failure the test expects does not happen"
 )
+_TEXT_OUTPUT_NOT_PARSED = (
+    "Cosmos does not parse the text output of dbt 2 in subprocess mode: it has 'Summary: 1 total | 1 warn' and "
+    "'Warned test <name>', not the 'Done. WARN=N TOTAL=N' and 'Failure in test <name>' lines the parsers read"
+)
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _MODEL_VERSION_ALIAS = "dbt-oss fails on this project with 'Template not found: jaffle_shop.generate_alias_name'"
 _VIEW_OVER_TABLE = (
@@ -78,6 +82,9 @@ SKIPPED_TESTS: dict[str, str] = {
     # dbt 2 behaves differently: expected load error not raised (2)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[dbt_runner]": _NO_LOAD_ERROR,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[subprocess]": _NO_LOAD_ERROR,
+    # dbt 2 subprocess text output is not parsed (2)
+    "tests/operators/test_local.py::test_run_test_operator_with_callback_and_trailing_dbt_output": _TEXT_OUTPUT_NOT_PARSED,
+    "tests/operators/test_local.py::test_run_test_operator_subprocess_failure_exposes_failing_tests": _TEXT_OUTPUT_NOT_PARSED,
     # dbt-oss installs missing dependencies on dbt ls instead of failing (2)
     "tests/dbt/test_graph.py::test_run_command_with_dbt_runner_exception": _AUTO_INSTALLS_DEPS,
     "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_exception": _AUTO_INSTALLS_DEPS,

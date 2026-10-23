@@ -164,8 +164,9 @@ def seeded_altered_jaffle_shop():
     table regardless of task order. dbt deps first: the project depends on dbt_utils."""
     project_dir = EXAMPLE_DAGS_DIR / "dbt" / "altered_jaffle_shop"
     dbt_args = ["--project-dir", str(project_dir), "--profiles-dir", str(project_dir)]
-    subprocess.run(["dbt", "deps", *dbt_args], check=True)
-    subprocess.run(["dbt", "seed", "--full-refresh", *dbt_args], check=True)
+    # cwd: dbt-oss resolves the seed files (seeds/raw_orders.csv) from the working directory, not from --project-dir.
+    subprocess.run(["dbt", "deps", *dbt_args], check=True, cwd=project_dir)
+    subprocess.run(["dbt", "seed", "--full-refresh", *dbt_args], check=True, cwd=project_dir)
 
 
 @pytest.mark.skipif(

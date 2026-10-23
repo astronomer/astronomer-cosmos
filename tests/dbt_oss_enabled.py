@@ -67,7 +67,6 @@ _TEXT_OUTPUT_NOT_PARSED = (
 )
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _ERROR_NOT_IN_CAPLOG = "the dbt-oss error text does not reach caplog in some cells (cause inferred, not investigated)"
-_UNKNOWN = "fails in the dbt-oss job for a cause not yet identified"
 
 # Tests that fail in the dbt-oss job for a known reason, keyed by pytest node id. Each one is skipped there with its
 # reason until it is fixed or made to work with dbt-oss; remove its entry when it does.
@@ -94,8 +93,6 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/test_example_dags.py::test_async_example_dag_without_setup_task": _ASYNC_DAG_NOT_ENABLED,
     # dbt-oss error text not in caplog (1)
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_failing_model": _ERROR_NOT_IN_CAPLOG,
-    # Unknown, needs investigation (1)
-    "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_empty_model": _UNKNOWN,
 }
 
 

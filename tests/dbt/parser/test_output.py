@@ -141,6 +141,27 @@ def test_extract_log_issues_dbt_1_12_format() -> None:
     assert test_results == ["Got 4 results, configured to warn if >1"]
 
 
+def test_extract_log_issues_dbt_1_ignores_warnings_above_finished_running() -> None:
+    """Only the warnings after ``Finished running N tests`` belong to the test run; older ones are excluded."""
+    log_list = [
+        "11:17:40  Warning in test older_test (models/schema.yml)",
+        "11:17:40  Got 2 results, configured to warn if >1",
+        "11:17:43  Finished running 1 test in 0 hours 0 minutes and 0.13 seconds (0.13s).",
+        "11:17:43  Warning in test new_test (models/schema.yml)",
+        "11:17:43  Got 4 results, configured to warn if >1",
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["new_test"]
+    assert test_results == ["Got 4 results, configured to warn if >1"]
+
+
+def test_extract_log_issues_dbt_v2_namespaced_test_name() -> None:
+    log_list = ["    Warned test  main_dbt_test__audit.sing_warn (tests/sing_warn.sql) [1 of 4 in 1.0s]"]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["main_dbt_test__audit.sing_warn"]
+    assert test_results == ["Warned test main_dbt_test__audit.sing_warn (tests/sing_warn.sql)"]
+
+
 def _json_log_line(msg: str) -> str:
     """A dbt ``--log-format json`` line."""
     return json.dumps({"data": {}, "info": {"level": "info", "msg": msg, "ts": "2026-10-19T10:00:00.000000Z"}})
@@ -284,6 +305,16 @@ def test_extract_dbt_failure_details_dbt_v2() -> None:
 def test_extract_dbt_failure_details_dbt_v2_test_that_errored_has_no_row_count() -> None:
     log_list = ["    Failed test  unique_mini_orders_id (models/schema.yml:16:13) [1 of 4 in 1.02s]"]
     assert extract_dbt_failure_details(log_list) == ["Failure in test unique_mini_orders_id (models/schema.yml:16:13)"]
+
+
+def test_extract_dbt_failure_details_dbt_v2_namespaced_test_name() -> None:
+    log_list = [
+        "    Failed test  main_dbt_test__audit.sing_fail (tests/sing_fail.sql) [1 of 1 in 0.01s]",
+        "Test failed (1 failed row(s)): sing_fail",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Failure in test main_dbt_test__audit.sing_fail (tests/sing_fail.sql) 1 failed row(s)"
+    ]
 
 
 def test_extract_dbt_failure_details_dbt_v2_json_log_format() -> None:

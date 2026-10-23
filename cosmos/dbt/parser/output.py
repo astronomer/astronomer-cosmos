@@ -35,13 +35,10 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
     """
     Parse the number of warnings from the output of a dbt command run via subprocess.
 
-    Scans the full output (every stdout line) for the dbt run summary line
-    ``Done. PASS=.. WARN=N .. TOTAL=N`` (``Summary: N total | .. | N warn`` on dbt 2) instead of only the last line.
-    Newer dbt versions print a deprecation summary, a ``--debug`` resource report and a "Flushing usage events" line
-    *after* the summary, so it is no longer guaranteed to be the final stdout line. Reading
-    only the last line silently misses warnings (issues #1951, #2492, #2014). The summary is
-    matched by shape (``Done.`` ... ``TOTAL=N``) so a stray ``WARN=<digits>`` token on any other
-    line is not miscounted.
+    Scans the full output for the run summary line (``Done. ... WARN=N ... TOTAL=N``, or ``Summary: N total | ... |
+    N warn`` on dbt 2) instead of only the last line. Newer dbt versions print lines after the summary, so it is not
+    guaranteed to be last (issues #1951, #2492, #2014). The summary is matched by shape so a stray ``WARN=<digits>``
+    token on any other line is not miscounted.
 
     :param result: The result of the dbt command run via subprocess.
     :return: The number of warnings reported by dbt, or 0 if no summary line is found.
@@ -100,6 +97,7 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
 
     This function searches for warning messages in dbt test. It reverses the log list for performance
     improvement. It extracts and formats the relevant information and appends it to a list of warnings.
+    It handles the dbt 1.x ``Warning in test`` / ``[WARNING]: in test`` lines and the dbt 2 ``Warned test`` line.
 
     :param log_list: List of strings, where each string is a log line from dbt test.
     :return: two lists of strings, the first one containing the test names and the second one
@@ -118,7 +116,7 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
     pattern1 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?(?:\[WARNING\]:\s*)?(?:Warning )?in test ([\w_]+).*")
     pattern2 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?(?:\[WARNING\]:\s*)?(.*)")
     # dbt 2 prints "Warned test  <name> (<path>) [1 of 4 in 1.0s]" and no detail line after it.
-    pattern_v2 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?Warned test\s+([\w_]+)\s*(.*?)\s*(?:\[\d+ of \d+ in [^\]]*\])?$")
+    pattern_v2 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?Warned test\s+(\S+)\s*(.*?)\s*(?:\[\d+ of \d+ in [^\]]*\])?$")
     # dbt 1.x prints "Finished running 1 test in ..." before the warnings. Other "Finished running" lines (dbt 1.x and
     # dbt 2 debug output for a single node or test) come earlier in the log and must not stop the scan.
     finished_running_all_tests = re.compile(r"Finished running \d")
@@ -154,7 +152,8 @@ def extract_dbt_failure_details(log_list: list[str]) -> list[str]:
     """
     Extract failing dbt nodes and their messages from subprocess output.
 
-    Counterpart of :func:`extract_log_issues`, which handles warnings.
+    Counterpart of :func:`extract_log_issues`, which handles warnings. Handles the dbt 1.x ``Failure in test`` /
+    ``Error in`` lines and the dbt 2 ``Failed test`` line.
 
     :param log_list: List of strings, where each string is a log line from a dbt command.
     :return: A list of formatted ``"<failure line> <detail>"`` strings, one per failing node.
@@ -181,7 +180,18 @@ def extract_dbt_failure_details(log_list: list[str]) -> list[str]:
         match_v2 = marker_v2.match(line)
         if match_v2:
             name, path = match_v2.group(1), match_v2.group(2)
-            details.append(" ".join(filter(None, [f"Failure in test {name}", path, failed_rows.get(name)])))
+            details.append(
+                " ".join(
+                    filter(
+                        None,
+                        [
+                            f"Failure in test {name}",
+                            path,
+                            failed_rows.get(name) or failed_rows.get(name.rsplit(".", 1)[-1]),
+                        ],
+                    )
+                )
+            )
             continue
         match = marker.match(line)
         if match:

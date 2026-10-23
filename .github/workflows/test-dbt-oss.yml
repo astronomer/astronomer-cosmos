@@ -177,6 +177,11 @@ jobs:
           for project in altered_jaffle_shop jaffle_shop_python model_version multiple_parents_test simple; do
             uv tool run --python ${{ matrix.python-version }} --from "dbt-autofix==0.22.6" dbt-autofix deprecations --path "dev/dags/dbt/$project"
           done
+          # tests/sample/mini is the project of the local operator tests. The tests copy schema_failing_test.yml, which
+          # dbt-autofix does not scan, into the models folder of a copy of the project: rewrite it in place from there.
+          cp tests/sample/mini/schema_failing_test.yml tests/sample/mini/models/schema.yml
+          uv tool run --python ${{ matrix.python-version }} --from "dbt-autofix==0.22.6" dbt-autofix deprecations --path tests/sample/mini
+          mv tests/sample/mini/models/schema.yml tests/sample/mini/schema_failing_test.yml
           git diff --stat
 
       - name: Point the Postgres profiles of the example dbt projects at BigQuery

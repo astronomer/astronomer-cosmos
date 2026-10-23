@@ -53,6 +53,9 @@ _NO_DATASETS = (
     "KeyError (logged at debug level) and the inlets and outlets stay empty (reproduced locally with dbt-oss 2.0.8)"
 )
 _NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
+_AUTO_INSTALLS_DEPS = (
+    "dbt-oss installs the missing dbt_packages itself on dbt ls, so the failure the test expects does not happen"
+)
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _MODEL_VERSION_ALIAS = "dbt-oss fails on this project with 'Template not found: jaffle_shop.generate_alias_name'"
 _VIEW_OVER_TABLE = (
@@ -75,6 +78,9 @@ SKIPPED_TESTS: dict[str, str] = {
     # dbt 2 behaves differently: expected load error not raised (2)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[dbt_runner]": _NO_LOAD_ERROR,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_without_dbt_deps[subprocess]": _NO_LOAD_ERROR,
+    # dbt-oss installs missing dependencies on dbt ls instead of failing (2)
+    "tests/dbt/test_graph.py::test_run_command_with_dbt_runner_exception": _AUTO_INSTALLS_DEPS,
+    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_exception": _AUTO_INSTALLS_DEPS,
     # dbt-oss has no partial parsing artifact (4)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[False]": _NO_PARTIAL_PARSE,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[True]": _NO_PARTIAL_PARSE,

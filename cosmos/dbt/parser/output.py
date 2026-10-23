@@ -18,6 +18,9 @@ DBT_FRESHNESS_WARN_MSG = "WARN freshness of"
 # line that happens to contain a "WARN=<digits>" token (e.g. a --debug resource/usage report printed
 # after the summary) is not mistaken for the warning count.
 DBT_SUMMARY_WARN_RE = re.compile(r"Done\..*\bWARN=(\d+)\b.*\bTOTAL=\d+")
+# dbt 2 (dbt-oss) prints "Summary: 4 total | 1 success | 1 warn | 2 error" instead, leaving out the categories that
+# are 0.
+DBT_V2_SUMMARY_WARN_RE = re.compile(r"Summary:\s*\d+ total\b.*\|\s*(\d+) warn\b")
 
 
 def _dbt_log_message(line: str) -> str:
@@ -33,8 +36,8 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
     Parse the number of warnings from the output of a dbt command run via subprocess.
 
     Scans the full output (every stdout line) for the dbt run summary line
-    ``Done. PASS=.. WARN=N .. TOTAL=N`` instead of only the last line. Newer dbt versions print a
-    deprecation summary, a ``--debug`` resource report and a "Flushing usage events" line
+    ``Done. PASS=.. WARN=N .. TOTAL=N`` (``Summary: N total | .. | N warn`` on dbt 2) instead of only the last line.
+    Newer dbt versions print a deprecation summary, a ``--debug`` resource report and a "Flushing usage events" line
     *after* the summary, so it is no longer guaranteed to be the final stdout line. Reading
     only the last line silently misses warnings (issues #1951, #2492, #2014). The summary is
     matched by shape (``Done.`` ... ``TOTAL=N``) so a stray ``WARN=<digits>`` token on any other
@@ -52,7 +55,7 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
     # Output: 1
     """
     for line in reversed(result.full_output):
-        match = DBT_SUMMARY_WARN_RE.search(line)
+        match = DBT_SUMMARY_WARN_RE.search(line) or DBT_V2_SUMMARY_WARN_RE.search(line)
         if match:
             return int(match.group(1))
     return 0
@@ -114,15 +117,26 @@ def extract_log_issues(log_list: list[str]) -> tuple[list[str], list[str]]:
     # The timestamp is optional because ``--log-format json`` messages (``info.msg``) do not carry one.
     pattern1 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?(?:\[WARNING\]:\s*)?(?:Warning )?in test ([\w_]+).*")
     pattern2 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?(?:\[WARNING\]:\s*)?(.*)")
+    # dbt 2 prints "Warned test  <name> (<path>) [1 of 4 in 1.0s]" and no detail line after it.
+    pattern_v2 = re.compile(r"(?:\d{2}:\d{2}:\d{2}\s+)?Warned test\s+([\w_]+)\s*(.*?)\s*(?:\[\d+ of \d+ in [^\]]*\])?$")
+    # dbt 1.x prints "Finished running 1 test in ..." before the warnings. Other "Finished running" lines (dbt 1.x and
+    # dbt 2 debug output for a single node or test) come earlier in the log and must not stop the scan.
+    finished_running_all_tests = re.compile(r"Finished running \d")
 
     log_list = [_dbt_log_message(line) for line in log_list]
 
     for line_index, line in enumerate(reversed(log_list)):
         cleaned_line = clean_line(line)
 
-        if "Finished running" in cleaned_line:
+        if finished_running_all_tests.search(cleaned_line):
             # No need to keep checking the log lines once all warnings are found
             break
+
+        match_v2 = pattern_v2.match(cleaned_line)
+        if match_v2:
+            test_names.append(match_v2.group(1))
+            test_results.append(f"Warned test {match_v2.group(1)} {match_v2.group(2)}".strip())
+            continue
 
         match = pattern1.match(cleaned_line)
         if match:
@@ -155,9 +169,20 @@ def extract_dbt_failure_details(log_list: list[str]) -> list[str]:
     def clean_line(line: str) -> str:
         return timestamp.sub("", ansi.sub("", line).strip())
 
+    # dbt 2 prints "Failed test  <name> (<path>) [1 of 4 in 1.0s]" for a failing test, and, in text output only, lists
+    # the ones that returned rows under "Test Failures" as "Test failed (4 failed row(s)): <name>".
+    marker_v2 = re.compile(r"^Failed test\s+(\S+)\s*(\(.*?\))?\s*(?:\[\d+ of \d+ in [^\]]*\])?$")
+    failed_rows_v2 = re.compile(r"^Test failed \((.*?)\):\s*(\S+)")
+
     cleaned = [clean_line(_dbt_log_message(line)) for line in log_list]
+    failed_rows = {m.group(2): m.group(1) for m in map(failed_rows_v2.match, cleaned) if m}
     details: list[str] = []
     for index, line in enumerate(cleaned):
+        match_v2 = marker_v2.match(line)
+        if match_v2:
+            name, path = match_v2.group(1), match_v2.group(2)
+            details.append(" ".join(filter(None, [f"Failure in test {name}", path, failed_rows.get(name)])))
+            continue
         match = marker.match(line)
         if match:
             failure = line if not error_prefix.match(line) else f"Error in {match.group(1)}"

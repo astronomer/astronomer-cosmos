@@ -3,8 +3,9 @@
 dbt-oss does not support the Postgres adapter the integration tests are written for, so that job runs them against
 BigQuery. It loads this plugin through ``PYTEST_PLUGINS=tests.dbt_oss_plugin``, so no other job imports it: every
 ``PostgresUserPasswordProfileMapping`` built by the tests and the example DAGs becomes a BigQuery mapping that writes
-to ``COSMOS_TEST_BIGQUERY_DATASET``, and the tests that need Postgres itself are skipped. Each test of
-``tests/test_example_dags.py`` gets its own dataset, named after the job's one, so no test depends on what another left.
+to ``COSMOS_TEST_BIGQUERY_DATASET``, and the tests that need Postgres itself are skipped. The tests in
+``PER_TEST_DATASET_TESTS`` get a dataset of their own, named after the job's one, so they do not depend on what another
+test left.
 
 Which example DAGs run, and which tests are skipped for dbt-oss, is listed in ``tests/dbt_oss_enabled.py``.
 """
@@ -60,18 +61,19 @@ def _use_bigquery_in_place_of_postgres() -> None:
 
 _use_bigquery_in_place_of_postgres()
 
-PER_TEST_DATASET_FILE = "tests/test_example_dags.py"
+# Other example DAGs still share the job's dataset: some of them rely on tables that an earlier test seeded there.
+PER_TEST_DATASET_TESTS = {"tests/test_example_dags.py::test_example_dag[example_multiple_parents_test]"}
 _NON_WORD = re.compile(r"\W")
 
 
 @pytest.fixture(autouse=True)
 def per_test_bigquery_dataset(request, monkeypatch):
-    """Give each example DAG test its own dataset, which dbt creates on first use.
+    """Give the tests in PER_TEST_DATASET_TESTS their own dataset, which dbt creates on first use.
 
     The job's cleanup step deletes every dataset that starts with the job's one. The sources of altered_jaffle_shop
     read POSTGRES_SCHEMA, so it follows the dataset.
     """
-    if request.node.nodeid.split("::")[0] == PER_TEST_DATASET_FILE:
+    if request.node.nodeid in PER_TEST_DATASET_TESTS:
         job_dataset = os.environ["COSMOS_TEST_BIGQUERY_DATASET"]
         dataset = f"{job_dataset}_{_NON_WORD.sub('_', request.node.name)}"
         monkeypatch.setenv("COSMOS_TEST_BIGQUERY_DATASET", dataset)

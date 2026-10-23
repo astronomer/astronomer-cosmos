@@ -864,7 +864,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         """
         if not isinstance(run_results_path, (str, os.PathLike)):
             return
-        command = dbt_command_line or []
+        # The executable (and other items) can be a ``Path``, as in the watcher producer's command.
+        command = [str(argument) for argument in dbt_command_line or []]
         profiles_dir = os.environ.get("DBT_PROFILES_DIR")
         for index, argument in enumerate(command):
             if argument == "--profiles-dir" and index + 1 < len(command):

@@ -1635,6 +1635,8 @@ def _write_run_results(path: Path, args: dict | None) -> None:
         (["dbt", "build", "--profiles-dir=/tmp/profiles"], {}, "/tmp/profiles"),
         (["dbt", "build"], {"DBT_PROFILES_DIR": "/from/env"}, "/from/env"),
         (["dbt", "build", "--profiles-dir", "/from/command"], {"DBT_PROFILES_DIR": "/from/env"}, "/from/command"),
+        # The executable and the directory can be ``Path`` objects, as in the command of the watcher producer.
+        ([Path("/usr/bin/dbt"), "build", "--profiles-dir", Path("/tmp/profiles")], {}, "/tmp/profiles"),
     ],
 )
 def test_add_missing_profiles_dir_to_run_results(tmp_path, dbt_command_line, env, expected):

@@ -39,7 +39,7 @@ variables that should be used for rendering and execution. It takes the followin
   instead, which overrides this value at task execution time only.
   When it is False and ``packages.yml`` lists more packages than ``dbt_packages`` holds, dbt 1.x fails during DAG parsing
   and Cosmos raises ``CosmosLoadDbtException``. dbt 2 (dbt-oss) installs the missing packages itself during ``dbt ls``,
-  so no error is raised there.
+  so no error is raised. This install still happens at parse time, even though ``install_dbt_deps`` is False.
 - ``copy_dbt_packages``: (new in v1.10) Copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
 - ``partial_parse``: (new in v1.4) If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
   for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``

@@ -662,10 +662,6 @@ class NodeSelector:
                 if node_id not in self.nodes:
                     continue
                 node = self.nodes[node_id]
-                # Since the method below changes the tags of test nodes, it can lead to incorrect
-                # results during the application of graph selectors. Therefore, it is being run within
-                # nodes previously selected
-                # This solves https://github.com/astronomer/astronomer-cosmos/pull/1466
                 if self._should_include_node(node_id, node):
                     selected_nodes.add(node_id)
         else:
@@ -709,18 +705,6 @@ class NodeSelector:
             return node_id in self.selected_nodes
 
         self.visited_nodes.add(node_id)
-
-        # Disclaimer: this method currently copies the tags from parent nodes to children nodes
-        # that are tests. This can lead to incorrect results in graph node selectors such as reported in
-        # https://github.com/astronomer/astronomer-cosmos/pull/1466
-        if node.resource_type == DbtResourceType.TEST and node.depends_on and len(node.depends_on) > 0:
-            node.tags = getattr(self.nodes.get(node.depends_on[0]), "tags", [])
-            logger.debug(
-                "The test node <%s> inherited these tags from the parent node <%s>: %s",
-                node_id,
-                node.depends_on[0],
-                node.tags,
-            )
 
         if not self._is_tags_subset(node):
             logger.debug("Excluding node <%s>", node_id)
@@ -818,10 +802,18 @@ class NodeSelector:
         return any(_node_matches_bare_identifier(node, bare) for bare in self.config.bare_identifiers)
 
     def _is_tags_subset(self, node: DbtNode) -> bool:
-        """Checks if the node's tags are a subset of the config's tags."""
-        if not (set(self.config.tags) <= set(node.tags)):
-            return False
-        return True
+        """Checks if the config's tags are a subset of the node's effective tags."""
+        return set(self.config.tags) <= self._effective_tags(node)
+
+    def _effective_tags(self, node: DbtNode) -> set[str]:
+        # A test also carries the tags of every parent, so ``tag:x`` follows a tagged model to its tests like dbt's
+        # default indirect selection; ``node.tags`` itself is left untouched, so graph operators (``+tag:x``) start
+        # only from nodes that carry the tag.
+        tags = set(node.tags)
+        if node.resource_type == DbtResourceType.TEST:
+            for parent_id in node.depends_on or []:
+                tags.update(getattr(self.nodes.get(parent_id), "tags", []))
+        return tags
 
     def _is_config_subset(self, node_config: dict[str, Any]) -> bool:
         """Checks if the node's config is a subset of the config's config."""
@@ -1519,19 +1511,20 @@ def select_nodes(
     exclude = exclude or []
     if not select and not exclude:
         return nodes
+    selected_ids, excluded_ids = select_node_ids(project_dir, nodes, select, exclude)
+    return get_nodes_from_subset(nodes, selected_ids - excluded_ids)
+
+
+def select_node_ids(
+    project_dir: Path | None, nodes: dict[str, DbtNode], select: list[str], exclude: list[str]
+) -> tuple[set[str], set[str]]:
+    """Return the ids matched by ``select`` (all nodes when empty) and by ``exclude``, both against the full graph."""
     validate_filters(exclude, select)
-
-    # Resolve `exclude` against the full graph, not the `select`-narrowed subset, so graph
-    # operators (`+tag:x`) still find their root nodes. This matches dbt. `select` must run
-    # first: the selector rewrites test-node tags in place as it walks the graph.
-    if select:
-        subset_ids = apply_select_filter(nodes, project_dir, select)
-    else:
-        subset_ids = set(nodes.keys())
-
-    exclude_ids = apply_exclude_filter(nodes, project_dir, exclude)
-
-    return get_nodes_from_subset(nodes, subset_ids - exclude_ids)
+    # `exclude` is resolved against the full graph, not the `select`-narrowed subset, so graph operators (`+tag:x`)
+    # still find their root nodes. This matches dbt.
+    selected_ids = apply_select_filter(nodes, project_dir, select) if select else set(nodes.keys())
+    excluded_ids = apply_exclude_filter(nodes, project_dir, exclude) if exclude else set()
+    return selected_ids, excluded_ids
 
 
 def get_nodes_from_subset(nodes: dict[str, DbtNode], subset_ids: set[str]) -> dict[str, DbtNode]:
@@ -1545,7 +1538,13 @@ def apply_exclude_filter(nodes: dict[str, DbtNode], project_dir: Path | None, ex
         config = SelectorConfig(project_dir, statement)
         node_selector = NodeSelector(nodes, config)
         exclude_ids.update(node_selector.select_nodes_ids_by_intersection)
-    return exclude_ids
+    # dbt's default (eager) indirect selection also excludes every test that depends on an excluded node.
+    excluded_test_ids = {
+        node_id
+        for node_id, node in nodes.items()
+        if node.resource_type == DbtResourceType.TEST and any(parent_id in exclude_ids for parent_id in node.depends_on)
+    }
+    return exclude_ids | excluded_test_ids
 
 
 def apply_select_filter(nodes: dict[str, DbtNode], project_dir: Path | None, select: list[str]) -> set[str]:

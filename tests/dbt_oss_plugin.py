@@ -63,6 +63,17 @@ def _use_bigquery_in_place_of_postgres() -> None:
     cosmos.profiles.PostgresUserPasswordProfileMapping = BigQueryInPlaceOfPostgresProfileMapping
     cosmos.profiles.postgres.PostgresUserPasswordProfileMapping = BigQueryInPlaceOfPostgresProfileMapping
 
+    # The example DAGs pick their mapping from the Postgres Airflow connection `example_conn`, which this job does not
+    # have. Only that connection is redirected; the tests that look up a mocked connection keep the real lookup.
+    get_automatic_profile_mapping = cosmos.profiles.get_automatic_profile_mapping
+
+    def get_automatic_profile_mapping_with_example_conn_on_bigquery(conn_id, profile_args=None):
+        if conn_id == "example_conn":
+            return BigQueryInPlaceOfPostgresProfileMapping(conn_id, profile_args)
+        return get_automatic_profile_mapping(conn_id, profile_args)
+
+    cosmos.profiles.get_automatic_profile_mapping = get_automatic_profile_mapping_with_example_conn_on_bigquery
+
 
 _use_bigquery_in_place_of_postgres()
 

@@ -56,11 +56,6 @@ _ASYNC_DAG_NOT_ENABLED = (
     "the async mock imports dbt-bigquery's BigQueryConnectionManager in the worker process (see _NO_BQ_ADAPTER_MODULE)"
 )
 _NO_CALLBACKS = "dbt-oss dbtRunner does not support callbacks, and dbt does not plan to (https://github.com/dbt-labs/dbt/issues/13102)"
-_TEXT_OUTPUT_NOT_PARSED = (
-    "Cosmos does not parse the text output of dbt 2 in subprocess mode: it has 'Summary: 1 total | 1 warn' and "
-    "'Warned test <name>', not the 'Done. WARN=N TOTAL=N' and 'Failure in test <name>' lines the parsers read "
-    "(reproduced locally with dbt-oss 2.0.8)"
-)
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _ERROR_NOT_IN_CAPLOG = "the dbt-oss error text does not reach caplog in some cells (cause inferred, not investigated)"
 _UNKNOWN = "fails in the dbt-oss job for a cause not yet identified"
@@ -72,9 +67,6 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/dbt/test_runner.py::test_dbt_runner_caching_and_callbacks": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_freshness_callback_excludes_model": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event": _NO_CALLBACKS,
-    # dbt 2 subprocess text output is not parsed (2)
-    "tests/operators/test_local.py::test_run_test_operator_with_callback_and_trailing_dbt_output": _TEXT_OUTPUT_NOT_PARSED,
-    "tests/operators/test_local.py::test_run_test_operator_subprocess_failure_exposes_failing_tests": _TEXT_OUTPUT_NOT_PARSED,
     # dbt-oss has no partial parsing artifact (4)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[False]": _NO_PARTIAL_PARSE,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[True]": _NO_PARTIAL_PARSE,

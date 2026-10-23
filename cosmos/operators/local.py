@@ -91,7 +91,7 @@ if TYPE_CHECKING:  # pragma: no cover
 from sqlalchemy.orm import Session
 
 import cosmos.dbt.runner as dbt_runner
-from cosmos.config import AiConfig, ProfileConfig
+from cosmos.config import AIConfig, ProfileConfig
 from cosmos.constants import (
     OPENLINEAGE_PRODUCER,
 )
@@ -222,7 +222,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         should_upload_compiled_sql: bool = False,
         append_env: bool = True,
         dbt_runner_callbacks: list[Callable] | None = None,  # type: ignore[type-arg]
-        ai_config: AiConfig | None = None,
+        ai_config: AIConfig | None = None,
         **kwargs: Any,
     ) -> None:
         self.task_id = task_id
@@ -685,7 +685,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
 
     def _handle_exception_and_diagnose(self, result: Any, tmp_project_dir: str, context: Context) -> None:
         """
-        Raise the dbt failure, if any, enriched with an AI diagnosis when ``AiConfig`` asks for it.
+        Raise the dbt failure, if any, enriched with an AI diagnosis when ``AIConfig`` asks for it.
 
         This runs while the temporary project is still there, so the diagnosis can read the dbt artifacts. The
         original exception is re-raised, with the diagnosis added after its message, so its type, traceback and the
@@ -733,7 +733,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             return False
         return True
 
-    def _append_ai_diagnosis(self, ai_config: AiConfig, exc: Exception, result: Any, tmp_project_dir: str) -> None:
+    def _append_ai_diagnosis(self, ai_config: AIConfig, exc: Exception, result: Any, tmp_project_dir: str) -> None:
         """Add the AI diagnosis to the message of ``exc``."""
         try:
             # Imported only here: ``cosmos.ai`` needs pydantic, which Airflow 2 and Cosmos themselves don't require.

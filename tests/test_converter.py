@@ -12,7 +12,7 @@ from packaging.version import Version
 
 from cosmos import DbtDag
 from cosmos.airflow.compatibility import EmptyOperator
-from cosmos.config import AiConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AIConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     AIRFLOW_VERSION,
     DbtResourceType,
@@ -289,7 +289,7 @@ def test_validate_arguments_schema_in_task_args():
     assert profile_config.profile_mapping.profile_args["schema"] == "abcd"
 
 
-AI_CONFIG = AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
+AI_CONFIG = AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
 
 
 def _validate_ai_config(execution_mode, ai_config):
@@ -325,7 +325,7 @@ def test_validate_arguments_ai_config_supported_execution_mode_is_accepted(execu
 
 @pytest.mark.parametrize("execution_mode", [ExecutionMode.KUBERNETES, ExecutionMode.WATCHER])
 def test_validate_arguments_ai_config_without_diagnosis_is_accepted_in_any_execution_mode(execution_mode):
-    _validate_ai_config(execution_mode, AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=False))
+    _validate_ai_config(execution_mode, AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=False))
 
 
 parent_seed = DbtNode(
@@ -1923,7 +1923,7 @@ def _convert_with_ai_config(execution_mode, *, ai_config=None, operator_args=Non
 def test_converter_forwards_ai_config_to_the_dbt_tasks(
     mock_load_dbt_graph, ai_config_source, execution_mode, operator_args
 ):
-    """Every dbt task of the supported modes holds the AiConfig, however it was passed."""
+    """Every dbt task of the supported modes holds the AIConfig, however it was passed."""
     if ai_config_source == "argument":
         dag = _convert_with_ai_config(execution_mode, ai_config=AI_CONFIG, operator_args=operator_args)
     else:
@@ -1974,8 +1974,8 @@ def test_converter_rejects_ai_config_set_as_argument_and_in_operator_args(mock_l
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
 @patch("cosmos.converter.DbtGraph.load")
 def test_converter_accepts_a_disabled_ai_config_in_an_unsupported_execution_mode(mock_load_dbt_graph, ai_config_source):
-    """An ``AiConfig`` that does not diagnose is harmless anywhere: those operators just don't receive it."""
-    disabled = AiConfig(llm_conn_id="my_llm_conn")
+    """An ``AIConfig`` that does not diagnose is harmless anywhere: those operators just don't receive it."""
+    disabled = AIConfig(llm_conn_id="my_llm_conn")
     operator_args = {"image": "sample-image"}
     if ai_config_source == "argument":
         dag = _convert_with_ai_config(ExecutionMode.KUBERNETES, ai_config=disabled, operator_args=operator_args)
@@ -1998,13 +1998,13 @@ def test_converter_rejects_ai_config_in_operator_args_for_unsupported_execution_
 @patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
 @patch("cosmos.converter.DbtGraph.load")
 def test_dag_with_ai_config_and_a_custom_output_type_serializes(mock_load_dbt_graph):
-    """``AiConfig`` is an operator argument that is not serialized: Airflow must keep serializing the DAG."""
+    """``AIConfig`` is an operator argument that is not serialized: Airflow must keep serializing the DAG."""
     from pydantic import BaseModel
 
     class Diagnosis(BaseModel):
         summary: str
 
-    ai_config = AiConfig(
+    ai_config = AIConfig(
         llm_conn_id="my_llm_conn",
         diagnose_on_failure=True,
         diagnosis_output_type=Diagnosis,

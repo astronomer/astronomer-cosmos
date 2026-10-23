@@ -7,7 +7,7 @@ import pytest
 
 from cosmos.ai.context import _MAX_TABLES, FailedNode, FailureContext
 from cosmos.ai.context import build_failure_context as build
-from cosmos.config import AiConfig
+from cosmos.config import AIConfig
 
 # Artifacts of a real ``dbt build`` (dbt-core 1.11, Postgres) with a model that fails with a database error, a test that
 # fails, and a model skipped because of a failed parent. The failing hook carries a fake secret, as in a real leak.
@@ -16,8 +16,8 @@ SAMPLE_ARTIFACTS = Path(__file__).parent.parent / "sample" / "ai_diagnosis"
 
 
 def build_failure_context(project_dir, output="", redact=lambda text: text, **limits):
-    """Build the context with the default limits of ``AiConfig``, or with the ones given."""
-    return build(project_dir, output, AiConfig(llm_conn_id="my_llm_conn", **limits), redact)
+    """Build the context with the default limits of ``AIConfig``, or with the ones given."""
+    return build(project_dir, output, AIConfig(llm_conn_id="my_llm_conn", **limits), redact)
 
 
 @pytest.fixture

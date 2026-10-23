@@ -37,7 +37,7 @@ except (ImportError, AirflowOptionalProviderFeatureException):
 
 if TYPE_CHECKING:
     from cosmos.ai.context import FailureContext
-    from cosmos.config import AiConfig, ProfileConfig
+    from cosmos.config import AIConfig, ProfileConfig
 
 logger = get_logger(__name__)
 
@@ -84,7 +84,7 @@ class DiagnosisHandle:
 
 def diagnose_dbt_failure(
     *,
-    ai_config: AiConfig,
+    ai_config: AIConfig,
     profile_config: ProfileConfig | None,
     failure_context: FailureContext,
     handle: DiagnosisHandle | None = None,
@@ -140,14 +140,14 @@ def diagnose_dbt_failure(
         return None
 
 
-def redact(text: str, ai_config: AiConfig) -> str:
-    """Mask the secrets Airflow knows about, then apply ``AiConfig.redactor``: what Airflow can't know is up to it."""
+def redact(text: str, ai_config: AIConfig) -> str:
+    """Mask the secrets Airflow knows about, then apply ``AIConfig.redactor``: what Airflow can't know is up to it."""
     # Without the provider nothing is sent, so there is nothing to mask: ``diagnose_dbt_failure`` returns before that.
     text = mask_secrets(text) if mask_secrets else text
     return ai_config.redactor(text) if ai_config.redactor else text
 
 
-def _run_agent(agent: Any, prompt: str, ai_config: AiConfig, handle: DiagnosisHandle) -> Any:
+def _run_agent(agent: Any, prompt: str, ai_config: AIConfig, handle: DiagnosisHandle) -> Any:
     """Run the agent on this thread. Returns None if the time limit is reached or the task is killed."""
     timed_out = threading.Event()
 
@@ -173,7 +173,7 @@ def _run_agent(agent: Any, prompt: str, ai_config: AiConfig, handle: DiagnosisHa
 
 
 def _build_toolsets(
-    ai_config: AiConfig, profile_config: ProfileConfig | None, failure_context: FailureContext
+    ai_config: AIConfig, profile_config: ProfileConfig | None, failure_context: FailureContext
 ) -> list[Any]:
     """
     The tools the agent can use to check the warehouse, for the tables of the failed node and its parents only.
@@ -185,7 +185,7 @@ def _build_toolsets(
 
     profile_mapping = profile_config.profile_mapping if profile_config else None
     if profile_mapping is None:
-        logger.warning("AiConfig.introspect_schema needs ProfileConfig.profile_mapping; skipping schema introspection.")
+        logger.warning("AIConfig.introspect_schema needs ProfileConfig.profile_mapping; skipping schema introspection.")
         return []
 
     if not failure_context.allowed_tables:
@@ -213,7 +213,7 @@ def _build_toolsets(
     return [_redacting(metadata_tools, ai_config, allowed_tables)]
 
 
-def _redacting(toolset: Any, ai_config: AiConfig, allowed_tables: list[str]) -> Any:
+def _redacting(toolset: Any, ai_config: AIConfig, allowed_tables: list[str]) -> Any:
     """Wrap ``toolset`` to log what the agent asks of its tools, and to redact what they return like the prompt."""
     # The provider, so pydantic-ai, is there by now.
     from pydantic_ai.exceptions import ModelRetry

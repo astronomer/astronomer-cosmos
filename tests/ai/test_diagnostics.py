@@ -16,7 +16,7 @@ from pydantic import BaseModel
 import cosmos.ai.diagnostics as diagnostics
 from cosmos.ai.context import FailedNode, FailureContext
 from cosmos.ai.diagnostics import DbtFailureDiagnosis, DiagnosisHandle, diagnose_dbt_failure
-from cosmos.config import AiConfig
+from cosmos.config import AIConfig
 
 try:
     from pydantic_ai import Agent
@@ -44,7 +44,7 @@ FAILURE_CONTEXT = FailureContext(
     )
 )
 DIAGNOSIS = DbtFailureDiagnosis(root_cause="Column foo is missing.", suggested_fix="Rename it.", confidence="high")
-AI_CONFIG = AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
+AI_CONFIG = AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
 
 
 # --- A fake provider: lets the diagnosis logic run, and be covered, without the optional dependencies ---------------
@@ -156,7 +156,7 @@ def test_diagnose_dbt_failure_uses_a_custom_output_type_and_generic_instructions
         output=Custom(summary="It broke."),
         usage=SimpleNamespace(requests=1, input_tokens=1, output_tokens=1),
     )
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_output_type=Custom)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_output_type=Custom)
 
     diagnosis = diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
 
@@ -166,7 +166,7 @@ def test_diagnose_dbt_failure_uses_a_custom_output_type_and_generic_instructions
 
 
 def test_diagnose_dbt_failure_custom_instructions_replace_the_default(fake_provider):
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_instructions="Be terse.")
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_instructions="Be terse.")
 
     diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
 
@@ -174,7 +174,7 @@ def test_diagnose_dbt_failure_custom_instructions_replace_the_default(fake_provi
 
 
 def test_diagnose_dbt_failure_bounds_the_number_of_model_requests_as_the_user_says(fake_provider):
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, max_requests=3)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, max_requests=3)
 
     diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
 
@@ -192,7 +192,7 @@ def test_diagnose_dbt_failure_masks_secrets_before_calling_the_model(fake_provid
 
 
 def test_diagnose_dbt_failure_applies_the_user_redactor_after_the_masker(fake_provider):
-    config = AiConfig(
+    config = AIConfig(
         llm_conn_id="c", diagnose_on_failure=True, redactor=lambda text: text.replace("raw.orders", "<table>")
     )
 
@@ -220,7 +220,7 @@ def test_diagnose_dbt_failure_sends_nothing_if_the_redactor_fails(fake_provider)
     def broken_redactor(text):
         raise RuntimeError("redactor bug")
 
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken_redactor)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken_redactor)
 
     with pytest.raises(RuntimeError, match="redactor bug"):
         diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
@@ -342,7 +342,7 @@ def test_diagnose_dbt_failure_returns_none_when_the_connection_is_wrong(fake_pro
 
 def test_diagnose_dbt_failure_times_out_without_leaving_threads_behind(fake_provider, caplog):
     fake_provider.behaviour = _block_until_cancelled
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, timeout_seconds=0.05)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, timeout_seconds=0.05)
     threads_before = threading.active_count()
 
     started = time.monotonic()
@@ -426,7 +426,7 @@ def test_build_toolsets_is_empty_unless_introspection_is_enabled():
     ],
 )
 def test_build_toolsets_skips_introspection_without_what_it_needs(profile_config, context, message, caplog):
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
 
     with caplog.at_level(logging.WARNING):
         assert diagnostics._build_toolsets(config, profile_config, context) == []
@@ -443,7 +443,7 @@ def test_build_toolsets_skips_introspection_when_the_sql_extra_is_missing(monkey
             raise AirflowOptionalProviderFeatureException("No module named 'sqlglot'")
 
     monkeypatch.setitem(__import__("sys").modules, "airflow.providers.common.ai.toolsets.sql", MissingSqlToolset())
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
 
     with caplog.at_level(logging.WARNING):
         assert diagnostics._build_toolsets(config, _profile_config(), FAILURE_CONTEXT) == []
@@ -529,7 +529,7 @@ def test_build_toolsets_limits_the_agent_to_the_related_tables_and_the_metadata_
     monkeypatch, fake_sql_toolset_module
 ):
     _sql_connection(monkeypatch)
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
 
     toolsets = diagnostics._build_toolsets(config, _profile_config("my_db_conn"), FAILURE_CONTEXT)
 
@@ -552,7 +552,7 @@ def test_diagnose_dbt_failure_tells_the_agent_which_tables_it_can_inspect(
     fake_provider, monkeypatch, fake_sql_toolset_module
 ):
     _sql_connection(monkeypatch)
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
 
     diagnose_dbt_failure(ai_config=config, profile_config=_profile_config(), failure_context=FAILURE_CONTEXT)
 
@@ -646,7 +646,7 @@ def test_redacting_toolset_never_logs_what_a_tool_returned(fake_provider, fake_w
 
 
 def test_redacting_toolset_applies_the_user_redactor(fake_provider, fake_wrapper_toolset):
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=lambda text: text.replace("pii", "<x>"))
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=lambda text: text.replace("pii", "<x>"))
 
     assert _tool_result("a pii column", config) == "a <x> column"
 
@@ -655,7 +655,7 @@ def test_redacting_toolset_returns_nothing_if_the_redactor_fails(fake_provider, 
     def broken(text):
         raise RuntimeError("redactor bug")
 
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken)
 
     with pytest.raises(RuntimeError, match="redactor bug"):
         _tool_result("anything", config)
@@ -668,7 +668,7 @@ def test_redacting_toolset_redacts_the_error_of_a_tool(fake_provider, fake_wrapp
         async def call_tool(self, name, tool_args, ctx, tool):
             raise FakeModelRetry("The get_schema tool failed: host db.corp-internal-42.example.com, SECRET-VALUE")
 
-    config = AiConfig(
+    config = AIConfig(
         llm_conn_id="c", diagnose_on_failure=True, redactor=lambda text: text.replace("corp-internal-42", "<host>")
     )
     toolset = diagnostics._redacting(FailingTools(), config, ["raw.orders"])
@@ -685,7 +685,7 @@ def test_build_toolsets_skips_introspection_for_connections_that_are_not_sql(
     monkeypatch.setattr(
         diagnostics.BaseHook, "get_connection", lambda conn_id: SimpleNamespace(get_hook=lambda: object())
     )
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
 
     with caplog.at_level(logging.WARNING):
         assert diagnostics._build_toolsets(config, _profile_config(), FAILURE_CONTEXT) == []
@@ -769,7 +769,7 @@ def test_real_agent_returns_a_custom_output_type(real_agent_hook):
         )
 
     real_agent_hook(handler)
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_output_type=Custom)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, diagnosis_output_type=Custom)
 
     diagnosis = diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
 
@@ -783,7 +783,7 @@ def test_real_agent_is_cancelled_when_the_timeout_expires(real_agent_hook):
         return _answer(info)
 
     real_agent_hook(slow)
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, timeout_seconds=0.3)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, timeout_seconds=0.3)
 
     started = time.monotonic()
     diagnosis = diagnose_dbt_failure(ai_config=config, profile_config=None, failure_context=FAILURE_CONTEXT)
@@ -868,7 +868,7 @@ def test_real_agent_never_sees_an_unredacted_tool_error():
     from pydantic_ai.exceptions import ModelRetry
     from pydantic_ai.toolsets import FunctionToolset
 
-    config = AiConfig(
+    config = AIConfig(
         llm_conn_id="c", diagnose_on_failure=True, redactor=lambda text: text.replace("corp-internal-42", "<host>")
     )
     tools = FunctionToolset()
@@ -904,7 +904,7 @@ def test_real_agent_is_stopped_when_a_tool_result_can_not_be_redacted(caplog):
     def broken(text):
         raise RuntimeError("redactor bug")
 
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, redactor=broken)
     tools = FunctionToolset()
 
     @tools.tool_plain
@@ -933,7 +933,7 @@ def test_real_toolset_exposes_only_the_metadata_tools_for_the_related_tables(mon
         "get_connection",
         lambda conn_id: SimpleNamespace(get_hook=lambda: MagicMock(spec=DbApiHook)),
     )
-    config = AiConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
+    config = AIConfig(llm_conn_id="c", diagnose_on_failure=True, introspect_schema=True)
 
     toolsets = diagnostics._build_toolsets(config, _profile_config(), FAILURE_CONTEXT)
 

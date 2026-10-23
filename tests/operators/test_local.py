@@ -34,7 +34,7 @@ from pendulum import datetime
 
 import cosmos.dbt.runner as dbt_runner
 from cosmos import DbtDag, DbtTaskGroup, ProjectConfig, RenderConfig, cache
-from cosmos.config import AiConfig, ProfileConfig
+from cosmos.config import AIConfig, ProfileConfig
 from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
 from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
@@ -3204,7 +3204,7 @@ def test_run_command_emits_datasets_only_when_flag_resolves_true(
 
 # --- AI-assisted failure diagnosis -------------------------------------------------------------------------------------
 
-AI_CONFIG = AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
+AI_CONFIG = AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
 FINAL_ATTEMPT_CONTEXT = {"ti": MagicMock(try_number=3, max_tries=2)}
 DIAGNOSIS_TEXT = "-" * 80 + "\nAI diagnosis (confidence: high)\n" + "-" * 80 + "\nRoot cause:\n  Column foo is missing."
 
@@ -3289,7 +3289,7 @@ def test_ai_diagnosis_is_given_the_artifacts_of_the_project_and_the_output(mock_
 @patch("cosmos.ai.context.build_failure_context")
 @patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=None)
 def test_ai_diagnosis_redacts_the_texts_of_the_failure_with_the_redactor_of_the_user(mock_diagnose, mock_build_context):
-    config = AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True, redactor=lambda t: t.replace("pw", "***"))
+    config = AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True, redactor=lambda t: t.replace("pw", "***"))
     operator = _ai_operator(config)
 
     with pytest.raises(AirflowException):
@@ -3311,7 +3311,7 @@ def test_failure_message_is_unchanged_when_there_is_no_diagnosis(mock_diagnose):
 
 @pytest.mark.parametrize(
     "ai_config",
-    [None, AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=False)],
+    [None, AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=False)],
     ids=["no_ai_config", "diagnosis_disabled"],
 )
 @patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
@@ -3523,7 +3523,7 @@ def test_run_command_diagnoses_a_failed_dbt_command_inside_the_project_directory
     # The artifacts are read from the temporary project, which is gone once ``run_command`` returns.
     mock_build_context.assert_called_once()
     assert mock_build_context.call_args.args[0] == str(tmp_path)
-    # The limits of what is sent come from the user's ``AiConfig``.
+    # The limits of what is sent come from the user's ``AIConfig``.
     assert mock_build_context.call_args.args[2] is AI_CONFIG
     assert str(exc_info.value).endswith(DIAGNOSIS_TEXT)
 

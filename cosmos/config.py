@@ -641,9 +641,9 @@ class ExecutionConfig:
 
 
 @dataclass
-class AiConfig:
+class AIConfig:
     """
-    Configuration for optional AI-assisted features in Cosmos.
+    Configuration for optional AI-assisted features in Cosmos. **Experimental**.
 
     It requires ``apache-airflow-providers-common-ai>=1.0.0``, which needs Python 3.11+ and Airflow 2.11+. Install it
     with the ``ai`` extra of Cosmos. See :ref:`ai-config`.
@@ -698,10 +698,10 @@ class AiConfig:
 
     def __post_init__(self) -> None:
         if not self.llm_conn_id or not isinstance(self.llm_conn_id, str):
-            raise CosmosValueError("AiConfig.llm_conn_id must be a non-empty Airflow connection ID.")
+            raise CosmosValueError("AIConfig.llm_conn_id must be a non-empty Airflow connection ID.")
         timeout = self.timeout_seconds
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 0 < timeout < math.inf:
-            raise CosmosValueError(f"AiConfig.timeout_seconds must be a finite number above 0, got {timeout!r}.")
+            raise CosmosValueError(f"AIConfig.timeout_seconds must be a finite number above 0, got {timeout!r}.")
         for name in (
             "max_requests",
             "max_failed_nodes",
@@ -712,15 +712,15 @@ class AiConfig:
         ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-                raise CosmosValueError(f"AiConfig.{name} must be a whole number of at least 1, got {value!r}.")
+                raise CosmosValueError(f"AIConfig.{name} must be a whole number of at least 1, got {value!r}.")
         if self.diagnosis_output_type is not None:
             # Imported here: pydantic is not a dependency of Cosmos, nor of Airflow 2, and Cosmos must import without it.
             from pydantic import BaseModel
 
             if not (isinstance(self.diagnosis_output_type, type) and issubclass(self.diagnosis_output_type, BaseModel)):
                 raise CosmosValueError(
-                    "AiConfig.diagnosis_output_type must be a pydantic model class (a subclass of pydantic.BaseModel), "
+                    "AIConfig.diagnosis_output_type must be a pydantic model class (a subclass of pydantic.BaseModel), "
                     f"got {self.diagnosis_output_type!r}."
                 )
         if self.redactor is not None and not callable(self.redactor):
-            raise CosmosValueError(f"AiConfig.redactor must be callable, got {self.redactor!r}.")
+            raise CosmosValueError(f"AIConfig.redactor must be callable, got {self.redactor!r}.")

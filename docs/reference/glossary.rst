@@ -7,9 +7,9 @@ Glossary
        An open-source Python package that allows you to write data transformations using dbt
        and then use Apache Airflow®'s orchestration to integrate dbt projects into end-to-end workflows.
 
-   AiConfig
-       The Cosmos class that turns on optional AI-assisted features, such as asking an LLM for the root cause of a
-       failed dbt task. It is off by default. See :ref:`ai-config`.
+   AIConfig
+       The Cosmos class that turns on optional, experimental AI-assisted features, such as asking an LLM for the root
+       cause of a failed dbt task. It is off by default. See :ref:`ai-config`.
 
    DAG
        An Airflow term derived from the mathematical structure called **Directed Acyclic Graph**. A DAG

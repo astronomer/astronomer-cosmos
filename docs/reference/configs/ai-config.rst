@@ -1,15 +1,16 @@
 .. _ai-config:
 
-AI config
-=========
+AI config (experimental)
+========================
 
 Cosmos can ask an LLM why a dbt task failed, and add the answer to the error message and the logs of the task. It uses
 the `Common AI provider <https://airflow.apache.org/docs/apache-airflow-providers-common-ai/stable/index.html>`_ of
-Airflow and is configured with ``cosmos.config.AiConfig``. It is off by default.
+Airflow and is configured with ``cosmos.config.AIConfig``. It is off by default.
 
-.. note::
+.. warning::
 
-    This feature is new. Its options may change based on feedback.
+    This feature is **experimental** and may change without a deprecation period. Its options, its defaults and the
+    format of the diagnosis may change based on feedback.
 
 Requirements
 ~~~~~~~~~~~~
@@ -38,11 +39,11 @@ Usage
 
 .. code-block:: python
 
-    from cosmos import AiConfig, DbtDag
+    from cosmos import AIConfig, DbtDag
 
     dag = DbtDag(
         # ...
-        ai_config=AiConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True),
+        ai_config=AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True),
     )
 
 The error message keeps the dbt error first and ends with the diagnosis:
@@ -130,7 +131,7 @@ repeat the values of the rows involved, as in a unique key violation, and names 
 
     import re
 
-    AiConfig(
+    AIConfig(
         llm_conn_id="my_llm_conn",
         diagnose_on_failure=True,
         redactor=lambda text: re.sub(r"(?i)(password|token)=\S+", r"\1=***", text),
@@ -184,7 +185,7 @@ item per line in the logs, and multi-line text, such as SQL, keeps its line brea
         confidence: str
 
 
-    AiConfig(
+    AIConfig(
         llm_conn_id="my_llm_conn",
         diagnose_on_failure=True,
         diagnosis_output_type=MyDiagnosis,

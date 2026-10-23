@@ -5,7 +5,7 @@ from unittest.mock import Mock, PropertyMock, call, patch
 import pytest
 from packaging.version import Version
 
-from cosmos.config import AiConfig, CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AIConfig, CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, InvocationMode, SeedRenderingBehavior, SourceRenderingBehavior, TestBehavior
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.athena.access_key import AthenaAccessKeyProfileMapping
@@ -537,7 +537,7 @@ def test_render_config_seed_rendering_behavior_defaults_to_always():
 
 
 def test_ai_config_defaults():
-    ai_config = AiConfig(llm_conn_id="my_llm_conn")
+    ai_config = AIConfig(llm_conn_id="my_llm_conn")
     assert ai_config.llm_conn_id == "my_llm_conn"
     assert ai_config.diagnose_on_failure is False
     assert ai_config.introspect_schema is False
@@ -556,7 +556,7 @@ def test_ai_config_custom_values():
     class CustomDiagnosis(BaseModel):
         summary: str
 
-    ai_config = AiConfig(
+    ai_config = AIConfig(
         llm_conn_id="my_llm_conn",
         diagnose_on_failure=True,
         introspect_schema=True,
@@ -592,7 +592,7 @@ def test_ai_config_custom_values():
 )
 def test_ai_config_rejects_invalid_values(kwargs, message):
     with pytest.raises(CosmosValueError, match=message):
-        AiConfig(**kwargs)
+        AIConfig(**kwargs)
 
 
 def test_cosmos_config_does_not_import_pydantic_at_module_level():
@@ -618,12 +618,12 @@ def test_cosmos_config_does_not_import_pydantic_at_module_level():
 )
 @pytest.mark.parametrize("value", [0, -1, 2.5, "10", None, True])
 def test_ai_config_limits_must_be_whole_numbers_of_at_least_one(name, value):
-    with pytest.raises(CosmosValueError, match=f"AiConfig.{name} must be a whole number of at least 1"):
-        AiConfig(llm_conn_id="c", **{name: value})
+    with pytest.raises(CosmosValueError, match=f"AIConfig.{name} must be a whole number of at least 1"):
+        AIConfig(llm_conn_id="c", **{name: value})
 
 
 def test_ai_config_accepts_the_limits_the_user_chooses():
-    ai_config = AiConfig(
+    ai_config = AIConfig(
         llm_conn_id="c",
         max_requests=1,
         max_failed_nodes=20,

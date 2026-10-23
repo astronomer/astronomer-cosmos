@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 from cosmos.log import get_logger
 
 if TYPE_CHECKING:
-    from cosmos.config import AiConfig
+    from cosmos.config import AIConfig
 
 logger = get_logger(__name__)
 
@@ -82,7 +82,7 @@ class FailureContext:
 
 
 def build_failure_context(
-    project_dir: str | Path, output: str, ai_config: AiConfig, redact: Callable[[str], str]
+    project_dir: str | Path, output: str, ai_config: AIConfig, redact: Callable[[str], str]
 ) -> FailureContext:
     """
     Build the context of a failed dbt invocation from the ``target`` folder of ``project_dir``.
@@ -110,7 +110,7 @@ def build_failure_context(
 
 
 def _to_failed_node(
-    result: dict[str, Any], entries: dict[str, Any], ai_config: AiConfig, redact: Callable[[str], str]
+    result: dict[str, Any], entries: dict[str, Any], ai_config: AIConfig, redact: Callable[[str], str]
 ) -> FailedNode:
     unique_id = result.get("unique_id", "")
     node = entries.get(unique_id) or {}
@@ -141,7 +141,7 @@ def _load_json(path: Path, max_bytes: int) -> dict[str, Any] | None:
     try:
         if path.stat().st_size > max_bytes:
             logger.warning(
-                "%s is larger than %s MB, the limit of AiConfig.max_artifact_mb; not reading it.", path, max_bytes >> 20
+                "%s is larger than %s MB, the limit of AIConfig.max_artifact_mb; not reading it.", path, max_bytes >> 20
             )
             return None
         with path.open() as file:

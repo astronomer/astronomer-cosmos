@@ -17,7 +17,7 @@ def format_diagnosis(diagnosis: BaseModel) -> str:
     Render a diagnosis as a wrapped, clearly delimited block.
 
     ``diagnosis`` can be Cosmos's built-in ``DbtFailureDiagnosis`` or a user model set with
-    ``AiConfig.diagnosis_output_type``, so the output is driven by the model's fields and not by hardcoded names. A
+    ``AIConfig.diagnosis_output_type``, so the output is driven by the model's fields and not by hardcoded names. A
     ``confidence`` field, if present, goes to the header, and every other field becomes a section.
     """
     fields = diagnosis.model_dump(mode="json")

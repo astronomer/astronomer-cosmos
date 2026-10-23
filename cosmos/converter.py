@@ -37,7 +37,7 @@ except ImportError:
 
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
-from cosmos.config import AiConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AIConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
     AI_DIAGNOSIS_SUPPORTED_EXECUTION_MODES,
@@ -160,7 +160,7 @@ def validate_arguments(
     ):
         supported = ", ".join(sorted(f"ExecutionMode.{mode.name}" for mode in AI_DIAGNOSIS_SUPPORTED_EXECUTION_MODES))
         raise CosmosValueError(
-            f"AiConfig.diagnose_on_failure is only supported with {supported}, "
+            f"AIConfig.diagnose_on_failure is only supported with {supported}, "
             f"but ExecutionConfig.execution_mode is ExecutionMode.{execution_config.execution_mode.name}. "
             "Set diagnose_on_failure=False or switch to a supported execution mode."
         )
@@ -331,7 +331,7 @@ class DbtToAirflowConverter:
         task_group: TaskGroup | None = None,
         operator_args: dict[str, Any] | None = None,
         on_warning_callback: Callable[..., Any] | None = None,
-        ai_config: AiConfig | None = None,
+        ai_config: AIConfig | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:

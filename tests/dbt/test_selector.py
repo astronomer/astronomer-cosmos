@@ -602,7 +602,7 @@ def _multi_parent_test_graph():
 
 @pytest.mark.parametrize("exclude", [[], ["tag:zzz"], ["tag:b"]])
 def test_select_nodes_exclude_does_not_change_what_select_sees(exclude):
-    """The selector rewrites test-node tags in place, so `exclude` must not run before `select`."""
+    """`exclude` must not change which nodes `select` sees."""
     base, nodes = _multi_parent_test_graph()
     selected = select_nodes(project_dir=base, nodes=nodes, select=["+tag:a"], exclude=exclude)
     assert sorted(selected) == ["model.p.m", "model.p.up"]
@@ -2658,7 +2658,8 @@ def test_tag_selector_matches_a_test_through_any_of_its_parents(depends_on):
 
 @pytest.mark.parametrize("depends_on", [["model.p.tagged", "model.p.plain"], ["model.p.plain", "model.p.tagged"]])
 @pytest.mark.parametrize("exclude", [["+tag:x"], ["tag:x"], ["tagged"]])
-def test_exclude_drops_the_tests_of_an_excluded_parent_but_keeps_its_other_parents(exclude, depends_on):
+@pytest.mark.parametrize("select", [[], ["path:models"]])
+def test_exclude_drops_the_tests_of_an_excluded_parent_but_keeps_its_other_parents(select, exclude, depends_on):
     """Only nodes carrying a tag are graph roots, and a test goes with any excluded parent, as in dbt."""
     base = Path("/tmp/proj")
 
@@ -2682,7 +2683,7 @@ def test_exclude_drops_the_tests_of_an_excluded_parent_but_keeps_its_other_paren
         )
     }
 
-    selected = select_nodes(project_dir=base, nodes=nodes, exclude=exclude)
+    selected = select_nodes(project_dir=base, nodes=nodes, select=select, exclude=exclude)
 
     assert sorted(selected) == ["model.p.plain"]
     assert nodes["test.p.shared_test"].tags == []

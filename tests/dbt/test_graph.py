@@ -51,6 +51,7 @@ SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_
 ALTERED_DBT_PROJECT_MANIFEST = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME / "target/manifest.json"
 SAMPLE_MANIFEST_SELECTORS = Path(__file__).parent.parent / "sample/manifest_selectors.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
+EXCLUDED_TESTS_PROJECT = DBT_PROJECTS_ROOT_DIR / "excluded_tests"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
 
 # File and directory names to skip when copying dbt project trees in tests (keeps fixture output deterministic).
@@ -997,6 +998,22 @@ def test_load_dbt_ls_file_without_project_path():
     assert err_info.value.args[0] == "Unable to load dbt ls file without RenderConfig.project_path"
 
 
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
+def test_load_clears_the_exclusions_of_a_previous_load(mock_load_via_dbt_ls):
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)
+    dbt_graph.excluded_node_ids = {"test.jaffle_shop.left_over"}
+
+    dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
+
+    assert dbt_graph.excluded_node_ids == set()
+
+
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=None)
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
 def test_load_automatic_without_manifest_with_profile_yml(mock_load_via_dbt_ls, mock_load_via_custom_parser):
@@ -1909,9 +1926,6 @@ def test_update_node_dependency_test_not_exist():
     for _, nodes in dbt_graph.filtered_nodes.items():
         assert nodes.has_test is False
         assert nodes.has_non_detached_test is False
-
-
-EXCLUDED_TESTS_PROJECT = DBT_PROJECTS_ROOT_DIR / "excluded_tests"
 
 
 @pytest.mark.parametrize(

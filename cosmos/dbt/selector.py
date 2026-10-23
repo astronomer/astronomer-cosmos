@@ -662,10 +662,6 @@ class NodeSelector:
                 if node_id not in self.nodes:
                     continue
                 node = self.nodes[node_id]
-                # Since the method below changes the tags of test nodes, it can lead to incorrect
-                # results during the application of graph selectors. Therefore, it is being run within
-                # nodes previously selected
-                # This solves https://github.com/astronomer/astronomer-cosmos/pull/1466
                 if self._should_include_node(node_id, node):
                     selected_nodes.add(node_id)
         else:
@@ -812,8 +808,7 @@ class NodeSelector:
     def _effective_tags(self, node: DbtNode) -> set[str]:
         # A test also carries the tags of every parent, so ``tag:x`` follows a tagged model to its tests like dbt's
         # default indirect selection; ``node.tags`` itself is left untouched, so graph operators (``+tag:x``) start
-        # only from nodes that carry the tag. Unlike dbt, ``tag:a,tag:b`` can match across own and inherited tags
-        # (https://github.com/astronomer/astronomer-cosmos/pull/1466).
+        # only from nodes that carry the tag.
         tags = set(node.tags)
         if node.resource_type == DbtResourceType.TEST:
             for parent_id in node.depends_on or []:

@@ -829,6 +829,7 @@ class DbtGraph:
         Fundamentally, there are two different execution paths
         There is automatic, and manual.
         """
+        self.excluded_node_ids = set()
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,

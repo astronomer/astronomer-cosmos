@@ -46,7 +46,6 @@ SAMPLE_DBT_MANIFEST = Path(__file__).parent / "sample/manifest.json"
 MULTIPLE_PARENTS_TEST_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt/multiple_parents_test/"
 DBT_PROJECTS_PROJ_WITH_DEPS_DIR = Path(__file__).parent.parent / "dev/dags/dbt" / "jaffle_shop"
 ALTERED_JAFFLE_SHOP_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt" / "altered_jaffle_shop"
-EXCLUDED_TESTS_DBT_PROJECT = Path(__file__).parent.parent / "dev/dags/dbt" / "excluded_tests"
 
 skipif_airflow_lt_3_dag_doc_hash = pytest.mark.skipif(
     AIRFLOW_VERSION < Version("3.0.0"),

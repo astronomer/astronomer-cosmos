@@ -199,6 +199,12 @@ def _node_label(node_result: Any) -> str:
     return str(getattr(node, "name", None) or getattr(node_result, "unique_id", None) or "unknown")
 
 
+def _status_value(node_result: Any) -> str:
+    """The lower-cased status of a result: dbt 2 reports ``FreshnessStatus.WARN`` as ``Warn``, dbt 1 as ``warn``."""
+    status = node_result.status
+    return str(getattr(status, "value", status)).lower()
+
+
 def extract_message_by_status(
     result: dbtRunnerResult, status_levels: list[str] | None = None
 ) -> tuple[list[str], list[str]]:
@@ -213,13 +219,13 @@ def extract_message_by_status(
     :return: two lists of strings, the first one containing the node names and the second one
         containing the node result message.
     """
-    status_levels = ["warn"] if status_levels is None else status_levels
+    status_levels = ["warn"] if status_levels is None else [level.lower() for level in status_levels]
 
     node_names = []
     node_results = []
 
     for node_result in result.result.results:
-        if node_result.status in status_levels:
+        if _status_value(node_result) in status_levels:
             node_names.append(_node_label(node_result))
             node_results.append(str(node_result.message))
 
@@ -232,7 +238,7 @@ def parse_number_of_warnings(result: dbtRunnerResult) -> int:
     """
     num = 0
     for run_result in result.result.results:
-        if run_result.status == "warn":
+        if _status_value(run_result) == "warn":
             num += 1
     return num
 

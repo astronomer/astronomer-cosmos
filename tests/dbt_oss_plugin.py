@@ -28,7 +28,6 @@ from tests.dbt_oss_enabled import SKIPPED_TESTS
 
 # Tests that depend on Postgres itself (and not only on the profile) and so cannot run against BigQuery.
 POSTGRES_ONLY_TEST_FILES = {
-    "tests/listeners/test_dag_run_listener.py": "asserts on the Postgres profile mapping",
     "tests/operators/test_virtualenv.py": "installs dbt-postgres in a virtualenv",
 }
 POSTGRES_ONLY_FIXTURES = {

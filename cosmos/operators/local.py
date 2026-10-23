@@ -856,11 +856,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     @staticmethod
     def _openlineage_requires_profiles_dir_in_run_results() -> bool:
         """
-        Return whether the installed ``openlineage-integration-common`` fails when ``args.profiles_dir`` is missing.
+        Return whether the installed ``openlineage-integration-common`` requires ``args.profiles_dir`` in ``run_results.json``.
 
-        1.43.0 and older read it unconditionally; 1.44.0 and later catch the ``KeyError`` and fall back to the
+        1.43.0 and older read it without a fallback; 1.44.0 and later catch the ``KeyError`` and use the
         ``--profiles-dir`` lookup. Airflow's constraints pin older releases (1.43.0 with Airflow 2.10, 1.40.0 with
-        Airflow 3.1). An unknown version is treated as affected, as adding the key is harmless.
+        Airflow 3.1). An unknown version is treated as requiring it.
         """
         try:
             return Version(version("openlineage-integration-common")) < Version("1.44.0")
@@ -873,8 +873,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         Add ``args.profiles_dir`` to ``run_results.json`` when dbt did not write it.
 
         dbt 2 (dbt-oss) leaves ``profiles_dir`` out of the run results ``args``. ``openlineage-integration-common``
-        1.43.0 and older read it unconditionally, so the ``KeyError`` left the task with no inlets or outlets; 1.44.0
-        and later fall back to the same ``--profiles-dir`` lookup and do not need this.
+        1.43.0 and older read it without a fallback, so the ``KeyError`` left the task with no inlets or outlets;
+        1.44.0 and later use the same ``--profiles-dir`` lookup instead.
 
         Only called when dbt 2 is installed in the Airflow environment (``is_dbt_v2``) and the library needs it
         (``_openlineage_requires_profiles_dir_in_run_results``). ``is_dbt_v2`` does not inspect

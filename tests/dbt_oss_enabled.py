@@ -56,10 +56,6 @@ _ASYNC_DAG_NOT_ENABLED = (
     "the async mock imports dbt-bigquery's BigQueryConnectionManager in the worker process (see _NO_BQ_ADAPTER_MODULE)"
 )
 _NO_CALLBACKS = "dbt-oss dbtRunner does not support callbacks, and dbt does not plan to (https://github.com/dbt-labs/dbt/issues/13102)"
-_NO_DATASETS = (
-    "dbt-oss writes no datasets: its run_results.json has no args.profiles_dir, so the OpenLineage artifact parser raises "
-    "KeyError (logged at debug level) and the inlets and outlets stay empty (reproduced locally with dbt-oss 2.0.8)"
-)
 _TEXT_OUTPUT_NOT_PARSED = (
     "Cosmos does not parse the text output of dbt 2 in subprocess mode: it has 'Summary: 1 total | 1 warn' and "
     "'Warned test <name>', not the 'Done. WARN=N TOTAL=N' and 'Failure in test <name>' lines the parsers read "
@@ -84,10 +80,6 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[True]": _NO_PARTIAL_PARSE,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_uses_partial_parse_when_cache_is_disabled": _NO_PARTIAL_PARSE,
     "tests/operators/test_local.py::test_run_operator_caches_partial_parsing": _NO_PARTIAL_PARSE,
-    # dbt-oss writes no datasets (3)
-    "tests/operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_210": _NO_DATASETS,
-    "tests/operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards": _NO_DATASETS,
-    "tests/operators/test_local.py::test_run_operator_dataset_manual_outlets_airflow_210": _NO_DATASETS,
     # dbt-bigquery module cannot be installed next to dbt-oss (1)
     "tests/operators/_asynchronous/test_bigquery.py::test_mock_bigquery_adapter": _NO_BQ_ADAPTER_MODULE,
     # The async example DAG is not enabled in this job (1)

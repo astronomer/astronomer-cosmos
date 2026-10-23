@@ -1624,6 +1624,88 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_get_proc
     assert "Unable to parse OpenLineage events" in caplog.text
 
 
+def _write_run_results(path: Path, args: dict | None) -> None:
+    path.write_text(json.dumps({"metadata": {}, "results": [], "args": args} if args is not None else {"results": []}))
+
+
+@pytest.mark.parametrize(
+    "dbt_command_line, env, expected",
+    [
+        (["dbt", "build", "--profiles-dir", "/tmp/profiles"], {}, "/tmp/profiles"),
+        (["dbt", "build", "--profiles-dir=/tmp/profiles"], {}, "/tmp/profiles"),
+        (["dbt", "build"], {"DBT_PROFILES_DIR": "/from/env"}, "/from/env"),
+        (["dbt", "build", "--profiles-dir", "/from/command"], {"DBT_PROFILES_DIR": "/from/env"}, "/from/command"),
+    ],
+)
+def test_add_missing_profiles_dir_to_run_results(tmp_path, dbt_command_line, env, expected):
+    """dbt 2 (dbt-oss) does not write ``args.profiles_dir``, which openlineage-integration-common reads."""
+    run_results = tmp_path / "run_results.json"
+    _write_run_results(run_results, {"command": "build", "which": "build"})
+
+    with patch.dict(os.environ, env):
+        DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, dbt_command_line)
+
+    args = json.loads(run_results.read_text())["args"]
+    assert args == {"command": "build", "which": "build", "profiles_dir": expected}
+
+
+def test_add_missing_profiles_dir_to_run_results_keeps_the_value_dbt_wrote(tmp_path):
+    run_results = tmp_path / "run_results.json"
+    _write_run_results(run_results, {"which": "run", "profiles_dir": "/written/by/dbt"})
+
+    DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, ["dbt", "run", "--profiles-dir", "/x"])
+
+    assert json.loads(run_results.read_text())["args"]["profiles_dir"] == "/written/by/dbt"
+
+
+@pytest.mark.parametrize("content", [None, "not json", json.dumps({"results": []}), json.dumps({"args": "text"})])
+def test_add_missing_profiles_dir_to_run_results_ignores_unusable_files(tmp_path, content):
+    run_results = tmp_path / "run_results.json"
+    if content is not None:
+        run_results.write_text(content)
+
+    DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, ["dbt", "run", "--profiles-dir", "/x"])
+
+    assert (run_results.read_text() if content is not None else None) == content
+
+
+def test_add_missing_profiles_dir_to_run_results_without_a_profiles_dir_or_path(tmp_path):
+    run_results = tmp_path / "run_results.json"
+    _write_run_results(run_results, {"which": "run"})
+    before = run_results.read_text()
+
+    with patch.dict(os.environ, {}, clear=False) as env:
+        env.pop("DBT_PROFILES_DIR", None)
+        DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, ["dbt", "run"])
+        DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(None, ["dbt", "run", "--profiles-dir", "/x"])
+
+    assert run_results.read_text() == before
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
+def test_calculate_openlineage_events_completes_adds_the_profiles_dir_before_parsing(
+    mock_get_processor, mock_add_profiles_dir
+):
+    instance = mock_get_processor.return_value.return_value
+    instance.run_result_path = "/project/target/run_results.json"
+
+    def parse():
+        mock_add_profiles_dir.assert_called_once()  # the key must be there before the library reads the file
+        return MagicMock(completes=[])
+
+    instance.parse.side_effect = parse
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, should_store_compiled_sql=False
+    )
+    command = ["dbt", "run", "--profiles-dir", "/profiles"]
+
+    dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=command)
+
+    mock_add_profiles_dir.assert_called_once_with("/project/target/run_results.json", command)
+    assert instance.parse.called
+
+
 def test_dbt_local_artifact_processor_imported_lazily():
     """Regression: importing ``cosmos.operators.local`` must not import the heavy openlineage
     ``DbtLocalArtifactProcessor`` at module load (that import is what we defer to keep it off the DAG-parse path).

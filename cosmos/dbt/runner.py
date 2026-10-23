@@ -227,7 +227,8 @@ def extract_message_by_status(
     for node_result in result.result.results:
         if _status_value(node_result) in status_levels:
             node_names.append(_node_label(node_result))
-            node_results.append(str(node_result.message))
+            # dbt 2 source freshness results (``FreshnessResultsNode``) have no ``message``: use their status instead.
+            node_results.append(str(getattr(node_result, "message", _status_value(node_result))))
 
     return node_names, node_results
 

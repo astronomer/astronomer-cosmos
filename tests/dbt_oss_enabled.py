@@ -13,8 +13,8 @@ from pathlib import Path
 # Example DAG files (under dev/dags) that run in the dbt-oss job. A DAG that does not parse under dbt-oss would make the
 # example DAG tests fail at collection time, so the files that are not listed are added to .airflowignore.
 # cosmos_profile_mapping.py is left out on purpose: it builds its profile from the Postgres Airflow connection
-# `example_conn`, which this job does not have. basic_cosmos_task_group.py, dbt_docs.py and example_duckdb_dag.py
-# are left out until dbt-oss handles their --vars, docs generate and duckdb seed. example_cosmos_sources.py (its own
+# `example_conn`, which this job does not have. basic_cosmos_task_group.py and dbt_docs.py are left out until dbt-oss
+# handles their --vars and docs generate. example_cosmos_sources.py (its own
 # Postgres profile) and simple_dag_async.py (async) are left out too.
 ENABLED_DAG_FILES = frozenset(
     {
@@ -25,8 +25,10 @@ ENABLED_DAG_FILES = frozenset(
         "cosmos_manifest_example.py",
         "cosmos_manifest_selectors_example.py",
         "cosmos_seed_dag.py",
+        "example_cosmos_cleanup_dag.py",
         "example_cosmos_dbt_build.py",
         "example_dbt_deps.py",
+        "example_duckdb_dag.py",
         "example_model_version.py",
         "example_seed_rendering.py",
         "example_source_pruning.py",

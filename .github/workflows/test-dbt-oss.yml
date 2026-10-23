@@ -213,7 +213,9 @@ jobs:
           PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH: s3://cosmos-remote-cache/target_compiled/
           AIRFLOW__COSMOS__REMOTE_TARGET_PATH_CONN_ID: aws_s3_conn
-          AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
+          # A duckdb file shared by every task. Without a `host` the profile has no path, and dbt-oss then opens a new
+          # in-memory database for each dbt command, so a seed in one task is not found by the model in the next.
+          AIRFLOW_CONN_DUCKDB_DEFAULT: '{"conn_type": "duckdb", "host": "/tmp/cosmos_dbt_oss.duckdb"}'
 
       - name: Delete the BigQuery dataset
         # Runs on success, failure and cancellation, but not when the create step never ran (for example when checkout or

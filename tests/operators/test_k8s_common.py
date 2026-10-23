@@ -121,6 +121,8 @@ def test_container_resources_dict_converted():
     (
         pytest.param("10:29:03  Done. PASS=5 WARN=3 ERROR=0 SKIP=0 NO-OP=0 TOTAL=8", 3, id="found"),
         pytest.param("10:29:03  Done. PASS=5 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=5", 0, id="zero"),
+        pytest.param("10:29:03  Summary: 4 total | 1 success | 1 warn | 2 error", 1, id="dbt_v2_found"),
+        pytest.param("10:29:03  Summary: 2 total | 2 success", None, id="dbt_v2_no_warn"),
         pytest.param("some unrelated log output", None, id="not_found"),
     ),
 )

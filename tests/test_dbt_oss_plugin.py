@@ -2,6 +2,7 @@ import importlib
 import sys
 
 import pytest
+from airflow.exceptions import AirflowNotFoundException
 
 import cosmos.profiles
 import cosmos.profiles.postgres
@@ -16,6 +17,7 @@ def dbt_oss_plugin(monkeypatch):
     for module in (cosmos.profiles, cosmos.profiles.postgres):
         # Importing the plugin replaces this attribute, and monkeypatch puts the original back.
         monkeypatch.setattr(module, "PostgresUserPasswordProfileMapping", module.PostgresUserPasswordProfileMapping)
+    monkeypatch.setattr(cosmos.profiles, "get_automatic_profile_mapping", cosmos.profiles.get_automatic_profile_mapping)
     already_loaded = sys.modules.pop(PLUGIN, None)  # the dbt-oss job loads it through PYTEST_PLUGINS
     yield importlib.import_module(PLUGIN)
     sys.modules.pop(PLUGIN, None)
@@ -39,3 +41,13 @@ def test_bigquery_swap_keeps_schema_in_profile_args_but_not_in_the_profile(monke
     assert mapping.profile_args["schema"] == "public"
     assert mapping.profile["dataset"] == "job_dataset"
     assert "schema" not in mapping.profile
+
+
+def test_example_conn_gets_the_bigquery_mapping_and_other_connections_the_real_lookup(monkeypatch, dbt_oss_plugin):
+    monkeypatch.setenv("COSMOS_TEST_BIGQUERY_DATASET", "job_dataset")
+
+    mapping = cosmos.profiles.get_automatic_profile_mapping("example_conn", {})
+
+    assert isinstance(mapping, GoogleCloudServiceAccountDictProfileMapping)
+    with pytest.raises(AirflowNotFoundException, match="not_a_registered_conn"):
+        cosmos.profiles.get_automatic_profile_mapping("not_a_registered_conn", {})

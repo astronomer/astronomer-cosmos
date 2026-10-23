@@ -24,7 +24,7 @@ KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
 # DAGs whose source tables must be seeded first; run via the dedicated tests below.
 DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag", "source_pruning_dag"]
 # DAGs whose source freshness check reads altered_jaffle_shop's raw_orders and can run before the DAG's own seed task.
-DAGS_NEEDING_SEEDED_ALTERED_JAFFLE_SHOP = {"example_watcher_with_freshness"}
+DAGS_NEEDING_SEEDED_ALTERED_JAFFLE_SHOP = {"example_watcher_with_freshness", "source_rendering_dag"}
 IGNORED_DAG_FILES = [
     "performance_dag.py",
     "jaffle_shop_kubernetes.py",

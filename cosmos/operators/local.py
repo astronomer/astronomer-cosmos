@@ -852,6 +852,37 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             # Exercised only when ``openlineage-integration-common`` is absent/broken, which CI always installs.
             return None
 
+    @staticmethod
+    def _add_missing_profiles_dir_to_run_results(run_results_path: Any, dbt_command_line: list[str] | None) -> None:
+        """
+        Add ``args.profiles_dir`` to ``run_results.json`` when dbt did not write it.
+
+        dbt 2 (dbt-oss) leaves ``profiles_dir`` out of the run results ``args``, and ``openlineage-integration-common``
+        reads it unconditionally, so the ``KeyError`` left the task with no inlets or outlets. The directory is the one
+        passed with ``--profiles-dir`` (or ``DBT_PROFILES_DIR``), the same lookup the library falls back to when the
+        profile file is not found in ``profiles_dir``. The file is in the temporary project directory of the task.
+        """
+        if not isinstance(run_results_path, (str, os.PathLike)):
+            return
+        command = dbt_command_line or []
+        profiles_dir = os.environ.get("DBT_PROFILES_DIR")
+        for index, argument in enumerate(command):
+            if argument == "--profiles-dir" and index + 1 < len(command):
+                profiles_dir = command[index + 1]
+            elif argument.startswith("--profiles-dir="):
+                profiles_dir = argument.split("=", 1)[1]
+        if not profiles_dir:
+            return
+        try:
+            run_results = json.loads(Path(run_results_path).read_text())
+            args = run_results.get("args")
+            if not isinstance(args, dict) or "profiles_dir" in args:
+                return
+            args["profiles_dir"] = profiles_dir
+            Path(run_results_path).write_text(json.dumps(run_results))
+        except (OSError, ValueError):
+            logger.debug("Unable to add profiles_dir to %s", run_results_path, exc_info=True)
+
     def calculate_openlineage_events_completes(
         self,
         env: dict[str, str | os.PathLike[Any] | bytes],
@@ -895,6 +926,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # Do not raise exception if a command is unsupported, following the openlineage-dbt processor:
         # https://github.com/OpenLineage/OpenLineage/blob/bdcaf828ebc117e0e5ffc5fab44ff8886eb7836b/integration/common/openlineage/common/provider/dbt/processor.py#L141
         openlineage_processor.should_raise_on_unsupported_command = False
+        self._add_missing_profiles_dir_to_run_results(
+            getattr(openlineage_processor, "run_result_path", None), dbt_command_line
+        )
         try:
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes

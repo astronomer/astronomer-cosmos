@@ -80,6 +80,7 @@ Bug Fixes
 * Skip dbt event callbacks for ``run-operation`` on dbt 2 by @pankajastro in #3089
 * Fix a circular import when ``cosmos.constants`` is imported before Airflow by @tatiana in #3087
 * Render source tests as a separate task under ``TestBehavior.BUILD`` by @developer-rpai in #3037
+* Compare dbt node statuses case-insensitively in ``ExecutionMode.WATCHER`` and enable the watcher tests on dbt-oss, so a capitalised ``Warn`` or ``Error`` from dbt 2 is recognised by the source sensor and the default freshness callback by @pankajastro in #3088
 
 Docs
 
@@ -110,10 +111,10 @@ Others
 * Run Snowflake CI as ``OSSUSER`` in ``OSS.COSMOS_CI`` with a key pair by @tatiana in #3075
 * Fix the pre-commit black failure on ``main`` by @tatiana in #3077
 * Show the Runtime alpha tag in the ``test-runtime-alpha`` run name and summary by @jedcunningham in #3078
-* Dependency updates by @dependabot and @pre-commit-ci in #2854, #2856, #2866, #2872, #2882, #2894, #2897, #2898, #2899, #2907, #2909, #2911, #2912, #2915, #2916, #2919, #2922, #2923, #2924, #2929, #2934, #2937, #2941, #2943, #2946, #2949, #2951, #2954, #2955, #2958, #2963, #2971, #2973, #2974, #2975, #2984, #2985, #2987, #2989, #2994, #3002, #3009, #3010, #3012, #3013, #3014, #3017, #3019, #3020, #3026, #3028, #3029, #3032, #3033, #3039, #3053, #3054, #3056, #3057, #3064, #3065, #3066, #3067, #3074, and #3079
 * Unskip dbt-oss integration tests for dbt ls and profile schema by @pankajastro in #3083
 * Run the integration tests against dbt-oss on BigQuery by @pankajastro in #3046
 * Run unit tests against dbt-oss in CI by @pankajastro in #3052
+* Dependency updates by @dependabot and @pre-commit-ci in #2854, #2856, #2866, #2872, #2882, #2894, #2897, #2898, #2899, #2907, #2909, #2911, #2912, #2915, #2916, #2919, #2922, #2923, #2924, #2929, #2934, #2937, #2941, #2943, #2946, #2949, #2951, #2954, #2955, #2958, #2963, #2971, #2973, #2974, #2975, #2984, #2985, #2987, #2989, #2994, #3002, #3009, #3010, #3012, #3013, #3014, #3017, #3019, #3020, #3026, #3028, #3029, #3032, #3033, #3039, #3053, #3054, #3056, #3057, #3064, #3065, #3066, #3067, #3074, and #3079
 
 1.15.1 (2026-08-04)
 -------------------

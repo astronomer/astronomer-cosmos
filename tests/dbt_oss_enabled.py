@@ -65,7 +65,6 @@ _TEXT_OUTPUT_NOT_PARSED = (
     "(reproduced locally with dbt-oss 2.0.8)"
 )
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
-_MODEL_VERSION_ALIAS = "dbt-oss fails on this project with 'Template not found: jaffle_shop.generate_alias_name'"
 _ERROR_NOT_IN_CAPLOG = "the dbt-oss error text does not reach caplog in some cells (cause inferred, not investigated)"
 _UNKNOWN = "fails in the dbt-oss job for a cause not yet identified"
 
@@ -92,8 +91,6 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/_asynchronous/test_bigquery.py::test_mock_bigquery_adapter": _NO_BQ_ADAPTER_MODULE,
     # The async example DAG is not enabled in this job (1)
     "tests/test_example_dags.py::test_async_example_dag_without_setup_task": _ASYNC_DAG_NOT_ENABLED,
-    # dbt-oss fails on the model_version project (1)
-    "tests/test_example_dags.py::test_example_dag[example_model_version]": _MODEL_VERSION_ALIAS,
     # dbt-oss error text not in caplog (1)
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_failing_model": _ERROR_NOT_IN_CAPLOG,
     # Unknown, needs investigation (2)

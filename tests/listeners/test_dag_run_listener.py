@@ -21,6 +21,7 @@ from cosmos.listeners.dag_run_listener import (
     total_cosmos_tasks,
 )
 from cosmos.profiles import PostgresUserPasswordProfileMapping
+from tests.dbt_oss_enabled import is_bigquery_test_adapter
 from tests.utils import new_test_dag
 
 DBT_ROOT_PATH = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -233,8 +234,13 @@ def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_e
     assert metrics["test_behavior"] == "after_each"
     assert metrics["source_behavior"] == "none"
     assert metrics["profile_strategy"] == "mapping"
-    assert metrics["profile_mapping_class"] == "PostgresUserPasswordProfileMapping"
-    assert metrics["database"] == "postgres"
+    if is_bigquery_test_adapter():
+        # The dbt-oss job runs on BigQuery: tests/dbt_oss_plugin.py swaps the Postgres mapping for a BigQuery one.
+        assert metrics["profile_mapping_class"] == "BigQueryInPlaceOfPostgresProfileMapping"
+        assert metrics["database"] == "bigquery"
+    else:
+        assert metrics["profile_mapping_class"] == "PostgresUserPasswordProfileMapping"
+        assert metrics["database"] == "postgres"
 
 
 @pytest.mark.integration

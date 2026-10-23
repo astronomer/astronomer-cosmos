@@ -864,6 +864,7 @@ def _add_watcher_producer_task(
     render_config: RenderConfig | None = None,
     execution_mode: ExecutionMode = ExecutionMode.WATCHER,
     tests_per_model: TestsPerModel | None = None,
+    children_per_node: dict[str, list[str]] | None = None,
 ) -> BaseOperator:
     """
     Create the producer task for the watcher execution mode and add it to the tasks_map.
@@ -878,6 +879,8 @@ def _add_watcher_producer_task(
     producer_task_args["emit_datasets"] = False
     if tests_per_model is not None:
         producer_task_args["tests_per_model"] = tests_per_model
+    if children_per_node and execution_mode == ExecutionMode.WATCHER:
+        producer_task_args["children_per_node"] = children_per_node
     if render_config is not None and render_config.source_rendering_behavior != SourceRenderingBehavior.NONE:
         producer_task_args["_check_source_freshness"] = True
 
@@ -1244,6 +1247,7 @@ def build_airflow_graph(
     async_py_requirements: list[str] | None = None,
     execution_config: ExecutionConfig | None = None,
     tests_per_model: TestsPerModel | None = None,
+    children_per_node: dict[str, list[str]] | None = None,
 ) -> dict[str, TaskGroup | BaseOperator]:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -1311,6 +1315,7 @@ def build_airflow_graph(
             render_config=render_config,
             execution_mode=execution_mode,
             tests_per_model=tests_per_model,
+            children_per_node=children_per_node,
         )
 
     for node_id, node in nodes.items():

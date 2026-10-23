@@ -2333,7 +2333,7 @@ def test_dbt_dag_with_watcher(caplog):
     # produce the "OK loaded seed file" event that Cosmos re-logs for dbt 1.x, so each dbt version has its own message.
     # dbt prints the schema before the table: "public" on Postgres, the dataset on BigQuery.
     if is_dbt_v2():
-        log_message = re.compile(r"Succeeded seed \S+\.raw_orders")
+        log_message = re.compile(r"Succeeded seed\s+\S+\.raw_orders")
     else:
         log_message = re.compile(r"OK loaded seed file \S+\.raw_orders")
     assert log_message.search(caplog.text)

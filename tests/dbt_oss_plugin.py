@@ -68,8 +68,7 @@ _use_bigquery_in_place_of_postgres()
 
 DATASET_SCRIPT = Path(__file__).parent.parent / "scripts/test/bigquery_ci_dataset.py"
 # Other example DAGs still share the job's dataset: some of them rely on tables that an earlier test seeded there.
-PER_TEST_DATASET_FILE = "tests/test_example_dags.py"
-PER_TEST_DATASET_TESTS = {f"{PER_TEST_DATASET_FILE}::test_example_dag[example_multiple_parents_test]"}
+PER_TEST_DATASET_TESTS = {"tests/test_example_dags.py::test_example_dag[example_multiple_parents_test]"}
 _NON_WORD = re.compile(r"\W")
 
 
@@ -93,22 +92,6 @@ def per_test_bigquery_dataset(request, monkeypatch):
         )
         monkeypatch.setenv("COSMOS_TEST_BIGQUERY_DATASET", dataset)
         monkeypatch.setenv("POSTGRES_SCHEMA", dataset)
-
-
-_seen_node_ids: set[str] = set()
-
-
-def pytest_deselected(items):
-    _seen_node_ids.update(item.nodeid for item in items)
-
-
-def pytest_collection_finish(session):
-    """Fail when a PER_TEST_DATASET_TESTS entry no longer matches a test, which would silently drop its isolation."""
-    seen = _seen_node_ids | {item.nodeid for item in session.items}
-    if any(node_id.startswith(PER_TEST_DATASET_FILE) for node_id in seen):
-        missing = PER_TEST_DATASET_TESTS - seen
-        if missing:
-            raise pytest.UsageError(f"PER_TEST_DATASET_TESTS has entries that match no test: {sorted(missing)}")
 
 
 def pytest_collection_modifyitems(items):

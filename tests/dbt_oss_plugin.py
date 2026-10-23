@@ -69,6 +69,7 @@ _use_bigquery_in_place_of_postgres()
 DATASET_SCRIPT = Path(__file__).parent.parent / "scripts/test/bigquery_ci_dataset.py"
 # Other example DAGs still share the job's dataset: some of them rely on tables that an earlier test seeded there.
 PER_TEST_DATASET_TESTS = {
+    # Its latest version pointer view `customers` collides with a `customers` table left in the shared dataset.
     "tests/test_example_dags.py::test_example_dag[example_model_version]",
     "tests/test_example_dags.py::test_example_dag[example_multiple_parents_test]",
 }

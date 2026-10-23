@@ -45,9 +45,10 @@ ENABLED_DAG_FILES = frozenset(
 
 # Why a test is skipped in the dbt-oss job.
 _POSTGRES_ENV = "uses a profiles.yml or sources.yml that reads POSTGRES_* variables, which this job does not set"
-_NO_BQ_ADAPTER_MODULE = (
-    "needs dbt-bigquery's dbt.adapters.bigquery, which cannot be installed next to dbt-oss (both provide the dbt package); "
-    "the async mock patches BigQueryConnectionManager, in the worker process when the setup task is disabled"
+_NO_BQ_ADAPTER_MODULE = "needs dbt-bigquery's dbt.adapters.bigquery, which cannot be installed next to dbt-oss (both provide the dbt package)"
+_ASYNC_DAG_NOT_ENABLED = (
+    "its DAG file simple_dag_async.py is not enabled in this job (BOSS-787); once enabled, with the setup task disabled "
+    "the async mock imports dbt-bigquery's BigQueryConnectionManager in the worker process (see _NO_BQ_ADAPTER_MODULE)"
 )
 _NO_CALLBACKS = "dbt-oss dbtRunner does not support callbacks, and dbt does not plan to (https://github.com/dbt-labs/dbt/issues/13102)"
 _NO_DATASETS = (
@@ -107,9 +108,10 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_210": _NO_DATASETS,
     "tests/operators/test_local.py::test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards": _NO_DATASETS,
     "tests/operators/test_local.py::test_run_operator_dataset_manual_outlets_airflow_210": _NO_DATASETS,
-    # dbt-bigquery module cannot be installed next to dbt-oss (2)
+    # dbt-bigquery module cannot be installed next to dbt-oss (1)
     "tests/operators/_asynchronous/test_bigquery.py::test_mock_bigquery_adapter": _NO_BQ_ADAPTER_MODULE,
-    "tests/test_example_dags.py::test_async_example_dag_without_setup_task": _NO_BQ_ADAPTER_MODULE,
+    # The async example DAG is not enabled in this job (1)
+    "tests/test_example_dags.py::test_async_example_dag_without_setup_task": _ASYNC_DAG_NOT_ENABLED,
     # dbt-oss fails on the model_version project (1)
     "tests/test_example_dags.py::test_example_dag[example_model_version]": _MODEL_VERSION_ALIAS,
     # dbt-oss view over a table left by an earlier test (1)

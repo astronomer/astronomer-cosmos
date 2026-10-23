@@ -880,10 +880,11 @@ def test_real_agent_never_sees_an_unredacted_tool_error():
     seen = []
 
     def handler(messages, info):
-        retries = [p for m in messages for p in m.parts if p.part_kind == "retry-prompt"]
-        if not retries:
+        # pydantic-ai 2.60 reports a tool's ModelRetry as a tool-return, earlier versions as a retry-prompt.
+        errors = [p for m in messages for p in m.parts if p.part_kind in ("retry-prompt", "tool-return")]
+        if not errors:
             return ModelResponse(parts=[ToolCallPart("get_schema", {"table_name": "raw.orders"})])
-        seen.extend(str(p.content) for p in retries)
+        seen.extend(str(p.content) for p in errors)
         return _answer(info)
 
     agent = Agent(

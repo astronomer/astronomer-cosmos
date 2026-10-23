@@ -70,9 +70,6 @@ _TEXT_OUTPUT_NOT_PARSED = (
 )
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
 _MODEL_VERSION_ALIAS = "dbt-oss fails on this project with 'Template not found: jaffle_shop.generate_alias_name'"
-_VIEW_OVER_TABLE = (
-    "dbt-oss's BigQuery view materialization will not replace a table that an earlier test left in the job's dataset"
-)
 _ERROR_NOT_IN_CAPLOG = "the dbt-oss error text does not reach caplog in some cells (cause inferred, not investigated)"
 _NEEDS_SEEDED_TABLE = (
     "needs the raw_orders table, which a seed task in the DAG creates but its source freshness check can run before, so it "
@@ -111,8 +108,6 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/test_example_dags.py::test_async_example_dag_without_setup_task": _ASYNC_DAG_NOT_ENABLED,
     # dbt-oss fails on the model_version project (1)
     "tests/test_example_dags.py::test_example_dag[example_model_version]": _MODEL_VERSION_ALIAS,
-    # dbt-oss view over a table left by an earlier test (1)
-    "tests/test_example_dags.py::test_example_dag[example_multiple_parents_test]": _VIEW_OVER_TABLE,
     # Depends on a table that an earlier test seeds in the job's dataset (1)
     "tests/test_example_dags.py::test_example_dag[source_rendering_dag]": _NEEDS_SEEDED_TABLE,
     # dbt-oss error text not in caplog (1)

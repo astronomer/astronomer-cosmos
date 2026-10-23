@@ -6,6 +6,8 @@ BigQuery. It loads this plugin through ``PYTEST_PLUGINS=tests.dbt_oss_plugin``, 
 to ``COSMOS_TEST_BIGQUERY_DATASET``, and the tests that need Postgres itself are skipped. The example projects that
 have their own Postgres ``profiles.yml`` are covered by a second mechanism: the workflow rewrites those files to
 BigQuery with ``scripts/test/bigquery_ci_profiles.py``, which this plugin cannot do because they are not Python mappings.
+The tests in ``PER_TEST_DATASET_TESTS`` get a dataset of their own, named after the job's one, so they do not depend on
+what another test left.
 
 Which example DAGs run, and which tests are skipped for dbt-oss, is listed in ``tests/dbt_oss_enabled.py``.
 """
@@ -13,6 +15,10 @@ Which example DAGs run, and which tests are skipped for dbt-oss, is listed in ``
 from __future__ import annotations
 
 import os
+import re
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -47,15 +53,45 @@ def _use_bigquery_in_place_of_postgres() -> None:
 
         @property
         def profile(self):
-            # BigQuery has no schema: the job's dataset is used instead. The caller's `schema` stays in `profile_args`
-            # so the tests that read it still see it, but it never reaches the dbt profile.
-            return {key: value for key, value in super().profile.items() if key != "schema"}
+            # BigQuery has no schema: the dataset is used instead. The caller's `schema` stays in `profile_args` so the
+            # tests that read it still see it, but it never reaches the dbt profile. The dataset is read here, not in
+            # __init__, because the DAGs are parsed before the per-test dataset is set.
+            profile = {key: value for key, value in super().profile.items() if key != "schema"}
+            profile["dataset"] = os.environ["COSMOS_TEST_BIGQUERY_DATASET"]
+            return profile
 
     cosmos.profiles.PostgresUserPasswordProfileMapping = BigQueryInPlaceOfPostgresProfileMapping
     cosmos.profiles.postgres.PostgresUserPasswordProfileMapping = BigQueryInPlaceOfPostgresProfileMapping
 
 
 _use_bigquery_in_place_of_postgres()
+
+DATASET_SCRIPT = Path(__file__).parent.parent / "scripts/test/bigquery_ci_dataset.py"
+# Other example DAGs still share the job's dataset: some of them rely on tables that an earlier test seeded there.
+PER_TEST_DATASET_TESTS = {"tests/test_example_dags.py::test_example_dag[example_multiple_parents_test]"}
+_NON_WORD = re.compile(r"\W")
+
+
+@pytest.fixture(autouse=True)
+def per_test_bigquery_dataset(request, monkeypatch):
+    """Give the tests in PER_TEST_DATASET_TESTS their own dataset, created like the job's one.
+
+    The job's cleanup step deletes the datasets that start with the job's one. POSTGRES_SCHEMA follows the dataset
+    because the sources of altered_jaffle_shop read it.
+    """
+    if request.node.nodeid in PER_TEST_DATASET_TESTS:
+        job_dataset = os.environ["COSMOS_TEST_BIGQUERY_DATASET"]
+        dataset = f"{job_dataset}_{_NON_WORD.sub('_', request.node.name)}"
+        env = {
+            **os.environ,
+            "COSMOS_TEST_BIGQUERY_DATASET": dataset,
+            "BIGQUERY_PROJECT": os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", "astronomer-dag-authoring"),
+        }
+        subprocess.run(
+            [sys.executable, "-I", str(DATASET_SCRIPT), "create", "--max-start-jitter", "0"], env=env, check=True
+        )
+        monkeypatch.setenv("COSMOS_TEST_BIGQUERY_DATASET", dataset)
+        monkeypatch.setenv("POSTGRES_SCHEMA", dataset)
 
 
 def pytest_collection_modifyitems(items):

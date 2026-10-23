@@ -20,18 +20,22 @@ from cosmos import (
     DbtSeedLocalOperator,
     ProfileConfig,
 )
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 # Set contains to be used by local operators
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 DBT_PROJ_DIR = DBT_ROOT_PATH / "jaffle_shop"
-DBT_PROFILE_PATH = DBT_PROJ_DIR / "profiles.yml"
 DBT_ARTIFACT = DBT_PROJ_DIR / "target"
 
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
-    profiles_yml_filepath=DBT_PROFILE_PATH,
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="example_conn",
+        profile_args={"schema": "public"},
+        disable_event_tracking=True,
+    ),
 )
 
 with DAG("example_outlets", start_date=datetime(2024, 1, 1), catchup=False) as dag:

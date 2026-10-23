@@ -30,6 +30,7 @@ ENABLED_DAG_FILES = frozenset(
         "example_dbt_deps.py",
         "example_duckdb_dag.py",
         "example_model_version.py",
+        "example_outlets.py",
         "example_seed_rendering.py",
         "example_source_pruning.py",
         "example_source_rendering.py",
@@ -39,6 +40,7 @@ ENABLED_DAG_FILES = frozenset(
         "example_tasks_map.py",
         "example_tests_multiple_parents.py",
         "example_watcher.py",
+        "user_defined_profile.py",
         "watcher_with_freshness_check.py",
     }
 )

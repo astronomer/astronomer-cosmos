@@ -15,7 +15,8 @@ from pathlib import Path
 # cosmos_profile_mapping.py is left out on purpose: it builds its profile from the Postgres Airflow connection
 # `example_conn`, which this job does not have. basic_cosmos_task_group.py and dbt_docs.py are left out until dbt-oss
 # handles their --vars and docs generate. example_cosmos_sources.py (its own
-# Postgres profile) and simple_dag_async.py (async) are left out too.
+# Postgres profile) and simple_dag_async.py (async) are left out too. user_defined_profile.py is left out because it
+# is the example of a user-supplied profiles.yml (profiles_yml_filepath), which the BigQuery profile swap cannot cover.
 ENABLED_DAG_FILES = frozenset(
     {
         "basic_cosmos_dag.py",
@@ -30,6 +31,7 @@ ENABLED_DAG_FILES = frozenset(
         "example_dbt_deps.py",
         "example_duckdb_dag.py",
         "example_model_version.py",
+        "example_outlets.py",
         "example_seed_rendering.py",
         "example_source_pruning.py",
         "example_source_rendering.py",

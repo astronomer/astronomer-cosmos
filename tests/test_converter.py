@@ -12,7 +12,7 @@ from packaging.version import Version
 
 from cosmos import DbtDag
 from cosmos.airflow.compatibility import EmptyOperator
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AIConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     AIRFLOW_VERSION,
     DbtResourceType,
@@ -287,6 +287,45 @@ def test_validate_arguments_schema_in_task_args():
         project_config=project_config,
     )
     assert profile_config.profile_mapping.profile_args["schema"] == "abcd"
+
+
+AI_CONFIG = AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
+
+
+def _validate_ai_config(execution_mode, ai_config):
+    validate_arguments(
+        execution_config=ExecutionConfig(execution_mode=execution_mode),
+        profile_config=MagicMock(),
+        render_config=RenderConfig(),
+        task_args={"ai_config": ai_config},
+        project_config=ProjectConfig(manifest_path=SAMPLE_DBT_MANIFEST, project_name="something"),
+    )
+
+
+@pytest.mark.parametrize(
+    "execution_mode",
+    [
+        ExecutionMode.KUBERNETES,
+        ExecutionMode.DOCKER,
+        ExecutionMode.AIRFLOW_ASYNC,
+        ExecutionMode.GCP_GKE,
+        # The WATCHER producer runs a single dbt build for the DAG, so there is no per-task failure to diagnose.
+        ExecutionMode.WATCHER,
+    ],
+)
+def test_validate_arguments_ai_config_unsupported_execution_mode_raises(execution_mode):
+    with pytest.raises(CosmosValueError, match="only supported with ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV"):
+        _validate_ai_config(execution_mode, AI_CONFIG)
+
+
+@pytest.mark.parametrize("execution_mode", [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV])
+def test_validate_arguments_ai_config_supported_execution_mode_is_accepted(execution_mode):
+    _validate_ai_config(execution_mode, AI_CONFIG)
+
+
+@pytest.mark.parametrize("execution_mode", [ExecutionMode.KUBERNETES, ExecutionMode.WATCHER])
+def test_validate_arguments_ai_config_without_diagnosis_is_accepted_in_any_execution_mode(execution_mode):
+    _validate_ai_config(execution_mode, AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=False))
 
 
 parent_seed = DbtNode(
@@ -1857,3 +1896,132 @@ def test_operator_args_emit_datasets_overrides_render_config(
 
     task_args = mock_build_airflow_graph.call_args.kwargs["task_args"]
     assert task_args["emit_datasets"] == expected_emit_datasets
+
+
+def _convert_with_ai_config(execution_mode, *, ai_config=None, operator_args=None, emit_datasets=True):
+    dag = DAG("sample_dag", start_date=datetime(2024, 4, 16))
+    DbtToAirflowConverter(
+        dag=dag,
+        nodes=nodes,
+        project_config=ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix()),
+        profile_config=sample_profile_config,
+        execution_config=ExecutionConfig(execution_mode=execution_mode),
+        render_config=RenderConfig(emit_datasets=emit_datasets),
+        operator_args=operator_args,
+        ai_config=ai_config,
+    )
+    return dag
+
+
+@pytest.mark.parametrize(
+    "execution_mode,operator_args",
+    [(ExecutionMode.LOCAL, {}), (ExecutionMode.VIRTUALENV, {"py_requirements": ["dbt-postgres"]})],
+)
+@pytest.mark.parametrize("ai_config_source", ["argument", "operator_args"])
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_forwards_ai_config_to_the_dbt_tasks(
+    mock_load_dbt_graph, ai_config_source, execution_mode, operator_args
+):
+    """Every dbt task of the supported modes holds the AIConfig, however it was passed."""
+    if ai_config_source == "argument":
+        dag = _convert_with_ai_config(execution_mode, ai_config=AI_CONFIG, operator_args=operator_args)
+    else:
+        dag = _convert_with_ai_config(execution_mode, operator_args={**operator_args, "ai_config": AI_CONFIG})
+
+    dbt_tasks = [task for task in dag.tasks if hasattr(task, "ai_config")]
+    assert dbt_tasks
+    assert all(task.ai_config is AI_CONFIG for task in dbt_tasks)
+
+
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_dbt_task_group_forwards_ai_config_to_its_tasks(mock_load_dbt_graph):
+    """``ai_config`` is a converter argument, so ``DbtTaskGroup`` must pass it on and not hand it to ``TaskGroup``."""
+    from cosmos import DbtTaskGroup
+
+    with DAG("sample_dag", start_date=datetime(2024, 4, 16)) as dag:
+        DbtTaskGroup(
+            project_config=ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT.as_posix()),
+            profile_config=sample_profile_config,
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.LOCAL),
+            ai_config=AI_CONFIG,
+        )
+
+    dbt_tasks = [task for task in dag.tasks if hasattr(task, "ai_config")]
+    assert dbt_tasks
+    assert all(task.ai_config is AI_CONFIG for task in dbt_tasks)
+
+
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_without_ai_config_leaves_the_tasks_unconfigured(mock_load_dbt_graph):
+    dag = _convert_with_ai_config(ExecutionMode.LOCAL)
+
+    dbt_tasks = [task for task in dag.tasks if hasattr(task, "ai_config")]
+    assert dbt_tasks
+    assert all(task.ai_config is None for task in dbt_tasks)
+
+
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_rejects_ai_config_set_as_argument_and_in_operator_args(mock_load_dbt_graph):
+    with pytest.raises(CosmosValueError, match="both as an argument and in operator_args"):
+        _convert_with_ai_config(ExecutionMode.LOCAL, ai_config=AI_CONFIG, operator_args={"ai_config": AI_CONFIG})
+
+
+@pytest.mark.parametrize("ai_config_source", ["argument", "operator_args"])
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_accepts_a_disabled_ai_config_in_an_unsupported_execution_mode(mock_load_dbt_graph, ai_config_source):
+    """An ``AIConfig`` that does not diagnose is harmless anywhere: those operators just don't receive it."""
+    disabled = AIConfig(llm_conn_id="my_llm_conn")
+    operator_args = {"image": "sample-image"}
+    if ai_config_source == "argument":
+        dag = _convert_with_ai_config(ExecutionMode.KUBERNETES, ai_config=disabled, operator_args=operator_args)
+    else:
+        dag = _convert_with_ai_config(ExecutionMode.KUBERNETES, operator_args={**operator_args, "ai_config": disabled})
+
+    assert dag.tasks
+    assert not any(hasattr(task, "ai_config") for task in dag.tasks)
+
+
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_converter_rejects_ai_config_in_operator_args_for_unsupported_execution_mode(mock_load_dbt_graph):
+    with pytest.raises(CosmosValueError, match="only supported with"):
+        _convert_with_ai_config(
+            ExecutionMode.KUBERNETES, operator_args={"ai_config": AI_CONFIG, "image": "sample-image"}
+        )
+
+
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+def test_dag_with_ai_config_and_a_custom_output_type_serializes(mock_load_dbt_graph):
+    """``AIConfig`` is an operator argument that is not serialized: Airflow must keep serializing the DAG."""
+    from pydantic import BaseModel
+
+    class Diagnosis(BaseModel):
+        summary: str
+
+    ai_config = AIConfig(
+        llm_conn_id="my_llm_conn",
+        diagnose_on_failure=True,
+        diagnosis_output_type=Diagnosis,
+        redactor=lambda text: text,
+    )
+    # No dataset outlets: serializing those looks up dataset aliases in the metadata DB, which unit tests don't have.
+    dag = _convert_with_ai_config(ExecutionMode.LOCAL, ai_config=ai_config, emit_datasets=False)
+
+    import json
+
+    try:
+        from airflow.serialization.serialized_objects import DagSerialization as Serializer  # Airflow 3.2+
+    except ImportError:
+        from airflow.serialization.serialized_objects import SerializedDAG as Serializer
+
+    payload = json.loads(json.dumps(Serializer.to_dict(dag)))
+
+    assert len(payload["dag"]["tasks"]) == len(dag.tasks)
+    assert "ai_config" not in json.dumps(payload)
+    assert "my_llm_conn" not in json.dumps(payload)

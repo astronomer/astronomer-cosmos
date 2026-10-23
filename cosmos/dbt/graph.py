@@ -68,7 +68,7 @@ from cosmos.dbt.project import (
     has_non_empty_dependencies_file,
     remove_dags_folder_from_pythonpath,
 )
-from cosmos.dbt.selector import YamlSelectors, select_nodes
+from cosmos.dbt.selector import YamlSelectors, get_nodes_from_subset, select_node_ids, select_nodes
 from cosmos.fs import _calculate_file_checksum
 from cosmos.log import get_logger
 
@@ -83,6 +83,20 @@ def _normalize_path(path: str | None) -> str:
         return ""
     else:
         return Path(path.replace("\\", "/")).as_posix()
+
+
+def _configured_dirs(absolute_paths: list[Path], relative_paths: list[Path], project_path: Path | None) -> list[str]:
+    """
+    Returns the model/seed/snapshot directories to hand to LegacyDbtProject, relative to the project root.
+
+    ProjectConfig only builds absolute paths when its own dbt_project_path is set. When the root comes
+    from RenderConfig/ExecutionConfig instead, fall back to the relative paths the user configured, so
+    they aren't silently replaced by LegacyDbtProject's defaults.
+    """
+    dirs = _relative_dirs(absolute_paths, project_path)
+    if dirs is not None:
+        return dirs
+    return [p.as_posix() for p in relative_paths]
 
 
 def _relative_dirs(paths: list[Path], project_path: Path | None) -> list[str] | None:
@@ -536,6 +550,7 @@ class DbtGraph:
 
     nodes: dict[str, DbtNode] = dict()
     filtered_nodes: dict[str, DbtNode] = dict()
+    excluded_node_ids: set[str] = set()
     tests_per_model: TestsPerModel = dict()
     load_method: LoadMode = LoadMode.AUTOMATIC
 
@@ -814,6 +829,7 @@ class DbtGraph:
         Fundamentally, there are two different execution paths
         There is automatic, and manual.
         """
+        self.excluded_node_ids = set()
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
@@ -1145,9 +1161,15 @@ class DbtGraph:
         project = LegacyDbtProject(
             project_name=self.render_config.project_path.stem,
             dbt_root_path=self.render_config.project_path.parent.as_posix(),
-            dbt_models_dir=_relative_dirs(self.project.models_paths, self.project.dbt_project_path),
-            dbt_seeds_dir=_relative_dirs(self.project.seeds_paths, self.project.dbt_project_path),
-            dbt_snapshots_dir=_relative_dirs(self.project.snapshots_paths, self.project.dbt_project_path),
+            dbt_models_dir=_configured_dirs(
+                self.project.models_paths, self.project.models_relative_paths, self.project.dbt_project_path
+            ),
+            dbt_seeds_dir=_configured_dirs(
+                self.project.seeds_paths, self.project.seeds_relative_paths, self.project.dbt_project_path
+            ),
+            dbt_snapshots_dir=_configured_dirs(
+                self.project.snapshots_paths, self.project.snapshots_relative_paths, self.project.dbt_project_path
+            ),
             dbt_vars=self.dbt_vars,
         )
         nodes = {}
@@ -1373,21 +1395,18 @@ class DbtGraph:
                     error_message += ". Check logs - the selector may have parsing errors logged as warnings"
                 raise CosmosLoadDbtException(error_message)
 
-            self.nodes = nodes
-            self.filtered_nodes = select_nodes(
-                project_dir=project_dir,
-                nodes=nodes,
-                select=selections["select"],
-                exclude=selections["exclude"],
-            )
+            select, exclude = selections["select"], selections["exclude"]
         else:
-            self.nodes = nodes
-            self.filtered_nodes = select_nodes(
-                project_dir=project_dir,
-                nodes=nodes,
-                select=self.render_config.select,
-                exclude=self.render_config.exclude,
-            )
+            select, exclude = self.render_config.select, self.render_config.exclude
+        self.nodes = nodes
+        if not select and not exclude:
+            self.filtered_nodes = nodes
+            self.excluded_node_ids = set()
+            return
+        selected_ids, self.excluded_node_ids = select_node_ids(project_dir, nodes, select or [], exclude or [])
+        # update_node_dependency adds a test back next to every rendered parent, so it also needs the excluded tests
+        # that select never reached (for example with ``select path:models``).
+        self.filtered_nodes = get_nodes_from_subset(nodes, selected_ids - self.excluded_node_ids)
 
     def _load_manifest_from_file(self, manifest_path: Path | ObjectStoragePath) -> dict[str, Any]:
         """
@@ -1479,6 +1498,8 @@ class DbtGraph:
         tests_per_model: TestsPerModel = {}
         for _, node in list(self.nodes.items()):
             if node.resource_type == DbtResourceType.TEST:
+                if node.unique_id in self.excluded_node_ids:
+                    continue
                 for node_id in node.depends_on:
                     if node_id in self.filtered_nodes:
                         self.filtered_nodes[node_id].has_test = True

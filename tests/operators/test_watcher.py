@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import re
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -33,7 +34,7 @@ from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators._watcher.aggregation import TestResultSummary
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
-from cosmos.operators._watcher.state import DbtTestStatus
+from cosmos.operators._watcher.state import DbtTestStatus, safe_xcom_push
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
@@ -288,7 +289,7 @@ def test_dbt_producer_watcher_operator_publishes_own_cmd_flags_to_xcom(
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
-@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher._delete_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_deletes_backup_on_success(mock_execute, mock_delete, mock_persist):
     """Test that the XCom backup Variable is deleted after a successful execution."""
@@ -303,7 +304,7 @@ def test_dbt_producer_watcher_operator_deletes_backup_on_success(mock_execute, m
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
-@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher._delete_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_keeps_backup_on_failure(mock_execute, mock_delete, mock_persist):
     """On failure the backup Variable is kept (not deleted) for the retry; the on-failure callback does the flush."""
@@ -356,7 +357,7 @@ def test_dbt_consumer_watcher_sensor_execute_complete_model_not_run_logs_message
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
-@patch("cosmos.operators.watcher._restore_xcom_from_variable")
+@patch("cosmos.operators.watcher._restore_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_skips_retry_attempt(mock_execute, mock_restore):
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -367,13 +368,13 @@ def test_dbt_producer_watcher_operator_skips_retry_attempt(mock_execute, mock_re
     with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
         op.execute(context=context)
 
-    mock_restore.assert_called_once_with(context)
+    mock_restore.assert_called_once_with(context, read_task_state_store=True)
     mock_execute.assert_not_called()
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
-@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher._delete_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_success(
     mock_execute, mock_delete, mock_persist
@@ -391,9 +392,107 @@ def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_succes
     mock_delete.assert_not_called()
 
 
+class _FakeTaskStateStore:
+    def __init__(self) -> None:
+        self.values: dict[str, str] = {}
+
+    def get(self, key, default=None):
+        return self.values.get(key, default)
+
+    def set(self, key, value):
+        self.values[key] = value
+
+    def delete(self, key):
+        self.values.pop(key, None)
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_restores_from_the_task_state_store_on_retry(mock_execute):
+    """A failed first attempt leaves its statuses in the task store; the retry restores them and skips (#2771)."""
+    task_state_store = _FakeTaskStateStore()
+    first_ti = _MockTI()
+    first_context = {"ti": first_ti, "run_id": "test_run", "task_state_store": task_state_store}
+
+    def push_then_fail(context, **_):
+        safe_xcom_push(context["ti"], "model__a_status", "success")
+        raise RuntimeError("dbt build failed")
+
+    mock_execute.side_effect = push_then_fail
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    with pytest.raises(RuntimeError):
+        op.execute(context=first_context)
+    assert "cosmos_xcom_backup_0" in task_state_store.values
+
+    retry_ti = _MockTI()
+    retry_ti.try_number = 2
+    retry_context = {"ti": retry_ti, "run_id": "test_run", "task_state_store": task_state_store}
+    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+        op.execute(context=retry_context)
+
+    assert retry_ti.store["model__a_status"] == "success"
+    assert task_state_store.values == {}
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_deletes_the_task_state_store_backup_on_success(mock_execute):
+    task_state_store = _FakeTaskStateStore()
+    context = {"ti": _MockTI(), "run_id": "test_run", "task_state_store": task_state_store}
+    mock_execute.side_effect = lambda context, **_: safe_xcom_push(context["ti"], "model__a_status", "success")
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+    op.execute(context=context)
+
+    assert task_state_store.values == {}
+
+
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators._watcher.xcom.set_variable")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_not_reliable_leaves_the_task_state_store_alone(mock_execute, mock_set_variable):
+    """With enable_watcher_reliable_retry=False the task store is not used; the retry callback flushes a Variable (#2771)."""
+    task_state_store = _FakeTaskStateStore()
+    ti = _MockTI()
+    context = {"ti": ti, "run_id": "test_run", "task_state_store": task_state_store}
+    mock_execute.side_effect = lambda context, **_: safe_xcom_push(context["ti"], "model__a_status", "success")
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+
+    op.execute(context=context)
+
+    assert task_state_store.values == {}
+    assert ti._cosmos_xcom_persist_incrementally is False
+    mock_set_variable.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "task_state_store,expected_level",
+    [(MagicMock(), logging.WARNING), (None, logging.INFO)],
+    ids=["task-store-in-use", "variable-only"],
+)
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
+@patch("cosmos.operators.watcher._restore_xcom_backup", return_value=False)
+@patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
+def test_dbt_producer_watcher_operator_logs_when_no_backup_is_found_on_retry(
+    mock_execute, mock_restore, caplog, task_state_store, expected_level
+):
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    ti = _MockTI()
+    ti.try_number = 2
+    context = {"ti": ti, "run_id": "test_run"}
+    if task_state_store is not None:
+        context["task_state_store"] = task_state_store
+
+    with caplog.at_level(logging.INFO), pytest.raises(AirflowSkipException):
+        op.execute(context=context)
+
+    record = next(r for r in caplog.records if "No XCom backup found for attempt #2" in r.getMessage())
+    assert record.levelno == expected_level
+
+
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
 @patch("cosmos.operators._watcher.xcom._persist_backup")
-@patch("cosmos.operators.watcher._delete_xcom_backup_variable")
+@patch("cosmos.operators.watcher._delete_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_failure(
     mock_execute, mock_delete, mock_persist
@@ -414,7 +513,7 @@ def test_dbt_producer_watcher_operator_in_memory_skips_variable_backup_on_failur
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
-@patch("cosmos.operators.watcher._restore_xcom_from_variable")
+@patch("cosmos.operators.watcher._restore_xcom_backup")
 @patch("cosmos.operators.local.DbtLocalBaseOperator.execute")
 def test_dbt_producer_watcher_operator_in_memory_restores_on_retry(mock_execute, mock_restore):
     """In-memory mode still restores on retry: a graceful attempt-1 failure flushes via the on-failure callback (#2776)."""
@@ -426,7 +525,7 @@ def test_dbt_producer_watcher_operator_in_memory_restores_on_retry(mock_execute,
     with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
         op.execute(context=context)
 
-    mock_restore.assert_called_once_with(context)
+    mock_restore.assert_called_once_with(context, read_task_state_store=False)
     mock_execute.assert_not_called()
 
 
@@ -679,7 +778,35 @@ class TestStoreDbtStatusFromLog:
         )
 
         assert upstream_failure_skipped_ids == {"model.pkg.downstream_model"}
-        assert ti.store.get("model__pkg__downstream_model_status") == {"status": "failed", "outlet_uris": []}
+        # The consumer tells an upstream-failure skip from a real failure by this flag (#3023).
+        assert ti.store.get("model__pkg__downstream_model_status") == {
+            "status": "failed",
+            "outlet_uris": [],
+            "upstream_failure_skip": True,
+        }
+
+    def test_store_dbt_resource_status_from_log_marks_upstream_failure_skip_without_node_finished(self):
+        """Subprocess and Kubernetes producers print no ``NodeFinished`` at dbt's default log level (#3023).
+
+        The status XCom alone carries the mark, so the producer writes no extra XCom for it.
+        """
+        ti = _MockTI()
+
+        store_dbt_resource_status_from_log(
+            self._node_log_line("model.pkg.downstream_model", "skipped", "SkippingDetails"),
+            {"context": {"ti": ti}},
+            tests_per_model={},
+            test_results_per_model={},
+            upstream_failure_skipped_ids=set(),
+        )
+
+        assert ti.store == {
+            "model__pkg__downstream_model_status": {
+                "status": "failed",
+                "outlet_uris": [],
+                "upstream_failure_skip": True,
+            }
+        }
 
     def test_store_dbt_resource_status_from_log_counts_upstream_failure_skipped_tests_as_skipped(self):
         ti = _MockTI()
@@ -1261,7 +1388,7 @@ def test_producer_resolves_namespace_only_when_generating_model_uris(
         patch("cosmos.operators.watcher.get_dataset_namespace", return_value="postgres://host:5432") as mock_namespace,
         patch("cosmos.operators.local.DbtLocalBaseOperator.execute", return_value=None),
         patch("cosmos.operators.watcher.safe_xcom_push"),
-        patch("cosmos.operators.watcher._delete_xcom_backup_variable"),
+        patch("cosmos.operators.watcher._delete_xcom_backup"),
     ):
         op.execute(context)
 
@@ -1294,6 +1421,14 @@ def test_run_subprocess_sets_process_log_line_callable():
     assert op._process_log_line_callable is not None
 
 
+@pytest.fixture
+def dbt_v1():
+    """Pretend dbt-core 1.x is installed: ``run_dbt_runner`` rejects dbt 2.x, which these tests do not exercise."""
+    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=False):
+        yield
+
+
+@pytest.mark.usefixtures("dbt_v1")
 def test_run_dbt_runner_registers_event_callback():
     """run_dbt_runner appends an EventMsg→JSON→parse callback to _dbt_runner_callbacks."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -1308,6 +1443,7 @@ def test_run_dbt_runner_registers_event_callback():
     assert len(op._dbt_runner_callbacks) == 1
 
 
+@pytest.mark.usefixtures("dbt_v1")
 def test_run_dbt_runner_event_callback_calls_store_from_log():
     """The registered callback converts an EventMsg to JSON and passes it to store_dbt_resource_status_from_log."""
     op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
@@ -1336,6 +1472,7 @@ def test_run_dbt_runner_event_callback_calls_store_from_log():
     assert call_args[0][1]["context"] is context
 
 
+@pytest.mark.usefixtures("dbt_v1")
 def test_run_dbt_runner_callback_error_fails_producer_after_run(caplog):
     """A callback error must not surface as GenericExceptionOnRun inside dbt; instead it must be
     re-raised after the dbt run so it propagates through execute() and triggers the task_status
@@ -1599,6 +1736,94 @@ class TestDbtConsumerWatcherSensor:
         sensor._fallback_to_non_watcher_run.assert_not_called()
         mock_log_dbt_event.assert_not_called()
 
+    UPSTREAM_SKIP_XCOMS = {
+        "model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": [], "upstream_failure_skip": True},
+    }
+    REAL_FAILURE_XCOMS = {
+        "model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []},
+        "model__jaffle_shop__stg_orders_dbt_event": {"status": "error"},
+    }
+
+    @staticmethod
+    def make_xcom_ti(xcoms: dict, try_number: int = 1) -> MagicMock:
+        ti = MagicMock()
+        ti.try_number = try_number
+        ti.xcom_pull.side_effect = lambda *args, key=None, **kwargs: xcoms.get(key)
+        return ti
+
+    def test_poke_falls_back_on_first_try_for_upstream_failure_skip(self):
+        """#3023: dbt never ran a node it skipped for an upstream failure, so build it on try 1 instead of
+        raising and waiting one retry_delay for try 2 to fall back."""
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+
+        assert sensor.poke(context) is True
+        sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
+        sensor._get_producer_task_status.assert_called_once()
+
+    @pytest.mark.parametrize(
+        "retries, xcoms, producer_state",
+        [
+            # A retry would not fall back either, so the outcome stays a failure.
+            (0, UPSTREAM_SKIP_XCOMS, "success"),
+            # dbt ran the node and it failed.
+            (1, REAL_FAILURE_XCOMS, "success"),
+            # Only the status XCom marks an upstream-failure skip, not the dbt event.
+            (
+                1,
+                {
+                    "model__jaffle_shop__stg_orders_status": {"status": "failed", "outlet_uris": []},
+                    "model__jaffle_shop__stg_orders_dbt_event": {"status": "skipped"},
+                },
+                "success",
+            ),
+            # The producer state is unknown, so it may still write XComs.
+            (1, UPSTREAM_SKIP_XCOMS, None),
+        ],
+    )
+    def test_poke_raises_on_first_try_without_upstream_failure_skip_fallback(self, retries, xcoms, producer_state):
+        sensor = self.make_sensor(retries=retries)
+        sensor._get_producer_task_status.return_value = producer_state
+        sensor._fallback_to_non_watcher_run = MagicMock()
+        context = self.make_context(self.make_xcom_ti(xcoms))
+
+        with pytest.raises(AirflowException, match="finished with status 'failed'"):
+            sensor.poke(context)
+        sensor._fallback_to_non_watcher_run.assert_not_called()
+
+    def test_poke_keeps_polling_upstream_failure_skip_while_producer_running(self):
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "running"
+        sensor._fallback_to_non_watcher_run = MagicMock()
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+
+        assert sensor.poke(context) is False
+        sensor._fallback_to_non_watcher_run.assert_not_called()
+
+    @patch("cosmos.settings.watcher_dbt_retry_queue", "dbt_retry")
+    def test_poke_leaves_upstream_failure_skip_to_the_retry_queue(self):
+        """The cluster policy moves only retries to watcher_dbt_retry_queue, so try 1 must not run dbt elsewhere."""
+        sensor = self.make_sensor(retries=1, queue="dbt_consumer")
+        sensor._get_producer_task_status.return_value = "success"
+        sensor._fallback_to_non_watcher_run = MagicMock()
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+
+        with pytest.raises(AirflowException, match="finished with status 'failed'"):
+            sensor.poke(context)
+        sensor._fallback_to_non_watcher_run.assert_not_called()
+
+    @patch("cosmos.settings.watcher_dbt_retry_queue", "dbt_retry")
+    def test_poke_falls_back_on_first_try_when_already_on_the_retry_queue(self):
+        sensor = self.make_sensor(retries=1, queue="dbt_retry")
+        sensor._get_producer_task_status.return_value = "success"
+        sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+
+        assert sensor.poke(context) is True
+        sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
+
     def test_fallback_to_non_watcher_run(self):
         """When the producer hasn't published its flags to XCom, fall back to this consumer's own."""
         sensor = self.make_sensor()
@@ -1804,6 +2029,38 @@ class TestDbtConsumerWatcherSensor:
                 sensor.execute_complete(context=context, event=mock_event)
         else:
             assert sensor.execute_complete(context=context, event=mock_event) is None
+
+    def test_execute_complete_falls_back_for_upstream_failure_skip(self):
+        """#3023: a deferred consumer of a node dbt skipped for an upstream failure builds it instead of raising."""
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
+        context = self.make_context(self.make_xcom_ti(self.REAL_FAILURE_XCOMS))
+
+        sensor.execute_complete(
+            context=context,
+            event={"status": "failed", "reason": WatcherEventReason.NODE_FAILED, "upstream_failure_skip": True},
+        )
+
+        sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
+
+    @pytest.mark.parametrize(
+        "retries, event",
+        [
+            (0, {"status": "failed", "reason": WatcherEventReason.NODE_FAILED, "upstream_failure_skip": True}),
+            (1, {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}),
+        ],
+    )
+    def test_execute_complete_raises_node_failed_without_upstream_failure_skip_fallback(self, retries, event):
+        sensor = self.make_sensor(retries=retries)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor._fallback_to_non_watcher_run = MagicMock()
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+
+        with pytest.raises(AirflowException, match="failed. Review the producer task"):
+            sensor.execute_complete(context=context, event=event)
+        sensor._fallback_to_non_watcher_run.assert_not_called()
+        sensor._get_producer_task_status.assert_not_called()
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
     def test_execute_complete_extracts_compiled_sql(self, mock_override_rtif):
@@ -2183,12 +2440,15 @@ def test_dbt_dag_with_watcher_and_subprocess(caplog):
         not in caplog.text
     )
 
-    log_message = "OK loaded seed file public.raw_orders"
-    assert log_message in caplog.text
+    # dbt prints the schema before the table: "public" on Postgres, the dataset on BigQuery.
+    log_message = re.compile(r"OK loaded seed file \S+\.raw_orders")
+    assert log_message.search(caplog.text)
 
     # Verify that log messages are not duplicated (each dbt message should appear only once)
-    message_count = sum(1 for record in caplog.records if log_message in record.message)
-    assert message_count == 1, f"Expected '{log_message}' to be logged exactly once, but found {message_count} times"
+    message_count = sum(1 for record in caplog.records if log_message.search(record.message))
+    assert (
+        message_count == 1
+    ), f"Expected '{log_message.pattern}' to be logged exactly once, but found {message_count} times"
 
 
 # Airflow 3.0.0 hangs indefinitely, while Airflow 3.0.6 fails due to this Airflow bug:
@@ -2891,9 +3151,10 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
     ``SkippingDetails``/``LogSkipBecauseError``, since both come from
     ``on_skip()`` which is only reached via ``do_skip(cause=...)``). Subsequent
     "skipped" terminal events for those unique_ids are rewritten to "failed" so
-    the consumer fails on attempt 1, Airflow retries it, and the existing
-    ``_fallback_to_non_watcher_run`` path runs the model locally once its
-    upstream has recovered.
+    the consumer does not end SKIPPED. Since #3023 their status XCom also
+    carries ``upstream_failure_skip``, so their consumers run the existing
+    ``_fallback_to_non_watcher_run`` path on attempt 1 once the upstream has
+    recovered, instead of raising and waiting one ``retry_delay`` for attempt 2.
     """
     from airflow import DAG
 
@@ -2939,20 +3200,93 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
 
     tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
 
-    # Core #2698 assertion: the parametrized downstream model must end SUCCESS,
-    # not SKIPPED, and must have actually been retried (try_number > 1 proves
-    # the consumer-fallback path fired rather than the task happening to succeed
-    # on the first attempt).
+    # Core #2698 assertion: the parametrized downstream model must end SUCCESS, not SKIPPED.
     assert tis[downstream_task_id].state == "success"
-    assert tis[downstream_task_id].try_number > 1
+    # #3023: dbt never ran the downstream model, so its consumer builds it on attempt 1.
+    assert tis[downstream_task_id].try_number == 1
 
-    # The flaky upstream itself also recovers via the consumer-retry fallback.
+    # The flaky upstream failed for real, so it still recovers through an Airflow retry.
     assert tis["watcher_upstream_failure_recovery.model_flaky_run"].state == "success"
+    assert tis["watcher_upstream_failure_recovery.model_flaky_run"].try_number > 1
     assert tis["watcher_upstream_failure_recovery.model_a_run"].state == "success"
 
     # Producer/gateway/post_dbt sanity (matches the gateway-prevents-skip test).
     assert tis["watcher_upstream_failure_recovery.dbt_producer_watcher_done"].state == "success"
     assert tis["post_dbt"].state == "success"
+
+
+@pytest.mark.skipif(
+    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    reason=(
+        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
+        "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
+        "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
+        "the watcher sensor cannot detect producer termination on retry. "
+        "Airflow 3.1.x crashes during task finalization (SetRenderedFields) when retrying "
+        "tasks inside a DbtTaskGroup via dag.test()."
+    ),
+)
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "execution_args",
+    [
+        {"invocation_mode": InvocationMode.DBT_RUNNER},
+        # Prints only info-level dbt events, like the Kubernetes producers.
+        {"invocation_mode": InvocationMode.SUBPROCESS, "dbt_executable_path": DBT_EXECUTABLE_PATH},
+    ],
+    ids=["dbt_runner", "subprocess"],
+)
+def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(
+    reset_fail_once_sequence, execution_args
+):
+    """With ``AFTER_EACH``, every run and test that dbt skipped below a failed model ends on attempt 1 (#3023).
+
+    Before, each of them failed on attempt 1 and waited one ``retry_delay``, so every level added a delay.
+    """
+    from airflow import DAG
+
+    from cosmos import DbtTaskGroup
+
+    reset_fail_once_sequence("_cosmos_recovery_fail_once_seq")
+
+    with DAG(
+        dag_id="watcher_upstream_failure_recovery_after_each_test",
+        start_date=datetime(2023, 1, 1),
+        default_args={"retries": 2, "retry_delay": timedelta(seconds=0)},
+        dagrun_timeout=timedelta(seconds=180),
+    ) as dag:
+        dbt_group = DbtTaskGroup(
+            group_id="watcher_upstream_failure_recovery",
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER, **execution_args),
+            project_config=ProjectConfig(dbt_project_path=DBT_WATCHER_UPSTREAM_FAILURE_RECOVERY_PATH),
+            profile_config=profile_config,
+            render_config=RenderConfig(emit_datasets=False, test_behavior=TestBehavior.AFTER_EACH),
+            operator_args={"trigger_rule": "none_failed", "execution_timeout": timedelta(seconds=180)},
+        )
+
+        # Same dag.test() ordering workaround as test_dbt_task_group_watcher_retry_recovers_skipped_downstream.
+        gateway = dag.task_dict["watcher_upstream_failure_recovery.dbt_producer_watcher_done"]
+        for root_task in dbt_group.get_roots():
+            if root_task.task_id.endswith("_done") or root_task.task_id.endswith("dbt_producer_watcher"):
+                continue
+            gateway >> root_task
+
+    outcome = new_test_dag(dag, expected_dag_state=DagRunState.SUCCESS)
+
+    tis = {ti.task_id: ti for ti in outcome.get_task_instances()}
+    group = "watcher_upstream_failure_recovery"
+
+    # model_flaky failed for real inside the producer, so it still recovers through an Airflow retry.
+    assert tis[f"{group}.model_flaky.run"].state == "success"
+    assert tis[f"{group}.model_flaky.run"].try_number > 1
+    for task_id in (
+        "model_flaky.test",
+        "model_downstream.run",
+        "model_downstream.test",
+        "model_downstream_2.run",
+        "model_downstream_2.test",
+    ):
+        assert (tis[f"{group}.{task_id}"].state, tis[f"{group}.{task_id}"].try_number) == ("success", 1), task_id
 
 
 @pytest.mark.skipif(
@@ -3252,6 +3586,45 @@ class TestDbtTestWatcherOperator:
         sensor.build_and_run_cmd.assert_called_once()
         _, kwargs = sensor.build_and_run_cmd.call_args
         assert kwargs["cmd_flags"] == ["--select", DbtNode.get_resource_name_from_unique_id(self.MODEL_UID)]
+
+    def make_xcom_ti(self, model_status: str | None) -> MagicMock:
+        xcoms: dict = {self.TESTS_STATUS_XCOM_KEY: "fail"}
+        if model_status is not None:
+            xcoms["model__jaffle_shop__stg_orders_status"] = {"status": model_status, "outlet_uris": []}
+        ti = MagicMock()
+        ti.try_number = 1
+        ti.xcom_pull.side_effect = lambda *args, key=None, **kwargs: xcoms.get(key)
+        return ti
+
+    def test_poke_runs_tests_on_first_try_when_model_did_not_succeed(self):
+        """#3023: dbt never runs a model's tests when the model did not succeed, so run them on try 1."""
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor.build_and_run_cmd = MagicMock()
+        context = self.make_context(self.make_xcom_ti("failed"))
+
+        assert sensor.poke(context) is True
+        _, kwargs = sensor.build_and_run_cmd.call_args
+        assert kwargs["cmd_flags"] == ["--select", DbtNode.get_resource_name_from_unique_id(self.MODEL_UID)]
+
+    @pytest.mark.parametrize(
+        "model_status",
+        [
+            # dbt ran the tests and at least one failed.
+            "success",
+            # The producer reported no status for the model.
+            None,
+        ],
+    )
+    def test_poke_raises_on_first_try_when_tests_may_have_run(self, model_status):
+        sensor = self.make_sensor(retries=1)
+        sensor._get_producer_task_status.return_value = "success"
+        sensor.build_and_run_cmd = MagicMock()
+        context = self.make_context(self.make_xcom_ti(model_status))
+
+        with pytest.raises(AirflowException, match="finished with status 'fail'"):
+            sensor.poke(context)
+        sensor.build_and_run_cmd.assert_not_called()
 
     def test_fallback_via_poke_does_not_forward_producer_flags(self):
         """Driving through ``poke`` on retry, the fallback should issue ``dbt test`` with

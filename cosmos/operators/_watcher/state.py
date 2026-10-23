@@ -176,9 +176,16 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
             if getattr(task_instance, "_cosmos_xcom_persist_incrementally", False):
                 var_key = getattr(task_instance, "_cosmos_xcom_backup_var_key", None)
                 if isinstance(var_key, str):
-                    from cosmos.operators._watcher.xcom import _persist_backup
+                    from cosmos.operators._watcher.xcom import (
+                        TASK_STATE_STORE_TI_ATTRIBUTE,
+                        _persist_backup,
+                        _persist_backup_row,
+                    )
 
-                    _persist_backup(var_key, backup_buffer)
+                    if getattr(task_instance, TASK_STATE_STORE_TI_ATTRIBUTE, None) is not None:
+                        _persist_backup_row(task_instance, key, value)
+                    else:
+                        _persist_backup(var_key, backup_buffer)
 
 
 # TODO: Unify the Airflow call from cosmos/operators/_watcher/triggerer.py and cosmos/operators/watcher.py

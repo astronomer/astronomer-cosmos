@@ -1,0 +1,45 @@
+{
+  "elapsed_time": 0.34808897972106934,
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v6.json",
+    "dbt_version": "1.11.4"
+  },
+  "results": [
+    {
+      "compiled_code": "select 1 as id, null::int as amount",
+      "execution_time": 0.06177401542663574,
+      "failures": null,
+      "message": "CREATE VIEW",
+      "relation_name": "\"d\".\"s\".\"base\"",
+      "status": "success",
+      "unique_id": "model.real_fail.base"
+    },
+    {
+      "compiled_code": "\nselect 1 as id",
+      "execution_time": 0.02048325538635254,
+      "failures": null,
+      "message": "Database Error in model leak (models/leak.sql)\n  syntax error at or near \"BOGUS\"\n  LINE 3: ...blink_connect('host=db password=hunter2-secret-value' BOGUS)\n                                                                   ^",
+      "relation_name": "\"d\".\"s\".\"leak\"",
+      "status": "error",
+      "unique_id": "model.real_fail.leak"
+    },
+    {
+      "compiled_code": "\n    \n    \n\n\n\nselect amount\nfrom \"d\".\"s\".\"base\"\nwhere amount is null\n\n\n",
+      "execution_time": 0.026277780532836914,
+      "failures": 1,
+      "message": "Got 1 result, configured to fail if != 0",
+      "relation_name": null,
+      "status": "fail",
+      "unique_id": "test.real_fail.not_null_base_amount.69cb8f167b"
+    },
+    {
+      "compiled_code": null,
+      "execution_time": 0,
+      "failures": null,
+      "message": null,
+      "relation_name": "\"d\".\"s\".\"db_error\"",
+      "status": "skipped",
+      "unique_id": "model.real_fail.db_error"
+    }
+  ]
+}

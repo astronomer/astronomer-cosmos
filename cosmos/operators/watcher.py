@@ -30,6 +30,7 @@ from cosmos.constants import (
 )
 from cosmos.dataset import get_dataset_namespace
 from cosmos.dbt.graph import DbtNode
+from cosmos.dbt.runner import dbt_event_to_json
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.operators._watcher import safe_xcom_push
@@ -44,9 +45,10 @@ from cosmos.operators._watcher.state import (
 )
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
-    _delete_xcom_backup_variable,
+    _delete_xcom_backup,
     _init_xcom_backup,
-    _restore_xcom_from_variable,
+    _log_missing_backup,
+    _restore_xcom_backup,
 )
 from cosmos.operators.base import (
     DbtBuildMixin,
@@ -207,8 +209,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     Both modes feed the same parser (``store_dbt_resource_status_from_log``):
     - SUBPROCESS: each JSON log line from stdout is parsed directly.
     - DBT_RUNNER: each ``EventMsg`` from the dbt callback is serialised to JSON via
-      ``google.protobuf.json_format.MessageToJson`` — a transitive dbt-core dependency — and then
-      passed through the same parser.
+      ``cosmos.dbt.runner.dbt_event_to_json`` and then passed through the same parser.
 
     As each ``NodeFinished`` event arrives the operator pushes the per-model status to XCom under
     key ``<unique_id>_status`` so downstream sensors can react without waiting for the full build
@@ -307,9 +308,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         captured via closure so the unified ``store_dbt_resource_status_from_log`` parser can be
         reused identically to the SUBPROCESS path.
 
-        ``google.protobuf.json_format`` is a transitive dependency of dbt-core and is always
-        available when ``InvocationMode.DBT_RUNNER`` is in use.
-
         The callback is only registered when ``context`` is present (i.e. during task execution,
         not during auxiliary calls such as ``dbt deps``). Without a context there is no XCom
         backend to push to, so registering a callback would cause it to raise and dbt would emit
@@ -353,10 +351,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
             def _event_callback(event: Any) -> None:
                 try:
-                    from google.protobuf.json_format import MessageToJson
-
-                    json_str = MessageToJson(event, preserving_proto_field_name=True)
-                    parse(json_str, extra_kwargs)
+                    parse(dbt_event_to_json(event), extra_kwargs)
                 except Exception as e:
                     self.log.exception("Error in dbt event callback: %s", e)
                     if not callback_error:
@@ -512,7 +507,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         reliable_retry = settings.enable_watcher_reliable_retry
 
         if try_number > 1:
-            _restore_xcom_from_variable(context)
+            if not _restore_xcom_backup(context, read_task_state_store=reliable_retry):
+                _log_missing_backup(context, try_number, read_task_state_store=reliable_retry)
             raise AirflowSkipException(
                 "Dbt WATCHER producer task does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
@@ -529,12 +525,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             return_value = super().execute(context=context, **kwargs)
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             if reliable_retry:
-                _delete_xcom_backup_variable(context)
+                _delete_xcom_backup(context)
             return return_value
 
         except Exception:
-            # The on-failure callback flushes the in-memory backup to the Variable; here we only
-            # record that the producer finished so consumer sensors stop waiting.
+            # Without a task store, the retry callback flushes the in-memory backup to the Variable; here we
+            # only record that the producer finished so consumer sensors stop waiting.
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             raise
 

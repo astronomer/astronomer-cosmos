@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.16.0a2 (2026-10-22)
+1.16.0a3 (2026-10-23)
 ---------------------
 
 Breaking Changes
@@ -14,6 +14,9 @@ Breaking Changes
 
 Behaviour Changes
 
+* ``RenderConfig.exclude`` is now resolved against the full project graph instead of against the subset ``RenderConfig.select`` already narrowed. Graph operators traverse outwards from the nodes their selector matches, so when ``select`` had already dropped those root nodes the traversal had nothing to start from and shared ancestors or descendants were silently kept. For example, given a ``parent`` tagged ``test`` and its ``child``, ``select=["+child"], exclude=["+tag:test"]`` previously rendered both ``parent`` and ``child``, because ``+tag:test`` was evaluated after ``+child`` had already been applied; it now renders only ``child``. This matches dbt, which evaluates both filters against the whole graph and subtracts afterwards. See #2976.
+* ``ProjectConfig`` now keeps the ``models``/``seeds``/``snapshots`` relative paths it was configured with even when it has no ``dbt_project_path`` of its own, and ``LoadMode.CUSTOM`` falls back to them when the project root is supplied through ``RenderConfig``/``ExecutionConfig`` instead. Previously those relative paths were discarded in that split configuration and ``LegacyDbtProject`` silently crawled its defaults, so a project declaring e.g. ``models_relative_paths="custom/models"`` rendered no models at all; it now crawls ``custom/models`` as configured. Projects that set ``dbt_project_path`` on ``ProjectConfig`` are unaffected. See #2977.
+* Under ``LoadMode.DBT_MANIFEST``, ``RenderConfig.exclude`` and a YAML selector's ``exclude`` now apply to test nodes: tests matched by the exclude (for example ``resource_type:test`` or ``tag:<x>``) are no longer rendered, where previously they were added back next to their model. With ``TestBehavior.AFTER_EACH``, a model whose tests are all excluded is rendered as a plain task instead of a run and test group, so its task ids change (for example ``model_a.run`` becomes ``model_a_run``). The tests of excluded models also leave ``DbtGraph.filtered_nodes``. Test nodes also keep their own tags in addition to the tags of every parent, so ``select tag:<x>`` matches a test tagged ``<x>`` whose parent is not. An ``exclude`` now also removes every test that depends on an excluded node, as dbt's default indirect selection does, so a multi-parent test goes with any excluded parent while the other parents stay. Selecting by a test's own tag now renders that test where the test behavior allows it: a detached task for a multi-parent test when ``should_detach_multiple_parents_tests=True``, or the single test task with ``TestBehavior.AFTER_ALL``; previously nothing was rendered. A source whose tests are all excluded no longer counts as having tests, so with ``source_rendering_behavior=WITH_TESTS_OR_FRESHNESS`` it is rendered only if it has a freshness check. See #2981 and #3080.
 * ``emit_datasets`` is now a template field on the dbt operators, so emission can be decided per DAG run:
   ``operator_args={"emit_datasets": "{{ dag_run.run_type != 'backfill' }}"}`` stops backfills from triggering downstream
   asset-scheduled DAGs. ``operator_args`` now takes precedence over ``RenderConfig.emit_datasets`` (which remains a
@@ -22,6 +25,11 @@ Behaviour Changes
 * When a dbt project cannot be found, Cosmos now raises a clearer error, and on Airflow 3 with an absolute ``dbt_project_path`` it appends guidance to set the path relative to the DAG file (e.g. ``(Path(__file__).parent / "dbt/my_dbt_project").absolute().as_posix()``). This makes failures caused by versioned DAG bundles (e.g. on Astronomer) relocating the project between DAG parsing and task execution self-explanatory in the logs. The missing-project case in ``create_symlinks`` now raises ``CosmosValueError`` instead of a bare ``FileNotFoundError``. See #2921.
 * In ``ExecutionMode.WATCHER`` (including the Kubernetes and GKE variants), the aggregated test status that the producer pushes to XCom under ``<model_unique_id>_tests_status`` is now a dict (``status``, ``passed_count``, ``failed_count``, ``total_count`` and up to five ``failed_tests`` unique_ids) instead of the ``"pass"`` or ``"fail"`` string, and the test sensors log that summary. The sensors and the trigger still accept the string, so DAG runs in flight during the upgrade are unaffected; anything reading that XCom key directly must now read ``status`` from the dict. See #2750.
 * Under ``SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS``, a source that has tests but no freshness checks now renders its freshness task as an ``EmptyOperator`` instead of a ``DbtSource`` task that always ended with "Nothing to do" and failed when warn-error is enabled, matching the existing ``SourceRenderingBehavior.ALL`` path. The ``EmptyOperator`` keeps the dbt owner and does not receive ``operator_args`` or per-node ``operator_kwargs``. The test tasks are unchanged. See #3044.
+* ``ExecutionMode.WATCHER`` consumers of a node that dbt skipped for an upstream failure now run the node on attempt 1 once the producer has finished, instead of failing and waiting one ``retry_delay`` for attempt 2. Previously every level of the graph below a failed model added one ``retry_delay``. Test consumers whose model did not succeed do the same. This applies only when the task has ``retries`` set, and either ``watcher_dbt_retry_queue`` is unset or the consumer already runs on it. Such a node now gets ``retries + 1`` real dbt runs instead of ``retries``. See #3023 and #3047.
+* On Airflow 3.3 and later, the ``ExecutionMode.WATCHER`` producer keeps its per-node XCom backup in the Airflow task store instead of an Airflow Variable when ``enable_watcher_reliable_retry`` is ``True``, split across keys that roll over at 8 KB so each push rewrites only the open key. Variable writes look the key up in every configured secrets backend first, so with an external backend the producer task ran between about 3 and 6 times faster in our benchmark, depending on how many backends are configured. With ``False`` the Variable flush from the retry callback is unchanged. A producer that finds no backup on a retry logs a warning when the task store was in use. On Airflow 3.4 and later, clearing the producer from the UI or the REST API discards that backup unless "Keep task state" is ticked; see the watcher execution mode guide. See #2771 and `#3076 <https://github.com/astronomer/astronomer-cosmos/pull/3076>`_.
+* Under ``TestBehavior.BUILD``, a rendered dbt source that has tests is now a task group (``<source>.source`` and
+  ``<source>.test``) instead of a single ``<source>_source`` task, so references to the old task id need updating.
+  The source tests, which this mode never executed before, now run and can fail the DAG. See #1683 and #3037.
 
 Features
 
@@ -33,6 +41,7 @@ Features
 * Add a ``retries`` parameter to the ``gcs_upload`` callback by @TTMichaelA in #2871
 * Make ``emit_datasets`` templatable via ``operator_args`` by @tatiana in #2996
 * Support ``config.group`` and ``group:`` selectors by @biswasbiplob in #2980
+* Add ``AIConfig`` (experimental, it may change without a deprecation period), an opt-in diagnosis of failed dbt tasks: on their last attempt, an LLM is asked for the root cause and a fix, which are added after the dbt error. It uses ``apache-airflow-providers-common-ai`` (``pip install astronomer-cosmos[ai]``, for Python 3.11+ and Airflow 2.11+), works with ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``, masks secrets, and lets you set what is sent and how much it can spend. See the :doc:`AI config reference </reference/configs/ai-config>` by @corsettigyg in #3018
 
 Enhancements
 
@@ -42,6 +51,7 @@ Enhancements
 * Clean up leftover dbt Core <1.8 references by @pankajastro in #2995
 * Add a DAG-bundle hint when a dbt project path is missing by @pankajkoti in #2921
 * Clarify missing profile field errors by @nightcityblade in #2970
+* Improve ``ExecutionMode.WATCHER`` producer failure performance by keeping the per-node XCom backup in the Airflow task store on Airflow 3.3 and later by @tatiana in #3076
 
 Bug Fixes
 
@@ -62,6 +72,14 @@ Bug Fixes
 * Use ``EmptyOperator`` for freshness tasks of test-only sources, which now carry the dbt owner when owner inheritance is enabled by @JH0917 in #3044
 * Keep the Airflow DAGs folder out of dbt's plugin discovery path by @pankajkoti in #2893
 * Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn by @pankajkoti in #2978
+* Stop rendering tests removed by ``exclude`` under ``LoadMode.DBT_MANIFEST`` by @tatiana and @ege-arhan in #3080
+* Resolve ``exclude`` graph selectors against the full project graph by @00yhj22-debug in #2976
+* Keep ``ProjectConfig`` relative paths when the project root comes from ``RenderConfig`` by @00yhj22-debug in #2977
+* Fix ``ExecutionMode.WATCHER`` consumers waiting one ``retry_delay`` per level below a failure by @biswasbiplob in #3047
+* Surface the macro error on ``run-operation`` failure with dbt < 1.12 by @barking-code in #2986
+* Skip dbt event callbacks for ``run-operation`` on dbt 2 by @pankajastro in #3089
+* Fix a circular import when ``cosmos.constants`` is imported before Airflow by @tatiana in #3087
+* Render source tests as a separate task under ``TestBehavior.BUILD`` by @developer-rpai in #3037
 
 Docs
 
@@ -70,6 +88,7 @@ Docs
 * Link the ``AGENTS.md`` test matrix to ``pyproject.toml`` instead of hardcoding versions by @pankajastro in #2887
 * Add dbt-core 1.12 to the Airflow/dbt conflicts table by @pankajastro in #2938
 * Fix broken Slack invite links to the #airflow-dbt channel by @pankajastro in #2956
+* Document ``on_failure_callback`` access to dbt test failures by @pankajastro in #2846
 
 Architectural Proposal
 
@@ -92,6 +111,9 @@ Others
 * Fix the pre-commit black failure on ``main`` by @tatiana in #3077
 * Show the Runtime alpha tag in the ``test-runtime-alpha`` run name and summary by @jedcunningham in #3078
 * Dependency updates by @dependabot and @pre-commit-ci in #2854, #2856, #2866, #2872, #2882, #2894, #2897, #2898, #2899, #2907, #2909, #2911, #2912, #2915, #2916, #2919, #2922, #2923, #2924, #2929, #2934, #2937, #2941, #2943, #2946, #2949, #2951, #2954, #2955, #2958, #2963, #2971, #2973, #2974, #2975, #2984, #2985, #2987, #2989, #2994, #3002, #3009, #3010, #3012, #3013, #3014, #3017, #3019, #3020, #3026, #3028, #3029, #3032, #3033, #3039, #3053, #3054, #3056, #3057, #3064, #3065, #3066, #3067, #3074, and #3079
+* Unskip dbt-oss integration tests for dbt ls and profile schema by @pankajastro in #3083
+* Run the integration tests against dbt-oss on BigQuery by @pankajastro in #3046
+* Run unit tests against dbt-oss in CI by @pankajastro in #3052
 
 1.15.1 (2026-08-04)
 -------------------

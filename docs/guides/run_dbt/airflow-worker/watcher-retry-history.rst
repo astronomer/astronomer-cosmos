@@ -124,6 +124,17 @@ Task-level retry — consumer
        (``SIGKILL``/OOM) leaves consumers without restored statuses, so they fall back to running
        their dbt node; a graceful producer failure still restores them — see
        *Task-level retry — producer*.
+   * - **1.16.0**
+     - Same as 1.15.0, except that consumers for nodes that dbt skipped due to upstream failure
+       (``upstream_failure``) run their fallback on attempt 1 once the producer has finished,
+       instead of failing and waiting one ``retry_delay`` for attempt 2. Before, each level of
+       the graph below the failed node added one ``retry_delay``. Test consumers whose model did
+       not succeed behave the same way, because dbt never ran their tests. Such a node now gets
+       ``retries + 1`` real dbt runs, like a node that failed inside the producer. This applies
+       only when the task has ``retries`` and no ``watcher_dbt_retry_queue`` is configured (or
+       the consumer already runs on it), because the cluster policy moves only retries to that
+       queue. Otherwise the consumer keeps the 1.15.0 behavior
+       (`#3023 <https://github.com/astronomer/astronomer-cosmos/issues/3023>`_).
 
 Task-level retry — producer
 +++++++++++++++++++++++++++++
@@ -195,9 +206,14 @@ Task-level retry — producer
        the per-node Variable I/O, and a *graceful* failure (e.g. a dbt error) still flushes the backup
        so consumers recover as before — only a *hard* kill, where the callback cannot run, loses the
        statuses and makes the affected consumers re-run their dbt node (results stay correct). The
-       long-term reliable-and-fast replacement is tracked in
-       `#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task &
-       Asset Store).
+       reliable-and-fast replacement, the Airflow 3.3 task store, shipped in 1.16.0
+       (`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_).
+   * - **1.16.0**
+     - Same as 1.15.0, except on Airflow 3.3 and later with ``enable_watcher_reliable_retry = True``:
+       the producer keeps its per-node backup in the Airflow task store instead of a Variable
+       (`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_), which makes no
+       secrets-backend calls. With ``False`` the Variable flush from the retry callback is unchanged.
+       A producer that finds no backup on a retry logs a warning when the task store was in use.
 
 Automatic retries
 +++++++++++++++++
@@ -299,6 +315,13 @@ Full DAG / TaskGroup clear
      - **Works.** Same as 1.14.2. ``enable_watcher_reliable_retry`` does not change full-clear
        behaviour; its only effect is on the producer's failure-time backup — see
        *Task-level retry — producer*.
+   * - **1.16.0**
+     - **Works, with a caveat on Airflow 3.4.** Same as 1.15.0 on Airflow 3.3 and earlier. On
+       Airflow 3.4 and later, clearing the producer or its task group from the UI or the REST API
+       discards the task store backup unless **Keep task state** is ticked, so the producer finds
+       nothing to restore, logs a warning and skips, and every cleared consumer falls back to
+       running its own dbt node. Results stay correct. Automatic retries, ``airflow dags clear``
+       and ``airflow tasks clear`` keep the backup. See :ref:`producer-status-backup-task-store`.
 
 Avoid duplicate or concurrent runs of the same dbt transformation in the same DAG run
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

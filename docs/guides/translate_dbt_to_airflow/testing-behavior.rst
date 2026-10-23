@@ -15,7 +15,7 @@ default behavior, which runs all models and tests, and then reports all failures
 Cosmos supports the following test behaviors:
 
 - ``after_each`` (default): turns each model into a task group with two steps: run the model, and run the tests
-- ``build``: (since Cosmos 1.8) run dbt resources using the ``dbt build`` command, using a single task. This applies to dbt models, seeds and snapshots.
+- ``build``: (since Cosmos 1.8) run dbt resources using the ``dbt build`` command, using a single task. This applies to dbt models, seeds and snapshots. Sources are rendered as ``dbt source freshness`` tasks and the build tasks select only their own node, so tests defined on sources are rendered as a separate test task after the source task, as with ``after_each``.
 - ``after_all``: each model becomes a single task, and the tests only run if all models are run successfully
 - ``none``: don't include tests
 
@@ -155,6 +155,33 @@ When at least one WARN message is present, the function passed to ``on_warning_c
     In Cosmos 1.15.0 and earlier, a callback passed only through ``operator_args`` was silently dropped, so the
     top-level argument remains the recommended form.
 
+Failure notifications
+~~~~~~~~~~~~~~~~~~~~~
+
+Tests configured with ``severity: error`` fail the task when they fail. To send notifications on failure, use
+Airflow's standard ``on_failure_callback``. Airflow exposes the raised exception to the callback as
+``context["exception"]``. With ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and the ``ExecutionMode.WATCHER``
+producer task, it includes the failing dbt nodes (test names and messages). Before Cosmos 1.16, this applied only to
+``InvocationMode.DBT_RUNNER``.
+
+.. code-block:: python
+
+    from airflow.providers.slack.hooks.slack_webhook import SlackWebhookHook
+    from airflow.utils.context import Context
+
+    from cosmos import DbtDag
+
+
+    def failure_callback_func(context: Context):
+        exception = context["exception"]
+        slack_hook = SlackWebhookHook(slack_webhook_conn_id="slack_conn_id")
+        slack_hook.send(text=f":red_circle: dbt failed:\n{exception}")
+
+
+    my_dag = DbtDag(
+        # ...
+        default_args={"on_failure_callback": failure_callback_func},
+    )
 
 Tests with multiple parents
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

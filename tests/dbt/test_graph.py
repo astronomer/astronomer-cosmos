@@ -51,6 +51,7 @@ SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_
 ALTERED_DBT_PROJECT_MANIFEST = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME / "target/manifest.json"
 SAMPLE_MANIFEST_SELECTORS = Path(__file__).parent.parent / "sample/manifest_selectors.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
+EXCLUDED_TESTS_PROJECT = DBT_PROJECTS_ROOT_DIR / "excluded_tests"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
 
 # File and directory names to skip when copying dbt project trees in tests (keeps fixture output deterministic).
@@ -352,8 +353,10 @@ def test_load_via_manifest_with_exclude(project_name, manifest_filepath, model_f
     dbt_graph.load_from_dbt_manifest()
 
     assert len(dbt_graph.nodes) == 28
-    assert len(dbt_graph.filtered_nodes) == 26
+    assert len(dbt_graph.filtered_nodes) == 14
     assert "model.jaffle_shop.orders" not in dbt_graph.filtered_nodes
+    excluded_models = {"model.jaffle_shop.orders", "model.jaffle_shop.customers"}
+    assert not [node for node in dbt_graph.filtered_nodes.values() if excluded_models & set(node.depends_on)]
 
     sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
     assert sample_node.name == "customers"
@@ -995,6 +998,22 @@ def test_load_dbt_ls_file_without_project_path():
     assert err_info.value.args[0] == "Unable to load dbt ls file without RenderConfig.project_path"
 
 
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
+def test_load_clears_the_exclusions_of_a_previous_load(mock_load_via_dbt_ls):
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)
+    dbt_graph.excluded_node_ids = {"test.jaffle_shop.left_over"}
+
+    dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
+
+    assert dbt_graph.excluded_node_ids == set()
+
+
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=None)
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
 def test_load_automatic_without_manifest_with_profile_yml(mock_load_via_dbt_ls, mock_load_via_custom_parser):
@@ -1158,7 +1177,9 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    dbt_graph.load_via_dbt_ls()
+    # dbt 2 runs `dbt ls` through a subprocess, which would bypass the dbtRunner this test mocks.
+    with patch("cosmos.dbt.graph.dbt_runner.is_dbt_v2", return_value=False):
+        dbt_graph.load_via_dbt_ls()
     assert not (tmp_dbt_project_dir / "target").exists()
     assert not (tmp_dbt_project_dir / "logs").exists()
 
@@ -1690,6 +1711,59 @@ def test_load_via_custom_parser_with_nested_model_dir(tmp_path):
     assert dbt_graph.nodes["my_model"].unique_id == "model.nested_project.my_model"
 
 
+def test_load_via_custom_parser_with_nested_model_dir_and_split_project_path(tmp_path):
+    """
+    The project root may come from RenderConfig/ExecutionConfig rather than ProjectConfig. In that case
+    ProjectConfig cannot build absolute models_paths, and the relative dirs the user configured must
+    still be honoured instead of falling back to LegacyDbtProject's default "models" directory.
+    """
+    project_dir = tmp_path / "split_project"
+    (project_dir / "custom" / "models").mkdir(parents=True)
+    (project_dir / "custom" / "models" / "my_model.sql").write_text("select 1")
+    (project_dir / "profiles.yml").write_text(
+        "test:\n"
+        "  target: test\n"
+        "  outputs:\n"
+        "    test:\n"
+        "      type: postgres\n"
+        "      host: localhost\n"
+        "      user: user\n"
+        "      password: pass\n"
+        "      port: 5432\n"
+        "      dbname: db\n"
+        "      schema: public\n"
+        "      threads: 1\n"
+    )
+
+    # No dbt_project_path here: the project root is supplied by RenderConfig/ExecutionConfig below,
+    # so ProjectConfig has no root to build absolute paths from.
+    project_config = ProjectConfig(
+        manifest_path=project_dir / "target" / "manifest.json",
+        project_name="split_project",
+        models_relative_paths="custom/models",
+    )
+    assert project_config.models_paths == []
+
+    execution_config = ExecutionConfig(dbt_project_path=project_dir)
+    render_config = RenderConfig(dbt_project_path=project_dir, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=project_dir / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_via_custom_parser()
+
+    assert "my_model" in dbt_graph.nodes
+    assert dbt_graph.nodes["my_model"].unique_id == "model.split_project.my_model"
+
+
 def test_load_via_custom_parser_with_explicit_empty_models_relative_paths(tmp_path):
     """
     models_relative_paths=[] means "no model directories" and must not fall back to crawling the
@@ -1856,6 +1930,101 @@ def test_update_node_dependency_test_not_exist():
         assert nodes.has_non_detached_test is False
 
 
+@pytest.mark.parametrize(
+    "render_config_args",
+    [
+        {"select": ["path:models"], "exclude": ["tag:excluded"]},
+        {"exclude": ["tag:excluded"]},
+        {"selector": "models_without_excluded_tests"},
+    ],
+)
+def test_update_node_dependency_does_not_add_back_excluded_tests(render_config_args):
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(
+            dbt_project_path=EXCLUDED_TESTS_PROJECT,
+            manifest_path=EXCLUDED_TESTS_PROJECT / "target/manifest.json",
+        ),
+        execution_config=ExecutionConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=EXCLUDED_TESTS_PROJECT / "profiles.yml",
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, **render_config_args),
+    )
+    dbt_graph.load()
+
+    rendered_tests = {
+        node_id for node_id, node in dbt_graph.filtered_nodes.items() if node.resource_type == DbtResourceType.TEST
+    }
+    assert rendered_tests == {
+        "test.excluded_tests.kept_singular_test",
+        "test.excluded_tests.not_null_model_a_id.1e928b9f1f",
+    }
+    assert dbt_graph.tests_per_model["model.excluded_tests.model_a"] == [
+        "test.excluded_tests.kept_singular_test",
+        "test.excluded_tests.not_null_model_a_id.1e928b9f1f",
+    ]
+
+
+def test_select_by_test_tag_selects_the_tests_without_their_parents():
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(
+            dbt_project_path=EXCLUDED_TESTS_PROJECT,
+            manifest_path=EXCLUDED_TESTS_PROJECT / "target/manifest.json",
+        ),
+        execution_config=ExecutionConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=EXCLUDED_TESTS_PROJECT / "profiles.yml",
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["tag:excluded"]),
+    )
+    dbt_graph.load()
+
+    assert set(dbt_graph.filtered_nodes) == {
+        "test.excluded_tests.excluded_singular_test",
+        "test.excluded_tests.unique_model_a_id.94b83a3ca6",
+    }
+    assert dbt_graph.tests_per_model == {}
+
+
+def test_apply_manifest_node_selection_exclude_does_not_widen_select():
+    def build_node(unique_id, resource_type, depends_on, tags, original_file_path):
+        return DbtNode(
+            unique_id=unique_id,
+            resource_type=resource_type,
+            depends_on=depends_on,
+            path_base=EXCLUDED_TESTS_PROJECT,
+            original_file_path=Path(original_file_path),
+            tags=tags,
+            config={},
+        )
+
+    nodes = {
+        "model.p.a": build_node("model.p.a", DbtResourceType.MODEL, [], ["chosen"], "models/a.sql"),
+        "model.p.b": build_node("model.p.b", DbtResourceType.MODEL, [], [], "models/b.sql"),
+        "test.p.t": build_node("test.p.t", DbtResourceType.TEST, ["model.p.a", "model.p.b"], [], "tests/t.sql"),
+    }
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        execution_config=ExecutionConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=EXCLUDED_TESTS_PROJECT / "profiles.yml",
+        ),
+        render_config=RenderConfig(select=["+tag:chosen"], exclude=["tag:unused"]),
+    )
+
+    dbt_graph._apply_manifest_node_selection(nodes, {})
+
+    assert set(dbt_graph.filtered_nodes) == {"model.p.a"}
+    assert dbt_graph.excluded_node_ids == set()
+    assert nodes["test.p.t"].tags == []
+
+
 def test_tests_per_model_populated():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
@@ -1966,7 +2135,10 @@ def test_tag_selected_node_test_exist():
     assert len(dbt_graph.filtered_nodes) > 0
 
     for _, node in dbt_graph.filtered_nodes.items():
-        assert node.tags == ["test_tag"]
+        if node.resource_type == DbtResourceType.TEST:
+            assert any("test_tag" in dbt_graph.nodes[parent_id].tags for parent_id in node.depends_on)
+        else:
+            assert node.tags == ["test_tag"]
         if node.resource_type == DbtResourceType.MODEL:
             assert node.has_test is True
             assert node.has_non_detached_test is True
@@ -2932,9 +3104,9 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("0eb95968fa13de21119a3538620f3860",)
+        assert hash_dir in ("2d097245d349c223f22168661a90248f",)
     else:
-        assert hash_dir == "0eb95968fa13de21119a3538620f3860"
+        assert hash_dir == "2d097245d349c223f22168661a90248f"
 
 
 @patch("cosmos.dbt.graph.datetime")
@@ -2973,9 +3145,9 @@ def test_save_yaml_selectors_cache(mock_variable_set, mock_datetime, tmp_dbt_pro
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.
-        assert hash_dir in ("0eb95968fa13de21119a3538620f3860",)
+        assert hash_dir in ("2d097245d349c223f22168661a90248f",)
     else:
-        assert hash_dir == "0eb95968fa13de21119a3538620f3860"
+        assert hash_dir == "2d097245d349c223f22168661a90248f"
 
 
 @pytest.mark.skipif(AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION, reason="AirflowRuntimeError is Airflow 3+ only")

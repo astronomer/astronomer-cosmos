@@ -217,7 +217,9 @@ By default (``enable_watcher_reliable_retry = True``), each XCom push is increme
 Variable. This ensures that when the producer fails and Airflow clears XCom entries before the retry,
 the backed-up values can be restored. On a successful run, the backup Variable is automatically deleted
 to avoid stale data accumulating over time. These eager per-node writes can be deferred to a single
-on-failure write to improve producer performance — see :ref:`producer-status-backup` below.
+on-failure write to improve producer performance — see :ref:`producer-status-backup` below. On Airflow 3.3
+and later, the per-node backup uses the Airflow task store instead of a Variable; see
+:ref:`producer-status-backup-task-store`.
 
 **How consumer retries work:**
 
@@ -292,12 +294,52 @@ Variable that survives the retry:
 
 Set it via the ``[cosmos]`` section or the ``AIRFLOW__COSMOS__ENABLE_WATCHER_RELIABLE_RETRY`` environment
 variable. Consider ``False`` for large dbt projects where the producer's per-node Variable I/O is a
-bottleneck and occasional duplicate consumer runs after a hard producer kill are acceptable.
+bottleneck and occasional duplicate consumer runs after a hard producer kill are acceptable. On Airflow 3.3
+and later the per-node writes go to the task store and make no secrets-backend calls, which removes most of
+that cost; see the next section.
 
-A future approach that delivers reliability and performance together is tracked in
-`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task & Asset
-Store, AIP-103), which would let retries resume from the point of failure without the per-node
-Variable backup.
+.. _producer-status-backup-task-store:
+
+Airflow 3.3 and later: backup in the task store
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. versionchanged:: 1.16.0
+
+On Airflow 3.3 and later, with ``enable_watcher_reliable_retry`` left at ``True``, the producer keeps this
+backup in the Airflow `task store <https://cwiki.apache.org/confluence/display/AIRFLOW/AIP-103%3A+Task+State+Management>`_
+instead of a Variable (`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_). This means:
+
+- The per-node backup writes make no secrets-backend calls. Every Variable write first looks the key up in each
+  configured secrets backend, so the producer task ran between about 3 and 6 times faster in our benchmark,
+  depending on how many backends are configured (500 dbt nodes, one status pushed per node, a secrets backend
+  stubbed at 20 ms per lookup, SQLite metadata database; the numbers are in
+  `#3076 <https://github.com/astronomer/astronomer-cosmos/pull/3076>`_). A retry still reads the backup Variable
+  once, and the retry callback writes it when the last task store write failed. Without an external backend both
+  cost about the same.
+- The backup is split across task store keys (``cosmos_xcom_backup_0``, ``_1``, ...): each push rewrites only
+  the open key, and a key rolls over before a push that would take it past 8 KB, so the per-push payload does
+  not grow with the project, unlike the single Variable. A single entry is never split: one larger than 8 KB
+  gets a key of its own and Cosmos logs a warning naming it, and one larger than
+  ``[state_store] max_value_storage_bytes`` (65535 bytes by default) also makes Airflow log its size warning.
+  Configure ``[workers] state_store_backend`` to offload such values. Deleting the backup after a restore or a
+  successful run is best effort: the keys go first, from the first key up, and the Variable only once every key
+  is gone, so a failure leaves the whole backup, no readable backup, or only the Variable's newest entries, never
+  a stale value; retention removes the rest.
+- Writes to the task store from the retry callback are rejected, so the task store only serves the per-node
+  backup. If the last task store write failed, the retry callback flushes the entries it missed to the backup
+  Variable, and the restore merges them on top of the task store keys. With ``enable_watcher_reliable_retry = False`` the producer behaves as described above: no per-node
+  writes, one Variable flush from the retry callback, and the task store is not used.
+- Backups left by a failed producer are removed by ``airflow state-store clean`` or ``airflow db clean`` once
+  they are older than ``[state_store] default_retention_days`` (default 30; 0 disables expiry), or when the DAG
+  run is deleted. Nothing removes them on a schedule.
+- On Airflow 3.4 and later, clearing the producer from the Airflow UI or the REST API (a single task or a task
+  group) discards its task store entries unless **Keep task state** is ticked in the clear dialog
+  (Settings > Clearing > *Keep task state on clear* makes that the default for your browser). Without it the
+  cleared producer finds no backup, logs a warning, skips, and every cleared consumer falls back to running its
+  own dbt node. Results stay correct, but the run takes longer. Automatic retries keep the task store, and so do
+  ``airflow dags clear`` and ``airflow tasks clear``.
+
+Older Airflow versions always use a Variable.
 
 Producer done gateway task (DbtTaskGroup only)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

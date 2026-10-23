@@ -15,6 +15,8 @@ from pathlib import Path
 # cosmos_profile_mapping.py is left out on purpose: it builds its profile from the Postgres Airflow connection
 # `example_conn`, which this job does not have. dbt_docs.py is left out until dbt-oss handles docs generate.
 # example_cosmos_sources.py (its own Postgres profile) and simple_dag_async.py (async) are left out too.
+# user_defined_profile.py is left out because it is the example of a user-supplied profiles.yml (profiles_yml_filepath),
+# which the BigQuery profile swap cannot cover.
 ENABLED_DAG_FILES = frozenset(
     {
         "basic_cosmos_dag.py",
@@ -30,6 +32,7 @@ ENABLED_DAG_FILES = frozenset(
         "example_dbt_deps.py",
         "example_duckdb_dag.py",
         "example_model_version.py",
+        "example_outlets.py",
         "example_seed_rendering.py",
         "example_source_pruning.py",
         "example_source_rendering.py",
@@ -50,10 +53,6 @@ _NO_CALLBACKS = "dbt-oss dbtRunner does not support callbacks, and dbt does not 
 _NO_DATASETS = (
     "dbt-oss writes no datasets: its run_results.json has no args.profiles_dir, so the OpenLineage artifact parser raises "
     "KeyError (logged at debug level) and the inlets and outlets stay empty (reproduced locally with dbt-oss 2.0.8)"
-)
-_FORCES_DBT_RUNNER = (
-    "its example DAG pins invocation_mode=InvocationMode.DBT_RUNNER, which Cosmos rejects on dbt 2 because the dbtRunner "
-    "has no callbacks (leaving it unset would fall back to subprocess, but the example is included in the docs)"
 )
 _NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
@@ -85,9 +84,6 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/test_local.py::test_run_test_operator_without_callback[InvocationMode.SUBPROCESS]": _POSTGRES_ENV,
     "tests/test_debug.py::test_dbt_run_local_operator_stores_memory_in_xcom_when_debug_enabled": _POSTGRES_ENV,
     "tests/test_example_dags.py::test_source_pruning_dag": _POSTGRES_ENV,
-    # The example DAG forces dbtRunner, which has no callbacks on dbt 2 (2)
-    "tests/test_example_dags.py::test_example_dag[example_watcher]": _FORCES_DBT_RUNNER,
-    "tests/test_example_dags.py::test_example_dag[example_watcher_with_freshness]": _FORCES_DBT_RUNNER,
     # dbt 2 dbtRunner has no callbacks (3)
     "tests/dbt/test_runner.py::test_dbt_runner_caching_and_callbacks": _NO_CALLBACKS,
     "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_freshness_callback_excludes_model": _NO_CALLBACKS,

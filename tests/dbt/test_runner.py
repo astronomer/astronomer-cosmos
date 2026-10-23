@@ -4,6 +4,7 @@ import shutil
 import sys
 import tempfile
 import types
+from enum import Enum
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -458,6 +459,57 @@ def test_extract_message_by_status_still_prefers_node_name():
 
     assert names == ["my_model"]
     assert messages == ["boom"]
+
+
+class _DbtOssFreshnessStatus(Enum):
+    """Mirrors dbt-oss, which reports a source freshness warning as ``<FreshnessStatus.WARN: 'Warn'>``."""
+
+    WARN = "Warn"
+
+
+def test_extract_message_by_status_matches_the_warn_status_in_any_case():
+    results = [
+        SimpleNamespace(status=_DbtOssFreshnessStatus.WARN, node=SimpleNamespace(name="source_a"), message="late"),
+        SimpleNamespace(status="warn", node=SimpleNamespace(name="test_b"), message="warned"),
+        SimpleNamespace(status="pass", node=SimpleNamespace(name="test_c"), message=None),
+    ]
+    result = SimpleNamespace(result=SimpleNamespace(results=results))
+
+    names, messages = dbt_runner.extract_message_by_status(result)
+
+    assert names == ["source_a", "test_b"]
+    assert messages == ["late", "warned"]
+
+
+def test_extract_message_by_status_handles_results_without_a_message():
+    # dbt-oss source freshness results (``FreshnessResultsNode``) carry a status but no ``message`` attribute.
+    freshness = SimpleNamespace(status=_DbtOssFreshnessStatus.WARN, node=SimpleNamespace(name="source_a"))
+    result = SimpleNamespace(result=SimpleNamespace(results=[freshness]))
+
+    names, messages = dbt_runner.extract_message_by_status(result)
+
+    assert names == ["source_a"]
+    assert messages == ["warn"]
+
+
+def test_extract_message_by_status_matches_the_levels_in_any_case():
+    results = [
+        SimpleNamespace(status="Error", node=SimpleNamespace(name="model_a"), message="boom"),
+        SimpleNamespace(status="runtime error", node=SimpleNamespace(name="model_b"), message="bad"),
+        SimpleNamespace(status="success", node=SimpleNamespace(name="model_c"), message=None),
+    ]
+    result = SimpleNamespace(result=SimpleNamespace(results=results))
+
+    names, _ = dbt_runner.extract_message_by_status(result, ["error", "Fail", "runtime error"])
+
+    assert names == ["model_a", "model_b"]
+
+
+def test_parse_number_of_warnings_counts_the_warn_status_in_any_case():
+    statuses = [_DbtOssFreshnessStatus.WARN, "warn", "pass", "error"]
+    result = SimpleNamespace(result=SimpleNamespace(results=[SimpleNamespace(status=s) for s in statuses]))
+
+    assert dbt_runner.parse_number_of_warnings(result) == 2
 
 
 def _dbt_event(event_class: str, **kwargs):

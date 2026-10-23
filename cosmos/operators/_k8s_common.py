@@ -57,7 +57,7 @@ except ImportError:
         pass
 
 
-from cosmos.dbt.parser.output import extract_log_issues
+from cosmos.dbt.parser.output import DBT_V2_SUMMARY_WARN_RE, extract_log_issues
 from cosmos.operators._watcher.base import store_dbt_resource_status_from_log
 from cosmos.operators.base import AbstractDbtBase
 
@@ -309,12 +309,12 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         """
         Detect warnings using the standard dbt summary pattern.
 
-        Pattern: "Done. PASS=X WARN=Y ERROR=Z SKIP=W"
+        Pattern: "Done. PASS=X WARN=Y ERROR=Z SKIP=W", or "Summary: N total | ... | Y warn" on dbt 2
 
         :param log_text: Complete log text from the pod
         :return: Number of warnings detected, or None if pattern not found
         """
-        match = _WARN_COUNT_PATTERN.search(log_text)
+        match = _WARN_COUNT_PATTERN.search(log_text) or DBT_V2_SUMMARY_WARN_RE.search(log_text)
         if match:
             return int(match.group(1))
         return None

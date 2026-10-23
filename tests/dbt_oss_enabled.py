@@ -59,10 +59,6 @@ _NO_DATASETS = (
     "KeyError (logged at debug level) and the inlets and outlets stay empty (reproduced locally with dbt-oss 2.0.8)"
 )
 _NO_LOAD_ERROR = "dbt-oss does not raise the load error the test expects"
-_AUTO_INSTALLS_DEPS = (
-    "dbt-oss installs the missing dbt_packages itself on dbt ls, so the failure the test expects does not happen "
-    "(reproduced locally with dbt-oss 2.0.8)"
-)
 _TEXT_OUTPUT_NOT_PARSED = (
     "Cosmos does not parse the text output of dbt 2 in subprocess mode: it has 'Summary: 1 total | 1 warn' and "
     "'Warned test <name>', not the 'Done. WARN=N TOTAL=N' and 'Failure in test <name>' lines the parsers read "
@@ -93,9 +89,6 @@ SKIPPED_TESTS: dict[str, str] = {
     # dbt 2 subprocess text output is not parsed (2)
     "tests/operators/test_local.py::test_run_test_operator_with_callback_and_trailing_dbt_output": _TEXT_OUTPUT_NOT_PARSED,
     "tests/operators/test_local.py::test_run_test_operator_subprocess_failure_exposes_failing_tests": _TEXT_OUTPUT_NOT_PARSED,
-    # dbt-oss installs missing dependencies on dbt ls instead of failing (2)
-    "tests/dbt/test_graph.py::test_run_command_with_dbt_runner_exception": _AUTO_INSTALLS_DEPS,
-    "tests/dbt/test_runner.py::test_handle_exception_if_needed_after_exception": _AUTO_INSTALLS_DEPS,
     # dbt-oss has no partial parsing artifact (4)
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[False]": _NO_PARTIAL_PARSE,
     "tests/dbt/test_graph.py::test_load_via_dbt_ls_caching_partial_parsing_subprocess[True]": _NO_PARTIAL_PARSE,

@@ -268,6 +268,10 @@ def test_run_command(valid_dbt_project_dir):
     assert dbt_runner.handle_exception_if_needed(response) is None
 
 
+@pytest.mark.skipif(
+    dbt_runner.is_dbt_v2(),
+    reason="dbt 2 installs the missing dbt_packages itself on dbt ls, so the command does not fail",
+)
 @pytest.mark.integration
 def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
     # The following command will fail because we didn't run `dbt deps` in advance
@@ -295,6 +299,21 @@ def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
     else:
         expected2 = "dbt expects 1 package(s) based on packages specified in packages.yml, but found only 0 package(s) installed in dbt_packages"
     assert expected2 in err_msg
+
+
+@pytest.mark.integration
+def test_handle_exception_if_needed_after_exception_invalid_project_file(valid_dbt_project_dir):
+    """Same path as above, with a failure every dbt version raises: ``dbt_project.yml`` is not valid YAML."""
+    (valid_dbt_project_dir / "dbt_project.yml").write_text("name: [broken\n")
+
+    response = dbt_runner.run_command(command=["dbt", "ls"], env=os.environ, cwd=valid_dbt_project_dir)
+    assert not response.success
+    assert response.exception
+
+    with pytest.raises(CosmosDbtRunError) as exc_info:
+        dbt_runner.handle_exception_if_needed(response)
+
+    assert "dbt invocation did not complete with unhandled error:" in str(exc_info.value)
 
 
 @pytest.mark.integration

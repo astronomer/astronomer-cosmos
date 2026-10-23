@@ -38,6 +38,7 @@ from cosmos.dbt.graph import (
     run_command,
     run_command_with_subprocess,
 )
+from cosmos.dbt.runner import is_dbt_v2
 from cosmos.dbt.selector import YamlSelectors
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -2382,6 +2383,10 @@ def test_run_command_uses_dbt_runner_for_dbt_v1_ls(
     assert not mock_subprocess.called
 
 
+@pytest.mark.skipif(
+    is_dbt_v2(),
+    reason="dbt 2 installs the missing dbt_packages itself on dbt ls, so the missing-packages error never occurs",
+)
 @pytest.mark.integration
 def test_run_command_with_dbt_runner_exception(tmp_dbt_project_dir):
     with pytest.raises(CosmosLoadDbtException) as err_info:

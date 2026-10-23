@@ -45,9 +45,10 @@ from cosmos.operators._watcher.state import (
 )
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
-    _delete_xcom_backup_variable,
+    _delete_xcom_backup,
     _init_xcom_backup,
-    _restore_xcom_from_variable,
+    _log_missing_backup,
+    _restore_xcom_backup,
 )
 from cosmos.operators.base import (
     DbtBuildMixin,
@@ -506,7 +507,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         reliable_retry = settings.enable_watcher_reliable_retry
 
         if try_number > 1:
-            _restore_xcom_from_variable(context)
+            if not _restore_xcom_backup(context, read_task_state_store=reliable_retry):
+                _log_missing_backup(context, try_number, read_task_state_store=reliable_retry)
             raise AirflowSkipException(
                 "Dbt WATCHER producer task does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
@@ -523,12 +525,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             return_value = super().execute(context=context, **kwargs)
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             if reliable_retry:
-                _delete_xcom_backup_variable(context)
+                _delete_xcom_backup(context)
             return return_value
 
         except Exception:
-            # The on-failure callback flushes the in-memory backup to the Variable; here we only
-            # record that the producer finished so consumer sensors stop waiting.
+            # Without a task store, the retry callback flushes the in-memory backup to the Variable; here we
+            # only record that the producer finished so consumer sensors stop waiting.
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             raise
 

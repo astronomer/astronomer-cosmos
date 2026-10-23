@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -483,7 +484,7 @@ def test_pod_manager_passes_extra_kwargs_only_to_marked_callbacks():
     ),
 )
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._delete_xcom_backup")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
 def test_execute_watcher_producer(mock_init, mock_delete, extra_kwargs: dict):
     ti = MagicMock()
@@ -499,8 +500,10 @@ def test_execute_watcher_producer(mock_init, mock_delete, extra_kwargs: dict):
     mock_delete.assert_called_once_with(context)
 
 
-@patch("cosmos.operators._k8s_common._restore_xcom_from_variable")
-def test_execute_watcher_producer_skips_retry(mock_restore):
+@pytest.mark.parametrize("reliable_retry", [True, False])
+@patch("cosmos.operators._k8s_common._restore_xcom_backup")
+def test_execute_watcher_producer_skips_retry(mock_restore, reliable_retry):
+    """A retry restores and skips; the task store is read only when enable_watcher_reliable_retry is on (#2771)."""
     from airflow.exceptions import AirflowSkipException
 
     ti = MagicMock()
@@ -508,15 +511,18 @@ def test_execute_watcher_producer_skips_retry(mock_restore):
     context = {"ti": ti, "run_id": "test_run"}
     parent_execute = MagicMock()
 
-    with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
+    with (
+        patch("cosmos.settings.enable_watcher_reliable_retry", reliable_retry),
+        pytest.raises(AirflowSkipException, match="does not support Airflow retries"),
+    ):
         execute_watcher_producer(MagicMock(), context, parent_execute)
 
-    mock_restore.assert_called_once_with(context)
+    mock_restore.assert_called_once_with(context, read_task_state_store=reliable_retry)
     parent_execute.assert_not_called()
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", True)
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._delete_xcom_backup")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
 def test_execute_watcher_producer_keeps_backup_on_failure(mock_init, mock_delete):
     """On failure the backup Variable is kept (not deleted) for the retry; the on-failure
@@ -534,7 +540,7 @@ def test_execute_watcher_producer_keeps_backup_on_failure(mock_init, mock_delete
 
 
 @patch("cosmos.settings.enable_watcher_reliable_retry", False)
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._delete_xcom_backup")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
 def test_execute_watcher_producer_in_memory_mode_skips_variable_backup(mock_init, mock_delete):
     """With enable_watcher_reliable_retry=False the producer keeps the buffer in memory only (#2776)."""
@@ -550,6 +556,46 @@ def test_execute_watcher_producer_in_memory_mode_skips_variable_backup(mock_init
     mock_delete.assert_not_called()
 
 
+@patch("cosmos.settings.enable_watcher_reliable_retry", False)
+@patch("cosmos.operators._k8s_common._delete_xcom_backup")
+@patch("cosmos.operators._k8s_common._init_xcom_backup")
+def test_execute_watcher_producer_not_reliable_keeps_the_variable_flush_with_a_task_state_store(mock_init, mock_delete):
+    """With enable_watcher_reliable_retry=False the task store is left alone and nothing is deleted on success (#2771)."""
+    ti = MagicMock()
+    ti.try_number = 1
+    context = {"ti": ti, "run_id": "test_run", "task_state_store": MagicMock()}
+
+    execute_watcher_producer(MagicMock(), context, MagicMock(return_value="result"))
+
+    mock_init.assert_called_once_with(context, persist=False)
+    mock_delete.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "task_state_store,expected_level",
+    [(MagicMock(), logging.WARNING), (None, logging.INFO)],
+    ids=["task-store-in-use", "variable-only"],
+)
+@patch("cosmos.settings.enable_watcher_reliable_retry", True)
+@patch("cosmos.operators._k8s_common._restore_xcom_backup", return_value=False)
+def test_execute_watcher_producer_logs_when_no_backup_is_found_on_retry(
+    mock_restore, caplog, task_state_store, expected_level
+):
+    from airflow.exceptions import AirflowSkipException
+
+    ti = MagicMock()
+    ti.try_number = 2
+    context = {"ti": ti, "run_id": "test_run"}
+    if task_state_store is not None:
+        context["task_state_store"] = task_state_store
+
+    with caplog.at_level(logging.INFO), pytest.raises(AirflowSkipException):
+        execute_watcher_producer(MagicMock(), context, MagicMock())
+
+    record = next(r for r in caplog.records if "No XCom backup found for attempt #2" in r.getMessage())
+    assert record.levelno == expected_level
+
+
 def test_execute_watcher_producer_raises_when_ti_missing():
     from airflow.exceptions import AirflowException
 
@@ -557,7 +603,7 @@ def test_execute_watcher_producer_raises_when_ti_missing():
         execute_watcher_producer(MagicMock(), {"ti": None}, MagicMock())
 
 
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._delete_xcom_backup")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
 def test_execute_watcher_producer_sets_context_before_parent_execute(mock_init, mock_delete):
     """The context holder (read by build_watcher_pod_manager) is populated before parent_execute runs."""
@@ -577,7 +623,7 @@ def test_execute_watcher_producer_sets_context_before_parent_execute(mock_init, 
     operator._upstream_failure_skipped_ids.clear.assert_called_once_with()
 
 
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._delete_xcom_backup")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
 def test_execute_watcher_producer_publishes_own_cmd_flags_to_xcom(mock_init, mock_delete):
     """The producer must publish its own rendered ``add_cmd_flags()`` so consumer fallback runs can

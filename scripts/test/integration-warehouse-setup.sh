@@ -5,6 +5,9 @@ set -e
 
 AIRFLOW_VERSION="$1"
 DBT_VERSION="$2"
+# TEMP, REVERT BEFORE MERGE: pull_request_target runs the workflow file from main, so the new 2.0-dbt-oss matrix cell
+# does not run on this PR. Force the existing dbt 1.12 cell to install dbt-oss so the tests can run against it in CI.
+DBT_VERSION="2.0-dbt-oss"
 # dbt-oss has no lockfile of its own: its environment starts from the dbt 1.12 one (see pre-install-airflow.sh).
 case "$DBT_VERSION" in
   *-dbt-oss) LOCKFILE_DBT_VERSION="1.12" ;;

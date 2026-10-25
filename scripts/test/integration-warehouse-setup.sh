@@ -28,6 +28,12 @@ case "$DBT_VERSION" in
     # dbt 1.x).
     sh scripts/test/install-dbt-oss.sh "$DBT_VERSION"
     pip install -c "$CONSTRAINTS_FILE" databricks-sql-connector snowflake-connector-python
+    # None of the dbt 1.x packages that provide the `dbt` package may be left next to dbt-oss, in particular not the
+    # Databricks and Snowflake adapters, or the job would not be testing dbt-oss.
+    if pip freeze | grep -i -E '^(dbt-core|dbt-adapters|dbt-databricks|dbt-snowflake)=='; then
+      echo "::error::A dbt 1.x package is installed next to dbt-oss"
+      exit 1
+    fi
     ;;
   *)
     pip install -c "$CONSTRAINTS_FILE" "dbt-databricks>=1.12.5,<1.13" "dbt-snowflake>=1.12,<1.13"

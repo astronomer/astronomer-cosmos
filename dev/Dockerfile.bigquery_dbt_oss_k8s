@@ -20,6 +20,10 @@ RUN mkdir dags
 COPY dags dags
 RUN rm dags/dbt/jaffle_shop/packages.yml
 
+# dbt-oss opens a seed CSV relative to the working directory (/), not to --project-dir (dags/dbt/jaffle_shop), so make
+# `seeds/<file>.csv` resolve from there too.
+RUN ln -s /dags/dbt/jaffle_shop/seeds /seeds
+
 # The DAGs run dbt with the profiles.yml of the project (profiles_yml_filepath), so replace that one and keep a copy
 # where dbt looks by default.
 COPY profiles.bigquery_dbt_oss_k8s.yml dags/dbt/jaffle_shop/profiles.yml

@@ -247,10 +247,10 @@ jobs:
         run: |
           hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_dataset.py delete
 
-  # The Kubernetes example DAG with dbt-oss in the task pods, against BigQuery. test.yml runs the Kubernetes examples with
-  # dbt 1.x and a Postgres in the cluster (Run-Kubernetes-Tests); that job is unchanged. Only jaffle_shop_watcher_kubernetes
-  # runs here: jaffle_shop_kubernetes ends with a dbt docs task, which dbt-oss does not support. Airflow runs on the runner
-  # and only the dbt pods run in the KinD cluster.
+  # The Kubernetes example DAGs with dbt-oss in the task pods, against BigQuery. test.yml runs the Kubernetes examples with
+  # dbt 1.x and a Postgres in the cluster (Run-Kubernetes-Tests); that job is unchanged. jaffle_shop_kubernetes ends with a
+  # dbt docs task, which dbt-oss does not support, so its test runs that task as a no-op. Airflow runs on the runner and
+  # only the dbt pods run in the KinD cluster.
   Run-dbt-oss-BigQuery-Kubernetes-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
@@ -322,15 +322,15 @@ jobs:
             --from-literal=host=not-used \
             --from-file=password="$KEYFILE"
 
-      - name: Test the Kubernetes example against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
+      - name: Test the Kubernetes examples against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
         run: |
           HATCH_ENV="tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}"
           hatch run "$HATCH_ENV:test-dbt-oss-setup"
           hatch run "$HATCH_ENV:test-kubernetes-dbt-oss"
         env:
           COSMOS_TEST_ADAPTER: bigquery
-          # The DAG file jaffle_shop_kubernetes is parsed too (the test parses both): it needs the BigQuery profile
-          # mapping in place of the Postgres one, like the other example DAGs of this workflow.
+          # jaffle_shop_kubernetes builds its profile with the Postgres profile mapping for the DAG parsing, so it needs
+          # the BigQuery mapping in place of it, like the other example DAGs of this workflow.
           PYTEST_PLUGINS: tests.dbt_oss_plugin
           PYTEST_ADDOPTS: -rfEs
           POSTGRES_DB: ${{ env.COSMOS_TEST_BIGQUERY_PROJECT }}

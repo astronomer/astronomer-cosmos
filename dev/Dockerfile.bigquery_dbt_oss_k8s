@@ -1,0 +1,26 @@
+# The dbt image of the Kubernetes example DAGs for the dbt-oss workflow (.github/workflows/test-dbt-oss.yml): dbt-oss
+# with a BigQuery profile in place of the Postgres one of Dockerfile.postgres_profile_docker_k8s. Build it from this
+# directory, with the same tag the DAGs use:
+#
+#   docker build -t dbt-jaffle-shop:1.0.0 -f Dockerfile.bigquery_dbt_oss_k8s \
+#     --build-arg COSMOS_TEST_BIGQUERY_PROJECT=<project> --build-arg COSMOS_TEST_BIGQUERY_DATASET=<dataset> .
+#
+# The service account key is not in the image. The DAGs give the pod POSTGRES_PASSWORD from the key `password` of the
+# secret `postgres-secrets`, so the workflow stores the key there and the profile reads it from that variable.
+FROM python:3.12
+
+RUN pip install --no-cache-dir "dbt-oss~=2.0.0" boto3
+
+ARG COSMOS_TEST_BIGQUERY_PROJECT
+ARG COSMOS_TEST_BIGQUERY_DATASET
+ENV COSMOS_TEST_BIGQUERY_PROJECT=${COSMOS_TEST_BIGQUERY_PROJECT}
+ENV COSMOS_TEST_BIGQUERY_DATASET=${COSMOS_TEST_BIGQUERY_DATASET}
+
+RUN mkdir dags
+COPY dags dags
+RUN rm dags/dbt/jaffle_shop/packages.yml
+
+# The DAGs run dbt with the profiles.yml of the project (profiles_yml_filepath), so replace that one and keep a copy
+# where dbt looks by default.
+COPY profiles.bigquery_dbt_oss_k8s.yml dags/dbt/jaffle_shop/profiles.yml
+RUN mkdir /root/.dbt && cp dags/dbt/jaffle_shop/profiles.yml /root/.dbt/profiles.yml

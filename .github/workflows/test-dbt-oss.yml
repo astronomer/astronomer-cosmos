@@ -251,7 +251,7 @@ jobs:
   # dbt 1.x and a Postgres in the cluster (Run-Kubernetes-Tests); that job is unchanged. Only jaffle_shop_watcher_kubernetes
   # runs here: jaffle_shop_kubernetes ends with a dbt docs task, which dbt-oss does not support. Airflow runs on the runner
   # and only the dbt pods run in the KinD cluster.
-  Run-dbt-oss-Kubernetes-Tests:
+  Run-dbt-oss-BigQuery-Kubernetes-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-latest

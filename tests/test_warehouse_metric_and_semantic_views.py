@@ -16,7 +16,6 @@ Databricks gets a throwaway schema. The Snowflake CI role cannot create schemas,
 from __future__ import annotations
 
 import json
-import logging
 import os
 import uuid
 import warnings
@@ -394,44 +393,6 @@ def assert_warehouse_objects(warehouse: Warehouse) -> None:
         assert warehouse.revenue_from_downstream_table(cursor) == SEEDED_REVENUE_BY_STATUS
 
 
-# TEMP, revert before merge: the Databricks watcher run emits no asset events on dbt-oss, so log what the producer
-# resolved. Keep the warehouse clients quiet, since log_cli_level=DEBUG is set for this job.
-for _noisy_logger in ("databricks", "snowflake", "urllib3", "botocore", "asyncio"):
-    logging.getLogger(_noisy_logger).setLevel(logging.WARNING)
-
-
-def diagnose_asset_events(dag_id: str, run_id: str, warehouse: Warehouse) -> str:
-    """TEMP, revert before merge. Describe the dataset namespace, the producer XComs and every asset event of the run."""
-    lines: list[str] = []
-    try:
-        from cosmos.dataset import get_dataset_namespace
-
-        lines.append(f"dataset namespace: {get_dataset_namespace(warehouse.profile_config)!r}")
-    except Exception as error:  # noqa: BLE001
-        lines.append(f"dataset namespace failed: {error!r}")
-    try:
-        from airflow.models.xcom import XComModel as XComTable
-    except ImportError:
-        from airflow.models.xcom import XCom as XComTable  # type: ignore[assignment]
-    try:
-        with create_session() as session:
-            rows = session.query(XComTable).filter(XComTable.dag_id == dag_id, XComTable.run_id == run_id).all()
-            for row in rows:
-                if row.key.endswith("_status") or row.key == "uri":
-                    lines.append(f"xcom {row.task_id} {row.key} = {str(row.value)[:300]}")
-    except Exception as error:  # noqa: BLE001
-        lines.append(f"xcom query failed: {error!r}")
-    try:
-        from airflow.models.asset import AssetEvent
-
-        with create_session() as session:
-            for event in session.query(AssetEvent).filter(AssetEvent.source_dag_id == dag_id).all():
-                lines.append(f"asset event {event.source_run_id} {event.source_task_id} {event.asset.uri}")
-    except Exception as error:  # noqa: BLE001
-        lines.append(f"asset event query failed: {error!r}")
-    return "\n".join(lines)
-
-
 def asset_event_uris_by_task(dag_id: str, run_id: str) -> dict[str, list[str]]:
     from airflow.models.asset import AssetEvent
 
@@ -559,5 +520,5 @@ def test_semantic_metric_view_task_emits_asset_events(
     chain = expected_task_chain(warehouse)
     for run_id in run_ids_by_dag_id[dag.dag_id]:
         events = asset_event_uris_by_task(dag.dag_id, run_id)
-        assert events.get(chain[1]), (run_id, events, diagnose_asset_events(dag.dag_id, run_id, warehouse))
+        assert events.get(chain[1]), (run_id, events)
         assert events.get(semantic_task_id_in(chain)), (run_id, events)

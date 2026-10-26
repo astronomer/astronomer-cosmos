@@ -72,11 +72,9 @@ def parse_number_of_warnings_dbt_runner(result: dbtRunnerResult) -> int:
     """Parses a dbt runner result and returns the number of warnings found. This only works for dbtRunnerResult
     from invoking dbt build, compile, run, seed, snapshot, test, or run-operation.
     """
-    num = 0
-    for run_result in result.result.results:
-        if run_result.status == "warn":
-            num += 1
-    return num
+    from cosmos.dbt.runner import parse_number_of_warnings
+
+    return parse_number_of_warnings(result)
 
 
 def extract_freshness_warn_msg(result: FullOutputSubprocessResult) -> tuple[list[str], list[str]]:

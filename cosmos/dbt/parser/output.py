@@ -21,6 +21,8 @@ DBT_SUMMARY_WARN_RE = re.compile(r"Done\..*\bWARN=(\d+)\b.*\bTOTAL=\d+")
 # dbt 2 (dbt-oss) prints "Summary: 4 total | 1 success | 1 warn | 2 error" instead, leaving out the categories that
 # are 0.
 DBT_V2_SUMMARY_WARN_RE = re.compile(r"Summary:\s*\d+ total\b.*\|\s*(\d+) warn\b")
+# dbt prints colour codes when the output is a terminal or colours are forced.
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def _dbt_log_message(line: str) -> str:
@@ -52,6 +54,7 @@ def parse_number_of_warnings_subprocess(result: FullOutputSubprocessResult) -> i
     # Output: 1
     """
     for line in reversed(result.full_output):
+        line = _ANSI_ESCAPE_RE.sub("", line)
         match = DBT_SUMMARY_WARN_RE.search(line) or DBT_V2_SUMMARY_WARN_RE.search(line)
         if match:
             return int(match.group(1))
@@ -160,13 +163,12 @@ def extract_dbt_failure_details(log_list: list[str]) -> list[str]:
     """
     # dbt <= 1.11 prints "Failure in test <name> (<path>)"; dbt 1.12 reworded this to
     # "[ERROR]: in test <name> (<path>)" (also used for errored models) and prefixes the detail line the same way.
-    ansi = re.compile(r"\x1b\[[0-9;]*m")
     timestamp = re.compile(r"^\d{2}:\d{2}:\d{2}\s+")
     error_prefix = re.compile(r"^\[ERROR\]:\s*")
     marker = re.compile(r"^(?:(?:Failure|Error) in |\[ERROR\]:\s*in )(.*)")
 
     def clean_line(line: str) -> str:
-        return timestamp.sub("", ansi.sub("", line).strip())
+        return timestamp.sub("", _ANSI_ESCAPE_RE.sub("", line).strip())
 
     # dbt 2 prints "Failed test  <name> (<path>) [1 of 4 in 1.0s]" for a failing test, and, in text output only, lists
     # the ones that returned rows under "Test Failures" as "Test failed (4 failed row(s)): <name>".

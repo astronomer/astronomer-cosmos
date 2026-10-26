@@ -205,6 +205,22 @@ def test_on_pod_completion_test_operator_with_warnings():
     callback.assert_called_once()
 
 
+def test_on_pod_completion_dbt_v2_logs_fire_the_callback_with_the_warned_tests():
+    callback = MagicMock()
+    task = MagicMock(spec=DbtTestKubernetesOperator)
+    task.pod_manager.read_pod_logs.return_value = [
+        b"10:29:03  Warned test  accepted_values_orders_status (models/schema.yml) [1 of 3 in 0.5s]",
+        b"10:29:03  Summary: 3 total | 2 success | 1 warn",
+    ]
+    context = {"task_instance": MagicMock(task=task)}
+    handler = _make_handler(on_warning_callback=callback, context=context)
+
+    handler.on_pod_completion(pod=MagicMock())
+
+    callback.assert_called_once_with(context)
+    assert context["test_names"] == ["accepted_values_orders_status"]
+
+
 def test_on_pod_completion_falls_back_to_provider_context():
     """After a deferral, the resumed operator never ran ``execute``: the handler uses the context from the provider."""
     callback = MagicMock()

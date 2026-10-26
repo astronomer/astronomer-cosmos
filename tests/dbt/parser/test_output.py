@@ -33,6 +33,11 @@ def _subprocess_result(full_output: list[str]) -> FullOutputSubprocessResult:
         (["Summary: 3 total | 3 warn"], 3),
         (["Summary: 1 total | 1 success"], 0),
         (["Summary: 1 total | 1 error"], 0),
+        # Colours forced with CLICOLOR_FORCE=1.
+        (
+            ["Summary: \x1b[37m\x1b[1m9 total\x1b[0m | \x1b[32m\x1b[1m6 success\x1b[0m | \x1b[33m\x1b[1m3 warn\x1b[0m"],
+            3,
+        ),
     ],
 )
 def test_parse_number_of_warnings_subprocess(full_output: list[str], expected_warnings: int):
@@ -141,12 +146,19 @@ def test_extract_log_issues_dbt_1_12_format() -> None:
     assert test_results == ["Got 4 results, configured to warn if >1"]
 
 
-def test_extract_log_issues_dbt_1_ignores_warnings_above_finished_running() -> None:
+@pytest.mark.parametrize(
+    "finished_running",
+    [
+        "11:17:43  Finished running 1 test in 0 hours 0 minutes and 0.13 seconds (0.13s).",
+        "11:17:43  Finished running 10 data tests, 3 unit tests in 0 hours 0 minutes and 0.78 seconds (0.78s).",
+    ],
+)
+def test_extract_log_issues_dbt_1_ignores_warnings_above_finished_running(finished_running: str) -> None:
     """Only the warnings after ``Finished running N tests`` belong to the test run; older ones are excluded."""
     log_list = [
         "11:17:40  Warning in test older_test (models/schema.yml)",
         "11:17:40  Got 2 results, configured to warn if >1",
-        "11:17:43  Finished running 1 test in 0 hours 0 minutes and 0.13 seconds (0.13s).",
+        finished_running,
         "11:17:43  Warning in test new_test (models/schema.yml)",
         "11:17:43  Got 4 results, configured to warn if >1",
     ]

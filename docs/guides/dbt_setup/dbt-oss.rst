@@ -71,6 +71,8 @@ These are the differences between dbt OSS and dbt Core 1.x that Cosmos accounts 
      - dbt OSS leaves ``args.profiles_dir`` out of ``run_results.json``. With ``openlineage-integration-common`` older than 1.44.0, this stops the ``inlets`` and ``outlets`` from being filled. Cosmos adds the value from ``--profiles-dir`` or ``DBT_PROFILES_DIR``.
    * - dbt docs
      - ``dbt docs generate`` writes a different site, without ``catalog.json``. ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` upload its ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``.
+   * - ``--vars`` and ``--args``
+     - Cosmos writes dict values for these flags as one-line flow YAML, for example ``{var: '2'}``, because dbt OSS rejects block YAML that contains quoted strings. It does this for every dbt version, so only the flag text in task logs and rendered commands differs from before. See `#3099 <https://github.com/astronomer/astronomer-cosmos/pull/3099>`_.
    * - ``ExecutionMode.VIRTUALENV``
      - Add dbt OSS to ``py_requirements``, for example ``["dbt-oss~=2.0.0"]``. Cosmos checks the Airflow environment, not the virtual environment, so the ``inlets`` and ``outlets`` handling above also needs dbt OSS in the Airflow environment.
 
@@ -89,6 +91,8 @@ Limitations
      - The ``dbtRunner`` of dbt OSS has no callbacks, and dbt does not plan to add them. With ``InvocationMode.DBT_RUNNER``, the error for a failed ``run-operation`` does not include the macro error text.
    * - Empty models
      - ``dbt ls`` does not list empty models, so ``LoadMode.DBT_LS`` does not render them.
+   * - Projects with the same name (``InvocationMode.DBT_RUNNER``)
+     - dbt OSS keeps the macros of a project by package name for the lifetime of the Python process, so two dbt projects with the same ``name`` that run in one worker process can resolve each other's macros. Give each project a unique ``name``. See `#3116 <https://github.com/astronomer/astronomer-cosmos/pull/3116>`_.
    * - ``ExecutionMode.AIRFLOW_ASYNC``
      - Not supported or verified with dbt OSS. See `#3103 <https://github.com/astronomer/astronomer-cosmos/issues/3103>`_.
    * - Assets with ``ExecutionMode.WATCHER`` and ``LoadMode.DBT_LS``

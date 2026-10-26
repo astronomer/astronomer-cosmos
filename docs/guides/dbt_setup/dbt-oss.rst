@@ -46,33 +46,75 @@ How to use
 How Cosmos behaves with dbt OSS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ``LoadMode.DBT_LS`` runs ``dbt ls`` in a subprocess, even with ``InvocationMode.DBT_RUNNER``, because the dbt OSS ``dbtRunner`` returns only node names for ``dbt ls --output json``. ``dbt deps`` still runs through ``dbtRunner``.
-- dbt OSS installs missing dbt packages itself during ``dbt ls``, even when ``install_dbt_deps`` is ``False``.
-- ``ExecutionMode.WATCHER`` runs the producer task in a subprocess, because the ``dbtRunner`` of dbt OSS has no event callbacks. Setting ``InvocationMode.DBT_RUNNER`` for the producer raises ``CosmosValueError``.
-- When an upstream node fails, dbt OSS reports the nodes it skips in a different way. ``ExecutionMode.WATCHER`` uses the dbt graph to find them, so their consumer tasks run when the upstream node succeeds on a retry.
-- With ``InvocationMode.SUBPROCESS``, Cosmos reads the text output of dbt OSS to count test warnings for ``on_warning_callback`` and to name the failing tests in the error.
-- dbt OSS leaves ``args.profiles_dir`` out of ``run_results.json``. With ``openlineage-integration-common`` older than 1.44.0, this stops the ``inlets`` and ``outlets`` from being filled. Cosmos adds the value from ``--profiles-dir`` or ``DBT_PROFILES_DIR``.
-- ``dbt docs generate`` writes a different site, without ``catalog.json``. ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` upload its ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``.
-- With ``ExecutionMode.VIRTUALENV``, add dbt OSS to ``py_requirements``, for example ``["dbt-oss~=2.0.0"]``. Cosmos checks the Airflow environment, not the virtual environment, so the ``inlets`` and ``outlets`` handling above also needs dbt OSS in the Airflow environment.
+These are the differences between dbt OSS and dbt Core 1.x that Cosmos accounts for.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Area
+     - What Cosmos does
+   * - DAG parsing (``LoadMode.DBT_LS``)
+     - Runs ``dbt ls`` in a subprocess, even with ``InvocationMode.DBT_RUNNER``, because the dbt OSS ``dbtRunner`` returns only node names for ``dbt ls --output json``. ``dbt deps`` still runs through ``dbtRunner``.
+   * - Missing dbt packages
+     - dbt OSS installs them itself during ``dbt ls``, even when ``install_dbt_deps`` is ``False``.
+   * - ``ExecutionMode.WATCHER``
+     - Runs the producer task in a subprocess, because the ``dbtRunner`` of dbt OSS has no event callbacks. Setting ``InvocationMode.DBT_RUNNER`` for the producer raises ``CosmosValueError``.
+   * - ``ExecutionMode.WATCHER``, upstream failure
+     - dbt OSS reports the nodes it skips in a different way. Cosmos uses the dbt graph to find them, so their consumer tasks run when the upstream node succeeds on a retry.
+   * - Test warnings and failures (``InvocationMode.SUBPROCESS``)
+     - Reads the text output of dbt OSS to count test warnings for ``on_warning_callback`` and to name the failing tests in the error.
+   * - ``inlets`` and ``outlets``
+     - dbt OSS leaves ``args.profiles_dir`` out of ``run_results.json``. With ``openlineage-integration-common`` older than 1.44.0, this stops the ``inlets`` and ``outlets`` from being filled. Cosmos adds the value from ``--profiles-dir`` or ``DBT_PROFILES_DIR``.
+   * - dbt docs
+     - ``dbt docs generate`` writes a different site, without ``catalog.json``. ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` upload its ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``.
+   * - ``ExecutionMode.VIRTUALENV``
+     - Add dbt OSS to ``py_requirements``, for example ``["dbt-oss~=2.0.0"]``. Cosmos checks the Airflow environment, not the virtual environment, so the ``inlets`` and ``outlets`` handling above also needs dbt OSS in the Airflow environment.
 
 Limitations
 ~~~~~~~~~~~
 
-- **Partial parsing**: ``partial_parse`` has no effect, because dbt OSS does not write ``target/partial_parse.msgpack``. dbt OSS has its own opt-in partial parsing, which Cosmos does not use.
-- **Event callbacks**: the ``dbtRunner`` of dbt OSS has no callbacks, and dbt does not plan to add them. With ``InvocationMode.DBT_RUNNER``, the error for a failed ``run-operation`` does not include the macro error text.
-- **Empty models**: ``dbt ls`` does not list empty models, so ``LoadMode.DBT_LS`` does not render them.
-- **Kubernetes watcher modes**: ``WATCHER_KUBERNETES`` and ``WATCHER_GCP_GKE`` do not get the skipped-node handling described above, because the scheduler cannot see the dbt version inside the pod.
-- **dbt-loom**: `dbt-loom <https://github.com/nicholasyager/dbt-loom>`_ does not work with dbt OSS, which blocks the plugin hook it uses. See `dbt-loom issue 192 <https://github.com/adrienneyager/dbt-loom/issues/192>`_.
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Area
+     - Limitation
+   * - Partial parsing
+     - ``partial_parse`` has no effect, because dbt OSS does not write ``target/partial_parse.msgpack``. dbt OSS has its own opt-in partial parsing, which Cosmos does not use.
+   * - Event callbacks
+     - The ``dbtRunner`` of dbt OSS has no callbacks, and dbt does not plan to add them. With ``InvocationMode.DBT_RUNNER``, the error for a failed ``run-operation`` does not include the macro error text.
+   * - Empty models
+     - ``dbt ls`` does not list empty models, so ``LoadMode.DBT_LS`` does not render them.
+   * - Kubernetes watcher modes
+     - ``WATCHER_KUBERNETES`` and ``WATCHER_GCP_GKE`` do not get the skipped-node handling above, because the scheduler cannot see the dbt version inside the pod.
+   * - dbt-loom
+     - `dbt-loom <https://github.com/nicholasyager/dbt-loom>`_ does not work with dbt OSS, which blocks the plugin hook it uses. See `dbt-loom issue 192 <https://github.com/adrienneyager/dbt-loom/issues/192>`_.
 
 Test coverage
 ~~~~~~~~~~~~~
 
-Cosmos CI runs the unit tests against ``dbt-oss`` on Python 3.11 to 3.14 and Airflow 2.9 to 3.4. It runs the integration tests against BigQuery on Python 3.11 and 3.12 and Airflow 2.10, 3.0 and 3.1. Python 3.10 is not tested with dbt OSS.
+Cosmos CI tests dbt OSS as follows:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Tests
+     - Python and Airflow versions
+   * - Unit tests, against ``dbt-oss``
+     - Python 3.11 to 3.14, Airflow 2.9 to 3.4
+   * - Integration tests, against BigQuery
+     - Python 3.11 and 3.12, Airflow 2.10, 3.0 and 3.1
+   * - Kubernetes integration tests (``ExecutionMode.KUBERNETES`` and ``ExecutionMode.WATCHER_KUBERNETES``)
+     - Python 3.12, Airflow 3.0
+
+Python 3.10 is not tested with dbt OSS.
 
 These are not tested with dbt OSS:
 
 - ``ExecutionMode.AIRFLOW_ASYNC``. Its BigQuery operator imports ``dbt-bigquery``, which cannot be installed next to dbt OSS.
-- Kubernetes execution modes other than ``ExecutionMode.KUBERNETES`` and ``ExecutionMode.WATCHER_KUBERNETES``, which run on Airflow 3.0 only.
+- Kubernetes execution modes other than ``ExecutionMode.KUBERNETES`` and ``ExecutionMode.WATCHER_KUBERNETES``.
 - ``ExecutionMode.DOCKER``, ``AWS_ECS``, ``AZURE_CONTAINER_INSTANCE`` and ``GCP_CLOUD_RUN_JOB``.
 - dbt Python models on Databricks.
 - Adapters that dbt OSS treats as experimental, such as Postgres.

@@ -230,11 +230,11 @@ The following code snippet shows how to provide this flag with the default jaffl
 dbt-oss
 +++++++++++++++
 
-``dbt docs generate`` of dbt-oss writes a different site, without ``catalog.json``.
+``dbt docs generate`` of dbt OSS writes a different site, without ``catalog.json``.
 When the S3, Azure and GCS operators find it in the ``target`` folder, they upload ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``, keeping the folder structure and setting the content type of each file.
 
-``--static`` is for dbt 1 only: dbt-oss does not accept it.
-The Airflow UI plugin also serves the ``assets/`` and ``info_schema/`` folders of the dbt-oss site, so it can show it. Copy the whole ``target`` folder (or the bucket prefix the operators upload to) to the ``dir`` of the project.
+``--static`` is for dbt 1 only: dbt OSS does not accept it.
+The Airflow UI plugin also serves the ``assets/`` and ``info_schema/`` folders of the dbt OSS site, so it can show it. Copy the whole ``target`` folder (or the bucket prefix the operators upload to) to the ``dir`` of the project.
 
 Custom callback
 +++++++++++++++

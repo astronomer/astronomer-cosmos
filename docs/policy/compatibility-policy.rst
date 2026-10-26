@@ -116,7 +116,7 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
   ``mashumaro`` dependency (e.g. ``mashumaro.exceptions.UnserializableField``),
   which hasn't caught up to Python 3.14's typing changes.
 - dbt Fusion (``2.0``) is **not** installed via ``pip install dbt-core==2.0``
-  — there is no such release on PyPI. Fusion ships as a separate
+  — there is no such release on PyPI. dbt Fusion ships as a separate
   binary/installer; this table's pip-based check does not apply to it.
 - dbt OSS (``2.0``) installs with ``pip install dbt-oss``. This table's
   pip-based check does not cover it.

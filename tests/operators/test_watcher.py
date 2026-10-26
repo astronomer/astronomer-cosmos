@@ -1061,6 +1061,155 @@ class TestStoreDbtStatusFromLog:
 
         mock_ensure.assert_called_once_with({}, "postgres://host:5432", "/tmp/project")
 
+    @staticmethod
+    def _model_log_line_with_relation(relation: dict[str, str] | None, resource_type: str = "model") -> str:
+        """A node event shaped like the ones of dbt-oss 2.0.8, whose ``node_info`` names the relation of the node."""
+        node_info: dict[str, Any] = {
+            "node_status": "success",
+            "unique_id": "model.pkg.my_model",
+            "resource_type": resource_type,
+        }
+        if relation is not None:
+            node_info["node_relation"] = relation
+        return json.dumps({"data": {"node_info": node_info}})
+
+    _RELATION = {
+        "database": "catalog",
+        "schema": "analytics",
+        "alias": "orders",
+        "relation_name": "catalog.analytics.orders",
+    }
+
+    def _store_with_empty_manifest(self, line: str, dataset_namespace: str | None, **kwargs: Any) -> dict[str, Any]:
+        """Run the parser as the watcher producer does when the manifest holds no URIs, and return the stored status."""
+        ti = _MockTI()
+        with patch("cosmos.operators._watcher.base._ensure_subprocess_model_outlet_uris"):
+            store_dbt_resource_status_from_log(
+                line,
+                {"context": {"ti": ti}, "project_dir": "/tmp/project"},
+                model_outlet_uris=kwargs.pop("model_outlet_uris", {}),
+                dataset_namespace=dataset_namespace,
+                **kwargs,
+            )
+        return ti.store["model__pkg__my_model_status"]
+
+    def test_store_dbt_resource_status_from_log_builds_uris_from_the_relation_when_the_manifest_has_none(self):
+        """dbt-oss writes manifest.json when the run ends, so the URI comes from the relation of the node event."""
+        from cosmos.dataset import construct_dataset_uri
+
+        status = self._store_with_empty_manifest(
+            self._model_log_line_with_relation(self._RELATION), "databricks://host", should_generate_model_uris=True
+        )
+
+        expected = construct_dataset_uri("databricks://host", "catalog.analytics.orders", warn_uri_migration=False)
+        assert status == {"status": "success", "outlet_uris": [expected]}
+
+    def test_store_dbt_resource_status_from_log_prefers_the_uris_of_the_manifest(self):
+        status = self._store_with_empty_manifest(
+            self._model_log_line_with_relation(self._RELATION),
+            "databricks://host",
+            model_outlet_uris={"model.pkg.my_model": ["databricks://host/from/manifest"]},
+            should_generate_model_uris=True,
+        )
+
+        assert status == {"status": "success", "outlet_uris": ["databricks://host/from/manifest"]}
+
+    def test_store_dbt_resource_status_from_log_builds_uris_from_the_relation_when_the_project_has_no_manifest(
+        self, tmp_path
+    ):
+        """The path of a dbt-oss run: nothing patched, and no ``target/manifest.json`` while the first node finishes."""
+        from cosmos.dataset import construct_dataset_uri
+
+        ti = _MockTI()
+        store_dbt_resource_status_from_log(
+            self._model_log_line_with_relation(self._RELATION),
+            {"context": {"ti": ti}, "project_dir": str(tmp_path)},
+            model_outlet_uris={},
+            dataset_namespace="databricks://host",
+            should_generate_model_uris=True,
+        )
+
+        expected = construct_dataset_uri("databricks://host", "catalog.analytics.orders", warn_uri_migration=False)
+        assert ti.store["model__pkg__my_model_status"] == {"status": "success", "outlet_uris": [expected]}
+
+    def test_store_dbt_resource_status_from_log_prefers_the_uris_of_the_manifest_of_the_project(self, tmp_path):
+        """With a ``target/manifest.json`` that names the node, its database, schema and alias win over the event."""
+        from cosmos.dataset import construct_dataset_uri
+
+        (tmp_path / "target").mkdir()
+        manifest = {
+            "nodes": {
+                "model.pkg.my_model": {
+                    "resource_type": "model",
+                    "database": "manifest_db",
+                    "schema": "manifest_schema",
+                    "alias": "manifest_alias",
+                }
+            }
+        }
+        (tmp_path / "target" / "manifest.json").write_text(json.dumps(manifest))
+
+        ti = _MockTI()
+        store_dbt_resource_status_from_log(
+            self._model_log_line_with_relation(self._RELATION),
+            {"context": {"ti": ti}, "project_dir": str(tmp_path)},
+            model_outlet_uris={},
+            dataset_namespace="databricks://host",
+            should_generate_model_uris=True,
+        )
+
+        expected = construct_dataset_uri(
+            "databricks://host", "manifest_db.manifest_schema.manifest_alias", warn_uri_migration=False
+        )
+        assert ti.store["model__pkg__my_model_status"] == {"status": "success", "outlet_uris": [expected]}
+
+    @pytest.mark.parametrize(
+        "relation, dataset_namespace, should_generate_model_uris",
+        [
+            pytest.param(None, "databricks://host", True, id="no-relation"),
+            pytest.param({"database": "catalog", "schema": "analytics"}, "databricks://host", True, id="no-alias"),
+            pytest.param(
+                {"database": "", "schema": "analytics", "alias": "orders"},
+                "databricks://host",
+                True,
+                id="empty-database",
+            ),
+            pytest.param(_RELATION, None, True, id="no-namespace"),
+            pytest.param(_RELATION, "databricks://host", False, id="uris-disabled"),
+        ],
+    )
+    def test_store_dbt_resource_status_from_log_builds_no_uri_without_a_full_relation_and_namespace(
+        self, relation, dataset_namespace, should_generate_model_uris
+    ):
+        status = self._store_with_empty_manifest(
+            self._model_log_line_with_relation(relation),
+            dataset_namespace,
+            should_generate_model_uris=should_generate_model_uris,
+        )
+
+        assert status == {"status": "success", "outlet_uris": []}
+
+    def test_store_dbt_resource_status_from_log_builds_no_uri_for_resources_that_do_not_emit_datasets(self):
+        ti = _MockTI()
+        line = json.dumps(
+            {
+                "data": {
+                    "node_info": {
+                        "node_status": "success",
+                        "unique_id": "model.pkg.my_model",
+                        "resource_type": "analysis",
+                        "node_relation": self._RELATION,
+                    }
+                }
+            }
+        )
+
+        store_dbt_resource_status_from_log(
+            line, {"context": {"ti": ti}}, dataset_namespace="databricks://host", should_generate_model_uris=True
+        )
+
+        assert ti.store["model__pkg__my_model_status"] == {"status": "success", "outlet_uris": []}
+
     def test_store_dbt_resources_status_from_log_detects_passed_test_status(self):
         """Test that a passed test status is correctly parsed and stored in XCom."""
         ti = _MockTI()

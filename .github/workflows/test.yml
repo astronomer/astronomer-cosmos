@@ -133,7 +133,7 @@ jobs:
             case "$f" in
               cosmos/*|pyproject.toml|requirements/*) WAREHOUSE_E2E_CHANGED=true; break ;;
               tests/test_warehouse_metric_and_semantic_views.py|tests/utils.py) WAREHOUSE_E2E_CHANGED=true; break ;;
-              scripts/test/integration-setup.sh|scripts/test/integration-warehouse.sh|scripts/test/integration-warehouse-setup.sh) WAREHOUSE_E2E_CHANGED=true; break ;;
+              scripts/test/integration-setup.sh|scripts/test/integration-warehouse.sh|scripts/test/integration-warehouse-setup.sh|scripts/test/install-dbt-oss.sh) WAREHOUSE_E2E_CHANGED=true; break ;;
               dev/dags/dbt/databricks_metric_view/*|dev/dags/dbt/snowflake_semantic_view/*) WAREHOUSE_E2E_CHANGED=true; break ;;
               dev/dags/example_databricks_metric_view.py|dev/dags/example_snowflake_semantic_view.py) WAREHOUSE_E2E_CHANGED=true; break ;;
               .github/workflows/test.yml) WAREHOUSE_E2E_CHANGED=true; break ;;
@@ -366,12 +366,16 @@ jobs:
     permissions:
       contents: read
     strategy:
+      # The dbt-oss cell must not cancel the dbt 1.12 one, or the other way round.
+      fail-fast: false
       matrix:
         python-version: ["3.11"]
         airflow-version: ["3.2"]
-        dbt-version: ["1.12"]
+        dbt-version: ["1.12", "2.0-dbt-oss"]
     env:
-      RESOURCE_PREFIX: cosmos_e2e_${{ github.run_id }}_${{ github.run_attempt }}
+      # One prefix per matrix cell: it names the Databricks schema and prefixes the Snowflake objects, so the cells
+      # would otherwise create and drop the same ones.
+      RESOURCE_PREFIX: cosmos_e2e_${{ github.run_id }}_${{ github.run_attempt }}_${{ strategy.job-index }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -404,7 +408,8 @@ jobs:
       - name: Install the warehouse adapters
         id: warehouse-adapters
         # The Airflow 3.2 + dbt 1.12 lockfile carries dbt-databricks 1.10 and no dbt-snowflake; metric
-        # views need dbt-databricks >= 1.12.5 and semantic views need dbt-snowflake.
+        # views need dbt-databricks >= 1.12.5 and semantic views need dbt-snowflake. dbt-oss has both adapters
+        # built in, so for 2.0-dbt-oss the script installs dbt-oss and only the warehouse clients the tests use.
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-warehouse-setup
 

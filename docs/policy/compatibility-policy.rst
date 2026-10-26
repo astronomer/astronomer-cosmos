@@ -121,7 +121,8 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
 - dbt OSS (``2.0``) installs with ``pip install dbt-oss``. This table's
   pip-based check does not cover it, so ``n/a`` does not mean untested:
   dbt OSS is tested in Cosmos CI (unit and integration tests, the
-  integration tests against BigQuery only).
+  integration tests against BigQuery, plus the Databricks metric view and
+  Snowflake semantic view tests).
 
 .. note::
 

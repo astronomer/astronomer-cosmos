@@ -7,14 +7,14 @@ dbt OSS support (experimental)
     Available since Cosmos 1.16.0.
 
 .. warning::
-    Support for dbt OSS is experimental. The behavior may change between Cosmos releases, and it is not recommended for production yet. Cosmos CI runs the integration tests against BigQuery only (see `#3101 <https://github.com/astronomer/astronomer-cosmos/issues/3101>`_).
+    Support for dbt OSS is experimental. The behavior may change between Cosmos releases, and it is not recommended for production yet. Cosmos CI runs the integration tests against BigQuery, and only the Databricks metric view and Snowflake semantic view tests against the other adapters (see `#3101 <https://github.com/astronomer/astronomer-cosmos/issues/3101>`_).
 
 Context
 ~~~~~~~
 
 dbt OSS is the open-source (Apache 2.0) distribution of dbt 2. See `Comparing dbt and dbt OSS <https://docs.getdbt.com/blog/comparing-dbt-and-dbt-oss>`_ for how it differs from dbt Core 1.x and :ref:`dbt Fusion <dbt_fusion>`.
 
-It is published on PyPI as ``dbt-oss`` and includes its adapters, so you do not install ``dbt-<adapter>`` packages. See the `dbt supported data platforms <https://docs.getdbt.com/docs/supported-data-platforms>`_ for the adapters it supports. Adapters that dbt OSS marks as experimental, such as Postgres, need ``DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true``. Of these, Cosmos tests BigQuery only.
+It is published on PyPI as ``dbt-oss`` and includes its adapters, so you do not install ``dbt-<adapter>`` packages. See the `dbt supported data platforms <https://docs.getdbt.com/docs/supported-data-platforms>`_ for the adapters it supports. Adapters that dbt OSS marks as experimental, such as Postgres, need ``DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true``. Of these, Cosmos tests BigQuery, and Databricks and Snowflake for metric and semantic views only.
 
 How to use
 ~~~~~~~~~~
@@ -95,8 +95,6 @@ Limitations
      - dbt OSS keeps the macros of a project by package name for the lifetime of the Python process, so two dbt projects with the same ``name`` that run in one worker process can resolve each other's macros. Give each project a unique ``name``. See `#3116 <https://github.com/astronomer/astronomer-cosmos/pull/3116>`_.
    * - ``ExecutionMode.AIRFLOW_ASYNC``
      - Not supported or verified with dbt OSS. See `#3103 <https://github.com/astronomer/astronomer-cosmos/issues/3103>`_.
-   * - Assets with ``ExecutionMode.WATCHER`` and ``LoadMode.DBT_LS``
-     - dbt OSS writes ``manifest.json`` when the run ends, so the producer finds no outlet URIs and the consumer tasks do not emit their assets. See `#3129 <https://github.com/astronomer/astronomer-cosmos/pull/3129>`_.
    * - Configuration that dbt 1.x accepts
      - dbt OSS rejects some of it. Cosmos CI runs ``dbt-autofix deprecations`` on the example projects, and you may need to run it on yours.
    * - dbt-loom

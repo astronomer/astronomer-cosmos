@@ -50,7 +50,7 @@ How Cosmos behaves with dbt OSS
 - ``ExecutionMode.WATCHER`` runs the producer task in a subprocess. The dbt OSS ``dbtRunner`` does not accept the event callbacks the producer uses. Setting ``InvocationMode.DBT_RUNNER`` explicitly for the producer raises ``CosmosValueError``.
 - Node statuses are matched case-insensitively, since dbt OSS reports some of them capitalised (for example ``Warn`` for a source freshness check).
 - Missing packages are installed by dbt during ``dbt ls``, even when ``install_dbt_deps`` is ``False``.
-- Dictionary flags such as ``--vars`` are passed to dbt OSS as JSON, since it rejects the quoted string values of the YAML Cosmos writes for dbt Core 1.x.
+- Dictionary flags such as ``--vars`` and ``--args`` are passed as one-line flow YAML (``{key: value}``), since dbt OSS rejects block YAML with quoted string values. This applies to every dbt version, not only dbt OSS.
 - With ``InvocationMode.SUBPROCESS``, Cosmos reads the text output of dbt OSS to count test warnings and to name failing tests (``Summary:`` line, ``Warned test`` and ``Failed test`` lines).
 - The dbt OSS ``run_results.json`` has no ``args.profiles_dir``. With ``openlineage-integration-common`` older than 1.44.0, which reads it without a fallback, Cosmos adds it from ``--profiles-dir`` or ``DBT_PROFILES_DIR`` before the OpenLineage artifact parser reads the file, so the ``inlets`` and ``outlets`` are populated.
 - ``dbt docs generate`` writes a different site, without ``catalog.json``. ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` upload its ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``.
@@ -61,7 +61,7 @@ How Cosmos behaves with dbt OSS
 Limitations
 ~~~~~~~~~~~
 
-The list below reflects what is skipped or not covered in Cosmos CI for dbt OSS. The unit tests run against ``dbt-oss`` on Python 3.11 to 3.14, and the integration tests run against BigQuery on Python 3.11 and 3.12. Python 3.10 is not tested with dbt OSS.
+The list below reflects what is skipped or not covered in Cosmos CI for dbt OSS. The unit tests run against ``dbt-oss`` on Python 3.11 to 3.14, and the integration tests run against BigQuery on Python 3.11 and 3.12. The unit tests cover Airflow 2.9 to 3.4, and the integration tests Airflow 2.10, 3.0 and 3.1. Python 3.10 is not tested with dbt OSS.
 
 Features that behave differently:
 
@@ -73,7 +73,8 @@ Features that behave differently:
 Not tested yet with dbt OSS:
 
 - ``ExecutionMode.AIRFLOW_ASYNC``, which needs ``dbt-bigquery`` that cannot be installed next to dbt OSS.
-- Kubernetes execution modes other than ``KubernetesOperator`` and ``WATCHER_KUBERNETES``.
+- Kubernetes execution modes other than ``ExecutionMode.KUBERNETES`` and ``ExecutionMode.WATCHER_KUBERNETES``, which run against Airflow 3.0 only.
+- ``ExecutionMode.DOCKER``, ``AWS_ECS``, ``AZURE_CONTAINER_INSTANCE`` and ``GCP_CLOUD_RUN_JOB``.
 - Cross-project references with `dbt-loom <https://github.com/nicholasyager/dbt-loom>`_.
 - dbt Python models on Databricks.
 - Adapters that dbt OSS treats as experimental, such as Postgres. The CI job uses BigQuery.

@@ -57,7 +57,6 @@ _ASYNC_DAG_NOT_ENABLED = (
 )
 _NO_CALLBACKS = "dbt-oss dbtRunner does not support callbacks, and dbt does not plan to (https://github.com/dbt-labs/dbt/issues/13102)"
 _NO_PARTIAL_PARSE = "dbt-oss has no partial parsing artifact (no target/partial_parse.msgpack, no log line), so Cosmos has nothing to cache"
-_UNKNOWN = "fails in the dbt-oss job for a cause not yet identified"
 
 # Tests that fail in the dbt-oss job for a known reason, keyed by pytest node id. Each one is skipped there with its
 # reason until it is fixed or made to work with dbt-oss; remove its entry when it does.
@@ -75,8 +74,6 @@ SKIPPED_TESTS: dict[str, str] = {
     "tests/operators/_asynchronous/test_bigquery.py::test_mock_bigquery_adapter": _NO_BQ_ADAPTER_MODULE,
     # The async example DAG is not enabled in this job (1)
     "tests/test_example_dags.py::test_async_example_dag_without_setup_task": _ASYNC_DAG_NOT_ENABLED,
-    # Unknown, needs investigation (1)
-    "tests/operators/test_watcher.py::test_dbt_dag_with_watcher_and_empty_model": _UNKNOWN,
 }
 
 

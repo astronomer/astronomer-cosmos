@@ -2484,6 +2484,7 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
     # micro_dbt_project.empty_model
     #
     # However, during `dbt build`, dbt skips running the empty model, and only runs the add_row model:
+    # (the output below is from dbt 1.11; dbt 2 lists only add_row, so Cosmos renders no task for the empty model)
     #
     # 10:29:03  Running with dbt=1.11.2
     # 10:29:03  Registered adapter: postgres=1.10.0
@@ -2520,30 +2521,31 @@ def test_dbt_dag_with_watcher_and_empty_model(caplog):
     outcome = new_test_dag(watcher_dag)
     assert outcome.state == DagRunState.SUCCESS
 
-    assert len(watcher_dag.dbt_graph.filtered_nodes) == 2
+    # dbt 2 does not list the empty model in `dbt ls` (nor can it be selected), so Cosmos renders only add_row.
+    # The dbt build runs add_row in both cases and never reports the empty model.
+    expected_task_names = ["dbt_producer_watcher", "add_row_run"]
+    if not is_dbt_v2():
+        expected_task_names.append("empty_model_run")
+    expected_models = len(expected_task_names) - 1
 
-    assert len(watcher_dag.task_dict) == 3
+    assert len(watcher_dag.dbt_graph.filtered_nodes) == expected_models
+
+    assert len(watcher_dag.task_dict) == len(expected_task_names)
     tasks_names = [task.task_id for task in watcher_dag.topological_sort()]
-    expected_task_names = [
-        "dbt_producer_watcher",
-        "add_row_run",
-        "empty_model_run",
-    ]
     assert tasks_names == expected_task_names
 
     assert isinstance(watcher_dag.task_dict["dbt_producer_watcher"], DbtProducerWatcherOperator)
     assert isinstance(watcher_dag.task_dict["add_row_run"], DbtRunWatcherOperator)
-    assert isinstance(watcher_dag.task_dict["empty_model_run"], DbtRunWatcherOperator)
+    assert watcher_dag.task_dict["dbt_producer_watcher"].downstream_task_ids == set(expected_task_names[1:])
 
-    assert watcher_dag.task_dict["dbt_producer_watcher"].downstream_task_ids == {
-        "add_row_run",
-        "empty_model_run",
-    }
-
-    assert "Total filtered nodes: 2" in caplog.text
+    assert f"Total filtered nodes: {expected_models}" in caplog.text
     assert "Finished running node model.micro_dbt_project.add_row" in caplog.text
     assert "Finished running node model.micro_dbt_project.empty_model_run" not in caplog.text
-    assert "Model 'model.micro_dbt_project.empty_model' was skipped by the dbt command" in caplog.text
+    if is_dbt_v2():
+        assert "was skipped by the dbt command" not in caplog.text
+    else:
+        assert isinstance(watcher_dag.task_dict["empty_model_run"], DbtRunWatcherOperator)
+        assert "Model 'model.micro_dbt_project.empty_model' was skipped by the dbt command" in caplog.text
 
 
 @pytest.mark.integration

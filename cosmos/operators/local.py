@@ -859,8 +859,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         Return whether the installed ``openlineage-integration-common`` requires ``args.profiles_dir`` in ``run_results.json``.
 
         1.43.0 and older read it without a fallback; 1.44.0 and later catch the ``KeyError`` and use the
-        ``--profiles-dir`` lookup. Airflow's constraints pin older releases (1.43.0 with Airflow 2.10, 1.40.0 with
-        Airflow 3.1). An unknown version is treated as requiring it.
+        ``--profiles-dir`` lookup. An unknown version is treated as requiring it.
         """
         try:
             return Version(version("openlineage-integration-common")) < Version("1.44.0")
@@ -880,7 +879,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         (``_openlineage_requires_profiles_dir_in_run_results``). ``is_dbt_v2`` does not inspect
         ``dbt_executable_path``: a dbt 2 executable next to a dbt 1.x environment is not covered, and the dbt Fusion
         binary used with a dbt 2 environment is. The directory is the one passed with ``--profiles-dir`` (the last
-        occurrence, as dbt does) or ``DBT_PROFILES_DIR``; nothing is added when neither is set. The file is in the
+        occurrence, as dbt 1.x does) or ``DBT_PROFILES_DIR``; nothing is added when neither is set. The file is in the
         temporary project directory of the task.
         """
         if not isinstance(run_results_path, (str, os.PathLike)):

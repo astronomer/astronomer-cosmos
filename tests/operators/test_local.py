@@ -1642,6 +1642,7 @@ def _write_run_results(path: Path, args: dict | None) -> None:
         (["dbt", "build", "--profiles-dir=/tmp/profiles"], {}, "/tmp/profiles"),
         (["dbt", "build"], {"DBT_PROFILES_DIR": "/from/env"}, "/from/env"),
         (["dbt", "build", "--profiles-dir", "/from/command"], {"DBT_PROFILES_DIR": "/from/env"}, "/from/command"),
+        (["dbt", "build", "--profiles-dir", "/a", "--profiles-dir=/b"], {}, "/b"),
         # The executable and the directory can be ``Path`` objects, as in the command of the watcher producer.
         ([Path("/usr/bin/dbt"), "build", "--profiles-dir", Path("/tmp/profiles")], {}, "/tmp/profiles"),
     ],
@@ -1659,29 +1660,29 @@ def test_add_missing_profiles_dir_to_run_results(tmp_path, dbt_command_line, env
 
 
 @pytest.mark.parametrize(
-    "content, dbt_command_line, env",
+    "content, dbt_command_line",
     [
         pytest.param(
             json.dumps({"args": {"which": "run", "profiles_dir": "/written/by/dbt"}}),
             ["dbt", "run", "--profiles-dir", "/x"],
-            {},
             id="keeps_the_value_dbt_wrote",
         ),
-        pytest.param(None, ["dbt", "run", "--profiles-dir", "/x"], {}, id="missing_file"),
-        pytest.param("not json", ["dbt", "run", "--profiles-dir", "/x"], {}, id="invalid_json"),
-        pytest.param(json.dumps({"results": []}), ["dbt", "run", "--profiles-dir", "/x"], {}, id="no_args"),
-        pytest.param(json.dumps({"args": "text"}), ["dbt", "run", "--profiles-dir", "/x"], {}, id="args_not_a_dict"),
-        pytest.param(json.dumps({"args": {"which": "run"}}), ["dbt", "run"], {}, id="no_profiles_dir_to_add"),
+        pytest.param(None, ["dbt", "run", "--profiles-dir", "/x"], id="missing_file"),
+        pytest.param("not json", ["dbt", "run", "--profiles-dir", "/x"], id="invalid_json"),
+        pytest.param(json.dumps({"results": []}), ["dbt", "run", "--profiles-dir", "/x"], id="no_args"),
+        pytest.param(json.dumps({"args": "text"}), ["dbt", "run", "--profiles-dir", "/x"], id="args_not_a_dict"),
+        pytest.param(json.dumps({"args": {"which": "run"}}), ["dbt", "run"], id="no_profiles_dir_to_add"),
     ],
 )
-def test_add_missing_profiles_dir_to_run_results_leaves_the_file_alone(tmp_path, content, dbt_command_line, env):
+def test_add_missing_profiles_dir_to_run_results_leaves_the_file_alone(
+    tmp_path, monkeypatch, content, dbt_command_line
+):
     run_results = tmp_path / "run_results.json"
     if content is not None:
         run_results.write_text(content)
 
-    with patch.dict(os.environ, env):
-        os.environ.pop("DBT_PROFILES_DIR", None)
-        DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, dbt_command_line)
+    monkeypatch.delenv("DBT_PROFILES_DIR", raising=False)
+    DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, dbt_command_line)
 
     assert (run_results.read_text() if content is not None else None) == content
 

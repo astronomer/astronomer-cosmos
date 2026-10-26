@@ -52,6 +52,7 @@ Bug Fixes
   tasks and the build tasks of models, seeds and snapshots select only their own node, so source tests were never
   selected by any task. See #1683.
 * ``InvocationMode.DBT_RUNNER`` now matches dbt node statuses case-insensitively when it collects warnings. dbt 2 (``dbt-oss``) reports a source freshness warning as ``Warn``, which did not match ``warn``, so ``DbtSourceLocalOperator`` called ``on_warning_callback`` with empty ``test_names`` and ``test_results``. dbt 2 source freshness results have no ``message``, so their status is reported in ``test_results`` instead. dbt 1 is unchanged. See #3101.
+* ``ExecutionMode.WATCHER`` now emits the datasets of models, seeds and snapshots with dbt-oss when no ``manifest.json`` is available while the nodes run. dbt-oss writes the manifest when the run ends, so the URIs found in it were empty. When the manifest has none, the producer builds them from the database, schema and alias in the relation of the node event, so the consumer sensors emit their assets.
 
 1.15.1 (2026-08-04)
 -------------------

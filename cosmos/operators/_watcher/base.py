@@ -272,6 +272,36 @@ def _ensure_subprocess_model_outlet_uris(
         model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []
 
 
+def _outlet_uris_from_node_relation(node_info: dict[str, Any], dataset_namespace: str | None) -> list[str]:
+    """Outlet URIs of a node from the relation named by its dbt event.
+
+    dbt 2 (dbt-oss) writes ``manifest.json`` only when the run ends, so it is missing while the nodes finish and the
+    URIs cannot be read from it. The events of a node name its relation, with the database, schema and alias that the
+    manifest has.
+    """
+    relation = node_info.get("node_relation") or {}
+    database, schema, alias = relation.get("database"), relation.get("schema"), relation.get("alias")
+    if not dataset_namespace or not all([database, schema, alias]):
+        return []
+
+    from cosmos.dataset import construct_dataset_uri
+
+    return [construct_dataset_uri(dataset_namespace, f"{database}.{schema}.{alias}", warn_uri_migration=False)]
+
+
+def _resolve_outlet_uris(
+    unique_id: str | None,
+    node_info: dict[str, Any],
+    model_outlet_uris: dict[str, list[str]] | None,
+    dataset_namespace: str | None,
+    project_dir: str | None,
+) -> list[str]:
+    """Outlet URIs of a node: the ones of the manifest, or else the ones of the relation of its event."""
+    _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
+    outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris and unique_id else []
+    return outlet_uris or _outlet_uris_from_node_relation(node_info, dataset_namespace)
+
+
 def _rewrite_upstream_failure_skip_status(
     log_line: dict[str, Any],
     unique_id: str | None,
@@ -406,9 +436,9 @@ def store_dbt_resource_status_from_log(
                 # (models/seeds/snapshots).
                 outlet_uris: list[str] = []
                 if should_generate_model_uris and dbt_node_resource_type in _DATASET_EMITTING_RESOURCE_TYPES:
-                    project_dir = extra_kwargs.get("project_dir")
-                    _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
-                    outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
+                    outlet_uris = _resolve_outlet_uris(
+                        unique_id, node_info, model_outlet_uris, dataset_namespace, extra_kwargs.get("project_dir")
+                    )
 
                 safe_xcom_push(
                     task_instance=context["ti"],

@@ -18,7 +18,7 @@ How to use
 
 1. Install dbt OSS in the environment where dbt runs
 
-   dbt OSS and dbt Core 1.x both provide the ``dbt`` Python package, so they cannot be installed in the same environment. Use an environment without dbt Core 1.x, or remove dbt Core 1.x, its adapters and the packages only they depend on first.
+   dbt OSS and dbt Core 1.x both provide the ``dbt`` Python package, so install dbt OSS in an environment without dbt Core 1.x.
 
    .. code-block:: bash
 

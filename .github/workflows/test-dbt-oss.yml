@@ -26,14 +26,14 @@ jobs:
     environment: ${{ github.event_name == 'pull_request_target' &&
       github.event.pull_request.head.repo.full_name != github.repository &&
       'external' || 'internal' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - run: true
 
   Check-changed-files:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -124,7 +124,7 @@ jobs:
   Run-dbt-oss-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
       contents: read
@@ -244,5 +244,111 @@ jobs:
         env:
           AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
           BIGQUERY_PROJECT: astronomer-dag-authoring
+        run: |
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_dataset.py delete
+
+  # The Kubernetes example DAG with dbt-oss in the task pods, against BigQuery. test.yml runs the Kubernetes examples with
+  # dbt 1.x and a Postgres in the cluster (Run-Kubernetes-Tests); that job is unchanged. Only jaffle_shop_watcher_kubernetes
+  # runs here: jaffle_shop_kubernetes ends with a dbt docs task, which dbt-oss does not support. Airflow runs on the runner
+  # and only the dbt pods run in the KinD cluster.
+  Run-dbt-oss-BigQuery-Kubernetes-Tests:
+    needs: [Authorize, Check-changed-files]
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+        airflow-version: ["3.0"]
+        dbt-version: ["2.0-dbt-oss"]
+    env:
+      COSMOS_TEST_BIGQUERY_DATASET: cosmos_ci_${{ github.run_id }}_${{ github.run_attempt }}_oss_k8s_${{ strategy.job-index }}
+      COSMOS_TEST_BIGQUERY_PROJECT: astronomer-dag-authoring
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+          # Safe under pull_request_target: this job runs only after the Authorize job's
+          # owner-review environment gate approves the run (see the Authorize job above).
+          allow-unsafe-pr-checkout: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Create KinD cluster
+        uses: container-tools/kind-action@0ad70e2299366b0e1552c7240f4e4567148f723e # v2.0.4
+
+      - name: Install packages and dependencies
+        run: |
+          python -m pip install uv
+          uv pip install --system "hatch>=1.14.2"
+          hatch -e tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }} run pip freeze
+
+      - name: Create the BigQuery dataset
+        id: create-bigquery-dataset
+        # Same as in Run-dbt-oss-Tests.
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+          BIGQUERY_PROJECT: ${{ env.COSMOS_TEST_BIGQUERY_PROJECT }}
+        run: |
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_dataset.py create
+
+      - name: Build the dbt-oss image and load it into KinD
+        # The project and dataset are not secret, so they are build arguments. The service account key is not in the image.
+        run: |
+          cd dev
+          docker build --progress=plain -t dbt-jaffle-shop:1.0.0 -f Dockerfile.bigquery_dbt_oss_k8s \
+            --build-arg COSMOS_TEST_BIGQUERY_PROJECT="$COSMOS_TEST_BIGQUERY_PROJECT" \
+            --build-arg COSMOS_TEST_BIGQUERY_DATASET="$COSMOS_TEST_BIGQUERY_DATASET" .
+          kind load docker-image dbt-jaffle-shop:1.0.0
+
+      - name: Store the service account key in the Kubernetes secret that the DAGs read
+        # The DAGs give the pods POSTGRES_PASSWORD and POSTGRES_HOST from `postgres-secrets`. The password is the key (the
+        # BigQuery profile reads it from there) and the host is not used. The key goes through a file readable only by this
+        # user (--from-file), never through a command line, and the file is removed at the end of the step.
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+        run: |
+          KEYFILE="$RUNNER_TEMP/gcp-key.json"
+          trap 'rm -f "$KEYFILE"' EXIT
+          hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_keyfile.py "$KEYFILE"
+          kubectl create secret generic postgres-secrets \
+            --from-literal=host=not-used \
+            --from-file=password="$KEYFILE"
+
+      - name: Test the Kubernetes example against Airflow ${{ matrix.airflow-version }}, Python ${{ matrix.python-version }} and dbt ${{ matrix.dbt-version }}
+        run: |
+          HATCH_ENV="tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}"
+          hatch run "$HATCH_ENV:test-dbt-oss-setup"
+          hatch run "$HATCH_ENV:test-kubernetes-dbt-oss"
+        env:
+          COSMOS_TEST_ADAPTER: bigquery
+          # The DAG file jaffle_shop_kubernetes is parsed too (the test parses both): it needs the BigQuery profile
+          # mapping in place of the Postgres one, like the other example DAGs of this workflow.
+          PYTEST_PLUGINS: tests.dbt_oss_plugin
+          PYTEST_ADDOPTS: -rfEs
+          POSTGRES_DB: ${{ env.COSMOS_TEST_BIGQUERY_PROJECT }}
+          POSTGRES_SCHEMA: ${{ env.COSMOS_TEST_BIGQUERY_DATASET }}
+          AIRFLOW__COSMOS__ENABLE_CACHE_DBT_LS: 0
+          AIRFLOW_HOME: /home/runner/work/astronomer-cosmos/astronomer-cosmos/
+          AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 120
+          AIRFLOW__CORE__DAG_FILE_PROCESSOR_TIMEOUT: 120
+          AIRFLOW__DAG_PROCESSOR__DAGBAG_IMPORT_TIMEOUT: 120
+          AIRFLOW__DAG_PROCESSOR__DAG_FILE_PROCESSOR_TIMEOUT: 120
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+          PYTHONPATH: /home/runner/work/astronomer-cosmos/astronomer-cosmos/:$PYTHONPATH
+
+      - name: Delete the BigQuery dataset
+        # Same as in Run-dbt-oss-Tests.
+        if: always() && steps.create-bigquery-dataset.outcome != 'skipped'
+        env:
+          AIRFLOW_CONN_GCP_GS_CONN: ${{ secrets.AIRFLOW_CONN_GCP_GS_CONN }}
+          BIGQUERY_PROJECT: ${{ env.COSMOS_TEST_BIGQUERY_PROJECT }}
         run: |
           hatch run "tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:python" -I scripts/test/bigquery_ci_dataset.py delete

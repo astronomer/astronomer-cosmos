@@ -254,7 +254,7 @@ jobs:
   Run-dbt-oss-BigQuery-Kubernetes-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
       contents: read

@@ -11,8 +11,8 @@ on:
     branches: [main]
   # Uses secrets, so it depends on the Authorize job, which requires manually approving the workflow run for external PRs
   # (same as test.yml). Pull requests use the workflow file from the base branch.
-  pull_request: # TEMP: run this branch's workflow file; revert to pull_request_target before merge
-    branches: [main, 'release-*']
+  pull_request_target:
+    branches: [main, 'release-*'] # zizmor: ignore[dangerous-triggers]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -123,7 +123,7 @@ jobs:
 
   Run-dbt-oss-Tests:
     needs: [Authorize, Check-changed-files]
-    if: false && needs.Check-changed-files.outputs.code_changed == 'true' # TEMP: skip the matrix, it already ran
+    if: needs.Check-changed-files.outputs.code_changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:

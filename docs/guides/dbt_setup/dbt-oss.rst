@@ -98,7 +98,7 @@ Limitations
    * - Configuration that dbt 1.x accepts
      - dbt OSS rejects some of it. Cosmos CI runs ``dbt-autofix deprecations`` on the example projects, and you may need to run it on yours.
    * - dbt-loom
-     - `dbt-loom <https://github.com/nicholasyager/dbt-loom>`_ is reported not to work with dbt OSS, which blocks the plugin hook it uses. See `dbt-loom issue 192 <https://github.com/nicholasyager/dbt-loom/issues/192>`_. The dbt-loom example DAGs are disabled in the dbt OSS CI job (`#3105 <https://github.com/astronomer/astronomer-cosmos/issues/3105>`_).
+     - `dbt-loom <https://github.com/adrienneyager/dbt-loom>`_ is reported not to work with dbt OSS, which blocks the plugin hook it uses. See `dbt-loom issue 192 <https://github.com/adrienneyager/dbt-loom/issues/192>`_. The dbt-loom example DAGs are disabled in the dbt OSS CI job (`#3105 <https://github.com/astronomer/astronomer-cosmos/issues/3105>`_).
 
 Tracking
 ~~~~~~~~

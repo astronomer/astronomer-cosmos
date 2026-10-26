@@ -22,7 +22,6 @@ How to use
 
    .. code-block:: bash
 
-       pip uninstall -y dbt-core dbt-adapters dbt-common dbt-postgres  # and any other dbt 1.x adapter
        pip install "astronomer-cosmos[dbt-oss]>=1.16.0"
 
 2. Use Cosmos as usual

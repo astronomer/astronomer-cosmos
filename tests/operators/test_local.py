@@ -2045,11 +2045,16 @@ def test_dbt_docs_local_operator_ignores_graph_gpickle():
     assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
 
 
+# mimetypes also reads the host's mime.types files, so a host that knows parquet reports its own type for it.
+PARQUET_CONTENT_TYPE = mimetypes.guess_type("x.parquet")[0] or "application/octet-stream"
+
+
 def _docs_target_dir(tmp_path, dbt_v2: bool) -> str:
     """A project dir whose target/ holds the docs written by dbt 1 or by dbt 2 (dbt-oss)."""
     target = tmp_path / "target"
     if dbt_v2:
         files = ["index.html", "manifest.json", "run_results.json", "assets/app.js", "assets/styles/site.css"]
+        files += ["assets/styles/theme.css"]
         files += ["info_schema/v1/dbt.models.parquet", "private/index/x.parquet"]
     else:
         files = ["index.html", "manifest.json", "catalog.json", "run_results.json"]
@@ -2090,6 +2095,28 @@ def test_dbt_docs_files_to_upload_is_the_site_for_dbt_2(tmp_path):
         "manifest.json",
         "assets/app.js",
         "assets/styles/site.css",
+        "assets/styles/theme.css",
+        "info_schema/v1/dbt.models.parquet",
+    ]
+
+
+def test_dbt_docs_files_to_upload_is_sorted_whatever_the_order_of_the_filesystem(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_v2=True) + "/target"
+    rglob = Path.rglob
+
+    def reversed_rglob(self, pattern):
+        return iter(sorted(rglob(self, pattern), reverse=True))
+
+    with patch.object(Path, "rglob", reversed_rglob):
+        files = operator._files_to_upload(target_dir)
+
+    assert files == [
+        "index.html",
+        "manifest.json",
+        "assets/app.js",
+        "assets/styles/site.css",
+        "assets/styles/theme.css",
         "info_schema/v1/dbt.models.parquet",
     ]
 
@@ -2108,14 +2135,28 @@ def test_dbt_docs_gcs_local_operator_uploads_the_dbt_2_site(tmp_path):
         operator = _docs_operator(DbtDocsGCSLocalOperator, folder_dir="docs")
         operator.upload_to_cloud_storage(project_dir)
 
-    object_names = [c.kwargs["object_name"] for c in mock_gcs.GCSHook.return_value.upload.call_args_list]
-    assert object_names == [
-        "docs/index.html",
-        "docs/manifest.json",
-        "docs/assets/app.js",
-        "docs/assets/styles/site.css",
-        "docs/info_schema/v1/dbt.models.parquet",
+    calls = mock_gcs.GCSHook.return_value.upload.call_args_list
+    # GCSHook.upload would send application/octet-stream for all of them without a mime_type.
+    assert [(c.kwargs["object_name"], c.kwargs["mime_type"]) for c in calls] == [
+        ("docs/index.html", "text/html"),
+        ("docs/manifest.json", "application/json"),
+        ("docs/assets/app.js", mimetypes.guess_type("app.js")[0]),
+        ("docs/assets/styles/site.css", "text/css"),
+        ("docs/assets/styles/theme.css", "text/css"),
+        ("docs/info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
     ]
+
+
+def test_dbt_docs_gcs_local_operator_sets_no_mime_type_for_dbt_1(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_v2=False)
+    mock_gcs = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_gcs}):
+        operator = _docs_operator(DbtDocsGCSLocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_gcs.GCSHook.return_value.upload.call_args_list
+    assert [c.kwargs["object_name"] for c in calls] == ["index.html", "manifest.json", "catalog.json"]
+    assert all("mime_type" not in c.kwargs for c in calls)
 
 
 def test_dbt_docs_s3_local_operator_uploads_dbt_1_files_as_html(tmp_path):
@@ -2150,9 +2191,10 @@ def test_dbt_docs_s3_local_operator_uploads_the_dbt_2_site_with_content_types(tm
         ("docs/manifest.json", "application/json"),
         ("docs/assets/app.js", mimetypes.guess_type("app.js")[0]),
         ("docs/assets/styles/site.css", "text/css"),
-        ("docs/info_schema/v1/dbt.models.parquet", "application/octet-stream"),
+        ("docs/assets/styles/theme.css", "text/css"),
+        ("docs/info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
     ]
-    # One hook per content type, not one per file.
+    # One hook per content type, not one per file: six files, one of the five types is shared by two of them.
     assert mock_s3.S3Hook.call_count == 5
 
 
@@ -2175,7 +2217,8 @@ def test_dbt_docs_azure_local_operator_uploads_the_dbt_2_site_with_content_types
         ("manifest.json", "application/json"),
         ("assets/app.js", mimetypes.guess_type("app.js")[0]),
         ("assets/styles/site.css", "text/css"),
-        ("info_schema/v1/dbt.models.parquet", "application/octet-stream"),
+        ("assets/styles/theme.css", "text/css"),
+        ("info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
     ]
 
 

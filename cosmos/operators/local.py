@@ -1650,14 +1650,19 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
 
         target_dir = f"{project_dir}/target"
         hook = GCSHook(self.connection_id)
+        dbt_v2_layout = self._is_dbt_v2_docs_layout(target_dir)
 
         for filename in self._files_to_upload(target_dir):
             blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
             self.log.info("Uploading %s to %s", filename, f"gs://{self.bucket_name}/{blob_name}")
+            # GCSHook.upload sends application/octet-stream when no mime_type is given, which stops a browser from
+            # running the JavaScript of the dbt 2 site. The dbt 1 files keep the hook's default.
+            upload_kwargs: dict[str, Any] = {"mime_type": _content_type(filename)} if dbt_v2_layout else {}
             hook.upload(
                 filename=f"{target_dir}/{filename}",
                 bucket_name=self.bucket_name,
                 object_name=blob_name,
+                **upload_kwargs,
             )
 
 

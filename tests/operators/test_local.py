@@ -1276,7 +1276,10 @@ def test_run_test_operator_subprocess_failure_exposes_failing_tests(failing_erro
 
     assert raised, "dbt test was expected to fail"
     assert "accepted_values_mini_orders_status__placed" in raised[0]
-    assert "Got " in raised[0] and "results, configured to fail if" in raised[0]
+    if dbt_runner.is_dbt_v2():
+        assert "failed row(s)" in raised[0]
+    else:
+        assert "Got " in raised[0] and "results, configured to fail if" in raised[0]
 
 
 @pytest.mark.integration

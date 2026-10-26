@@ -36,7 +36,6 @@ except ImportError:  # pragma: no cover
 
 from cosmos import DbtDag, ProfileConfig, TestBehavior, settings
 from cosmos.constants import AIRFLOW_VERSION, DbtResourceType
-from cosmos.dbt.runner import is_dbt_v2
 from cosmos.operators.base import DbtSemanticMetricViewMixin
 from cosmos.operators.local import (
     DbtRunLocalOperator,
@@ -509,10 +508,6 @@ def test_dbt_dag_with_watcher_execution(warehouse: Warehouse, watcher_dag: DbtDa
 
 @pytest.mark.skipif(
     AIRFLOW_VERSION.major < 3, reason="Asset events are read from airflow.models.asset, available from Airflow 3"
-)
-@pytest.mark.skipif(
-    is_dbt_v2(),
-    reason="dbt-oss writes no datasets: its run_results.json has no args.profiles_dir (see BOSS-764, PR #3111)",
 )
 @pytest.mark.parametrize("dag_fixture", ["local_dag", "watcher_dag"])
 def test_semantic_metric_view_task_emits_asset_events(

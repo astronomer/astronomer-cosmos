@@ -29,8 +29,9 @@ case "$DBT_VERSION" in
     sh scripts/test/install-dbt-oss.sh "$DBT_VERSION"
     pip install -c "$CONSTRAINTS_FILE" databricks-sql-connector snowflake-connector-python
     # None of the dbt 1.x packages that provide the `dbt` package may be left next to dbt-oss, in particular not the
-    # Databricks and Snowflake adapters, or the job would not be testing dbt-oss.
-    if pip freeze | grep -i -E '^(dbt-core|dbt-adapters|dbt-databricks|dbt-snowflake)=='; then
+    # Databricks and Snowflake adapters, or the job would not be testing dbt-oss. This matches the packages that
+    # install-dbt-oss.sh uninstalls (dbt-state is not in that list, but requires dbt-core).
+    if pip freeze | grep -i -E '^dbt[-_](core|adapters|common|databricks|snowflake|spark|loom|state|extractor|protos|semantic[-_]interfaces)=='; then
       echo "::error::A dbt 1.x package is installed next to dbt-oss"
       exit 1
     fi

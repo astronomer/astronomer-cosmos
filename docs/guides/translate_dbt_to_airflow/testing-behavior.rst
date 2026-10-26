@@ -144,8 +144,9 @@ When at least one WARN message is present, the function passed to ``on_warning_c
 .. note::
 
     If warnings that are not associated with tests occur (e.g. freshness warnings), they will still trigger the
-    ``on_warning_callback`` method above. However, these warnings will not be included in the ``test_names`` and
-    ``test_results`` context variables, which are specific to test-related warnings.
+    ``on_warning_callback`` method above. When they come from a source freshness or build task, they are also included
+    in the ``test_names`` and ``test_results`` context variables. For dbt 2 freshness results with
+    ``InvocationMode.DBT_RUNNER``, ``test_results`` holds the status (``warn``), since those results have no message.
 
 .. note::
 

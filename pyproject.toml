@@ -204,6 +204,7 @@ test-integration-setup = 'sh scripts/test/integration-setup.sh {matrix:dbt}'
 test-integration = 'sh scripts/test/integration.sh {args}'
 test-kubernetes = "sh scripts/test/integration-kubernetes.sh"
 test-kubernetes-setup = "sh scripts/test/kubernetes-setup.sh {matrix:dbt}"
+test-kubernetes-dbt-oss = "sh scripts/test/integration-kubernetes-dbt-oss.sh"
 test-dbt-oss-setup = 'sh scripts/test/install-dbt-oss.sh {matrix:dbt}'
 test-integration-dbt-oss-setup = [
     'sh scripts/test/integration-dbtf-setup.sh',

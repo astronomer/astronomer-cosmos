@@ -9,13 +9,15 @@ same BigQuery mapping for ``example_conn`` and does the real lookup for every ot
 have their own Postgres ``profiles.yml`` are covered by a second mechanism: the workflow rewrites those files to
 BigQuery with ``scripts/test/bigquery_ci_profiles.py``, which this plugin cannot do because they are not Python mappings.
 The tests in ``PER_TEST_DATASET_TESTS`` get a dataset of their own, named after the job's one, so they do not depend on
-what another test left.
+what another test left. The virtualenv operators get dbt-oss in their virtualenv, in place of the dbt 1 and
+``dbt-postgres`` the example DAGs install.
 
 Which example DAGs run, and which tests are skipped for dbt-oss, is listed in ``tests/dbt_oss_enabled.py``.
 """
 
 from __future__ import annotations
 
+import functools
 import os
 import re
 import subprocess
@@ -26,14 +28,35 @@ import pytest
 
 from tests.dbt_oss_enabled import SKIPPED_TESTS
 
+DEFAULT_BIGQUERY_PROJECT = "astronomer-dag-authoring"
+
 # Tests that depend on Postgres itself (and not only on the profile) and so cannot run against BigQuery.
-POSTGRES_ONLY_TEST_FILES = {
-    "tests/listeners/test_dag_run_listener.py": "asserts on the Postgres profile mapping",
-    "tests/operators/test_virtualenv.py": "installs dbt-postgres in a virtualenv",
-}
+POSTGRES_ONLY_TEST_FILES: dict[str, str] = {}
 POSTGRES_ONLY_FIXTURES = {
     "reset_fail_once_sequence": "uses psycopg2 and Postgres sequences",
 }
+
+
+def _install_dbt_oss_in_virtualenvs() -> None:
+    """Give the virtualenv operators the dbt-oss of this job in their virtualenv.
+
+    The example DAGs install ``dbt-postgres`` and ``dbt-core<2.0`` there, and BigQuery needs neither: dbt-oss has the
+    BigQuery adapter built in, so the virtualenv runs the same dbt-oss version as the job.
+    """
+    import importlib.metadata
+
+    from cosmos.operators.virtualenv import DbtVirtualenvBaseOperator
+
+    init = DbtVirtualenvBaseOperator.__init__
+
+    @functools.wraps(init)
+    def init_with_dbt_oss(self, *args, **kwargs):
+        init(self, *args, **kwargs)
+        if any(requirement.startswith("dbt-postgres") for requirement in self.py_requirements):
+            kept = [r for r in self.py_requirements if not r.startswith(("dbt-postgres", "dbt-core"))]
+            self.py_requirements = [*kept, f"dbt-oss=={importlib.metadata.version('dbt-oss')}"]
+
+    DbtVirtualenvBaseOperator.__init__ = init_with_dbt_oss
 
 
 def _use_bigquery_in_place_of_postgres() -> None:
@@ -45,7 +68,7 @@ def _use_bigquery_in_place_of_postgres() -> None:
         def __init__(self, conn_id, profile_args=None, disable_event_tracking=None, dbt_config_vars=None):
             bigquery_profile_args = dict(profile_args or {})
             bigquery_profile_args["dataset"] = os.environ["COSMOS_TEST_BIGQUERY_DATASET"]
-            bigquery_profile_args["project"] = os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", "astronomer-dag-authoring")
+            bigquery_profile_args["project"] = os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", DEFAULT_BIGQUERY_PROJECT)
             super().__init__(
                 conn_id="gcp_gs_conn",
                 profile_args=bigquery_profile_args,
@@ -78,6 +101,7 @@ def _use_bigquery_in_place_of_postgres() -> None:
 
 
 _use_bigquery_in_place_of_postgres()
+_install_dbt_oss_in_virtualenvs()
 
 DATASET_SCRIPT = Path(__file__).parent.parent / "scripts/test/bigquery_ci_dataset.py"
 # Other example DAGs still share the job's dataset: some of them rely on tables that an earlier test seeded there.

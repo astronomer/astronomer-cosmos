@@ -230,14 +230,11 @@ The following code snippet shows how to provide this flag with the default jaffl
 dbt 2 (dbt-oss)
 +++++++++++++++
 
-``dbt docs generate`` of dbt 2 writes a different site: there is no ``catalog.json``, and ``index.html`` loads the ``assets/`` and ``info_schema/`` folders next to it.
-When the ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` find that layout in the ``target`` folder, they upload ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``, keeping the folder structure, and set the content type of each file, because a browser does not run the JavaScript of the site without it.
-The files uploaded for dbt 1 are the same as before.
+``dbt docs generate`` of dbt 2 writes a different site, without ``catalog.json``.
+When the S3, Azure and GCS operators find it in the ``target`` folder, they upload ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``, keeping the folder structure and setting the content type of each file.
+Nothing changes for dbt 1.
 
-dbt 2 does not accept the ``--static`` flag.
-
-The Airflow UI plugin only serves ``dbt_docs_index.html``, ``manifest.json`` and ``catalog.json``, so it supports the dbt 1 layout and does not show a dbt 2 site.
-The ``DbtDocsS3KubernetesOperator`` uploads the whole ``target`` folder, with the content type of each file guessed from its name, whatever the dbt version.
+dbt 2 does not accept the ``--static`` flag, and the Airflow UI plugin only shows the dbt 1 layout.
 
 Custom callback
 +++++++++++++++

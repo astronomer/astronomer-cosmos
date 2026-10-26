@@ -233,7 +233,8 @@ dbt-oss
 ``dbt docs generate`` of dbt-oss writes a different site, without ``catalog.json``.
 When the S3, Azure and GCS operators find it in the ``target`` folder, they upload ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``, keeping the folder structure and setting the content type of each file.
 
-dbt-oss does not accept the ``--static`` flag, and the Airflow UI plugin only shows the dbt 1 layout.
+``--static`` is for dbt 1 only: dbt-oss does not accept it.
+The Airflow UI plugin serves only ``index.html``, ``manifest.json`` and ``catalog.json``, so it cannot show the dbt-oss site.
 
 Custom callback
 +++++++++++++++

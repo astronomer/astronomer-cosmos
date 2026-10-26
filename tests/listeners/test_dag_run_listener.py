@@ -233,8 +233,9 @@ def test_on_dag_run_success_with_telemetry_metadata(mock_emit_usage_metrics_if_e
     assert metrics["test_behavior"] == "after_each"
     assert metrics["source_behavior"] == "none"
     assert metrics["profile_strategy"] == "mapping"
-    assert metrics["profile_mapping_class"] == "PostgresUserPasswordProfileMapping"
-    assert metrics["database"] == "postgres"
+    # In the dbt-oss job tests/dbt_oss_plugin.py swaps this class for a BigQuery mapping, so these follow the adapter.
+    assert metrics["profile_mapping_class"] == PostgresUserPasswordProfileMapping.__name__
+    assert metrics["database"] == PostgresUserPasswordProfileMapping.dbt_profile_type
 
 
 @pytest.mark.integration

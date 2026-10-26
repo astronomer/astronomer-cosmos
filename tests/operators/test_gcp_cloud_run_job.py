@@ -106,8 +106,7 @@ def test_dbt_gcp_cloud_run_job_operator_add_global_flags() -> None:
     )
     assert dbt_base_operator.add_global_flags() == [
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
         "--no-version-check",
     ]
 
@@ -200,8 +199,7 @@ def test_dbt_gcp_cloud_run_job_build_command():
                 "dbt",
                 command_name,
                 "--vars",
-                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
                 "--no-version-check",
                 "--project-dir",
                 "my/dir",
@@ -212,8 +210,7 @@ def test_dbt_gcp_cloud_run_job_build_command():
                 command_name,
                 "some-macro",
                 "--vars",
-                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
                 "--no-version-check",
                 "--project-dir",
                 "my/dir",
@@ -224,8 +221,7 @@ def test_dbt_gcp_cloud_run_job_build_command():
                 command_name,
                 "freshness",
                 "--vars",
-                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
                 "--no-version-check",
                 "--project-dir",
                 "my/dir",
@@ -261,8 +257,7 @@ def test_dbt_gcp_cloud_run_job_build_command_with_profile_config():
                 "dbt",
                 command_name,
                 "--vars",
-                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
                 "--no-version-check",
                 "--profile",
                 "test",
@@ -277,8 +272,7 @@ def test_dbt_gcp_cloud_run_job_build_command_with_profile_config():
                 command_name,
                 "some-macro",
                 "--vars",
-                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
                 "--no-version-check",
                 "--profile",
                 "test",
@@ -293,8 +287,7 @@ def test_dbt_gcp_cloud_run_job_build_command_with_profile_config():
                 command_name,
                 "freshness",
                 "--vars",
-                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
                 "--no-version-check",
                 "--profile",
                 "test",

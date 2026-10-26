@@ -121,6 +121,8 @@ def test_container_resources_dict_converted():
     (
         pytest.param("10:29:03  Done. PASS=5 WARN=3 ERROR=0 SKIP=0 NO-OP=0 TOTAL=8", 3, id="found"),
         pytest.param("10:29:03  Done. PASS=5 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=5", 0, id="zero"),
+        pytest.param("10:29:03  Summary: 4 total | 1 success | 1 warn | 2 error", 1, id="dbt_v2_found"),
+        pytest.param("10:29:03  Summary: 2 total | 2 success", None, id="dbt_v2_no_warn"),
         pytest.param("some unrelated log output", None, id="not_found"),
     ),
 )
@@ -201,6 +203,22 @@ def test_on_pod_completion_test_operator_with_warnings():
         handler.on_pod_completion(pod=MagicMock())
 
     callback.assert_called_once()
+
+
+def test_on_pod_completion_dbt_v2_logs_fire_the_callback_with_the_warned_tests():
+    callback = MagicMock()
+    task = MagicMock(spec=DbtTestKubernetesOperator)
+    task.pod_manager.read_pod_logs.return_value = [
+        b"10:29:03  Warned test  accepted_values_orders_status (models/schema.yml) [1 of 3 in 0.5s]",
+        b"10:29:03  Summary: 3 total | 2 success | 1 warn",
+    ]
+    context = {"task_instance": MagicMock(task=task)}
+    handler = _make_handler(on_warning_callback=callback, context=context)
+
+    handler.on_pod_completion(pod=MagicMock())
+
+    callback.assert_called_once_with(context)
+    assert context["test_names"] == ["accepted_values_orders_status"]
 
 
 def test_on_pod_completion_falls_back_to_provider_context():

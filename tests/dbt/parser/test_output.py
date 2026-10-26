@@ -27,6 +27,17 @@ def _subprocess_result(full_output: list[str]) -> FullOutputSubprocessResult:
         (["Done. PASS=15 WARN=0 ERROR=0 SKIP=0 TOTAL=16"], 0),
         (["Done. PASS=15 WARN=2 ERROR=0 SKIP=0 TOTAL=16"], 2),
         (["Nothing to do. Exiting without running tests."], 0),
+        # dbt 2 (dbt-oss) leaves out the categories that are 0.
+        (["Summary: 1 total | 1 warn"], 1),
+        (["Summary: 4 total | 1 success | 1 warn | 2 error"], 1),
+        (["Summary: 3 total | 3 warn"], 3),
+        (["Summary: 1 total | 1 success"], 0),
+        (["Summary: 1 total | 1 error"], 0),
+        # Colours forced with CLICOLOR_FORCE=1.
+        (
+            ["Summary: \x1b[37m\x1b[1m9 total\x1b[0m | \x1b[32m\x1b[1m6 success\x1b[0m | \x1b[33m\x1b[1m3 warn\x1b[0m"],
+            3,
+        ),
     ],
 )
 def test_parse_number_of_warnings_subprocess(full_output: list[str], expected_warnings: int):
@@ -135,6 +146,34 @@ def test_extract_log_issues_dbt_1_12_format() -> None:
     assert test_results == ["Got 4 results, configured to warn if >1"]
 
 
+@pytest.mark.parametrize(
+    "finished_running",
+    [
+        "11:17:43  Finished running 1 test in 0 hours 0 minutes and 0.13 seconds (0.13s).",
+        "11:17:43  Finished running 10 data tests, 3 unit tests in 0 hours 0 minutes and 0.78 seconds (0.78s).",
+    ],
+)
+def test_extract_log_issues_dbt_1_ignores_warnings_above_finished_running(finished_running: str) -> None:
+    """Only the warnings after ``Finished running N tests`` belong to the test run; older ones are excluded."""
+    log_list = [
+        "11:17:40  Warning in test older_test (models/schema.yml)",
+        "11:17:40  Got 2 results, configured to warn if >1",
+        finished_running,
+        "11:17:43  Warning in test new_test (models/schema.yml)",
+        "11:17:43  Got 4 results, configured to warn if >1",
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["new_test"]
+    assert test_results == ["Got 4 results, configured to warn if >1"]
+
+
+def test_extract_log_issues_dbt_v2_namespaced_test_name() -> None:
+    log_list = ["    Warned test  main_dbt_test__audit.sing_warn (tests/sing_warn.sql) [1 of 4 in 1.0s]"]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["main_dbt_test__audit.sing_warn"]
+    assert test_results == ["Warned test main_dbt_test__audit.sing_warn (tests/sing_warn.sql)"]
+
+
 def _json_log_line(msg: str) -> str:
     """A dbt ``--log-format json`` line."""
     return json.dumps({"data": {}, "info": {"level": "info", "msg": msg, "ts": "2026-10-19T10:00:00.000000Z"}})
@@ -200,6 +239,100 @@ def test_extract_dbt_failure_details_json_log_format_dbt_1_12() -> None:
     assert extract_dbt_failure_details(log_list) == [
         "Error in test not_null_m_id (models/schema.yml) Got 1 result, configured to fail if != 0"
     ]
+
+
+# The dbt 2 lines below were captured from dbt-oss 2.0.8 running ``dbt test`` on tests/sample/mini and a variant with
+# several tests. dbt 2 writes its text output to stderr, which the subprocess hook merges into the output.
+DBT_V2_WARNED_TESTS_LOG = [
+    "   dbt-oss 2.0.8",
+    "   Loading profiles.yml",
+    "    Failed test  unique_mini_orders_id (models/schema.yml:16:13) [1 of 4 in 1.02s]",
+    "    Passed test  not_null_mini_orders_status [2 of 4 in 1.02s]",
+    "    Warned test  accepted_values_mini_orders_status__placed (models/schema.yml:7:13) [3 of 4 in 2.03s]",
+    "    Warned test  other_warned_test (models/schema.yml:20:13) [4 of 4 in 2.04s]",
+    "==================== Execution Summary =====================",
+    "Finished 'test' with 2 warnings and 1 error for target 'dev' [2.3s]",
+    "Processed: 4 tests",
+    "Summary: 4 total | 1 success | 2 warn | 1 error",
+]
+
+
+def test_extract_log_issues_dbt_v2() -> None:
+    test_names, test_results = extract_log_issues(DBT_V2_WARNED_TESTS_LOG)
+    assert sorted(test_names) == ["accepted_values_mini_orders_status__placed", "other_warned_test"]
+    assert "Warned test accepted_values_mini_orders_status__placed (models/schema.yml:7:13)" in test_results
+    assert len(test_results) == 2
+
+
+def test_extract_log_issues_dbt_v2_debug_does_not_stop_at_the_first_finished_running_line() -> None:
+    log_list = [
+        "Finished running [  0.01s] test main_dbt_test__audit.first_test [warn]",
+        "    Warned test  first_test (models/schema.yml:7:13) [1 of 2 in 0.01s]",
+        "Finished running [  0.01s] test main_dbt_test__audit.second_test [warn]",
+        "    Warned test  second_test (models/schema.yml:9:13) [2 of 2 in 0.01s]",
+        "Summary: 2 total | 2 warn",
+    ]
+    test_names, _ = extract_log_issues(log_list)
+    assert sorted(test_names) == ["first_test", "second_test"]
+
+
+def test_extract_log_issues_dbt_v2_json_log_format_with_node_finished_event() -> None:
+    log_list = [
+        _json_log_line("    Warned test  my_test (models/schema.yml:13:13) [1 of 1 in 0.01s]"),
+        _json_log_line("Finished running node test.mini.my_test.c968fa614a"),
+        _json_log_line("\n=== Execution Summary ===\nSummary: 1 total | 1 warn"),
+    ]
+    assert extract_log_issues(log_list)[0] == ["my_test"]
+
+
+def test_extract_log_issues_dbt_v2_no_warning() -> None:
+    log_list = ["    Passed test  not_null_mini_orders_status [1 of 1 in 0.01s]", "Summary: 1 total | 1 success"]
+    assert extract_log_issues(log_list) == ([], [])
+
+
+def test_extract_log_issues_dbt_v2_json_log_format() -> None:
+    log_list = [
+        _json_log_line("    Warned test  my_test (models/schema.yml:13:13) [1 of 1 in 0.01s]"),
+        _json_log_line("\n=== Execution Summary ===\nSummary: 1 total | 1 warn"),
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["my_test"]
+    assert test_results == ["Warned test my_test (models/schema.yml:13:13)"]
+
+
+def test_extract_dbt_failure_details_dbt_v2() -> None:
+    log_list = [
+        "   dbt-oss 2.0.8",
+        "    Failed test  accepted_values_mini_orders_status__placed (models/schema.yml:13:13) [1 of 1 in 0.01s]",
+        "====================== Test Failures =======================",
+        "Test failed (4 failed row(s)): accepted_values_mini_orders_status__placed",
+        "==================== Execution Summary =====================",
+        "Summary: 1 total | 1 error",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Failure in test accepted_values_mini_orders_status__placed (models/schema.yml:13:13) 4 failed row(s)"
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_test_that_errored_has_no_row_count() -> None:
+    log_list = ["    Failed test  unique_mini_orders_id (models/schema.yml:16:13) [1 of 4 in 1.02s]"]
+    assert extract_dbt_failure_details(log_list) == ["Failure in test unique_mini_orders_id (models/schema.yml:16:13)"]
+
+
+def test_extract_dbt_failure_details_dbt_v2_namespaced_test_name() -> None:
+    log_list = [
+        "    Failed test  main_dbt_test__audit.sing_fail (tests/sing_fail.sql) [1 of 1 in 0.01s]",
+        "Test failed (1 failed row(s)): sing_fail",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Failure in test main_dbt_test__audit.sing_fail (tests/sing_fail.sql) 1 failed row(s)"
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_json_log_format() -> None:
+    # In JSON output dbt 2 has the "Failed test" line only, not the "Test failed (N failed row(s))" one.
+    log_list = [_json_log_line("    Failed test  not_null_m_id (models/schema.yml:3:9) [1 of 1 in 0.01s]")]
+    assert extract_dbt_failure_details(log_list) == ["Failure in test not_null_m_id (models/schema.yml:3:9)"]
 
 
 def test_extract_dbt_runner_issues():

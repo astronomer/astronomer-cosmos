@@ -42,6 +42,7 @@ def get_all_dag_files():
 def test_example_dag_kubernetes(session, monkeypatch):
     if is_bigquery_test_adapter():
         # The last task of the DAG runs `dbt docs generate`, which dbt-oss does not support: run it as a no-op there.
+        # TODO: remove this patch once the docs task works with dbt-oss (#3135).
         monkeypatch.setattr(DbtDocsS3KubernetesOperator, "execute", lambda self, context: None)
     get_all_dag_files()
     db = test_utils.make_dag_bag(EXAMPLE_DAGS_DIR, include_examples=False)

@@ -15,7 +15,7 @@ pip install "apache-airflow-providers-cncf-kubernetes==10.8.0" "protobuf==6.33.2
 # Reset the Airflow database to its initial state
 airflow db reset -y
 
-# Both examples run. jaffle_shop_kubernetes ends with a dbt docs task, which dbt-oss does not support: its test runs that task as a no-op
+# The whole file runs. jaffle_shop_kubernetes ends with a dbt docs task, which dbt-oss does not support: its test runs that task as a no-op
 pytest -vv \
     -m 'integration and not dbtfusion' \
     tests/test_example_k8s_dags.py

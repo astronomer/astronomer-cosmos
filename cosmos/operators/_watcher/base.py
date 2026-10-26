@@ -289,6 +289,9 @@ def _rewrite_upstream_failure_skip_status(
     rewritten XCom with the original ``"skipped"``. Tracking affected
     ``unique_id``\\ s in a per-execution set lets the parser rewrite both. See
     #2698.
+
+    dbt 2 (dbt-oss) emits neither event: ``_track_node_skipped_by_dbt_v2`` adds the node of a skipped
+    ``MarkSkippedChildren`` event to the same set, so the rewrite below covers it too.
     """
     if not unique_id or upstream_failure_skipped_ids is None:
         return dbt_node_status

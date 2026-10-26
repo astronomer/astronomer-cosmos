@@ -40,8 +40,7 @@ def test_dbt_azure_container_instance_operator_add_global_flags() -> None:
     )
     assert dbt_base_operator.add_global_flags() == [
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        '{"end_time": "{{ data_interval_end.strftime(\'%Y%m%d%H%M%S\') }}", "start_time": "{{ data_interval_start.strftime(\'%Y%m%d%H%M%S\') }}"}',
         "--no-version-check",
     ]
 
@@ -147,8 +146,7 @@ def test_dbt_azure_container_instance_build_command():
             "dbt",
             command_name,
             "--vars",
-            "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-            "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+            '{"end_time": "{{ data_interval_end.strftime(\'%Y%m%d%H%M%S\') }}", "start_time": "{{ data_interval_start.strftime(\'%Y%m%d%H%M%S\') }}"}',
             "--no-version-check",
         ]
 
@@ -209,5 +207,5 @@ def test_build_and_run_cmd_invokes_interceptors(mock_execute):
 
     assert "--vars" in operator.command
     vars_idx = operator.command.index("--vars")
-    assert "new_var: new_var_value" in operator.command[vars_idx + 1]
+    assert '"new_var": "new_var_value"' in operator.command[vars_idx + 1]
     assert operator.environment_variables.get("NEW_ENV_VAR") == "new_env_var_value"

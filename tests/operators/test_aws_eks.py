@@ -55,8 +55,7 @@ def test_dbt_kubernetes_build_command():
             "dbt",
             command_name,
             "--vars",
-            "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-            "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+            '{"end_time": "{{ data_interval_end.strftime(\'%Y%m%d%H%M%S\') }}", "start_time": "{{ data_interval_start.strftime(\'%Y%m%d%H%M%S\') }}"}',
             "--no-version-check",
             "--project-dir",
             "my/dir",
@@ -76,8 +75,7 @@ def test_dbt_aws_eks_build_command_preserves_custom_cmds():
         "dbt",
         "ls",
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        '{"end_time": "{{ data_interval_end.strftime(\'%Y%m%d%H%M%S\') }}", "start_time": "{{ data_interval_start.strftime(\'%Y%m%d%H%M%S\') }}"}',
         "--no-version-check",
         "--project-dir",
         "my/dir",

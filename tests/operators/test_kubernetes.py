@@ -95,8 +95,7 @@ def test_dbt_kubernetes_operator_add_global_flags(base_operator) -> None:
     )
     assert dbt_kube_operator.add_global_flags() == [
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        '{"end_time": "{{ data_interval_end.strftime(\'%Y%m%d%H%M%S\') }}", "start_time": "{{ data_interval_start.strftime(\'%Y%m%d%H%M%S\') }}"}',
         "--no-version-check",
     ]
 
@@ -149,7 +148,7 @@ def test_build_and_run_cmd_invokes_interceptors(mock_kube_execute, base_operator
 
     assert "--vars" in operator.arguments
     vars_idx = operator.arguments.index("--vars")
-    assert "new_var: new_var_value" in operator.arguments[vars_idx + 1]
+    assert '"new_var": "new_var_value"' in operator.arguments[vars_idx + 1]
     assert any(
         getattr(e, "name", None) == "NEW_ENV_VAR" and getattr(e, "value", None) == "new_env_var_value"
         for e in operator.env_vars
@@ -219,8 +218,7 @@ def test_dbt_kubernetes_build_command():
             "dbt",
             *command_name,
             "--vars",
-            "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-            "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+            '{"end_time": "{{ data_interval_end.strftime(\'%Y%m%d%H%M%S\') }}", "start_time": "{{ data_interval_start.strftime(\'%Y%m%d%H%M%S\') }}"}',
             "--no-version-check",
             "--project-dir",
             "my/dir",
@@ -238,8 +236,7 @@ def test_dbt_kubernetes_build_command_with_explicit_cmds():
     assert operator.arguments == [
         "ls",
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        '{"end_time": "{{ data_interval_end.strftime(\'%Y%m%d%H%M%S\') }}", "start_time": "{{ data_interval_start.strftime(\'%Y%m%d%H%M%S\') }}"}',
         "--no-version-check",
         "--project-dir",
         "my/dir",
@@ -259,8 +256,7 @@ def test_dbt_kubernetes_build_command_preserves_custom_cmds():
         "dbt",
         "ls",
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        '{"end_time": "{{ data_interval_end.strftime(\'%Y%m%d%H%M%S\') }}", "start_time": "{{ data_interval_start.strftime(\'%Y%m%d%H%M%S\') }}"}',
         "--no-version-check",
         "--project-dir",
         "my/dir",
@@ -631,12 +627,7 @@ def test_created_pod():
         "dbt",
         "ls",
         "--vars",
-        "end_time: '{{ "
-        "data_interval_end.strftime(''%Y%m%d%H%M%S'') "
-        "}}'\n"
-        "start_time: '{{ "
-        "data_interval_start.strftime(''%Y%m%d%H%M%S'') "
-        "}}'\n",
+        '{"end_time": "{{ data_interval_end.strftime(\'%Y%m%d%H%M%S\') }}", "start_time": "{{ data_interval_start.strftime(\'%Y%m%d%H%M%S\') }}"}',
         "--no-version-check",
         "--project-dir",
         "my/dir",

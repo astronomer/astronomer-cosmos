@@ -9,8 +9,6 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml
-
 try:
     from airflow.sdk.definitions.context import context_merge  # type: ignore[attr-defined]
 except ImportError:
@@ -31,7 +29,6 @@ from airflow.utils.strings import to_boolean
 
 from cosmos import settings
 from cosmos.dbt.executable import get_system_dbt
-from cosmos.dbt.runner import is_dbt_v2
 from cosmos.log import get_logger
 
 
@@ -50,6 +47,11 @@ def resolve_templated_bool(value: bool | str | None) -> bool:
         # rendered " true " would otherwise resolve to False on the Airflow 2 matrix.
         return to_boolean(value.strip())
     return bool(value)
+
+
+def _dump_dbt_mapping(value: dict[str, Any]) -> str:
+    """Serialize a dict for dbt's ``--vars`` and ``--args``. dbt 2 rejects the quoted strings YAML dumps, but accepts JSON."""
+    return json.dumps(value, sort_keys=True, default=str)
 
 
 class AbstractDbtBase(metaclass=ABCMeta):
@@ -296,10 +298,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         if flag_value is None:
             return []
         elif isinstance(flag_value, dict):
-            # dbt 2 rejects the single quotes yaml.dump puts around string values, but accepts JSON (flow style) mappings
-            if is_dbt_v2():
-                return [flag_name, json.dumps(flag_value)]
-            return [flag_name, yaml.dump(flag_value)]
+            return [flag_name, _dump_dbt_mapping(flag_value)]
         elif isinstance(flag_value, list) and flag_value:
             return [flag_name, " ".join(flag_value)]
         elif isinstance(flag_value, list):
@@ -531,7 +530,7 @@ class DbtRunOperationMixin:
         flags = []
         if self.args is not None:
             flags.append("--args")
-            flags.append(yaml.dump(self.args))
+            flags.append(_dump_dbt_mapping(self.args))
         return flags
 
 

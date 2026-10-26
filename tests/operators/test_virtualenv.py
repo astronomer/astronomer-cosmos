@@ -500,5 +500,5 @@ def test_build_and_run_cmd_invokes_interceptors(mock_run_command):
     env = call_kwargs["env"]
 
     assert "--vars" in cmd
-    assert "new_var: new_var_value" in cmd[cmd.index("--vars") + 1]
+    assert '"new_var": "new_var_value"' in cmd[cmd.index("--vars") + 1]
     assert env.get("NEW_ENV_VAR") == "new_env_var_value"

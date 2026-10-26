@@ -162,7 +162,7 @@ def test_dbt_mixin_add_cmd_flags_full_refresh(full_refresh, expected_flags, dbt_
     assert flags == expected_flags
 
 
-@pytest.mark.parametrize("args, expected_flags", [(None, []), ({"arg1": "val1"}, ["--args", "arg1: val1\n"])])
+@pytest.mark.parametrize("args, expected_flags", [(None, []), ({"arg1": "val1"}, ["--args", '{"arg1": "val1"}'])])
 def test_dbt_mixin_add_cmd_flags_run_operator(args, expected_flags):
     macro_name = "some_macro"
     run_operation = DbtRunOperationMixin(macro_name=macro_name, args=args)
@@ -242,10 +242,8 @@ def test_dbt_base_operator_execute_debug_mode_success_stops_memory_tracking(
             mock_stop_tracking.assert_called_once_with({})
 
 
-@pytest.mark.parametrize(
-    "is_dbt_v2, expected",
-    [(False, ["--vars", "var: '2'\n"]), (True, ["--vars", '{"var": "2"}'])],
-)
-def test_process_global_flag_dict_format_depends_on_dbt_version(is_dbt_v2, expected):
-    with patch("cosmos.operators.base.is_dbt_v2", return_value=is_dbt_v2):
-        assert AbstractDbtBase._process_global_flag("--vars", {"var": "2"}) == expected
+def test_process_global_flag_serializes_dicts_as_json():
+    assert AbstractDbtBase._process_global_flag("--vars", {"b": "2", "a": datetime(2024, 1, 1)}) == [
+        "--vars",
+        '{"a": "2024-01-01 00:00:00", "b": "2"}',
+    ]

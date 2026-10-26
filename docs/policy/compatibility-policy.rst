@@ -68,7 +68,7 @@ dbt Core
 - **Minimum required version**: dbt Core 1.8
 - **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12
 - **dbt Fusion**: 2.0. See :ref:`dbt Fusion support <dbt_fusion>`.
-- **dbt OSS** (experimental): 2.0. See :ref:`dbt OSS support <dbt_oss>`.
+- **dbt OSS** (experimental support): 2.0. See :ref:`dbt OSS support <dbt_oss>`.
 
 .. note::
 
@@ -106,7 +106,7 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
      - n/a
      - n/a
      - n/a
-   * - 2.0 (dbt OSS, experimental)
+   * - 2.0 (dbt OSS, experimental support)
      - n/a
      - n/a
      - n/a

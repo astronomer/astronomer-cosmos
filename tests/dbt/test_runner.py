@@ -461,7 +461,7 @@ def test_extract_message_by_status_still_prefers_node_name():
     assert messages == ["boom"]
 
 
-class _DbtOssFreshnessStatus(Enum):
+class _DbtOssFreshnessStatus(str, Enum):
     """Mirrors dbt-oss, which reports a source freshness warning as ``<FreshnessStatus.WARN: 'Warn'>``."""
 
     WARN = "Warn"
@@ -469,7 +469,7 @@ class _DbtOssFreshnessStatus(Enum):
 
 def test_extract_message_by_status_matches_the_warn_status_in_any_case():
     results = [
-        SimpleNamespace(status=_DbtOssFreshnessStatus.WARN, node=SimpleNamespace(name="source_a"), message="late"),
+        SimpleNamespace(status=_DbtOssFreshnessStatus.WARN, unique_id="source.p.s.a"),
         SimpleNamespace(status="warn", node=SimpleNamespace(name="test_b"), message="warned"),
         SimpleNamespace(status="pass", node=SimpleNamespace(name="test_c"), message=None),
     ]
@@ -477,30 +477,31 @@ def test_extract_message_by_status_matches_the_warn_status_in_any_case():
 
     names, messages = dbt_runner.extract_message_by_status(result)
 
-    assert names == ["source_a", "test_b"]
-    assert messages == ["late", "warned"]
+    assert names == ["source.p.s.a", "test_b"]
+    assert messages == ["warn", "warned"]
 
 
 def test_extract_message_by_status_handles_results_without_a_message():
-    # dbt-oss source freshness results (``FreshnessResultsNode``) carry a status but no ``message`` attribute.
-    freshness = SimpleNamespace(status=_DbtOssFreshnessStatus.WARN, node=SimpleNamespace(name="source_a"))
+    # dbt-oss source freshness results (``FreshnessResultsNode``) carry a status and a ``unique_id``, but no ``node``
+    # and no ``message``.
+    freshness = SimpleNamespace(status=_DbtOssFreshnessStatus.WARN, unique_id="source.p.s.a")
     result = SimpleNamespace(result=SimpleNamespace(results=[freshness]))
 
     names, messages = dbt_runner.extract_message_by_status(result)
 
-    assert names == ["source_a"]
+    assert names == ["source.p.s.a"]
     assert messages == ["warn"]
 
 
 def test_extract_message_by_status_matches_the_levels_in_any_case():
     results = [
-        SimpleNamespace(status="Error", node=SimpleNamespace(name="model_a"), message="boom"),
-        SimpleNamespace(status="runtime error", node=SimpleNamespace(name="model_b"), message="bad"),
+        SimpleNamespace(status="error", node=SimpleNamespace(name="model_a"), message="boom"),
+        SimpleNamespace(status="Runtime Error", node=SimpleNamespace(name="model_b"), message="bad"),
         SimpleNamespace(status="success", node=SimpleNamespace(name="model_c"), message=None),
     ]
     result = SimpleNamespace(result=SimpleNamespace(results=results))
 
-    names, _ = dbt_runner.extract_message_by_status(result, ["error", "Fail", "runtime error"])
+    names, _ = dbt_runner.extract_message_by_status(result, ["Error", "Fail", "runtime error"])
 
     assert names == ["model_a", "model_b"]
 

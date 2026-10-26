@@ -2061,33 +2061,6 @@ def test_tests_per_model_populated():
     assert any("unique_customers_customer_id" in t for t in customers_tests)
 
 
-def test_children_per_node_lists_the_nodes_that_depend_on_each_node():
-    project_config = ProjectConfig(
-        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
-    )
-    profile_config = ProfileConfig(
-        profile_name="test",
-        target_name="test",
-        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
-    )
-    dbt_graph = DbtGraph(
-        project=project_config,
-        execution_config=ExecutionConfig(dbt_project_path=project_config.dbt_project_path),
-        profile_config=profile_config,
-    )
-    dbt_graph.load()
-
-    # Every dependency of every node is a child edge, tests included.
-    for node in dbt_graph.nodes.values():
-        for parent_id in node.depends_on:
-            assert node.unique_id in dbt_graph.children_per_node[parent_id]
-
-    # Spot-check: customers is built from stg_customers and has tests below it.
-    children_of_customers = dbt_graph.children_per_node["model.jaffle_shop.customers"]
-    assert any("not_null_customers_customer_id" in child for child in children_of_customers)
-    assert "model.jaffle_shop.customers" in dbt_graph.children_per_node["model.jaffle_shop.stg_customers"]
-
-
 def test_tests_per_model_lists_multi_parent_test_under_every_parent():
     """A test with multiple parents (e.g. a relationships test) is listed under each parent.
 

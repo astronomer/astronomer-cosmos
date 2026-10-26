@@ -232,8 +232,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
         self.tests_per_model: TestsPerModel = kwargs.pop("tests_per_model", {})
-        # Node unique_id -> unique_ids of its children, from the dbt graph. Set only for dbt 2, see the log parser.
-        self.children_per_node: dict[str, list[str]] | None = kwargs.pop("children_per_node", None)
         self.test_results_per_model: ResultsTestsPerModel = {}
         self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
         self._should_generate_model_uris: bool = kwargs.pop(
@@ -265,9 +263,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._dataset_namespace: str | None = None
         self._model_outlet_uris: dict[str, list[str]] = {}
         # Mutable set populated by the log parser when dbt emits SkippingDetails
-        # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
-        # for those unique_ids are rewritten to "failed" so the consumer sensor
-        # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+        # or LogSkipBecauseError (dbt 1), or a skipped MarkSkippedChildren (dbt 2), for a node;
+        # subsequent "skipped" terminal events for those unique_ids are rewritten to "failed"
+        # so the consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
         # See #2698.
         self._upstream_failure_skipped_ids: set[str] = set()
 
@@ -284,7 +282,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             dataset_namespace=self._dataset_namespace,
             should_generate_model_uris=self._should_generate_model_uris,
             upstream_failure_skipped_ids=self._upstream_failure_skipped_ids,
-            children_per_node=self.children_per_node,
         )
 
     def _discover_invocation_mode(self) -> None:

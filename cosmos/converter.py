@@ -51,7 +51,6 @@ from cosmos.constants import (
 from cosmos.dbt.executable import get_system_dbt, is_dbt_installed_in_same_environment
 from cosmos.dbt.graph import DbtGraph
 from cosmos.dbt.project import has_non_empty_dependencies_file
-from cosmos.dbt.runner import is_dbt_v2
 from cosmos.dbt.selector import retrieve_by_label
 from cosmos.exceptions import CosmosValueError
 
@@ -445,8 +444,6 @@ class DbtToAirflowConverter:
             async_py_requirements=execution_config.async_py_requirements,
             execution_config=execution_config,
             tests_per_model=self.dbt_graph.tests_per_model,
-            # Only dbt 2 needs it (see store_dbt_resource_status_from_log), so dbt 1 DAGs do not carry it.
-            children_per_node=self.dbt_graph.children_per_node if is_dbt_v2() else None,
         )
 
         current_time = time.perf_counter()

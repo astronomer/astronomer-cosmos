@@ -300,31 +300,26 @@ def _rewrite_upstream_failure_skip_status(
 
 
 # dbt 2 (dbt-oss) does not emit ``SkippingDetails`` or ``LogSkipBecauseError`` for a node it skipped because an upstream
-# node failed. It emits ``MarkSkippedChildren`` instead, which names the parent (``data.unique_id``) before the parent
-# finishes, so the skipped children are found in the dbt graph Cosmos loaded.
+# node failed. Every node it handles that way, a skipped one included, emits ``MarkSkippedChildren`` naming itself, with
+# the ``status`` it ends with, before its own ``NodeFinished``. A node that failed reports ``error`` or ``fail``, and one
+# dbt skipped reports ``skipped``.
 _DBT_V2_MARK_SKIPPED_CHILDREN_EVENT = "MarkSkippedChildren"
+_DBT_V2_SKIPPED_STATUS = "skipped"
 
 
-def _track_children_skipped_by_dbt_v2(
-    log_line: dict[str, Any],
-    upstream_failure_skipped_ids: set[str] | None,
-    children_per_node: dict[str, list[str]] | None,
-) -> None:
-    """Add every descendant of the node of a ``MarkSkippedChildren`` event to the upstream-failure skips.
+def _track_node_skipped_by_dbt_v2(log_line: dict[str, Any], upstream_failure_skipped_ids: set[str] | None) -> None:
+    """Add the node of a dbt 2 ``MarkSkippedChildren`` event to the upstream-failure skips when dbt skipped it.
 
-    dbt skips the whole subtree of a failed (or skipped) node, so the transitive children are added. The nodes that
-    report ``skipped`` later are then rewritten like the dbt 1 ones by ``_rewrite_upstream_failure_skip_status``.
+    The event comes before the node's ``NodeFinished``, so ``_rewrite_upstream_failure_skip_status`` rewrites that
+    ``skipped`` like the dbt 1 ones.
     """
-    if not children_per_node or upstream_failure_skipped_ids is None:
+    if upstream_failure_skipped_ids is None:
         return
     if log_line.get("info", {}).get("name") != _DBT_V2_MARK_SKIPPED_CHILDREN_EVENT:
         return
-    pending = list(children_per_node.get(log_line.get("data", {}).get("unique_id"), ()))
-    while pending:
-        unique_id = pending.pop()
-        if unique_id not in upstream_failure_skipped_ids:
-            upstream_failure_skipped_ids.add(unique_id)
-            pending.extend(children_per_node.get(unique_id, ()))
+    data = log_line.get("data", {})
+    if data.get("status") == _DBT_V2_SKIPPED_STATUS and data.get("unique_id"):
+        upstream_failure_skipped_ids.add(data["unique_id"])
 
 
 def _node_status_xcom_value(
@@ -355,7 +350,6 @@ def store_dbt_resource_status_from_log(
     dataset_namespace: str | None = None,
     should_generate_model_uris: bool = True,
     upstream_failure_skipped_ids: set[str] | None = None,
-    children_per_node: dict[str, list[str]] | None = None,
 ) -> None:
     """
     Parses a single line from dbt JSON logs and stores node status to Airflow XCom.
@@ -382,13 +376,11 @@ def store_dbt_resource_status_from_log(
         generation is skipped regardless of ``dataset_namespace``.
     :param upstream_failure_skipped_ids: Mutable accumulator set of node unique_ids
         that dbt skipped because of an upstream-node failure. Populated when this
-        function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event; later
+        function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event (dbt 1), or a ``MarkSkippedChildren`` event
+        with ``status="skipped"`` (dbt 2); later
         ``NodeFinished`` events with ``node_status="skipped"`` for these unique_ids
         are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
         retry it) rather than going SKIPPED. See #2698.
-    :param children_per_node: dbt 2 only. Mapping of node unique_id to the unique_ids of its children, from the dbt
-        graph. dbt 2 emits ``MarkSkippedChildren`` (naming the parent) instead of the dbt 1 skip events, so the
-        children of that node are added to ``upstream_failure_skipped_ids``.
     """
     try:
         log_line = json.loads(line)
@@ -401,7 +393,7 @@ def store_dbt_resource_status_from_log(
         _surface_non_json_stdout(line)
         log_line = {}
     else:
-        _track_children_skipped_by_dbt_v2(log_line, upstream_failure_skipped_ids, children_per_node)
+        _track_node_skipped_by_dbt_v2(log_line, upstream_failure_skipped_ids)
         context = extra_kwargs.get("context")
         if context is not None:
             _store_startup_event_from_log(context["ti"], log_line)

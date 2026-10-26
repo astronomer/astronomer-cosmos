@@ -552,7 +552,6 @@ class DbtGraph:
     filtered_nodes: dict[str, DbtNode] = dict()
     excluded_node_ids: set[str] = set()
     tests_per_model: TestsPerModel = dict()
-    children_per_node: dict[str, list[str]] = dict()
     load_method: LoadMode = LoadMode.AUTOMATIC
 
     def __init__(
@@ -1492,13 +1491,9 @@ class DbtGraph:
         `has_non_detached_test` if there's at least one non-detached `dbt` test.
         Also builds `tests_per_model`: a mapping of model unique_id to its associated test names.
 
-        Also builds `children_per_node`: a mapping of node unique_id to the unique_ids of the nodes that depend on it
-        (tests included). The watcher uses it to tell which nodes dbt 2 skipped because an upstream node failed.
-
         Updates in-place:
         * self.filtered_nodes
         * self.tests_per_model
-        * self.children_per_node
         """
         tests_per_model: TestsPerModel = {}
         for _, node in list(self.nodes.items()):
@@ -1521,13 +1516,3 @@ class DbtGraph:
                     if parent_node is not None:
                         parent_node.downstream.append(node.unique_id)
         self.tests_per_model = tests_per_model
-        self.children_per_node = self._build_children_per_node()
-
-    def _build_children_per_node(self) -> dict[str, list[str]]:
-        """Map each node unique_id to the unique_ids of the nodes that depend on it, tests included."""
-        children_per_node: dict[str, list[str]] = {}
-        for node in self.nodes.values():
-            if node.unique_id not in self.excluded_node_ids:
-                for parent_node_id in node.depends_on:
-                    children_per_node.setdefault(parent_node_id, []).append(node.unique_id)
-        return children_per_node

@@ -1024,35 +1024,6 @@ def test_project_config_install_dbt_deps_overrides_operator_args(
     assert kwargs["task_args"].get("install_deps", None) == expected
 
 
-@pytest.mark.parametrize("dbt_v2, expected", [(True, {"model.pkg.a": ["model.pkg.b"]}), (False, None)])
-@patch("cosmos.config.ProjectConfig.validate_project")
-@patch("cosmos.converter.validate_initial_user_config")
-@patch("cosmos.converter.DbtGraph")
-@patch("cosmos.converter.build_airflow_graph")
-def test_converter_passes_children_per_node_only_for_dbt_2(
-    mock_build_airflow_graph, mock_dbt_graph, mock_user_config, mock_validate_project, dbt_v2, expected
-):
-    """The watcher needs the dbt graph's child map only with dbt 2, so dbt 1 DAGs do not carry it."""
-    mock_dbt_graph.return_value.children_per_node = {"model.pkg.a": ["model.pkg.b"]}
-    project_config = ProjectConfig(project_name="fake-project", dbt_project_path="/some/project/path")
-    with (
-        patch("cosmos.converter.is_dbt_v2", return_value=dbt_v2),
-        DAG("test-id", start_date=datetime(2022, 1, 1)) as dag,
-    ):
-        DbtToAirflowConverter(
-            dag=dag,
-            nodes=nodes,
-            project_config=project_config,
-            profile_config=sample_profile_config,
-            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
-            render_config=MagicMock(),
-            operator_args={},
-        )
-    _, kwargs = mock_build_airflow_graph.call_args
-
-    assert kwargs["children_per_node"] == expected
-
-
 @pytest.mark.parametrize(
     "execution_install_dbt_deps,project_install_dbt_deps,expected",
     [

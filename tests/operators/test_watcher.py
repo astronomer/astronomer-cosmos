@@ -788,105 +788,155 @@ class TestStoreDbtStatusFromLog:
 
     @staticmethod
     def _mark_skipped_children_line(unique_id: str, status: str) -> str:
-        """The dbt 2 (dbt-oss) event that names the parent whose children dbt skips."""
+        """The dbt 2 (dbt-oss) event every failed or skipped node emits for itself, before its ``NodeFinished``."""
         return json.dumps({"info": {"name": "MarkSkippedChildren"}, "data": {"unique_id": unique_id, "status": status}})
 
-    # A flaky model with a chain of two models and a test below it, and an unrelated model.
-    _CHILDREN_PER_NODE = {
-        "model.pkg.flaky": ["model.pkg.downstream", "test.pkg.not_null_flaky_id"],
-        "model.pkg.downstream": ["model.pkg.downstream_2"],
-        "model.pkg.other": ["model.pkg.other_child"],
-    }
+    # The events of dbt-oss 2.0.8 for ``dbt build`` where the model ``a`` fails, ``b`` and ``c`` are below it, and ``a``
+    # has a test.
+    _DBT_V2_MODEL_FAILED = (
+        ("MarkSkippedChildren", "model.pkg.a", "error"),
+        ("NodeFinished", "model.pkg.a", "error"),
+        ("MarkSkippedChildren", "test.pkg.not_null_a_id", "skipped"),
+        ("NodeFinished", "test.pkg.not_null_a_id", "skipped"),
+        ("MarkSkippedChildren", "model.pkg.b", "skipped"),
+        ("NodeFinished", "model.pkg.b", "skipped"),
+        ("MarkSkippedChildren", "model.pkg.c", "skipped"),
+        ("NodeFinished", "model.pkg.c", "skipped"),
+    )
+    # The same project where ``a`` builds and its test fails: dbt skips ``b``, the direct child of the tested model.
+    _DBT_V2_TEST_FAILED = (
+        ("NodeFinished", "model.pkg.a", "success"),
+        ("MarkSkippedChildren", "test.pkg.not_null_a_id", "fail"),
+        ("NodeFinished", "test.pkg.not_null_a_id", "fail"),
+        ("MarkSkippedChildren", "model.pkg.b", "skipped"),
+        ("NodeFinished", "model.pkg.b", "skipped"),
+        ("MarkSkippedChildren", "model.pkg.c", "skipped"),
+        ("NodeFinished", "model.pkg.c", "skipped"),
+    )
+    # ``dbt build --exclude b`` where ``a`` fails: dbt skips ``c`` and never reports ``b``.
+    _DBT_V2_MODEL_FAILED_WITH_EXCLUDED_NODE = (
+        ("MarkSkippedChildren", "model.pkg.a", "error"),
+        ("NodeFinished", "model.pkg.a", "error"),
+        ("MarkSkippedChildren", "model.pkg.c", "skipped"),
+        ("NodeFinished", "model.pkg.c", "skipped"),
+    )
 
-    def test_store_dbt_resource_status_from_log_rewrites_children_skipped_by_dbt_v2(self):
-        """dbt 2 names the failed parent in ``MarkSkippedChildren``; its whole subtree is marked from the dbt graph."""
+    def _replay_dbt_v2_events(self, events: tuple[tuple[str, str, str], ...]) -> tuple[_MockTI, set[str]]:
         ti = _MockTI()
-        ctx = {"ti": ti}
         upstream_failure_skipped_ids: set[str] = set()
-
-        for line in (
-            self._mark_skipped_children_line("model.pkg.flaky", "error"),
-            self._node_log_line("model.pkg.flaky", "error"),
-            self._node_log_line("model.pkg.downstream", "skipped"),
-            self._node_log_line("model.pkg.downstream_2", "skipped"),
-        ):
+        for event_name, unique_id, status in events:
+            line = (
+                self._mark_skipped_children_line(unique_id, status)
+                if event_name == "MarkSkippedChildren"
+                else self._node_log_line(unique_id, status)
+            )
             store_dbt_resource_status_from_log(
                 line,
-                {"context": ctx},
+                {"context": {"ti": ti}},
                 tests_per_model={},
                 test_results_per_model={},
                 upstream_failure_skipped_ids=upstream_failure_skipped_ids,
-                children_per_node=self._CHILDREN_PER_NODE,
             )
+        return ti, upstream_failure_skipped_ids
 
-        assert upstream_failure_skipped_ids == {
-            "model.pkg.downstream",
-            "model.pkg.downstream_2",
-            "test.pkg.not_null_flaky_id",
-        }
-        assert ti.store.get("model__pkg__flaky_status") == {"status": "error", "outlet_uris": []}
-        for downstream in ("downstream", "downstream_2"):
-            assert ti.store.get(f"model__pkg__{downstream}_status") == {
+    @pytest.mark.parametrize(
+        "events, failed_or_ok, rewritten",
+        [
+            pytest.param(
+                _DBT_V2_MODEL_FAILED,
+                {"model__pkg__a": "error"},
+                ["test__pkg__not_null_a_id", "model__pkg__b", "model__pkg__c"],
+                id="model-failed",
+            ),
+            pytest.param(
+                _DBT_V2_TEST_FAILED,
+                {"model__pkg__a": "success", "test__pkg__not_null_a_id": "fail"},
+                ["model__pkg__b", "model__pkg__c"],
+                id="test-failed-direct-child-is-skipped",
+            ),
+            pytest.param(
+                _DBT_V2_MODEL_FAILED_WITH_EXCLUDED_NODE,
+                {"model__pkg__a": "error"},
+                ["model__pkg__c"],
+                id="excluded-node-between-failed-and-skipped",
+            ),
+        ],
+    )
+    def test_store_dbt_resource_status_from_log_rewrites_nodes_skipped_by_dbt_v2(self, events, failed_or_ok, rewritten):
+        """dbt 2 reports each node it skipped through ``MarkSkippedChildren``, so no dbt graph is needed to find them."""
+        ti, _ = self._replay_dbt_v2_events(events)
+
+        for key, status in failed_or_ok.items():
+            assert ti.store.get(f"{key}_status") == {"status": status, "outlet_uris": []}
+        for key in rewritten:
+            assert ti.store.get(f"{key}_status") == {
                 "status": "failed",
                 "outlet_uris": [],
                 "upstream_failure_skip": True,
             }
 
-    def test_store_dbt_resource_status_from_log_keeps_unrelated_dbt_v2_skips_as_skipped(self):
-        """A node that is not below the failed one is not an upstream-failure skip."""
-        ti = _MockTI()
-        upstream_failure_skipped_ids: set[str] = set()
-
-        for line in (
-            self._mark_skipped_children_line("model.pkg.flaky", "error"),
-            self._node_log_line("model.pkg.other_child", "skipped"),
-        ):
-            store_dbt_resource_status_from_log(
-                line,
-                {"context": {"ti": ti}},
-                tests_per_model={},
-                test_results_per_model={},
-                upstream_failure_skipped_ids=upstream_failure_skipped_ids,
-                children_per_node=self._CHILDREN_PER_NODE,
+    def test_store_dbt_resource_status_from_log_keeps_other_dbt_v2_statuses_unchanged(self):
+        """Only a ``skipped`` ``MarkSkippedChildren`` marks a node: a failed, passed or warned one is not rewritten."""
+        _, upstream_failure_skipped_ids = self._replay_dbt_v2_events(
+            (
+                ("MarkSkippedChildren", "model.pkg.a", "error"),
+                ("MarkSkippedChildren", "test.pkg.t", "fail"),
+                ("MarkSkippedChildren", "test.pkg.w", "warn"),
+                ("MarkSkippedChildren", "model.pkg.ok", "success"),
             )
-
-        assert "model.pkg.other_child" not in upstream_failure_skipped_ids
-        assert ti.store.get("model__pkg__other_child_status") == {"status": "skipped", "outlet_uris": []}
-
-    def test_store_dbt_resource_status_from_log_ignores_mark_skipped_children_without_children_per_node(self):
-        """Without the dbt graph (dbt 1, or no map passed) the event changes nothing."""
-        ti = _MockTI()
-        upstream_failure_skipped_ids: set[str] = set()
-
-        for line in (
-            self._mark_skipped_children_line("model.pkg.flaky", "error"),
-            self._node_log_line("model.pkg.downstream", "skipped"),
-        ):
-            store_dbt_resource_status_from_log(
-                line,
-                {"context": {"ti": ti}},
-                tests_per_model={},
-                test_results_per_model={},
-                upstream_failure_skipped_ids=upstream_failure_skipped_ids,
-            )
+        )
 
         assert upstream_failure_skipped_ids == set()
-        assert ti.store.get("model__pkg__downstream_status") == {"status": "skipped", "outlet_uris": []}
 
-    def test_store_dbt_resource_status_from_log_dbt_v2_skip_of_unknown_parent_is_ignored(self):
-        """A parent that is not in the graph adds nothing, and does not raise."""
+    def test_store_dbt_resource_status_from_log_keeps_skip_without_dbt_v2_event_as_skipped(self):
+        """A ``skipped`` node dbt 2 did not announce through ``MarkSkippedChildren`` stays ``skipped``."""
+        ti, upstream_failure_skipped_ids = self._replay_dbt_v2_events((("NodeFinished", "model.pkg.other", "skipped"),))
+
+        assert upstream_failure_skipped_ids == set()
+        assert ti.store.get("model__pkg__other_status") == {"status": "skipped", "outlet_uris": []}
+
+    def test_store_dbt_resource_status_from_log_ignores_skipped_status_of_other_dbt_v2_events(self):
+        """Only the ``MarkSkippedChildren`` event announces an upstream-failure skip, whatever else carries a status."""
         upstream_failure_skipped_ids: set[str] = set()
 
         store_dbt_resource_status_from_log(
-            self._mark_skipped_children_line("model.pkg.not_in_the_graph", "error"),
+            json.dumps({"info": {"name": "LogModelResult"}, "data": {"unique_id": "model.pkg.a", "status": "skipped"}}),
             {"context": {"ti": _MockTI()}},
             tests_per_model={},
             test_results_per_model={},
             upstream_failure_skipped_ids=upstream_failure_skipped_ids,
-            children_per_node=self._CHILDREN_PER_NODE,
         )
 
         assert upstream_failure_skipped_ids == set()
+
+    def test_store_dbt_resource_status_from_log_ignores_malformed_mark_skipped_children(self):
+        """An event without a ``unique_id`` or a ``status`` adds nothing and does not raise."""
+        upstream_failure_skipped_ids: set[str] = set()
+
+        for data in ({"status": "skipped"}, {"unique_id": "model.pkg.a"}, {}):
+            store_dbt_resource_status_from_log(
+                json.dumps({"info": {"name": "MarkSkippedChildren"}, "data": data}),
+                {"context": {"ti": _MockTI()}},
+                tests_per_model={},
+                test_results_per_model={},
+                upstream_failure_skipped_ids=upstream_failure_skipped_ids,
+            )
+
+        assert upstream_failure_skipped_ids == set()
+
+    def test_store_dbt_resource_status_from_log_dbt_v2_event_without_tracking_set_is_ignored(self):
+        """Without ``upstream_failure_skipped_ids`` the event changes nothing."""
+        ti = _MockTI()
+
+        for line in (
+            self._mark_skipped_children_line("model.pkg.b", "skipped"),
+            self._node_log_line("model.pkg.b", "skipped"),
+        ):
+            store_dbt_resource_status_from_log(
+                line, {"context": {"ti": ti}}, tests_per_model={}, test_results_per_model={}
+            )
+
+        assert ti.store.get("model__pkg__b_status") == {"status": "skipped", "outlet_uris": []}
 
     def test_store_dbt_resource_status_from_log_marks_upstream_failure_skip_without_node_finished(self):
         """Subprocess and Kubernetes producers print no ``NodeFinished`` at dbt's default log level (#3023).
@@ -1511,15 +1561,6 @@ def test_make_parse_callable_forwards_should_generate_model_uris():
     callable_ = op._make_parse_callable()
 
     assert callable_.keywords["should_generate_model_uris"] is False
-
-
-def test_make_parse_callable_forwards_children_per_node():
-    """The parser callable forwards the dbt graph's child map, which only dbt 2 needs."""
-    children_per_node = {"model.pkg.a": ["model.pkg.b"]}
-    op = DbtProducerWatcherOperator(project_dir=".", profile_config=profile_config, children_per_node=children_per_node)
-
-    assert op._make_parse_callable().keywords["children_per_node"] == children_per_node
-    assert DbtProducerWatcherOperator(project_dir=".", profile_config=profile_config).children_per_node is None
 
 
 def test_run_subprocess_sets_process_log_line_callable():

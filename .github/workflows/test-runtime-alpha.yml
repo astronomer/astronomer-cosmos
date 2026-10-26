@@ -108,7 +108,7 @@ jobs:
       options: --user root
     services:
       postgres:
-        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494 # 14.18
+        image: postgres@sha256:90da0743e4ed7939b08e2945e0451401b4d7abd792530c7d3cc2da82ed534f08 # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -209,7 +209,7 @@ jobs:
       options: --user root
     services:
       postgres:
-        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494 # 14.18
+        image: postgres@sha256:90da0743e4ed7939b08e2945e0451401b4d7abd792530c7d3cc2da82ed534f08 # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -266,7 +266,7 @@ jobs:
       options: --user root
     services:
       postgres:
-        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494 # 14.18
+        image: postgres@sha256:90da0743e4ed7939b08e2945e0451401b4d7abd792530c7d3cc2da82ed534f08 # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -333,7 +333,7 @@ jobs:
       options: --user root
     services:
       postgres:
-        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494 # 14.18
+        image: postgres@sha256:90da0743e4ed7939b08e2945e0451401b4d7abd792530c7d3cc2da82ed534f08 # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -402,7 +402,7 @@ jobs:
       options: --user root
     services:
       postgres:
-        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494 # 14.18
+        image: postgres@sha256:90da0743e4ed7939b08e2945e0451401b4d7abd792530c7d3cc2da82ed534f08 # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
@@ -459,7 +459,7 @@ jobs:
       options: --user root
     services:
       postgres:
-        image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494 # 14.18
+        image: postgres@sha256:90da0743e4ed7939b08e2945e0451401b4d7abd792530c7d3cc2da82ed534f08 # 14.18
         env:
           POSTGRES_PASSWORD: postgres
         options: >-

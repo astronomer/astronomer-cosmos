@@ -94,31 +94,4 @@ Limitations
 Test coverage
 ~~~~~~~~~~~~~
 
-Cosmos CI tests dbt OSS as follows:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 75
-
-   * - Tests
-     - Python and Airflow versions
-   * - Unit tests, against ``dbt-oss``
-     - Python 3.11 to 3.14, Airflow 2.9 to 3.4
-   * - Integration tests, against BigQuery
-     - Python 3.11 and 3.12, Airflow 2.10, 3.0 and 3.1
-   * - Kubernetes integration tests (``ExecutionMode.KUBERNETES`` and ``ExecutionMode.WATCHER_KUBERNETES``)
-     - Python 3.12, Airflow 3.0
-
-Python 3.10 is not tested with dbt OSS.
-
-These are not tested with dbt OSS:
-
-- ``ExecutionMode.AIRFLOW_ASYNC``. Its BigQuery operator imports ``dbt-bigquery``, which cannot be installed next to dbt OSS.
-- Kubernetes execution modes other than ``ExecutionMode.KUBERNETES`` and ``ExecutionMode.WATCHER_KUBERNETES``.
-- ``ExecutionMode.DOCKER``, ``AWS_ECS``, ``AZURE_CONTAINER_INSTANCE`` and ``GCP_CLOUD_RUN_JOB``.
-- dbt Python models on Databricks.
-- Adapters that dbt OSS treats as experimental, such as Postgres.
-- Uploading the dbt OSS docs site to a real S3, Azure or GCS bucket, and viewing it in the Airflow dbt docs menu.
-- ``DbtDocsS3KubernetesOperator``, which uploads the whole ``target`` folder from the pod.
-
-Related work is tracked in the `dbt-oss CI tracking issue <https://github.com/astronomer/astronomer-cosmos/issues/3101>`_.
+Cosmos CI runs unit and integration tests against dbt OSS. What is skipped or not covered is tracked in the `dbt-oss CI tracking issue <https://github.com/astronomer/astronomer-cosmos/issues/3101>`_. The related issues and pull requests have the `dbt-oss-v2 label <https://github.com/astronomer/astronomer-cosmos/labels/dbt-oss-v2>`_.

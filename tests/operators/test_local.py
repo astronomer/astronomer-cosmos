@@ -243,8 +243,7 @@ def test_dbt_base_operator_add_global_flags() -> None:
         "--select",
         "my_first_model my_second_model",
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
         "--no-version-check",
     ]
 
@@ -1559,7 +1558,7 @@ def test_store_compiled_sql_airflow3(tmp_path: Path) -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["run-operation", "bla", "--args", "days: 7\ndry_run: true\n"],
+                "cmd_flags": ["run-operation", "bla", "--args", "{days: 7, dry_run: true}"],
                 "run_as_async": False,
                 "async_context": None,
                 "push_run_results_to_xcom": False,

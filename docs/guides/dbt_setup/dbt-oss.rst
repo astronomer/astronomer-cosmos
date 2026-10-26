@@ -1,17 +1,20 @@
 .. _dbt_oss:
 
-dbt OSS support
-===============
+dbt OSS support (experimental)
+==============================
 
 .. note::
     Available since Cosmos 1.16.0.
+
+.. warning::
+    Support for dbt OSS is experimental. The behavior may change between Cosmos releases, and it is not recommended for production yet. Cosmos CI runs the integration tests against BigQuery only (see `#3101 <https://github.com/astronomer/astronomer-cosmos/issues/3101>`_).
 
 Context
 ~~~~~~~
 
 dbt OSS is the open-source (Apache 2.0) distribution of dbt 2. See `Comparing dbt and dbt OSS <https://docs.getdbt.com/blog/comparing-dbt-and-dbt-oss>`_ for how it differs from dbt Core 1.x and :ref:`dbt Fusion <dbt_fusion>`.
 
-It is published on PyPI as ``dbt-oss`` and includes its adapters, so you do not install ``dbt-<adapter>`` packages. dbt-oss 2.0.8 supports Snowflake, BigQuery, Databricks, Redshift, DuckDB, Salesforce and ClickHouse. Other adapters, such as Postgres, are experimental and need ``DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true``.
+It is published on PyPI as ``dbt-oss`` and includes its adapters, so you do not install ``dbt-<adapter>`` packages. See the `dbt supported data platforms <https://docs.getdbt.com/docs/supported-data-platforms>`_ for the adapters it supports. Adapters that dbt OSS marks as experimental, such as Postgres, need ``DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true``. Of these, Cosmos tests BigQuery only.
 
 How to use
 ~~~~~~~~~~
@@ -41,7 +44,7 @@ How to use
            ...,
        )
 
-   Cosmos detects dbt OSS from the Python environment that Airflow runs in. It does not look at ``dbt_executable_path``.
+   Cosmos detects dbt OSS from the Python environment that Airflow runs in. It does not look at ``dbt_executable_path``. It treats the environment as dbt 2 when ``dbt-oss``, ``dbt-core`` or ``dbt`` is installed at version 2, so installing ``dbt`` 2.x also takes the dbt OSS code paths.
 
 How Cosmos behaves with dbt OSS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,7 +64,7 @@ These are the differences between dbt OSS and dbt Core 1.x that Cosmos accounts 
    * - ``ExecutionMode.WATCHER``
      - Runs the producer task in a subprocess, because the ``dbtRunner`` of dbt OSS has no event callbacks. Setting ``InvocationMode.DBT_RUNNER`` for the producer raises ``CosmosValueError``.
    * - Watcher modes, upstream failure
-     - dbt OSS reports the nodes it skips after an upstream failure with the ``MarkSkippedChildren`` event, not the dbt 1.x events. Cosmos reads that event from the producer log, so the consumer tasks of those nodes run when the upstream node succeeds on a retry. This applies to ``ExecutionMode.WATCHER``, ``WATCHER_KUBERNETES`` and ``WATCHER_GCP_GKE``.
+     - dbt OSS reports the nodes it skips after an upstream failure with the ``MarkSkippedChildren`` event, not the dbt 1.x events. Cosmos reads that event from the producer log, so the consumer tasks of those nodes run when the upstream node succeeds on a retry. This applies to ``ExecutionMode.WATCHER``, ``WATCHER_KUBERNETES`` and ``WATCHER_GCP_GKE``. It was checked against recorded dbt OSS events, and the retry scenario is not run end to end against dbt OSS in CI yet (see `#3137 <https://github.com/astronomer/astronomer-cosmos/issues/3137>`_).
    * - Test warnings and failures (``InvocationMode.SUBPROCESS``)
      - Reads the text output of dbt OSS to count test warnings for ``on_warning_callback`` and to name the failing tests in the error.
    * - ``inlets`` and ``outlets``
@@ -86,8 +89,14 @@ Limitations
      - The ``dbtRunner`` of dbt OSS has no callbacks, and dbt does not plan to add them. With ``InvocationMode.DBT_RUNNER``, the error for a failed ``run-operation`` does not include the macro error text.
    * - Empty models
      - ``dbt ls`` does not list empty models, so ``LoadMode.DBT_LS`` does not render them.
+   * - ``ExecutionMode.AIRFLOW_ASYNC``
+     - Not supported or verified with dbt OSS. See `#3103 <https://github.com/astronomer/astronomer-cosmos/issues/3103>`_.
+   * - Assets with ``ExecutionMode.WATCHER`` and ``LoadMode.DBT_LS``
+     - dbt OSS writes ``manifest.json`` when the run ends, so the producer finds no outlet URIs and the consumer tasks do not emit their assets. See `#3129 <https://github.com/astronomer/astronomer-cosmos/pull/3129>`_.
+   * - Configuration that dbt 1.x accepts
+     - dbt OSS rejects some of it. Cosmos CI runs ``dbt-autofix deprecations`` on the example projects, and you may need to run it on yours.
    * - dbt-loom
-     - `dbt-loom <https://github.com/nicholasyager/dbt-loom>`_ does not work with dbt OSS, which blocks the plugin hook it uses. See `dbt-loom issue 192 <https://github.com/adrienneyager/dbt-loom/issues/192>`_.
+     - `dbt-loom <https://github.com/nicholasyager/dbt-loom>`_ is reported not to work with dbt OSS, which blocks the plugin hook it uses. See `dbt-loom issue 192 <https://github.com/nicholasyager/dbt-loom/issues/192>`_. The dbt-loom example DAGs are disabled in the dbt OSS CI job (`#3105 <https://github.com/astronomer/astronomer-cosmos/issues/3105>`_).
 
 Tracking
 ~~~~~~~~

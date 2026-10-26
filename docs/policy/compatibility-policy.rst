@@ -68,7 +68,7 @@ dbt Core
 - **Minimum required version**: dbt Core 1.8
 - **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12
 - **dbt Fusion**: 2.0. See :ref:`dbt Fusion support <dbt_fusion>`.
-- **dbt OSS**: 2.0. See :ref:`dbt OSS support <dbt_oss>`.
+- **dbt OSS** (experimental): 2.0. See :ref:`dbt OSS support <dbt_oss>`.
 
 .. note::
 
@@ -106,7 +106,7 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
      - n/a
      - n/a
      - n/a
-   * - 2.0 (dbt OSS)
+   * - 2.0 (dbt OSS, experimental)
      - n/a
      - n/a
      - n/a
@@ -119,7 +119,9 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
   — there is no such release on PyPI. dbt Fusion ships as a separate
   binary/installer; this table's pip-based check does not apply to it.
 - dbt OSS (``2.0``) installs with ``pip install dbt-oss``. This table's
-  pip-based check does not cover it.
+  pip-based check does not cover it, so ``n/a`` does not mean untested:
+  dbt OSS is tested in Cosmos CI (unit and integration tests, the
+  integration tests against BigQuery only).
 
 .. note::
 

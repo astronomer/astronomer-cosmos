@@ -52,6 +52,7 @@ Bug Fixes
   with a dedicated test task, as under ``TestBehavior.AFTER_EACH``. Sources are rendered as ``dbt source freshness``
   tasks and the build tasks of models, seeds and snapshots select only their own node, so source tests were never
   selected by any task. See #1683.
+* ``ExecutionMode.WATCHER`` now recognises the nodes that dbt 2 (``dbt-oss``) skips because an upstream node failed. dbt 2 does not emit ``SkippingDetails`` or ``LogSkipBecauseError`` for them, only ``MarkSkippedChildren``, so their consumers ended SKIPPED and were never built after the upstream recovered on a retry. Cosmos now reads the ``MarkSkippedChildren`` event that dbt 2 emits for each node it skips and treats the node as it does for dbt 1, including the nodes below a failed test and below an excluded node. See #2698, #3023 and #3101.
 * ``InvocationMode.DBT_RUNNER`` now matches dbt node statuses case-insensitively when it collects warnings. dbt 2 (``dbt-oss``) reports a source freshness warning as ``Warn``, which did not match ``warn``, so ``DbtSourceLocalOperator`` called ``on_warning_callback`` with empty ``test_names`` and ``test_results``. dbt 2 source freshness results have no ``message``, so their status is reported in ``test_results`` instead. dbt 1 is unchanged. See #3101.
 
 1.15.1 (2026-08-04)

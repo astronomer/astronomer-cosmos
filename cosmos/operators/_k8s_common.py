@@ -527,9 +527,9 @@ def finalize_watcher_producer(operator: Any) -> None:
     """
     operator.dbt_cmd_flags += ["--log-format", "json"]
     compose_watcher_backup_callbacks(operator)
-    # Populated by the log parser when dbt emits SkippingDetails or LogSkipBecauseError for a node;
-    # subsequent "skipped" terminal events for those unique_ids are rewritten to "failed" so the
-    # consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+    # Populated by the log parser when dbt emits SkippingDetails or LogSkipBecauseError (dbt 1), or a skipped
+    # MarkSkippedChildren (dbt 2), for a node; subsequent "skipped" terminal events for those unique_ids are
+    # rewritten to "failed" so the consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
     # Mirrors DbtProducerWatcherOperator._upstream_failure_skipped_ids; see #2698.
     operator._upstream_failure_skipped_ids = set()
 

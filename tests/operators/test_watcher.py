@@ -1114,6 +1114,55 @@ class TestStoreDbtStatusFromLog:
 
         assert status == {"status": "success", "outlet_uris": ["databricks://host/from/manifest"]}
 
+    def test_store_dbt_resource_status_from_log_builds_uris_from_the_relation_when_the_project_has_no_manifest(
+        self, tmp_path
+    ):
+        """The path of a dbt-oss run: nothing patched, and no ``target/manifest.json`` while the first node finishes."""
+        from cosmos.dataset import construct_dataset_uri
+
+        ti = _MockTI()
+        store_dbt_resource_status_from_log(
+            self._model_log_line_with_relation(self._RELATION),
+            {"context": {"ti": ti}, "project_dir": str(tmp_path)},
+            model_outlet_uris={},
+            dataset_namespace="databricks://host",
+            should_generate_model_uris=True,
+        )
+
+        expected = construct_dataset_uri("databricks://host", "catalog.analytics.orders", warn_uri_migration=False)
+        assert ti.store["model__pkg__my_model_status"] == {"status": "success", "outlet_uris": [expected]}
+
+    def test_store_dbt_resource_status_from_log_prefers_the_uris_of_the_manifest_of_the_project(self, tmp_path):
+        """With a ``target/manifest.json`` that names the node, its database, schema and alias win over the event."""
+        from cosmos.dataset import construct_dataset_uri
+
+        (tmp_path / "target").mkdir()
+        manifest = {
+            "nodes": {
+                "model.pkg.my_model": {
+                    "resource_type": "model",
+                    "database": "manifest_db",
+                    "schema": "manifest_schema",
+                    "alias": "manifest_alias",
+                }
+            }
+        }
+        (tmp_path / "target" / "manifest.json").write_text(json.dumps(manifest))
+
+        ti = _MockTI()
+        store_dbt_resource_status_from_log(
+            self._model_log_line_with_relation(self._RELATION),
+            {"context": {"ti": ti}, "project_dir": str(tmp_path)},
+            model_outlet_uris={},
+            dataset_namespace="databricks://host",
+            should_generate_model_uris=True,
+        )
+
+        expected = construct_dataset_uri(
+            "databricks://host", "manifest_db.manifest_schema.manifest_alias", warn_uri_migration=False
+        )
+        assert ti.store["model__pkg__my_model_status"] == {"status": "success", "outlet_uris": [expected]}
+
     @pytest.mark.parametrize(
         "relation, dataset_namespace, should_generate_model_uris",
         [

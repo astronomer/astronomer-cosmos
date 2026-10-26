@@ -23,7 +23,7 @@ env:
 jobs:
   # Skip unit/telemetry/performance tests when only non-code files changed.
   Check-changed-files:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -107,7 +107,7 @@ jobs:
           echo "code_changed=$CODE_CHANGED" >> "$GITHUB_OUTPUT"
 
   Type-Check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -127,7 +127,7 @@ jobs:
   Run-Unit-Tests:
     needs: Check-changed-files
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
@@ -215,7 +215,7 @@ jobs:
   Run-Telemetry-Tests:
     needs: Check-changed-files
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
@@ -264,7 +264,7 @@ jobs:
   Run-Performance-Tests:
     needs: Check-changed-files
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
@@ -344,7 +344,7 @@ jobs:
     # it runs here in the unprivileged workflow rather than under pull_request_target.
     needs: Check-changed-files
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:

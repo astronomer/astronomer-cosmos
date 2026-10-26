@@ -23,7 +23,7 @@ jobs:
     environment: ${{ github.event_name == 'pull_request_target' &&
       github.event.pull_request.head.repo.full_name != github.repository &&
       'external' || 'internal' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -31,7 +31,7 @@ jobs:
 
   # Skip the integration and kubernetes tests when only non-code files changed.
   Check-changed-files:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -144,7 +144,7 @@ jobs:
   Run-Integration-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Diagnostic: cap the job at 60 min so a hang does not run until GitHub's 6h default
     # timeout. This is a job-level backstop and does not itself produce a pytest traceback.
     timeout-minutes: 60
@@ -271,7 +271,7 @@ jobs:
   Run-Integration-Tests-Expensive:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
@@ -361,7 +361,7 @@ jobs:
   Run-Integration-Tests-Warehouse:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.warehouse_e2e_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -447,7 +447,7 @@ jobs:
   Run-Integration-Tests-DBT-1-8:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
@@ -527,7 +527,7 @@ jobs:
   Run-Integration-Tests-DBT-Async:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
@@ -613,7 +613,7 @@ jobs:
   Run-Integration-dbt-fusion-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -708,7 +708,7 @@ jobs:
   Run-Kubernetes-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
@@ -785,7 +785,7 @@ jobs:
       - Run-Integration-Tests-DBT-Async
       - Run-Integration-dbt-fusion-Tests
       - Run-Kubernetes-Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       # Required to read artifacts from the sibling test-unprivileged.yml run.

@@ -1399,10 +1399,10 @@ class DbtRunOperationLocalOperator(DbtRunOperationMixin, DbtLocalBaseOperator):
         super().__init__(*args, **kwargs)
 
 
-# What `dbt docs generate` of dbt 2 writes for the docs site, next to the files it also writes into target/ (compiled SQL,
+# What `dbt docs generate` of dbt-oss writes for the docs site, next to the files it also writes into target/ (compiled SQL,
 # dbt's own state, ...) that are not part of the site.
-_DBT_V2_DOCS_FILES = ["index.html", "manifest.json"]
-_DBT_V2_DOCS_FOLDERS = ["assets", "info_schema"]
+_DBT_OSS_DOCS_FILES = ["index.html", "manifest.json"]
+_DBT_OSS_DOCS_FOLDERS = ["assets", "info_schema"]
 
 
 def _content_type(filename: str) -> str:
@@ -1435,11 +1435,11 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
                 self.required_files.remove("graph.gpickle")
 
     @staticmethod
-    def _is_dbt_v2_docs_layout(target_dir: str) -> bool:
+    def _is_dbt_oss_docs_layout(target_dir: str) -> bool:
         """
-        Whether ``target_dir`` holds the docs site written by dbt 2 (dbt-oss) rather than by dbt 1.
+        Whether ``target_dir`` holds the docs site written by dbt-oss rather than by dbt 1.
 
-        dbt 2 writes no ``catalog.json``: ``index.html`` loads its ``assets/`` and the ``info_schema/`` parquet files.
+        dbt-oss writes no ``catalog.json``: ``index.html`` loads its ``assets/`` and the ``info_schema/`` parquet files.
         The layout is read from the files, not from the dbt version, because the dbt executable may not be the one
         installed next to Airflow.
         """
@@ -1450,18 +1450,18 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
         """
         Paths, relative to ``target_dir``, of the generated docs to upload.
 
-        This is ``required_files`` for dbt 1. For dbt 2 it is the files of the site, which are in sub-folders.
+        This is ``required_files`` for dbt 1. For dbt-oss it is the files of the site, which are in sub-folders.
         """
-        if not self._is_dbt_v2_docs_layout(target_dir):
+        if not self._is_dbt_oss_docs_layout(target_dir):
             return list(self.required_files)
         target = Path(target_dir)
         site_files = [
             path.relative_to(target).as_posix()
-            for folder in _DBT_V2_DOCS_FOLDERS
+            for folder in _DBT_OSS_DOCS_FOLDERS
             for path in sorted((target / folder).rglob("*"))
             if path.is_file()
         ]
-        return [*_DBT_V2_DOCS_FILES, *site_files]
+        return [*_DBT_OSS_DOCS_FILES, *site_files]
 
 
 class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
@@ -1531,12 +1531,12 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
 
         target_dir = f"{project_dir}/target"
 
-        # dbt 1 files are all uploaded as text/html. dbt 2 site files need their own type, or a browser will not run them.
-        dbt_v2_layout = self._is_dbt_v2_docs_layout(target_dir)
+        # dbt 1 files are all uploaded as text/html. dbt-oss site files need their own type, or a browser will not run them.
+        dbt_oss_layout = self._is_dbt_oss_docs_layout(target_dir)
         hooks: dict[str, S3Hook] = {}
 
         for filename in self._files_to_upload(target_dir):
-            content_type = _content_type(filename) if dbt_v2_layout else "text/html"
+            content_type = _content_type(filename) if dbt_oss_layout else "text/html"
             if content_type not in hooks:
                 hooks[content_type] = S3Hook(self.connection_id, extra_args={"ContentType": content_type})
             hook = hooks[content_type]
@@ -1601,7 +1601,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
         hook = WasbHook(
             self.connection_id,
         )
-        dbt_v2_layout = self._is_dbt_v2_docs_layout(target_dir)
+        dbt_oss_layout = self._is_dbt_oss_docs_layout(target_dir)
 
         for filename in self._files_to_upload(target_dir):
             self.log.info(
@@ -1613,7 +1613,7 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
             blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
 
             upload_kwargs: dict[str, Any] = {}
-            if dbt_v2_layout:
+            if dbt_oss_layout:
                 from azure.storage.blob import ContentSettings
 
                 upload_kwargs["content_settings"] = ContentSettings(content_type=_content_type(filename))
@@ -1650,14 +1650,14 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
 
         target_dir = f"{project_dir}/target"
         hook = GCSHook(self.connection_id)
-        dbt_v2_layout = self._is_dbt_v2_docs_layout(target_dir)
+        dbt_oss_layout = self._is_dbt_oss_docs_layout(target_dir)
 
         for filename in self._files_to_upload(target_dir):
             blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
             self.log.info("Uploading %s to %s", filename, f"gs://{self.bucket_name}/{blob_name}")
             # GCSHook.upload sends application/octet-stream when no mime_type is given, which stops a browser from
-            # running the JavaScript of the dbt 2 site. The dbt 1 files keep the hook's default.
-            upload_kwargs: dict[str, Any] = {"mime_type": _content_type(filename)} if dbt_v2_layout else {}
+            # running the JavaScript of the dbt-oss site. The dbt 1 files keep the hook's default.
+            upload_kwargs: dict[str, Any] = {"mime_type": _content_type(filename)} if dbt_oss_layout else {}
             hook.upload(
                 filename=f"{target_dir}/{filename}",
                 bucket_name=self.bucket_name,

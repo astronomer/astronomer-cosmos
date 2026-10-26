@@ -227,14 +227,13 @@ The following code snippet shows how to provide this flag with the default jaffl
         dbt_cmd_flags=["--static"],
     )
 
-dbt 2 (dbt-oss)
+dbt-oss
 +++++++++++++++
 
-``dbt docs generate`` of dbt 2 writes a different site, without ``catalog.json``.
+``dbt docs generate`` of dbt-oss writes a different site, without ``catalog.json``.
 When the S3, Azure and GCS operators find it in the ``target`` folder, they upload ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``, keeping the folder structure and setting the content type of each file.
-Nothing changes for dbt 1.
 
-dbt 2 does not accept the ``--static`` flag, and the Airflow UI plugin only shows the dbt 1 layout.
+dbt-oss does not accept the ``--static`` flag, and the Airflow UI plugin only shows the dbt 1 layout.
 
 Custom callback
 +++++++++++++++

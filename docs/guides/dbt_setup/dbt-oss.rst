@@ -91,7 +91,7 @@ Limitations
    * - dbt-loom
      - `dbt-loom <https://github.com/nicholasyager/dbt-loom>`_ does not work with dbt OSS, which blocks the plugin hook it uses. See `dbt-loom issue 192 <https://github.com/adrienneyager/dbt-loom/issues/192>`_.
 
-Test coverage
-~~~~~~~~~~~~~
+Tracking
+~~~~~~~~
 
-Cosmos CI runs unit and integration tests against dbt OSS. What is skipped or not covered is tracked in the `dbt-oss CI tracking issue <https://github.com/astronomer/astronomer-cosmos/issues/3101>`_. The related issues and pull requests have the `dbt-oss-v2 label <https://github.com/astronomer/astronomer-cosmos/labels/dbt-oss-v2>`_.
+dbt OSS work is tracked in the `dbt-oss tracking issue <https://github.com/astronomer/astronomer-cosmos/issues/3101>`_. Related issues and pull requests have the `dbt-oss-v2 label <https://github.com/astronomer/astronomer-cosmos/labels/dbt-oss-v2>`_.

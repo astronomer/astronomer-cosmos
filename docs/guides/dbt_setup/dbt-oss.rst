@@ -60,8 +60,8 @@ These are the differences between dbt OSS and dbt Core 1.x that Cosmos accounts 
      - dbt OSS installs them itself during ``dbt ls``, even when ``install_dbt_deps`` is ``False``.
    * - ``ExecutionMode.WATCHER``
      - Runs the producer task in a subprocess, because the ``dbtRunner`` of dbt OSS has no event callbacks. Setting ``InvocationMode.DBT_RUNNER`` for the producer raises ``CosmosValueError``.
-   * - ``ExecutionMode.WATCHER``, upstream failure
-     - dbt OSS reports the nodes it skips in a different way. Cosmos uses the dbt graph to find them, so their consumer tasks run when the upstream node succeeds on a retry.
+   * - Watcher modes, upstream failure
+     - dbt OSS reports the nodes it skips after an upstream failure with the ``MarkSkippedChildren`` event, not the dbt 1.x events. Cosmos reads that event from the producer log, so the consumer tasks of those nodes run when the upstream node succeeds on a retry. This applies to ``ExecutionMode.WATCHER``, ``WATCHER_KUBERNETES`` and ``WATCHER_GCP_GKE``.
    * - Test warnings and failures (``InvocationMode.SUBPROCESS``)
      - Reads the text output of dbt OSS to count test warnings for ``on_warning_callback`` and to name the failing tests in the error.
    * - ``inlets`` and ``outlets``
@@ -86,8 +86,6 @@ Limitations
      - The ``dbtRunner`` of dbt OSS has no callbacks, and dbt does not plan to add them. With ``InvocationMode.DBT_RUNNER``, the error for a failed ``run-operation`` does not include the macro error text.
    * - Empty models
      - ``dbt ls`` does not list empty models, so ``LoadMode.DBT_LS`` does not render them.
-   * - Kubernetes watcher modes
-     - ``WATCHER_KUBERNETES`` and ``WATCHER_GCP_GKE`` do not get the skipped-node handling above, because the scheduler cannot see the dbt version inside the pod.
    * - dbt-loom
      - `dbt-loom <https://github.com/nicholasyager/dbt-loom>`_ does not work with dbt OSS, which blocks the plugin hook it uses. See `dbt-loom issue 192 <https://github.com/adrienneyager/dbt-loom/issues/192>`_.
 

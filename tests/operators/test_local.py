@@ -242,7 +242,7 @@ def test_dbt_base_operator_add_global_flags() -> None:
         "--select",
         "my_first_model my_second_model",
         "--vars",
-        '{"end_time": "{{ data_interval_end.strftime(\'%Y%m%d%H%M%S\') }}", "start_time": "{{ data_interval_start.strftime(\'%Y%m%d%H%M%S\') }}"}',
+        "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
         "--no-version-check",
     ]
 
@@ -1548,7 +1548,7 @@ def test_store_compiled_sql_airflow3(tmp_path: Path) -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["run-operation", "bla", "--args", '{"days": 7, "dry_run": true}'],
+                "cmd_flags": ["run-operation", "bla", "--args", "{days: 7, dry_run: true}"],
                 "run_as_async": False,
                 "async_context": None,
                 "push_run_results_to_xcom": False,
@@ -2364,7 +2364,7 @@ def test_build_and_run_cmd_invokes_interceptors(mock_run_command):
 
     assert "--vars" in cmd
     assert "--vars" == cmd[2]
-    assert '"new_var": "new_var_value"' in cmd[3]
+    assert "new_var: new_var_value" in cmd[3]
     assert env.get("NEW_ENV_VAR") == "new_env_var_value"
 
 

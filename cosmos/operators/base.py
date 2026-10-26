@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import inspect
-import json
 import logging
 import os
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import yaml
 
 try:
     from airflow.sdk.definitions.context import context_merge  # type: ignore[attr-defined]
@@ -50,8 +51,8 @@ def resolve_templated_bool(value: bool | str | None) -> bool:
 
 
 def _dump_dbt_mapping(value: dict[str, Any]) -> str:
-    """Serialize a dict for dbt's ``--vars`` and ``--args``. dbt 2 rejects the quoted strings YAML dumps, but accepts JSON."""
-    return json.dumps(value, sort_keys=True, default=str)
+    """Serialize a dict for dbt's ``--vars`` and ``--args`` as one-line flow YAML, as dbt 2 rejects block YAML with quoted strings."""
+    return yaml.dump(value, default_flow_style=True, width=float("inf"), allow_unicode=True).strip()
 
 
 class AbstractDbtBase(metaclass=ABCMeta):

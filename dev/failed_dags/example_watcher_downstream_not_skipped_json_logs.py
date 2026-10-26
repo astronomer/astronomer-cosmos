@@ -19,7 +19,7 @@ Expected behaviour on the retry of ``watcher_downstream_not_skipped_json_logs.mo
   dbt's default text format (see ``example_watcher_downstream_not_skipped``).
 
 Reuses the same dbt project as the original DAG (``watcher_downstream_not_skipped``) and
-the same ``public._cosmos_fail_once_seq`` sequence — do **not** run both DAGs concurrently
+the same ``public._cosmos_fail_once_`` table — do **not** run both DAGs concurrently
 or they will race on the fail-once marker.
 """
 
@@ -93,7 +93,7 @@ with DAG(
     cleanup = SQLExecuteQueryOperator(
         task_id="drop_fail_once_marker",
         conn_id="example_conn",
-        sql="DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq;",
+        sql="DROP TABLE IF EXISTS public._cosmos_fail_once_;",
         trigger_rule="all_done",
     )
 

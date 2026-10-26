@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import shutil
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -98,35 +99,16 @@ class _MockContext(dict):
 
 
 @pytest.fixture
-def reset_fail_once_sequence():
-    """Drop a fail-once Postgres sequence on ``example_conn`` so a watcher
-    retry-recovery integration test starts from a clean state.
+def fresh_fail_once_state(monkeypatch):
+    """Give a watcher retry-recovery integration test its own fail-once state.
 
-    The watcher integration tests use a per-project Postgres sequence
-    (created in the dbt project's ``on-run-start``) plus a model ``pre_hook``
-    that ``nextval``s into it and raises if the value is <= 1. That makes the
-    first run of the flaky model fail and any subsequent run succeed -- the
-    minimal recipe for exercising the consumer-fallback retry path. Each test
-    drops its sequence before running so re-runs and CI parallelism don't
-    leak sequence state.
+    The watcher integration projects use the ``fail_once`` macro (in each project's ``macros`` folder) in a model
+    ``pre_hook``. It counts its runs in a table of the target schema, named after ``COSMOS_FAIL_ONCE_TOKEN``, and
+    fails the first run of the flaky model, so any subsequent run succeeds -- the minimal recipe for exercising the
+    consumer-fallback retry path. A token that is new for each test starts it from a clean state, so re-runs and CI
+    parallelism don't leak state, on any warehouse.
     """
-    import psycopg2
-    from airflow.hooks.base import BaseHook
-
-    def _drop(sequence_name: str) -> None:
-        airflow_conn = BaseHook.get_connection("example_conn")
-        with psycopg2.connect(
-            host=airflow_conn.host,
-            port=airflow_conn.port or 5432,
-            dbname=airflow_conn.schema or "postgres",
-            user=airflow_conn.login,
-            password=airflow_conn.password,
-        ) as conn:
-            conn.autocommit = True
-            with conn.cursor() as cur:
-                cur.execute(f"DROP SEQUENCE IF EXISTS public.{sequence_name}")
-
-    return _drop
+    monkeypatch.setenv("COSMOS_FAIL_ONCE_TOKEN", uuid.uuid4().hex[:10])
 
 
 def test_dbt_producer_watcher_operator_priority_weight_default():
@@ -785,6 +767,158 @@ class TestStoreDbtStatusFromLog:
             "outlet_uris": [],
             "upstream_failure_skip": True,
         }
+
+    @staticmethod
+    def _mark_skipped_children_line(unique_id: str, status: str) -> str:
+        """The dbt 2 (dbt-oss) event every failed or skipped node emits for itself, before its ``NodeFinished``."""
+        return json.dumps({"info": {"name": "MarkSkippedChildren"}, "data": {"unique_id": unique_id, "status": status}})
+
+    # The events of dbt-oss 2.0.8 for ``dbt build`` where the model ``a`` fails, ``b`` and ``c`` are below it, and ``a``
+    # has a test.
+    _DBT_V2_MODEL_FAILED = (
+        ("MarkSkippedChildren", "model.pkg.a", "error"),
+        ("NodeFinished", "model.pkg.a", "error"),
+        ("MarkSkippedChildren", "test.pkg.not_null_a_id", "skipped"),
+        ("NodeFinished", "test.pkg.not_null_a_id", "skipped"),
+        ("MarkSkippedChildren", "model.pkg.b", "skipped"),
+        ("NodeFinished", "model.pkg.b", "skipped"),
+        ("MarkSkippedChildren", "model.pkg.c", "skipped"),
+        ("NodeFinished", "model.pkg.c", "skipped"),
+    )
+    # The same project where ``a`` builds and its test fails: dbt skips ``b``, the direct child of the tested model.
+    _DBT_V2_TEST_FAILED = (
+        ("NodeFinished", "model.pkg.a", "success"),
+        ("MarkSkippedChildren", "test.pkg.not_null_a_id", "fail"),
+        ("NodeFinished", "test.pkg.not_null_a_id", "fail"),
+        ("MarkSkippedChildren", "model.pkg.b", "skipped"),
+        ("NodeFinished", "model.pkg.b", "skipped"),
+        ("MarkSkippedChildren", "model.pkg.c", "skipped"),
+        ("NodeFinished", "model.pkg.c", "skipped"),
+    )
+    # ``dbt build --exclude b`` where ``a`` fails: dbt skips ``c`` and never reports ``b``.
+    _DBT_V2_MODEL_FAILED_WITH_EXCLUDED_NODE = (
+        ("MarkSkippedChildren", "model.pkg.a", "error"),
+        ("NodeFinished", "model.pkg.a", "error"),
+        ("MarkSkippedChildren", "model.pkg.c", "skipped"),
+        ("NodeFinished", "model.pkg.c", "skipped"),
+    )
+
+    def _replay_dbt_v2_events(self, events: tuple[tuple[str, str, str], ...]) -> tuple[_MockTI, set[str]]:
+        ti = _MockTI()
+        upstream_failure_skipped_ids: set[str] = set()
+        for event_name, unique_id, status in events:
+            line = (
+                self._mark_skipped_children_line(unique_id, status)
+                if event_name == "MarkSkippedChildren"
+                else self._node_log_line(unique_id, status)
+            )
+            store_dbt_resource_status_from_log(
+                line,
+                {"context": {"ti": ti}},
+                tests_per_model={},
+                test_results_per_model={},
+                upstream_failure_skipped_ids=upstream_failure_skipped_ids,
+            )
+        return ti, upstream_failure_skipped_ids
+
+    @pytest.mark.parametrize(
+        "events, failed_or_ok, rewritten",
+        [
+            pytest.param(
+                _DBT_V2_MODEL_FAILED,
+                {"model__pkg__a": "error"},
+                ["test__pkg__not_null_a_id", "model__pkg__b", "model__pkg__c"],
+                id="model-failed",
+            ),
+            pytest.param(
+                _DBT_V2_TEST_FAILED,
+                {"model__pkg__a": "success", "test__pkg__not_null_a_id": "fail"},
+                ["model__pkg__b", "model__pkg__c"],
+                id="test-failed-direct-child-is-skipped",
+            ),
+            pytest.param(
+                _DBT_V2_MODEL_FAILED_WITH_EXCLUDED_NODE,
+                {"model__pkg__a": "error"},
+                ["model__pkg__c"],
+                id="excluded-node-between-failed-and-skipped",
+            ),
+        ],
+    )
+    def test_store_dbt_resource_status_from_log_rewrites_nodes_skipped_by_dbt_v2(self, events, failed_or_ok, rewritten):
+        """dbt 2 reports each node it skipped through ``MarkSkippedChildren``, so no dbt graph is needed to find them."""
+        ti, _ = self._replay_dbt_v2_events(events)
+
+        for key, status in failed_or_ok.items():
+            assert ti.store.get(f"{key}_status") == {"status": status, "outlet_uris": []}
+        for key in rewritten:
+            assert ti.store.get(f"{key}_status") == {
+                "status": "failed",
+                "outlet_uris": [],
+                "upstream_failure_skip": True,
+            }
+
+    def test_store_dbt_resource_status_from_log_keeps_other_dbt_v2_statuses_unchanged(self):
+        """Only a ``skipped`` ``MarkSkippedChildren`` marks a node: a failed, passed or warned one is not rewritten."""
+        _, upstream_failure_skipped_ids = self._replay_dbt_v2_events(
+            (
+                ("MarkSkippedChildren", "model.pkg.a", "error"),
+                ("MarkSkippedChildren", "test.pkg.t", "fail"),
+                ("MarkSkippedChildren", "test.pkg.w", "warn"),
+                ("MarkSkippedChildren", "model.pkg.ok", "success"),
+            )
+        )
+
+        assert upstream_failure_skipped_ids == set()
+
+    def test_store_dbt_resource_status_from_log_keeps_skip_without_dbt_v2_event_as_skipped(self):
+        """A ``skipped`` node dbt 2 did not announce through ``MarkSkippedChildren`` stays ``skipped``."""
+        ti, upstream_failure_skipped_ids = self._replay_dbt_v2_events((("NodeFinished", "model.pkg.other", "skipped"),))
+
+        assert upstream_failure_skipped_ids == set()
+        assert ti.store.get("model__pkg__other_status") == {"status": "skipped", "outlet_uris": []}
+
+    def test_store_dbt_resource_status_from_log_ignores_skipped_status_of_other_dbt_v2_events(self):
+        """Only the ``MarkSkippedChildren`` event announces an upstream-failure skip, whatever else carries a status."""
+        upstream_failure_skipped_ids: set[str] = set()
+
+        store_dbt_resource_status_from_log(
+            json.dumps({"info": {"name": "LogModelResult"}, "data": {"unique_id": "model.pkg.a", "status": "skipped"}}),
+            {"context": {"ti": _MockTI()}},
+            tests_per_model={},
+            test_results_per_model={},
+            upstream_failure_skipped_ids=upstream_failure_skipped_ids,
+        )
+
+        assert upstream_failure_skipped_ids == set()
+
+    def test_store_dbt_resource_status_from_log_ignores_malformed_mark_skipped_children(self):
+        """An event without a ``unique_id`` or a ``status`` adds nothing and does not raise."""
+        upstream_failure_skipped_ids: set[str] = set()
+
+        for data in ({"status": "skipped"}, {"unique_id": "model.pkg.a"}, {}):
+            store_dbt_resource_status_from_log(
+                json.dumps({"info": {"name": "MarkSkippedChildren"}, "data": data}),
+                {"context": {"ti": _MockTI()}},
+                tests_per_model={},
+                test_results_per_model={},
+                upstream_failure_skipped_ids=upstream_failure_skipped_ids,
+            )
+
+        assert upstream_failure_skipped_ids == set()
+
+    def test_store_dbt_resource_status_from_log_dbt_v2_event_without_tracking_set_is_ignored(self):
+        """Without ``upstream_failure_skipped_ids`` the event changes nothing."""
+        ti = _MockTI()
+
+        for line in (
+            self._mark_skipped_children_line("model.pkg.b", "skipped"),
+            self._node_log_line("model.pkg.b", "skipped"),
+        ):
+            store_dbt_resource_status_from_log(
+                line, {"context": {"ti": ti}}, tests_per_model={}, test_results_per_model={}
+            )
+
+        assert ti.store.get("model__pkg__b_status") == {"status": "skipped", "outlet_uris": []}
 
     def test_store_dbt_resource_status_from_log_marks_upstream_failure_skip_without_node_finished(self):
         """Subprocess and Kubernetes producers print no ``NodeFinished`` at dbt's default log level (#3023).
@@ -3173,7 +3307,7 @@ def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
     ),
 )
 @pytest.mark.integration
-def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, reset_fail_once_sequence):
+def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, fresh_fail_once_state):
     """
     Verify that the dbt_producer_watcher_done gateway task prevents the producer's skip
     from propagating to tasks downstream of the DbtTaskGroup.
@@ -3186,8 +3320,6 @@ def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, reset_f
         from airflow.providers.standard.operators.empty import EmptyOperator
     except ImportError:
         from airflow.operators.empty import EmptyOperator
-
-    reset_fail_once_sequence("_cosmos_fail_once_seq")
 
     caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
 
@@ -3250,7 +3382,7 @@ def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, reset_f
         "watcher_upstream_failure_recovery.model_downstream_2_run",
     ],
 )
-def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_fail_once_sequence, downstream_task_id):
+def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, fresh_fail_once_state, downstream_task_id):
     """Regression for upstream-failure skips that previously left downstream models skipped (#2698).
 
     When a dbt model fails on the producer's first attempt, dbt emits
@@ -3282,8 +3414,6 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
         from airflow.providers.standard.operators.empty import EmptyOperator
     except ImportError:
         from airflow.operators.empty import EmptyOperator
-
-    reset_fail_once_sequence("_cosmos_recovery_fail_once_seq")
 
     caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
 
@@ -3354,9 +3484,7 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, reset_
     ],
     ids=["dbt_runner", "subprocess"],
 )
-def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(
-    reset_fail_once_sequence, execution_args
-):
+def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(fresh_fail_once_state, execution_args):
     """With ``AFTER_EACH``, every run and test that dbt skipped below a failed model ends on attempt 1 (#3023).
 
     Before, each of them failed on attempt 1 and waited one ``retry_delay``, so every level added a delay.
@@ -3364,8 +3492,6 @@ def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(
     from airflow import DAG
 
     from cosmos import DbtTaskGroup
-
-    reset_fail_once_sequence("_cosmos_recovery_fail_once_seq")
 
     with DAG(
         dag_id="watcher_upstream_failure_recovery_after_each_test",
@@ -3419,9 +3545,7 @@ def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(
     ),
 )
 @pytest.mark.integration
-def test_dbt_task_group_watcher_in_memory_retry_recovers_skipped_downstream(
-    caplog, reset_fail_once_sequence, monkeypatch
-):
+def test_dbt_task_group_watcher_in_memory_retry_recovers_skipped_downstream(caplog, fresh_fail_once_state, monkeypatch):
     """In-memory mode (enable_watcher_reliable_retry=False): after a producer retry, consumers fall back to local dbt runs and the DAG still ends SUCCESS (#2776)."""
     from airflow import DAG
 
@@ -3433,7 +3557,6 @@ def test_dbt_task_group_watcher_in_memory_retry_recovers_skipped_downstream(
         from airflow.operators.empty import EmptyOperator
 
     monkeypatch.setattr("cosmos.settings.enable_watcher_reliable_retry", False)
-    reset_fail_once_sequence("_cosmos_recovery_fail_once_seq")
 
     caplog.set_level(logging.DEBUG, logger="cosmos.operators._watcher.base")
 

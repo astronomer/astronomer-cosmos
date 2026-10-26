@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import mimetypes
 import os
 import shutil
 import subprocess
@@ -2042,6 +2043,195 @@ def test_dbt_docs_local_operator_ignores_graph_gpickle():
         dbt_cmd_global_flags=["--no-write-json"],
     )
     assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
+
+
+# mimetypes also reads the host's mime.types files, so a host that knows parquet reports its own type for it.
+PARQUET_CONTENT_TYPE = mimetypes.guess_type("x.parquet")[0] or "application/octet-stream"
+
+
+def _docs_target_dir(tmp_path, dbt_oss: bool) -> str:
+    """A project dir whose target/ holds the docs written by dbt 1 or by dbt-oss."""
+    target = tmp_path / "target"
+    if dbt_oss:
+        files = ["index.html", "manifest.json", "run_results.json", "assets/app.js", "assets/styles/site.css"]
+        files += ["assets/styles/theme.css"]
+        files += ["info_schema/v1/dbt.models.parquet", "private/index/x.parquet"]
+    else:
+        files = ["index.html", "manifest.json", "catalog.json", "run_results.json"]
+    for name in files:
+        (target / name).parent.mkdir(parents=True, exist_ok=True)
+        (target / name).write_text("x")
+    return tmp_path.as_posix()
+
+
+def _docs_operator(operator_class, **kwargs):
+    return operator_class(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        connection_id="fake-conn",
+        bucket_name="fake-bucket",
+        **kwargs,
+    )
+
+
+def test_dbt_docs_files_to_upload_is_required_files_for_dbt_1(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=False) + "/target"
+    assert operator._files_to_upload(target_dir) == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_files_to_upload_is_required_files_when_target_is_missing():
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    assert operator._files_to_upload("fake-dir/target") == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_files_to_upload_is_the_site_for_dbt_oss(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=True) + "/target"
+    # The site only: not run_results.json nor the private/ state that dbt-oss also writes to target/.
+    assert operator._files_to_upload(target_dir) == [
+        "index.html",
+        "manifest.json",
+        "assets/app.js",
+        "assets/styles/site.css",
+        "assets/styles/theme.css",
+        "info_schema/v1/dbt.models.parquet",
+    ]
+
+
+def test_dbt_docs_files_to_upload_is_sorted_whatever_the_order_of_the_filesystem(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=True) + "/target"
+    rglob = Path.rglob
+
+    def reversed_rglob(self, pattern):
+        return iter(sorted(rglob(self, pattern), reverse=True))
+
+    with patch.object(Path, "rglob", reversed_rglob):
+        files = operator._files_to_upload(target_dir)
+
+    assert files == [
+        "index.html",
+        "manifest.json",
+        "assets/app.js",
+        "assets/styles/site.css",
+        "assets/styles/theme.css",
+        "info_schema/v1/dbt.models.parquet",
+    ]
+
+
+def test_dbt_docs_keeps_dbt_1_files_when_catalog_json_is_present(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=True) + "/target"
+    (tmp_path / "target" / "catalog.json").write_text("x")
+    assert operator._files_to_upload(target_dir) == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_gcs_local_operator_uploads_the_dbt_oss_site(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=True)
+    mock_gcs = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_gcs}):
+        operator = _docs_operator(DbtDocsGCSLocalOperator, folder_dir="docs")
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_gcs.GCSHook.return_value.upload.call_args_list
+    # GCSHook.upload would send application/octet-stream for all of them without a mime_type.
+    assert [(c.kwargs["object_name"], c.kwargs["mime_type"]) for c in calls] == [
+        ("docs/index.html", "text/html"),
+        ("docs/manifest.json", "application/json"),
+        ("docs/assets/app.js", mimetypes.guess_type("app.js")[0]),
+        ("docs/assets/styles/site.css", "text/css"),
+        ("docs/assets/styles/theme.css", "text/css"),
+        ("docs/info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
+    ]
+
+
+def test_dbt_docs_gcs_local_operator_sets_no_mime_type_for_dbt_1(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=False)
+    mock_gcs = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_gcs}):
+        operator = _docs_operator(DbtDocsGCSLocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_gcs.GCSHook.return_value.upload.call_args_list
+    assert [c.kwargs["object_name"] for c in calls] == ["index.html", "manifest.json", "catalog.json"]
+    assert all("mime_type" not in c.kwargs for c in calls)
+
+
+def test_dbt_docs_s3_local_operator_uploads_dbt_1_files_as_html(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=False)
+    mock_s3 = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_s3}):
+        operator = _docs_operator(DbtDocsS3LocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    mock_s3.S3Hook.assert_called_once_with("fake-conn", extra_args={"ContentType": "text/html"})
+    keys = [c.kwargs["key"] for c in mock_s3.S3Hook.return_value.load_file.call_args_list]
+    assert keys == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_s3_local_operator_uploads_the_dbt_oss_site_with_content_types(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=True)
+    uploads = []
+
+    def make_hook(connection_id, extra_args):
+        hook = MagicMock()
+        hook.load_file.side_effect = lambda **kwargs: uploads.append((kwargs["key"], extra_args["ContentType"]))
+        return hook
+
+    mock_s3 = MagicMock()
+    mock_s3.S3Hook.side_effect = make_hook
+    with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_s3}):
+        operator = _docs_operator(DbtDocsS3LocalOperator, folder_dir="docs")
+        operator.upload_to_cloud_storage(project_dir)
+
+    assert uploads == [
+        ("docs/index.html", "text/html"),
+        ("docs/manifest.json", "application/json"),
+        ("docs/assets/app.js", mimetypes.guess_type("app.js")[0]),
+        ("docs/assets/styles/site.css", "text/css"),
+        ("docs/assets/styles/theme.css", "text/css"),
+        ("docs/info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
+    ]
+    # One hook per content type, not one per file: six files, one of the five types is shared by two of them.
+    assert mock_s3.S3Hook.call_count == 5
+
+
+def test_dbt_docs_azure_local_operator_uploads_the_dbt_oss_site_with_content_types(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=True)
+    mock_wasb = MagicMock()
+    mock_blob = MagicMock()
+    mock_blob.ContentSettings.side_effect = lambda content_type: content_type
+    modules = {
+        "airflow.providers.microsoft.azure.hooks.wasb": mock_wasb,
+        "azure.storage.blob": mock_blob,
+    }
+    with patch.dict(sys.modules, modules):
+        operator = _docs_operator(DbtDocsAzureStorageLocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_wasb.WasbHook.return_value.load_file.call_args_list
+    assert [(c.kwargs["blob_name"], c.kwargs["content_settings"]) for c in calls] == [
+        ("index.html", "text/html"),
+        ("manifest.json", "application/json"),
+        ("assets/app.js", mimetypes.guess_type("app.js")[0]),
+        ("assets/styles/site.css", "text/css"),
+        ("assets/styles/theme.css", "text/css"),
+        ("info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
+    ]
+
+
+def test_dbt_docs_azure_local_operator_sets_no_content_settings_for_dbt_1(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=False)
+    mock_wasb = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.microsoft.azure.hooks.wasb": mock_wasb}):
+        operator = _docs_operator(DbtDocsAzureStorageLocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_wasb.WasbHook.return_value.load_file.call_args_list
+    assert [c.kwargs["blob_name"] for c in calls] == ["index.html", "manifest.json", "catalog.json"]
+    assert all("content_settings" not in c.kwargs for c in calls)
 
 
 @patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")

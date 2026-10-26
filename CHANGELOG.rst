@@ -37,6 +37,7 @@ Features
   ``<source>.test``) instead of a single ``<source>_source`` task, so references to the old task id need updating.
   The source tests, which this mode never executed before, now run and can fail the DAG. See #1683.
 * Add ``AIConfig`` (experimental, it may change without a deprecation period), an opt-in diagnosis of failed dbt tasks: on their last attempt, an LLM is asked for the root cause and a fix, which are added after the dbt error. It uses ``apache-airflow-providers-common-ai`` (``pip install astronomer-cosmos[ai]``, for Python 3.11+ and Airflow 2.11+), works with ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``, masks secrets, and lets you set what is sent and how much it can spend. See the :doc:`AI config reference </reference/configs/ai-config>` and #3018.
+* ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` now upload the docs site written by dbt-oss, which has no ``catalog.json``, with the content type of each file. The files uploaded for dbt 1 are unchanged. See #3101.
 
 Bug Fixes
 
@@ -51,6 +52,7 @@ Bug Fixes
   with a dedicated test task, as under ``TestBehavior.AFTER_EACH``. Sources are rendered as ``dbt source freshness``
   tasks and the build tasks of models, seeds and snapshots select only their own node, so source tests were never
   selected by any task. See #1683.
+* ``ExecutionMode.WATCHER`` now recognises the nodes that dbt 2 (``dbt-oss``) skips because an upstream node failed. dbt 2 does not emit ``SkippingDetails`` or ``LogSkipBecauseError`` for them, only ``MarkSkippedChildren``, so their consumers ended SKIPPED and were never built after the upstream recovered on a retry. Cosmos now reads the ``MarkSkippedChildren`` event that dbt 2 emits for each node it skips and treats the node as it does for dbt 1, including the nodes below a failed test and below an excluded node. See #2698, #3023 and #3101.
 * ``InvocationMode.DBT_RUNNER`` now matches dbt node statuses case-insensitively when it collects warnings. dbt 2 (``dbt-oss``) reports a source freshness warning as ``Warn``, which did not match ``warn``, so ``DbtSourceLocalOperator`` called ``on_warning_callback`` with empty ``test_names`` and ``test_results``. dbt 2 source freshness results have no ``message``, so their status is reported in ``test_results`` instead. dbt 1 is unchanged. See #3101.
 * ``ExecutionMode.WATCHER`` now emits the datasets of models, seeds and snapshots with dbt-oss when no ``manifest.json`` is available while the nodes run. dbt-oss writes the manifest when the run ends, so the URIs found in it were empty. When the manifest has none, the producer builds them from the database, schema and alias in the relation of the node event, so the consumer sensors emit their assets.
 

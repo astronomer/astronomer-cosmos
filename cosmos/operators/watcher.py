@@ -263,9 +263,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._dataset_namespace: str | None = None
         self._model_outlet_uris: dict[str, list[str]] = {}
         # Mutable set populated by the log parser when dbt emits SkippingDetails
-        # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
-        # for those unique_ids are rewritten to "failed" so the consumer sensor
-        # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+        # or LogSkipBecauseError (dbt 1), or a skipped MarkSkippedChildren (dbt 2), for a node;
+        # subsequent "skipped" terminal events for those unique_ids are rewritten to "failed"
+        # so the consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
         # See #2698.
         self._upstream_failure_skipped_ids: set[str] = set()
 

@@ -32,9 +32,6 @@ DEFAULT_BIGQUERY_PROJECT = "astronomer-dag-authoring"
 
 # Tests that depend on Postgres itself (and not only on the profile) and so cannot run against BigQuery.
 POSTGRES_ONLY_TEST_FILES: dict[str, str] = {}
-POSTGRES_ONLY_FIXTURES = {
-    "reset_fail_once_sequence": "uses psycopg2 and Postgres sequences",
-}
 
 
 def _install_dbt_oss_in_virtualenvs() -> None:
@@ -138,9 +135,7 @@ def per_test_bigquery_dataset(request, monkeypatch):
 def pytest_collection_modifyitems(items):
     for item in items:
         file_path = item.nodeid.split("::")[0]
-        reason = POSTGRES_ONLY_TEST_FILES.get(file_path) or next(
-            (why for fixture, why in POSTGRES_ONLY_FIXTURES.items() if fixture in item.fixturenames), None
-        )
+        reason = POSTGRES_ONLY_TEST_FILES.get(file_path)
         if reason:
             reason = f"Requires Postgres: {reason}"
         elif item.nodeid in SKIPPED_TESTS:

@@ -68,6 +68,8 @@ dbt-databricks = ["dbt-databricks"]
 dbt-duckdb = ["dbt-duckdb", "airflow-provider-duckdb>=0.2.0"]
 dbt-exasol = ["dbt-exasol"]
 dbt-loom = ["dbt-loom"]
+# Not part of ``dbt-all``: dbt-oss and dbt-core 1.x both provide the ``dbt`` package and cannot be installed together.
+dbt-oss = ["dbt-oss>=2,<3"]
 dbt-mysql = ["dbt-mysql"]
 dbt-oracle = ["dbt-oracle"]
 dbt-postgres = ["dbt-postgres"]
@@ -86,6 +88,8 @@ amazon = [
 # Due to issue https://github.com/fsspec/gcsfs/issues/664
 google = ["apache-airflow-providers-google>=10.17.0", "gcsfs<2025.3.0"]
 microsoft = ["apache-airflow-providers-microsoft-azure>=8.5.0"]
+# Not part of ``all``: the provider needs Python 3.11+ and Airflow 2.11+, while Cosmos supports older versions.
+ai = ["apache-airflow-providers-common-ai[sql]>=1.0.0"]
 all = [
     "astronomer-cosmos[dbt-all]",
     "astronomer-cosmos[openlineage]",
@@ -202,6 +206,7 @@ test-integration-setup = 'sh scripts/test/integration-setup.sh {matrix:dbt}'
 test-integration = 'sh scripts/test/integration.sh {args}'
 test-kubernetes = "sh scripts/test/integration-kubernetes.sh"
 test-kubernetes-setup = "sh scripts/test/kubernetes-setup.sh {matrix:dbt}"
+test-kubernetes-dbt-oss = "sh scripts/test/integration-kubernetes-dbt-oss.sh"
 test-dbt-oss-setup = 'sh scripts/test/install-dbt-oss.sh {matrix:dbt}'
 test-integration-dbt-oss-setup = [
     'sh scripts/test/integration-dbtf-setup.sh',

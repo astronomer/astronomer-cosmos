@@ -50,6 +50,7 @@ DBT_SKIPPED_STATUSES = frozenset({DbtNodeStatus.SKIPPED})
 # dbt fires SkippingDetails (non-ephemeral upstream) or LogSkipBecauseError
 # (ephemeral upstream) only from on_skip(), which is reached only when
 # do_skip(cause=...) was called -- i.e. exclusively on upstream node failure.
+# dbt 2 (dbt-oss) emits neither: it is covered by the MarkSkippedChildren event, see _track_node_skipped_by_dbt_v2.
 DBT_UPSTREAM_FAILURE_SKIP_EVENT_NAMES = frozenset({"SkippingDetails", "LogSkipBecauseError"})
 
 # dbt source freshness statuses that mark a source as stale and propagate skips downstream.
@@ -102,19 +103,28 @@ class DbtTestStatus(str, Enum):
         return str(self.value)
 
 
+def normalize_dbt_node_status(status: str | None) -> str | None:
+    """Lowercase a dbt status so ``"Warn"`` (dbt 2) and ``"warn"`` (dbt 1.x) match. ``None`` passes through.
+
+    The ``DBT_*_STATUSES`` sets are lowercase only, so query them through the ``is_dbt_node_status_*`` helpers
+    or this function.
+    """
+    return status.lower() if isinstance(status, str) else status
+
+
 def is_dbt_node_status_success(status: str | None) -> bool:
     """Check if the dbt node status indicates success (works for both models and tests)."""
-    return status in DBT_SUCCESS_STATUSES
+    return normalize_dbt_node_status(status) in DBT_SUCCESS_STATUSES
 
 
 def is_dbt_node_status_failed(status: str | None) -> bool:
     """Check if the dbt node status indicates failure (works for both models and tests)."""
-    return status in DBT_FAILED_STATUSES
+    return normalize_dbt_node_status(status) in DBT_FAILED_STATUSES
 
 
 def is_dbt_node_status_skipped(status: str | None) -> bool:
     """Check if the dbt node status indicates it was skipped (e.g. stale upstream source, upstream failure)."""
-    return status in DBT_SKIPPED_STATUSES
+    return normalize_dbt_node_status(status) in DBT_SKIPPED_STATUSES
 
 
 def is_dbt_node_status_terminal(status: str | None) -> bool:
@@ -176,9 +186,16 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
             if getattr(task_instance, "_cosmos_xcom_persist_incrementally", False):
                 var_key = getattr(task_instance, "_cosmos_xcom_backup_var_key", None)
                 if isinstance(var_key, str):
-                    from cosmos.operators._watcher.xcom import _persist_backup
+                    from cosmos.operators._watcher.xcom import (
+                        TASK_STATE_STORE_TI_ATTRIBUTE,
+                        _persist_backup,
+                        _persist_backup_row,
+                    )
 
-                    _persist_backup(var_key, backup_buffer)
+                    if getattr(task_instance, TASK_STATE_STORE_TI_ATTRIBUTE, None) is not None:
+                        _persist_backup_row(task_instance, key, value)
+                    else:
+                        _persist_backup(var_key, backup_buffer)
 
 
 # TODO: Unify the Airflow call from cosmos/operators/_watcher/triggerer.py and cosmos/operators/watcher.py
@@ -293,7 +310,7 @@ def _log_dbt_event(dbt_event: dict[str, Any] | None = None) -> None:
 
     start_str = start_time if start_time else "N/A"
     finish_str = finish_time if finish_time else "N/A"
-    if status in {"None"} | DBT_FAILED_STATUSES:
+    if status == "None" or is_dbt_node_status_failed(status):
         logger.error("%s", msg)
 
     logger.info("[%s] Start: %s, Finish: %s", status.upper(), start_str, finish_str)

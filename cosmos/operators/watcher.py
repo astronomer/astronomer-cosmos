@@ -40,14 +40,16 @@ from cosmos.operators._watcher.base import (
 )
 from cosmos.operators._watcher.state import (
     DBT_SOURCE_FRESHNESS_STALE_STATUSES,
-    DBT_SUCCESS_STATUSES,
     DbtNodeStatus,
+    is_dbt_node_status_success,
+    normalize_dbt_node_status,
 )
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
-    _delete_xcom_backup_variable,
+    _delete_xcom_backup,
     _init_xcom_backup,
-    _restore_xcom_from_variable,
+    _log_missing_backup,
+    _restore_xcom_backup,
 )
 from cosmos.operators.base import (
     DbtBuildMixin,
@@ -86,7 +88,8 @@ def _default_freshness_callback(
 ) -> list[tuple[str, str]]:
     """Return a list of ``(unique_id, state)`` tuples for nodes that must be skipped due to stale sources.
 
-    Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``.
+    Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``, matched
+    case-insensitively because dbt 2 writes ``Warn``.
 
     A node is skipped only when **all** of its upstream dependencies are either stale sources or
     already-skipped nodes.  If a node has at least one clean upstream path it may still execute
@@ -101,7 +104,7 @@ def _default_freshness_callback(
     stale_source_ids = {
         r["unique_id"]
         for r in sources_json.get("results", [])
-        if r.get("status") in DBT_SOURCE_FRESHNESS_STALE_STATUSES
+        if normalize_dbt_node_status(r.get("status")) in DBT_SOURCE_FRESHNESS_STALE_STATUSES
     }
     if not stale_source_ids:
         return []
@@ -260,9 +263,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._dataset_namespace: str | None = None
         self._model_outlet_uris: dict[str, list[str]] = {}
         # Mutable set populated by the log parser when dbt emits SkippingDetails
-        # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
-        # for those unique_ids are rewritten to "failed" so the consumer sensor
-        # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+        # or LogSkipBecauseError (dbt 1), or a skipped MarkSkippedChildren (dbt 2), for a node;
+        # subsequent "skipped" terminal events for those unique_ids are rewritten to "failed"
+        # so the consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
         # See #2698.
         self._upstream_failure_skipped_ids: set[str] = set()
 
@@ -414,7 +417,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # "error") that a custom freshness_callback may return.  Without exclusion,
         # dbt would run the model anyway and either overwrite the pre-set XCom status
         # or trigger a race condition with the consumer sensor.
-        excluded_ids = [uid for uid, state in node_state_pairs if state not in DBT_SUCCESS_STATUSES]
+        excluded_ids = [uid for uid, state in node_state_pairs if not is_dbt_node_status_success(state)]
         if not excluded_ids:
             return
         resource_names = set()
@@ -506,7 +509,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         reliable_retry = settings.enable_watcher_reliable_retry
 
         if try_number > 1:
-            _restore_xcom_from_variable(context)
+            if not _restore_xcom_backup(context, read_task_state_store=reliable_retry):
+                _log_missing_backup(context, try_number, read_task_state_store=reliable_retry)
             raise AirflowSkipException(
                 "Dbt WATCHER producer task does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
@@ -523,12 +527,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             return_value = super().execute(context=context, **kwargs)
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             if reliable_retry:
-                _delete_xcom_backup_variable(context)
+                _delete_xcom_backup(context)
             return return_value
 
         except Exception:
-            # The on-failure callback flushes the in-memory backup to the Variable; here we only
-            # record that the producer finished so consumer sensors stop waiting.
+            # Without a task store, the retry callback flushes the in-memory backup to the Variable; here we
+            # only record that the producer finished so consumer sensors stop waiting.
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             raise
 

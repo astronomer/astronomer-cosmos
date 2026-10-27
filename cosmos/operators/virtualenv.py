@@ -164,6 +164,7 @@ class DbtVirtualenvBaseOperator(DbtLocalBaseOperator):
             self.clean_dir_if_temporary()
 
     def on_kill(self) -> None:
+        self._cancel_ai_diagnosis()
         self.clean_dir_if_temporary()
 
     def _prepare_virtualenv(self) -> Any:

@@ -272,6 +272,36 @@ def _ensure_subprocess_model_outlet_uris(
         model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []
 
 
+def _outlet_uris_from_node_relation(node_info: dict[str, Any], dataset_namespace: str | None) -> list[str]:
+    """Outlet URIs of a node from the relation named by its dbt event.
+
+    dbt 2 (dbt-oss) writes ``manifest.json`` only when the run ends, so it is missing while the nodes finish and the
+    URIs cannot be read from it. The events of a node name its relation, with the database, schema and alias that the
+    manifest has.
+    """
+    relation = node_info.get("node_relation") or {}
+    database, schema, alias = relation.get("database"), relation.get("schema"), relation.get("alias")
+    if not dataset_namespace or not all([database, schema, alias]):
+        return []
+
+    from cosmos.dataset import construct_dataset_uri
+
+    return [construct_dataset_uri(dataset_namespace, f"{database}.{schema}.{alias}", warn_uri_migration=False)]
+
+
+def _resolve_outlet_uris(
+    unique_id: str | None,
+    node_info: dict[str, Any],
+    model_outlet_uris: dict[str, list[str]] | None,
+    dataset_namespace: str | None,
+    project_dir: str | None,
+) -> list[str]:
+    """Outlet URIs of a node: the ones of the manifest, or else the ones of the relation of its event."""
+    _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
+    outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris and unique_id else []
+    return outlet_uris or _outlet_uris_from_node_relation(node_info, dataset_namespace)
+
+
 def _rewrite_upstream_failure_skip_status(
     log_line: dict[str, Any],
     unique_id: str | None,
@@ -289,6 +319,9 @@ def _rewrite_upstream_failure_skip_status(
     rewritten XCom with the original ``"skipped"``. Tracking affected
     ``unique_id``\\ s in a per-execution set lets the parser rewrite both. See
     #2698.
+
+    dbt 2 (dbt-oss) emits neither event: ``_track_node_skipped_by_dbt_v2`` adds the node of a skipped
+    ``MarkSkippedChildren`` event to the same set, so the rewrite below covers it too.
     """
     if not unique_id or upstream_failure_skipped_ids is None:
         return dbt_node_status
@@ -297,6 +330,29 @@ def _rewrite_upstream_failure_skip_status(
     if is_dbt_node_status_skipped(dbt_node_status) and unique_id in upstream_failure_skipped_ids:
         return DbtNodeStatus.FAILED
     return dbt_node_status
+
+
+# dbt 2 (dbt-oss) does not emit ``SkippingDetails`` or ``LogSkipBecauseError`` for a node it skipped because an upstream
+# node failed. Every node it handles that way, a skipped one included, emits ``MarkSkippedChildren`` naming itself, with
+# the ``status`` it ends with, before its own ``NodeFinished``. A node that failed reports ``error`` or ``fail``, and one
+# dbt skipped reports ``skipped``.
+_DBT_V2_MARK_SKIPPED_CHILDREN_EVENT = "MarkSkippedChildren"
+_DBT_V2_SKIPPED_STATUS = "skipped"
+
+
+def _track_node_skipped_by_dbt_v2(log_line: dict[str, Any], upstream_failure_skipped_ids: set[str] | None) -> None:
+    """Add the node of a dbt 2 ``MarkSkippedChildren`` event to the upstream-failure skips when dbt skipped it.
+
+    The event comes before the node's ``NodeFinished``, so ``_rewrite_upstream_failure_skip_status`` rewrites that
+    ``skipped`` like the dbt 1 ones.
+    """
+    if upstream_failure_skipped_ids is None:
+        return
+    if log_line.get("info", {}).get("name") != _DBT_V2_MARK_SKIPPED_CHILDREN_EVENT:
+        return
+    data = log_line.get("data", {})
+    if data.get("status") == _DBT_V2_SKIPPED_STATUS and data.get("unique_id"):
+        upstream_failure_skipped_ids.add(data["unique_id"])
 
 
 def _node_status_xcom_value(
@@ -353,7 +409,8 @@ def store_dbt_resource_status_from_log(
         generation is skipped regardless of ``dataset_namespace``.
     :param upstream_failure_skipped_ids: Mutable accumulator set of node unique_ids
         that dbt skipped because of an upstream-node failure. Populated when this
-        function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event; later
+        function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event (dbt 1), or a ``MarkSkippedChildren`` event
+        with ``status="skipped"`` (dbt 2); later
         ``NodeFinished`` events with ``node_status="skipped"`` for these unique_ids
         are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
         retry it) rather than going SKIPPED. See #2698.
@@ -369,6 +426,7 @@ def store_dbt_resource_status_from_log(
         _surface_non_json_stdout(line)
         log_line = {}
     else:
+        _track_node_skipped_by_dbt_v2(log_line, upstream_failure_skipped_ids)
         context = extra_kwargs.get("context")
         if context is not None:
             _store_startup_event_from_log(context["ti"], log_line)
@@ -406,9 +464,9 @@ def store_dbt_resource_status_from_log(
                 # (models/seeds/snapshots).
                 outlet_uris: list[str] = []
                 if should_generate_model_uris and dbt_node_resource_type in _DATASET_EMITTING_RESOURCE_TYPES:
-                    project_dir = extra_kwargs.get("project_dir")
-                    _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
-                    outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
+                    outlet_uris = _resolve_outlet_uris(
+                        unique_id, node_info, model_outlet_uris, dataset_namespace, extra_kwargs.get("project_dir")
+                    )
 
                 safe_xcom_push(
                     task_instance=context["ti"],

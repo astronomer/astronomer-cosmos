@@ -6,7 +6,7 @@ import pytest
 from airflow.utils.state import DagRunState
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, InvocationMode
+from cosmos.constants import AIRFLOW_VERSION, ExecutionMode, InvocationMode
 from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 
 DBT_FUSION_BINARY = Path.home() / ".local/bin/dbt"
@@ -79,6 +79,10 @@ def test_dbt_fusion(dag_id, execution_config, profile_config):
         tags=["profiles"],
         operator_args=operator_args,
     )
+    if AIRFLOW_VERSION.major == 2:
+        # On Airflow 2.10, dag.test() does not sync the DAG, so the DatasetAlias of the tasks has no row in the database
+        # yet and the first dataset a task emits fails to flush. The scheduler syncs DAGs, so only the test needs this.
+        dbt_fusion_dag.sync_to_db()
     outcome = dbt_fusion_dag.test()
     assert outcome.state == DagRunState.SUCCESS
 

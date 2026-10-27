@@ -136,6 +136,10 @@ Task-level retry — consumer
        queue. Otherwise the consumer keeps the 1.15.0 behavior
        (`#3023 <https://github.com/astronomer/astronomer-cosmos/issues/3023>`_).
 
+The consumer rows above that mention nodes skipped due to upstream failure apply to dbt 2 (``dbt-oss``) as well as to
+dbt 1. dbt 2 does not emit the dbt 1 skip events, so the producer reads the ``MarkSkippedChildren`` event that dbt 2
+emits for each node it skips.
+
 Task-level retry — producer
 +++++++++++++++++++++++++++++
 

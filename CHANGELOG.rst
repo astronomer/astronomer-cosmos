@@ -1,8 +1,8 @@
 Changelog
 =========
 
-1.16.0a3 (2026-10-23)
----------------------
+1.16.0rc1 (2026-10-27)
+----------------------
 
 Breaking Changes
 
@@ -14,6 +14,7 @@ Breaking Changes
 
 Behaviour Changes
 
+* Cosmos now passes the ``--vars`` and ``--args`` dbt flags as one-line flow YAML (for example ``{var: '2'}``) instead of block YAML, because dbt 2 rejects block YAML that contains quoted strings, for example ``var: '2'``. dbt 1.x parses both forms to the same values, but the flag text in task logs and rendered commands differs. See `#3099 <https://github.com/astronomer/astronomer-cosmos/pull/3099>`_.
 * ``RenderConfig.exclude`` is now resolved against the full project graph instead of against the subset ``RenderConfig.select`` already narrowed. Graph operators traverse outwards from the nodes their selector matches, so when ``select`` had already dropped those root nodes the traversal had nothing to start from and shared ancestors or descendants were silently kept. For example, given a ``parent`` tagged ``test`` and its ``child``, ``select=["+child"], exclude=["+tag:test"]`` previously rendered both ``parent`` and ``child``, because ``+tag:test`` was evaluated after ``+child`` had already been applied; it now renders only ``child``. This matches dbt, which evaluates both filters against the whole graph and subtracts afterwards. See #2976.
 * ``ProjectConfig`` now keeps the ``models``/``seeds``/``snapshots`` relative paths it was configured with even when it has no ``dbt_project_path`` of its own, and ``LoadMode.CUSTOM`` falls back to them when the project root is supplied through ``RenderConfig``/``ExecutionConfig`` instead. Previously those relative paths were discarded in that split configuration and ``LegacyDbtProject`` silently crawled its defaults, so a project declaring e.g. ``models_relative_paths="custom/models"`` rendered no models at all; it now crawls ``custom/models`` as configured. Projects that set ``dbt_project_path`` on ``ProjectConfig`` are unaffected. See #2977.
 * Under ``LoadMode.DBT_MANIFEST``, ``RenderConfig.exclude`` and a YAML selector's ``exclude`` now apply to test nodes: tests matched by the exclude (for example ``resource_type:test`` or ``tag:<x>``) are no longer rendered, where previously they were added back next to their model. With ``TestBehavior.AFTER_EACH``, a model whose tests are all excluded is rendered as a plain task instead of a run and test group, so its task ids change (for example ``model_a.run`` becomes ``model_a_run``). The tests of excluded models also leave ``DbtGraph.filtered_nodes``. Test nodes also keep their own tags in addition to the tags of every parent, so ``select tag:<x>`` matches a test tagged ``<x>`` whose parent is not. An ``exclude`` now also removes every test that depends on an excluded node, as dbt's default indirect selection does, so a multi-parent test goes with any excluded parent while the other parents stay. Selecting by a test's own tag now renders that test where the test behavior allows it: a detached task for a multi-parent test when ``should_detach_multiple_parents_tests=True``, or the single test task with ``TestBehavior.AFTER_ALL``; previously nothing was rendered. A source whose tests are all excluded no longer counts as having tests, so with ``source_rendering_behavior=WITH_TESTS_OR_FRESHNESS`` it is rendered only if it has a freshness check. See #2981 and #3080.
@@ -30,6 +31,8 @@ Behaviour Changes
 * Under ``TestBehavior.BUILD``, a rendered dbt source that has tests is now a task group (``<source>.source`` and
   ``<source>.test``) instead of a single ``<source>_source`` task, so references to the old task id need updating.
   The source tests, which this mode never executed before, now run and can fail the DAG. See #1683 and #3037.
+* With dbt 2 (``dbt-oss``) installed in the Airflow environment and ``openlineage-integration-common`` 1.43.0 or older, local operators now emit datasets (assets); before, they emitted none. ``emit_datasets`` is enabled by default, so DAGs scheduled on the assets of dbt models can be triggered by dbt 2 runs; set ``emit_datasets=False`` to keep the previous behaviour. With ``openlineage-integration-common`` 1.44.0 or later, dbt 2 already emitted datasets and this does not change. On Airflow 2.10.5, a version where registering new datasets is only partially supported, emitting datasets can fail with ``FlushError: Can't flush None value found in collection DatasetModel.aliases``. See #3111.
+* ``ExecutionMode.WATCHER`` now emits the datasets of models, seeds and snapshots when the manifest has no URI for them, as with dbt-oss, which writes ``manifest.json`` when the run ends, and dbt Fusion. The producer builds the URI from the database, schema and alias in the relation of the node event, and the manifest still wins when it has one. With ``emit_datasets=False`` nothing changes, and neither do the Kubernetes and GKE watchers. See #3129.
 
 Features
 
@@ -42,6 +45,8 @@ Features
 * Make ``emit_datasets`` templatable via ``operator_args`` by @tatiana in #2996
 * Support ``config.group`` and ``group:`` selectors by @biswasbiplob in #2980
 * Add ``AIConfig`` (experimental, it may change without a deprecation period), an opt-in diagnosis of failed dbt tasks: on their last attempt, an LLM is asked for the root cause and a fix, which are added after the dbt error. It uses ``apache-airflow-providers-common-ai`` (``pip install astronomer-cosmos[ai]``, for Python 3.11+ and Airflow 2.11+), works with ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``, masks secrets, and lets you set what is sent and how much it can spend. See the :doc:`AI config reference </reference/configs/ai-config>` by @corsettigyg in #3018
+* Add a ``dbt-oss`` extra (``pip install astronomer-cosmos[dbt-oss]``) by @pankajastro in #3130
+* ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` now upload the docs site written by dbt-oss, which has no ``catalog.json``, with the content type of each file. The files uploaded for dbt 1 are unchanged. by @pankajastro in #3119
 
 Enhancements
 
@@ -81,6 +86,12 @@ Bug Fixes
 * Fix a circular import when ``cosmos.constants`` is imported before Airflow by @tatiana in #3087
 * Render source tests as a separate task under ``TestBehavior.BUILD`` by @developer-rpai in #3037
 * Compare dbt node statuses case-insensitively in ``ExecutionMode.WATCHER`` and enable the watcher tests on dbt-oss, so a capitalised ``Warn`` or ``Error`` from dbt 2 is recognised by the source sensor and the default freshness callback by @pankajastro in #3088
+* Serialize the ``--vars`` and ``--args`` dbt flags as one-line flow YAML, because dbt 2 rejects block YAML that contains quoted strings by @pankajkoti in #3099
+* Local operators now emit inlets and outlets (datasets) when dbt 2 (``dbt-oss``) is installed in the Airflow environment and ``openlineage-integration-common`` is 1.43.0 or older (Airflow's constraints pin 1.27.0 with Airflow 2.10.5, 1.37.0 with 3.1.0 and 1.43.0 with 3.1.7). dbt 2 leaves ``args.profiles_dir`` out of ``run_results.json``. Those library versions read it without a fallback, so parsing the OpenLineage events raised a ``KeyError`` and the task got no inlets or outlets (1.44.0 and later use the ``--profiles-dir`` lookup, and Cosmos does not change their run results). Cosmos now adds the profiles directory (``--profiles-dir`` or ``DBT_PROFILES_DIR``) to the run results of the task's temporary project before parsing, only when dbt did not write it. A dbt 2 executable used with a dbt 1.x environment is not covered. dbt Fusion used with a dbt 2 environment is covered. by @pankajastro in #3111
+* In ``InvocationMode.SUBPROCESS``, Cosmos now reads the text output of dbt 2 (``dbt-oss``) for dbt tests. ``DbtTestLocalOperator`` now calls ``on_warning_callback`` with the warned tests in ``test_names`` and ``test_results``, and the exception for a failing dbt test, from any local operator, names the failing tests, with the number of failed rows when dbt 2 reports it. Previously the parsers only knew the dbt 1.x lines (``Done. PASS=.. WARN=N .. TOTAL=N``, ``Warning in test <name>``, ``Failure in test <name>``), so on dbt 2 the warning count was 0, the callback never fired, and the exception had no test details. The Kubernetes-based test operators (Kubernetes, GKE and EKS) now also read the dbt 2 ``Summary: .. | N warn`` line, so their ``on_warning_callback`` fires. by @pankajastro in #3108
+* ``ExecutionMode.WATCHER`` now recognises the nodes that dbt 2 (``dbt-oss``) skips because an upstream node failed. dbt 2 does not emit ``SkippingDetails`` or ``LogSkipBecauseError`` for them, only ``MarkSkippedChildren``, so their consumers ended SKIPPED and were never built after the upstream recovered on a retry. Cosmos now reads the ``MarkSkippedChildren`` event that dbt 2 emits for each node it skips and treats the node as it does for dbt 1, including the nodes below a failed test and below an excluded node. by @pankajastro in #3124, see #2698 and #3023
+* ``InvocationMode.DBT_RUNNER`` now matches dbt node statuses case-insensitively when it collects warnings. dbt 2 (``dbt-oss``) reports a source freshness warning as ``Warn``, which did not match ``warn``, so ``DbtSourceLocalOperator`` called ``on_warning_callback`` with empty ``test_names`` and ``test_results``. dbt 2 source freshness results have no ``message``, so their status is reported in ``test_results`` instead. dbt 1 is unchanged. by @pankajastro in #3123
+* ``ExecutionMode.WATCHER`` now emits the datasets of models, seeds and snapshots when the manifest has no URI for them, as with dbt-oss and dbt Fusion by @pankajastro in #3129
 
 Docs
 
@@ -114,7 +125,9 @@ Others
 * Unskip dbt-oss integration tests for dbt ls and profile schema by @pankajastro in #3083
 * Run the integration tests against dbt-oss on BigQuery by @pankajastro in #3046
 * Run unit tests against dbt-oss in CI by @pankajastro in #3052
-* Dependency updates by @dependabot and @pre-commit-ci in #2854, #2856, #2866, #2872, #2882, #2894, #2897, #2898, #2899, #2907, #2909, #2911, #2912, #2915, #2916, #2919, #2922, #2923, #2924, #2929, #2934, #2937, #2941, #2943, #2946, #2949, #2951, #2954, #2955, #2958, #2963, #2971, #2973, #2974, #2975, #2984, #2985, #2987, #2989, #2994, #3002, #3009, #3010, #3012, #3013, #3014, #3017, #3019, #3020, #3026, #3028, #3029, #3032, #3033, #3039, #3053, #3054, #3056, #3057, #3064, #3065, #3066, #3067, #3074, and #3079
+* Enable and unskip more integration tests in the dbt-oss CI jobs by @pankajastro and @pankajkoti in #3090, #3093, #3097, #3098, #3100, #3102, #3106, #3107, #3110, #3114, #3115, #3116, #3118, #3120, #3121, #3122, #3125, #3126, #3127, #3128, and #3129
+* Run the test workflows on ``ubuntu-24.04`` by @pankajastro in #3134
+* Dependency updates by @dependabot and @pre-commit-ci in #2854, #2856, #2866, #2872, #2882, #2894, #2897, #2898, #2899, #2907, #2909, #2911, #2912, #2915, #2916, #2919, #2922, #2923, #2924, #2929, #2934, #2937, #2941, #2943, #2946, #2949, #2951, #2954, #2955, #2958, #2963, #2971, #2973, #2974, #2975, #2984, #2985, #2987, #2989, #2994, #3002, #3009, #3010, #3012, #3013, #3014, #3017, #3019, #3020, #3026, #3028, #3029, #3032, #3033, #3039, #3053, #3054, #3056, #3057, #3064, #3065, #3066, #3067, #3074, #3079, #3085, #3086, #3094, and #3131
 
 1.15.1 (2026-08-04)
 -------------------

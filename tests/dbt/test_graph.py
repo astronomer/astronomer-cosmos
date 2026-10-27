@@ -38,6 +38,7 @@ from cosmos.dbt.graph import (
     run_command,
     run_command_with_subprocess,
 )
+from cosmos.dbt.runner import is_dbt_v2
 from cosmos.dbt.selector import YamlSelectors
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -1395,6 +1396,10 @@ def test_altered_jaffle_shop_manifest_is_in_sync_with_project():
         assert sorted(manifest_graph.nodes[unique_id].depends_on) == sorted(node.depends_on), unique_id
 
 
+@pytest.mark.skipif(
+    is_dbt_v2(),
+    reason="dbt 2 installs the missing dbt_packages itself on dbt ls, so the missing-packages error never occurs",
+)
 @pytest.mark.integration
 @pytest.mark.parametrize("runner", ("subprocess", "dbt_runner"))
 def test_load_via_dbt_ls_without_dbt_deps(runner, postgres_profile_config):
@@ -2161,16 +2166,16 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method, postgres_profi
     )
     getattr(dbt_graph, load_method)()
     expected_dbt_nodes = {
-        "seed.jaffle_shop.raw_customers": "raw_customers",
-        "seed.jaffle_shop.raw_orders": "raw_orders",
-        "seed.jaffle_shop.raw_payments": "raw_payments",
-        "model.jaffle_shop.stg_customers.v1": "stg_customers_v1",
-        "model.jaffle_shop.stg_customers.v2": "stg_customers_v2",
-        "model.jaffle_shop.customers.v1": "customers_v1",
-        "model.jaffle_shop.customers.v2": "customers_v2",
-        "model.jaffle_shop.stg_orders.v1": "stg_orders_v1",
-        "model.jaffle_shop.stg_payments": "stg_payments",
-        "model.jaffle_shop.orders": "orders",
+        "seed.model_version.raw_customers": "raw_customers",
+        "seed.model_version.raw_orders": "raw_orders",
+        "seed.model_version.raw_payments": "raw_payments",
+        "model.model_version.stg_customers.v1": "stg_customers_v1",
+        "model.model_version.stg_customers.v2": "stg_customers_v2",
+        "model.model_version.customers.v1": "customers_v1",
+        "model.model_version.customers.v2": "customers_v2",
+        "model.model_version.stg_orders.v1": "stg_orders_v1",
+        "model.model_version.stg_payments": "stg_payments",
+        "model.model_version.orders": "orders",
     }
 
     for unique_id, name in expected_dbt_nodes.items():
@@ -2179,19 +2184,19 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method, postgres_profi
 
     # Test dependencies
     assert {
-        "model.jaffle_shop.stg_customers.v1",
-        "model.jaffle_shop.stg_orders.v1",
-        "model.jaffle_shop.stg_payments",
-    } == set(dbt_graph.nodes["model.jaffle_shop.customers.v1"].depends_on)
+        "model.model_version.stg_customers.v1",
+        "model.model_version.stg_orders.v1",
+        "model.model_version.stg_payments",
+    } == set(dbt_graph.nodes["model.model_version.customers.v1"].depends_on)
     assert {
-        "model.jaffle_shop.stg_customers.v2",
-        "model.jaffle_shop.stg_orders.v1",
-        "model.jaffle_shop.stg_payments",
-    } == set(dbt_graph.nodes["model.jaffle_shop.customers.v2"].depends_on)
+        "model.model_version.stg_customers.v2",
+        "model.model_version.stg_orders.v1",
+        "model.model_version.stg_payments",
+    } == set(dbt_graph.nodes["model.model_version.customers.v2"].depends_on)
     assert {
-        "model.jaffle_shop.stg_orders.v1",
-        "model.jaffle_shop.stg_payments",
-    } == set(dbt_graph.nodes["model.jaffle_shop.orders"].depends_on)
+        "model.model_version.stg_orders.v1",
+        "model.model_version.stg_payments",
+    } == set(dbt_graph.nodes["model.model_version.orders"].depends_on)
 
 
 @pytest.mark.integration
@@ -2382,6 +2387,11 @@ def test_run_command_uses_dbt_runner_for_dbt_v1_ls(
     assert not mock_subprocess.called
 
 
+@pytest.mark.skipif(
+    is_dbt_v2(),
+    reason="run_command runs dbt ls as a subprocess on dbt 2, which installs the missing dbt_packages itself, "
+    "so the missing-packages error never occurs",
+)
 @pytest.mark.integration
 def test_run_command_with_dbt_runner_exception(tmp_dbt_project_dir):
     with pytest.raises(CosmosLoadDbtException) as err_info:

@@ -50,6 +50,7 @@ DBT_SKIPPED_STATUSES = frozenset({DbtNodeStatus.SKIPPED})
 # dbt fires SkippingDetails (non-ephemeral upstream) or LogSkipBecauseError
 # (ephemeral upstream) only from on_skip(), which is reached only when
 # do_skip(cause=...) was called -- i.e. exclusively on upstream node failure.
+# dbt 2 (dbt-oss) emits neither: it is covered by the MarkSkippedChildren event, see _track_node_skipped_by_dbt_v2.
 DBT_UPSTREAM_FAILURE_SKIP_EVENT_NAMES = frozenset({"SkippingDetails", "LogSkipBecauseError"})
 
 # dbt source freshness statuses that mark a source as stale and propagate skips downstream.

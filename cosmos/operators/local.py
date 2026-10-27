@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import inspect
 import json
+import mimetypes
 import os
 import tempfile
 import time
@@ -11,6 +12,7 @@ import zlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from functools import cached_property
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
@@ -18,7 +20,7 @@ from urllib.parse import urlparse
 import jinja2
 from airflow.exceptions import AirflowException, AirflowTaskTimeout
 from airflow.models.taskinstance import TaskInstance
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 
 from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.io import _construct_dest_file_path
@@ -852,6 +854,57 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             # Exercised only when ``openlineage-integration-common`` is absent/broken, which CI always installs.
             return None
 
+    @staticmethod
+    def _openlineage_requires_profiles_dir_in_run_results() -> bool:
+        """
+        Return whether the installed ``openlineage-integration-common`` requires ``args.profiles_dir`` in ``run_results.json``.
+
+        1.43.0 and older read it without a fallback; 1.44.0 and later catch the ``KeyError`` and use the
+        ``--profiles-dir`` lookup. An unknown version is treated as requiring it.
+        """
+        try:
+            return Version(version("openlineage-integration-common")) < Version("1.44.0")
+        except (PackageNotFoundError, InvalidVersion):
+            return True
+
+    @staticmethod
+    def _add_missing_profiles_dir_to_run_results(run_results_path: Any, dbt_command_line: list[str] | None) -> None:
+        """
+        Add ``args.profiles_dir`` to ``run_results.json`` when dbt did not write it.
+
+        dbt 2 (dbt-oss) leaves ``profiles_dir`` out of the run results ``args``. ``openlineage-integration-common``
+        1.43.0 and older read it without a fallback, so the ``KeyError`` left the task with no inlets or outlets;
+        1.44.0 and later use the same ``--profiles-dir`` lookup instead.
+
+        Only called when dbt 2 is installed in the Airflow environment (``is_dbt_v2``) and the library needs it
+        (``_openlineage_requires_profiles_dir_in_run_results``). ``is_dbt_v2`` does not inspect
+        ``dbt_executable_path``: a dbt 2 executable next to a dbt 1.x environment is not covered, and the dbt Fusion
+        binary used with a dbt 2 environment is. The directory is the one passed with ``--profiles-dir`` (the last
+        occurrence, as dbt 1.x does) or ``DBT_PROFILES_DIR``; nothing is added when neither is set. The file is in the
+        temporary project directory of the task.
+        """
+        if not isinstance(run_results_path, (str, os.PathLike)):
+            return
+        # The executable (and other items) can be a ``Path``, as in the watcher producer's command.
+        command = [str(argument) for argument in dbt_command_line or []]
+        profiles_dir = os.environ.get("DBT_PROFILES_DIR")
+        for index, argument in enumerate(command):
+            if argument == "--profiles-dir" and index + 1 < len(command):
+                profiles_dir = command[index + 1]
+            elif argument.startswith("--profiles-dir="):
+                profiles_dir = argument.split("=", 1)[1]
+        if not profiles_dir:
+            return
+        try:
+            run_results = json.loads(Path(run_results_path).read_text())
+            args = run_results.get("args")
+            if not isinstance(args, dict) or "profiles_dir" in args:
+                return
+            args["profiles_dir"] = profiles_dir
+            Path(run_results_path).write_text(json.dumps(run_results))
+        except (OSError, ValueError):
+            logger.debug("Unable to add profiles_dir to %s", run_results_path, exc_info=True)
+
     def calculate_openlineage_events_completes(
         self,
         env: dict[str, str | os.PathLike[Any] | bytes],
@@ -895,6 +948,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # Do not raise exception if a command is unsupported, following the openlineage-dbt processor:
         # https://github.com/OpenLineage/OpenLineage/blob/bdcaf828ebc117e0e5ffc5fab44ff8886eb7836b/integration/common/openlineage/common/provider/dbt/processor.py#L141
         openlineage_processor.should_raise_on_unsupported_command = False
+        if dbt_runner.is_dbt_v2() and self._openlineage_requires_profiles_dir_in_run_results():
+            self._add_missing_profiles_dir_to_run_results(
+                getattr(openlineage_processor, "run_result_path", None), dbt_command_line
+            )
         try:
             events = openlineage_processor.parse()
             self.openlineage_events_completes = events.completes
@@ -1342,6 +1399,16 @@ class DbtRunOperationLocalOperator(DbtRunOperationMixin, DbtLocalBaseOperator):
         super().__init__(*args, **kwargs)
 
 
+# What `dbt docs generate` of dbt-oss writes for the docs site, next to the files it also writes into target/ (compiled SQL,
+# dbt's own state, ...) that are not part of the site.
+_DBT_OSS_DOCS_FILES = ["index.html", "manifest.json"]
+_DBT_OSS_DOCS_FOLDERS = ["assets", "info_schema"]
+
+
+def _content_type(filename: str) -> str:
+    return mimetypes.guess_type(filename)[0] or "application/octet-stream"
+
+
 class DbtDocsLocalOperator(DbtLocalBaseOperator):
     """
     Executes `dbt docs generate` command.
@@ -1366,6 +1433,35 @@ class DbtDocsLocalOperator(DbtLocalBaseOperator):
         if self.dbt_cmd_global_flags:
             if "--no-write-json" in self.dbt_cmd_global_flags and "graph.gpickle" in self.required_files:
                 self.required_files.remove("graph.gpickle")
+
+    @staticmethod
+    def _is_dbt_oss_docs_layout(target_dir: str) -> bool:
+        """
+        Whether ``target_dir`` holds the docs site written by dbt-oss rather than by dbt 1.
+
+        dbt-oss writes no ``catalog.json``: ``index.html`` loads its ``assets/`` and the ``info_schema/`` parquet files.
+        The layout is read from the files, not from the dbt version, because the dbt executable may not be the one
+        installed next to Airflow.
+        """
+        target = Path(target_dir)
+        return (target / "info_schema").is_dir() and not (target / "catalog.json").exists()
+
+    def _files_to_upload(self, target_dir: str) -> list[str]:
+        """
+        Paths, relative to ``target_dir``, of the generated docs to upload.
+
+        This is ``required_files`` for dbt 1. For dbt-oss it is the files of the site, which are in sub-folders.
+        """
+        if not self._is_dbt_oss_docs_layout(target_dir):
+            return list(self.required_files)
+        target = Path(target_dir)
+        site_files = [
+            path.relative_to(target).as_posix()
+            for folder in _DBT_OSS_DOCS_FOLDERS
+            for path in sorted((target / folder).rglob("*"))
+            if path.is_file()
+        ]
+        return [*_DBT_OSS_DOCS_FILES, *site_files]
 
 
 class DbtDocsCloudLocalOperator(DbtDocsLocalOperator, ABC):
@@ -1435,14 +1531,15 @@ class DbtDocsS3LocalOperator(DbtDocsCloudLocalOperator):
 
         target_dir = f"{project_dir}/target"
 
-        hook = S3Hook(
-            self.connection_id,
-            extra_args={
-                "ContentType": "text/html",
-            },
-        )
+        # dbt 1 files are all uploaded as text/html. dbt-oss site files need their own type, or a browser will not run them.
+        dbt_oss_layout = self._is_dbt_oss_docs_layout(target_dir)
+        hooks: dict[str, S3Hook] = {}
 
-        for filename in self.required_files:
+        for filename in self._files_to_upload(target_dir):
+            content_type = _content_type(filename) if dbt_oss_layout else "text/html"
+            if content_type not in hooks:
+                hooks[content_type] = S3Hook(self.connection_id, extra_args={"ContentType": content_type})
+            hook = hooks[content_type]
             key = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
             s3_path = f"s3://{self.bucket_name}/{key}"
             self.log.info("Uploading %s to %s", filename, s3_path)
@@ -1504,8 +1601,9 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
         hook = WasbHook(
             self.connection_id,
         )
+        dbt_oss_layout = self._is_dbt_oss_docs_layout(target_dir)
 
-        for filename in self.required_files:
+        for filename in self._files_to_upload(target_dir):
             self.log.info(
                 "Uploading %s to %s",
                 filename,
@@ -1514,11 +1612,18 @@ class DbtDocsAzureStorageLocalOperator(DbtDocsCloudLocalOperator):
 
             blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
 
+            upload_kwargs: dict[str, Any] = {}
+            if dbt_oss_layout:
+                from azure.storage.blob import ContentSettings
+
+                upload_kwargs["content_settings"] = ContentSettings(content_type=_content_type(filename))
+
             hook.load_file(
                 file_path=f"{target_dir}/{filename}",
                 container_name=self.bucket_name,
                 blob_name=blob_name,
                 overwrite=True,
+                **upload_kwargs,
             )
 
 
@@ -1545,14 +1650,19 @@ class DbtDocsGCSLocalOperator(DbtDocsCloudLocalOperator):
 
         target_dir = f"{project_dir}/target"
         hook = GCSHook(self.connection_id)
+        dbt_oss_layout = self._is_dbt_oss_docs_layout(target_dir)
 
-        for filename in self.required_files:
+        for filename in self._files_to_upload(target_dir):
             blob_name = f"{self.folder_dir}/{filename}" if self.folder_dir else filename
             self.log.info("Uploading %s to %s", filename, f"gs://{self.bucket_name}/{blob_name}")
+            # GCSHook.upload sends application/octet-stream when no mime_type is given, which stops a browser from
+            # running the JavaScript of the dbt-oss site. The dbt 1 files keep the hook's default.
+            upload_kwargs: dict[str, Any] = {"mime_type": _content_type(filename)} if dbt_oss_layout else {}
             hook.upload(
                 filename=f"{target_dir}/{filename}",
                 bucket_name=self.bucket_name,
                 object_name=blob_name,
+                **upload_kwargs,
             )
 
 

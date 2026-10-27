@@ -31,7 +31,7 @@ SAMPLE_KEY = {
     "type": "service_account",
     "project_id": "test-project",
     "private_key_id": "key-id-12345",
-    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----\n",
+    "private_key": "fake-ci-private-key-line-1\nfake-ci-private-key-line-2\n",
     "client_email": "sa@test-project.iam.gserviceaccount.com",
 }
 
@@ -200,3 +200,43 @@ def test_bigquery_ci_profiles_rewrite(monkeypatch, tmp_path):
     assert dev_output["threads"] == 4
     # Snowflake output should be unchanged
     assert rewritten["my_profile"]["outputs"]["other"]["type"] == "snowflake"
+
+
+def test_scripts_run_with_python_isolated_mode_end_to_end(tmp_path):
+    """Verify that helper scripts execute successfully end-to-end under python -I with valid args."""
+    import os
+
+    conn_json = json.dumps({"conn_type": "google_cloud_platform", "extra": {"keyfile_dict": SAMPLE_KEY}})
+    env = {**os.environ, "AIRFLOW_CONN_GCP_GS_CONN": conn_json}
+
+    # Test bigquery_ci_keyfile.py
+    keyfile_path = tmp_path / "sa_key_isolated.json"
+    res = subprocess.run(
+        [sys.executable, "-I", str(SCRIPTS_DIR / "bigquery_ci_keyfile.py"), str(keyfile_path)],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert res.returncode == 0
+    assert json.loads(keyfile_path.read_text()) == SAMPLE_KEY
+
+    # Test bigquery_ci_profiles.py
+    profiles_path = tmp_path / "profiles_isolated.yml"
+    profiles_content = {
+        "my_profile": {
+            "target": "dev",
+            "outputs": {
+                "dev": {"type": "postgres", "host": "localhost", "threads": 4},
+            },
+        }
+    }
+    profiles_path.write_text(yaml.safe_dump(profiles_content))
+    res = subprocess.run(
+        [sys.executable, "-I", str(SCRIPTS_DIR / "bigquery_ci_profiles.py"), str(profiles_path)],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert res.returncode == 0
+    rewritten = yaml.safe_load(profiles_path.read_text())
+    assert rewritten["my_profile"]["outputs"]["dev"]["type"] == "bigquery"

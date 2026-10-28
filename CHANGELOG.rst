@@ -40,6 +40,10 @@ Features
 * Add ``AIConfig`` (experimental, it may change without a deprecation period), an opt-in diagnosis of failed dbt tasks: on their last attempt, an LLM is asked for the root cause and a fix, which are added after the dbt error. It uses ``apache-airflow-providers-common-ai`` (``pip install astronomer-cosmos[ai]``, for Python 3.11+ and Airflow 2.11+), works with ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``, masks secrets, and lets you set what is sent and how much it can spend. See the :doc:`AI config reference </reference/configs/ai-config>` and #3018.
 * ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` now upload the docs site written by dbt-oss, which has no ``catalog.json``, with the content type of each file. The files uploaded for dbt 1 are unchanged. See #3101.
 
+Docs
+
+* The :doc:`compatibility policy </policy/compatibility-policy>` now ties Astronomer Runtime support to End of Maintenance instead of End of Basic Support, and documents that Cosmos follows a fix-forward convention.
+
 Bug Fixes
 
 * Stop rendering tests removed by ``exclude`` under ``LoadMode.DBT_MANIFEST``. In ``ExecutionMode.WATCHER`` their consumer tasks waited for an XCom the producer never pushed, because the producer honoured the exclude. By @tatiana and @ege-arhan in #3080, closes #2981.

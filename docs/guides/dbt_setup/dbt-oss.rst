@@ -76,7 +76,7 @@ These are the differences between dbt OSS and dbt Core 1.x that Cosmos accounts 
    * - ``ExecutionMode.VIRTUALENV``
      - Add dbt OSS to ``py_requirements``, for example ``["dbt-oss~=2.0.0"]``. Cosmos checks the Airflow environment, not the virtual environment, so the ``inlets`` and ``outlets`` handling above also needs dbt OSS in the Airflow environment.
    * - Container modes, working directory (``ExecutionMode.KUBERNETES``, ``WATCHER_KUBERNETES``)
-     - Start the pod in the dbt project directory and keep its ``profiles.yml`` there. dbt OSS looks for ``profiles.yml`` in the working directory before ``~/.dbt``, and its BigQuery adapter reads seed CSV files relative to the working directory, not ``--project-dir``. ``KubernetesPodOperator`` has no ``working_dir`` argument, so set ``WORKDIR`` in the image, or pass an entrypoint script that changes into the project directory through ``cmds``. See :ref:`kubernetes`.
+     - Start the pod in the dbt project directory and keep its ``profiles.yml`` there. dbt OSS looks for ``profiles.yml`` in the working directory before ``~/.dbt``, and its BigQuery adapter reads seed CSV files relative to the working directory, not ``--project-dir``. Set ``WORKDIR`` in the image, or pass an entrypoint script that changes into the project directory through ``cmds``. See :ref:`kubernetes`.
 
 Limitations
 ~~~~~~~~~~~

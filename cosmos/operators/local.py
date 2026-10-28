@@ -1141,7 +1141,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                         dataset_alias_name = outlet.uri
                         outlets.append(DatasetAlias(name=dataset_alias_name))
 
-                    # Handle DatasetAliasModel, which is not JSON serializable in Airflow 2
+                    # Handle DatasetAliasModel, which is not JSON serializable in 2.10+
                     elif isinstance(outlet, DatasetAliasModel):
                         dataset_alias_name = outlet.name
                         outlets.append(DatasetAlias(name=dataset_alias_name))

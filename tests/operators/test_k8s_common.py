@@ -252,6 +252,102 @@ def test_on_pod_completion_source_operator_with_freshness_warnings():
     callback.assert_called_once()
 
 
+# Real output of ``dbt source freshness`` on dbt 2 (dbt OSS) for a source that is stale beyond ``warn_after``.
+DBT_V2_FRESHNESS_WARN_LOG = """\
+dbt-oss 2.0.8
+Loading profiles.yml
+Loading packages.yml
+Warned source raw.raw_orders (last updated 8years 6months 20days 4h 43m 20s ago) [5.73s]
+Successfully wrote sources.json
+=================== Errors and Warnings ====================
+[warning] [StaleSource (dbt1063)]: Stale source source.jaffle_shop.raw.raw_orders
+--> models/staging/sources.yml
+==================== Execution Summary ====================
+Finished 'freshness' with 1 warning for target 'dev' [6.0s]
+"""
+
+
+def test_detect_source_freshness_warnings_dbt_v2():
+    """dbt 2 prints ``Warned source <name> (...) [Ns]`` instead of ``WARN freshness of``."""
+    handler = _make_handler()
+    result = handler._detect_source_freshness_warnings(DBT_V2_FRESHNESS_WARN_LOG)
+    assert result == [
+        {
+            "name": "source_freshness_raw.raw_orders",
+            "status": "WARN",
+            "type": "source_freshness",
+            "source": "raw.raw_orders",
+            "execution_time": "5.73",
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    ("log_text", "expected_sources"),
+    (
+        pytest.param(
+            "20:18:55  Warned source raw.raw_orders (last updated 1h ago) [1.2s]", ["raw.raw_orders"], id="timestamp"
+        ),
+        pytest.param(
+            "Warned source raw.a (last updated 1h ago) [1.0s]\nWarned source raw.b (last updated 2h ago) [2.0s]",
+            ["raw.a", "raw.b"],
+            id="several_sources",
+        ),
+        pytest.param(
+            "Warned source raw.a (last updated 1h ago) [1.0s]\nWarned source raw.a (last updated 1h ago) [1.0s]",
+            ["raw.a"],
+            id="same_source_once",
+        ),
+        pytest.param("Warned source raw.a", ["raw.a"], id="without_details"),
+        pytest.param("Stale source raw.orders_stale (last updated 1y ago) [5.8s]", [], id="error_is_not_a_warning"),
+        pytest.param(
+            "Warned test unique_orders_id (models/schema.yml:12:22) [3 of 8 in 3.4s]",
+            [],
+            id="warned_test_is_not_a_source",
+        ),
+        pytest.param("Source raw.orders is fresh [1.0s]", [], id="fresh_source"),
+    ),
+)
+def test_detect_source_freshness_warnings_dbt_v2_lines(log_text, expected_sources):
+    handler = _make_handler()
+    result = handler._detect_source_freshness_warnings(log_text)
+    assert [w["source"] for w in result] == expected_sources
+
+
+def test_detect_source_freshness_warnings_dbt_v2_without_details_has_no_execution_time():
+    handler = _make_handler()
+    (warning,) = handler._detect_source_freshness_warnings("Warned source raw.a")
+    assert "execution_time" not in warning
+
+
+def test_on_pod_completion_source_operator_with_dbt_v2_freshness_warning():
+    callback = MagicMock()
+    task = MagicMock(spec=DbtSourceKubernetesOperator)
+    task.pod_manager.read_pod_logs.return_value = [line.encode() for line in DBT_V2_FRESHNESS_WARN_LOG.splitlines()]
+    context = {"task_instance": MagicMock(task=task)}
+    handler = _make_handler(on_warning_callback=callback, context=context)
+
+    with patch("cosmos.operators._k8s_common.extract_log_issues", return_value=(["src1"], ["warn"])):
+        handler.on_pod_completion(pod=MagicMock())
+
+    callback.assert_called_once()
+
+
+def test_on_pod_completion_source_operator_dbt_v2_fresh_source_does_not_call_callback():
+    callback = MagicMock()
+    operator = MagicMock()
+    task = MagicMock(spec=DbtSourceKubernetesOperator)
+    task.pod_manager.read_pod_logs.return_value = [
+        b"Finished 'freshness' successfully for target 'dev' [6.0s]",
+    ]
+    context = {"task_instance": MagicMock(task=task)}
+    handler = _make_handler(on_warning_callback=callback, operator=operator, context=context)
+
+    handler.on_pod_completion(pod=MagicMock())
+
+    callback.assert_not_called()
+
+
 def test_on_pod_completion_no_warnings_logs_failure():
     callback = MagicMock()
     operator = MagicMock()

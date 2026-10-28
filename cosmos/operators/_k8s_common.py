@@ -217,6 +217,9 @@ _FRESHNESS_PATTERN = re.compile(
 # Secondary pattern for simpler source freshness warnings
 # Matches: "WARN freshness of source_name"
 _SIMPLE_FRESHNESS_PATTERN = re.compile(r"WARN\s+freshness\s+of\s+([^\s]+)")
+# dbt 2 (dbt OSS) pattern for source freshness warnings
+# Matches: "Warned source raw.raw_orders (last updated 8years 6months ago) [5.73s]"
+_DBT_V2_FRESHNESS_PATTERN = re.compile(r"Warned\s+source\s+(\S+)(?:[^\n]*?\[([\d.]+)s\])?")
 
 
 class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc]
@@ -326,6 +329,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         Pattern examples:
         - "15:49:21 1 of 1 WARN freshness of auction_net.auction_net_raw ... [WARN in 0.90s]"
         - "WARN freshness of source_name.table_name"
+        - dbt 2: "Warned source raw.raw_orders (last updated 8years 6months ago) [5.73s]"
 
         :param log_text: Complete log text from the pod
         :return: List of warning dictionaries
@@ -361,6 +365,20 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
                         "source": source_name,
                     }
                 )
+
+        for match in _DBT_V2_FRESHNESS_PATTERN.finditer(log_text):
+            source_name = match.group(1)
+            if source_name not in seen_sources:
+                seen_sources.add(source_name)
+                warning: dict[str, Any] = {
+                    "name": f"source_freshness_{source_name}",
+                    "status": "WARN",
+                    "type": "source_freshness",
+                    "source": source_name,
+                }
+                if match.group(2):
+                    warning["execution_time"] = match.group(2)
+                warnings.append(warning)
 
         return warnings
 

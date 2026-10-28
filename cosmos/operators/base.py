@@ -44,7 +44,7 @@ def resolve_templated_bool(value: bool | str | None) -> bool:
     ``render_template_as_native_obj``, so a flag can arrive as ``"False"`` - which is truthy.
     """
     if isinstance(value, str):
-        # Airflow 2's to_boolean does not strip whitespace (Airflow 3 does), so a
+        # Airflow 2.9-2.11's to_boolean does not strip whitespace (Airflow 3 does), so a
         # rendered " true " would otherwise resolve to False on the Airflow 2 matrix.
         return to_boolean(value.strip())
     return bool(value)

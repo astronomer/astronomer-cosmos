@@ -1595,6 +1595,37 @@ class TestStoreCompiledSqlForModelPathHandling:
         store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.stg_orders", "staging/stg_orders.sql", "model")
         assert ti.store.get("model__pkg__stg_orders_compiled_sql") == "SELECT * FROM staging.orders"
 
+    def test_compiled_sql_with_dbt_2_node_path_pushed(self, tmp_path):
+        """dbt 2 reports node_path relative to the project (models/staging/foo.sql): the file is in the same place."""
+        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models" / "staging"
+        compiled_dir.mkdir(parents=True)
+        (compiled_dir / "stg_orders.sql").write_text("SELECT * FROM staging.orders")
+        ti = _MockTI()
+        store_compiled_sql_for_model(
+            ti, str(tmp_path), "model.pkg.stg_orders", "models/staging/stg_orders.sql", "model"
+        )
+        assert ti.store.get("model__pkg__stg_orders_compiled_sql") == "SELECT * FROM staging.orders"
+
+    def test_compiled_sql_dbt_1_layout_wins_when_both_paths_exist(self, tmp_path):
+        """The dbt 1 layout is tried first: a file under models/models/ does not shadow models/<node_path>."""
+        compiled_root = tmp_path / "target" / "compiled" / "pkg" / "models"
+        (compiled_root / "models").mkdir(parents=True)
+        (compiled_root / "foo.sql").write_text("SELECT 'top level'")
+        (compiled_root / "models" / "foo.sql").write_text("SELECT 'nested folder named models'")
+        ti = _MockTI()
+        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.foo", "models/foo.sql", "model")
+        assert ti.store.get("model__pkg__foo_compiled_sql") == "SELECT 'nested folder named models'"
+
+    def test_compiled_sql_missing_logs_every_path_tried(self, tmp_path, caplog):
+        """When neither layout has the file, one warning names the paths that were looked at."""
+        ti = _MockTI()
+        with caplog.at_level(logging.WARNING):
+            store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.foo", "models/foo.sql", "model")
+        assert "model__pkg__foo_compiled_sql" not in ti.store
+        assert caplog.text.count("Compiled sql path") == 1
+        assert "compiled/pkg/models/models/foo.sql or" in caplog.text
+        assert "compiled/pkg/models/foo.sql" in caplog.text
+
     def test_compiled_sql_flat_path_pushed(self, tmp_path):
         """node_path as single file under models/ (e.g. foo.sql) is read and pushed."""
         compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"

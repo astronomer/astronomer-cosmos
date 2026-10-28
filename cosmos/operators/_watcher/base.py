@@ -157,11 +157,16 @@ def _extract_compiled_sql(
         return None
 
     package = unique_id.split(".", 2)[1]
-    compiled_sql_path = Path(project_dir) / "target" / "compiled" / package / "models" / node_path
-    if not compiled_sql_path.exists():
+    compiled_root = Path(project_dir) / "target" / "compiled" / package
+    # dbt 1 reports node_path relative to the models folder (``staging/m.sql``), dbt 2 relative to the project
+    # (``models/staging/m.sql``). Both write the file to ``compiled/<package>/models/staging/m.sql``. The dbt 1 layout is
+    # tried first, so it behaves as before.
+    candidates = [compiled_root / "models" / node_path, compiled_root / node_path]
+    compiled_sql_path = next((path for path in candidates if path.exists()), None)
+    if compiled_sql_path is None:
         logger.warning(
             "Compiled sql path %s does not exist and hence the rendered template field compiled_sql for the model will not be populated",
-            compiled_sql_path,
+            " or ".join(str(path) for path in candidates),
         )
         return None
     return compiled_sql_path.read_text(encoding="utf-8").strip() or None

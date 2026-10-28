@@ -396,7 +396,7 @@ def register_dataset_on_task(
     1. **Airflow 3 with ``enable_dataset_alias=True`` (default)** — uses
        ``AssetAlias`` with ``context["outlet_events"]``. This is the
        recommended path and the one Cosmos tests against.
-    2. **Airflow 2 with ``enable_dataset_alias=True``** — uses the
+    2. **Airflow 2.10+ with ``enable_dataset_alias=True``** — uses the
        Airflow 2 ``DatasetAlias`` equivalent with ``context["outlet_events"]``.
     3. **Airflow 2 with ``enable_dataset_alias=False``** — mutates
        ``task.outlets`` / ``task.inlets`` directly and persists the DAG.
@@ -417,13 +417,13 @@ def register_dataset_on_task(
         diverge and Cosmos supports both.
     new_inlets
         Airflow ``Asset`` / ``Dataset`` instances to add as inlets. Unused on
-        the ``outlet_events`` path; used by the legacy
+        the ``outlet_events`` path (Airflow 2.10+ / 3); used by the legacy
         direct-mutation path.
     new_outlets
         Airflow ``Asset`` / ``Dataset`` instances to add as outlets.
     context
         The Airflow task execution context. Must contain ``outlet_events``
-        on the ``outlet_events`` path.
+        on the 2.10+ / 3 path.
     """
     try:
         from airflow.sdk import DAG

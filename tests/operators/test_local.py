@@ -568,7 +568,7 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
     assert operator.parse_number_of_warnings == dbt_runner.parse_number_of_warnings
 
 
-@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2")
+@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     try:
@@ -614,7 +614,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 
     with pytest.raises(FlushError):
         run_test_dag(dag, custom_tester=True)
-        # This is a known limitation of Airflow 2
+        # This is a known limitation of Airflow 2.10.0 and 2.10.1
         # https://github.com/apache/airflow/issues/42495
 
         # When this is solved, we can uncomment the following:
@@ -627,7 +627,7 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
         # assert dataset_model == 1
 
 
-@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2")
+@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
 @pytest.mark.integration
 def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
     from airflow.datasets import Dataset, DatasetAlias
@@ -720,7 +720,7 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
 
     with pytest.raises(FlushError):
         run_test_dag(dag, custom_tester=True)
-        # This is a known limitation of Airflow 2
+        # This is a known limitation of Airflow 2.10.0 and 2.10.1
         # https://github.com/apache/airflow/issues/42495
 
         # When this is solved, we can uncomment the following:

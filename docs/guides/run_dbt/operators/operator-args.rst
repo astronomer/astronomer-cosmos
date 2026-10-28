@@ -149,13 +149,13 @@ Note that ``operator_args`` wins over ``RenderConfig.emit_datasets``, which stay
 default. Two caveats on the Airflow Dataset alias, neither of which affects whether downstream DAGs
 are triggered, because a suppressed run emits no events:
 
-- On Airflow 2, ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and
+- On Airflow 2.10 and 2.11, ``ExecutionMode.LOCAL``, ``ExecutionMode.VIRTUALENV`` and
   ``ExecutionMode.WATCHER`` tasks register a ``DatasetAlias`` when the task is built, before the
   template is rendered. A run that renders to false therefore leaves the alias registered, but adds
   no events to it. ``ExecutionMode.WATCHER_KUBERNETES`` and ``ExecutionMode.WATCHER_GCP_GKE`` are
   not affected: their consumers build on the container operators, which register no alias.
-- ``ExecutionMode.AIRFLOW_ASYNC`` registers the alias regardless of ``emit_datasets``, even when it
-  is a plain ``False``.
+- ``ExecutionMode.AIRFLOW_ASYNC`` registers the alias on Airflow 2.10 and later, including Airflow
+  3, regardless of ``emit_datasets``, even when it is a plain ``False``.
 
 Example usage of templated ``dbt_cmd_flags`` for microbatch models with event-time ranges:
 

@@ -374,7 +374,7 @@ def test_register_event_with_uri(mock_register_dataset, profile_config_mock):
 
 @patch("cosmos.operators._asynchronous.bigquery.settings.enable_dataset_alias", True)
 def test_init_sets_outlets_when_dataset_alias_enabled(profile_config_mock):
-    """When ``settings.enable_dataset_alias`` is True, ``__init__`` populates
+    """When ``settings.enable_dataset_alias`` is True and Airflow >= 2.10, ``__init__`` populates
     ``kwargs['outlets']`` with a DatasetAlias derived from the task_id (and optional task_group)."""
     operator = DbtRunAirflowAsyncBigqueryOperator(
         task_id="test_task",

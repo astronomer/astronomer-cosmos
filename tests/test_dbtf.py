@@ -80,7 +80,7 @@ def test_dbt_fusion(dag_id, execution_config, profile_config):
         operator_args=operator_args,
     )
     if AIRFLOW_VERSION.major == 2:
-        # On Airflow 2, dag.test() does not sync the DAG, so the DatasetAlias of the tasks has no row in the database
+        # On Airflow 2.10, dag.test() does not sync the DAG, so the DatasetAlias of the tasks has no row in the database
         # yet and the first dataset a task emits fails to flush. The scheduler syncs DAGs, so only the test needs this.
         dbt_fusion_dag.sync_to_db()
     outcome = dbt_fusion_dag.test()

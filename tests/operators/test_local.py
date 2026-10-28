@@ -37,7 +37,7 @@ from pendulum import datetime
 import cosmos.dbt.runner as dbt_runner
 from cosmos import DbtDag, DbtTaskGroup, ProjectConfig, RenderConfig, cache
 from cosmos.config import AIConfig, ProfileConfig
-from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
+from cosmos.constants import InvocationMode
 from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
 )
@@ -568,58 +568,7 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
     assert operator.parse_number_of_warnings == dbt_runner.parse_number_of_warnings
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) >= version.parse("2.10")
-    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
-    "From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
-@pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets(caplog):
-    from airflow.datasets import Dataset
-
-    project_dir = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
-
-    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="seed",
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        run_operator = DbtRunLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="run",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        test_operator = DbtTestLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="test",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        seed_operator >> run_operator >> test_operator
-
-    run_test_dag(dag)
-
-    assert run_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.raw_customers", extra=None)]
-    assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
-    assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
-    assert test_operator.outlets == []
-
-
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     try:
@@ -679,10 +628,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 
 
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="Outlets are only overridden in Airflow 2.10 and 2.11 in DbtLocalBaseOperator.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
     from airflow.datasets import Dataset, DatasetAlias
@@ -943,10 +888,6 @@ def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fai
 
 
 @patch("cosmos.settings.enable_dataset_alias", 0)
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_via_envvar(caplog):
     with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
@@ -962,45 +903,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_vi
     assert run_operator.outlets == []
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) not in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
-    # https://github.com/apache/airflow/issues/39486
-)
-@pytest.mark.integration
-def test_run_operator_dataset_emission_is_skipped(caplog):
-    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="seed",
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-            emit_datasets=False,
-        )
-        run_operator = DbtRunLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="run",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-            emit_datasets=False,
-        )
-
-        seed_operator >> run_operator
-
-    run_test_dag(dag)
-
-    assert run_operator.inlets == []
-    assert run_operator.outlets == []
-
-
-@pytest.mark.skipif(
-    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
-)
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
@@ -1035,10 +937,6 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     ]
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
-)
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",

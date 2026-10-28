@@ -74,7 +74,7 @@ with DAG(
         )
         # [END aws_s3_example]
     except ModuleNotFoundError:
-        print("aws_s3_example is not available in Airflow 2.9")
+        print("aws_s3_example requires apache-airflow-providers-amazon[s3fs]")
         aws_s3_example = None
 
     # [START gcp_gs_example]

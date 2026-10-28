@@ -42,8 +42,13 @@ New minor or major releases of Cosmos may drop support for Apache Airflow versio
 
 In some cases, Cosmos may continue to support older Airflow versions, depending on the Cosmos release cycle.
 
-- **Minimum required version**: Apache Airflow 2.9.0
-- **Supported versions**: 2.9, 2.10, 2.11, 3.0, 3.1, 3.2, 3.3, 3.4
+- **Minimum required version**: Apache Airflow 2.11.0
+- **Supported versions**: 2.11, 3.0, 3.1, 3.2, 3.3, 3.4
+
+.. note::
+
+   From Cosmos 1.16.0, Apache Airflow 2.9 and 2.10 are no longer supported. Users who cannot upgrade Airflow should
+   stay on Cosmos 1.15.x.
 
 .. note::
 
@@ -157,7 +162,8 @@ policy pages directly for the current state.
 .. note::
 
    Runtime 11 (Airflow 2.9) and Runtime 12 (Airflow 2.10) are omitted above
-   because they are past End of Maintenance.
+   because they are past End of Maintenance. Cosmos 1.15.x is the last release
+   series that supports them.
 
 .. note::
 

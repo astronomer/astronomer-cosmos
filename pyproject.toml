@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Orchestrate your dbt projects in Airflow"
 readme = "README.rst"
 license = "Apache-2.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{ name = "Astronomer", email = "humans@astronomer.io" }]
 keywords = ["airflow", "apache-airflow", "astronomer", "dags", "dbt", "dbt-core", "dbt-fusion"]
 classifiers = [
@@ -21,7 +21,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -88,7 +87,7 @@ amazon = [
 # Due to issue https://github.com/fsspec/gcsfs/issues/664
 google = ["apache-airflow-providers-google>=10.17.0", "gcsfs<2025.3.0"]
 microsoft = ["apache-airflow-providers-microsoft-azure>=8.5.0"]
-# Not part of ``all``: the provider needs Python 3.11+, while Cosmos supports Python 3.10.
+# Not part of ``all``: the provider needs newer versions than the Airflow constraint files pin.
 ai = ["apache-airflow-providers-common-ai[sql]>=1.0.0"]
 all = [
     "astronomer-cosmos[dbt-all]",
@@ -182,14 +181,8 @@ dependencies = [
 pre-install-commands = ["sh scripts/test/pre-install-airflow.sh {matrix:airflow} {matrix:python} {matrix:dbt}"]
 
 [[tool.hatch.envs.tests.matrix]]
-python = ["3.10", "3.11", "3.12", "3.13", "3.14"]
-airflow = ["2.11", "3.0", "3.1", "3.2", "3.3"]
-dbt = ["1.8", "1.9", "1.10", "1.11", "1.12", "2.0-dbt-fusion", "2.0-dbt-oss"]
-
-# Airflow 3.4 requires Python 3.11+.
-[[tool.hatch.envs.tests.matrix]]
 python = ["3.11", "3.12", "3.13", "3.14"]
-airflow = ["3.4"]
+airflow = ["2.11", "3.0", "3.1", "3.2", "3.3", "3.4"]
 dbt = ["1.8", "1.9", "1.10", "1.11", "1.12", "2.0-dbt-fusion", "2.0-dbt-oss"]
 
 [tool.hatch.envs.tests.overrides]
@@ -263,7 +256,7 @@ serve-no-reload = "sphinx-build -b html docs docs/_build && python -m http.serve
 ######################################
 [tool.black]
 line-length = 120
-target-version = ["py310", "py311", "py312", "py313"]
+target-version = ["py311", "py312", "py313"]
 
 [tool.coverage.run]
 omit = [

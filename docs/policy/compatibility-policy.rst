@@ -32,8 +32,14 @@ The following versions are currently tested and supported.
 Python
 ++++++
 
-- **Minimum required**: Python 3.10
-- **Supported versions**: 3.10, 3.11, 3.12, 3.13, 3.14
+- **Minimum required**: Python 3.11
+- **Supported versions**: 3.11, 3.12, 3.13, 3.14
+
+.. note::
+
+   From Cosmos 1.16.0, Python 3.10 is no longer supported. It reached End of Life in October 2026 per the
+   `Python release schedule <https://devguide.python.org/versions/>`_. Users who cannot upgrade Python, such as those on
+   Astro Runtime 13 with its Python 3.10 image, can use Cosmos 1.15.x or move to Python 3.11 or 3.12.
 
 Apache Airflow
 ++++++++++++++
@@ -79,13 +85,11 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
    :header-rows: 1
 
    * - dbt Core
-     - 3.10
      - 3.11
      - 3.12
      - 3.13
      - 3.14
    * - 1.8 – 1.11
-     - OK
      - OK
      - OK
      - OK
@@ -95,9 +99,7 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
      - OK
      - OK
      - OK
-     - OK
    * - 2.0 (Fusion)
-     - n/a
      - n/a
      - n/a
      - n/a

@@ -1122,11 +1122,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
 
         AbstractDbtLocalBase.__init__(self, **base_kwargs)
         if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
-            if (
-                kwargs.get("emit_datasets", True)
-                and settings.enable_dataset_alias
-                and AIRFLOW_VERSION >= Version("2.10")
-            ):
+            if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias:
                 from airflow.datasets import Dataset, DatasetAlias
                 from airflow.models.dataset import DatasetAliasModel
 
@@ -1145,7 +1141,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                         dataset_alias_name = outlet.uri
                         outlets.append(DatasetAlias(name=dataset_alias_name))
 
-                    # Handle DatasetAliasModel, which is not JSON serializable in 2.10
+                    # Handle DatasetAliasModel, which is not JSON serializable in Airflow 2
                     elif isinstance(outlet, DatasetAliasModel):
                         dataset_alias_name = outlet.name
                         outlets.append(DatasetAlias(name=dataset_alias_name))

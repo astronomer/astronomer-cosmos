@@ -110,11 +110,11 @@ Testing the application with Hatch
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 After following the steps described in :ref:`setting-up-hatch`, you are ready to run Cosmos tests locally.
-For instance, to run the tests using Python 3.11, `Apache Airflow® <https://airflow.apache.org/>`_ 2.10 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
+For instance, to run the tests using Python 3.11, `Apache Airflow® <https://airflow.apache.org/>`_ 2.11 and `dbt-core <https://github.com/dbt-labs/dbt-core/>`_ 1.9, use the following:
 
 .. code-block:: bash
 
-    hatch run tests.py3.11-2.10-1.9:test-cov
+    hatch run tests.py3.11-2.11-1.9:test-cov
 
 It is also possible to run the tests using all the matrix combinations, by using:
 
@@ -144,21 +144,21 @@ To run the integration tests for the first time, use:
     export POSTGRES_PASSWORD=postgres
     export POSTGRES_USER=postgres
     export POSTGRES_HOST=localhost
-    hatch run tests.py3.11-2.10-1.9:test-cov:test-integration-setup
-    hatch run tests.py3.11-2.10-1.9:test-cov:test-integration
+    hatch run tests.py3.11-2.11-1.9:test-cov:test-integration-setup
+    hatch run tests.py3.11-2.11-1.9:test-cov:test-integration
 
 If testing for the same Airflow and Python version, next runs of the integration tests can be:
 
 .. code-block:: bash
 
-    hatch run tests.py3.11-2.10-1.9:test-integration
+    hatch run tests.py3.11-2.11-1.9:test-integration
 
 Any extra arguments passed after ``test-integration`` are forwarded to ``pytest``. This is convenient for iterating on a single test:
 
 .. code-block:: bash
 
-    hatch run tests.py3.11-2.10-1.9:test-integration -k test_name
-    hatch run tests.py3.11-2.10-1.9:test-integration tests/operators/test_watcher.py::test_name
+    hatch run tests.py3.11-2.11-1.9:test-integration -k test_name
+    hatch run tests.py3.11-2.11-1.9:test-integration tests/operators/test_watcher.py::test_name
 
 The same applies to other pytest flags (``-x``, ``-vv``, ``--lf``, ``--pdb``). Note: ``scripts/test/integration.sh`` passes its own ``-k`` exclusion list for k8s and python-models DAGs, so a ``-k`` passed here overrides that exclusion. Setting ``PYTEST_ADDOPTS="-k ..."`` does not work — pytest only honors the last ``-k`` it sees, and the script's ``-k`` wins.
 

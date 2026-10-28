@@ -132,7 +132,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
-        airflow-version: ["2.10", "3.0", "3.1"]
+        airflow-version: ["2.11", "3.0", "3.1"]
         dbt-version: ["2.0-dbt-oss"]
         split-group: [1, 2, 3]
     env:

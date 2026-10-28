@@ -12,19 +12,19 @@ An Apache Airflow provider library that orchestrates dbt projects as Airflow DAG
 
 Unit tests (excluding integration/perf/dbtfusion):
 ```bash
-hatch run tests.py3.11-2.10-1.9:test
-hatch run tests.py3.11-2.10-1.9:test-cov   # with coverage
+hatch run tests.py3.11-2.11-1.9:test
+hatch run tests.py3.11-2.11-1.9:test-cov   # with coverage
 ```
 
 Run a single test file or test:
 ```bash
-hatch run tests.py3.11-2.10-1.9:test tests/perf/test_dag_generation_perf.py
-hatch run tests.py3.11-2.10-1.9:test -k "test_function_name"
+hatch run tests.py3.11-2.11-1.9:test tests/perf/test_dag_generation_perf.py
+hatch run tests.py3.11-2.11-1.9:test -k "test_function_name"
 ```
 
 Integration tests:
 ```bash
-hatch run tests.py3.11-2.10-1.9:test-integration
+hatch run tests.py3.11-2.11-1.9:test-integration
 ```
 
 Type checking:

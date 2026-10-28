@@ -3165,10 +3165,6 @@ def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
             assert task.execution_timeout == timedelta(seconds=1)
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10"),
-    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
-)
 @pytest.mark.integration
 def test_dbt_dag_with_watcher_and_failing_model(caplog):
     """
@@ -3277,10 +3273,6 @@ def test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event(tmp_pat
     assert "this_column_does_not_exist_at_all" in pushed["msg"]
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10"),
-    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
-)
 @pytest.mark.integration
 def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
     """
@@ -3344,10 +3336,8 @@ def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10") or (Version("3.1.0") <= AIRFLOW_VERSION < Version("3.2.0")),
-    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0"),
     reason=(
-        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
         "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
         "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
         "the watcher sensor cannot detect producer termination on retry. "
@@ -3410,9 +3400,8 @@ def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, fresh_f
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0"),
     reason=(
-        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
         "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
         "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
         "the watcher sensor cannot detect producer termination on retry. "
@@ -3513,9 +3502,8 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, fresh_
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0"),
     reason=(
-        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
         "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
         "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
         "the watcher sensor cannot detect producer termination on retry. "
@@ -3583,9 +3571,8 @@ def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(f
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0"),
     reason=(
-        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
         "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
         "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
         "the watcher sensor cannot detect producer termination on retry. "

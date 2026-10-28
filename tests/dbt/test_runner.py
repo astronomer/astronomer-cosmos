@@ -336,6 +336,79 @@ def test_handle_exception_if_needed_after_error(invalid_dbt_project_dir):
     assert expected1 in err_msg
 
 
+def _failed_result(*results):
+    """A dbtRunnerResult of a failed command with no exception, as ``dbtRunner`` returns it for node errors."""
+    return SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=list(results)))
+
+
+def _node_result(unique_id, status, message):
+    return SimpleNamespace(status=status, message=message, unique_id=unique_id)
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
+def test_handle_exception_if_needed_dbt_2_failure_on_every_node_is_reported_once(mock_is_dbt_v2):
+    """dbt-oss 2.0.8 returns 37 results, all ``Compilation Error``, for a failing ``run-operation`` macro."""
+    unique_ids = ["exposure.jaffle_shop.weekly_metrics"] + [f"model.jaffle_shop.model_{i}" for i in range(36)]
+    response = _failed_result(*(_node_result(unique_id, "error", "Compilation Error") for unique_id in unique_ids))
+
+    with pytest.raises(CosmosDbtRunError) as exc_info:
+        dbt_runner.handle_exception_if_needed(response)
+
+    assert str(exc_info.value) == (
+        'dbt invocation completed with errors: all 37 nodes reported "Compilation Error". '
+        "dbt 2 reports a failure that is not tied to one node (for example the error of a run-operation macro) "
+        "on every node: see the dbt output above for the cause."
+    )
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
+@pytest.mark.parametrize(
+    "results, expected_message",
+    [
+        pytest.param(
+            [
+                _node_result("model.p.a", "error", "Database Error in model a"),
+                _node_result("model.p.b", "error", "Database Error in model b"),
+            ],
+            "dbt invocation completed with errors: model.p.a: Database Error in model a\n"
+            "model.p.b: Database Error in model b",
+            id="different_messages",
+        ),
+        pytest.param(
+            [
+                _node_result("model.p.a", "error", "Compilation Error"),
+                _node_result("model.p.b", "success", "Succeeded"),
+            ],
+            "dbt invocation completed with errors: model.p.a: Compilation Error",
+            id="not_every_node_failed",
+        ),
+        pytest.param(
+            [_node_result("model.p.a", "error", "Compilation Error")],
+            "dbt invocation completed with errors: model.p.a: Compilation Error",
+            id="single_node",
+        ),
+    ],
+)
+def test_handle_exception_if_needed_dbt_2_lists_the_nodes_otherwise(mock_is_dbt_v2, results, expected_message):
+    with pytest.raises(CosmosDbtRunError) as exc_info:
+        dbt_runner.handle_exception_if_needed(_failed_result(*results))
+
+    assert str(exc_info.value) == expected_message
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=False)
+def test_handle_exception_if_needed_dbt_1_keeps_listing_nodes_with_the_same_message(mock_is_dbt_v2):
+    """On dbt 1 five models can fail for the same reason, and the user needs to know which."""
+    response = _failed_result(*(_node_result(f"model.p.m{i}", "error", "permission denied") for i in range(2)))
+
+    with pytest.raises(CosmosDbtRunError) as exc_info:
+        dbt_runner.handle_exception_if_needed(response)
+
+    assert str(exc_info.value) == (
+        "dbt invocation completed with errors: model.p.m0: permission denied\nmodel.p.m1: permission denied"
+    )
+
+
 @pytest.mark.integration
 def test_dbt_runner_caching_and_callbacks(valid_dbt_project_dir):
     """Test that:

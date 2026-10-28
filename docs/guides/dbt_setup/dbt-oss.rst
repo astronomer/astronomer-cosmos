@@ -94,11 +94,13 @@ Limitations
    * - Empty models
      - ``dbt ls`` does not list empty models, so ``LoadMode.DBT_LS`` does not render them.
    * - Projects with the same name (``InvocationMode.DBT_RUNNER``)
-     - dbt OSS keeps the macros of a project by package name for the lifetime of the Python process, so two dbt projects with the same ``name`` that run in one worker process can resolve each other's macros. Give each project a unique ``name``. See `#3116 <https://github.com/astronomer/astronomer-cosmos/pull/3116>`_.
+     - dbt OSS keeps the macros of a project by package name for the lifetime of the Python process, so two dbt projects with the same ``name`` that run in one worker process can resolve each other's macros. A project without its own ``generate_alias_name`` can then fail with ``Template not found: <name>.generate_alias_name``, and a project that overrides it can silently lose the override. Give each project a unique ``name``, or use ``InvocationMode.SUBPROCESS``. See `#3116 <https://github.com/astronomer/astronomer-cosmos/pull/3116>`_ and `#3158 <https://github.com/astronomer/astronomer-cosmos/issues/3158>`_.
    * - Source freshness warnings in ``ExecutionMode.KUBERNETES``
      - In Cosmos 1.16.0rc1, ``on_warning_callback`` of ``DbtSourceKubernetesOperator`` and of the GKE source operator does not run for a stale source, because it looks for the dbt 1.x ``WARN freshness of`` line and dbt OSS prints ``Warned source``. See `#3156 <https://github.com/astronomer/astronomer-cosmos/pull/3156>`_.
+   * - Python models
+     - dbt OSS rejects them on DuckDB with ``Python models are not supported for duckdb adapter``. On BigQuery they need ``compute_region`` and ``gcs_bucket`` in the profile and a Dataproc role for the service account.
    * - ``ExecutionMode.AIRFLOW_ASYNC``
-     - Not supported or verified with dbt OSS. See `#3103 <https://github.com/astronomer/astronomer-cosmos/issues/3103>`_.
+     - Not supported. It fails with ``No module named 'agate'`` (checked on dbt OSS 2.0.8), because it needs ``dbt-bigquery``, which cannot be installed next to dbt OSS. See `#3103 <https://github.com/astronomer/astronomer-cosmos/issues/3103>`_.
    * - Configuration that dbt 1.x accepts
      - dbt OSS rejects some of it. Cosmos CI runs ``dbt-autofix deprecations`` on the example projects, and you may need to run it on yours.
    * - dbt-loom

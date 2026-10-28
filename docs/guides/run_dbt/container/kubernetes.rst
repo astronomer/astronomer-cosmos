@@ -111,7 +111,7 @@ When the image holds one project, set the working directory in the Dockerfile:
     WORKDIR /usr/app/my_project
     COPY profiles.yml /usr/app/my_project/profiles.yml
 
-``KubernetesPodOperator`` has no ``working_dir`` argument. When the image holds several projects, use an entrypoint script that changes into the project directory and runs the dbt command Cosmos passes as arguments:
+When the image holds several projects, pass an entrypoint script through ``cmds``. The script changes into the project directory and runs the dbt command Cosmos passes as arguments:
 
 .. code-block:: bash
 

@@ -56,7 +56,7 @@ The following example shows how to configure a ``DbtDag`` with ``ExecutionMode.W
         },
     )
 
-To use dbt OSS, follow :ref:`dbt OSS in the Kubernetes Pods <kubernetes-dbt-oss>`: the Pod image, the dbt installed in the Airflow environment, the working directory and the profile are the same as in the Kubernetes execution mode.
+To use dbt OSS, follow :ref:`dbt OSS in the Kubernetes Pods <kubernetes-dbt-oss>`: the Pod image, the working directory and the profile are the same as in the Kubernetes execution mode.
 
 **Key differences from** ``ExecutionMode.KUBERNETES``:
 

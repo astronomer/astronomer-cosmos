@@ -96,8 +96,6 @@ To run dbt OSS (dbt 2) in the Pods, install it in the image instead of dbt Core 
 
     RUN pip install "dbt-oss~=2.0.0"
 
-Cosmos decides that it runs dbt OSS from the dbt installed in the Apache Airflow® environment, not from the Pod image, and ``LoadMode.DBT_LS`` runs ``dbt ls`` in the Airflow environment to parse the project. Install dbt OSS in the Airflow environment too.
-
 Working directory and profile
 +++++++++++++++++++++++++++++
 

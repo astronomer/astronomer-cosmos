@@ -14,7 +14,8 @@ Overview
 Astronomer Cosmos is committed to maintaining compatibility with a range of
 Python, Apache Airflow, and dbt Core versions to support diverse user
 environments. We remove support for versions when they reach End of Life (EOL)
-or when our dependencies no longer support them.
+or when our dependencies no longer support them. Cosmos follows a fix-forward
+convention.
 
 This policy establishes:
 
@@ -37,7 +38,7 @@ Python
 Apache Airflow
 ++++++++++++++
 
-New minor or major releases of Cosmos may drop support for Apache Airflow versions that have reached **End of Basic Support**, as defined in the `Astro Runtime Lifecycle schedule <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy#astro-runtime-lifecycle-schedule>`_.
+New minor or major releases of Cosmos may drop support for Apache Airflow versions that have reached **End of Maintenance**, as defined in the `Astro Runtime Lifecycle schedule <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy#astro-runtime-lifecycle-schedule>`_.
 
 In some cases, Cosmos may continue to support older Airflow versions, depending on the Cosmos release cycle.
 
@@ -119,13 +120,12 @@ Astronomer Runtime
 
 Astronomer Runtime bundles a specific Apache Airflow version with a supported
 Python range. Because Cosmos's supported Airflow and Python ranges above track
-Astronomer Runtime, any Runtime series still in **Maintenance** or **Basic
-Support** is compatible with the current Cosmos release — provided the dbt
-Core version you pair it with also supports that Python version (see the
-verified Python × dbt Core table above).
+Astronomer Runtime, any Runtime series still in **Maintenance** is compatible with the current
+Cosmos release — provided the dbt Core version you pair it with also supports
+that Python version (see the verified Python × dbt Core table above).
 
-The table below reflects Runtime series still in Maintenance or Basic Support
-as of 2026-07-23, per the `Astronomer Runtime lifecycle policy
+The table below reflects Runtime series still in Maintenance as of
+2026-10-28, per the `Astronomer Runtime lifecycle policy
 <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_.
 Runtime ships new patch and minor versions frequently — treat this table as a
 snapshot and check the `Runtime release notes
@@ -157,9 +157,7 @@ policy pages directly for the current state.
 .. note::
 
    Runtime 11 (Airflow 2.9) and Runtime 12 (Airflow 2.10) are omitted above
-   because their Basic Support windows have already closed. Cosmos still
-   supports Airflow 2.9/2.10 per the matrix above for users pinned to those
-   Runtime series, but new Astro deployments can no longer be created on them.
+   because they are past End of Maintenance.
 
 .. note::
 
@@ -175,7 +173,8 @@ Cosmos and Astronomer Runtime compatibility
 +++++++++++++++++++++++++++++++++++++++++++
 
 The table below shows which Cosmos releases (1.5.1 to 1.15.0) work on each
-Astronomer Runtime series, verified 2026-07-23. See :doc:`Airflow 3
+Astronomer Runtime series, verified 2026-07-23. It is a historical record, not
+a support commitment. See :doc:`Airflow 3
 compatibility notes </policy/airflow3-compatibility>` for details on
 Cosmos's Airflow 3 support.
 
@@ -291,7 +290,7 @@ following conditions are met:
   to the
   `Apache Airflow release policy <https://airflow.apache.org/docs/apache-airflow/stable/installation/supported-versions.html>`_
 - **Astronomer Runtime EOL**: The Astronomer Runtime version has reached End of
-  Basic Support according to the
+  Maintenance according to the
   `Astronomer Runtime lifecycle policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_
 
 dbt Core version removal criteria

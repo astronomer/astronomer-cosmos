@@ -75,6 +75,10 @@ These are the differences between dbt OSS and dbt Core 1.x that Cosmos accounts 
      - Cosmos writes dict values for these flags as one-line flow YAML, for example ``{var: '2'}``, because dbt OSS rejects block YAML that contains quoted strings. It does this for every dbt version, so only the flag text in task logs and rendered commands differs from before. See `#3099 <https://github.com/astronomer/astronomer-cosmos/pull/3099>`_.
    * - ``ExecutionMode.VIRTUALENV``
      - Add dbt OSS to ``py_requirements``, for example ``["dbt-oss~=2.0.0"]``. Cosmos checks the Airflow environment, not the virtual environment, so the ``inlets`` and ``outlets`` handling above also needs dbt OSS in the Airflow environment.
+   * - Container modes, working directory (``ExecutionMode.KUBERNETES``, ``WATCHER_KUBERNETES``)
+     - Start the pod in the dbt project directory and keep its ``profiles.yml`` there. dbt OSS looks for ``profiles.yml`` in the working directory before ``~/.dbt``, and its BigQuery adapter reads seed CSV files relative to the working directory, not ``--project-dir``. ``KubernetesPodOperator`` has no ``working_dir`` argument, so set ``WORKDIR`` in the image, or pass an entrypoint script that changes into the project directory through ``cmds``. See :ref:`kubernetes`.
+   * - Container modes, dbt in Airflow
+     - Install dbt OSS in the image and in the Airflow environment. Cosmos checks the Airflow environment, not the image, to decide that it runs dbt OSS, and ``LoadMode.DBT_LS`` runs ``dbt ls`` in the Airflow environment when it parses the project.
 
 Limitations
 ~~~~~~~~~~~
@@ -93,6 +97,8 @@ Limitations
      - ``dbt ls`` does not list empty models, so ``LoadMode.DBT_LS`` does not render them.
    * - Projects with the same name (``InvocationMode.DBT_RUNNER``)
      - dbt OSS keeps the macros of a project by package name for the lifetime of the Python process, so two dbt projects with the same ``name`` that run in one worker process can resolve each other's macros. Give each project a unique ``name``. See `#3116 <https://github.com/astronomer/astronomer-cosmos/pull/3116>`_.
+   * - Source freshness warnings in ``ExecutionMode.KUBERNETES``
+     - In Cosmos 1.16.0rc1, ``on_warning_callback`` of ``DbtSourceKubernetesOperator`` and of the GKE source operator does not run for a stale source, because it looks for the dbt 1.x ``WARN freshness of`` line and dbt OSS prints ``Warned source``. See `#3156 <https://github.com/astronomer/astronomer-cosmos/pull/3156>`_.
    * - ``ExecutionMode.AIRFLOW_ASYNC``
      - Not supported or verified with dbt OSS. See `#3103 <https://github.com/astronomer/astronomer-cosmos/issues/3103>`_.
    * - Configuration that dbt 1.x accepts

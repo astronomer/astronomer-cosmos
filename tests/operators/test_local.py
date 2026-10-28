@@ -2758,7 +2758,8 @@ def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_co
 
 
 @pytest.mark.integration
-def test_generate_dbt_flags_appends_no_static_parser(tmp_path):
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=False)
+def test_generate_dbt_flags_appends_no_static_parser(mock_is_dbt_v2, tmp_path):
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="test-task",
@@ -2769,6 +2770,19 @@ def test_generate_dbt_flags_appends_no_static_parser(tmp_path):
     profile_path = tmp_path / "profiles.yml"
     flags = operator._generate_dbt_flags(tmp_project_dir, profile_path)
     assert "--no-static-parser" in flags
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
+def test_generate_dbt_flags_does_not_append_no_static_parser_on_dbt_v2(mock_is_dbt_v2, tmp_path):
+    """dbt 2 has no static parser: it warns about the flag on every command and ``--warn-error`` fails on the warning."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir=tmp_path,
+    )
+    operator.invocation_mode = InvocationMode.DBT_RUNNER
+    flags = operator._generate_dbt_flags(str(tmp_path), tmp_path / "profiles.yml")
+    assert "--no-static-parser" not in flags
 
 
 def test_generate_dbt_flags_does_not_append_no_static_parser_in_subprocess(tmp_path):

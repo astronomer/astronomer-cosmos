@@ -406,3 +406,54 @@ def test_extract_freshness_warn_msg_json_log_format():
 
     assert node_names == ["postgres_db.raw_orders"]
     assert node_results == [warn_msg]
+
+
+# What dbt 2 (dbt-oss 2.0.8) prints for ``dbt source freshness`` when raw_orders is past ``warn_after`` and raw_orders_stale
+# is past ``error_after``.
+DBT_V2_FRESHNESS_OUTPUT = [
+    "   dbt-oss 2.0.8",
+    "   Loading profiles.yml",
+    "    Warned source raw.raw_orders (last updated 8years 9months 26days 11h 44m 36s ago) [0.01s]",
+    "     Stale source raw.raw_orders_stale (last updated 8years 9months 26days 11h 44m 36s ago) [0.01s]",
+    "Successfully wrote sources.json",
+    "=================== Errors and Warnings ====================",
+    "[warning] [StaleSource (dbt1063)]: Stale source source.jaffle_shop.raw.raw_orders",
+    "  --> models/staging/sources.yml",
+    "[error] [StaleSource (dbt1063)]: Stale source source.jaffle_shop.raw.raw_orders_stale",
+    "  --> models/staging/sources.yml",
+    "==================== Execution Summary =====================",
+    "Finished 'freshness' with 3 warnings and 1 error for target 'dev' [646ms]",
+]
+
+
+def test_extract_freshness_warn_msg_dbt_v2():
+    """dbt 2 prints ``Warned source`` for a warning: the stale (error) source and the diagnostics are not warnings."""
+    result = FullOutputSubprocessResult(
+        full_output=DBT_V2_FRESHNESS_OUTPUT, output=DBT_V2_FRESHNESS_OUTPUT[-1], exit_code=1
+    )
+    node_names, node_results = extract_freshness_warn_msg(result)
+
+    assert node_names == ["raw.raw_orders"]
+    assert node_results == ["Warned source raw.raw_orders (last updated 8years 9months 26days 11h 44m 36s ago) [0.01s]"]
+
+
+def test_extract_freshness_warn_msg_dbt_v2_ignores_colors_and_timestamps():
+    lines = [
+        "\x1b[33m    Warned source raw.raw_orders (last updated 1day ago) [0.01s]\x1b[0m",
+        "10:46:31  Warned source raw.raw_payments (last updated 2days ago) [0.02s]",
+    ]
+    result = FullOutputSubprocessResult(full_output=lines, output=lines[-1], exit_code=0)
+    node_names, node_results = extract_freshness_warn_msg(result)
+
+    assert node_names == ["raw.raw_orders", "raw.raw_payments"]
+    assert node_results == [
+        "Warned source raw.raw_orders (last updated 1day ago) [0.01s]",
+        "10:46:31  Warned source raw.raw_payments (last updated 2days ago) [0.02s]",
+    ]
+
+
+def test_extract_freshness_warn_msg_dbt_v2_without_warnings():
+    lines = ["   dbt-oss 2.0.8", "     Passed source raw.raw_orders (last updated 1h ago) [0.01s]"]
+    result = FullOutputSubprocessResult(full_output=lines, output=lines[-1], exit_code=0)
+
+    assert extract_freshness_warn_msg(result) == ([], [])

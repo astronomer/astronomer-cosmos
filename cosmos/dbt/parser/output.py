@@ -13,6 +13,9 @@ from cosmos import __version__ as cosmos_version
 from cosmos.hooks.subprocess import FullOutputSubprocessResult
 
 DBT_FRESHNESS_WARN_MSG = "WARN freshness of"
+# dbt 2 (dbt-oss) prints "Warned source <source>.<table> (last updated ... ago) [0.01s]" for a source whose freshness is
+# past ``warn_after``, and "Stale source ..." for one past ``error_after``, which is not a warning.
+DBT_V2_FRESHNESS_WARN_RE = re.compile(r"^\s*(?:\d{2}:\d{2}:\d{2}\s+)?Warned source\s+(\S+)")
 # The dbt run summary line looks like "Done. PASS=15 WARN=1 ERROR=0 SKIP=0 NO-OP=0 TOTAL=16".
 # Anchor on its shape (``Done.`` ... ``WARN=<count>`` ... ``TOTAL=<n>``) so that a later non-summary
 # line that happens to contain a "WARN=<digits>" token (e.g. a --debug resource/usage report printed
@@ -88,6 +91,13 @@ def extract_freshness_warn_msg(result: FullOutputSubprocessResult) -> tuple[list
             node_name = line.split(DBT_FRESHNESS_WARN_MSG)[1].split(" ")[1]
             node_names.append(node_name)
             node_results.append(line)
+            continue
+
+        cleaned_line = _ANSI_ESCAPE_RE.sub("", line)
+        match_v2 = DBT_V2_FRESHNESS_WARN_RE.match(cleaned_line)
+        if match_v2:
+            node_names.append(match_v2.group(1))
+            node_results.append(cleaned_line.strip())
 
     return node_names, node_results
 

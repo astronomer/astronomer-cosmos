@@ -85,25 +85,26 @@ Behavior across versions
 - In Cosmos 1.15.0, Cosmos began setting ``cmds`` to ``["dbt"]`` unconditionally. Because setting the Pod ``cmds`` sets the container ``command`` field, this overrode the image ``ENTRYPOINT`` and also discarded any custom ``cmds`` value (`#2889 <https://github.com/astronomer/astronomer-cosmos/issues/2889>`__).
 - Cosmos 1.15.1 restores the earlier behavior: the image ``ENTRYPOINT`` is preserved by default, a custom ``cmds`` is honored as provided, and ``["dbt"]`` is used as the container command only when set explicitly.
 
-dbt Core and dbt OSS
-~~~~~~~~~~~~~~~~~~~~
+.. _kubernetes-dbt-oss:
 
-The Pod image can run either dbt Core 1.x or dbt OSS (dbt 2). Install one of them, since they cannot be installed in the same environment:
+dbt OSS
+~~~~~~~
+
+To run dbt OSS (dbt 2) in the Pods, install it in the image instead of dbt Core and its adapter. It includes its adapters, and it cannot be installed in the same environment as dbt Core:
 
 .. code-block:: docker
 
-    # dbt Core 1.x, with the adapter of your warehouse
-    RUN pip install dbt-core dbt-bigquery
-
-    # dbt OSS, which includes its adapters
     RUN pip install "dbt-oss~=2.0.0"
 
-Cosmos decides which dbt it runs from the dbt installed in the Apache Airflow® environment, not from the Pod image, and ``LoadMode.DBT_LS`` runs ``dbt ls`` in the Airflow environment to parse the project. Keep the dbt in the Airflow environment in line with the one in the image: dbt OSS in both, or dbt Core in both.
+Cosmos decides that it runs dbt OSS from the dbt installed in the Apache Airflow® environment, not from the Pod image, and ``LoadMode.DBT_LS`` runs ``dbt ls`` in the Airflow environment to parse the project. Install dbt OSS in the Airflow environment too.
 
 Working directory and profile
 +++++++++++++++++++++++++++++
 
-Start the Pod in the dbt project directory and keep the ``profiles.yml`` of the Pod in that directory. Both dbt Core and dbt OSS look for ``profiles.yml`` in the working directory before ``~/.dbt``, so a ``profiles.yml`` that is left in the project directory for local development takes precedence over the one you copy to ``~/.dbt``. dbt OSS also reads seed CSV files with its BigQuery adapter relative to the working directory, not to ``--project-dir``, so seeds fail with ``open "seeds/<name>.csv": no such file or directory`` when the Pod starts elsewhere.
+With dbt OSS, start the Pod in the dbt project directory and keep the ``profiles.yml`` of the Pod in that directory:
+
+- dbt OSS looks for ``profiles.yml`` in the working directory before ``~/.dbt``, so a ``profiles.yml`` that is left in the project directory for local development takes precedence over the one you copy to ``~/.dbt``.
+- The BigQuery adapter of dbt OSS reads seed CSV files relative to the working directory, not to ``--project-dir``, so seeds fail with ``open "seeds/<name>.csv": no such file or directory`` when the Pod starts elsewhere.
 
 When the image holds one project, set the working directory in the Dockerfile:
 
@@ -125,35 +126,6 @@ When the image holds one project, set the working directory in the Dockerfile:
         "image": "my-dbt-image:1.0.0",
         "cmds": ["/usr/local/bin/entrypoint.sh"],
         "env_vars": {"DBT_WORKDIR": "/usr/app/my_project"},
-    }
-
-Credentials in the Pod
-++++++++++++++++++++++
-
-Keep credentials out of the image. For example, for BigQuery, create a Kubernetes secret from the service account key and mount it in the Pod. The profile in the image reads the key file and the project from the mounted file and an environment variable:
-
-.. code-block:: yaml
-
-    my_profile:
-      target: dev
-      outputs:
-        dev:
-          type: bigquery
-          method: service-account
-          keyfile: /secrets/key.json
-          project: "{{ env_var('GCP_PROJECT') }}"
-          dataset: my_dataset
-          threads: 4
-
-.. code-block:: python
-
-    from airflow.providers.cncf.kubernetes.secret import Secret
-
-    operator_args = {
-        "secrets": [
-            Secret("volume", "/secrets", "bigquery-key")
-        ],  # a Kubernetes secret with the key ``key.json``
-        "env_vars": {"GCP_PROJECT": "my-project"},
     }
 
 Step-by-step instructions

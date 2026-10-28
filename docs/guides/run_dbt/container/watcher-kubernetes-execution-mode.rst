@@ -56,7 +56,7 @@ The following example shows how to configure a ``DbtDag`` with ``ExecutionMode.W
         },
     )
 
-The Pod image, the dbt installed in the Airflow environment, the working directory and the credentials follow the same rules as in the :ref:`Kubernetes execution mode <kubernetes>`, for both dbt Core and dbt OSS. The producer Pod runs ``dbt build``, and Cosmos reads its logs to report the status of each node to the consumer tasks.
+To use dbt OSS, follow :ref:`dbt OSS in the Kubernetes Pods <kubernetes-dbt-oss>`: the Pod image, the dbt installed in the Airflow environment, the working directory and the profile are the same as in the Kubernetes execution mode.
 
 **Key differences from** ``ExecutionMode.KUBERNETES``:
 

@@ -1,6 +1,6 @@
 import mimetypes
 import os.path as op
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal, overload
 from urllib.parse import urlsplit
 
@@ -27,6 +27,10 @@ else:
     MENU_ACCESS_PERMISSIONS = [
         (permissions.ACTION_CAN_READ, permissions.RESOURCE_WEBSITE),
     ]
+
+
+# Schemes that ``open_file`` reads from a remote store; any other path is a local file.
+REMOTE_DOCS_SCHEMES = ("s3://", "gs://", "wasb://", "http://", "https://")
 
 
 def bucket_and_key(path: str) -> tuple[str, str]:
@@ -227,8 +231,14 @@ class DbtDocsView(AirflowBaseView):  # type: ignore[misc]
         parts = PurePosixPath(folder, asset_path).parts
         if len(parts) < 2 or ".." in parts:
             abort(404)
+        file_path = op.join(dbt_docs_dir, *parts)
+        # A symlink in the docs folder must not lead to a file outside of it (remote paths are read as they are).
+        if not file_path.strip().startswith(REMOTE_DOCS_SCHEMES) and not Path(file_path).resolve().is_relative_to(
+            Path(dbt_docs_dir).resolve()
+        ):
+            abort(404)
         try:
-            data = open_file(op.join(dbt_docs_dir, *parts), conn_id=dbt_docs_conn_id, binary=True)
+            data = open_file(file_path, conn_id=dbt_docs_conn_id, binary=True)
         except (FileNotFoundError, IsADirectoryError):
             abort(404)
         return Response(data, mimetype=mimetypes.guess_type(parts[-1])[0] or "application/octet-stream")

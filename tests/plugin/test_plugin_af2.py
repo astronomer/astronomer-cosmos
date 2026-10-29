@@ -29,6 +29,7 @@ except ImportError:
     jinja2.escape = markupsafe.escape
 
 import importlib
+import mimetypes
 import sys
 from importlib.util import find_spec
 from unittest.mock import MagicMock, PropertyMock, mock_open, patch
@@ -477,7 +478,8 @@ def test_get_storage_type(path, expected_type):
         (
             "/cosmos/info_schema/v1/nodes.parquet",
             "path/to/docs/dir/info_schema/v1/nodes.parquet",
-            "application/octet-stream",
+            # Same lookup as the handler: a host whose MIME database registers ``.parquet`` returns that type.
+            mimetypes.guess_type("nodes.parquet")[0] or "application/octet-stream",
         ),
     ],
 )
@@ -639,3 +641,32 @@ def test_open_http_file_binary():
         res = open_http_file("http://mock-path/to/docs", conn_id="mock_conn_id", binary=True)
 
         assert res == b"\x00\x01"
+
+
+@pytest.mark.integration
+def test_dbt_oss_docs_static_files_do_not_follow_a_symlink_out_of_the_docs_folder(monkeypatch, app, tmp_path):
+    outside = tmp_path / "outside.txt"
+    outside.write_text("secret")
+    docs_dir = tmp_path / "target"
+    (docs_dir / "assets").mkdir(parents=True)
+    (docs_dir / "assets" / "inside.txt").write_text("docs")
+    (docs_dir / "assets" / "linked.txt").symlink_to(outside)
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", str(docs_dir))
+
+    linked = app.get("/cosmos/assets/linked.txt")
+
+    assert linked.status_code == 404
+    assert b"secret" not in linked.data
+    assert app.get("/cosmos/assets/inside.txt").data == b"docs"
+
+
+@pytest.mark.integration
+def test_dbt_oss_docs_static_files_are_served_when_the_docs_folder_is_a_symlink(monkeypatch, app, tmp_path):
+    real_dir = tmp_path / "real_target"
+    (real_dir / "assets").mkdir(parents=True)
+    (real_dir / "assets" / "index.js").write_text("console.log('dbt docs')")
+    docs_dir = tmp_path / "target"
+    docs_dir.symlink_to(real_dir, target_is_directory=True)
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", str(docs_dir))
+
+    assert app.get("/cosmos/assets/index.js").status_code == 200

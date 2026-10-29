@@ -59,6 +59,14 @@ def _node_fqn_str(node: DbtNode) -> str | None:
     return None
 
 
+def _is_matched_by_fqn_method(node: DbtNode) -> bool:
+    """
+    dbt's fqn method (the ``fqn:`` selector and a bare token such as ``staging``) never matches sources, even though
+    a source's fqn includes the folder of its YAML file. Sources are selected with ``source:``.
+    """
+    return node.resource_type != DbtResourceType.SOURCE
+
+
 def _fqn_matches(node_fqn: str, fqn_selector_value: str) -> bool:
     """
     Return True if the node's fully qualified name exactly equals the selector value.
@@ -96,6 +104,8 @@ def _node_matches_bare_identifier(node: DbtNode, identifier: str) -> bool:
     (e.g. LoadMode.CUSTOM), match package name, the patched task name (a dotted token maps to the
     dot-to-underscore node name), or a project-relative folder segment (directories only, not the file name).
     """
+    if not _is_matched_by_fqn_method(node):
+        return False
     if node.fqn:
         is_versioned = node.resource_type == DbtResourceType.MODEL and "." in node.resource_name
         return _fqn_selector_matches(node.fqn, identifier, is_versioned) or _fqn_selector_matches(
@@ -305,7 +315,7 @@ class GraphSelector:
             fqn_pattern = self.node_name[len(FQN_SELECTOR) :].strip()
             for node_id, node in nodes.items():
                 node_fqn = _node_fqn_str(node)
-                if node_fqn and _fqn_matches(node_fqn, fqn_pattern):
+                if node_fqn and _is_matched_by_fqn_method(node) and _fqn_matches(node_fqn, fqn_pattern):
                     root_nodes.add(node_id)
 
         elif SOURCE_SELECTOR in self.node_name:
@@ -758,7 +768,7 @@ class NodeSelector:
     def _is_fqn_matching(self, node: DbtNode) -> bool:
         """Checks if the node's fully qualified name exactly matches any of the config's fqn selector values."""
         node_fqn = _node_fqn_str(node)
-        if node_fqn is None:
+        if node_fqn is None or not _is_matched_by_fqn_method(node):
             return False
         return any(_fqn_matches(node_fqn, fqn_value) for fqn_value in self.config.fqns)
 

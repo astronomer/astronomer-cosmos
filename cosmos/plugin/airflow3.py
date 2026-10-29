@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import html
 import json
+import mimetypes
 import os
 import os.path as op
 from collections.abc import Generator
 from contextlib import contextmanager
+from pathlib import Path, PurePosixPath
 from typing import Any
 from unittest.mock import patch
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import airflow
 
@@ -50,6 +52,10 @@ def ensure_airflow_version_supported() -> None:
         )
 
 
+# The dbt OSS (dbt 2) docs site is a single-page app: ``index.html`` loads its JavaScript and CSS from ``assets/`` and reads its
+# data from ``info_schema/``. Only these folders are served besides the index, ``manifest.json`` and ``catalog.json``.
+DBT_DOCS_STATIC_DIRS = ("assets", "info_schema")
+
 API_BASE = conf.get("api", "base_url", fallback="")  # reads AIRFLOW__API__BASE_URL
 API_BASE_PATH = urlsplit(API_BASE).path.rstrip("/")
 
@@ -76,31 +82,47 @@ def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  
         yield
 
 
-def _read_content_via_object_storage(path: str, conn_id: str | None = None) -> Any:
+def _read_content_via_object_storage(path: str, conn_id: str | None = None, binary: bool = False) -> Any:
+    mode = "rb" if binary else "r"
     # Use connection_env only for Airflow 3.1.0
     if is_airflow_310() and conn_id is not None:
         with connection_env(conn_id):
             p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
-            with p.open("r") as f:  # type: ignore[no-untyped-call]
+            with p.open(mode) as f:  # type: ignore[no-untyped-call]
                 content = f.read()
             return content
     else:
         p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
-        with p.open("r") as f:  # type: ignore[no-untyped-call]
+        with p.open(mode) as f:  # type: ignore[no-untyped-call]
             content = f.read()
         return content
 
 
-def open_file(path: str, conn_id: str | None = None) -> Any:
+def _is_parent_segment(segment: str) -> bool:
+    """
+    Whether a URL path segment means ``..`` once it is decoded.
+
+    The web framework decodes the URL once, so ``%252e%252e`` arrives as the literal ``%2e%2e``, which passes a check for
+    ``..``. For a docs folder behind HTTP the client turns it into ``..`` when it builds the upstream URL, so decode until
+    nothing changes.
+    """
+    decoded = unquote(segment)
+    while decoded != segment:
+        segment, decoded = decoded, unquote(decoded)
+    return segment == ".."
+
+
+def open_file(path: str, conn_id: str | None = None, binary: bool = False) -> Any:
     """
     Retrieve a file from http, https, gs, s3, or wasb.
 
     Raise a (base Python) FileNotFoundError if the file is not found.
+    Return ``bytes`` when ``binary`` is True, otherwise ``str``.
     """
     if path.strip().startswith(AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES):
-        return _read_content_via_object_storage(path, conn_id=conn_id)
+        return _read_content_via_object_storage(path, conn_id=conn_id, binary=binary)
     else:
-        with open(path) as f:
+        with open(path, "rb" if binary else "r") as f:
             content = f.read()
         return content
 
@@ -299,6 +321,41 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                     status_code=500,
                 )
             return JSONResponse(content=json.loads(data))
+
+        # Static files of the dbt OSS docs site (``assets/`` and ``info_schema/``), read from the same directory or bucket.
+        @app.get(f"/{slug}/{{asset_path:path}}")
+        def docs_static_file(asset_path: str, slug_alias: str = slug) -> Response:
+            cfg_local = projects.get(slug_alias, {})
+            docs_dir_local = cfg_local.get("dir")
+            conn_id_local = cfg_local.get("conn_id")
+            parts = PurePosixPath(asset_path).parts
+            if (
+                not docs_dir_local
+                or len(parts) < 2
+                or parts[0] not in DBT_DOCS_STATIC_DIRS
+                or any(_is_parent_segment(part) for part in parts)
+            ):
+                return JSONResponse(content={"error": "not found", "slug": slug_alias}, status_code=404)
+            file_path = op.join(docs_dir_local, *parts)
+            # A symlink in the docs folder must not lead to a file outside of it (remote paths are read as they are).
+            if not file_path.strip().startswith(AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES) and not Path(
+                file_path
+            ).resolve().is_relative_to(Path(docs_dir_local).resolve()):
+                return JSONResponse(content={"error": "not found", "slug": slug_alias}, status_code=404)
+            try:
+                data = open_file(file_path, conn_id=conn_id_local, binary=True)
+            except (FileNotFoundError, IsADirectoryError):
+                return JSONResponse(content={"error": "file not found", "slug": slug_alias}, status_code=404)
+            except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError):
+                logger.exception(
+                    "Error reading docs file for slug '%s', path '%s', conn_id '%s'",
+                    slug_alias,
+                    file_path,
+                    conn_id_local,
+                )
+                return JSONResponse(content={"error": "file read failed", "slug": slug_alias}, status_code=500)
+            media_type = mimetypes.guess_type(parts[-1])[0] or "application/octet-stream"
+            return Response(content=data, media_type=media_type)
 
     return app
 

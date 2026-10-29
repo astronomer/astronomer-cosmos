@@ -565,7 +565,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             "--target",
             self.profile_config.target_name,
         ]
-        if self.invocation_mode == InvocationMode.DBT_RUNNER:
+        # dbt 2 has no static parser: it rejects the flag with a "no longer supported" warning on every command, which
+        # ``--warn-error`` turns into a failure.
+        if self.invocation_mode == InvocationMode.DBT_RUNNER and not dbt_runner.is_dbt_v2():
             # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
             # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
             # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary
@@ -1122,11 +1124,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
 
         AbstractDbtLocalBase.__init__(self, **base_kwargs)
         if AIRFLOW_VERSION.major < _AIRFLOW3_MAJOR_VERSION:
-            if (
-                kwargs.get("emit_datasets", True)
-                and settings.enable_dataset_alias
-                and AIRFLOW_VERSION >= Version("2.10")
-            ):
+            if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias:
                 from airflow.datasets import Dataset, DatasetAlias
                 from airflow.models.dataset import DatasetAliasModel
 
@@ -1145,7 +1143,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                         dataset_alias_name = outlet.uri
                         outlets.append(DatasetAlias(name=dataset_alias_name))
 
-                    # Handle DatasetAliasModel, which is not JSON serializable in 2.10
+                    # Handle DatasetAliasModel, which is not JSON serializable in 2.10+
                     elif isinstance(outlet, DatasetAliasModel):
                         dataset_alias_name = outlet.name
                         outlets.append(DatasetAlias(name=dataset_alias_name))

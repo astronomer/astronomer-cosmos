@@ -1595,6 +1595,37 @@ class TestStoreCompiledSqlForModelPathHandling:
         store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.stg_orders", "staging/stg_orders.sql", "model")
         assert ti.store.get("model__pkg__stg_orders_compiled_sql") == "SELECT * FROM staging.orders"
 
+    def test_compiled_sql_with_dbt_2_node_path_pushed(self, tmp_path):
+        """dbt 2 reports node_path relative to the project (models/staging/foo.sql): the file is in the same place."""
+        compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models" / "staging"
+        compiled_dir.mkdir(parents=True)
+        (compiled_dir / "stg_orders.sql").write_text("SELECT * FROM staging.orders")
+        ti = _MockTI()
+        store_compiled_sql_for_model(
+            ti, str(tmp_path), "model.pkg.stg_orders", "models/staging/stg_orders.sql", "model"
+        )
+        assert ti.store.get("model__pkg__stg_orders_compiled_sql") == "SELECT * FROM staging.orders"
+
+    def test_compiled_sql_dbt_1_layout_wins_when_both_paths_exist(self, tmp_path):
+        """The dbt 1 layout is tried first: a file under models/models/ does not shadow models/<node_path>."""
+        compiled_root = tmp_path / "target" / "compiled" / "pkg" / "models"
+        (compiled_root / "models").mkdir(parents=True)
+        (compiled_root / "foo.sql").write_text("SELECT 'top level'")
+        (compiled_root / "models" / "foo.sql").write_text("SELECT 'nested folder named models'")
+        ti = _MockTI()
+        store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.foo", "models/foo.sql", "model")
+        assert ti.store.get("model__pkg__foo_compiled_sql") == "SELECT 'nested folder named models'"
+
+    def test_compiled_sql_missing_logs_every_path_tried(self, tmp_path, caplog):
+        """When neither layout has the file, one warning names the paths that were looked at."""
+        ti = _MockTI()
+        with caplog.at_level(logging.WARNING):
+            store_compiled_sql_for_model(ti, str(tmp_path), "model.pkg.foo", "models/foo.sql", "model")
+        assert "model__pkg__foo_compiled_sql" not in ti.store
+        assert caplog.text.count("Compiled sql path") == 1
+        assert "compiled/pkg/models/models/foo.sql or" in caplog.text
+        assert "compiled/pkg/models/foo.sql" in caplog.text
+
     def test_compiled_sql_flat_path_pushed(self, tmp_path):
         """node_path as single file under models/ (e.g. foo.sql) is read and pushed."""
         compiled_dir = tmp_path / "target" / "compiled" / "pkg" / "models"
@@ -3165,10 +3196,6 @@ def test_sensor_and_producer_different_param_values(mock_bigquery_conn):
             assert task.execution_timeout == timedelta(seconds=1)
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10"),
-    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
-)
 @pytest.mark.integration
 def test_dbt_dag_with_watcher_and_failing_model(caplog):
     """
@@ -3277,10 +3304,6 @@ def test_process_dbt_log_event_surfaces_dbt_runner_error_from_real_event(tmp_pat
     assert "this_column_does_not_exist_at_all" in pushed["msg"]
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10"),
-    reason="dag.test() in Airflow 2.9 hangs when a task fails with retries configured",
-)
 @pytest.mark.integration
 def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
     """
@@ -3344,10 +3367,8 @@ def test_dbt_dag_with_watcher_freshness_callback_excludes_model():
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10") or (Version("3.1.0") <= AIRFLOW_VERSION < Version("3.2.0")),
-    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0"),
     reason=(
-        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
         "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
         "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
         "the watcher sensor cannot detect producer termination on retry. "
@@ -3410,9 +3431,8 @@ def test_dbt_task_group_watcher_gateway_prevents_downstream_skip(caplog, fresh_f
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0"),
     reason=(
-        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
         "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
         "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
         "the watcher sensor cannot detect producer termination on retry. "
@@ -3513,9 +3533,8 @@ def test_dbt_task_group_watcher_retry_recovers_skipped_downstream(caplog, fresh_
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0"),
     reason=(
-        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
         "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
         "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
         "the watcher sensor cannot detect producer termination on retry. "
@@ -3583,9 +3602,8 @@ def test_dbt_task_group_watcher_after_each_recovers_skipped_nodes_on_first_try(f
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10") or (Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0")),
+    Version("3.0.0") <= AIRFLOW_VERSION < Version("3.2.0"),
     reason=(
-        "dag.test() in Airflow 2.9 hangs when a task fails with retries configured. "
         "Airflow 3.0 runs tasks inline via _run_raw_task without the task SDK supervisor, "
         "so RuntimeTaskInstance.get_task_states raises NameError for SUPERVISOR_COMMS and "
         "the watcher sensor cannot detect producer termination on retry. "

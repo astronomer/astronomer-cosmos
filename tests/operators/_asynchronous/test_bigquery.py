@@ -316,7 +316,6 @@ def test_execute_does_not_call_register_event_when_emit_datasets_false(
     mock_register_event.assert_not_called()
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), reason="Require Airflow >= 2.10")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
 def test_execute_complete_calls_register_event_when_emit_datasets_true(
@@ -344,7 +343,6 @@ def test_execute_complete_calls_register_event_when_emit_datasets_true(
     mock_register_event.assert_called_once_with(mock_context)
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), reason="Require Airflow >= 2.10")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "register_dataset")
 def test_register_event_with_uri(mock_register_dataset, profile_config_mock):
     """Test that _register_event correctly extracts table name from complex unique_id."""
@@ -374,7 +372,6 @@ def test_register_event_with_uri(mock_register_dataset, profile_config_mock):
         assert args[1][0].uri == "bigquery://my_project.my_dataset.my_complex_table_name/"
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), reason="DatasetAlias outlets require Airflow >= 2.10")
 @patch("cosmos.operators._asynchronous.bigquery.settings.enable_dataset_alias", True)
 def test_init_sets_outlets_when_dataset_alias_enabled(profile_config_mock):
     """When ``settings.enable_dataset_alias`` is True and Airflow >= 2.10, ``__init__`` populates

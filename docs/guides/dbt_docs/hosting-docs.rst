@@ -51,6 +51,7 @@ Endpoints per project (``<slug>``):
 - ``/cosmos/<slug>/dbt_docs`` (wrapper page)
 - ``/cosmos/<slug>/dbt_docs_index.html`` (docs index)
 - ``/cosmos/<slug>/manifest.json`` and ``/cosmos/<slug>/catalog.json``
+- ``/cosmos/<slug>/assets/...`` and ``/cosmos/<slug>/info_schema/...`` (the files of the dbt-oss docs site, read from the same ``dir``)
 
 
 Local vs Remote docs (Apache Airflow® 3)

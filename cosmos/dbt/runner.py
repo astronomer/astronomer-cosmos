@@ -244,6 +244,27 @@ def parse_number_of_warnings(result: dbtRunnerResult) -> int:
     return num
 
 
+# The message dbt 2 puts on every node when a failure is not tied to one node.
+DBT_V2_GENERIC_ERROR_MESSAGE = "Compilation Error"
+
+
+def _failure_reported_on_every_node(result: dbtRunnerResult, error_messages: list[str]) -> bool:
+    """
+    Whether dbt 2 marked every node as failed with its generic message.
+
+    dbt 2 reports a failure that is not tied to one node, for example the error of a ``run-operation`` macro, as an
+    error on every node of the project, all with the same generic message (``Compilation Error``). The cause is only in
+    the dbt output, not in the result. Other failures that share a message are not matched: for example, failing tests
+    all report ``Error``, and their names are what the user needs.
+    """
+    return (
+        is_dbt_v2()
+        and len(error_messages) > 1
+        and len(error_messages) == len(result.result.results)
+        and set(error_messages) == {DBT_V2_GENERIC_ERROR_MESSAGE}
+    )
+
+
 def handle_exception_if_needed(result: dbtRunnerResult) -> None:
     """
     Given a dbtRunnerResult, identify if it failed and handle the exception, if necessary.
@@ -254,5 +275,11 @@ def handle_exception_if_needed(result: dbtRunnerResult) -> None:
             raise CosmosDbtRunError(f"dbt invocation did not complete with unhandled error: {result.exception}")
         else:
             node_names, node_results = extract_message_by_status(result, ["error", "fail", "runtime error"])
+            if _failure_reported_on_every_node(result, node_results):
+                raise CosmosDbtRunError(
+                    f'dbt invocation completed with errors: all {len(node_results)} nodes reported "{node_results[0]}". '
+                    "dbt 2 reports a failure that is not tied to one node (for example the error of a run-operation "
+                    "macro) on every node: see the dbt output above for the cause."
+                )
             error_message = "\n".join([f"{name}: {result}" for name, result in zip(node_names, node_results)])
             raise CosmosDbtRunError(f"dbt invocation completed with errors: {error_message}")

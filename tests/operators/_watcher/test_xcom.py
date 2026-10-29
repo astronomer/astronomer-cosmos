@@ -145,10 +145,6 @@ def test_xcom_backup_falls_back_to_the_variable_when_the_last_write_fails():
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(
-    AIRFLOW_VERSION < Version("2.10.0"),
-    reason="dag.test() never advances try_number on Airflow 2.9, so the retry does not run",
-)
 def test_xcom_backup_survives_retry_in_the_variable_when_not_persisting():
     if AIRFLOW_VERSION >= Version("3.1.0"):
         from airflow.sdk import DAG, task

@@ -2,7 +2,7 @@ import mimetypes
 import os.path as op
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, overload
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from airflow.configuration import conf
 from airflow.plugins_manager import AirflowPlugin
@@ -31,6 +31,19 @@ else:
 
 # Schemes that ``open_file`` reads from a remote store; any other path is a local file.
 REMOTE_DOCS_SCHEMES = ("s3://", "gs://", "wasb://", "http://", "https://")
+
+
+def _is_parent_segment(segment: str) -> bool:
+    """
+    Whether a URL path segment means ``..`` once it is decoded.
+
+    Flask decodes the URL once, so ``%252e%252e`` arrives as the literal ``%2e%2e``, which passes a check for ``..``. For an
+    HTTP docs folder ``requests`` turns it into ``..`` when it builds the upstream URL, so decode until nothing changes.
+    """
+    decoded = unquote(segment)
+    while decoded != segment:
+        segment, decoded = decoded, unquote(decoded)
+    return segment == ".."
 
 
 def bucket_and_key(path: str) -> tuple[str, str]:
@@ -91,7 +104,8 @@ def open_azure_file(path: str, conn_id: str | None, binary: bool = False) -> str
     container, blob = bucket_and_key(path)
     try:
         if binary:
-            content = hook.get_blob_client(container_name=container, blob_name=blob).download_blob().readall()
+            # ``WasbHook`` has no public ``get_blob_client``: use the client of the Azure SDK that ``get_conn`` returns.
+            content = hook.get_conn().get_blob_client(container=container, blob=blob).download_blob().readall()
         else:
             content = hook.read_file(container_name=container, blob_name=blob)
     except ResourceNotFoundError:
@@ -229,7 +243,8 @@ class DbtDocsView(AirflowBaseView):  # type: ignore[misc]
         if dbt_docs_dir is None:
             abort(404)
         parts = PurePosixPath(folder, asset_path).parts
-        if len(parts) < 2 or ".." in parts:
+        # ``parts[0] != folder`` keeps an absolute ``asset_path``, which replaces ``folder`` in ``PurePosixPath``, out.
+        if len(parts) < 2 or parts[0] != folder or any(_is_parent_segment(part) for part in parts):
             abort(404)
         file_path = op.join(dbt_docs_dir, *parts)
         # A symlink in the docs folder must not lead to a file outside of it (remote paths are read as they are).

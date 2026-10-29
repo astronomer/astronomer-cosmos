@@ -40,6 +40,7 @@ from airflow.utils.db import initdb, resetdb
 from airflow.www.app import cached_app
 from airflow.www.extensions.init_appbuilder import AirflowAppBuilder
 from flask.testing import FlaskClient
+from werkzeug.exceptions import NotFound
 
 import cosmos
 import cosmos.plugin
@@ -514,6 +515,9 @@ def test_dbt_oss_docs_static_files_not_found(mock_open_file, monkeypatch, app, u
     [
         "/cosmos/assets/%2e%2e/run_results.json",
         "/cosmos/assets/../run_results.json",
+        "/cosmos/assets/%252e%252e/private/secret.txt",  # Flask decodes once, and ``requests`` decodes the rest for an HTTP dir
+        "/cosmos/assets/%252e%252e/%252e%252e/secret.txt",
+        "/cosmos/info_schema/%25252e%25252e/secret.txt",
         "/cosmos/info_schema/%2e%2e/%2e%2e/outside.txt",
         "/cosmos/assets/v1/%2e%2e/%2e%2e/run_results.json",
     ],
@@ -610,11 +614,12 @@ def test_open_azure_file_binary():
     mock_module = MagicMock()
     with patch.dict(sys.modules, {"airflow.providers.microsoft.azure.hooks.wasb": mock_module}):
         mock_hook = mock_module.WasbHook.return_value
-        mock_hook.get_blob_client.return_value.download_blob.return_value.readall.return_value = b"\x00\x01"
+        blob_client = mock_hook.get_conn.return_value.get_blob_client
+        blob_client.return_value.download_blob.return_value.readall.return_value = b"\x00\x01"
 
         res = open_azure_file("wasb://mock-path/to/docs", conn_id="mock_conn_id", binary=True)
 
-        mock_hook.get_blob_client.assert_called_once_with(container_name="mock-path", blob_name="to/docs")
+        blob_client.assert_called_once_with(container="mock-path", blob="to/docs")
         mock_hook.read_file.assert_not_called()
         assert res == b"\x00\x01"
 
@@ -625,7 +630,8 @@ def test_open_azure_file_binary_not_found():
 
     mock_module = MagicMock()
     with patch.dict(sys.modules, {"airflow.providers.microsoft.azure.hooks.wasb": mock_module}):
-        mock_module.WasbHook.return_value.get_blob_client.side_effect = ResourceNotFoundError
+        mock_hook = mock_module.WasbHook.return_value
+        mock_hook.get_conn.return_value.get_blob_client.return_value.download_blob.side_effect = ResourceNotFoundError
 
         with pytest.raises(FileNotFoundError):
             open_azure_file("wasb://mock-path/to/docs", conn_id="mock_conn_id", binary=True)
@@ -670,3 +676,22 @@ def test_dbt_oss_docs_static_files_are_served_when_the_docs_folder_is_a_symlink(
     monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", str(docs_dir))
 
     assert app.get("/cosmos/assets/index.js").status_code == 200
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("asset_path", ["", "/etc/passwd", "../x"])
+def test_dbt_oss_docs_static_files_reject_an_asset_path_that_does_not_stay_in_its_folder(monkeypatch, asset_path):
+    # An absolute ``asset_path`` replaces the folder in ``PurePosixPath``; routing does not let one through, so call the method.
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", "path/to/docs/dir")
+    with patch.object(cosmos.plugin.airflow2, "open_file") as mock_open_file, pytest.raises(NotFound):
+        cosmos.plugin.airflow2.dbt_docs_view._serve_docs_file("assets", asset_path)
+
+    mock_open_file.assert_not_called()
+
+
+@pytest.mark.integration
+def test_dbt_oss_docs_static_files_directory_is_not_found(monkeypatch, app, tmp_path):
+    (tmp_path / "assets" / "v1").mkdir(parents=True)
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", str(tmp_path))
+
+    assert app.get("/cosmos/assets/v1").status_code == 404

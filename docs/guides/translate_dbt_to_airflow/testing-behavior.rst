@@ -145,7 +145,7 @@ When at least one WARN message is present, the function passed to ``on_warning_c
 
     If warnings that are not associated with tests occur (e.g. freshness warnings), they will still trigger the
     ``on_warning_callback`` method above. When they come from a source freshness or build task, they are also included
-    in the ``test_names`` and ``test_results`` context variables. For dbt 2 freshness results with
+    in the ``test_names`` and ``test_results`` context variables. For dbt OSS freshness results with
     ``InvocationMode.DBT_RUNNER``, ``test_results`` holds the status (``warn``), since those results have no message.
     With ``InvocationMode.SUBPROCESS``, Cosmos reads dbt's text output: ``test_names`` holds the source (for example
     ``raw.raw_orders``) and ``test_results`` the line dbt printed for it, on dbt 1 and on dbt 2 (on dbt 2 without leading whitespace or colours).

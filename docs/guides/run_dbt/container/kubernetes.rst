@@ -101,7 +101,7 @@ Working directory and profile
 
 With dbt OSS, start the Pod in the dbt project directory and keep the ``profiles.yml`` of the Pod in that directory:
 
-- dbt OSS looks for ``profiles.yml`` in the working directory before ``~/.dbt``, so a ``profiles.yml`` that is left in the project directory for local development takes precedence over the one you copy to ``~/.dbt``.
+- dbt OSS looks for ``profiles.yml`` in the working directory and then in ``~/.dbt``, not in the directory passed with ``--project-dir``. A ``profiles.yml`` in the working directory takes precedence over the one in ``~/.dbt``. Alternatively, pass ``--profiles-dir`` to dbt.
 - The BigQuery adapter of dbt OSS reads seed CSV files relative to the working directory, not to ``--project-dir``, so seeds fail with ``open "seeds/<name>.csv": no such file or directory`` when the Pod starts elsewhere.
 
 When the image holds one project, set the working directory in the Dockerfile:
@@ -111,7 +111,7 @@ When the image holds one project, set the working directory in the Dockerfile:
     WORKDIR /usr/app/my_project
     COPY profiles.yml /usr/app/my_project/profiles.yml
 
-When the image holds several projects, pass an entrypoint script through ``cmds``. The script changes into the project directory and runs the dbt command Cosmos passes as arguments:
+When the image holds several projects, pass an entrypoint script through ``cmds`` (requires Cosmos 1.15.1 or higher, see `Behavior across versions`_). The script changes into the project directory and runs the dbt command Cosmos passes as arguments:
 
 .. code-block:: bash
 

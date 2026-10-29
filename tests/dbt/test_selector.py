@@ -1641,6 +1641,7 @@ def test_fqn_selectors_do_not_select_sources():
     select = lambda token: select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=[token])
 
     assert select("fqn:proj.staging.raw.raw_orders") == {}
+    assert select("fqn:proj.staging.raw.raw_orders+") == {}
     assert select("fqn:proj.staging.raw.raw_orders,resource_type:source") == {}
     assert select("resource_type:source,staging") == {}
 

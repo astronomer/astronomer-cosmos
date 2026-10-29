@@ -14,6 +14,7 @@ if version.parse(airflow_version).major < _AIRFLOW3_MAJOR_VERSION:
 
 import importlib
 import json
+import mimetypes
 import os
 from contextlib import nullcontext
 from pathlib import Path
@@ -591,7 +592,8 @@ def test_dbt_oss_docs_static_files_are_served(tmp_path: Path):
     parquet = client.get("/core/info_schema/nested/nodes.parquet")
     assert parquet.status_code == 200
     assert parquet.content == parquet_bytes
-    assert parquet.headers["content-type"] == "application/octet-stream"
+    # Same lookup as the handler: a host whose MIME database registers ``.parquet`` returns that type.
+    assert parquet.headers["content-type"] == (mimetypes.guess_type("nodes.parquet")[0] or "application/octet-stream")
 
 
 @skip_pre_airflow_31
@@ -613,9 +615,7 @@ def test_dbt_oss_docs_static_files_missing_returns_404(tmp_path: Path):
         "run_results.json",  # outside the served folders
         "compiled/jaffle_shop/models/orders.sql",
         "private/secret.txt",
-        "assets/../run_results.json",
-        "assets/%2e%2e/run_results.json",
-        "info_schema/../../outside.txt",
+        "assets/%2e%2e/run_results.json",  # a plain ``..`` is normalised by the test client before the request is sent
     ],
 )
 def test_dbt_oss_docs_static_files_only_serves_assets_and_info_schema(tmp_path: Path, path: str):
@@ -633,6 +633,36 @@ def test_dbt_oss_docs_static_files_only_serves_assets_and_info_schema(tmp_path: 
 
     assert response.status_code == 404
     assert "secret" not in response.text and "select 1" not in response.text
+
+
+@skip_pre_airflow_31
+def test_dbt_oss_docs_static_files_do_not_follow_a_symlink_out_of_the_docs_folder(tmp_path: Path):
+    outside = tmp_path / "outside.txt"
+    outside.write_text("secret")
+    docs_dir = tmp_path / "target"
+    (docs_dir / "assets").mkdir(parents=True)
+    (docs_dir / "assets" / "inside.txt").write_text("docs")
+    (docs_dir / "assets" / "linked.txt").symlink_to(outside)
+    af3, app = _app_with_projects({"core": {"dir": str(docs_dir), "name": "Core"}})
+    client = TestClient(app)
+
+    linked = client.get("/core/assets/linked.txt")
+
+    assert linked.status_code == 404
+    assert "secret" not in linked.text
+    assert client.get("/core/assets/inside.txt").text == "docs"
+
+
+@skip_pre_airflow_31
+def test_dbt_oss_docs_static_files_are_served_when_the_docs_folder_is_a_symlink(tmp_path: Path):
+    real_dir = tmp_path / "real_target"
+    (real_dir / "assets").mkdir(parents=True)
+    (real_dir / "assets" / "index.js").write_text("console.log('dbt docs')")
+    docs_dir = tmp_path / "target"
+    docs_dir.symlink_to(real_dir, target_is_directory=True)
+    af3, app = _app_with_projects({"core": {"dir": str(docs_dir), "name": "Core"}})
+
+    assert TestClient(app).get("/core/assets/index.js").status_code == 200
 
 
 @skip_pre_airflow_31

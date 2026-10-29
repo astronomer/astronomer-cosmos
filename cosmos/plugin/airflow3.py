@@ -7,7 +7,7 @@ import os
 import os.path as op
 from collections.abc import Generator
 from contextlib import contextmanager
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any
 from unittest.mock import patch
 from urllib.parse import urlsplit
@@ -318,6 +318,11 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             if not docs_dir_local or len(parts) < 2 or parts[0] not in DBT_DOCS_STATIC_DIRS or ".." in parts:
                 return JSONResponse(content={"error": "not found", "slug": slug_alias}, status_code=404)
             file_path = op.join(docs_dir_local, *parts)
+            # A symlink in the docs folder must not lead to a file outside of it (remote paths are read as they are).
+            if not file_path.strip().startswith(AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES) and not Path(
+                file_path
+            ).resolve().is_relative_to(Path(docs_dir_local).resolve()):
+                return JSONResponse(content={"error": "not found", "slug": slug_alias}, status_code=404)
             try:
                 data = open_file(file_path, conn_id=conn_id_local, binary=True)
             except (FileNotFoundError, IsADirectoryError):

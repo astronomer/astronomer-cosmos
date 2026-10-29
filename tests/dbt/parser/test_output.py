@@ -408,8 +408,8 @@ def test_extract_freshness_warn_msg_json_log_format():
     assert node_results == [warn_msg]
 
 
-# What dbt 2 (dbt-oss 2.0.8) prints for ``dbt source freshness`` when raw_orders is past ``warn_after`` and raw_orders_stale
-# is past ``error_after``.
+# Abridged output of dbt 2 (dbt-oss 2.0.8) for ``dbt source freshness`` when raw_orders is past ``warn_after`` and
+# raw_orders_stale is past ``error_after``.
 DBT_V2_FRESHNESS_OUTPUT = [
     "   dbt-oss 2.0.8",
     "   Loading profiles.yml",

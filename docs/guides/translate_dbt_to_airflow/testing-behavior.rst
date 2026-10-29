@@ -148,8 +148,9 @@ When at least one WARN message is present, the function passed to ``on_warning_c
     in the ``test_names`` and ``test_results`` context variables. For dbt 2 freshness results with
     ``InvocationMode.DBT_RUNNER``, ``test_results`` holds the status (``warn``), since those results have no message.
     With ``InvocationMode.SUBPROCESS``, Cosmos reads dbt's text output: ``test_names`` holds the source (for example
-    ``raw.raw_orders``) and ``test_results`` the line dbt printed for it, on dbt 1 and on dbt 2. dbt 2 prints no such
-    line with ``--log-format json``, so a freshness warning is not found in that case.
+    ``raw.raw_orders``) and ``test_results`` the line dbt printed for it, on dbt 1 and on dbt 2 (on dbt 2 without leading whitespace or colours).
+    dbt 2 does not print the ``Warned source`` line with ``--log-format json``, so a freshness warning is not found in
+    that case.
 
 .. note::
 

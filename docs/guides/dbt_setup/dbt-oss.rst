@@ -7,14 +7,14 @@ dbt OSS support (experimental)
     Available since Cosmos 1.16.0.
 
 .. warning::
-    Support for dbt OSS is experimental. The behavior may change between Cosmos releases, and it is not recommended for production yet. Cosmos CI runs the integration tests against BigQuery, and only the Databricks metric view and Snowflake semantic view tests against the other adapters (see `#3101 <https://github.com/astronomer/astronomer-cosmos/issues/3101>`_).
+    Support for dbt OSS is experimental. The behavior may change between Cosmos releases, and it is not recommended for production yet. Cosmos CI runs the integration tests against BigQuery and DuckDB, and only the Databricks metric view and Snowflake semantic view tests against the other adapters (see `#3101 <https://github.com/astronomer/astronomer-cosmos/issues/3101>`_).
 
 Context
 ~~~~~~~
 
 dbt OSS is the open-source (Apache 2.0) distribution of dbt 2. See `Comparing dbt and dbt OSS <https://docs.getdbt.com/blog/comparing-dbt-and-dbt-oss>`_ for how it differs from dbt Core 1.x and :ref:`dbt Fusion <dbt_fusion>`.
 
-It is published on PyPI as ``dbt-oss`` and includes its adapters, so you do not install ``dbt-<adapter>`` packages. See the `dbt supported data platforms <https://docs.getdbt.com/docs/supported-data-platforms>`_ for the adapters it supports. Adapters that dbt OSS marks as experimental, such as Postgres, need ``DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true``. Of these, Cosmos tests BigQuery, and Databricks and Snowflake for metric and semantic views only.
+It is published on PyPI as ``dbt-oss`` and includes its adapters, so you do not install ``dbt-<adapter>`` packages. See the `dbt supported data platforms <https://docs.getdbt.com/docs/supported-data-platforms>`_ for the adapters it supports. Adapters that dbt OSS marks as experimental, such as Postgres, need ``DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true``. Of these, Cosmos tests BigQuery and DuckDB, and Databricks and Snowflake for metric and semantic views only.
 
 How to use
 ~~~~~~~~~~
@@ -98,7 +98,7 @@ Limitations
    * - Python models
      - dbt OSS rejects them on DuckDB with ``Python models are not supported for duckdb adapter``. On BigQuery they need ``compute_region`` and ``gcs_bucket`` in the profile and a Dataproc role for the service account.
    * - ``ExecutionMode.AIRFLOW_ASYNC``
-     - Not supported. It fails with ``No module named 'agate'`` (checked on dbt OSS 2.0.8), because it needs ``dbt-bigquery``, which cannot be installed next to dbt OSS. See `#3103 <https://github.com/astronomer/astronomer-cosmos/issues/3103>`_.
+     - Not supported. The ``dbt_setup_async`` task fails with ``No module named 'agate'`` (checked on dbt OSS 2.0.8 with BigQuery), because it needs ``dbt-bigquery``, which cannot be installed next to dbt OSS. See `#3103 <https://github.com/astronomer/astronomer-cosmos/issues/3103>`_.
    * - Configuration that dbt 1.x accepts
      - dbt OSS rejects some of it. Cosmos CI runs ``dbt-autofix deprecations`` on the example projects, and you may need to run it on yours.
    * - dbt-loom

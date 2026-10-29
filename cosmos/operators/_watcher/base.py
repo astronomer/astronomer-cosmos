@@ -161,6 +161,8 @@ def _extract_compiled_sql(
     # dbt 1 reports node_path relative to the models folder (``staging/m.sql``), dbt 2 relative to the project
     # (``models/staging/m.sql``). Both write the file to ``compiled/<package>/models/staging/m.sql``. The dbt 1 layout is
     # tried first, so it behaves as before.
+    # Known limit: on dbt 1, if the own file is missing (for example with a custom ``model-paths``), the second candidate can
+    # match another model's compiled file when ``node_path`` starts with a folder named ``models``.
     candidates = [compiled_root / "models" / node_path, compiled_root / node_path]
     compiled_sql_path = next((path for path in candidates if path.exists()), None)
     if compiled_sql_path is None:

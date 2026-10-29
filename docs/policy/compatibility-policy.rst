@@ -66,7 +66,9 @@ dbt Core
 ++++++++
 
 - **Minimum required version**: dbt Core 1.8
-- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12, 2.0 (dbt Fusion)
+- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12
+- **dbt Fusion**: 2.0. See :ref:`dbt Fusion support <dbt_fusion>`.
+- **dbt OSS** (experimental support): 2.0. See :ref:`dbt OSS support <dbt_oss>`.
 
 .. note::
 
@@ -99,7 +101,12 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
      - OK
      - OK
      - OK
-   * - 2.0 (Fusion)
+   * - 2.0 (dbt Fusion)
+     - n/a
+     - n/a
+     - n/a
+     - n/a
+   * - 2.0 (dbt OSS, experimental support)
      - n/a
      - n/a
      - n/a
@@ -109,8 +116,13 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
   ``mashumaro`` dependency (e.g. ``mashumaro.exceptions.UnserializableField``),
   which hasn't caught up to Python 3.14's typing changes.
 - dbt Fusion (``2.0``) is **not** installed via ``pip install dbt-core==2.0``
-  — there is no such release on PyPI. Fusion ships as a separate
+  — there is no such release on PyPI. dbt Fusion ships as a separate
   binary/installer; this table's pip-based check does not apply to it.
+- dbt OSS (``2.0``) installs with ``pip install dbt-oss``. This table's
+  pip-based check does not cover it, so ``n/a`` does not mean untested:
+  dbt OSS is tested in Cosmos CI: the unit tests on Python 3.11 to 3.14, and
+  the integration tests on Python 3.11 and 3.12 against BigQuery and DuckDB,
+  plus the Databricks metric view and Snowflake semantic view tests.
 
 .. note::
 

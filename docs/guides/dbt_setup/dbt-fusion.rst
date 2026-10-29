@@ -9,6 +9,8 @@ dbt Fusion support
 Context
 ~~~~~~~
 
+For dbt OSS, the open-source distribution of dbt 2, see :ref:`dbt OSS support <dbt_oss>`.
+
 dbt Labs `launched <https://www.getdbt.com/blog/dbt-launch-showcase-2025-recap>`_ `dbt Fusion <https://github.com/dbt-labs/dbt-fusion>`_ on 28 May 2025. dbt Fusion is the next-generation dbt engine that enables real-time model validation, improved SQL parsing and state-aware orchestration.
 It is a unified approach that aims to merge dbt Core and dbt Cloud features via a completely new CLI,
 implemented in a different programming language (Rust, as opposed to Python).

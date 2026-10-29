@@ -78,6 +78,7 @@ Remote docs (S3, GCS, Azure, HTTP[S])
   - Files (index, manifest.json, catalog.json) are read via Airflow ObjectStorage (uPath/fsspec).
   - For cloud object storage, set ``conn_id`` or embed it inline (e.g. ``s3://aws_default@my-bucket/path``).
   - HTTP/HTTPS does not require a connection (an Airflow HTTP connection can be used if desired).
+  - Azure Blob Storage needs a different scheme on Airflow 3 than on Airflow 2. Use ``abfs://<container>/<path>`` (or ``abfss://``) on Airflow 3, with the storage account taken from the connection. A ``wasb://`` URI works only on Airflow 2: Airflow 3 registers no filesystem for it, so every request for that project returns HTTP 500 (``No filesystem registered for scheme wasb``), including ``index.html`` and ``manifest.json``.
   - Example (S3):
 
     .. code-block:: ini
@@ -177,6 +178,10 @@ Google Cloud Storage Example
 
 Azure Blob Storage Example
 ++++++++++++++++++++++++++
+
+.. note::
+
+   This example is for Airflow 2. On Airflow 3, configure the project with an ``abfs://`` URI, as described under *Remote docs* above.
 
 .. code-block:: cfg
 

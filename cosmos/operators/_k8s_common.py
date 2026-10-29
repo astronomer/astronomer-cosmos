@@ -228,7 +228,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
 
     This handler can detect warnings from:
     1. Regular dbt tests (using the standard "Done. PASS=X WARN=Y" pattern)
-    2. Source freshness tests (using "WARN freshness of..." pattern)
+    2. Source freshness tests (using the "WARN freshness of..." pattern on dbt 1 and the "Warned source ..." line on dbt 2)
 
     The ``test_operator_class`` and ``source_operator_class`` parameters allow
     the same handler to work for both Kubernetes and GCP GKE operator variants.

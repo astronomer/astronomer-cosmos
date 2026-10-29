@@ -282,23 +282,32 @@ def test_detect_source_freshness_warnings_dbt_v2():
     ]
 
 
+def _dbt_v2_freshness_warning(source, execution_time=None):
+    warning = {"name": f"source_freshness_{source}", "status": "WARN", "type": "source_freshness", "source": source}
+    if execution_time:
+        warning["execution_time"] = execution_time
+    return warning
+
+
 @pytest.mark.parametrize(
-    ("log_text", "expected_sources"),
+    ("log_text", "expected_warnings"),
     (
         pytest.param(
-            "20:18:55  Warned source raw.raw_orders (last updated 1h ago) [1.2s]", ["raw.raw_orders"], id="timestamp"
+            "20:18:55  Warned source raw.raw_orders (last updated 1h ago) [1.2s]",
+            [_dbt_v2_freshness_warning("raw.raw_orders", "1.2")],
+            id="timestamp",
         ),
         pytest.param(
             "Warned source raw.a (last updated 1h ago) [1.0s]\nWarned source raw.b (last updated 2h ago) [2.0s]",
-            ["raw.a", "raw.b"],
+            [_dbt_v2_freshness_warning("raw.a", "1.0"), _dbt_v2_freshness_warning("raw.b", "2.0")],
             id="several_sources",
         ),
         pytest.param(
             "Warned source raw.a (last updated 1h ago) [1.0s]\nWarned source raw.a (last updated 1h ago) [1.0s]",
-            ["raw.a"],
+            [_dbt_v2_freshness_warning("raw.a", "1.0")],
             id="same_source_once",
         ),
-        pytest.param("Warned source raw.a", ["raw.a"], id="without_details"),
+        pytest.param("Warned source raw.a", [_dbt_v2_freshness_warning("raw.a")], id="without_details"),
         pytest.param("Stale source raw.orders_stale (last updated 1y ago) [5.8s]", [], id="error_is_not_a_warning"),
         pytest.param(
             "Warned test unique_orders_id (models/schema.yml:12:22) [3 of 8 in 3.4s]",
@@ -308,16 +317,9 @@ def test_detect_source_freshness_warnings_dbt_v2():
         pytest.param("Source raw.orders is fresh [1.0s]", [], id="fresh_source"),
     ),
 )
-def test_detect_source_freshness_warnings_dbt_v2_lines(log_text, expected_sources):
+def test_detect_source_freshness_warnings_dbt_v2_lines(log_text, expected_warnings):
     handler = _make_handler()
-    result = handler._detect_source_freshness_warnings(log_text)
-    assert [w["source"] for w in result] == expected_sources
-
-
-def test_detect_source_freshness_warnings_dbt_v2_without_details_has_no_execution_time():
-    handler = _make_handler()
-    (warning,) = handler._detect_source_freshness_warnings("Warned source raw.a")
-    assert "execution_time" not in warning
+    assert handler._detect_source_freshness_warnings(log_text) == expected_warnings
 
 
 def test_on_pod_completion_source_operator_with_dbt_v2_freshness_warning():

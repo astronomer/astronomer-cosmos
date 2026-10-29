@@ -565,7 +565,9 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             "--target",
             self.profile_config.target_name,
         ]
-        if self.invocation_mode == InvocationMode.DBT_RUNNER:
+        # dbt 2 has no static parser: it rejects the flag with a "no longer supported" warning on every command, which
+        # ``--warn-error`` turns into a failure.
+        if self.invocation_mode == InvocationMode.DBT_RUNNER and not dbt_runner.is_dbt_v2():
             # PR #1484 introduced the use of dbtRunner during DAG parsing. As a result, invoking dbtRunner again
             # during task execution can lead to task hangs—especially on Airflow 2.x. Investigation revealed that
             # the issue stems from how dbtRunner handles static parsing. Cosmos copies the dbt project to temporary

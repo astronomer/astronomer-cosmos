@@ -2757,18 +2757,24 @@ def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_co
     mock_path.rmdir.assert_not_called()
 
 
-@pytest.mark.integration
-def test_generate_dbt_flags_appends_no_static_parser(tmp_path):
+@pytest.mark.parametrize(
+    "is_dbt_v2, expect_flag",
+    [
+        pytest.param(False, True, marks=pytest.mark.integration, id="dbt-core"),
+        # dbt 2 has no static parser: it warns about the flag on every command and ``--warn-error`` fails on the warning
+        pytest.param(True, False, id="dbt-v2"),
+    ],
+)
+def test_generate_dbt_flags_no_static_parser(is_dbt_v2, expect_flag, tmp_path):
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="test-task",
         project_dir=tmp_path,
     )
     operator.invocation_mode = InvocationMode.DBT_RUNNER
-    tmp_project_dir = str(tmp_path)
-    profile_path = tmp_path / "profiles.yml"
-    flags = operator._generate_dbt_flags(tmp_project_dir, profile_path)
-    assert "--no-static-parser" in flags
+    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2):
+        flags = operator._generate_dbt_flags(str(tmp_path), tmp_path / "profiles.yml")
+    assert ("--no-static-parser" in flags) is expect_flag
 
 
 def test_generate_dbt_flags_does_not_append_no_static_parser_in_subprocess(tmp_path):

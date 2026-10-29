@@ -387,6 +387,20 @@ def test_handle_exception_if_needed_dbt_2_failure_on_every_node_is_reported_once
             "dbt invocation completed with errors: model.p.a: Compilation Error",
             id="single_node",
         ),
+        pytest.param(
+            # What dbt-oss 2.0.8 returns for ``dbt test`` when two tests each return a row.
+            [_node_result("test.p.fail_a", "fail", "Error"), _node_result("test.p.fail_b", "fail", "Error")],
+            "dbt invocation completed with errors: test.p.fail_a: Error\ntest.p.fail_b: Error",
+            id="failing_tests_with_the_same_message",
+        ),
+        pytest.param(
+            [
+                _node_result("model.p.a", "error", "permission denied"),
+                _node_result("model.p.b", "error", "permission denied"),
+            ],
+            "dbt invocation completed with errors: model.p.a: permission denied\nmodel.p.b: permission denied",
+            id="every_node_with_another_same_message",
+        ),
     ],
 )
 def test_handle_exception_if_needed_dbt_2_lists_the_nodes_otherwise(mock_is_dbt_v2, results, expected_message):

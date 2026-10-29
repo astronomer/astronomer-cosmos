@@ -244,19 +244,24 @@ def parse_number_of_warnings(result: dbtRunnerResult) -> int:
     return num
 
 
+# The message dbt 2 puts on every node when a failure is not tied to one node.
+DBT_V2_GENERIC_ERROR_MESSAGE = "Compilation Error"
+
+
 def _failure_reported_on_every_node(result: dbtRunnerResult, error_messages: list[str]) -> bool:
     """
-    Whether dbt 2 marked every node as failed with the same message.
+    Whether dbt 2 marked every node as failed with its generic message.
 
     dbt 2 reports a failure that is not tied to one node, for example the error of a ``run-operation`` macro, as an
     error on every node of the project, all with the same generic message (``Compilation Error``). The cause is only in
-    the dbt output, not in the result.
+    the dbt output, not in the result. Other failures that share a message are not matched: for example, failing tests
+    all report ``Error``, and their names are what the user needs.
     """
     return (
         is_dbt_v2()
         and len(error_messages) > 1
         and len(error_messages) == len(result.result.results)
-        and len(set(error_messages)) == 1
+        and set(error_messages) == {DBT_V2_GENERIC_ERROR_MESSAGE}
     )
 
 

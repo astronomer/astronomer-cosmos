@@ -30,6 +30,11 @@ _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 DBT_V2_ERROR_RE = re.compile(r"^\[error\]\s+\[(\w+)\s+\((dbt\d+)\)\]:\s*(.*)$", re.DOTALL)
 # Lines of one dbt 2 error that go into the exception (a model error is followed by the database error, a SQL excerpt...).
 DBT_V2_ERROR_MAX_LINES = 10
+# The lines that end the message of a dbt 2 error in text output: the next "[error]"/"[warning]"/"[info]" block, a "===" header or
+# the line of a failed or warned test, which dbt prints outside the "Errors and Warnings" block.
+DBT_V2_ERROR_END_RE = re.compile(
+    r"^(?:\[(?:error|warning|info)\]\s+\[\w+\s+\(dbt\d+\)\]|={3,}|(?:Failed|Warned) test\s|(?:Failure|Error) in test\s)"
+)
 
 
 def _dbt_log_message(line: str) -> str:
@@ -179,7 +184,7 @@ def _read_dbt_v2_error(cleaned: list[str], index: int, is_json_event: bool) -> t
     if not is_json_event:
         # Scanning is bounded in case a block is not followed by a header.
         while end + 1 < len(cleaned) and end - index < 4 * DBT_V2_ERROR_MAX_LINES:
-            if cleaned[end + 1].startswith(("[", "=")):
+            if DBT_V2_ERROR_END_RE.match(cleaned[end + 1]):
                 break
             end += 1
             error_lines.append(cleaned[end])
@@ -203,7 +208,9 @@ def extract_dbt_failure_details(log_list: list[str]) -> list[str]:
     blocks (failed models, macros and sources), each with up to ``DBT_V2_ERROR_MAX_LINES`` lines.
 
     :param log_list: List of strings, where each string is a log line from a dbt command.
-    :return: A list of formatted ``"<failure line> <detail>"`` strings, one per failing node.
+    :return: A list of formatted failures, one per failing node: ``"<failure line> <detail>"`` for dbt 1.x lines and
+        ``"<Name> (dbt<code>): <message>"`` followed by up to ``DBT_V2_ERROR_MAX_LINES - 1`` indented lines (and ``...``
+        when it is longer) for a dbt 2 error.
     """
     # dbt <= 1.11 prints "Failure in test <name> (<path>)"; dbt 1.12 reworded this to
     # "[ERROR]: in test <name> (<path>)" (also used for errored models) and prefixes the detail line the same way.
@@ -221,15 +228,16 @@ def extract_dbt_failure_details(log_list: list[str]) -> list[str]:
 
     cleaned = [clean_line(_dbt_log_message(line)) for line in log_list]
     # With ``--log-format json`` each error is one event whose message already has all its lines. In text output the
-    # message continues on the next lines, up to the next "[warning]"/"[error]" line or a "====" header.
-    is_json_event = [_dbt_log_message(line) != line for line in log_list]
+    # message continues on the next lines, up to the next error or warning block, a "====" header or a test failure line
+    # (``DBT_V2_ERROR_END_RE``).
+    line_is_json_event = [_dbt_log_message(line) != line for line in log_list]
     failed_rows = {m.group(2): m.group(1) for m in map(failed_rows_v2.match, cleaned) if m}
     details: list[str] = []
     consumed_until = -1
     for index, line in enumerate(cleaned):
         if index <= consumed_until:
             continue
-        dbt_v2_error = _read_dbt_v2_error(cleaned, index, is_json_event[index])
+        dbt_v2_error = _read_dbt_v2_error(cleaned, index, line_is_json_event[index])
         if dbt_v2_error:
             entry, consumed_until = dbt_v2_error
             details.append(entry)

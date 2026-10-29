@@ -620,3 +620,60 @@ def test_extract_freshness_warn_msg_dbt_v2_without_warnings():
     result = FullOutputSubprocessResult(full_output=lines, output=lines[-1], exit_code=0)
 
     assert extract_freshness_warn_msg(result) == ([], [])
+
+
+def test_extract_dbt_failure_details_dbt_v2_error_continues_over_indented_lines_that_start_with_a_bracket() -> None:
+    log_list = [
+        "[error] [DbDriverFailed (dbt1308)]: Database Error in model a",
+        "  [SQL: select 1]",
+        "  [1, 2, 3] not matched",
+        "  more",
+        "==================== Execution Summary =====================",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "DbDriverFailed (dbt1308): Database Error in model a\n  [SQL: select 1]\n  [1, 2, 3] not matched\n  more"
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_error_stops_at_a_test_failure_line() -> None:
+    log_list = [
+        "[error] [DbDriverFailed (dbt1308)]: Database Error in model a",
+        "  cause",
+        "Failed test  unique_a_id (models/schema.yml:12:22) [1 of 2 in 0.01s]",
+        "Failure in test not_null_a_id (models/schema.yml:14:22)",
+        "  Got 1 result, configured to fail if != 0",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "DbDriverFailed (dbt1308): Database Error in model a\n  cause",
+        "Failure in test unique_a_id (models/schema.yml:12:22)",
+        "Failure in test not_null_a_id (models/schema.yml:14:22) Got 1 result, configured to fail if != 0",
+    ]
+
+
+# Abridged output of ``dbt build`` on dbt-oss 2.0.8 for a test that errors (``errors_out`` selects from a missing table) and
+# a test that returns rows.
+DBT_V2_ERRORED_TEST_OUTPUT = [
+    " Succeeded model main.m (view) [3 of 3 in 0.01s]",
+    "    Failed test  errors_out (tests/errors_out.sql) [2 of 3 in 1.01s]",
+    "    Failed test  returns_rows (tests/returns_rows.sql) [1 of 3 in 1.01s]",
+    "",
+    "=================== Errors and Warnings ====================",
+    "[error] [DbDriverFailed (dbt1308)]: Error materializing test test.proj.errors_out (target/run/proj/tests/errors_out.sql)",
+    "  Catalog Error: Table with name no_such_table does not exist!",
+    "  ",
+    "  (in run/proj/tests/errors_out.sql:1:1)",
+    "",
+    "==================== Execution Summary =====================",
+    "Summary: 3 total | 1 success | 2 error",
+]
+
+
+def test_extract_dbt_failure_details_dbt_v2_test_that_errors_is_listed_from_its_line_and_its_error() -> None:
+    """A test that errors prints a ``Failed test`` line and an ``[error]`` block, so it is listed twice, the second time with the cause."""
+    assert extract_dbt_failure_details(DBT_V2_ERRORED_TEST_OUTPUT) == [
+        "Failure in test errors_out (tests/errors_out.sql)",
+        "Failure in test returns_rows (tests/returns_rows.sql)",
+        "DbDriverFailed (dbt1308): Error materializing test test.proj.errors_out (target/run/proj/tests/errors_out.sql)"
+        "\n  Catalog Error: Table with name no_such_table does not exist!"
+        "\n  (in run/proj/tests/errors_out.sql:1:1)",
+    ]

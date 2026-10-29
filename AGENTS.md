@@ -29,7 +29,7 @@ hatch run tests.py3.11-2.11-1.9:test-integration
 
 Type checking:
 ```bash
-hatch run tests.py3.10-3.1-1.9:type-check
+hatch run tests.py3.11-3.1-1.9:type-check
 ```
 
 **Always run the type-check before committing or opening a PR** — mypy is enforced in CI and skipping it locally wastes a CI round-trip. The `type-check` script is an alias for `pre-commit run mypy --files cosmos/**/*`, so if the hatch env's `pre-install-airflow.sh` fails to bootstrap on your machine, fall back to:
@@ -225,7 +225,7 @@ Controlled by `TestBehavior` enum:
 ### Code Quality Settings
 
 - Line length: **120** characters
-- Python minimum: **3.10**
+- Python minimum: **3.11**
 - mypy: strict mode
 - Ruff rules: C901 (complexity), D300, I (imports), F (pyflakes); max complexity 10
 - pytest markers: `integration`, `perf`, `dbtfusion`

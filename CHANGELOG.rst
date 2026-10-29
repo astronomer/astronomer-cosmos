@@ -6,6 +6,7 @@ Unreleased
 
 Breaking Changes
 
+* Raised the minimum supported Python version to 3.11. Python 3.10 has reached End of Life per the `Python release schedule <https://devguide.python.org/versions/>`_. Users on Python 3.10 can stay on Cosmos 1.15.x or move to Python 3.11 or newer.
 * Raised the minimum supported dbt Core version to 1.8. dbt Core 1.5, 1.6, and 1.7 have reached End of Life per the `dbt Labs support policy <https://docs.getdbt.com/docs/dbt-versions/core>`_ and are no longer tested or supported; see the :doc:`compatibility policy </policy/compatibility-policy>` for the current supported range. See #2902.
 * Raised the minimum supported Apache Airflow version to 2.11. Apache Airflow 2.9 and 2.10 (Astro Runtime 11 and 12) are past End of Maintenance per the `Astronomer Runtime lifecycle policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_ and are no longer tested or supported. Users who cannot upgrade Airflow should stay on Cosmos 1.15.x; see the :doc:`compatibility policy </policy/compatibility-policy>` for the current supported range.
 * ``ExecutionMode.AIRFLOW_ASYNC`` is no longer supported on Apache Airflow 2.x. Cosmos now builds the async operator at runtime in a way that works on Airflow 3.4, which leaves the operator not fully initialised on Airflow 2.9 and unpicklable on Airflow 2.x. Users who run ``AIRFLOW_ASYNC`` and cannot upgrade to Airflow 3 should stay on an earlier Cosmos release. See `#3050 <https://github.com/astronomer/astronomer-cosmos/pull/3050>`_.

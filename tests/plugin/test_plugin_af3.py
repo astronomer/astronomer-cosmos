@@ -713,3 +713,22 @@ def test_open_file_remote_binary_uses_objectstorage():
             assert af3.open_file("gs://bucket/docs/assets/a.js", conn_id="my_conn", binary=True) == b"\x00\x01"
 
     assert modes == ["rb"]
+
+
+@skip_pre_airflow_31
+@pytest.mark.parametrize(
+    "path",
+    [
+        "assets/%252e%252e/private/secret.txt",  # decoded once by the framework, and again by the HTTP client of a remote dir
+        "assets/%252e%252e/%252e%252e/secret.txt",
+        "info_schema/%25252e%25252e/secret.txt",
+    ],
+)
+def test_dbt_oss_docs_static_files_reject_double_encoded_parent_segments(path: str):
+    af3, app = _app_with_projects({"core": {"dir": "https://example.com/docs", "name": "Core"}})
+
+    with patch.object(af3, "open_file") as mock_open_file:
+        response = TestClient(app).get(f"/core/{path}")
+
+    assert response.status_code == 404
+    mock_open_file.assert_not_called()

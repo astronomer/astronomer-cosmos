@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from typing import Any
 from unittest.mock import patch
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import airflow
 
@@ -96,6 +96,20 @@ def _read_content_via_object_storage(path: str, conn_id: str | None = None, bina
         with p.open(mode) as f:  # type: ignore[no-untyped-call]
             content = f.read()
         return content
+
+
+def _is_parent_segment(segment: str) -> bool:
+    """
+    Whether a URL path segment means ``..`` once it is decoded.
+
+    The web framework decodes the URL once, so ``%252e%252e`` arrives as the literal ``%2e%2e``, which passes a check for
+    ``..``. For a docs folder behind HTTP the client turns it into ``..`` when it builds the upstream URL, so decode until
+    nothing changes.
+    """
+    decoded = unquote(segment)
+    while decoded != segment:
+        segment, decoded = decoded, unquote(decoded)
+    return segment == ".."
 
 
 def open_file(path: str, conn_id: str | None = None, binary: bool = False) -> Any:
@@ -315,7 +329,12 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
             docs_dir_local = cfg_local.get("dir")
             conn_id_local = cfg_local.get("conn_id")
             parts = PurePosixPath(asset_path).parts
-            if not docs_dir_local or len(parts) < 2 or parts[0] not in DBT_DOCS_STATIC_DIRS or ".." in parts:
+            if (
+                not docs_dir_local
+                or len(parts) < 2
+                or parts[0] not in DBT_DOCS_STATIC_DIRS
+                or any(_is_parent_segment(part) for part in parts)
+            ):
                 return JSONResponse(content={"error": "not found", "slug": slug_alias}, status_code=404)
             file_path = op.join(docs_dir_local, *parts)
             # A symlink in the docs folder must not lead to a file outside of it (remote paths are read as they are).

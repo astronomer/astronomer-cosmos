@@ -502,7 +502,10 @@ def _reset_dbt_plugin_discovery_cache():
     sys.modules.pop("dbt_victim", None)
 
 
-@pytest.mark.skipif(is_dbt_v2(), reason="Uses the dbt-core 1.x dbt.plugins module")
+@pytest.mark.skipif(
+    is_dbt_v2(),
+    reason="Uses the dbt-core 1.x dbt.plugins module; dbt-oss has no plugin discovery, so the #1673 leak does not apply",
+)
 def test_run_command_dbt_runner_excludes_dags_folder_dbt_module(tmp_path):
     """#1673, in-process ``InvocationMode.DBT_RUNNER`` path.
 
@@ -542,7 +545,10 @@ def test_run_command_dbt_runner_excludes_dags_folder_dbt_module(tmp_path):
             sys.path.remove(str(dags_folder))
 
 
-@pytest.mark.skipif(is_dbt_v2(), reason="dbt-oss has no dbt_* plugin discovery, so the #1673 leak does not apply")
+@pytest.mark.skipif(
+    is_dbt_v2(),
+    reason="dbt-oss (dbt v2) has no dbt_* plugin discovery (checked on dbt-oss 2.0.8), so the #1673 leak does not apply",
+)
 def test_run_command_with_subprocess_excludes_dags_folder_dbt_module(tmp_path):
     """#1673, ``InvocationMode.SUBPROCESS`` path.
 

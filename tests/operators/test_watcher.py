@@ -2066,11 +2066,12 @@ class TestDbtConsumerWatcherSensor:
         ti.xcom_pull.side_effect = lambda *args, key=None, **kwargs: xcoms.get(key)
         return ti
 
-    def test_poke_falls_back_on_first_try_for_upstream_failure_skip(self):
+    @pytest.mark.parametrize("producer_state", ["success", "up_for_retry"])
+    def test_poke_falls_back_on_first_try_for_upstream_failure_skip(self, producer_state):
         """#3023: dbt never ran a node it skipped for an upstream failure, so build it on try 1 instead of
         raising and waiting one retry_delay for try 2 to fall back."""
         sensor = self.make_sensor(retries=1)
-        sensor._get_producer_task_status.return_value = "success"
+        sensor._get_producer_task_status.return_value = producer_state
         sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
         context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
 
@@ -2083,6 +2084,8 @@ class TestDbtConsumerWatcherSensor:
         [
             # A retry would not fall back either, so the outcome stays a failure.
             (0, UPSTREAM_SKIP_XCOMS, "success"),
+            (0, UPSTREAM_SKIP_XCOMS, "up_for_retry"),
+            (1, REAL_FAILURE_XCOMS, "up_for_retry"),
             # dbt ran the node and it failed.
             (1, REAL_FAILURE_XCOMS, "success"),
             # Only the status XCom marks an upstream-failure skip, not the dbt event.
@@ -2118,10 +2121,11 @@ class TestDbtConsumerWatcherSensor:
         sensor._fallback_to_non_watcher_run.assert_not_called()
 
     @patch("cosmos.settings.watcher_dbt_retry_queue", "dbt_retry")
-    def test_poke_leaves_upstream_failure_skip_to_the_retry_queue(self):
+    @pytest.mark.parametrize("producer_state", ["success", "up_for_retry"])
+    def test_poke_leaves_upstream_failure_skip_to_the_retry_queue(self, producer_state):
         """The cluster policy moves only retries to watcher_dbt_retry_queue, so try 1 must not run dbt elsewhere."""
         sensor = self.make_sensor(retries=1, queue="dbt_consumer")
-        sensor._get_producer_task_status.return_value = "success"
+        sensor._get_producer_task_status.return_value = producer_state
         sensor._fallback_to_non_watcher_run = MagicMock()
         context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
 
@@ -2130,9 +2134,10 @@ class TestDbtConsumerWatcherSensor:
         sensor._fallback_to_non_watcher_run.assert_not_called()
 
     @patch("cosmos.settings.watcher_dbt_retry_queue", "dbt_retry")
-    def test_poke_falls_back_on_first_try_when_already_on_the_retry_queue(self):
+    @pytest.mark.parametrize("producer_state", ["success", "up_for_retry"])
+    def test_poke_falls_back_on_first_try_when_already_on_the_retry_queue(self, producer_state):
         sensor = self.make_sensor(retries=1, queue="dbt_retry")
-        sensor._get_producer_task_status.return_value = "success"
+        sensor._get_producer_task_status.return_value = producer_state
         sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
         context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
 
@@ -2345,10 +2350,11 @@ class TestDbtConsumerWatcherSensor:
         else:
             assert sensor.execute_complete(context=context, event=mock_event) is None
 
-    def test_execute_complete_falls_back_for_upstream_failure_skip(self):
+    @pytest.mark.parametrize("producer_state", ["success", "up_for_retry"])
+    def test_execute_complete_falls_back_for_upstream_failure_skip(self, producer_state):
         """#3023: a deferred consumer of a node dbt skipped for an upstream failure builds it instead of raising."""
         sensor = self.make_sensor(retries=1)
-        sensor._get_producer_task_status.return_value = "success"
+        sensor._get_producer_task_status.return_value = producer_state
         sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
         context = self.make_context(self.make_xcom_ti(self.REAL_FAILURE_XCOMS))
 
@@ -2376,6 +2382,19 @@ class TestDbtConsumerWatcherSensor:
             sensor.execute_complete(context=context, event=event)
         sensor._fallback_to_non_watcher_run.assert_not_called()
         sensor._get_producer_task_status.assert_not_called()
+
+    @pytest.mark.parametrize("retries, retry_queue", [(0, None), (1, "dbt_retry")])
+    def test_execute_complete_upstream_skip_respects_retries_and_queue(self, retries, retry_queue):
+        sensor = self.make_sensor(retries=retries, queue="dbt_consumer")
+        sensor._get_producer_task_status.return_value = "up_for_retry"
+        sensor._fallback_to_non_watcher_run = MagicMock()
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+        event = {"status": "failed", "reason": WatcherEventReason.NODE_FAILED, "upstream_failure_skip": True}
+
+        with patch("cosmos.settings.watcher_dbt_retry_queue", retry_queue):
+            with pytest.raises(AirflowException, match="failed. Review the producer task"):
+                sensor.execute_complete(context=context, event=event)
+        sensor._fallback_to_non_watcher_run.assert_not_called()
 
     @patch("cosmos.operators.local.AbstractDbtLocalBase._override_rtif")
     def test_execute_complete_extracts_compiled_sql(self, mock_override_rtif):

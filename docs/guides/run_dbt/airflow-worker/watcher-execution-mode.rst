@@ -207,6 +207,14 @@ If a branch of the DAG fails, users can clear the status of a failed consumer ta
    to an Airflow Variable so consumer sensors can read model statuses from the first attempt
    (`#2559 <https://github.com/astronomer/astronomer-cosmos/pull/2559>`_).
 
+.. versionchanged:: 1.16.0
+   Consumer sensors treat a producer sitting in ``up_for_retry`` like a terminated producer and
+   fall back to a standalone dbt run on the consumer's retry, instead of polling the failed attempt's stale
+   XCom until the producer's self-skipping retry lands. A failed node still raises on the first try,
+   respecting the consumer's retry count and ``watcher_dbt_retry_queue``. Consumers without a node
+   status can fall back immediately
+   (`#3001 <https://github.com/astronomer/astronomer-cosmos/issues/3001>`_).
+
 When the ``DbtProducerWatcherOperator`` is triggered for a retry (``try_number > 1``), it raises
 ``AirflowSkipException`` instead of re-running the ``dbt build`` command. Before skipping, it restores
 XCom values from a backup so that consumer sensors can still read model statuses from the first attempt.

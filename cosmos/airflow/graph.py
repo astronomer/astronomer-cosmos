@@ -1359,6 +1359,8 @@ def build_airflow_graph(
     )
 
     create_airflow_task_dependencies(nodes, tasks_map)
+    if group_nodes_by_folder:
+        warn_about_folder_task_group_cycles(nodes, tasks_map)
 
     if producer_task:
         _add_watcher_dependencies(
@@ -1390,6 +1392,119 @@ def build_airflow_graph(
             async_py_requirements=async_py_requirements,
         )
     return tasks_map
+
+
+def _folder_task_group_path(task_or_group: TaskGroup | BaseOperator) -> list[str]:
+    group = task_or_group.parent_group if isinstance(task_or_group, TaskGroup) else task_or_group.task_group
+    path: list[str] = []
+    while group is not None and group.group_id is not None:
+        path.append(group.group_id)
+        group = group.parent_group
+    return path[::-1]
+
+
+def _task_or_group_id(task_or_group: TaskGroup | BaseOperator) -> str:
+    return str(task_or_group.group_id) if isinstance(task_or_group, TaskGroup) else task_or_group.task_id
+
+
+def _depth_first_finish_order(graph: dict[str, set[str]]) -> list[str]:
+    finished: list[str] = []
+    visited: set[str] = set()
+    for start in sorted(graph):
+        if start in visited:
+            continue
+        visited.add(start)
+        work = [(start, iter(sorted(graph[start])))]
+        while work:
+            vertex, successors = work[-1]
+            successor = next((unit for unit in successors if unit not in visited), None)
+            if successor is None:
+                work.pop()
+                finished.append(vertex)
+                continue
+            visited.add(successor)
+            work.append((successor, iter(sorted(graph.get(successor, ())))))
+    return finished
+
+
+def _cyclic_unit_sets(graph: dict[str, set[str]]) -> list[set[str]]:
+    """Return the strongly connected components with more than one unit (Kosaraju, linear in the graph size)."""
+    reversed_graph: dict[str, set[str]] = defaultdict(set)
+    for unit, successors in graph.items():
+        for successor in successors:
+            reversed_graph[successor].add(unit)
+    assigned: set[str] = set()
+    cycles: list[set[str]] = []
+    for start in reversed(_depth_first_finish_order(graph)):
+        if start in assigned:
+            continue
+        component = {start}
+        pending = [start]
+        assigned.add(start)
+        while pending:
+            for predecessor in reversed_graph.get(pending.pop(), ()):
+                if predecessor not in assigned:
+                    assigned.add(predecessor)
+                    component.add(predecessor)
+                    pending.append(predecessor)
+        if len(component) > 1:
+            cycles.append(component)
+    return cycles
+
+
+def warn_about_folder_task_group_cycles(
+    nodes: dict[str, DbtNode],
+    tasks_map: dict[str, TaskGroup | BaseOperator],
+) -> None:
+    """
+    Log a warning for every set of folder TaskGroups whose dependencies form a cycle.
+
+    ``RenderConfig.group_nodes_by_folder`` creates one TaskGroup per folder, so models that reference each other
+    across two folders in both directions make the groups depend on each other in a cycle, even though the model
+    graph is acyclic. Airflow 3.3.1 and later order TaskGroups as units: the Grid and Graph views fail for such DAGs
+    on 3.3.x, Airflow 3.4 issues a deprecation warning, and Airflow 3.5 is expected to reject them at parse time.
+    See https://github.com/astronomer/astronomer-cosmos/issues/3082.
+    """
+    graphs: dict[str | None, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    model_edges: dict[str | None, list[tuple[str, str, str, str]]] = defaultdict(list)
+    for node_id, node in nodes.items():
+        for parent_node_id in node.depends_on:
+            if node_id not in tasks_map or parent_node_id not in tasks_map:
+                continue
+            parent_path = _folder_task_group_path(tasks_map[parent_node_id])
+            child_path = _folder_task_group_path(tasks_map[node_id])
+            depth = 0
+            while depth < min(len(parent_path), len(child_path)) and parent_path[depth] == child_path[depth]:
+                depth += 1
+            scope = parent_path[depth - 1] if depth else None
+            parent_unit = (
+                parent_path[depth] if depth < len(parent_path) else _task_or_group_id(tasks_map[parent_node_id])
+            )
+            child_unit = child_path[depth] if depth < len(child_path) else _task_or_group_id(tasks_map[node_id])
+            graphs[scope][parent_unit].add(child_unit)
+            graphs[scope].setdefault(child_unit, set())
+            model_edges[scope].append((parent_unit, child_unit, parent_node_id, node_id))
+
+    for scope, graph in graphs.items():
+        cycles = _cyclic_unit_sets(graph)
+        cycle_of_unit = {unit: index for index, members in enumerate(cycles) for unit in members}
+        edges_by_cycle: dict[int, list[str]] = defaultdict(list)
+        for parent_unit, child_unit, parent_node_id, node_id in model_edges[scope]:
+            cycle_index = cycle_of_unit.get(parent_unit)
+            if cycle_index is not None and cycle_of_unit.get(child_unit) == cycle_index:
+                edges_by_cycle[cycle_index].append(f"{parent_node_id} -> {node_id}")
+        for cycle_index, members in enumerate(cycles):
+            unit_names = sorted(members)
+            edges = sorted(edges_by_cycle[cycle_index])
+            logger.warning(
+                "The folder TaskGroups %s depend on each other in a cycle through these dbt dependencies: %s. "
+                "The dbt graph is acyclic, but Airflow 3.3.1 and later order TaskGroups as units: the Grid and "
+                "Graph views fail on Airflow 3.3.x, Airflow 3.4 warns, and Airflow 3.5 is expected to reject the "
+                "DAG. Move these models so the folder task groups no longer depend on each other in a cycle, or disable "
+                "RenderConfig.group_nodes_by_folder. See https://github.com/astronomer/astronomer-cosmos/issues/3082.",
+                ", ".join(unit_names),
+                "; ".join(edges),
+            )
 
 
 def create_airflow_task_dependencies(

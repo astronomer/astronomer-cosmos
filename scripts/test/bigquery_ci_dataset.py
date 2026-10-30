@@ -12,18 +12,23 @@ Environment: ``COSMOS_TEST_BIGQUERY_DATASET`` (must start with ``cosmos_ci_``), 
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import random
 import sys
 import time
+from pathlib import Path
 
 import requests
-from airflow.models.connection import Connection
 from google import auth
 from google.api_core import exceptions, retry
 from google.cloud import bigquery
 from google.oauth2 import service_account
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from bigquery_ci_common import keyfile
 
 DATASET_PREFIX = "cosmos_ci_"
 # Tables the job forgets to clean up (for example when the runner dies) expire on their own.
@@ -77,15 +82,8 @@ def _dataset_name() -> str:
 
 
 def _client() -> bigquery.Client:
-    raw = os.environ["AIRFLOW_CONN_GCP_GS_CONN"]
-    conn = Connection.from_json(raw) if raw.lstrip().startswith("{") else Connection(uri=raw)
-    extra = conn.extra_dejson
-    keyfile = extra.get("keyfile_dict") or extra.get("extra__google_cloud_platform__keyfile_dict")
-    if isinstance(keyfile, str):
-        keyfile = json.loads(keyfile)
-    if not keyfile:
-        raise SystemExit("AIRFLOW_CONN_GCP_GS_CONN has no keyfile_dict")
-    credentials = service_account.Credentials.from_service_account_info(keyfile)
+    key = keyfile()
+    credentials = service_account.Credentials.from_service_account_info(key)
     return bigquery.Client(project=os.environ["BIGQUERY_PROJECT"], credentials=credentials)
 
 

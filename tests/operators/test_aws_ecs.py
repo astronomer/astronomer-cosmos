@@ -44,8 +44,7 @@ def test_dbt_aws_ecs_operator_add_global_flags() -> None:
     )
     assert dbt_base_operator.add_global_flags() == [
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
         "--no-version-check",
     ]
 
@@ -151,8 +150,7 @@ def test_dbt_aws_ecs_build_command():
                 "dbt",
                 command_name,
                 "--vars",
-                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
                 "--no-version-check",
             ]
         elif command_name == "source":
@@ -161,8 +159,7 @@ def test_dbt_aws_ecs_build_command():
                 command_name,
                 "freshness",
                 "--vars",
-                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
                 "--no-version-check",
             ]
         else:
@@ -171,8 +168,7 @@ def test_dbt_aws_ecs_build_command():
                 command_name,
                 "some-macro",
                 "--vars",
-                "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-                "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+                "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
                 "--no-version-check",
             ]
 

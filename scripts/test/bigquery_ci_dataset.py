@@ -116,21 +116,43 @@ def create(dataset: str, max_start_jitter: float = MAX_START_JITTER_SECONDS) -> 
             time.sleep(2)
 
 
-def delete(dataset: str) -> None:
-    """Delete the dataset. A failure to reach the API is a warning, not an error: the tables expire on their own."""
+_API_FAILURES = (
+    exceptions.GoogleAPICallError,
+    exceptions.RetryError,
+    requests.exceptions.RequestException,
+    auth.exceptions.GoogleAuthError,
+)
+
+
+def _delete_quietly(client: bigquery.Client, dataset: str) -> None:
     print(f"Deleting BigQuery dataset {dataset}")
-    # A bad connection is a setup mistake and fails the step; only the API call, including a network or token
-    # failure while making it, is allowed to fail quietly.
-    client = _client()
     try:
         client.delete_dataset(dataset, delete_contents=True, not_found_ok=True, retry=RETRY)
-    except (
-        exceptions.GoogleAPICallError,
-        exceptions.RetryError,
-        requests.exceptions.RequestException,
-        auth.exceptions.GoogleAuthError,
-    ) as exc:  # the job's result must not depend on cleanup
+    except _API_FAILURES as exc:  # the job's result must not depend on cleanup
         print(f"::warning::Could not delete BigQuery dataset {dataset}: {exc}")
+
+
+def delete(dataset: str) -> None:
+    """Delete the dataset, then the per-test ones created for it (``<dataset>_<test>``, labelled with this run's id).
+
+    A failure to reach the API is a warning, not an error: the tables of the datasets expire on their own.
+    """
+    # A bad connection is a setup mistake and fails the step; only the API calls, including a network or token
+    # failure while making them, are allowed to fail quietly.
+    client = _client()
+    _delete_quietly(client, dataset)
+    run_id = os.environ.get("GITHUB_RUN_ID", "local")
+    try:
+        per_test = [
+            d.dataset_id
+            for d in client.list_datasets(filter=f"labels.run-id:{run_id}", retry=RETRY)
+            if d.dataset_id.startswith(f"{dataset}_")
+        ]
+    except _API_FAILURES as exc:
+        print(f"::warning::Could not list the per-test BigQuery datasets of {dataset}: {exc}")
+        return
+    for name in per_test:
+        _delete_quietly(client, name)
 
 
 def main(argv: list[str] | None = None) -> int:

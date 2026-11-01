@@ -42,22 +42,8 @@ def get_dag_bag() -> DagBag:
             print(f"Adding {file_name} to .airflowignore")
             file.write(f"{file_name}\n")
 
-        if AIRFLOW_VERSION == Version("2.9.0"):
-            # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9.0
-            file.write("cosmos_example_manifest_dag.py\n")
-            # This DAG is taking too long to run in the CI (https://github.com/astronomer/astronomer-cosmos/actions/runs/21902660682/job/63234728594)
-            file.write("example_cosmos_python_models.py\n")
-            # The Airflow 2.9 lockfiles pin databricks-sql-connector 3.7.4, whose generated Thrift module takes over
-            # two minutes to import on Python 3.12 and exceeds the DagBag import timeout
-            # (https://github.com/astronomer/astronomer-cosmos/actions/runs/39240346293/job/118019428362)
-            file.write("example_databricks_metric_view.py\n")
-
         if AIRFLOW_VERSION >= Version("3.0.0"):
             file.write("example_cosmos_cleanup_dag.py\n")
-
-        if AIRFLOW_VERSION < Version("2.10.0"):
-            # DatasetAlias was introduced in Airflow 2.10
-            file.write("example_outlets.py\n")
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())

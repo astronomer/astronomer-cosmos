@@ -4,6 +4,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 import pytest
+import yaml
 from airflow.models import BaseOperator
 
 try:
@@ -162,7 +163,7 @@ def test_dbt_mixin_add_cmd_flags_full_refresh(full_refresh, expected_flags, dbt_
     assert flags == expected_flags
 
 
-@pytest.mark.parametrize("args, expected_flags", [(None, []), ({"arg1": "val1"}, ["--args", "arg1: val1\n"])])
+@pytest.mark.parametrize("args, expected_flags", [(None, []), ({"arg1": "val1"}, ["--args", "{arg1: val1}"])])
 def test_dbt_mixin_add_cmd_flags_run_operator(args, expected_flags):
     macro_name = "some_macro"
     run_operation = DbtRunOperationMixin(macro_name=macro_name, args=args)
@@ -240,3 +241,12 @@ def test_dbt_base_operator_execute_debug_mode_success_stops_memory_tracking(
             mock_start_tracking.assert_called_once_with({})
             # Verify memory tracking was stopped after successful execution
             mock_stop_tracking.assert_called_once_with({})
+
+
+def test_process_global_flag_dumps_dicts_as_one_line_flow_yaml_that_round_trips():
+    """dbt 2 rejects block YAML with quoted strings, and dbt 1.x parses the flag with PyYAML."""
+    value = {"s": "2", "f": 1e-06, "e": "😀", "m": {1: "one", "default": "other"}, "long": "x" * 200}
+    flag_name, flag_value = AbstractDbtBase._process_global_flag("--vars", value)
+    assert flag_name == "--vars"
+    assert "\n" not in flag_value
+    assert yaml.safe_load(flag_value) == value

@@ -52,6 +52,9 @@ concurrency:
 
 env:
   SCARF_NO_ANALYTICS: "true"
+  # The default C tracer on Python 3.12 takes ~150s to trace the generated databricks thrift module
+  # that `dbt ls` imports in-process, exceeding Airflow's 120s DagBag import timeout.
+  COVERAGE_CORE: sysmon
   # Provider + dbt-adapter extras the test modules import. Without these, pytest collection fails to
   # import modules like tests/operators/test_kubernetes.py. Mirrors the provider set cosmos's own
   # integration environment installs. Validated to resolve under the Runtime image's pinned Airflow.
@@ -63,9 +66,11 @@ defaults:
   run:
     shell: bash
 
+# Jobs use ubuntu-24.04 rather than ubuntu-latest because ubuntu-26.04 blocks the socketcall syscall
+# in containers (actions/runner-images#14790), which breaks the 32-bit Postgres service image.
 jobs:
   Run-Unit-Tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -92,7 +97,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
   Run-Integration-Tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -163,7 +168,7 @@ jobs:
           AIRFLOW_CONN_DUCKDB_DEFAULT: "duckdb:///?host=''"
 
   Run-Telemetry-Tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -193,7 +198,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
 
   Run-Performance-Tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -245,7 +250,7 @@ jobs:
           POSTGRES_PORT: 5432
 
   Run-Integration-dbt-Loom-Tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -307,7 +312,7 @@ jobs:
           POSTGRES_PORT: 5432
 
   Run-Integration-dbt-1-8-Tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -377,7 +382,7 @@ jobs:
           TEST_SINGLE_DAG: "basic_cosmos_task_group.py"
 
   Run-Integration-dbt-Async-Tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     # Disabled everywhere for now. The async BigQuery operator reassigns __bases__ to the google
     # provider's operator and breaks on the provider version the alpha image ships. Tracked and
@@ -444,7 +449,7 @@ jobs:
     # Paid Databricks: off unless run_paid_suites is set. A durable gate that survives removing the
     # TEMP triggers, where an event_name check would become always-true. Remaining failure: BOSS-662.
     if: ${{ inputs.run_paid_suites }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -505,7 +510,7 @@ jobs:
     # Paid Snowflake: off unless run_paid_suites is set. Durable gate (see the Databricks suite).
     # Serialization + cloud validation tracked in BOSS-662.
     if: ${{ inputs.run_paid_suites }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -585,7 +590,7 @@ jobs:
     # workflow (not deleted) so the follow-up has the full job to iterate on. Re-enable by setting
     # the RUN_KUBERNETES_SUITE repo variable to 'true' (a plain `if: false` trips actionlint).
     if: ${{ vars.RUN_KUBERNETES_SUITE == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -672,7 +677,7 @@ jobs:
       - Run-Integration-Tests-Expensive
       - Run-Integration-dbt-Fusion-Tests
       - Run-Kubernetes-Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read

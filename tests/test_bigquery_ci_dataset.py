@@ -102,17 +102,45 @@ def test_create_gives_up_when_the_dataset_never_becomes_visible(monkeypatch):
         bigquery_ci_dataset.create("cosmos_ci_42_1_oss_0", max_start_jitter=0)
 
 
-def test_delete_removes_the_dataset_and_its_contents(monkeypatch):
+def test_delete_removes_the_dataset_and_the_per_test_ones_with_their_contents(monkeypatch):
     client = MagicMock()
+    names = [
+        "cosmos_ci_42_1_oss_0_test_example_dag_x",
+        "cosmos_ci_42_1_oss_01",
+        "cosmos_ci_43_1_oss_0_test_example_dag_x",
+    ]
+    client.list_datasets.return_value = [MagicMock(dataset_id=name) for name in names]
     monkeypatch.setattr(bigquery_ci_dataset, "_client", lambda: client)
 
     bigquery_ci_dataset.delete("cosmos_ci_42_1_oss_0")
 
-    kwargs = client.delete_dataset.call_args.kwargs
-    assert client.delete_dataset.call_args.args == ("cosmos_ci_42_1_oss_0",)
-    assert kwargs["delete_contents"] is True
-    assert kwargs["not_found_ok"] is True
-    assert kwargs["retry"] is bigquery_ci_dataset.RETRY
+    assert client.list_datasets.call_args.kwargs["filter"].startswith("labels.run-id:")
+    deleted = [call.args[0] for call in client.delete_dataset.call_args_list]
+    assert deleted == ["cosmos_ci_42_1_oss_0", "cosmos_ci_42_1_oss_0_test_example_dag_x"]
+    for call in client.delete_dataset.call_args_list:
+        assert call.kwargs["delete_contents"] is True
+        assert call.kwargs["not_found_ok"] is True
+        assert call.kwargs["retry"] is bigquery_ci_dataset.RETRY
+
+
+def test_delete_keeps_going_when_listing_or_a_deletion_fails(monkeypatch, capsys):
+    client = MagicMock()
+    client.list_datasets.side_effect = exceptions.Forbidden("no access")
+    monkeypatch.setattr(bigquery_ci_dataset, "_client", lambda: client)
+
+    bigquery_ci_dataset.delete("cosmos_ci_42_1_oss_0")
+
+    assert [call.args[0] for call in client.delete_dataset.call_args_list] == ["cosmos_ci_42_1_oss_0"]
+    assert "::warning::Could not list the per-test BigQuery datasets" in capsys.readouterr().out
+
+    client = MagicMock()
+    client.list_datasets.return_value = [MagicMock(dataset_id=f"cosmos_ci_42_1_oss_0_{name}") for name in ("a", "b")]
+    client.delete_dataset.side_effect = [exceptions.Forbidden("no access"), None, None]
+    monkeypatch.setattr(bigquery_ci_dataset, "_client", lambda: client)
+
+    bigquery_ci_dataset.delete("cosmos_ci_42_1_oss_0")
+
+    assert client.delete_dataset.call_count == 3
 
 
 def test_delete_failure_is_a_warning_not_an_error(monkeypatch, capsys):

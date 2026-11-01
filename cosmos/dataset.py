@@ -398,7 +398,7 @@ def register_dataset_on_task(
        recommended path and the one Cosmos tests against.
     2. **Airflow 2.10+ with ``enable_dataset_alias=True``** — uses the
        Airflow 2 ``DatasetAlias`` equivalent with ``context["outlet_events"]``.
-    3. **Airflow < 2.10 OR ``enable_dataset_alias=False``** — mutates
+    3. **Airflow 2 with ``enable_dataset_alias=False``** — mutates
        ``task.outlets`` / ``task.inlets`` directly and persists the DAG.
        Carries the limitations described in
        https://github.com/astronomer/astronomer-cosmos/issues/522.
@@ -437,7 +437,7 @@ def register_dataset_on_task(
         raise AirflowCompatibilityError(
             "To emit datasets with Airflow 3, the setting `enable_dataset_alias` must be True (default)."
         )
-    if AIRFLOW_VERSION < Version("2.10") or not settings.enable_dataset_alias:
+    if not settings.enable_dataset_alias:
         from airflow.utils.session import create_session
 
         logger.info("Assigning inlets/outlets without DatasetAlias")

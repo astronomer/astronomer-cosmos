@@ -26,7 +26,6 @@ try:
     from airflow.sdk.definitions.context import Context
 except ImportError:
     from airflow.utils.context import Context  # type: ignore[attr-defined]
-from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import ProfileConfig
@@ -109,7 +108,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         AbstractDbtLocalBase.__init__(
             self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )
-        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
+        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias:
             try:
                 from airflow.sdk.definitions.asset import AssetAlias as DatasetAlias
             except ImportError:

@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import mimetypes
 import os
 import shutil
 import subprocess
@@ -8,6 +9,7 @@ import sys
 import tempfile
 import threading
 import zlib
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 from urllib.parse import urlparse
@@ -35,7 +37,7 @@ from pendulum import datetime
 import cosmos.dbt.runner as dbt_runner
 from cosmos import DbtDag, DbtTaskGroup, ProjectConfig, RenderConfig, cache
 from cosmos.config import AIConfig, ProfileConfig
-from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
+from cosmos.constants import InvocationMode
 from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
 )
@@ -242,8 +244,7 @@ def test_dbt_base_operator_add_global_flags() -> None:
         "--select",
         "my_first_model my_second_model",
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
         "--no-version-check",
     ]
 
@@ -567,58 +568,7 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
     assert operator.parse_number_of_warnings == dbt_runner.parse_number_of_warnings
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) >= version.parse("2.10")
-    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
-    "From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
-@pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets(caplog):
-    from airflow.datasets import Dataset
-
-    project_dir = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
-
-    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="seed",
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        run_operator = DbtRunLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="run",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        test_operator = DbtTestLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="test",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        seed_operator >> run_operator >> test_operator
-
-    run_test_dag(dag)
-
-    assert run_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.raw_customers", extra=None)]
-    assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
-    assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
-    assert test_operator.outlets == []
-
-
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     try:
@@ -678,10 +628,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 
 
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="Outlets are only overridden in Airflow 2.10 and 2.11 in DbtLocalBaseOperator.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
     from airflow.datasets import Dataset, DatasetAlias
@@ -834,6 +780,12 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
     conn = urlparse(os.environ.get("AIRFLOW_CONN_EXAMPLE_CONN", "postgres://user:pass@0.0.0.0:5432/postgres"))
     db_name = conn.path.lstrip("/") or "postgres"
     expected_asset = f"postgres://{conn.hostname}:{conn.port or 5432}/{db_name}/public/stg_customers"
+    if "tests.dbt_oss_plugin" in os.getenv("PYTEST_PLUGINS", ""):
+        # The dbt-oss job runs the Postgres profile mapping above on BigQuery (tests/dbt_oss_plugin.py).
+        from tests.dbt_oss_plugin import DEFAULT_BIGQUERY_PROJECT
+
+        bigquery_project = os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", DEFAULT_BIGQUERY_PROJECT)
+        expected_asset = f"bigquery/{bigquery_project}/{os.environ['COSMOS_TEST_BIGQUERY_DATASET']}/stg_customers"
     assert f"Outlets: [Asset(name='{expected_asset}', uri='{expected_asset}'" in caplog.text
 
 
@@ -936,10 +888,6 @@ def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fai
 
 
 @patch("cosmos.settings.enable_dataset_alias", 0)
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_via_envvar(caplog):
     with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
@@ -955,45 +903,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_vi
     assert run_operator.outlets == []
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) not in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
-    # https://github.com/apache/airflow/issues/39486
-)
-@pytest.mark.integration
-def test_run_operator_dataset_emission_is_skipped(caplog):
-    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="seed",
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-            emit_datasets=False,
-        )
-        run_operator = DbtRunLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="run",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-            emit_datasets=False,
-        )
-
-        seed_operator >> run_operator
-
-    run_test_dag(dag)
-
-    assert run_operator.inlets == []
-    assert run_operator.outlets == []
-
-
-@pytest.mark.skipif(
-    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
-)
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
@@ -1028,10 +937,6 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     ]
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
-)
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
@@ -1269,7 +1174,10 @@ def test_run_test_operator_subprocess_failure_exposes_failing_tests(failing_erro
 
     assert raised, "dbt test was expected to fail"
     assert "accepted_values_mini_orders_status__placed" in raised[0]
-    assert "Got " in raised[0] and "results, configured to fail if" in raised[0]
+    if dbt_runner.is_dbt_v2():
+        assert "failed row(s)" in raised[0]
+    else:
+        assert "Got " in raised[0] and "results, configured to fail if" in raised[0]
 
 
 @pytest.mark.integration
@@ -1549,7 +1457,7 @@ def test_store_compiled_sql_airflow3(tmp_path: Path) -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["run-operation", "bla", "--args", "days: 7\ndry_run: true\n"],
+                "cmd_flags": ["run-operation", "bla", "--args", "{days: 7, dry_run: true}"],
                 "run_as_async": False,
                 "async_context": None,
                 "push_run_results_to_xcom": False,
@@ -1622,6 +1530,149 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_get_proc
 
     assert instance.parse.called
     assert "Unable to parse OpenLineage events" in caplog.text
+
+
+def _write_run_results(path: Path, args: dict | None) -> None:
+    path.write_text(json.dumps({"metadata": {}, "results": [], "args": args} if args is not None else {"results": []}))
+
+
+@pytest.mark.parametrize(
+    "dbt_command_line, env, expected",
+    [
+        (["dbt", "build", "--profiles-dir", "/tmp/profiles"], {}, "/tmp/profiles"),
+        (["dbt", "build", "--profiles-dir=/tmp/profiles"], {}, "/tmp/profiles"),
+        (["dbt", "build"], {"DBT_PROFILES_DIR": "/from/env"}, "/from/env"),
+        (["dbt", "build", "--profiles-dir", "/from/command"], {"DBT_PROFILES_DIR": "/from/env"}, "/from/command"),
+        (["dbt", "build", "--profiles-dir", "/a", "--profiles-dir=/b"], {}, "/b"),
+        # The executable and the directory can be ``Path`` objects, as in the command of the watcher producer.
+        ([Path("/usr/bin/dbt"), "build", "--profiles-dir", Path("/tmp/profiles")], {}, "/tmp/profiles"),
+    ],
+)
+def test_add_missing_profiles_dir_to_run_results(tmp_path, dbt_command_line, env, expected):
+    """dbt 2 (dbt-oss) does not write ``args.profiles_dir``, which openlineage-integration-common reads."""
+    run_results = tmp_path / "run_results.json"
+    _write_run_results(run_results, {"command": "build", "which": "build"})
+
+    with patch.dict(os.environ, env):
+        DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, dbt_command_line)
+
+    args = json.loads(run_results.read_text())["args"]
+    assert args == {"command": "build", "which": "build", "profiles_dir": expected}
+
+
+@pytest.mark.parametrize(
+    "content, dbt_command_line",
+    [
+        pytest.param(
+            json.dumps({"args": {"which": "run", "profiles_dir": "/written/by/dbt"}}),
+            ["dbt", "run", "--profiles-dir", "/x"],
+            id="keeps_the_value_dbt_wrote",
+        ),
+        pytest.param(None, ["dbt", "run", "--profiles-dir", "/x"], id="missing_file"),
+        pytest.param("not json", ["dbt", "run", "--profiles-dir", "/x"], id="invalid_json"),
+        pytest.param(json.dumps({"results": []}), ["dbt", "run", "--profiles-dir", "/x"], id="no_args"),
+        pytest.param(json.dumps({"args": "text"}), ["dbt", "run", "--profiles-dir", "/x"], id="args_not_a_dict"),
+        pytest.param(json.dumps({"args": {"which": "run"}}), ["dbt", "run"], id="no_profiles_dir_to_add"),
+    ],
+)
+def test_add_missing_profiles_dir_to_run_results_leaves_the_file_alone(
+    tmp_path, monkeypatch, content, dbt_command_line
+):
+    run_results = tmp_path / "run_results.json"
+    if content is not None:
+        run_results.write_text(content)
+
+    monkeypatch.delenv("DBT_PROFILES_DIR", raising=False)
+    DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, dbt_command_line)
+
+    assert (run_results.read_text() if content is not None else None) == content
+
+
+def test_add_missing_profiles_dir_to_run_results_without_a_path():
+    DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(None, ["dbt", "run", "--profiles-dir", "/x"])
+
+
+@patch(
+    "cosmos.operators.local.DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results", return_value=True
+)
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
+@patch("cosmos.operators.local.DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
+def test_calculate_openlineage_events_completes_adds_the_profiles_dir_before_parsing(
+    mock_get_processor, mock_add_profiles_dir, mock_is_dbt_v2, mock_requires_profiles_dir
+):
+    instance = mock_get_processor.return_value.return_value
+    instance.run_result_path = "/project/target/run_results.json"
+
+    def parse():
+        mock_add_profiles_dir.assert_called_once()  # the key is expected before the library reads the file
+        return MagicMock(completes=[])
+
+    instance.parse.side_effect = parse
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, should_store_compiled_sql=False
+    )
+    command = ["dbt", "run", "--profiles-dir", "/profiles"]
+
+    dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=command)
+
+    mock_add_profiles_dir.assert_called_once_with("/project/target/run_results.json", command)
+    assert instance.parse.called
+
+
+@pytest.mark.parametrize(
+    "is_dbt_v2, library_requires_it, expected_call",
+    [
+        pytest.param(True, True, True, id="dbt_2_and_library_needs_it"),
+        # dbt Fusion used with a dbt 1.x environment: no change.
+        pytest.param(False, True, False, id="not_dbt_2"),
+        # openlineage-integration-common 1.44.0 and later use the --profiles-dir lookup themselves.
+        pytest.param(True, False, False, id="library_does_not_need_it"),
+    ],
+)
+@patch("cosmos.operators.local.DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
+def test_calculate_openlineage_events_completes_adds_the_profiles_dir_only_when_needed(
+    mock_get_processor, mock_add_profiles_dir, is_dbt_v2, library_requires_it, expected_call
+):
+    instance = mock_get_processor.return_value.return_value
+    instance.run_result_path = "/project/target/run_results.json"
+    instance.parse.return_value = MagicMock(completes=[])
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, should_store_compiled_sql=False
+    )
+    command = ["dbt", "run", "--profiles-dir", "/profiles"]
+
+    with (
+        patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2),
+        patch(
+            "cosmos.operators.local.DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results",
+            return_value=library_requires_it,
+        ),
+    ):
+        dbt_base_operator.calculate_openlineage_events_completes(
+            env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=command
+        )
+
+    if expected_call:
+        mock_add_profiles_dir.assert_called_once_with("/project/target/run_results.json", command)
+    else:
+        mock_add_profiles_dir.assert_not_called()
+    assert instance.parse.called
+
+
+@pytest.mark.parametrize(
+    "installed_version, expected",
+    [("1.40.0", True), ("1.43.0", True), ("1.44.0", False), ("1.54.0", False), ("not a version", True)],
+)
+def test_openlineage_requires_profiles_dir_in_run_results(installed_version, expected):
+    with patch("cosmos.operators.local.version", return_value=installed_version):
+        assert DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results() is expected
+
+
+def test_openlineage_requires_profiles_dir_in_run_results_when_the_library_is_not_found():
+    with patch("cosmos.operators.local.version", side_effect=PackageNotFoundError):
+        assert DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results() is True
 
 
 def test_dbt_local_artifact_processor_imported_lazily():
@@ -1890,6 +1941,195 @@ def test_dbt_docs_local_operator_ignores_graph_gpickle():
         dbt_cmd_global_flags=["--no-write-json"],
     )
     assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
+
+
+# mimetypes also reads the host's mime.types files, so a host that knows parquet reports its own type for it.
+PARQUET_CONTENT_TYPE = mimetypes.guess_type("x.parquet")[0] or "application/octet-stream"
+
+
+def _docs_target_dir(tmp_path, dbt_oss: bool) -> str:
+    """A project dir whose target/ holds the docs written by dbt 1 or by dbt-oss."""
+    target = tmp_path / "target"
+    if dbt_oss:
+        files = ["index.html", "manifest.json", "run_results.json", "assets/app.js", "assets/styles/site.css"]
+        files += ["assets/styles/theme.css"]
+        files += ["info_schema/v1/dbt.models.parquet", "private/index/x.parquet"]
+    else:
+        files = ["index.html", "manifest.json", "catalog.json", "run_results.json"]
+    for name in files:
+        (target / name).parent.mkdir(parents=True, exist_ok=True)
+        (target / name).write_text("x")
+    return tmp_path.as_posix()
+
+
+def _docs_operator(operator_class, **kwargs):
+    return operator_class(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        connection_id="fake-conn",
+        bucket_name="fake-bucket",
+        **kwargs,
+    )
+
+
+def test_dbt_docs_files_to_upload_is_required_files_for_dbt_1(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=False) + "/target"
+    assert operator._files_to_upload(target_dir) == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_files_to_upload_is_required_files_when_target_is_missing():
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    assert operator._files_to_upload("fake-dir/target") == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_files_to_upload_is_the_site_for_dbt_oss(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=True) + "/target"
+    # The site only: not run_results.json nor the private/ state that dbt-oss also writes to target/.
+    assert operator._files_to_upload(target_dir) == [
+        "index.html",
+        "manifest.json",
+        "assets/app.js",
+        "assets/styles/site.css",
+        "assets/styles/theme.css",
+        "info_schema/v1/dbt.models.parquet",
+    ]
+
+
+def test_dbt_docs_files_to_upload_is_sorted_whatever_the_order_of_the_filesystem(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=True) + "/target"
+    rglob = Path.rglob
+
+    def reversed_rglob(self, pattern):
+        return iter(sorted(rglob(self, pattern), reverse=True))
+
+    with patch.object(Path, "rglob", reversed_rglob):
+        files = operator._files_to_upload(target_dir)
+
+    assert files == [
+        "index.html",
+        "manifest.json",
+        "assets/app.js",
+        "assets/styles/site.css",
+        "assets/styles/theme.css",
+        "info_schema/v1/dbt.models.parquet",
+    ]
+
+
+def test_dbt_docs_keeps_dbt_1_files_when_catalog_json_is_present(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=True) + "/target"
+    (tmp_path / "target" / "catalog.json").write_text("x")
+    assert operator._files_to_upload(target_dir) == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_gcs_local_operator_uploads_the_dbt_oss_site(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=True)
+    mock_gcs = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_gcs}):
+        operator = _docs_operator(DbtDocsGCSLocalOperator, folder_dir="docs")
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_gcs.GCSHook.return_value.upload.call_args_list
+    # GCSHook.upload would send application/octet-stream for all of them without a mime_type.
+    assert [(c.kwargs["object_name"], c.kwargs["mime_type"]) for c in calls] == [
+        ("docs/index.html", "text/html"),
+        ("docs/manifest.json", "application/json"),
+        ("docs/assets/app.js", mimetypes.guess_type("app.js")[0]),
+        ("docs/assets/styles/site.css", "text/css"),
+        ("docs/assets/styles/theme.css", "text/css"),
+        ("docs/info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
+    ]
+
+
+def test_dbt_docs_gcs_local_operator_sets_no_mime_type_for_dbt_1(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=False)
+    mock_gcs = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_gcs}):
+        operator = _docs_operator(DbtDocsGCSLocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_gcs.GCSHook.return_value.upload.call_args_list
+    assert [c.kwargs["object_name"] for c in calls] == ["index.html", "manifest.json", "catalog.json"]
+    assert all("mime_type" not in c.kwargs for c in calls)
+
+
+def test_dbt_docs_s3_local_operator_uploads_dbt_1_files_as_html(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=False)
+    mock_s3 = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_s3}):
+        operator = _docs_operator(DbtDocsS3LocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    mock_s3.S3Hook.assert_called_once_with("fake-conn", extra_args={"ContentType": "text/html"})
+    keys = [c.kwargs["key"] for c in mock_s3.S3Hook.return_value.load_file.call_args_list]
+    assert keys == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_s3_local_operator_uploads_the_dbt_oss_site_with_content_types(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=True)
+    uploads = []
+
+    def make_hook(connection_id, extra_args):
+        hook = MagicMock()
+        hook.load_file.side_effect = lambda **kwargs: uploads.append((kwargs["key"], extra_args["ContentType"]))
+        return hook
+
+    mock_s3 = MagicMock()
+    mock_s3.S3Hook.side_effect = make_hook
+    with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_s3}):
+        operator = _docs_operator(DbtDocsS3LocalOperator, folder_dir="docs")
+        operator.upload_to_cloud_storage(project_dir)
+
+    assert uploads == [
+        ("docs/index.html", "text/html"),
+        ("docs/manifest.json", "application/json"),
+        ("docs/assets/app.js", mimetypes.guess_type("app.js")[0]),
+        ("docs/assets/styles/site.css", "text/css"),
+        ("docs/assets/styles/theme.css", "text/css"),
+        ("docs/info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
+    ]
+    # One hook per content type, not one per file: six files, one of the five types is shared by two of them.
+    assert mock_s3.S3Hook.call_count == 5
+
+
+def test_dbt_docs_azure_local_operator_uploads_the_dbt_oss_site_with_content_types(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=True)
+    mock_wasb = MagicMock()
+    mock_blob = MagicMock()
+    mock_blob.ContentSettings.side_effect = lambda content_type: content_type
+    modules = {
+        "airflow.providers.microsoft.azure.hooks.wasb": mock_wasb,
+        "azure.storage.blob": mock_blob,
+    }
+    with patch.dict(sys.modules, modules):
+        operator = _docs_operator(DbtDocsAzureStorageLocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_wasb.WasbHook.return_value.load_file.call_args_list
+    assert [(c.kwargs["blob_name"], c.kwargs["content_settings"]) for c in calls] == [
+        ("index.html", "text/html"),
+        ("manifest.json", "application/json"),
+        ("assets/app.js", mimetypes.guess_type("app.js")[0]),
+        ("assets/styles/site.css", "text/css"),
+        ("assets/styles/theme.css", "text/css"),
+        ("info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
+    ]
+
+
+def test_dbt_docs_azure_local_operator_sets_no_content_settings_for_dbt_1(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=False)
+    mock_wasb = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.microsoft.azure.hooks.wasb": mock_wasb}):
+        operator = _docs_operator(DbtDocsAzureStorageLocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_wasb.WasbHook.return_value.load_file.call_args_list
+    assert [c.kwargs["blob_name"] for c in calls] == ["index.html", "manifest.json", "catalog.json"]
+    assert all("content_settings" not in c.kwargs for c in calls)
 
 
 @patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")
@@ -2517,18 +2757,24 @@ def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_co
     mock_path.rmdir.assert_not_called()
 
 
-@pytest.mark.integration
-def test_generate_dbt_flags_appends_no_static_parser(tmp_path):
+@pytest.mark.parametrize(
+    "is_dbt_v2, expect_flag",
+    [
+        pytest.param(False, True, marks=pytest.mark.integration, id="dbt-core"),
+        # dbt 2 has no static parser: it warns about the flag on every command and ``--warn-error`` fails on the warning
+        pytest.param(True, False, id="dbt-v2"),
+    ],
+)
+def test_generate_dbt_flags_no_static_parser(is_dbt_v2, expect_flag, tmp_path):
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="test-task",
         project_dir=tmp_path,
     )
     operator.invocation_mode = InvocationMode.DBT_RUNNER
-    tmp_project_dir = str(tmp_path)
-    profile_path = tmp_path / "profiles.yml"
-    flags = operator._generate_dbt_flags(tmp_project_dir, profile_path)
-    assert "--no-static-parser" in flags
+    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2):
+        flags = operator._generate_dbt_flags(str(tmp_path), tmp_path / "profiles.yml")
+    assert ("--no-static-parser" in flags) is expect_flag
 
 
 def test_generate_dbt_flags_does_not_append_no_static_parser_in_subprocess(tmp_path):

@@ -21,7 +21,9 @@ For ``ExecutionMode.LOCAL`` execution mode, Cosmos supports two invocation modes
    the differing temp paths can interfere with dbt's static parser and
    cause task hangs. Disabling the static parser is a workaround for this
    interaction. If you rely on dbt's static parser, use
-   ``InvocationMode.SUBPROCESS`` instead. See
+   ``InvocationMode.SUBPROCESS`` instead. dbt 2 has no static parser and
+   rejects the flag with a warning, so Cosmos does not append it when dbt 2
+   is installed. See
    `#1751 <https://github.com/astronomer/astronomer-cosmos/issues/1751>`_ and
    `#1760 <https://github.com/astronomer/astronomer-cosmos/pull/1760>`_ for the
    investigation that led to this workaround.

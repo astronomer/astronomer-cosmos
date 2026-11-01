@@ -14,6 +14,7 @@ if version.parse(airflow_version).major < _AIRFLOW3_MAJOR_VERSION:
 
 import importlib
 import json
+import mimetypes
 import os
 from contextlib import nullcontext
 from pathlib import Path
@@ -569,3 +570,165 @@ def test_get_storage_type(path, expected_type):
     from cosmos.plugin.storage import get_storage_type_from_path
 
     assert get_storage_type_from_path(path) == expected_type
+
+
+@skip_pre_airflow_31
+def test_dbt_oss_docs_static_files_are_served(tmp_path: Path):
+    docs_dir = tmp_path / "target"
+    (docs_dir / "assets").mkdir(parents=True)
+    (docs_dir / "info_schema" / "nested").mkdir(parents=True)
+    (docs_dir / "assets" / "index.js").write_text("console.log('dbt docs')")
+    (docs_dir / "assets" / "index.css").write_text("body {}")
+    parquet_bytes = bytes(range(256))
+    (docs_dir / "info_schema" / "nested" / "nodes.parquet").write_bytes(parquet_bytes)
+    af3, app = _app_with_projects({"core": {"dir": str(docs_dir), "index": "index.html", "name": "Core"}})
+    client = TestClient(app)
+
+    js = client.get("/core/assets/index.js")
+    assert js.status_code == 200
+    assert js.headers["content-type"].startswith(("text/javascript", "application/javascript"))
+    assert js.text == "console.log('dbt docs')"
+    assert client.get("/core/assets/index.css").headers["content-type"].startswith("text/css")
+    parquet = client.get("/core/info_schema/nested/nodes.parquet")
+    assert parquet.status_code == 200
+    assert parquet.content == parquet_bytes
+    # Same lookup as the handler: a host whose MIME database registers ``.parquet`` returns that type.
+    assert parquet.headers["content-type"] == (mimetypes.guess_type("nodes.parquet")[0] or "application/octet-stream")
+
+
+@skip_pre_airflow_31
+def test_dbt_oss_docs_static_files_missing_returns_404(tmp_path: Path):
+    docs_dir = tmp_path / "target"
+    (docs_dir / "assets").mkdir(parents=True)
+    af3, app = _app_with_projects({"core": {"dir": str(docs_dir), "name": "Core"}})
+    client = TestClient(app)
+
+    assert client.get("/core/assets/missing.js").status_code == 404
+    assert client.get("/core/assets").status_code == 404
+    assert client.get("/core/assets/").status_code == 404
+
+
+@skip_pre_airflow_31
+@pytest.mark.parametrize(
+    "path",
+    [
+        "run_results.json",  # outside the served folders
+        "compiled/jaffle_shop/models/orders.sql",
+        "private/secret.txt",
+        "assets/%2e%2e/run_results.json",  # a plain ``..`` is normalised by the test client before the request is sent
+    ],
+)
+def test_dbt_oss_docs_static_files_only_serves_assets_and_info_schema(tmp_path: Path, path: str):
+    docs_dir = tmp_path / "target"
+    (docs_dir / "assets").mkdir(parents=True)
+    (docs_dir / "compiled" / "jaffle_shop" / "models").mkdir(parents=True)
+    (docs_dir / "private").mkdir()
+    (docs_dir / "run_results.json").write_text("{}")
+    (docs_dir / "compiled" / "jaffle_shop" / "models" / "orders.sql").write_text("select 1")
+    (docs_dir / "private" / "secret.txt").write_text("secret")
+    (tmp_path / "outside.txt").write_text("outside")
+    af3, app = _app_with_projects({"core": {"dir": str(docs_dir), "name": "Core"}})
+
+    response = TestClient(app).get(f"/core/{path}")
+
+    assert response.status_code == 404
+    assert "secret" not in response.text and "select 1" not in response.text
+
+
+@skip_pre_airflow_31
+def test_dbt_oss_docs_static_files_do_not_follow_a_symlink_out_of_the_docs_folder(tmp_path: Path):
+    outside = tmp_path / "outside.txt"
+    outside.write_text("secret")
+    docs_dir = tmp_path / "target"
+    (docs_dir / "assets").mkdir(parents=True)
+    (docs_dir / "assets" / "inside.txt").write_text("docs")
+    (docs_dir / "assets" / "linked.txt").symlink_to(outside)
+    af3, app = _app_with_projects({"core": {"dir": str(docs_dir), "name": "Core"}})
+    client = TestClient(app)
+
+    linked = client.get("/core/assets/linked.txt")
+
+    assert linked.status_code == 404
+    assert "secret" not in linked.text
+    assert client.get("/core/assets/inside.txt").text == "docs"
+
+
+@skip_pre_airflow_31
+def test_dbt_oss_docs_static_files_are_served_when_the_docs_folder_is_a_symlink(tmp_path: Path):
+    real_dir = tmp_path / "real_target"
+    (real_dir / "assets").mkdir(parents=True)
+    (real_dir / "assets" / "index.js").write_text("console.log('dbt docs')")
+    docs_dir = tmp_path / "target"
+    docs_dir.symlink_to(real_dir, target_is_directory=True)
+    af3, app = _app_with_projects({"core": {"dir": str(docs_dir), "name": "Core"}})
+
+    assert TestClient(app).get("/core/assets/index.js").status_code == 200
+
+
+@skip_pre_airflow_31
+def test_dbt_oss_docs_static_files_not_configured_returns_404():
+    af3, app = _app_with_projects({"core": {"dir": None, "name": "Core"}})
+
+    assert TestClient(app).get("/core/assets/index.js").status_code == 404
+
+
+@skip_pre_airflow_31
+def test_dbt_oss_docs_static_files_read_error_returns_500(tmp_path: Path):
+    docs_dir = tmp_path / "target"
+    docs_dir.mkdir(parents=True)
+    af3, app = _app_with_projects({"core": {"dir": str(docs_dir), "name": "Core"}})
+
+    with patch("cosmos.plugin.airflow3.open_file", side_effect=PermissionError("denied")):
+        response = TestClient(app).get("/core/assets/index.js")
+
+    assert response.status_code == 500
+    assert response.json()["error"] == "file read failed"
+
+
+def test_open_file_remote_binary_uses_objectstorage():
+    af3 = _reload_af3_module()
+    modes = []
+
+    class _FakeFile:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b"\x00\x01"
+
+    class _FakePath:
+        def __init__(self, path: str, conn_id=None):
+            self.path = path
+            self.conn_id = conn_id
+
+        def open(self, mode="r", **kwargs):
+            modes.append(mode)
+            return _FakeFile()
+
+    with patch("cosmos.plugin.airflow3.connection_env", side_effect=lambda *_a, **_k: nullcontext()):
+        with patch("cosmos.plugin.airflow3.ObjectStoragePath", _FakePath):
+            assert af3.open_file("gs://bucket/docs/assets/a.js", conn_id="my_conn", binary=True) == b"\x00\x01"
+
+    assert modes == ["rb"]
+
+
+@skip_pre_airflow_31
+@pytest.mark.parametrize(
+    "path",
+    [
+        "assets/%252e%252e/private/secret.txt",  # decoded once by the framework, and again by the HTTP client of a remote dir
+        "assets/%252e%252e/%252e%252e/secret.txt",
+        "info_schema/%25252e%25252e/secret.txt",
+    ],
+)
+def test_dbt_oss_docs_static_files_reject_double_encoded_parent_segments(path: str):
+    af3, app = _app_with_projects({"core": {"dir": "https://example.com/docs", "name": "Core"}})
+
+    with patch.object(af3, "open_file") as mock_open_file:
+        response = TestClient(app).get(f"/core/{path}")
+
+    assert response.status_code == 404
+    mock_open_file.assert_not_called()

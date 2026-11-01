@@ -23,7 +23,7 @@ jobs:
     environment: ${{ github.event_name == 'pull_request_target' &&
       github.event.pull_request.head.repo.full_name != github.repository &&
       'external' || 'internal' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -31,7 +31,7 @@ jobs:
 
   # Skip the integration and kubernetes tests when only non-code files changed.
   Check-changed-files:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
@@ -133,7 +133,7 @@ jobs:
             case "$f" in
               cosmos/*|pyproject.toml|requirements/*) WAREHOUSE_E2E_CHANGED=true; break ;;
               tests/test_warehouse_metric_and_semantic_views.py|tests/utils.py) WAREHOUSE_E2E_CHANGED=true; break ;;
-              scripts/test/integration-setup.sh|scripts/test/integration-warehouse.sh|scripts/test/integration-warehouse-setup.sh) WAREHOUSE_E2E_CHANGED=true; break ;;
+              scripts/test/integration-setup.sh|scripts/test/integration-warehouse.sh|scripts/test/integration-warehouse-setup.sh|scripts/test/install-dbt-oss.sh) WAREHOUSE_E2E_CHANGED=true; break ;;
               dev/dags/dbt/databricks_metric_view/*|dev/dags/dbt/snowflake_semantic_view/*) WAREHOUSE_E2E_CHANGED=true; break ;;
               dev/dags/example_databricks_metric_view.py|dev/dags/example_snowflake_semantic_view.py) WAREHOUSE_E2E_CHANGED=true; break ;;
               .github/workflows/test.yml) WAREHOUSE_E2E_CHANGED=true; break ;;
@@ -144,7 +144,7 @@ jobs:
   Run-Integration-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Diagnostic: cap the job at 60 min so a hang does not run until GitHub's 6h default
     # timeout. This is a job-level backstop and does not itself produce a pytest traceback.
     timeout-minutes: 60
@@ -153,34 +153,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        airflow-version: ["2.9", "2.10", "2.11", "3.0", "3.1", "3.2", "3.3", "3.4"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        airflow-version: ["2.11", "3.0", "3.1", "3.2", "3.3", "3.4"]
         dbt-version: [ "1.12" ]
         split-group: [1, 2, 3]
         exclude:
           # Apache Airflow versions prior to 3.1.0 have not been tested with Python 3.13.
-          - python-version: "3.13"
-            airflow-version: "2.9"
-          - python-version: "3.13"
-            airflow-version: "2.10"
           - python-version: "3.13"
             airflow-version: "2.11"
           - python-version: "3.13"
             airflow-version: "3.0"
           # Python 3.14 is only pinned in the Airflow 3.2/3.3 dbt-1.12 lockfiles.
           - python-version: "3.14"
-            airflow-version: "2.9"
-          - python-version: "3.14"
-            airflow-version: "2.10"
-          - python-version: "3.14"
             airflow-version: "2.11"
           - python-version: "3.14"
             airflow-version: "3.0"
           - python-version: "3.14"
             airflow-version: "3.1"
-          # Apache Airflow 3.4 requires Python >=3.11.
-          - python-version: "3.10"
-            airflow-version: "3.4"
     services:
       postgres:
         image: postgres@sha256:4cd697181d4bd3ddc41a09012f339fa8cb5a8cd3d8b30130ea8378c176b6c494  # 14.18
@@ -210,7 +199,7 @@ jobs:
           key: integration-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}--${{ matrix.dbt-version }}${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -271,13 +260,13 @@ jobs:
   Run-Integration-Tests-Expensive:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
       matrix:
         python-version: ["3.11"]
-        airflow-version: ["2.9"]
+        airflow-version: ["2.11"]
         dbt-version: ["1.9"]
 
     services:
@@ -310,7 +299,7 @@ jobs:
           key: integration-expensive-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -361,17 +350,21 @@ jobs:
   Run-Integration-Tests-Warehouse:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.warehouse_e2e_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
     strategy:
+      # The dbt-oss cell must not cancel the dbt 1.12 one, or the other way round.
+      fail-fast: false
       matrix:
         python-version: ["3.11"]
         airflow-version: ["3.2"]
-        dbt-version: ["1.12"]
+        dbt-version: ["1.12", "2.0-dbt-oss"]
     env:
-      RESOURCE_PREFIX: cosmos_e2e_${{ github.run_id }}_${{ github.run_attempt }}
+      # One prefix per matrix cell: it names the Databricks schema and prefixes the Snowflake objects, so the cells
+      # would otherwise create and drop the same ones.
+      RESOURCE_PREFIX: cosmos_e2e_${{ github.run_id }}_${{ github.run_attempt }}_${{ strategy.job-index }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -391,7 +384,7 @@ jobs:
           key: integration-warehouse-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -404,7 +397,8 @@ jobs:
       - name: Install the warehouse adapters
         id: warehouse-adapters
         # The Airflow 3.2 + dbt 1.12 lockfile carries dbt-databricks 1.10 and no dbt-snowflake; metric
-        # views need dbt-databricks >= 1.12.5 and semantic views need dbt-snowflake.
+        # views need dbt-databricks >= 1.12.5 and semantic views need dbt-snowflake. dbt-oss has both adapters
+        # built in, so for 2.0-dbt-oss the script installs dbt-oss and only the warehouse clients the tests use.
         run: |
           hatch run tests.py${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}:test-integration-warehouse-setup
 
@@ -447,14 +441,14 @@ jobs:
   Run-Integration-Tests-DBT-1-8:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
         python-version: [ "3.11" ]
-        airflow-version: [ "2.10", "3.0" ]
+        airflow-version: [ "2.11", "3.0" ]
         dbt-version: [ "1.8" ]
     services:
       postgres:
@@ -486,7 +480,7 @@ jobs:
           key: integration-dbt-1-8-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -527,7 +521,7 @@ jobs:
   Run-Integration-Tests-DBT-Async:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
@@ -566,7 +560,7 @@ jobs:
           key: integration-dbt-async-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -613,15 +607,15 @@ jobs:
   Run-Integration-dbt-fusion-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11"]
-        airflow-version: ["2.10", "3.0"]
+        python-version: ["3.11"]
+        airflow-version: ["2.11", "3.0"]
         dbt-version: ["2.0-dbt-fusion"]  # dbt Fusion
 
     steps:
@@ -641,7 +635,7 @@ jobs:
           key: integration-dbtf-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}--${{ matrix.dbt-version }}${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -708,14 +702,14 @@ jobs:
   Run-Kubernetes-Tests:
     needs: [Authorize, Check-changed-files]
     if: needs.Check-changed-files.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
         python-version: [ "3.12" ]
-        airflow-version: [ "2.10", "3.0" ]
+        airflow-version: [ "2.11", "3.0" ]
         dbt-version: [ "1.11" ]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -734,7 +728,7 @@ jobs:
           key: coverage-integration-kubernetes-test-${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ matrix.dbt-version }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -785,7 +779,7 @@ jobs:
       - Run-Integration-Tests-DBT-Async
       - Run-Integration-dbt-fusion-Tests
       - Run-Kubernetes-Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       # Required to read artifacts from the sibling test-unprivileged.yml run.
@@ -800,7 +794,7 @@ jobs:
           allow-unsafe-pr-checkout: true
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11"
       - name: Install coverage

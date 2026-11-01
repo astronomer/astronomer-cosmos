@@ -752,7 +752,7 @@ class DbtGraph:
                 self.cache_key, self.project_path, self.dbt_ls_cache_key_args
             ),
             "dbt_ls_compressed": dbt_ls_compressed,
-            "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "last_modified": datetime.datetime.now(datetime.UTC).isoformat(),
             **self.airflow_metadata,
         }
         remote_cache_dir = _configure_remote_cache_dir()
@@ -1286,7 +1286,7 @@ class DbtGraph:
             ),
             "raw_selectors_compressed": raw_selectors_compressed,
             "parsed_selectors_compressed": parsed_selectors_compressed,
-            "last_modified": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "last_modified": datetime.datetime.now(datetime.UTC).isoformat(),
             **self.airflow_metadata,
         }
         remote_cache_dir = _configure_remote_cache_dir()

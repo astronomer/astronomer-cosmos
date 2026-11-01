@@ -57,7 +57,7 @@ except ImportError:
         pass
 
 
-from cosmos.dbt.parser.output import extract_log_issues
+from cosmos.dbt.parser.output import DBT_V2_SUMMARY_WARN_RE, extract_log_issues
 from cosmos.operators._watcher.base import store_dbt_resource_status_from_log
 from cosmos.operators.base import AbstractDbtBase
 
@@ -217,6 +217,9 @@ _FRESHNESS_PATTERN = re.compile(
 # Secondary pattern for simpler source freshness warnings
 # Matches: "WARN freshness of source_name"
 _SIMPLE_FRESHNESS_PATTERN = re.compile(r"WARN\s+freshness\s+of\s+([^\s]+)")
+# dbt 2 (dbt OSS) pattern for source freshness warnings
+# Matches: "Warned source raw.raw_orders (last updated 8years 6months ago) [5.73s]"
+_DBT_V2_FRESHNESS_PATTERN = re.compile(r"Warned\s+source\s+(\S+)(?:[^\n]*?\[([\d.]+)s\])?")
 
 
 class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc]
@@ -225,7 +228,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
 
     This handler can detect warnings from:
     1. Regular dbt tests (using the standard "Done. PASS=X WARN=Y" pattern)
-    2. Source freshness tests (using "WARN freshness of..." pattern)
+    2. Source freshness tests (using the "WARN freshness of..." pattern on dbt 1 and the "Warned source ..." line on dbt 2)
 
     The ``test_operator_class`` and ``source_operator_class`` parameters allow
     the same handler to work for both Kubernetes and GCP GKE operator variants.
@@ -309,12 +312,12 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         """
         Detect warnings using the standard dbt summary pattern.
 
-        Pattern: "Done. PASS=X WARN=Y ERROR=Z SKIP=W"
+        Pattern: "Done. PASS=X WARN=Y ERROR=Z SKIP=W", or "Summary: N total | ... | Y warn" on dbt 2
 
         :param log_text: Complete log text from the pod
         :return: Number of warnings detected, or None if pattern not found
         """
-        match = _WARN_COUNT_PATTERN.search(log_text)
+        match = _WARN_COUNT_PATTERN.search(log_text) or DBT_V2_SUMMARY_WARN_RE.search(log_text)
         if match:
             return int(match.group(1))
         return None
@@ -326,6 +329,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         Pattern examples:
         - "15:49:21 1 of 1 WARN freshness of auction_net.auction_net_raw ... [WARN in 0.90s]"
         - "WARN freshness of source_name.table_name"
+        - dbt 2: "Warned source raw.raw_orders (last updated 8years 6months ago) [5.73s]"
 
         :param log_text: Complete log text from the pod
         :return: List of warning dictionaries
@@ -361,6 +365,20 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
                         "source": source_name,
                     }
                 )
+
+        for match in _DBT_V2_FRESHNESS_PATTERN.finditer(log_text):
+            source_name = match.group(1)
+            if source_name not in seen_sources:
+                seen_sources.add(source_name)
+                warning: dict[str, Any] = {
+                    "name": f"source_freshness_{source_name}",
+                    "status": "WARN",
+                    "type": "source_freshness",
+                    "source": source_name,
+                }
+                if match.group(2):
+                    warning["execution_time"] = match.group(2)
+                warnings.append(warning)
 
         return warnings
 
@@ -527,9 +545,9 @@ def finalize_watcher_producer(operator: Any) -> None:
     """
     operator.dbt_cmd_flags += ["--log-format", "json"]
     compose_watcher_backup_callbacks(operator)
-    # Populated by the log parser when dbt emits SkippingDetails or LogSkipBecauseError for a node;
-    # subsequent "skipped" terminal events for those unique_ids are rewritten to "failed" so the
-    # consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+    # Populated by the log parser when dbt emits SkippingDetails or LogSkipBecauseError (dbt 1), or a skipped
+    # MarkSkippedChildren (dbt 2), for a node; subsequent "skipped" terminal events for those unique_ids are
+    # rewritten to "failed" so the consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
     # Mirrors DbtProducerWatcherOperator._upstream_failure_skipped_ids; see #2698.
     operator._upstream_failure_skipped_ids = set()
 

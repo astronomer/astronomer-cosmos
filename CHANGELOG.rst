@@ -49,6 +49,7 @@ Docs
 
 Bug Fixes
 
+* Preserve explicit false and zero values from Airflow connection extras in generated dbt profiles.
 * Stop rendering tests removed by ``exclude`` under ``LoadMode.DBT_MANIFEST``. In ``ExecutionMode.WATCHER`` their consumer tasks waited for an XCom the producer never pushed, because the producer honoured the exclude. By @tatiana and @ege-arhan in #3080, closes #2981.
 * On Airflow 3.0, the Cosmos plugin now logs a warning and skips the dbt docs views instead of raising ``RuntimeError`` on load. Previously, with ``[core] lazy_load_plugins = False`` (as on Astro Runtime), every Airflow CLI command logged a "Failed to import plugin cosmos" traceback, and the plugin's listeners were never registered.
 * The Airflow 2 dbt docs plugin now serves the ``assets/`` and ``info_schema/`` files of the docs site written by dbt 2 (``dbt-oss``), at ``/cosmos/assets/<path>`` and ``/cosmos/info_schema/<path>``, from a local folder or a remote bucket. Before, only the index page, ``manifest.json``, ``catalog.json`` and ``run_results.json`` were served, so the dbt 2 docs site loaded as a blank page. Files that a symlink points to outside the docs folder are not served. See #3101.

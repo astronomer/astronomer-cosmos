@@ -313,7 +313,7 @@ class BaseProfileMapping(ABC):
 
             for airflow_field in airflow_fields:
                 value = self._get_airflow_conn_field(airflow_field)
-                if not value:
+                if value is None or value == "":
                     continue
                 # if there's a transform method, use it
                 if hasattr(self, f"transform_{name}"):

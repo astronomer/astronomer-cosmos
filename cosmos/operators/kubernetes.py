@@ -290,7 +290,11 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
         return result
 
     def inject_upload_env_vars(self, env_vars: dict[str, str]) -> None:
-        existing_env_vars: list[Any] = list(self.env_vars or [])  # type: ignore[has-type]
+        current_env_vars = self.env_vars or []  # type: ignore[has-type]
+        # cncf-kubernetes >= 10.23.0 leaves a user-supplied ``env_vars`` dict unconverted until pod build time
+        if isinstance(current_env_vars, dict):
+            current_env_vars = convert_env_vars(current_env_vars)
+        existing_env_vars: list[Any] = list(current_env_vars)
         declared_env_var_names = {env_var.name for env_var in existing_env_vars if getattr(env_var, "name", None)} | {
             secret.deploy_target
             for secret in self.secrets or []

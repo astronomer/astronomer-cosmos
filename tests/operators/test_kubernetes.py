@@ -1291,3 +1291,29 @@ def test_dbt_docs_cloud_kubernetes_operator_upload_runs_with_python_path_with_sp
 
     assert result.returncode == 0, result.stderr
     assert result.stdout == "uploader ran\n"
+
+
+@pytest.mark.parametrize(
+    ("operator_class", "operator_kwargs"),
+    [
+        (DbtDocsS3KubernetesOperator, {"connection_id": "aws_s3_conn"}),
+        (DbtDocsGCSKubernetesOperator, {}),
+    ],
+)
+def test_dbt_docs_cloud_kubernetes_operator_inject_upload_env_vars_handles_dict_env_vars(
+    operator_class, operator_kwargs
+):
+    """cncf-kubernetes >= 10.23.0 keeps a user ``env_vars`` dict unconverted, so injection must not iterate its keys."""
+    operator = operator_class(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        bucket_name="fake-bucket",
+        **operator_kwargs,
+    )
+    operator.env_vars = {"USER_VAR": "user-value", "UPLOAD_VAR": "user-override"}
+
+    operator.inject_upload_env_vars({"UPLOAD_VAR": "from-connection", "NEW_VAR": "new-value"})
+
+    env_vars = {env_var.name: env_var.value for env_var in operator.env_vars}
+    assert env_vars == {"USER_VAR": "user-value", "UPLOAD_VAR": "user-override", "NEW_VAR": "new-value"}

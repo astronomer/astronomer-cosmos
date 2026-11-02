@@ -119,6 +119,7 @@ Docs
 * Document dbt OSS (dbt 2) in Kubernetes Pods by @pankajastro in #3157
 * Fix the ``enable_dataset_alias`` value that Airflow 3 rejects in the scheduling guide by @jedcunningham in #3153
 * Add a dbt OSS setup guide and list dbt Fusion and dbt OSS 2.0 separately in the compatibility policy by @pankajastro in #3132
+* Add a favicon to the docs site by @jedcunningham in #3162
 
 Architectural Proposal
 

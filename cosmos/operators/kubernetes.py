@@ -5,6 +5,7 @@ import shlex
 import textwrap
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from airflow.providers.cncf.kubernetes.backcompat.backwards_compat_converters import convert_env_vars
@@ -18,6 +19,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 import cosmos.operators._k8s_common as _k8s_common
 from cosmos.config import ProfileConfig
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators.base import (
     AbstractDbtBase,
     DbtBuildMixin,
@@ -237,6 +239,15 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
         """Return env vars required by the upload command."""
 
     @staticmethod
+    def _run_python_script_command(script: str) -> str:
+        """
+        Build the shell command that runs ``script`` with the Python of the image.
+
+        The interpreter path is quoted so that a path with spaces is not split by the shell.
+        """
+        return f"\"$(command -v python3 || command -v python)\" - <<'PY'\n{script}\nPY"
+
+    @staticmethod
     def _command_parts(command: Any) -> list[str]:
         if not command:
             return []
@@ -279,7 +290,11 @@ class DbtDocsCloudKubernetesOperator(DbtDocsKubernetesOperator, ABC):
         return result
 
     def inject_upload_env_vars(self, env_vars: dict[str, str]) -> None:
-        existing_env_vars: list[Any] = list(self.env_vars or [])  # type: ignore[has-type]
+        current_env_vars = self.env_vars or []  # type: ignore[has-type]
+        # cncf-kubernetes >= 10.23.0 leaves a user-supplied ``env_vars`` dict unconverted until pod build time
+        if isinstance(current_env_vars, dict):
+            current_env_vars = convert_env_vars(current_env_vars)
+        existing_env_vars: list[Any] = list(current_env_vars)
         declared_env_var_names = {env_var.name for env_var in existing_env_vars if getattr(env_var, "name", None)} | {
             secret.deploy_target
             for secret in self.secrets or []
@@ -365,7 +380,7 @@ class DbtDocsS3KubernetesOperator(DbtDocsCloudKubernetesOperator):
                 else:
                     s3.upload_file(str(file_path), bucket_name, key)
             """).strip()
-        return f"$(command -v python3 || command -v python) - <<'PY'\n{upload_script}\nPY"
+        return self._run_python_script_command(upload_script)
 
     def get_upload_env_vars(self) -> dict[str, str]:
         return self.aws_env_vars_from_connection(self.connection_id)
@@ -411,5 +426,143 @@ class DbtDocsS3KubernetesOperator(DbtDocsCloudKubernetesOperator):
             client_config["config_kwargs"] = config_kwargs
         if client_config:
             env_vars["COSMOS_AWS_CLIENT_CONFIG"] = json.dumps(client_config)
+
+        return env_vars
+
+
+class DbtDocsGCSKubernetesOperator(DbtDocsCloudKubernetesOperator):
+    """
+    Executes `dbt docs generate` inside a Kubernetes Pod and uploads the generated
+    documentation to Google Cloud Storage also inside that Pod using ``google-cloud-storage``.
+
+    The Pod authenticates with Application Default Credentials (for example GKE Workload Identity) unless
+    ``connection_id`` is given. With ``connection_id``, the service account key (``keyfile_dict`` or ``key_path``) and
+    the project of that Airflow connection are resolved on the Airflow worker and passed to the Pod as environment
+    variables.
+
+    :param bucket_name: Google Cloud Storage's bucket name
+    :param connection_id: Google Cloud's Airflow connection ID. Optional: without it the Pod uses its own
+        Application Default Credentials.
+    :param folder_dir: This can be used to specify under which directory the generated DBT documentation should be
+        uploaded.
+    """
+
+    ui_color = "#4772d5"
+
+    # Connection fields that hold credentials the Pod cannot use. Ignoring them would make the Pod silently upload
+    # with its own identity instead of the one configured in the connection.
+    _UNSUPPORTED_CREDENTIAL_FIELDS = (
+        "key_secret_name",
+        "credential_config_file",
+        "idp_issuer_url",
+        "is_anonymous",
+        "impersonation_chain",
+    )
+
+    def __init__(
+        self,
+        bucket_name: str,
+        connection_id: str | None = None,
+        folder_dir: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.connection_id = connection_id
+        self.bucket_name = bucket_name
+        self.folder_dir = folder_dir
+
+    def build_upload_shell_command(self, docs_target: str) -> str:
+        folder_dir = self.folder_dir.strip("/") if self.folder_dir else ""
+        upload_script = textwrap.dedent(f"""
+            import json
+            import mimetypes
+            import os
+            from pathlib import Path
+
+            try:
+                from google.cloud import storage
+            except ImportError as exc:
+                raise SystemExit(
+                    "google-cloud-storage is required in the Kubernetes image to upload dbt docs to GCS."
+                ) from exc
+
+            target_dir = Path({json.dumps(docs_target)})
+            bucket_name = {json.dumps(self.bucket_name)}
+            folder_dir = {json.dumps(folder_dir)}
+
+            # Uploading objects needs no project. An explicit None stops the client from raising when it cannot
+            # find one, for example with user credentials outside Google Cloud.
+            client_kwargs = dict(project=os.environ.get("GOOGLE_CLOUD_PROJECT") or None)
+
+            keyfile_dict = os.environ.get("COSMOS_GCP_KEYFILE_DICT")
+            if keyfile_dict:
+                from google.oauth2 import service_account
+
+                client_kwargs["credentials"] = service_account.Credentials.from_service_account_info(
+                    json.loads(keyfile_dict)
+                )
+
+            bucket = storage.Client(**client_kwargs).bucket(bucket_name)
+            for file_path in target_dir.rglob("*"):
+                if not file_path.is_file():
+                    continue
+
+                relative_path = file_path.relative_to(target_dir).as_posix()
+                blob_name = f"{{folder_dir}}/{{relative_path}}" if folder_dir else relative_path
+                content_type, _ = mimetypes.guess_type(str(file_path))
+                print(f"Uploading {{file_path}} to gs://{{bucket_name}}/{{blob_name}}")
+                bucket.blob(blob_name).upload_from_filename(str(file_path), content_type=content_type)
+            """).strip()
+        return self._run_python_script_command(upload_script)
+
+    def get_upload_env_vars(self) -> dict[str, str]:
+        if not self.connection_id:
+            self.log.info(
+                "No connection_id given: the Pod uploads the dbt docs with its Application Default Credentials"
+            )
+            return {}
+        return self.gcp_env_vars_from_connection(self.connection_id)
+
+    def gcp_env_vars_from_connection(self, connection_id: str) -> dict[str, str]:
+        try:
+            from airflow.providers.google.common.hooks.base_google import GoogleBaseHook
+        except ImportError:
+            from cosmos.operators.lazy_load import MissingPackage
+
+            GoogleBaseHook = MissingPackage(
+                "airflow.providers.google.common.hooks.base_google.GoogleBaseHook",
+                "google",
+            )
+
+        hook = GoogleBaseHook(gcp_conn_id=connection_id)
+
+        unsupported_fields = [field for field in self._UNSUPPORTED_CREDENTIAL_FIELDS if hook._get_field(field)]
+        if unsupported_fields:
+            raise CosmosValueError(
+                f"The Airflow connection '{connection_id}' sets {', '.join(unsupported_fields)}, which "
+                f"{self.__class__.__name__} cannot pass to the Kubernetes Pod. Use a connection with `keyfile_dict` "
+                "or `key_path`, or leave `connection_id` unset so the Pod uses its Application Default Credentials."
+            )
+
+        env_vars = {}
+        keyfile_dict = hook._get_field("keyfile_dict")
+        key_path = hook._get_field("key_path")
+        if keyfile_dict:
+            env_vars["COSMOS_GCP_KEYFILE_DICT"] = (
+                keyfile_dict if isinstance(keyfile_dict, str) else json.dumps(keyfile_dict)
+            )
+        elif key_path:
+            # The key file lives on the Airflow worker, not in the Pod, so its content is passed instead of its path.
+            env_vars["COSMOS_GCP_KEYFILE_DICT"] = Path(key_path).read_text(encoding="utf-8")
+        else:
+            self.log.info(
+                "The Airflow connection '%s' has no service account key: the Pod uploads the dbt docs with its "
+                "Application Default Credentials",
+                connection_id,
+            )
+
+        project_id = hook._get_field("project")
+        if project_id:
+            env_vars["GOOGLE_CLOUD_PROJECT"] = project_id
 
         return env_vars

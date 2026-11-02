@@ -15,9 +15,10 @@ Cosmos offers pre-built ways of generating and uploading dbt docs, plus a fallba
 - :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator` (introduced in Cosmos 1.15.0): generates docs in a Kubernetes Pod and uploads them to an S3 bucket from inside that Pod.
 - :class:`~cosmos.operators.DbtDocsAzureStorageOperator`: generates and uploads docs to an Azure Blob Storage.
 - :class:`~cosmos.operators.DbtDocsGCSOperator`: generates and uploads docs to a GCS bucket.
+- :class:`~cosmos.operators.kubernetes.DbtDocsGCSKubernetesOperator`: generates docs in a Kubernetes Pod and uploads them to a GCS bucket from inside that Pod.
 - :class:`~cosmos.operators.DbtDocsOperator`: generates docs and runs a custom callback.
 
-The first four operators require you to have a connection to the target storage. The last operator allows you to run custom code after the docs are generated in order to upload them to a storage of your choice.
+The upload operators require you to have a connection to the target storage, except :class:`~cosmos.operators.kubernetes.DbtDocsGCSKubernetesOperator`, which can use the credentials of the Pod instead. The last operator allows you to run custom code after the docs are generated in order to upload them to a storage of your choice.
 
 
 Examples
@@ -152,7 +153,7 @@ The following example extends the Kubernetes example DAG and uploads the generat
 The ``connection_id`` is resolved from Airflow with ``AwsBaseHook`` and translated into AWS environment variables that are injected into the Pod before the ``boto3`` uploader runs.
 
 .. note::
-    This Kubernetes integration currently supports S3 only. If you need another storage backend, use one of the local operators or extend Cosmos with another Kubernetes docs operator.
+    In Kubernetes execution mode, Cosmos supports S3 and GCS (see :ref:`upload-to-gcs-from-kubernetes`). If you need another storage backend, use one of the local operators or extend Cosmos with another Kubernetes docs operator.
 
 Upload to Azure Blob Storage
 ++++++++++++++++++++++++++++
@@ -194,6 +195,49 @@ You can use the :class:`~cosmos.operators.DbtDocsGCSOperator` to generate and up
         # docs-specific arguments
         connection_id="test_gcs",
         bucket_name="test_bucket",
+    )
+
+.. _upload-to-gcs-from-kubernetes:
+
+Upload to GCS from Kubernetes
++++++++++++++++++++++++++++++
+
+If you run dbt in :ref:`kubernetes` (including ``ExecutionMode.GCP_GKE``), use :class:`~cosmos.operators.kubernetes.DbtDocsGCSKubernetesOperator`.
+Like :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator`, it generates the docs and uploads them from inside the Kubernetes Pod, where the dbt ``target`` directory is created.
+
+Requirements specific to Kubernetes:
+
+- The container image must include your dbt project files and a ``profiles.yml`` file.
+- The container image must have ``google-cloud-storage`` available, either installed directly or provided by packages such as ``apache-airflow-providers-google`` or ``dbt-bigquery``.
+- The identity used by the Pod needs permission to create objects in the bucket, for example the ``roles/storage.objectAdmin`` role on the bucket. Use ``roles/storage.objectAdmin`` rather than ``roles/storage.objectCreator``, because later runs overwrite the existing files.
+
+The Pod can authenticate in two ways:
+
+- Without ``connection_id`` (recommended on GKE), the Pod uses its Application Default Credentials, for example a Kubernetes service account bound to a Google service account with `Workload Identity Federation for GKE <https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity>`_. No credentials leave the cluster.
+- With ``connection_id``, Cosmos reads the service account key of that Airflow Google Cloud connection on the Airflow worker (``keyfile_dict``, or the content of the file at ``key_path``) and its project, and injects them in the Pod as the ``COSMOS_GCP_KEYFILE_DICT`` and ``GOOGLE_CLOUD_PROJECT`` environment variables. A connection without a key falls back to the Pod's Application Default Credentials. Connections that use ``key_secret_name``, ``credential_config_file``, ``idp_issuer_url``, ``is_anonymous`` or ``impersonation_chain`` are rejected, because the Pod cannot use them.
+
+.. warning::
+    With ``connection_id``, the service account key is stored in plain text in the Pod specification, so anyone who can read Pods in the namespace can read it. Prefer Workload Identity when you can.
+
+.. code-block:: python
+
+    from cosmos.operators.kubernetes import DbtDocsGCSKubernetesOperator
+
+    # then, in your DAG code:
+    generate_dbt_docs_gcs = DbtDocsGCSKubernetesOperator(
+        task_id="generate_dbt_docs_gcs",
+        project_dir="/usr/app/dbt/jaffle_shop",
+        profile_config=ProfileConfig(
+            profiles_yml_filepath="/root/.dbt/profiles.yml",
+            profile_name="default",
+            target_name="dev",
+        ),
+        image="my-dbt-image:latest",
+        # The Kubernetes service account bound to a Google service account with Workload Identity
+        service_account_name="dbt-docs",
+        # docs-specific arguments
+        bucket_name="test_bucket",
+        folder_dir="dbt_docs",
     )
 
 Choosing a folder

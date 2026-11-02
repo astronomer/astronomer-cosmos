@@ -41,6 +41,7 @@ Features
   ``<source>.test``) instead of a single ``<source>_source`` task, so references to the old task id need updating.
   The source tests, which this mode never executed before, now run and can fail the DAG. See #1683.
 * Add ``AIConfig`` (experimental, it may change without a deprecation period), an opt-in diagnosis of failed dbt tasks: on their last attempt, an LLM is asked for the root cause and a fix, which are added after the dbt error. It uses ``apache-airflow-providers-common-ai`` (``pip install astronomer-cosmos[ai]``, for Python 3.11+ and Airflow 2.11+), works with ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``, masks secrets, and lets you set what is sent and how much it can spend. See the :doc:`AI config reference </reference/configs/ai-config>` and #3018.
+* Add ``DbtDocsGCSKubernetesOperator``, which generates dbt docs in a Kubernetes Pod and uploads them to Google Cloud Storage from inside that Pod. The Pod uses its Application Default Credentials (for example GKE Workload Identity), or the service account key of an optional Airflow Google Cloud ``connection_id``. The Pod image needs ``google-cloud-storage``. See #3167.
 * ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` now upload the docs site written by dbt OSS, which has no ``catalog.json``, with the content type of each file. The files uploaded for dbt 1 are unchanged. See #3101.
 
 Docs
@@ -49,6 +50,8 @@ Docs
 
 Bug Fixes
 
+* ``DbtDocsS3KubernetesOperator`` now quotes the path of the Python interpreter that runs its uploader in the Pod. Before, the upload failed with ``No such file or directory`` when that path contained a space. See #3167.
+* ``DbtDocsS3KubernetesOperator`` no longer fails with ``AttributeError: 'str' object has no attribute 'value'`` when ``env_vars`` is a dict and ``apache-airflow-providers-cncf-kubernetes`` is 10.23.0 or later. That provider version keeps the dict unconverted, and the operator used to read its keys as environment variables. See #3167.
 * Stop rendering tests removed by ``exclude`` under ``LoadMode.DBT_MANIFEST``. In ``ExecutionMode.WATCHER`` their consumer tasks waited for an XCom the producer never pushed, because the producer honoured the exclude. By @tatiana and @ege-arhan in #3080, closes #2981.
 * On Airflow 3.0, the Cosmos plugin now logs a warning and skips the dbt docs views instead of raising ``RuntimeError`` on load. Previously, with ``[core] lazy_load_plugins = False`` (as on Astro Runtime), every Airflow CLI command logged a "Failed to import plugin cosmos" traceback, and the plugin's listeners were never registered.
 * The Airflow 2 dbt docs plugin now serves the ``assets/`` and ``info_schema/`` files of the docs site written by dbt 2 (``dbt-oss``), at ``/cosmos/assets/<path>`` and ``/cosmos/info_schema/<path>``, from a local folder or a remote bucket. Before, only the index page, ``manifest.json``, ``catalog.json`` and ``run_results.json`` were served, so the dbt 2 docs site loaded as a blank page. Files that a symlink points to outside the docs folder are not served. See #3101.

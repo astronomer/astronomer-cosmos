@@ -39,6 +39,7 @@ At the moment, the user is expected to add to the Docker image both:
 - Handle secrets
 
 If you plan to generate dbt docs and upload them to S3 from Kubernetes, the Pod image must have ``boto3`` available, either installed directly or provided by packages such as ``apache-airflow-providers-amazon``.
+To upload them to GCS instead, the Pod image must have ``google-cloud-storage`` available.
 
 Additional KubernetesPodOperator parameters can be added to the ``operator_args`` parameter of the ``DbtKubernetesOperator``.
 
@@ -50,6 +51,7 @@ For instance,
    :end-before: [END kubernetes_tg_example]
 
 To generate dbt docs and upload them to S3 from the same Pod, use :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator` and Cosmos 1.15.0 or higher.
+To upload them to GCS, use :class:`~cosmos.operators.kubernetes.DbtDocsGCSKubernetesOperator`.
 See :ref:`generating-docs` for an end-to-end example and the extra requirements for this workflow.
 
 Container command and image ENTRYPOINT
@@ -257,4 +259,4 @@ The Kubernetes execution mode has the following limitations:
 - Does not support :ref:`callbacks` (there is an `open ticket #1575 <https://github.com/astronomer/astronomer-cosmos/issues/1575>`__ to address this)
 - Does not expose Compiled SQL as a :ref:`templated field <compiled-sql>`
 - Does not benefit from :ref:`Cosmos caching mechanisms <caching>`
-- Since 1.15.0, supports generating dbt docs and uploading them to S3 with :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator`; other object stores and callback-based uploads remain unsupported in Kubernetes execution mode
+- Supports generating dbt docs and uploading them to S3 with :class:`~cosmos.operators.kubernetes.DbtDocsS3KubernetesOperator` (since 1.15.0) and to GCS with :class:`~cosmos.operators.kubernetes.DbtDocsGCSKubernetesOperator`; other object stores and callback-based uploads remain unsupported in Kubernetes execution mode

@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,10 +19,12 @@ from pendulum import datetime
 from cosmos import ExecutionConfig, ExecutionMode, ProfileConfig, ProjectConfig
 from cosmos.airflow.task_group import DbtTaskGroup
 from cosmos.constants import InvocationMode
+from cosmos.exceptions import CosmosValueError
 from cosmos.operators._k8s_common import DbtTestWarningHandler
 from cosmos.operators.kubernetes import (
     DbtBuildKubernetesOperator,
     DbtCloneKubernetesOperator,
+    DbtDocsGCSKubernetesOperator,
     DbtDocsKubernetesOperator,
     DbtDocsS3KubernetesOperator,
     DbtKubernetesBaseOperator,
@@ -713,11 +716,13 @@ def test_operator_execute_with_flags(operator_class, kwargs, expected_args):
     (
         DbtDocsKubernetesOperator,
         DbtDocsS3KubernetesOperator,
+        DbtDocsGCSKubernetesOperator,
     ),
 )
 def test_operator_execute_without_flags(operator_class):
     operator_class_kwargs = {
         DbtDocsS3KubernetesOperator: {"connection_id": "aws_s3_conn", "bucket_name": "fake-bucket"},
+        DbtDocsGCSKubernetesOperator: {"connection_id": "gcp_conn", "bucket_name": "fake-bucket"},
     }
     task = operator_class(
         profile_config=profile_config,
@@ -939,7 +944,7 @@ def test_dbt_docs_s3_kubernetes_operator_uses_connection_id(
     assert "--profile default" in shell_cmd
     assert "--target dev" in shell_cmd
     assert "--project-dir fake-dir" in shell_cmd
-    assert " && $(command -v python3 || command -v python) - <<'PY'" in shell_cmd
+    assert " && \"$(command -v python3 || command -v python)\" - <<'PY'" in shell_cmd
     assert f'folder_dir = "{expected_folder_dir}"' in shell_cmd
 
 
@@ -1046,3 +1051,243 @@ def test_dbt_docs_s3_kubernetes_operator_upload_script_uploads_target_tree(tmp_p
             "ExtraArgs": None,
         },
     ]
+
+
+def _make_gcs_operator(**kwargs):
+    return DbtDocsGCSKubernetesOperator(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        image="fake-image",
+        profile_config=profile_config,
+        bucket_name="fake-bucket",
+        **kwargs,
+    )
+
+
+def _mock_google_base_hook(mock_hook_class, fields):
+    mock_hook_class.return_value._get_field.side_effect = lambda field: fields.get(field)
+    return mock_hook_class.return_value
+
+
+@pytest.mark.parametrize(
+    ("folder_dir", "expected_folder_dir"),
+    [("docs", "docs"), (None, ""), ("docs/", "docs"), ("/nested/docs/", "nested/docs")],
+)
+@patch(
+    "cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_cmd", return_value=(["dbt", "docs", "generate"], {})
+)
+def test_dbt_docs_gcs_kubernetes_operator_builds_shell_command(
+    _mock_build_cmd, mock_kubernetes_execute, folder_dir, expected_folder_dir
+):
+    operator = _make_gcs_operator(folder_dir=folder_dir)
+
+    operator.build_and_run_cmd(context={})
+
+    mock_kubernetes_execute.assert_called_once()
+    # Guard the bash -c path: the shell command must keep the "dbt" executable (see PR #2488).
+    assert operator.cmds == ["/bin/bash", "-c"]
+    shell_cmd = operator.arguments[0]
+    assert shell_cmd.startswith("dbt docs generate")
+    assert "--project-dir fake-dir" in shell_cmd
+    assert " && \"$(command -v python3 || command -v python)\" - <<'PY'" in shell_cmd
+    assert "from google.cloud import storage" in shell_cmd
+    assert 'target_dir = Path("fake-dir/target")' in shell_cmd
+    assert 'bucket_name = "fake-bucket"' in shell_cmd
+    assert f'folder_dir = "{expected_folder_dir}"' in shell_cmd
+    assert operator.callback is None
+
+
+@patch(
+    "cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_cmd", return_value=(["dbt", "docs", "generate"], {})
+)
+def test_dbt_docs_gcs_kubernetes_operator_without_connection_uses_pod_credentials(
+    _mock_build_cmd, mock_kubernetes_execute
+):
+    operator = _make_gcs_operator()
+
+    with patch("airflow.providers.google.common.hooks.base_google.GoogleBaseHook") as mock_hook_class:
+        operator.build_and_run_cmd(context={})
+
+    mock_hook_class.assert_not_called()
+    assert not operator.env_vars
+
+
+@pytest.mark.parametrize(
+    "keyfile_dict",
+    [
+        {"type": "service_account", "project_id": "key-project"},
+        '{"type": "service_account", "project_id": "key-project"}',
+    ],
+)
+@patch(
+    "cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_cmd", return_value=(["dbt", "docs", "generate"], {})
+)
+def test_dbt_docs_gcs_kubernetes_operator_passes_keyfile_dict(_mock_build_cmd, mock_kubernetes_execute, keyfile_dict):
+    operator = _make_gcs_operator(connection_id="gcp_conn")
+
+    with patch("airflow.providers.google.common.hooks.base_google.GoogleBaseHook") as mock_hook_class:
+        _mock_google_base_hook(mock_hook_class, {"keyfile_dict": keyfile_dict, "project": "my-project"})
+        operator.build_and_run_cmd(context={})
+
+    mock_hook_class.assert_called_once_with(gcp_conn_id="gcp_conn")
+    env_vars = {env_var.name: env_var.value for env_var in operator.env_vars}
+    assert json.loads(env_vars["COSMOS_GCP_KEYFILE_DICT"]) == {"type": "service_account", "project_id": "key-project"}
+    assert env_vars["GOOGLE_CLOUD_PROJECT"] == "my-project"
+
+
+def test_dbt_docs_gcs_kubernetes_operator_reads_key_path_on_worker(tmp_path):
+    key_file = tmp_path / "key.json"
+    key_file.write_text('{"type": "service_account"}', encoding="utf-8")
+    operator = _make_gcs_operator(connection_id="gcp_conn")
+
+    with patch("airflow.providers.google.common.hooks.base_google.GoogleBaseHook") as mock_hook_class:
+        _mock_google_base_hook(mock_hook_class, {"key_path": str(key_file)})
+        env_vars = operator.get_upload_env_vars()
+
+    assert env_vars == {"COSMOS_GCP_KEYFILE_DICT": '{"type": "service_account"}'}
+
+
+def test_dbt_docs_gcs_kubernetes_operator_connection_without_key_uses_pod_credentials():
+    operator = _make_gcs_operator(connection_id="gcp_conn")
+
+    with patch("airflow.providers.google.common.hooks.base_google.GoogleBaseHook") as mock_hook_class:
+        _mock_google_base_hook(mock_hook_class, {"project": "my-project"})
+        env_vars = operator.get_upload_env_vars()
+
+    assert env_vars == {"GOOGLE_CLOUD_PROJECT": "my-project"}
+
+
+@pytest.mark.parametrize(
+    "field", ["key_secret_name", "credential_config_file", "idp_issuer_url", "is_anonymous", "impersonation_chain"]
+)
+def test_dbt_docs_gcs_kubernetes_operator_rejects_unsupported_credentials(field):
+    operator = _make_gcs_operator(connection_id="gcp_conn")
+
+    with patch("airflow.providers.google.common.hooks.base_google.GoogleBaseHook") as mock_hook_class:
+        _mock_google_base_hook(mock_hook_class, {field: "some-value", "keyfile_dict": "{}"})
+        with pytest.raises(CosmosValueError, match=field):
+            operator.get_upload_env_vars()
+
+
+@patch(
+    "cosmos.operators.kubernetes.DbtKubernetesBaseOperator.build_cmd", return_value=(["dbt", "docs", "generate"], {})
+)
+def test_dbt_docs_gcs_kubernetes_operator_keeps_user_declared_env_vars(_mock_build_cmd, mock_kubernetes_execute):
+    operator = _make_gcs_operator(connection_id="gcp_conn", env_vars={"GOOGLE_CLOUD_PROJECT": "user-project"})
+
+    with patch("airflow.providers.google.common.hooks.base_google.GoogleBaseHook") as mock_hook_class:
+        _mock_google_base_hook(mock_hook_class, {"keyfile_dict": "{}", "project": "conn-project"})
+        operator.build_and_run_cmd(context={})
+
+    env_vars = {env_var.name: env_var.value for env_var in operator.env_vars}
+    assert env_vars["GOOGLE_CLOUD_PROJECT"] == "user-project"
+    assert env_vars["COSMOS_GCP_KEYFILE_DICT"] == "{}"
+
+
+def _run_gcs_upload_script(operator, target_dir, monkeypatch):
+    uploads = []
+    clients = []
+
+    class FakeBlob:
+        def __init__(self, bucket_name, name):
+            self.bucket_name = bucket_name
+            self.name = name
+
+        def upload_from_filename(self, filename, content_type=None):
+            uploads.append(
+                {"bucket": self.bucket_name, "name": self.name, "filename": filename, "content_type": content_type}
+            )
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            clients.append(kwargs)
+
+        def bucket(self, bucket_name):
+            return SimpleNamespace(blob=lambda name: FakeBlob(bucket_name, name))
+
+    fake_service_account = SimpleNamespace(
+        Credentials=SimpleNamespace(from_service_account_info=lambda info: ("credentials", info))
+    )
+    monkeypatch.setitem(sys.modules, "google.cloud", SimpleNamespace(storage=SimpleNamespace(Client=FakeClient)))
+    monkeypatch.setitem(sys.modules, "google.oauth2", SimpleNamespace(service_account=fake_service_account))
+
+    shell_cmd = operator.build_upload_shell_command(str(target_dir))
+    upload_script = shell_cmd.split("<<'PY'\n", 1)[1].removesuffix("\nPY")
+    exec(upload_script, {})
+
+    return clients, sorted(uploads, key=lambda upload: upload["name"])
+
+
+def test_dbt_docs_gcs_kubernetes_operator_upload_script_uploads_target_tree(tmp_path, monkeypatch):
+    target_dir = tmp_path / "target"
+    (target_dir / "assets").mkdir(parents=True)
+    (target_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    (target_dir / "assets" / "style.css").write_text("", encoding="utf-8")
+    (target_dir / "assets" / "artifact").write_text("{}", encoding="utf-8")
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    monkeypatch.delenv("COSMOS_GCP_KEYFILE_DICT", raising=False)
+
+    clients, uploads = _run_gcs_upload_script(_make_gcs_operator(folder_dir="docs"), target_dir, monkeypatch)
+
+    # project=None, not missing: the client raises when it cannot find a project and none is passed
+    assert clients == [{"project": None}]
+    assert [upload["name"] for upload in uploads] == [
+        "docs/assets/artifact",
+        "docs/assets/style.css",
+        "docs/index.html",
+    ]
+    assert {upload["name"]: upload["content_type"] for upload in uploads} == {
+        "docs/assets/style.css": "text/css",
+        "docs/assets/artifact": None,
+        "docs/index.html": "text/html",
+    }
+    assert all(upload["bucket"] == "fake-bucket" for upload in uploads)
+    assert uploads[2]["filename"] == str(target_dir / "index.html")
+
+
+def test_dbt_docs_gcs_kubernetes_operator_upload_script_uses_connection_credentials(tmp_path, monkeypatch):
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    (target_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "my-project")
+    monkeypatch.setenv("COSMOS_GCP_KEYFILE_DICT", '{"type": "service_account"}')
+
+    clients, uploads = _run_gcs_upload_script(_make_gcs_operator(), target_dir, monkeypatch)
+
+    assert clients == [{"project": "my-project", "credentials": ("credentials", {"type": "service_account"})}]
+    assert [upload["name"] for upload in uploads] == ["index.html"]
+
+
+@pytest.mark.parametrize(
+    ("operator_class", "operator_kwargs"),
+    [
+        (DbtDocsS3KubernetesOperator, {"connection_id": "aws_s3_conn"}),
+        (DbtDocsGCSKubernetesOperator, {}),
+    ],
+)
+def test_dbt_docs_cloud_kubernetes_operator_upload_runs_with_python_path_with_spaces(
+    tmp_path, operator_class, operator_kwargs
+):
+    """The interpreter path is quoted, so a Python installed under a path with spaces still runs the uploader."""
+    bin_dir = tmp_path / "dir with spaces"
+    bin_dir.mkdir()
+    (bin_dir / "python3").symlink_to(sys.executable)
+    operator = operator_class(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        bucket_name="fake-bucket",
+        **operator_kwargs,
+    )
+    shell_cmd = operator._run_python_script_command("print('uploader ran')")
+
+    result = subprocess.run(
+        ["/bin/bash", "-c", shell_cmd],
+        env={"PATH": f"{bin_dir}:/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "uploader ran\n"

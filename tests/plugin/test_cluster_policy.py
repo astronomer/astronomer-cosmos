@@ -89,7 +89,7 @@ class TestTaskInstanceMutationHook:
             (Version("2.6.0"), 1, False),  # try_number 1 (first attempt) should not set queue
             (Version("2.6.0"), 2, True),  # try_number 2 (first retry) should set queue
             (Version("2.6.0"), 3, True),  # try_number 3 should set queue
-            (Version("2.10.0"), 2, True),  # Later Airflow 2.x versions should also work
+            (Version("2.11.0"), 2, True),  # Later Airflow 2.x versions should also work
         ],
     )
     @patch("cosmos.settings.watcher_dbt_retry_queue", "custom_retry_queue")

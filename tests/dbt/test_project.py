@@ -194,7 +194,7 @@ def test_create_symlinks_missing_project_includes_bundle_hint_on_airflow3(tmp_pa
     [
         (Version("3.0.0"), "/absolute/dbt/project", True),
         (Version("3.1.2"), "/absolute/dbt/project", True),
-        (Version("2.10.0"), "/absolute/dbt/project", False),  # Airflow 2 has no DAG bundles
+        (Version("2.11.0"), "/absolute/dbt/project", False),  # Airflow 2 has no DAG bundles
         (Version("3.0.0"), "relative/dbt/project", False),  # relative paths are unaffected by bundle relocation
         (Version("3.0.0"), None, False),  # no path configured
     ],

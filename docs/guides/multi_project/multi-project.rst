@@ -190,7 +190,7 @@ This option uses pre-generated ``manifest.json`` files for faster DAG parsing (n
     - Generate ``manifest.json`` for both projects before deploying (``dbt compile`` or ``dbt parse``)
     - For remote manifests (S3/GCS/Azure), configure the appropriate Airflow connection and use ``manifest_conn_id``
 
-**Option 3: Separate DAGs with Assets (Airflow 3) / Datasets (Airflow 2.4+)**
+**Option 3: Separate DAGs with Assets (Airflow 3) / Datasets (Airflow 2)**
 
 Cosmos automatically emits assets from each task when ``emit_datasets=True`` (the default).
 You can use these assets to trigger downstream DAGs.
@@ -258,7 +258,7 @@ For example, a Postgres model ``stg_customers`` in schema ``platform`` generates
         schedule=[UPSTREAM_CUSTOMERS, UPSTREAM_ORDERS],  # Triggers on upstream completion
     )
 
-**Example: Using AssetAlias (Airflow 3) / DatasetAlias (Airflow 2.10+)**
+**Example: Using AssetAlias (Airflow 3) / DatasetAlias (Airflow 2)**
 
 AssetAlias provides more flexible asset matching using URI patterns:
 
@@ -611,7 +611,7 @@ Best Practices
 4. **Generate manifests in CI** to ensure they're always available
 5. **Use persistent storage** (not in-memory databases) for cross-project data sharing
 6. **For asset-based scheduling**, use a completion marker task or depend on specific model assets
-7. **Consider AssetAlias** (Airflow 3) / **DatasetAlias** (Airflow 2.10+) for more flexible asset matching
+7. **Consider AssetAlias** (Airflow 3) / **DatasetAlias** (Airflow 2) for more flexible asset matching
 8. **For bidirectional setups**, follow the bootstrap order in
    :ref:`bidirectional-cross-project-references` the first time you generate both manifests
 

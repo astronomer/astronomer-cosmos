@@ -157,6 +157,63 @@ def test_get_dbt_packages_subpath_with_env_var_template(tmpdir):
     assert result == "dbt_packages_prod"
 
 
+SUFFIXED_PACKAGES_PATH = (
+    'dbt_packages{{ "_" + env_var("dbt_packages_suffix","") if env_var("dbt_packages_suffix","")!="" }}'
+)
+
+
+def test_get_dbt_packages_subpath_env_vars_take_precedence_over_os_environ(tmpdir, monkeypatch):
+    """Variables dbt runs with (e.g. ``ProjectConfig.env_vars``) win over the worker environment."""
+    monkeypatch.setenv("dbt_packages_suffix", "worker")
+    write_dbt_project_yml(tmpdir, {"packages-install-path": SUFFIXED_PACKAGES_PATH})
+
+    assert get_dbt_packages_subpath(tmpdir, {"dbt_packages_suffix": "RB"}) == "dbt_packages_RB"
+    assert get_dbt_packages_subpath(tmpdir, {"dbt_packages_suffix": ""}) == "dbt_packages"
+    assert get_dbt_packages_subpath(tmpdir, {"unrelated": "value"}) == "dbt_packages_worker"
+    assert get_dbt_packages_subpath(tmpdir) == "dbt_packages_worker"
+
+
+def test_resolve_env_var_falls_back_to_default_when_missing_from_env_vars(monkeypatch):
+    monkeypatch.delenv("NONEXISTENT_VAR", raising=False)
+    assert _resolve_env_var('{{ env_var("NONEXISTENT_VAR", "default_path") }}', {}) == "default_path"
+
+
+def test_create_symlinks_ignores_packages_folder_resolved_from_env_vars(tmp_path, monkeypatch):
+    """Regression: the suffixed packages folder used to be symlinked, so ``dbt deps`` failed with
+    ``Cannot call rmtree on a symbolic link`` when the suffix was only set in ``ProjectConfig.env_vars``."""
+    monkeypatch.delenv("dbt_packages_suffix", raising=False)
+    project_path = tmp_path / "project"
+    (project_path / "dbt_packages_RB").mkdir(parents=True)
+    (project_path / "models").mkdir()
+    write_dbt_project_yml(project_path, {"packages-install-path": SUFFIXED_PACKAGES_PATH})
+    tmp_dir = tmp_path / "tmp"
+    tmp_dir.mkdir()
+
+    create_symlinks(project_path, tmp_dir, ignore_dbt_packages=True, env_vars={"dbt_packages_suffix": "RB"})
+
+    assert not os.path.lexists(tmp_dir / "dbt_packages_RB")
+    assert (tmp_dir / "models").is_symlink()
+    assert (tmp_dir / DBT_PROJECT_FILENAME).is_symlink()
+
+
+def test_copy_dbt_packages_uses_env_vars_to_find_packages_folder(tmp_path, monkeypatch):
+    monkeypatch.delenv("dbt_packages_suffix", raising=False)
+    project_path = tmp_path / "project"
+    (project_path / "dbt_packages_RB" / "some_package").mkdir(parents=True)
+    (project_path / "dbt_packages_RB" / "some_package" / "dbt_project.yml").write_text("name: some_package")
+    (project_path / PACKAGE_LOCKFILE_YML).write_text("packages: []")
+    write_dbt_project_yml(project_path, {"packages-install-path": SUFFIXED_PACKAGES_PATH})
+    tmp_dir = tmp_path / "tmp"
+    tmp_dir.mkdir()
+
+    copy_dbt_packages(project_path, tmp_dir, env_vars={"dbt_packages_suffix": "RB"})
+
+    copied_package = tmp_dir / "dbt_packages_RB" / "some_package" / "dbt_project.yml"
+    assert copied_package.read_text() == "name: some_package"
+    assert not (tmp_dir / "dbt_packages_RB").is_symlink()
+    assert (tmp_dir / PACKAGE_LOCKFILE_YML).is_file()
+
+
 def test_create_symlinks(tmp_path):
     """Tests that symlinks are created for expected files in the dbt project directory."""
     tmp_dir = tmp_path / "dbt-project"

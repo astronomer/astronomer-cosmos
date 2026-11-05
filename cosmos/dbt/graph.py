@@ -903,8 +903,9 @@ class DbtGraph:
         else:
             load_method[method]()
 
-        self.update_node_dependency()
         self.bridge_filtered_dependencies()
+        # Build reverse dependencies from the final, bridged graph.
+        self.update_node_dependency()
 
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.filtered_nodes))

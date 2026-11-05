@@ -73,7 +73,8 @@ With ``LoadMode.DBT_LS``, dbt applies the selection itself, so Cosmos runs one e
 unfiltered ``dbt ls`` to recover the full graph, but only when a rendered node actually has an
 unrendered model, seed or snapshot parent. If a valid ``dbt ls`` cache exists but the project
 has such gaps, the cache is skipped and the project is loaded live so the ordering stays
-consistent between parses.
+consistent between parses. Without a ``profile_config``, Cosmos cannot reload the project
+live, so it keeps the cached graph and logs a warning that task dependencies may be incomplete.
 
 Examples:
 

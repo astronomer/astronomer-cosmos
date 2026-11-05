@@ -4002,6 +4002,42 @@ def test_load_via_manifest_with_selection_gap_bridges_dependencies():
     assert orders.depends_on == ["seed.jaffle_shop.raw_orders", "seed.jaffle_shop.raw_payments"]
     test_node = dbt_graph.filtered_nodes["test.jaffle_shop.not_null_orders_amount.106140f9fd"]
     assert test_node.depends_on == ["model.jaffle_shop.orders"]
+    assert orders.has_test
+    assert orders.has_non_detached_test
+    assert test_node.unique_id in dbt_graph.tests_per_model[orders.unique_id]
+
+    for node in dbt_graph.nodes.values():
+        expected_downstream = {
+            child.unique_id
+            for child in dbt_graph.nodes.values()
+            if child.resource_type != DbtResourceType.TEST and node.unique_id in child.depends_on
+        }
+        assert set(node.downstream) == expected_downstream
+
+
+def test_load_via_dbt_ls_with_selection_gap_keeps_reverse_dependencies():
+    graph = DbtGraph(project=ProjectConfig())
+    raw = _make_bridge_node("seed.proj.raw", DbtResourceType.SEED, [])
+    orders = _make_bridge_node("model.proj.orders", DbtResourceType.MODEL, ["model.proj.stg"])
+
+    def load_selected_nodes():
+        graph.nodes = {node.unique_id: node for node in (raw, orders)}
+        graph.filtered_nodes = graph.nodes
+        graph.unfiltered_nodes = {
+            node.unique_id: node
+            for node in (
+                _make_bridge_node(raw.unique_id, DbtResourceType.SEED, []),
+                _make_bridge_node("model.proj.stg", DbtResourceType.MODEL, [raw.unique_id]),
+                _make_bridge_node(orders.unique_id, DbtResourceType.MODEL, ["model.proj.stg"]),
+            )
+        }
+
+    with patch.object(graph, "load_via_dbt_ls", side_effect=load_selected_nodes):
+        graph.load(method=LoadMode.DBT_LS)
+
+    assert orders.depends_on == [raw.unique_id]
+    assert raw.downstream == [orders.unique_id]
+    assert orders.downstream == []
 
 
 @patch.object(DbtGraph, "load_via_dbt_ls_without_cache")

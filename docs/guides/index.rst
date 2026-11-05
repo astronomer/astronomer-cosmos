@@ -24,6 +24,7 @@ Make your dbt projects available to Airflow and install dbt into the environment
    :caption: Set up dbt with Airflow
 
    dbt_setup/dbt-fusion
+   dbt_setup/dbt-oss
    dbt_setup/execution-modes-local-conflicts
 
 Connect to your dbt database
@@ -57,6 +58,7 @@ You can customize how Cosmos parses your dbt workflows into Airflow Dags. Choosi
    Configure tests <translate_dbt_to_airflow/testing-behavior>
    translate_dbt_to_airflow/managing-sources
    translate_dbt_to_airflow/managing-seeds
+   translate_dbt_to_airflow/managing-semantic-metric-views
    translate_dbt_to_airflow/render-config
    Customize node conversion <translate_dbt_to_airflow/dag-customization>
 

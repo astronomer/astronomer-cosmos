@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import html
 import json
+import mimetypes
 import os
 import os.path as op
 from collections.abc import Generator
 from contextlib import contextmanager
+from pathlib import Path, PurePosixPath
 from typing import Any
 from unittest.mock import patch
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import airflow
 
@@ -26,6 +28,7 @@ from cosmos import telemetry
 from cosmos.constants import AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES
 from cosmos.listeners import dag_run_listener, task_instance_listener
 from cosmos.log import get_logger
+from cosmos.plugin import airflow3_auth
 from cosmos.plugin.snippets import IFRAME_SCRIPT
 from cosmos.plugin.storage import get_storage_type_from_path
 
@@ -34,6 +37,12 @@ logger = get_logger(__name__)
 # Airflow version gating: External views feature for the plugins used here (CosmosAF3Plugin) exist only in >= 3.1
 # Note: We compute AIRFLOW_VERSION locally here (not from constants) so that tests can patch airflow.__version__ and reload this module
 AIRFLOW_VERSION = Version(airflow.__version__)
+_airflow_310_docs_warning_logged = False
+
+
+def is_airflow_310() -> bool:
+    # Astro builds carry a local suffix (3.1.0+astro.2), and tests patch AIRFLOW_VERSION, so compare at call time.
+    return Version(AIRFLOW_VERSION.base_version) == Version("3.1.0")
 
 
 def ensure_airflow_version_supported() -> None:
@@ -42,6 +51,10 @@ def ensure_airflow_version_supported() -> None:
             "Cosmos AF3 plugin requires Airflow >= 3.1. External views are unavailable on earlier versions."
         )
 
+
+# The dbt OSS (dbt 2) docs site is a single-page app: ``index.html`` loads its JavaScript and CSS from ``assets/`` and reads its
+# data from ``info_schema/``. Only these folders are served besides the index, ``manifest.json`` and ``catalog.json``.
+DBT_DOCS_STATIC_DIRS = ("assets", "info_schema")
 
 API_BASE = conf.get("api", "base_url", fallback="")  # reads AIRFLOW__API__BASE_URL
 API_BASE_PATH = urlsplit(API_BASE).path.rstrip("/")
@@ -69,31 +82,47 @@ def connection_env(conn_id: str | None = None) -> Generator[None, None, None]:  
         yield
 
 
-def _read_content_via_object_storage(path: str, conn_id: str | None = None) -> Any:
+def _read_content_via_object_storage(path: str, conn_id: str | None = None, binary: bool = False) -> Any:
+    mode = "rb" if binary else "r"
     # Use connection_env only for Airflow 3.1.0
-    if AIRFLOW_VERSION == Version("3.1.0"):
+    if is_airflow_310() and conn_id is not None:
         with connection_env(conn_id):
             p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
-            with p.open("r") as f:  # type: ignore[no-untyped-call]
+            with p.open(mode) as f:  # type: ignore[no-untyped-call]
                 content = f.read()
             return content
     else:
         p = ObjectStoragePath(path, conn_id=conn_id) if conn_id else ObjectStoragePath(path)
-        with p.open("r") as f:  # type: ignore[no-untyped-call]
+        with p.open(mode) as f:  # type: ignore[no-untyped-call]
             content = f.read()
         return content
 
 
-def open_file(path: str, conn_id: str | None = None) -> Any:
+def _is_parent_segment(segment: str) -> bool:
+    """
+    Whether a URL path segment means ``..`` once it is decoded.
+
+    The web framework decodes the URL once, so ``%252e%252e`` arrives as the literal ``%2e%2e``, which passes a check for
+    ``..``. For a docs folder behind HTTP the client turns it into ``..`` when it builds the upstream URL, so decode until
+    nothing changes.
+    """
+    decoded = unquote(segment)
+    while decoded != segment:
+        segment, decoded = decoded, unquote(decoded)
+    return segment == ".."
+
+
+def open_file(path: str, conn_id: str | None = None, binary: bool = False) -> Any:
     """
     Retrieve a file from http, https, gs, s3, or wasb.
 
     Raise a (base Python) FileNotFoundError if the file is not found.
+    Return ``bytes`` when ``binary`` is True, otherwise ``str``.
     """
     if path.strip().startswith(AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES):
-        return _read_content_via_object_storage(path, conn_id=conn_id)
+        return _read_content_via_object_storage(path, conn_id=conn_id, binary=binary)
     else:
-        with open(path) as f:
+        with open(path, "rb" if binary else "r") as f:
             content = f.read()
         return content
 
@@ -132,7 +161,13 @@ def _load_projects_from_conf() -> dict[str, dict[str, str | None]]:
 
 def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
     ensure_airflow_version_supported()
-    app = FastAPI()
+    # FastAPI registers /openapi.json, /docs and /redoc without the app-wide dependencies, so they would be served unauthenticated.
+    app = FastAPI(
+        dependencies=airflow3_auth.dbt_docs_auth_dependencies(),
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
 
     projects = _load_projects_from_conf()
 
@@ -287,7 +322,54 @@ def create_cosmos_fastapi_app() -> FastAPI:  # noqa: C901
                 )
             return JSONResponse(content=json.loads(data))
 
+        # Static files of the dbt OSS docs site (``assets/`` and ``info_schema/``), read from the same directory or bucket.
+        @app.get(f"/{slug}/{{asset_path:path}}")
+        def docs_static_file(asset_path: str, slug_alias: str = slug) -> Response:
+            cfg_local = projects.get(slug_alias, {})
+            docs_dir_local = cfg_local.get("dir")
+            conn_id_local = cfg_local.get("conn_id")
+            parts = PurePosixPath(asset_path).parts
+            if (
+                not docs_dir_local
+                or len(parts) < 2
+                or parts[0] not in DBT_DOCS_STATIC_DIRS
+                or any(_is_parent_segment(part) for part in parts)
+            ):
+                return JSONResponse(content={"error": "not found", "slug": slug_alias}, status_code=404)
+            file_path = op.join(docs_dir_local, *parts)
+            # A symlink in the docs folder must not lead to a file outside of it (remote paths are read as they are).
+            if not file_path.strip().startswith(AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES) and not Path(
+                file_path
+            ).resolve().is_relative_to(Path(docs_dir_local).resolve()):
+                return JSONResponse(content={"error": "not found", "slug": slug_alias}, status_code=404)
+            try:
+                data = open_file(file_path, conn_id=conn_id_local, binary=True)
+            except (FileNotFoundError, IsADirectoryError):
+                return JSONResponse(content={"error": "file not found", "slug": slug_alias}, status_code=404)
+            except (OSError, ValueError, RuntimeError, TimeoutError, PermissionError):
+                logger.exception(
+                    "Error reading docs file for slug '%s', path '%s', conn_id '%s'",
+                    slug_alias,
+                    file_path,
+                    conn_id_local,
+                )
+                return JSONResponse(content={"error": "file read failed", "slug": slug_alias}, status_code=500)
+            media_type = mimetypes.guess_type(parts[-1])[0] or "application/octet-stream"
+            return Response(content=data, media_type=media_type)
+
     return app
+
+
+def _warn_once_that_airflow_310_cannot_open_dbt_docs() -> None:
+    global _airflow_310_docs_warning_logged
+    if _airflow_310_docs_warning_logged:
+        return
+    _airflow_310_docs_warning_logged = True
+    # The Airflow 3.1.0 UI deletes its session cookie after login, so the browser cannot authenticate to plugin routes.
+    logger.warning(
+        "Cosmos dbt docs require an authenticated user, which the Airflow 3.1.0 UI cannot provide to plugin "
+        "views; upgrade to Airflow >= 3.1.1 to open dbt docs from the Airflow UI."
+    )
 
 
 class CosmosAF3Plugin(AirflowPlugin):
@@ -303,7 +385,14 @@ class CosmosAF3Plugin(AirflowPlugin):
 
     def __init__(self) -> None:
         super().__init__()
-        ensure_airflow_version_supported()
+        if AIRFLOW_VERSION < Version("3.1.0"):
+            logger.warning(
+                "Cosmos dbt docs views require Airflow >= 3.1 (running %s); skipping them.", airflow.__version__
+            )
+            return
+        projects = _load_projects_from_conf()
+        if not projects:
+            return
         # Initialize FastAPI app only after version support is confirmed
         self.fastapi_apps = [
             {
@@ -312,7 +401,10 @@ class CosmosAF3Plugin(AirflowPlugin):
                 "url_prefix": "/cosmos",
             }
         ]
-        projects = _load_projects_from_conf()
+        if is_airflow_310():
+            _warn_once_that_airflow_310_cannot_open_dbt_docs()
+        # Instance-level list: Airflow 3 can instantiate the plugin more than once per process
+        self.external_views = []
         for slug, cfg in projects.items():
             display_name = cfg.get("name") or f"dbt Docs ({slug})"
             self.external_views.append(

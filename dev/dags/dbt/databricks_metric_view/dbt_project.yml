@@ -1,0 +1,24 @@
+name: databricks_metric_view
+version: "1.0.0"
+config-version: 2
+profile: databricks_metric_view
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+target-path: target
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  databricks_metric_view:
+    +materialized: table
+
+seeds:
+  databricks_metric_view:
+    raw_orders:
+      +column_types:
+        order_id: int
+        customer_id: int
+        order_date: date
+        status: string
+        revenue: decimal(10, 2)

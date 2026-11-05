@@ -1,8 +1,11 @@
+import json
 import os
 import shutil
 import sys
 import tempfile
 import types
+from enum import Enum
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -59,6 +62,42 @@ def invalid_dbt_project_dir(valid_dbt_project_dir):
 @patch.dict(sys.modules, {"dbt.cli.main": None})
 def test_is_available_is_false():
     assert not dbt_runner.is_available()
+
+
+@patch("cosmos.dbt.runner.version", return_value="2.0.0rc2")
+def test_is_dbt_v2(mock_version):
+    assert dbt_runner.is_dbt_v2()
+    mock_version.assert_called_once_with("dbt-core")
+
+
+@patch("cosmos.dbt.runner.version")
+def test_is_dbt_v2_is_false_for_dbt_v1(mock_version):
+    mock_version.side_effect = ["1.12.6", PackageNotFoundError("dbt-oss"), PackageNotFoundError("dbt")]
+    assert not dbt_runner.is_dbt_v2()
+    assert mock_version.call_count == 3
+    mock_version.assert_called_with("dbt")
+
+
+@patch("cosmos.dbt.runner.version")
+def test_is_dbt_v2_is_false_for_dbt_v3(mock_version):
+    mock_version.side_effect = ["3.0.0", PackageNotFoundError("dbt-oss"), PackageNotFoundError("dbt")]
+    assert not dbt_runner.is_dbt_v2()
+    assert mock_version.call_count == 3
+    mock_version.assert_called_with("dbt")
+
+
+@patch("cosmos.dbt.runner.version")
+def test_is_dbt_v2_ignores_invalid_version(mock_version):
+    mock_version.side_effect = ["not-a-version", PackageNotFoundError("dbt-oss"), PackageNotFoundError("dbt")]
+    assert not dbt_runner.is_dbt_v2()
+    assert mock_version.call_count == 3
+
+
+@patch("cosmos.dbt.runner.version")
+def test_is_dbt_v2_with_dbt_core_v1_next_to_dbt_v2(mock_version):
+    mock_version.side_effect = ["1.12.6", PackageNotFoundError("dbt-oss"), "2.0.8"]
+    assert dbt_runner.is_dbt_v2()
+    assert mock_version.call_count == 3
 
 
 def test_cleanup_dbt_adapters_calls_reset_adapters_and_gc():
@@ -244,6 +283,10 @@ def test_run_command(valid_dbt_project_dir):
     assert dbt_runner.handle_exception_if_needed(response) is None
 
 
+@pytest.mark.skipif(
+    dbt_runner.is_dbt_v2(),
+    reason="dbt 2 installs the missing dbt_packages itself on dbt ls, so the command does not fail",
+)
 @pytest.mark.integration
 def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
     # The following command will fail because we didn't run `dbt deps` in advance
@@ -263,15 +306,32 @@ def test_handle_exception_if_needed_after_exception(valid_dbt_project_dir):
     # Version("1.11.0")/Version("1.12.0") boundary is unstable here — it would
     # exclude 1.11.x patches (1.11.11 > 1.11.0) and misclassify 1.12 pre-releases
     # (PEP 440 sorts 1.12.0b2 < 1.12.0).
-    from dbt.version import get_installed_version
-    from packaging.version import Version
+    from tests.utils import get_dbt_version
 
-    installed_dbt_version = Version(get_installed_version().to_version_string()[1:])
+    installed_dbt_version = get_dbt_version()
     if (installed_dbt_version.major, installed_dbt_version.minor) <= (1, 11):
         expected2 = "dbt found 1 package(s) specified in packages.yml, but only 0 package(s) installed"
     else:
         expected2 = "dbt expects 1 package(s) based on packages specified in packages.yml, but found only 0 package(s) installed in dbt_packages"
     assert expected2 in err_msg
+
+
+@pytest.mark.integration
+def test_handle_exception_if_needed_after_exception_invalid_project_file(valid_dbt_project_dir):
+    """Same path as above, with a failure that dbt 1.x and dbt 2 both raise: ``dbt_project.yml`` is not valid YAML.
+
+    It checks that the exception becomes a CosmosDbtRunError, not the missing-packages message.
+    """
+    (valid_dbt_project_dir / "dbt_project.yml").write_text("name: [broken\n")
+
+    response = dbt_runner.run_command(command=["dbt", "ls"], env=os.environ, cwd=valid_dbt_project_dir)
+    assert not response.success
+    assert response.exception
+
+    with pytest.raises(CosmosDbtRunError) as exc_info:
+        dbt_runner.handle_exception_if_needed(response)
+
+    assert "dbt invocation did not complete with unhandled error:" in str(exc_info.value)
 
 
 @pytest.mark.integration
@@ -288,6 +348,93 @@ def test_handle_exception_if_needed_after_error(invalid_dbt_project_dir):
     err_msg = str(exc_info.value)
     expected1 = "dbt invocation completed with errors:"
     assert expected1 in err_msg
+
+
+def _failed_result(*results):
+    """A dbtRunnerResult of a failed command with no exception, as ``dbtRunner`` returns it for node errors."""
+    return SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=list(results)))
+
+
+def _node_result(unique_id, status, message):
+    return SimpleNamespace(status=status, message=message, unique_id=unique_id)
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
+def test_handle_exception_if_needed_dbt_2_failure_on_every_node_is_reported_once(mock_is_dbt_v2):
+    """dbt-oss 2.0.8 returns 37 results, all ``Compilation Error``, for a failing ``run-operation`` macro."""
+    unique_ids = ["exposure.jaffle_shop.weekly_metrics"] + [f"model.jaffle_shop.model_{i}" for i in range(36)]
+    response = _failed_result(*(_node_result(unique_id, "error", "Compilation Error") for unique_id in unique_ids))
+
+    with pytest.raises(CosmosDbtRunError) as exc_info:
+        dbt_runner.handle_exception_if_needed(response)
+
+    assert str(exc_info.value) == (
+        'dbt invocation completed with errors: all 37 nodes reported "Compilation Error". '
+        "dbt 2 reports a failure that is not tied to one node (for example the error of a run-operation macro) "
+        "on every node: see the dbt output above for the cause."
+    )
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
+@pytest.mark.parametrize(
+    "results, expected_message",
+    [
+        pytest.param(
+            [
+                _node_result("model.p.a", "error", "Database Error in model a"),
+                _node_result("model.p.b", "error", "Database Error in model b"),
+            ],
+            "dbt invocation completed with errors: model.p.a: Database Error in model a\n"
+            "model.p.b: Database Error in model b",
+            id="different_messages",
+        ),
+        pytest.param(
+            [
+                _node_result("model.p.a", "error", "Compilation Error"),
+                _node_result("model.p.b", "success", "Succeeded"),
+            ],
+            "dbt invocation completed with errors: model.p.a: Compilation Error",
+            id="not_every_node_failed",
+        ),
+        pytest.param(
+            [_node_result("model.p.a", "error", "Compilation Error")],
+            "dbt invocation completed with errors: model.p.a: Compilation Error",
+            id="single_node",
+        ),
+        pytest.param(
+            # What dbt-oss 2.0.8 returns for ``dbt test`` when two tests each return a row.
+            [_node_result("test.p.fail_a", "fail", "Error"), _node_result("test.p.fail_b", "fail", "Error")],
+            "dbt invocation completed with errors: test.p.fail_a: Error\ntest.p.fail_b: Error",
+            id="failing_tests_with_the_same_message",
+        ),
+        pytest.param(
+            [
+                _node_result("model.p.a", "error", "permission denied"),
+                _node_result("model.p.b", "error", "permission denied"),
+            ],
+            "dbt invocation completed with errors: model.p.a: permission denied\nmodel.p.b: permission denied",
+            id="every_node_with_another_same_message",
+        ),
+    ],
+)
+def test_handle_exception_if_needed_dbt_2_lists_the_nodes_otherwise(mock_is_dbt_v2, results, expected_message):
+    with pytest.raises(CosmosDbtRunError) as exc_info:
+        dbt_runner.handle_exception_if_needed(_failed_result(*results))
+
+    assert str(exc_info.value) == expected_message
+
+
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=False)
+def test_handle_exception_if_needed_dbt_1_keeps_listing_nodes_with_the_same_message(mock_is_dbt_v2):
+    """On dbt 1 five models can fail for the same reason, and the user needs to know which."""
+    response = _failed_result(*(_node_result(f"model.p.m{i}", "error", "permission denied") for i in range(2)))
+
+    with pytest.raises(CosmosDbtRunError) as exc_info:
+        dbt_runner.handle_exception_if_needed(response)
+
+    assert str(exc_info.value) == (
+        "dbt invocation completed with errors: model.p.m0: permission denied\nmodel.p.m1: permission denied"
+    )
 
 
 @pytest.mark.integration
@@ -425,3 +572,209 @@ def test_override_sys_argv_restores_original_argv():
         assert sys.argv == test_command
 
     assert sys.argv == original_argv
+
+
+class _DbtOssFreshnessStatus(str, Enum):
+    """Mirrors dbt-oss, which reports a source freshness warning as ``<FreshnessStatus.WARN: 'Warn'>``."""
+
+    WARN = "Warn"
+
+
+def test_extract_message_by_status_matches_the_warn_status_in_any_case():
+    results = [
+        SimpleNamespace(status=_DbtOssFreshnessStatus.WARN, unique_id="source.p.s.a"),
+        SimpleNamespace(status="warn", node=SimpleNamespace(name="test_b"), message="warned"),
+        SimpleNamespace(status="pass", node=SimpleNamespace(name="test_c"), message=None),
+    ]
+    result = SimpleNamespace(result=SimpleNamespace(results=results))
+
+    names, messages = dbt_runner.extract_message_by_status(result)
+
+    assert names == ["source.p.s.a", "test_b"]
+    assert messages == ["warn", "warned"]
+
+
+def test_extract_message_by_status_handles_results_without_a_message():
+    # dbt-oss source freshness results (``FreshnessResultsNode``) carry a status and a ``unique_id``, but no ``node``
+    # and no ``message``.
+    freshness = SimpleNamespace(status=_DbtOssFreshnessStatus.WARN, unique_id="source.p.s.a")
+    result = SimpleNamespace(result=SimpleNamespace(results=[freshness]))
+
+    names, messages = dbt_runner.extract_message_by_status(result)
+
+    assert names == ["source.p.s.a"]
+    assert messages == ["warn"]
+
+
+def test_extract_message_by_status_matches_the_levels_in_any_case():
+    results = [
+        SimpleNamespace(status="error", node=SimpleNamespace(name="model_a"), message="boom"),
+        SimpleNamespace(status="Runtime Error", node=SimpleNamespace(name="model_b"), message="bad"),
+        SimpleNamespace(status="success", node=SimpleNamespace(name="model_c"), message=None),
+    ]
+    result = SimpleNamespace(result=SimpleNamespace(results=results))
+
+    names, _ = dbt_runner.extract_message_by_status(result, ["Error", "Fail", "runtime error"])
+
+    assert names == ["model_a", "model_b"]
+
+
+def test_parse_number_of_warnings_counts_the_warn_status_in_any_case():
+    statuses = [_DbtOssFreshnessStatus.WARN, "warn", "pass", "error"]
+    result = SimpleNamespace(result=SimpleNamespace(results=[SimpleNamespace(status=s) for s in statuses]))
+
+    assert dbt_runner.parse_number_of_warnings(result) == 2
+
+
+def _dbt_event(event_class: str, **kwargs):
+    """Build a real dbt ``EventMsg``.
+
+    The collector goes through dbt's protobuf event shape, so a hand-rolled stand-in would not
+    exercise the path that actually breaks when dbt changes its event fields.
+    """
+    # dbt 2 ships neither ``dbt.events`` nor ``dbt_common``, and its ``dbtRunner`` has no event callbacks.
+    dbt_event_types = pytest.importorskip("dbt.events.types", reason="dbt 2 has no Python event types")
+    from dbt_common.events.base_types import msg_from_base_event
+
+    return msg_from_base_event(getattr(dbt_event_types, event_class)(**kwargs))
+
+
+def _run_operation_runner(event, fake_result, seen):
+    def fake_get_runner(callbacks=None):
+        seen.append(callbacks)
+        runner = MagicMock()
+
+        def invoke(cli_args):
+            for callback in callbacks or []:
+                callback(event)
+            return fake_result
+
+        runner.invoke.side_effect = invoke
+        return runner
+
+    return fake_get_runner
+
+
+def _patched_run_command(fake_get_runner, command):
+    with (
+        patch.object(dbt_runner, "get_runner", side_effect=fake_get_runner),
+        patch.object(dbt_runner, "_cleanup_dbt_adapters"),
+        patch.object(dbt_runner, "change_working_directory"),
+        patch.object(dbt_runner, "environ"),
+        patch.object(dbt_runner, "logger") as mock_logger,
+    ):
+        return dbt_runner.run_command(command=command, env={}, cwd="/tmp/project"), mock_logger
+
+
+def test_run_command_fills_run_operation_message_from_macro_error_event():
+    """dbt < 1.12 leaves message unset, so the macro error is only available as an event."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = _dbt_event("RunningOperationCaughtError", exc="Database Error in boom")
+
+    _patched_run_command(_run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"])
+
+    # dbt < 1.12 prefixes the event text ("Encountered an error while running operation: ..."),
+    # so assert the macro error is carried rather than pinning dbt's own wording.
+    assert "Database Error in boom" in entry.message
+
+
+def test_run_command_keeps_run_operation_message_set_by_dbt():
+    """On dbt >= 1.12 the message is already populated and must not be overwritten."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message="Database Error in boom")
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = _dbt_event("RunningOperationUncaughtError", exc="event text")
+
+    _, mock_logger = _patched_run_command(
+        _run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"]
+    )
+
+    assert entry.message == "Database Error in boom"
+    assert mock_logger.debug.call_count == 0
+
+
+def test_run_command_ignores_unrelated_events():
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = _dbt_event("MainReportVersion", version="1.9.0", log_version=3)
+
+    _, mock_logger = _patched_run_command(
+        _run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"]
+    )
+
+    assert entry.message is None
+    # Without this the test also passes when the event was never read at all.
+    assert mock_logger.debug.call_count == 0
+
+
+def test_run_command_registers_macro_collector_only_for_run_operation():
+    fake_result = SimpleNamespace(success=True, exception=None, result=None)
+    seen = []
+    event = _dbt_event("MainReportVersion", version="1.9.0", log_version=3)
+    fake_get_runner = _run_operation_runner(event, fake_result, seen)
+
+    _patched_run_command(fake_get_runner, ["dbt", "run"])
+    _patched_run_command(fake_get_runner, ["dbt", "run-operation", "boom"])
+
+    assert seen[0] is None
+    assert len(seen[1]) == 1
+
+
+def test_run_command_fills_message_when_flags_surround_run_operation():
+    """build_cmd puts flags on both sides of the subcommand, so position tells nothing."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = _dbt_event("RunningOperationCaughtError", exc="Database Error in boom")
+
+    _patched_run_command(
+        _run_operation_runner(event, fake_result, []),
+        ["dbt", "--log-level", "debug", "run-operation", "boom", "--vars", "{}", "--quiet"],
+    )
+
+    assert "Database Error in boom" in entry.message
+
+
+@patch.object(dbt_runner, "is_dbt_v2", return_value=True)
+def test_run_command_registers_no_callbacks_for_run_operation_on_dbt_2(mock_is_dbt_v2):
+    """dbt 2's ``dbtRunner`` raises ``NotImplementedError`` when given ``callbacks=``."""
+    fake_result = SimpleNamespace(success=True, exception=None, result=SimpleNamespace(results=[]))
+    seen = []
+
+    _patched_run_command(_run_operation_runner(None, fake_result, seen), ["dbt", "run-operation", "boom"])
+
+    assert seen == [None]
+
+
+def test_dbt_event_to_json_exposes_the_event_info_fields():
+    """Both invocation modes read ``info.name``/``info.msg``, so keep those names locked."""
+    event = _dbt_event("RunningOperationCaughtError", exc="Database Error in boom")
+
+    info = json.loads(dbt_runner.dbt_event_to_json(event))["info"]
+
+    assert info["name"] == "RunningOperationCaughtError"
+    assert "Database Error in boom" in info["msg"]
+
+
+def test_fill_missing_messages_logs_when_there_is_nowhere_to_attach():
+    """A dbt result without ``results`` must surface as a debug log, never as an exception."""
+    result = SimpleNamespace(result=SimpleNamespace())
+
+    with patch.object(dbt_runner, "logger") as mock_logger:
+        dbt_runner._fill_missing_messages(result, ["Database Error in boom"])
+
+    assert mock_logger.debug.call_count == 1
+
+
+def test_run_command_swallows_a_failure_to_read_a_dbt_event():
+    """A collector that raises would reach dbt as GenericExceptionOnRun, hiding the real error."""
+    entry = SimpleNamespace(status="error", unique_id="macro.probe.boom", message=None)
+    fake_result = SimpleNamespace(success=False, exception=None, result=SimpleNamespace(results=[entry]))
+    event = _dbt_event("RunningOperationCaughtError", exc="Database Error in boom")
+
+    with patch.object(dbt_runner, "dbt_event_to_json", side_effect=RuntimeError("unreadable event")):
+        _, mock_logger = _patched_run_command(
+            _run_operation_runner(event, fake_result, []), ["dbt", "run-operation", "boom"]
+        )
+
+    assert entry.message is None
+    assert mock_logger.debug.call_count == 1

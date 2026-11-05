@@ -4,6 +4,8 @@ import pytest
 from packaging.version import Version
 
 from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
+from cosmos.operators._watcher.aggregation import TestResultSummary
+from cosmos.operators._watcher.state import DbtTestStatus
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 
 _STARTUP_EVENTS = [{"name": "MainReportVersion", "msg": "Running with dbt=1.0.0", "ts": ""}]
@@ -133,6 +135,58 @@ class TestWatcherTrigger:
         assert compiled_sql is None
         mock_get_xcom_val.assert_called_once_with("model__jaffle_shop__stg_orders_tests_status")
 
+    @pytest.mark.asyncio
+    async def test_parse_dbt_node_status_for_test_sensor_reads_summary_dict(self):
+        self.trigger.is_test_sensor = True
+        summary = {
+            "status": "fail",
+            "passed_count": 1,
+            "failed_count": 1,
+            "skipped_count": 0,
+            "total_count": 2,
+            "failed_tests": ["test.pkg.b"],
+        }
+
+        with patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=summary)):
+            status, compiled_sql = await self.trigger._parse_dbt_node_status_and_compiled_sql()
+
+        assert status == "fail"
+        assert compiled_sql is None
+        assert self.trigger._test_result_summary == TestResultSummary.from_dict(summary)
+
+    @pytest.mark.asyncio
+    async def test_parse_dbt_node_status_for_test_sensor_without_status_yet(self):
+        self.trigger.is_test_sensor = True
+
+        with patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=None)):
+            assert await self.trigger._parse_dbt_node_status_and_compiled_sql() == (None, None)
+
+        assert self.trigger._test_result_summary is None
+
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    @pytest.mark.asyncio
+    async def test_run_failed_tests_include_summary_in_event(self, mock_startup_events):
+        self.trigger.is_test_sensor = True
+        summary = {
+            "status": "fail",
+            "passed_count": 1,
+            "failed_count": 1,
+            "skipped_count": 0,
+            "total_count": 2,
+            "failed_tests": ["test.pkg.b"],
+        }
+
+        with (
+            patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=summary)),
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="failed")),
+        ):
+            events = [event async for event in self.trigger.run()]
+
+        assert len(events) == 1
+        assert events[0].payload["status"] == "failed"
+        assert events[0].payload["reason"] == WatcherEventReason.NODE_FAILED
+        assert events[0].payload["test_result_summary"] == summary
+
     @pytest.mark.parametrize(
         "airflow_version, expected_val",
         [
@@ -157,9 +211,12 @@ class TestWatcherTrigger:
         [
             ({"status": "success", "outlet_uris": []}, "running", {"status": "success"}),
             ({"status": "skipped", "outlet_uris": []}, "running", {"status": "skipped"}),
+            # Node failed and producer terminated -> NODE_FAILED (node status takes precedence over
+            # the producer state). A failed node while the producer is still running is NOT here: it
+            # keeps polling (see test_run_keeps_polling_while_node_failed_but_producer_running).
             (
                 {"status": "failed", "outlet_uris": []},
-                "running",
+                "failed",
                 {"status": "failed", "reason": WatcherEventReason.NODE_FAILED},
             ),
             (None, "failed", {"status": "failed", "reason": WatcherEventReason.PRODUCER_FAILED}),
@@ -378,7 +435,9 @@ class TestWatcherTrigger:
         parse_mock = AsyncMock(return_value=("failed", "SELECT * FROM broken_model"))
         with (
             patch.object(self.trigger, "get_xcom_val", AsyncMock(side_effect=get_xcom_val_side_effect)),
-            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="running")),
+            # Producer terminated so the failure surfaces (a failed node with the producer still
+            # running would keep polling instead).
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="failed")),
             patch.object(self.trigger, "_parse_dbt_node_status_and_compiled_sql", parse_mock),
         ):
             events = [event async for event in self.trigger.run()]
@@ -386,6 +445,46 @@ class TestWatcherTrigger:
         assert events[0].payload["status"] == "failed"
         assert events[0].payload["reason"] == WatcherEventReason.NODE_FAILED
         assert events[0].payload["compiled_sql"] == "SELECT * FROM broken_model"
+
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    @pytest.mark.asyncio
+    async def test_run_keeps_polling_while_node_failed_but_producer_running(self, mock_startup_events):
+        """#2947: a failed node must not surface NODE_FAILED while the producer is still running.
+        The trigger keeps polling until the producer terminates, then yields NODE_FAILED so the
+        consumer's retry path can fall back."""
+        get_producer_status_mock = AsyncMock(side_effect=["running", "running", "failed"])
+        parse_mock = AsyncMock(side_effect=[("failed", None), ("failed", None), ("failed", None)])
+        with (
+            patch.object(self.trigger, "get_xcom_val", AsyncMock(return_value=None)),
+            patch.object(self.trigger, "_get_producer_task_status", get_producer_status_mock),
+            patch.object(self.trigger, "_parse_dbt_node_status_and_compiled_sql", parse_mock),
+            patch("asyncio.sleep", new_callable=AsyncMock) as sleep_mock,
+        ):
+            events = [event async for event in self.trigger.run()]
+
+        # Polled through the two "producer still running" iterations, surfaced the failure only once
+        # the producer had terminated.
+        assert sleep_mock.await_count == 2
+        assert len(events) == 1
+        assert events[0].payload == {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}
+
+    @pytest.mark.asyncio
+    @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    async def test_run_failed_node_event_marks_upstream_failure_skip(self, mock_startup_events):
+        """#3023: the deferred consumer reads the upstream-failure-skip mark from the event, not from XCom."""
+        xcoms = {"model__test_status": {"status": "failed", "outlet_uris": [], "upstream_failure_skip": True}}
+        with (
+            patch.object(self.trigger, "get_xcom_val", AsyncMock(side_effect=xcoms.get)),
+            patch.object(self.trigger, "_get_producer_task_status", AsyncMock(return_value="success")),
+        ):
+            events = [event async for event in self.trigger.run()]
+
+        assert len(events) == 1
+        assert events[0].payload == {
+            "status": "failed",
+            "reason": WatcherEventReason.NODE_FAILED,
+            "upstream_failure_skip": True,
+        }
 
     @patch("cosmos.operators._watcher.triggerer.logger")
     @patch("cosmos.operators._watcher.triggerer.asyncio.sleep", new_callable=AsyncMock)
@@ -455,6 +554,20 @@ class TestBuildSuccessEvent:
         self.trigger._outlet_uris = ["uri://dataset1"]
         event = self.trigger._build_success_event(compiled_sql=None)
         assert event["outlet_uris"] == ["uri://dataset1"]
+
+    def test_with_test_result_summary(self):
+        self.trigger._test_result_summary = TestResultSummary(
+            status=DbtTestStatus.PASS, passed_count=2, failed_count=0, total_count=2, failed_tests=()
+        )
+        event = self.trigger._build_success_event(compiled_sql=None)
+        assert event["test_result_summary"] == {
+            "status": "pass",
+            "passed_count": 2,
+            "failed_count": 0,
+            "skipped_count": 0,
+            "total_count": 2,
+            "failed_tests": [],
+        }
 
     def test_with_compiled_sql_and_outlet_uris(self):
         self.trigger._outlet_uris = ["uri://dataset1"]

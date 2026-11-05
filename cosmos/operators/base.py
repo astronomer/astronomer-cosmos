@@ -50,6 +50,11 @@ def resolve_templated_bool(value: bool | str | None) -> bool:
     return bool(value)
 
 
+def _dump_dbt_mapping(value: dict[str, Any]) -> str:
+    """Serialize a dict for dbt's ``--vars`` and ``--args`` as one-line flow YAML, as dbt 2 rejects block YAML with quoted strings."""
+    return yaml.dump(value, default_flow_style=True, width=float("inf"), allow_unicode=True).strip()
+
+
 class AbstractDbtBase(metaclass=ABCMeta):
     """
     Executes a dbt core cli command.
@@ -294,8 +299,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         if flag_value is None:
             return []
         elif isinstance(flag_value, dict):
-            yaml_string = yaml.dump(flag_value)
-            return [flag_name, yaml_string]
+            return [flag_name, _dump_dbt_mapping(flag_value)]
         elif isinstance(flag_value, list) and flag_value:
             return [flag_name, " ".join(flag_value)]
         elif isinstance(flag_value, list):
@@ -476,6 +480,13 @@ class DbtRunMixin:
         return flags
 
 
+class DbtSemanticMetricViewMixin(DbtRunMixin):
+    """Mixin for dbt run command on adapter-native semantic metric views. Same command and flags
+    as DbtRunMixin, but its own type so these tasks render distinctly in the Airflow UI."""
+
+    ui_color = "#E8A33D"
+
+
 class DbtTestMixin:
     """Mixin for dbt test command."""
 
@@ -520,7 +531,7 @@ class DbtRunOperationMixin:
         flags = []
         if self.args is not None:
             flags.append("--args")
-            flags.append(yaml.dump(self.args))
+            flags.append(_dump_dbt_mapping(self.args))
         return flags
 
 

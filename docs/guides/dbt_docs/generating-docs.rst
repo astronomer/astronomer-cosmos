@@ -209,9 +209,6 @@ All of the DbtDocsOperator accept the ``--static`` flag. To learn more about the
 The static flag is used to generate a single doc file that can be hosted directly from cloud storage.
 By having a single documentation file, you can make use of Access control can be configured through Identity-Aware Proxy (IAP), and making it easy to host.
 
-.. note::
-    The static flag is only available from dbt-core >=1.7
-
 The following code snippet shows how to provide this flag with the default jaffle_shop project:
 
 
@@ -229,6 +226,15 @@ The following code snippet shows how to provide this flag with the default jaffl
         bucket_name="test_bucket",
         dbt_cmd_flags=["--static"],
     )
+
+dbt-oss
++++++++++++++++
+
+``dbt docs generate`` of dbt OSS writes a different site, without ``catalog.json``.
+When the S3, Azure and GCS operators find it in the ``target`` folder, they upload ``index.html``, ``manifest.json``, ``assets/`` and ``info_schema/``, keeping the folder structure and setting the content type of each file.
+
+``--static`` is for dbt 1 only: dbt OSS does not accept it.
+The Airflow UI plugin also serves the ``assets/`` and ``info_schema/`` folders of the dbt OSS site, so it can show it. Copy the whole ``target`` folder (or the bucket prefix the operators upload to) to the ``dir`` of the project.
 
 Custom callback
 +++++++++++++++

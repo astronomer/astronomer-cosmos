@@ -17,6 +17,7 @@ from cosmos.operators._watcher.base import BaseConsumerSensor
 from cosmos.operators.base import (
     DbtRunMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
 )
 from cosmos.operators.kubernetes import (
@@ -106,20 +107,34 @@ class DbtRunWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
         super().__init__(*args, **kwargs)
 
 
+class DbtSemanticMetricViewWatcherKubernetesOperator(DbtSemanticMetricViewMixin, DbtConsumerWatcherKubernetesSensor):
+    """
+    Watches for the progress of an adapter-native semantic metric view, run by the producer task
+    (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str, ...] = DbtConsumerWatcherKubernetesSensor.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
 class DbtTestWatcherKubernetesOperator(DbtConsumerWatcherKubernetesSensor):
     """Sensor that watches the aggregated test status for a dbt model in WATCHER_KUBERNETES execution mode.
 
     The producer task collects individual test results as they finish and,
     once every test for a given model has reported, pushes a single
-    aggregated XCom (``"pass"`` or ``"fail"``) under the key returned by
-    ``get_tests_status_xcom_key(model_uid)``. This key sanitizes the dbt
+    aggregated XCom under the key returned by ``get_tests_status_xcom_key(model_uid)``:
+    a dict with ``status`` (``"pass"`` or ``"fail"``), ``passed_count``, ``failed_count``,
+    ``skipped_count``, ``total_count`` and up to ``MAX_FAILED_TESTS_IN_SUMMARY`` ``failed_tests`` unique_ids.
+    The key sanitizes the dbt
     model unique ID by replacing ``.`` with ``__`` before appending
     ``_tests_status`` (for example,
     ``model.jaffle_shop.stg_orders`` becomes
     ``model__jaffle_shop__stg_orders_tests_status``).
 
-    This sensor polls that key and returns success when ``"pass"`` or raises
-    ``AirflowException`` when ``"fail"``.
+    This sensor polls that key, logs the summary and returns success when ``status``
+    is ``"pass"`` or raises ``AirflowException`` when it is ``"fail"``.
 
     On manual clear from the Airflow UI or Airflow-level retry, the sensor falls
     back to launching a pod that runs ``dbt test --select <model>`` for this

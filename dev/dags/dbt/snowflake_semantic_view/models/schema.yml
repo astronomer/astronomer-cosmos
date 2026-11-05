@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: orders
+    columns:
+      - name: order_id
+        data_tests:
+          - unique
+          - not_null
+  - name: orders_semantic_view
+    description: Snowflake semantic view over orders (adapter-native semantic layer).
+  - name: revenue_by_status
+    columns:
+      - name: order_status
+        data_tests:
+          - unique
+          - not_null

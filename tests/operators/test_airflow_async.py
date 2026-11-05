@@ -161,7 +161,7 @@ def test_airflow_async_operator_args_rejects_output_only_template_fields(mock_bi
 
 
 def test_dbt_run_airflow_async_operator_renders_emit_datasets():
-    """The public async operator reassigns its own ``__bases__`` at construction, so check that
+    """The public async operator becomes a dynamic subclass at construction, so check that
     ``emit_datasets`` survives in ``template_fields`` and is rendered on that concrete class."""
     from airflow import DAG
 

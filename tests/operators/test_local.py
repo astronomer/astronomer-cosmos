@@ -1,19 +1,23 @@
 import base64
 import json
 import logging
+import mimetypes
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import zlib
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
-from unittest.mock import MagicMock, call, mock_open, patch
+from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
+from urllib.parse import urlparse
 
 import pytest
 from airflow import DAG
 from airflow import __version__ as airflow_version
-from airflow.exceptions import AirflowException, AirflowSkipException
+from airflow.exceptions import AirflowException, AirflowSkipException, AirflowTaskTimeout
 
 try:  # For Airflow 3
     from airflow.providers.standard.hooks.subprocess import SubprocessResult
@@ -32,8 +36,8 @@ from pendulum import datetime
 
 import cosmos.dbt.runner as dbt_runner
 from cosmos import DbtDag, DbtTaskGroup, ProjectConfig, RenderConfig, cache
-from cosmos.config import ProfileConfig
-from cosmos.constants import PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS, InvocationMode
+from cosmos.config import AIConfig, ProfileConfig
+from cosmos.constants import InvocationMode
 from cosmos.dbt.parser.output import (
     parse_number_of_warnings_subprocess,
 )
@@ -107,6 +111,14 @@ def failing_test_dbt_project(tmp_path):
     shutil.copy(MINI_DBT_PROJ_DIR_FAILING_SCHEMA, target_schema)
     yield tmp_dir_path
     tmp_dir.cleanup()
+
+
+@pytest.fixture
+def failing_error_test_dbt_project(failing_test_dbt_project):
+    """Same as ``failing_test_dbt_project``, but the failing test has ``severity: error``."""
+    schema = failing_test_dbt_project / "models/schema.yml"
+    schema.write_text(schema.read_text().replace("severity: warn", "severity: error").replace("warn_if", "error_if"))
+    return failing_test_dbt_project
 
 
 class ConcreteDbtLocalBaseOperator(DbtLocalBaseOperator):
@@ -232,8 +244,7 @@ def test_dbt_base_operator_add_global_flags() -> None:
         "--select",
         "my_first_model my_second_model",
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
         "--no-version-check",
     ]
 
@@ -375,7 +386,7 @@ def test_dbt_base_operator_run_dbt_runner_cannot_import():
         project_dir="my/dir",
         invocation_mode=InvocationMode.DBT_RUNNER,
     )
-    expected_error_message = "Could not import dbt core. Ensure that dbt-core >= v1.5 is installed and available in the environment where the operator is running."
+    expected_error_message = "Could not import dbt core. Ensure that dbt-core is installed and available in the environment where the operator is running."
     with patch.dict(sys.modules, {"dbt.cli.main": None}):
         with pytest.raises(CosmosDbtRunError, match=expected_error_message):
             dbt_base_operator.run_dbt_runner(command=["cmd"], env={}, cwd="some-project")
@@ -557,58 +568,7 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
     assert operator.parse_number_of_warnings == dbt_runner.parse_number_of_warnings
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) >= version.parse("2.10")
-    or version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1. \n"
-    "From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
-@pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets(caplog):
-    from airflow.datasets import Dataset
-
-    project_dir = Path(__file__).parent.parent.parent / "dev/dags/dbt/altered_jaffle_shop"
-
-    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="seed",
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        run_operator = DbtRunLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="run",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        test_operator = DbtTestLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=project_dir,
-            task_id="test",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-        )
-        seed_operator >> run_operator >> test_operator
-
-    run_test_dag(dag)
-
-    assert run_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.raw_customers", extra=None)]
-    assert run_operator.outlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
-    assert test_operator.inlets == [Dataset(uri="postgres://0.0.0.0:5432/postgres.public.stg_customers", extra=None)]
-    assert test_operator.outlets == []
-
-
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     try:
@@ -668,10 +628,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
 
 
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="Outlets are only overridden in Airflow 2.10 and 2.11 in DbtLocalBaseOperator.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
     from airflow.datasets import Dataset, DatasetAlias
@@ -818,10 +774,19 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
 
     new_test_dag(dag)
     assert "Assigning outlets with DatasetAlias in Airflow 3" in caplog.text
-    assert (
-        "Outlets: [Asset(name='postgres://0.0.0.0:5432/postgres/public/stg_customers', uri='postgres://0.0.0.0:5432/postgres/public/stg_customers'"
-        in caplog.text
-    )
+    # The Asset URI host, port, and database name come from the example_conn connection, which
+    # differs between setups (0.0.0.0 on a runner, the service hostname inside a container). Derive
+    # them all so the assertion is host-agnostic.
+    conn = urlparse(os.environ.get("AIRFLOW_CONN_EXAMPLE_CONN", "postgres://user:pass@0.0.0.0:5432/postgres"))
+    db_name = conn.path.lstrip("/") or "postgres"
+    expected_asset = f"postgres://{conn.hostname}:{conn.port or 5432}/{db_name}/public/stg_customers"
+    if "tests.dbt_oss_plugin" in os.getenv("PYTEST_PLUGINS", ""):
+        # The dbt-oss job runs the Postgres profile mapping above on BigQuery (tests/dbt_oss_plugin.py).
+        from tests.dbt_oss_plugin import DEFAULT_BIGQUERY_PROJECT
+
+        bigquery_project = os.getenv("COSMOS_TEST_BIGQUERY_PROJECT", DEFAULT_BIGQUERY_PROJECT)
+        expected_asset = f"bigquery/{bigquery_project}/{os.environ['COSMOS_TEST_BIGQUERY_DATASET']}/stg_customers"
+    assert f"Outlets: [Asset(name='{expected_asset}', uri='{expected_asset}'" in caplog.text
 
 
 @pytest.mark.integration
@@ -923,10 +888,6 @@ def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fai
 
 
 @patch("cosmos.settings.enable_dataset_alias", 0)
-@pytest.mark.skipif(
-    version.parse(airflow_version) < version.parse("2.10"),
-    reason="From Airflow 2.10 onwards, we started using DatasetAlias, which changed this behaviour.",
-)
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_via_envvar(caplog):
     with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
@@ -942,45 +903,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_vi
     assert run_operator.outlets == []
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) not in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
-    # https://github.com/apache/airflow/issues/39486
-)
-@pytest.mark.integration
-def test_run_operator_dataset_emission_is_skipped(caplog):
-    with DAG("test-id-1", start_date=datetime(2022, 1, 1)) as dag:
-        seed_operator = DbtSeedLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="seed",
-            dbt_cmd_flags=["--select", "raw_customers"],
-            install_deps=True,
-            append_env=True,
-            emit_datasets=False,
-        )
-        run_operator = DbtRunLocalOperator(
-            profile_config=real_profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="run",
-            dbt_cmd_flags=["--models", "stg_customers"],
-            install_deps=True,
-            append_env=True,
-            emit_datasets=False,
-        )
-
-        seed_operator >> run_operator
-
-    run_test_dag(dag)
-
-    assert run_operator.inlets == []
-    assert run_operator.outlets == []
-
-
-@pytest.mark.skipif(
-    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
-)
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
@@ -1015,10 +937,6 @@ def test_run_operator_dataset_url_encoded_names_in_airflow2(caplog):
     ]
 
 
-@pytest.mark.skipif(
-    version.parse(airflow_version) in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow inlets and outlets do not work by default in Airflow 2.9.0 and 2.9.1",
-)
 @pytest.mark.skipif(
     version.parse(airflow_version) >= version.parse("3"),
     reason="We do not support emitting assets with Airflow 3.0 without dataset alias.",
@@ -1219,6 +1137,47 @@ def test_run_test_operator_with_callback_and_trailing_dbt_output(failing_test_db
     context = on_warning_callback.call_args.args[0]
     assert context.get("test_names")
     assert context.get("test_results")
+
+
+@pytest.mark.integration
+def test_run_test_operator_subprocess_failure_exposes_failing_tests(failing_error_test_dbt_project):
+    """In SUBPROCESS mode the exception for a failing dbt test names the failing test and its detail. Issue #1806."""
+    raised: list[str] = []
+    original = DbtTestLocalOperator.handle_exception_subprocess
+
+    def capture(self, result):
+        try:
+            original(self, result)
+        except AirflowException as exc:
+            raised.append(str(exc))
+            raise
+
+    with DAG("test-failure-details-subprocess", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_error_test_dbt_project,
+            task_id="seed",
+            append_env=True,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=mini_profile_config,
+            project_dir=failing_error_test_dbt_project,
+            task_id="test",
+            append_env=True,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        )
+        seed_operator >> test_operator
+
+    with patch.object(DbtTestLocalOperator, "handle_exception_subprocess", capture):
+        run_test_dag(dag, expected_dag_state=DagRunState.FAILED)
+
+    assert raised, "dbt test was expected to fail"
+    assert "accepted_values_mini_orders_status__placed" in raised[0]
+    if dbt_runner.is_dbt_v2():
+        assert "failed row(s)" in raised[0]
+    else:
+        assert "Got " in raised[0] and "results, configured to fail if" in raised[0]
 
 
 @pytest.mark.integration
@@ -1498,7 +1457,7 @@ def test_store_compiled_sql_airflow3(tmp_path: Path) -> None:
             {
                 "context": {},
                 "env": {},
-                "cmd_flags": ["run-operation", "bla", "--args", "days: 7\ndry_run: true\n"],
+                "cmd_flags": ["run-operation", "bla", "--args", "{days: 7, dry_run: true}"],
                 "run_as_async": False,
                 "async_context": None,
                 "push_run_results_to_xcom": False,
@@ -1571,6 +1530,149 @@ def test_calculate_openlineage_events_completes_openlineage_errors(mock_get_proc
 
     assert instance.parse.called
     assert "Unable to parse OpenLineage events" in caplog.text
+
+
+def _write_run_results(path: Path, args: dict | None) -> None:
+    path.write_text(json.dumps({"metadata": {}, "results": [], "args": args} if args is not None else {"results": []}))
+
+
+@pytest.mark.parametrize(
+    "dbt_command_line, env, expected",
+    [
+        (["dbt", "build", "--profiles-dir", "/tmp/profiles"], {}, "/tmp/profiles"),
+        (["dbt", "build", "--profiles-dir=/tmp/profiles"], {}, "/tmp/profiles"),
+        (["dbt", "build"], {"DBT_PROFILES_DIR": "/from/env"}, "/from/env"),
+        (["dbt", "build", "--profiles-dir", "/from/command"], {"DBT_PROFILES_DIR": "/from/env"}, "/from/command"),
+        (["dbt", "build", "--profiles-dir", "/a", "--profiles-dir=/b"], {}, "/b"),
+        # The executable and the directory can be ``Path`` objects, as in the command of the watcher producer.
+        ([Path("/usr/bin/dbt"), "build", "--profiles-dir", Path("/tmp/profiles")], {}, "/tmp/profiles"),
+    ],
+)
+def test_add_missing_profiles_dir_to_run_results(tmp_path, dbt_command_line, env, expected):
+    """dbt 2 (dbt-oss) does not write ``args.profiles_dir``, which openlineage-integration-common reads."""
+    run_results = tmp_path / "run_results.json"
+    _write_run_results(run_results, {"command": "build", "which": "build"})
+
+    with patch.dict(os.environ, env):
+        DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, dbt_command_line)
+
+    args = json.loads(run_results.read_text())["args"]
+    assert args == {"command": "build", "which": "build", "profiles_dir": expected}
+
+
+@pytest.mark.parametrize(
+    "content, dbt_command_line",
+    [
+        pytest.param(
+            json.dumps({"args": {"which": "run", "profiles_dir": "/written/by/dbt"}}),
+            ["dbt", "run", "--profiles-dir", "/x"],
+            id="keeps_the_value_dbt_wrote",
+        ),
+        pytest.param(None, ["dbt", "run", "--profiles-dir", "/x"], id="missing_file"),
+        pytest.param("not json", ["dbt", "run", "--profiles-dir", "/x"], id="invalid_json"),
+        pytest.param(json.dumps({"results": []}), ["dbt", "run", "--profiles-dir", "/x"], id="no_args"),
+        pytest.param(json.dumps({"args": "text"}), ["dbt", "run", "--profiles-dir", "/x"], id="args_not_a_dict"),
+        pytest.param(json.dumps({"args": {"which": "run"}}), ["dbt", "run"], id="no_profiles_dir_to_add"),
+    ],
+)
+def test_add_missing_profiles_dir_to_run_results_leaves_the_file_alone(
+    tmp_path, monkeypatch, content, dbt_command_line
+):
+    run_results = tmp_path / "run_results.json"
+    if content is not None:
+        run_results.write_text(content)
+
+    monkeypatch.delenv("DBT_PROFILES_DIR", raising=False)
+    DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(run_results, dbt_command_line)
+
+    assert (run_results.read_text() if content is not None else None) == content
+
+
+def test_add_missing_profiles_dir_to_run_results_without_a_path():
+    DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results(None, ["dbt", "run", "--profiles-dir", "/x"])
+
+
+@patch(
+    "cosmos.operators.local.DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results", return_value=True
+)
+@patch("cosmos.dbt.runner.is_dbt_v2", return_value=True)
+@patch("cosmos.operators.local.DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
+def test_calculate_openlineage_events_completes_adds_the_profiles_dir_before_parsing(
+    mock_get_processor, mock_add_profiles_dir, mock_is_dbt_v2, mock_requires_profiles_dir
+):
+    instance = mock_get_processor.return_value.return_value
+    instance.run_result_path = "/project/target/run_results.json"
+
+    def parse():
+        mock_add_profiles_dir.assert_called_once()  # the key is expected before the library reads the file
+        return MagicMock(completes=[])
+
+    instance.parse.side_effect = parse
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, should_store_compiled_sql=False
+    )
+    command = ["dbt", "run", "--profiles-dir", "/profiles"]
+
+    dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=command)
+
+    mock_add_profiles_dir.assert_called_once_with("/project/target/run_results.json", command)
+    assert instance.parse.called
+
+
+@pytest.mark.parametrize(
+    "is_dbt_v2, library_requires_it, expected_call",
+    [
+        pytest.param(True, True, True, id="dbt_2_and_library_needs_it"),
+        # dbt Fusion used with a dbt 1.x environment: no change.
+        pytest.param(False, True, False, id="not_dbt_2"),
+        # openlineage-integration-common 1.44.0 and later use the --profiles-dir lookup themselves.
+        pytest.param(True, False, False, id="library_does_not_need_it"),
+    ],
+)
+@patch("cosmos.operators.local.DbtLocalBaseOperator._add_missing_profiles_dir_to_run_results")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
+def test_calculate_openlineage_events_completes_adds_the_profiles_dir_only_when_needed(
+    mock_get_processor, mock_add_profiles_dir, is_dbt_v2, library_requires_it, expected_call
+):
+    instance = mock_get_processor.return_value.return_value
+    instance.run_result_path = "/project/target/run_results.json"
+    instance.parse.return_value = MagicMock(completes=[])
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, should_store_compiled_sql=False
+    )
+    command = ["dbt", "run", "--profiles-dir", "/profiles"]
+
+    with (
+        patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2),
+        patch(
+            "cosmos.operators.local.DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results",
+            return_value=library_requires_it,
+        ),
+    ):
+        dbt_base_operator.calculate_openlineage_events_completes(
+            env={}, project_dir=DBT_PROJ_DIR, dbt_command_line=command
+        )
+
+    if expected_call:
+        mock_add_profiles_dir.assert_called_once_with("/project/target/run_results.json", command)
+    else:
+        mock_add_profiles_dir.assert_not_called()
+    assert instance.parse.called
+
+
+@pytest.mark.parametrize(
+    "installed_version, expected",
+    [("1.40.0", True), ("1.43.0", True), ("1.44.0", False), ("1.54.0", False), ("not a version", True)],
+)
+def test_openlineage_requires_profiles_dir_in_run_results(installed_version, expected):
+    with patch("cosmos.operators.local.version", return_value=installed_version):
+        assert DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results() is expected
+
+
+def test_openlineage_requires_profiles_dir_in_run_results_when_the_library_is_not_found():
+    with patch("cosmos.operators.local.version", side_effect=PackageNotFoundError):
+        assert DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results() is True
 
 
 def test_dbt_local_artifact_processor_imported_lazily():
@@ -1841,6 +1943,195 @@ def test_dbt_docs_local_operator_ignores_graph_gpickle():
     assert operator.required_files == ["index.html", "manifest.json", "catalog.json"]
 
 
+# mimetypes also reads the host's mime.types files, so a host that knows parquet reports its own type for it.
+PARQUET_CONTENT_TYPE = mimetypes.guess_type("x.parquet")[0] or "application/octet-stream"
+
+
+def _docs_target_dir(tmp_path, dbt_oss: bool) -> str:
+    """A project dir whose target/ holds the docs written by dbt 1 or by dbt-oss."""
+    target = tmp_path / "target"
+    if dbt_oss:
+        files = ["index.html", "manifest.json", "run_results.json", "assets/app.js", "assets/styles/site.css"]
+        files += ["assets/styles/theme.css"]
+        files += ["info_schema/v1/dbt.models.parquet", "private/index/x.parquet"]
+    else:
+        files = ["index.html", "manifest.json", "catalog.json", "run_results.json"]
+    for name in files:
+        (target / name).parent.mkdir(parents=True, exist_ok=True)
+        (target / name).write_text("x")
+    return tmp_path.as_posix()
+
+
+def _docs_operator(operator_class, **kwargs):
+    return operator_class(
+        task_id="fake-task",
+        project_dir="fake-dir",
+        profile_config=profile_config,
+        connection_id="fake-conn",
+        bucket_name="fake-bucket",
+        **kwargs,
+    )
+
+
+def test_dbt_docs_files_to_upload_is_required_files_for_dbt_1(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=False) + "/target"
+    assert operator._files_to_upload(target_dir) == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_files_to_upload_is_required_files_when_target_is_missing():
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    assert operator._files_to_upload("fake-dir/target") == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_files_to_upload_is_the_site_for_dbt_oss(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=True) + "/target"
+    # The site only: not run_results.json nor the private/ state that dbt-oss also writes to target/.
+    assert operator._files_to_upload(target_dir) == [
+        "index.html",
+        "manifest.json",
+        "assets/app.js",
+        "assets/styles/site.css",
+        "assets/styles/theme.css",
+        "info_schema/v1/dbt.models.parquet",
+    ]
+
+
+def test_dbt_docs_files_to_upload_is_sorted_whatever_the_order_of_the_filesystem(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=True) + "/target"
+    rglob = Path.rglob
+
+    def reversed_rglob(self, pattern):
+        return iter(sorted(rglob(self, pattern), reverse=True))
+
+    with patch.object(Path, "rglob", reversed_rglob):
+        files = operator._files_to_upload(target_dir)
+
+    assert files == [
+        "index.html",
+        "manifest.json",
+        "assets/app.js",
+        "assets/styles/site.css",
+        "assets/styles/theme.css",
+        "info_schema/v1/dbt.models.parquet",
+    ]
+
+
+def test_dbt_docs_keeps_dbt_1_files_when_catalog_json_is_present(tmp_path):
+    operator = DbtDocsLocalOperator(task_id="fake-task", project_dir="fake-dir", profile_config=profile_config)
+    target_dir = _docs_target_dir(tmp_path, dbt_oss=True) + "/target"
+    (tmp_path / "target" / "catalog.json").write_text("x")
+    assert operator._files_to_upload(target_dir) == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_gcs_local_operator_uploads_the_dbt_oss_site(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=True)
+    mock_gcs = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_gcs}):
+        operator = _docs_operator(DbtDocsGCSLocalOperator, folder_dir="docs")
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_gcs.GCSHook.return_value.upload.call_args_list
+    # GCSHook.upload would send application/octet-stream for all of them without a mime_type.
+    assert [(c.kwargs["object_name"], c.kwargs["mime_type"]) for c in calls] == [
+        ("docs/index.html", "text/html"),
+        ("docs/manifest.json", "application/json"),
+        ("docs/assets/app.js", mimetypes.guess_type("app.js")[0]),
+        ("docs/assets/styles/site.css", "text/css"),
+        ("docs/assets/styles/theme.css", "text/css"),
+        ("docs/info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
+    ]
+
+
+def test_dbt_docs_gcs_local_operator_sets_no_mime_type_for_dbt_1(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=False)
+    mock_gcs = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_gcs}):
+        operator = _docs_operator(DbtDocsGCSLocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_gcs.GCSHook.return_value.upload.call_args_list
+    assert [c.kwargs["object_name"] for c in calls] == ["index.html", "manifest.json", "catalog.json"]
+    assert all("mime_type" not in c.kwargs for c in calls)
+
+
+def test_dbt_docs_s3_local_operator_uploads_dbt_1_files_as_html(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=False)
+    mock_s3 = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_s3}):
+        operator = _docs_operator(DbtDocsS3LocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    mock_s3.S3Hook.assert_called_once_with("fake-conn", extra_args={"ContentType": "text/html"})
+    keys = [c.kwargs["key"] for c in mock_s3.S3Hook.return_value.load_file.call_args_list]
+    assert keys == ["index.html", "manifest.json", "catalog.json"]
+
+
+def test_dbt_docs_s3_local_operator_uploads_the_dbt_oss_site_with_content_types(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=True)
+    uploads = []
+
+    def make_hook(connection_id, extra_args):
+        hook = MagicMock()
+        hook.load_file.side_effect = lambda **kwargs: uploads.append((kwargs["key"], extra_args["ContentType"]))
+        return hook
+
+    mock_s3 = MagicMock()
+    mock_s3.S3Hook.side_effect = make_hook
+    with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_s3}):
+        operator = _docs_operator(DbtDocsS3LocalOperator, folder_dir="docs")
+        operator.upload_to_cloud_storage(project_dir)
+
+    assert uploads == [
+        ("docs/index.html", "text/html"),
+        ("docs/manifest.json", "application/json"),
+        ("docs/assets/app.js", mimetypes.guess_type("app.js")[0]),
+        ("docs/assets/styles/site.css", "text/css"),
+        ("docs/assets/styles/theme.css", "text/css"),
+        ("docs/info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
+    ]
+    # One hook per content type, not one per file: six files, one of the five types is shared by two of them.
+    assert mock_s3.S3Hook.call_count == 5
+
+
+def test_dbt_docs_azure_local_operator_uploads_the_dbt_oss_site_with_content_types(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=True)
+    mock_wasb = MagicMock()
+    mock_blob = MagicMock()
+    mock_blob.ContentSettings.side_effect = lambda content_type: content_type
+    modules = {
+        "airflow.providers.microsoft.azure.hooks.wasb": mock_wasb,
+        "azure.storage.blob": mock_blob,
+    }
+    with patch.dict(sys.modules, modules):
+        operator = _docs_operator(DbtDocsAzureStorageLocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_wasb.WasbHook.return_value.load_file.call_args_list
+    assert [(c.kwargs["blob_name"], c.kwargs["content_settings"]) for c in calls] == [
+        ("index.html", "text/html"),
+        ("manifest.json", "application/json"),
+        ("assets/app.js", mimetypes.guess_type("app.js")[0]),
+        ("assets/styles/site.css", "text/css"),
+        ("assets/styles/theme.css", "text/css"),
+        ("info_schema/v1/dbt.models.parquet", PARQUET_CONTENT_TYPE),
+    ]
+
+
+def test_dbt_docs_azure_local_operator_sets_no_content_settings_for_dbt_1(tmp_path):
+    project_dir = _docs_target_dir(tmp_path, dbt_oss=False)
+    mock_wasb = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.microsoft.azure.hooks.wasb": mock_wasb}):
+        operator = _docs_operator(DbtDocsAzureStorageLocalOperator)
+        operator.upload_to_cloud_storage(project_dir)
+
+    calls = mock_wasb.WasbHook.return_value.load_file.call_args_list
+    assert [c.kwargs["blob_name"] for c in calls] == ["index.html", "manifest.json", "catalog.json"]
+    assert all("content_settings" not in c.kwargs for c in calls)
+
+
 @patch("cosmos.hooks.subprocess.FullOutputSubprocessHook.send_sigint")
 def test_dbt_local_operator_on_kill_sigint(mock_send_sigint) -> None:
     dbt_base_operator = ConcreteDbtLocalBaseOperator(
@@ -1890,6 +2181,28 @@ def test_handle_exception_subprocess(caplog):
 
     assert len(str(err_context.value)) < 100  # Ensure the error message is not too long
     assert "\n".join(full_output) in caplog.text
+
+
+def test_handle_exception_subprocess_surfaces_failing_tests():
+    """Failing dbt nodes are included in the raised exception. Issue #1806."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=None,
+        task_id="my-task",
+        project_dir="my/dir",
+    )
+    full_output = [
+        "20:30:02  Failure in test not_null_my_model_id (models/schema.yml)",
+        "20:30:02    Got 5 results, configured to fail if != 0",
+    ]
+    result = FullOutputSubprocessResult(exit_code=1, output="test", full_output=full_output)
+
+    with pytest.raises(AirflowException) as err_context:
+        operator.handle_exception_subprocess(result)
+
+    message = str(err_context.value)
+    assert "non-zero exit code 1" in message
+    assert "not_null_my_model_id" in message
+    assert "Got 5 results, configured to fail if != 0" in message
 
 
 @pytest.fixture
@@ -2444,18 +2757,24 @@ def test_delete_sql_files_directory_not_exists(mock_object_storage_path, mock_co
     mock_path.rmdir.assert_not_called()
 
 
-@pytest.mark.integration
-def test_generate_dbt_flags_appends_no_static_parser(tmp_path):
+@pytest.mark.parametrize(
+    "is_dbt_v2, expect_flag",
+    [
+        pytest.param(False, True, marks=pytest.mark.integration, id="dbt-core"),
+        # dbt 2 has no static parser: it warns about the flag on every command and ``--warn-error`` fails on the warning
+        pytest.param(True, False, id="dbt-v2"),
+    ],
+)
+def test_generate_dbt_flags_no_static_parser(is_dbt_v2, expect_flag, tmp_path):
     operator = ConcreteDbtLocalBaseOperator(
         profile_config=profile_config,
         task_id="test-task",
         project_dir=tmp_path,
     )
     operator.invocation_mode = InvocationMode.DBT_RUNNER
-    tmp_project_dir = str(tmp_path)
-    profile_path = tmp_path / "profiles.yml"
-    flags = operator._generate_dbt_flags(tmp_project_dir, profile_path)
-    assert "--no-static-parser" in flags
+    with patch("cosmos.dbt.runner.is_dbt_v2", return_value=is_dbt_v2):
+        flags = operator._generate_dbt_flags(str(tmp_path), tmp_path / "profiles.yml")
+    assert ("--no-static-parser" in flags) is expect_flag
 
 
 def test_generate_dbt_flags_does_not_append_no_static_parser_in_subprocess(tmp_path):
@@ -3127,3 +3446,367 @@ def test_run_command_emits_datasets_only_when_flag_resolves_true(
     )
 
     assert mock_handle_datasets.called is expected_emission
+
+
+# --- AI-assisted failure diagnosis -------------------------------------------------------------------------------------
+
+AI_CONFIG = AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True)
+FINAL_ATTEMPT_CONTEXT = {"ti": MagicMock(try_number=3, max_tries=2)}
+DIAGNOSIS_TEXT = "-" * 80 + "\nAI diagnosis (confidence: high)\n" + "-" * 80 + "\nRoot cause:\n  Column foo is missing."
+
+
+def _ai_operator(ai_config=AI_CONFIG, invocation_mode=InvocationMode.SUBPROCESS, **kwargs):
+    return ConcreteDbtLocalBaseOperator(
+        profile_config=None,
+        task_id="my-task",
+        project_dir="my/dir",
+        invocation_mode=invocation_mode,
+        ai_config=ai_config,
+        **kwargs,
+    )
+
+
+def _failed_subprocess_result(full_output=None):
+    return FullOutputSubprocessResult(exit_code=1, output="test", full_output=full_output or ["boom"])
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_failure_is_followed_by_the_ai_diagnosis_on_the_final_attempt(mock_diagnose):
+    operator = _ai_operator()
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    message = str(exc_info.value)
+    # The dbt failure comes first, as retry policies and callbacks read the head of the message.
+    assert message.startswith("dbt command failed. The command returned a non-zero exit code 1.")
+    assert message.endswith(DIAGNOSIS_TEXT)
+    assert message.index("dbt command failed") < message.index("AI diagnosis")
+    mock_diagnose.assert_called_once()
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_ai_diagnosis_goes_after_the_failing_node_details(mock_diagnose):
+    operator = _ai_operator()
+    log = [
+        "10:00:00  Failure in test not_null_my_model_id (models/schema.yml)",
+        "10:00:00    Got 5 results, configured to fail if != 0",
+    ]
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(log), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    message = str(exc_info.value)
+    assert (
+        message.index("Details:")
+        < message.index("Failure in test not_null_my_model_id")
+        < message.index("AI diagnosis")
+    )
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_ai_diagnosis_keeps_the_exception_type_of_the_dbt_runner_path(mock_diagnose):
+    operator = _ai_operator(invocation_mode=InvocationMode.DBT_RUNNER)
+    result = MagicMock(success=False, exception="some exception")
+
+    with pytest.raises(CosmosDbtRunError) as exc_info:
+        operator._handle_exception_and_diagnose(result, "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert str(exc_info.value).startswith("dbt invocation did not complete with unhandled error: some exception")
+    assert str(exc_info.value).endswith(DIAGNOSIS_TEXT)
+
+
+@patch("cosmos.ai.context.build_failure_context")
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=None)
+def test_ai_diagnosis_is_given_the_artifacts_of_the_project_and_the_output(mock_diagnose, mock_build_context):
+    operator = _ai_operator()
+
+    with pytest.raises(AirflowException):
+        operator._handle_exception_and_diagnose(
+            _failed_subprocess_result(["line 1", "line 2"]), "/tmp/project", FINAL_ATTEMPT_CONTEXT
+        )
+
+    mock_build_context.assert_called_once_with("/tmp/project", "line 1\nline 2", AI_CONFIG, ANY)
+    kwargs = mock_diagnose.call_args.kwargs
+    assert kwargs["ai_config"] is AI_CONFIG
+    assert kwargs["failure_context"] is mock_build_context.return_value
+
+
+@patch("cosmos.ai.context.build_failure_context")
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=None)
+def test_ai_diagnosis_redacts_the_texts_of_the_failure_with_the_redactor_of_the_user(mock_diagnose, mock_build_context):
+    config = AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=True, redactor=lambda t: t.replace("pw", "***"))
+    operator = _ai_operator(config)
+
+    with pytest.raises(AirflowException):
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    redact = mock_build_context.call_args.args[3]
+    assert redact("password=pw") == "password=***"
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=None)
+def test_failure_message_is_unchanged_when_there_is_no_diagnosis(mock_diagnose):
+    operator = _ai_operator()
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
+
+
+@pytest.mark.parametrize(
+    "ai_config",
+    [None, AIConfig(llm_conn_id="my_llm_conn", diagnose_on_failure=False)],
+    ids=["no_ai_config", "diagnosis_disabled"],
+)
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
+def test_no_ai_diagnosis_unless_enabled(mock_diagnose, ai_config):
+    operator = _ai_operator(ai_config=ai_config)
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    mock_diagnose.assert_not_called()
+    assert "AI diagnosis" not in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "try_number, max_tries, diagnoses",
+    [
+        (1, 0, True),  # no retries: the first attempt is the final one
+        (1, 2, False),  # first of three attempts
+        (2, 2, False),  # second of three attempts
+        (3, 2, True),  # final attempt
+        (5, 2, True),  # beyond max_tries, e.g. after a manual clear
+    ],
+)
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_ai_diagnosis_only_runs_on_the_final_attempt(mock_diagnose, try_number, max_tries, diagnoses):
+    operator = _ai_operator()
+    context = {"ti": MagicMock(try_number=try_number, max_tries=max_tries)}
+
+    with pytest.raises(AirflowException) as exc_info:
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", context)
+
+    assert mock_diagnose.called is diagnoses
+    assert ("AI diagnosis" in str(exc_info.value)) is diagnoses
+
+
+@pytest.mark.parametrize("context", [{}, {"ti": MagicMock()}, {"ti": MagicMock(try_number=None, max_tries=None)}])
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_ai_diagnosis_runs_when_the_attempt_cannot_be_determined(mock_diagnose, context):
+    operator = _ai_operator()
+
+    with pytest.raises(AirflowException):
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", context)
+
+    mock_diagnose.assert_called_once()
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
+def test_skipped_task_is_not_diagnosed(mock_diagnose):
+    operator = _ai_operator(skip_exit_code=1)
+
+    with pytest.raises(AirflowSkipException):
+        operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    mock_diagnose.assert_not_called()
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
+def test_successful_command_is_not_diagnosed(mock_diagnose):
+    operator = _ai_operator()
+    result = FullOutputSubprocessResult(exit_code=0, output="ok", full_output=["ok"])
+
+    operator._handle_exception_and_diagnose(result, "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    mock_diagnose.assert_not_called()
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", side_effect=RuntimeError("diagnosis bug"))
+def test_a_failing_diagnosis_never_hides_the_dbt_failure(mock_diagnose, caplog):
+    operator = _ai_operator()
+
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(AirflowException) as exc_info:
+            operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
+    assert "AI diagnosis failed unexpectedly" in caplog.text
+    assert operator._ai_diagnosis_handle is None
+
+
+def test_ai_diagnosis_without_its_dependencies_warns_and_keeps_the_dbt_failure(caplog):
+    operator = _ai_operator()
+
+    # ``None`` in ``sys.modules`` makes the import fail, as if pydantic or the provider were not installed.
+    with patch.dict("sys.modules", {"cosmos.ai.diagnostics": None}), caplog.at_level(logging.WARNING):
+        with pytest.raises(AirflowException) as exc_info:
+            operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
+    assert "astronomer-cosmos[ai]" in caplog.text
+    assert "failed unexpectedly" not in caplog.text
+    assert operator._ai_diagnosis_handle is None
+
+
+def test_a_crash_deciding_whether_to_diagnose_never_hides_the_dbt_failure(caplog):
+    operator = _ai_operator()
+
+    with patch.object(operator, "_is_last_attempt", side_effect=RuntimeError("bug")):
+        with caplog.at_level(logging.ERROR):
+            with pytest.raises(AirflowException) as exc_info:
+                operator._handle_exception_and_diagnose(
+                    _failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT
+                )
+
+    assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
+    assert "failed unexpectedly" in caplog.text
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", side_effect=AirflowTaskTimeout("Timeout, PID: 1"))
+def test_execution_timeout_during_the_ai_diagnosis_still_raises_the_dbt_failure(mock_diagnose, caplog):
+    """``AirflowTaskTimeout`` is a ``BaseException``: callbacks would otherwise see it and not the dbt failure."""
+    operator = _ai_operator()
+
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(AirflowException) as exc_info:
+            operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert not isinstance(exc_info.value, AirflowTaskTimeout)
+    assert str(exc_info.value) == "dbt command failed. The command returned a non-zero exit code 1."
+    assert "execution_timeout was reached during the AI diagnosis" in caplog.text
+    assert operator._ai_diagnosis_handle is None
+
+
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_ai_diagnosis_leaves_exceptions_without_a_text_message_untouched(mock_diagnose):
+    operator = _ai_operator()
+    exception = CosmosDbtRunError(404)
+
+    with patch.object(
+        ConcreteDbtLocalBaseOperator,
+        "handle_exception",
+        new_callable=PropertyMock,
+        return_value=MagicMock(side_effect=exception),
+    ):
+        with pytest.raises(CosmosDbtRunError) as exc_info:
+            operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert exc_info.value.args == (404,)
+
+
+def test_on_kill_cancels_the_diagnosis_in_flight():
+    operator = _ai_operator()
+    token = MagicMock()
+    cancelled = threading.Event()
+    token.cancel.side_effect = cancelled.set
+    observed = {}
+
+    def diagnose_then_get_killed(**kwargs):
+        observed["handle"] = kwargs["handle"]
+        kwargs["handle"].token = token
+        operator.on_kill()
+        observed["cancelled"] = cancelled.wait(timeout=5)
+        return None
+
+    with patch("cosmos.ai.diagnostics.diagnose_dbt_failure", side_effect=diagnose_then_get_killed):
+        with pytest.raises(AirflowException):
+            operator._handle_exception_and_diagnose(_failed_subprocess_result(), "/tmp/project", FINAL_ATTEMPT_CONTEXT)
+
+    assert operator._ai_diagnosis_handle is observed["handle"] or operator._ai_diagnosis_handle is None
+    assert observed["cancelled"] is True
+    # The handle is released once the diagnosis ends, so a later ``on_kill`` has nothing to cancel.
+    assert operator._ai_diagnosis_handle is None
+
+
+def test_on_kill_without_a_diagnosis_only_stops_dbt():
+    operator = _ai_operator()
+    operator.subprocess_hook = MagicMock()
+
+    operator.on_kill()
+
+    operator.subprocess_hook.send_sigint.assert_called_once()
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator._handle_post_execution")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.calculate_openlineage_events_completes", return_value=False)
+@patch("cosmos.config.ProfileConfig.ensure_profile")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.invoke_dbt")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._clone_project")
+@patch("cosmos.operators.local.tempfile.TemporaryDirectory")
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure", return_value=DIAGNOSIS_TEXT)
+def test_run_command_diagnoses_a_failed_dbt_command_inside_the_project_directory(
+    mock_diagnose,
+    mock_tmp_dir,
+    mock_clone_project,
+    mock_invoke_dbt,
+    mock_ensure_profile,
+    mock_calculate_openlineage,
+    mock_handle_post_execution,
+    tmp_path,
+):
+    mock_tmp_dir.return_value.__enter__.return_value = str(tmp_path)
+    mock_ensure_profile.return_value.__enter__.return_value = (tmp_path / "profiles.yml", {})
+    mock_invoke_dbt.return_value = _failed_subprocess_result()
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        install_deps=False,
+        emit_datasets=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+        ai_config=AI_CONFIG,
+    )
+
+    with patch("cosmos.ai.context.build_failure_context") as mock_build_context:
+        with pytest.raises(AirflowException) as exc_info:
+            operator.run_command(
+                cmd=["dbt", "cmd"], env={}, context={"run_id": "id", "ti": MagicMock(try_number=1, max_tries=0)}
+            )
+
+    # The artifacts are read from the temporary project, which is gone once ``run_command`` returns.
+    mock_build_context.assert_called_once()
+    assert mock_build_context.call_args.args[0] == str(tmp_path)
+    # The limits of what is sent come from the user's ``AIConfig``.
+    assert mock_build_context.call_args.args[2] is AI_CONFIG
+    assert str(exc_info.value).endswith(DIAGNOSIS_TEXT)
+
+
+@patch("cosmos.operators.local._read_target_sources_json", return_value={})
+@patch("cosmos.config.ProfileConfig.ensure_profile")
+@patch("cosmos.operators.local.DbtLocalBaseOperator.invoke_dbt")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._clone_project")
+@patch("cosmos.operators.local.tempfile.TemporaryDirectory")
+@patch("cosmos.ai.diagnostics.diagnose_dbt_failure")
+def test_run_command_does_not_diagnose_the_source_freshness_check(
+    mock_diagnose,
+    mock_tmp_dir,
+    mock_clone_project,
+    mock_invoke_dbt,
+    mock_ensure_profile,
+    mock_read_sources,
+    tmp_path,
+):
+    """``dbt source freshness`` exits non-zero by design when a source is stale: it is an outcome, not a failure."""
+    mock_tmp_dir.return_value.__enter__.return_value = str(tmp_path)
+    mock_ensure_profile.return_value.__enter__.return_value = (tmp_path / "profiles.yml", {})
+    mock_invoke_dbt.return_value = _failed_subprocess_result()
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir="my/dir",
+        install_deps=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+        ai_config=AI_CONFIG,
+    )
+
+    with pytest.raises(AirflowException):
+        operator.run_command(
+            cmd=["dbt", "cmd"],
+            env={},
+            context={"run_id": "id", "ti": MagicMock(try_number=1, max_tries=0), "_check_source_freshness": True},
+        )
+
+    mock_diagnose.assert_not_called()

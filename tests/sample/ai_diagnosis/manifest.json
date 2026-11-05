@@ -1,0 +1,72 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json"
+  },
+  "nodes": {
+    "model.real_fail.base": {
+      "alias": "base",
+      "config": {
+        "materialized": "view"
+      },
+      "database": "d",
+      "depends_on": {
+        "nodes": []
+      },
+      "name": "base",
+      "relation_name": "\"d\".\"s\".\"base\"",
+      "resource_type": "model",
+      "schema": "s",
+      "unique_id": "model.real_fail.base"
+    },
+    "model.real_fail.db_error": {
+      "alias": "db_error",
+      "config": {
+        "materialized": "view"
+      },
+      "database": "d",
+      "depends_on": {
+        "nodes": [
+          "model.real_fail.base"
+        ]
+      },
+      "name": "db_error",
+      "relation_name": "\"d\".\"s\".\"db_error\"",
+      "resource_type": "model",
+      "schema": "s",
+      "unique_id": "model.real_fail.db_error"
+    },
+    "model.real_fail.leak": {
+      "alias": "leak",
+      "config": {
+        "materialized": "view"
+      },
+      "database": "d",
+      "depends_on": {
+        "nodes": []
+      },
+      "name": "leak",
+      "relation_name": "\"d\".\"s\".\"leak\"",
+      "resource_type": "model",
+      "schema": "s",
+      "unique_id": "model.real_fail.leak"
+    },
+    "test.real_fail.not_null_base_amount.69cb8f167b": {
+      "alias": "not_null_base_amount",
+      "config": {
+        "materialized": "test"
+      },
+      "database": "d",
+      "depends_on": {
+        "nodes": [
+          "model.real_fail.base"
+        ]
+      },
+      "name": "not_null_base_amount",
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "s_dbt_test__audit",
+      "unique_id": "test.real_fail.not_null_base_amount.69cb8f167b"
+    }
+  },
+  "sources": {}
+}

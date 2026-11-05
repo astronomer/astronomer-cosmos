@@ -36,7 +36,7 @@ fi
 # Reset Airflow state before running the DAG
 rm -rf airflow.*
 
-AIRFLOW_VERSION=$(airflow version)
+AIRFLOW_VERSION=$(python -c 'from importlib.metadata import version; print(version("apache-airflow"))')
 AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | cut -d. -f1)
 if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
     echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db migrate'..."

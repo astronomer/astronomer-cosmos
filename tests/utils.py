@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.metadata
 import logging
 import sys
 import warnings
@@ -17,11 +18,10 @@ from airflow.utils import timezone
 from airflow.utils.session import NEW_SESSION, provide_session
 from airflow.utils.state import DagRunState, State
 from airflow.utils.types import DagRunType
-from packaging import version
 from packaging.version import Version
 from sqlalchemy.orm.session import Session
 
-from cosmos.constants import AIRFLOW_VERSION
+from cosmos.constants import AIRFLOW_VERSION, DBT_DISTRIBUTION_NAMES
 
 log = logging.getLogger(__name__)
 
@@ -64,32 +64,39 @@ def check_dag_state(dag_run: DagRun | None, expected_dag_state: DagRunState = Da
     return True
 
 
+def serialize_dag_to_db(dag: DAG) -> None:
+    """Serialize ``dag`` to the metadata DB.
+
+    Airflow 3.1+ requires a DAG to be serialized before ``dag.test()`` / ``create_dagrun()``,
+    which check for DagVersion and DagModel records. No-op on older Airflow.
+    """
+    if AIRFLOW_VERSION.release[:2] < (3, 1):
+        return
+
+    try:
+        from airflow.dag_processing.dagbag import sync_bag_to_db
+    except ImportError:
+        from airflow.models.dagbag import sync_bag_to_db
+
+    from airflow.models.dagbundle import DagBundleModel
+    from airflow.utils.session import create_session
+
+    # Create the DagBundle the DagModel foreign key needs (mimics manager.sync_bundles_to_db()),
+    # then bag + sync to create the DagModel and DagVersion records.
+    with create_session() as session:
+        session.merge(DagBundleModel(name="test_bundle"))
+        session.commit()
+
+    dagbag = make_dag_bag(include_examples=False)
+    dagbag.bag_dag(dag)
+    sync_bag_to_db(dagbag, bundle_name="test_bundle", bundle_version="1")
+
+
 def new_test_dag(dag: DAG, expected_dag_state: DagRunState = DagRunState.SUCCESS) -> DagRun:
-    if AIRFLOW_VERSION >= version.Version("3.1"):
-        # Airflow 3.1+ requires DAG to be serialized to database before calling dag.test()
-        # because create_dagrun() checks for DagVersion and DagModel records
-
-        try:
-            from airflow.dag_processing.dagbag import sync_bag_to_db
-        except ImportError:
-            from airflow.models.dagbag import sync_bag_to_db
-
-        from airflow.models.dagbundle import DagBundleModel
-        from airflow.utils.session import create_session
-
-        # Create DagBundle if it doesn't exist (required for DagModel foreign key)
-        # This mimics what get_bagged_dag does via manager.sync_bundles_to_db()
-        with create_session() as session:
-            dag_bundle = DagBundleModel(name="test_bundle")
-            session.merge(dag_bundle)
-            session.commit()
-
-        # This creates both DagModel and DagVersion records
-        dagbag = make_dag_bag(include_examples=False)
-        dagbag.bag_dag(dag)
-        sync_bag_to_db(dagbag, bundle_name="test_bundle", bundle_version="1")
+    if AIRFLOW_VERSION.release[:2] >= (3, 1):
+        serialize_dag_to_db(dag)
         dr = dag.test(logical_date=timezone.utcnow())
-    elif AIRFLOW_VERSION >= version.Version("3.0"):
+    elif AIRFLOW_VERSION.release[:2] >= (3, 0):
         # In Airflow 3.0, dag.test() does not properly register Assets as active, must be registered manually
         from airflow.models.asset import AssetActive, AssetModel
         from airflow.utils.session import create_session
@@ -139,7 +146,7 @@ def test_dag(
     dr = None
     if custom_tester:
         dr = test_old_dag(dag, conn_file_path)
-    elif AIRFLOW_VERSION not in (Version("2.10.0"), Version("2.10.1"), Version("2.10.2"), Version("2.11.0")):
+    elif AIRFLOW_VERSION.major >= 3:
         dr = new_test_dag(dag, expected_dag_state=expected_dag_state)
         assert check_dag_state(
             dr, expected_dag_state
@@ -161,9 +168,7 @@ def test_dag(
                 dr, expected_dag_state
             ), f"Dag {dag.dag_id} did not reach expected state {expected_dag_state}. State: {dr.state}. "
         except sqlalchemy.exc.PendingRollbackError:
-            warnings.warn(
-                "Early versions of Airflow 2.10 and Airflow 2.11 have issues when running the test command with DatasetAlias / Datasets"
-            )
+            warnings.warn("Airflow 2 has issues when running the test command with DatasetAlias / Datasets")
     return dr
 
 
@@ -313,3 +318,18 @@ def _get_or_create_dagrun(
     log.info("created dagrun %s", str(dr))
 
     return dr
+
+
+def get_dbt_version() -> Version:
+    """Return the installed dbt version, for dbt-core 1.x and dbt-oss (dbt-oss has no ``dbt.version`` module).
+
+    Assumes a single dbt install: it returns the first of dbt-core, dbt-oss and dbt that is installed, while
+    ``is_dbt_v2()`` treats any of them at major version 2 as dbt 2, so the two disagree if dbt-core 1.x is installed
+    next to dbt-oss.
+    """
+    for distribution in DBT_DISTRIBUTION_NAMES:
+        try:
+            return Version(importlib.metadata.version(distribution))
+        except importlib.metadata.PackageNotFoundError:
+            continue
+    raise RuntimeError(f"None of {DBT_DISTRIBUTION_NAMES} is installed.")

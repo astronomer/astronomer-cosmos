@@ -3,15 +3,18 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from airflow import __version__ as airflow_version
 from airflow.policies import hookimpl
 from packaging.version import Version
-
-from cosmos.constants import AIRFLOW_VERSION
 
 if TYPE_CHECKING:
     from airflow.models.taskinstance import TaskInstance
 
 log = getLogger(__name__)
+
+# Airflow imports this module while `import airflow` loads policy plugins, so importing cosmos.constants here
+# (which itself runs `import airflow`) would hit a partially initialised module.
+AIRFLOW_VERSION = Version(airflow_version)
 
 
 def _is_watcher_sensor(task_instance: TaskInstance) -> bool:

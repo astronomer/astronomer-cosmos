@@ -1,8 +1,11 @@
+import json
 from unittest.mock import MagicMock
 
 import pytest
 
 from cosmos.dbt.parser.output import (
+    DBT_V2_ERROR_MAX_LINES,
+    extract_dbt_failure_details,
     extract_dbt_runner_issues,
     extract_freshness_warn_msg,
     extract_log_issues,
@@ -25,6 +28,17 @@ def _subprocess_result(full_output: list[str]) -> FullOutputSubprocessResult:
         (["Done. PASS=15 WARN=0 ERROR=0 SKIP=0 TOTAL=16"], 0),
         (["Done. PASS=15 WARN=2 ERROR=0 SKIP=0 TOTAL=16"], 2),
         (["Nothing to do. Exiting without running tests."], 0),
+        # dbt 2 (dbt-oss) leaves out the categories that are 0.
+        (["Summary: 1 total | 1 warn"], 1),
+        (["Summary: 4 total | 1 success | 1 warn | 2 error"], 1),
+        (["Summary: 3 total | 3 warn"], 3),
+        (["Summary: 1 total | 1 success"], 0),
+        (["Summary: 1 total | 1 error"], 0),
+        # Colours forced with CLICOLOR_FORCE=1.
+        (
+            ["Summary: \x1b[37m\x1b[1m9 total\x1b[0m | \x1b[32m\x1b[1m6 success\x1b[0m | \x1b[33m\x1b[1m3 warn\x1b[0m"],
+            3,
+        ),
     ],
 )
 def test_parse_number_of_warnings_subprocess(full_output: list[str], expected_warnings: int):
@@ -133,6 +147,357 @@ def test_extract_log_issues_dbt_1_12_format() -> None:
     assert test_results == ["Got 4 results, configured to warn if >1"]
 
 
+@pytest.mark.parametrize(
+    "finished_running",
+    [
+        "11:17:43  Finished running 1 test in 0 hours 0 minutes and 0.13 seconds (0.13s).",
+        "11:17:43  Finished running 10 data tests, 3 unit tests in 0 hours 0 minutes and 0.78 seconds (0.78s).",
+    ],
+)
+def test_extract_log_issues_dbt_1_ignores_warnings_above_finished_running(finished_running: str) -> None:
+    """Only the warnings after ``Finished running N tests`` belong to the test run; older ones are excluded."""
+    log_list = [
+        "11:17:40  Warning in test older_test (models/schema.yml)",
+        "11:17:40  Got 2 results, configured to warn if >1",
+        finished_running,
+        "11:17:43  Warning in test new_test (models/schema.yml)",
+        "11:17:43  Got 4 results, configured to warn if >1",
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["new_test"]
+    assert test_results == ["Got 4 results, configured to warn if >1"]
+
+
+def test_extract_log_issues_dbt_v2_namespaced_test_name() -> None:
+    log_list = ["    Warned test  main_dbt_test__audit.sing_warn (tests/sing_warn.sql) [1 of 4 in 1.0s]"]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["main_dbt_test__audit.sing_warn"]
+    assert test_results == ["Warned test main_dbt_test__audit.sing_warn (tests/sing_warn.sql)"]
+
+
+def _json_log_line(msg: str) -> str:
+    """A dbt ``--log-format json`` line."""
+    return json.dumps({"data": {}, "info": {"level": "info", "msg": msg, "ts": "2026-10-19T10:00:00.000000Z"}})
+
+
+def test_extract_log_issues_json_log_format() -> None:
+    log_list = [
+        _json_log_line("Finished running 2 data tests, 1 view model in 0 hours 0 minutes and 0.24 seconds (0.24s)."),
+        _json_log_line("\x1b[33mWarning in test unique_m_id (models/schema.yml)\x1b[0m"),
+        _json_log_line("Got 1 result, configured to warn if != 0"),
+        _json_log_line("Done. PASS=1 WARN=1 ERROR=0 SKIP=0 NO-OP=0 TOTAL=2"),
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["unique_m_id"]
+    assert test_results == ["Got 1 result, configured to warn if != 0"]
+
+
+def test_extract_log_issues_json_log_format_dbt_1_12() -> None:
+    log_list = [
+        _json_log_line("Finished running 1 test in 0 hours 0 minutes and 0.13 seconds (0.13s)."),
+        _json_log_line("[WARNING]: in test accepted_values_mini_orders_status__placed (models/schema.yml)"),
+        _json_log_line("[WARNING]: Got 4 results, configured to warn if >1"),
+        _json_log_line("Done. PASS=0 WARN=1 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=1"),
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["accepted_values_mini_orders_status__placed"]
+    assert test_results == ["Got 4 results, configured to warn if >1"]
+
+
+def test_extract_dbt_failure_details() -> None:
+    log_list = [
+        "20:30:01  \x1b[31mRunning with dbt=1.3.0\x1b[0m",
+        "20:30:02  \x1b[31mFailure in test not_null_my_model_id (models/schema.yml)\x1b[0m",
+        "20:30:02  \x1b[31m  Got 5 results, configured to fail if != 0\x1b[0m",
+        "20:30:03  \x1b[31mError in model my_model (models/my_model.sql)\x1b[0m",
+        "20:30:03  \x1b[31m  Database Error: relation does not exist\x1b[0m",
+    ]
+    details = extract_dbt_failure_details(log_list)
+    assert details == [
+        "Failure in test not_null_my_model_id (models/schema.yml) Got 5 results, configured to fail if != 0",
+        "Error in model my_model (models/my_model.sql) Database Error: relation does not exist",
+    ]
+
+    assert extract_dbt_failure_details(["20:30:01  Running with dbt=1.3.0", "20:30:02  Completed successfully"]) == []
+
+
+def test_extract_dbt_failure_details_json_log_format() -> None:
+    log_list = [
+        _json_log_line("\x1b[31mFailure in test not_null_m_id (models/schema.yml)\x1b[0m"),
+        _json_log_line("  Got 1 result, configured to fail if != 0"),
+        "not a json line",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Failure in test not_null_m_id (models/schema.yml) Got 1 result, configured to fail if != 0"
+    ]
+
+
+def test_extract_dbt_failure_details_json_log_format_dbt_1_12() -> None:
+    log_list = [
+        _json_log_line("[ERROR]: in test not_null_m_id (models/schema.yml)"),
+        _json_log_line("[ERROR]: Got 1 result, configured to fail if != 0"),
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Error in test not_null_m_id (models/schema.yml) Got 1 result, configured to fail if != 0"
+    ]
+
+
+# The dbt 2 lines below were captured from dbt-oss 2.0.8 running ``dbt test`` on tests/sample/mini and a variant with
+# several tests. dbt 2 writes its text output to stderr, which the subprocess hook merges into the output.
+DBT_V2_WARNED_TESTS_LOG = [
+    "   dbt-oss 2.0.8",
+    "   Loading profiles.yml",
+    "    Failed test  unique_mini_orders_id (models/schema.yml:16:13) [1 of 4 in 1.02s]",
+    "    Passed test  not_null_mini_orders_status [2 of 4 in 1.02s]",
+    "    Warned test  accepted_values_mini_orders_status__placed (models/schema.yml:7:13) [3 of 4 in 2.03s]",
+    "    Warned test  other_warned_test (models/schema.yml:20:13) [4 of 4 in 2.04s]",
+    "==================== Execution Summary =====================",
+    "Finished 'test' with 2 warnings and 1 error for target 'dev' [2.3s]",
+    "Processed: 4 tests",
+    "Summary: 4 total | 1 success | 2 warn | 1 error",
+]
+
+
+def test_extract_log_issues_dbt_v2() -> None:
+    test_names, test_results = extract_log_issues(DBT_V2_WARNED_TESTS_LOG)
+    assert sorted(test_names) == ["accepted_values_mini_orders_status__placed", "other_warned_test"]
+    assert "Warned test accepted_values_mini_orders_status__placed (models/schema.yml:7:13)" in test_results
+    assert len(test_results) == 2
+
+
+def test_extract_log_issues_dbt_v2_debug_does_not_stop_at_the_first_finished_running_line() -> None:
+    log_list = [
+        "Finished running [  0.01s] test main_dbt_test__audit.first_test [warn]",
+        "    Warned test  first_test (models/schema.yml:7:13) [1 of 2 in 0.01s]",
+        "Finished running [  0.01s] test main_dbt_test__audit.second_test [warn]",
+        "    Warned test  second_test (models/schema.yml:9:13) [2 of 2 in 0.01s]",
+        "Summary: 2 total | 2 warn",
+    ]
+    test_names, _ = extract_log_issues(log_list)
+    assert sorted(test_names) == ["first_test", "second_test"]
+
+
+def test_extract_log_issues_dbt_v2_json_log_format_with_node_finished_event() -> None:
+    log_list = [
+        _json_log_line("    Warned test  my_test (models/schema.yml:13:13) [1 of 1 in 0.01s]"),
+        _json_log_line("Finished running node test.mini.my_test.c968fa614a"),
+        _json_log_line("\n=== Execution Summary ===\nSummary: 1 total | 1 warn"),
+    ]
+    assert extract_log_issues(log_list)[0] == ["my_test"]
+
+
+def test_extract_log_issues_dbt_v2_no_warning() -> None:
+    log_list = ["    Passed test  not_null_mini_orders_status [1 of 1 in 0.01s]", "Summary: 1 total | 1 success"]
+    assert extract_log_issues(log_list) == ([], [])
+
+
+def test_extract_log_issues_dbt_v2_json_log_format() -> None:
+    log_list = [
+        _json_log_line("    Warned test  my_test (models/schema.yml:13:13) [1 of 1 in 0.01s]"),
+        _json_log_line("\n=== Execution Summary ===\nSummary: 1 total | 1 warn"),
+    ]
+    test_names, test_results = extract_log_issues(log_list)
+    assert test_names == ["my_test"]
+    assert test_results == ["Warned test my_test (models/schema.yml:13:13)"]
+
+
+def test_extract_dbt_failure_details_dbt_v2() -> None:
+    log_list = [
+        "   dbt-oss 2.0.8",
+        "    Failed test  accepted_values_mini_orders_status__placed (models/schema.yml:13:13) [1 of 1 in 0.01s]",
+        "====================== Test Failures =======================",
+        "Test failed (4 failed row(s)): accepted_values_mini_orders_status__placed",
+        "==================== Execution Summary =====================",
+        "Summary: 1 total | 1 error",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Failure in test accepted_values_mini_orders_status__placed (models/schema.yml:13:13) 4 failed row(s)"
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_test_that_errored_has_no_row_count() -> None:
+    log_list = ["    Failed test  unique_mini_orders_id (models/schema.yml:16:13) [1 of 4 in 1.02s]"]
+    assert extract_dbt_failure_details(log_list) == ["Failure in test unique_mini_orders_id (models/schema.yml:16:13)"]
+
+
+def test_extract_dbt_failure_details_dbt_v2_namespaced_test_name() -> None:
+    log_list = [
+        "    Failed test  main_dbt_test__audit.sing_fail (tests/sing_fail.sql) [1 of 1 in 0.01s]",
+        "Test failed (1 failed row(s)): sing_fail",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Failure in test main_dbt_test__audit.sing_fail (tests/sing_fail.sql) 1 failed row(s)"
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_json_log_format() -> None:
+    # In JSON output dbt 2 has the "Failed test" line only, not the "Test failed (N failed row(s))" one.
+    log_list = [_json_log_line("    Failed test  not_null_m_id (models/schema.yml:3:9) [1 of 1 in 0.01s]")]
+    assert extract_dbt_failure_details(log_list) == ["Failure in test not_null_m_id (models/schema.yml:3:9)"]
+
+
+# What dbt-oss 2.0.8 prints (text output) for a model that fails. The blank-looking line inside the error is made of spaces.
+DBT_V2_FAILED_MODEL_OUTPUT = [
+    "   dbt-oss 2.0.8",
+    "   Loading profiles.yml",
+    " Succeeded model main.model_ok (table) [1 of 2 in 0.00s]",
+    "    Failed model main.model_fails (table) [2 of 2 in 1.01s]",
+    "",
+    "=================== Errors and Warnings ====================",
+    "[error] [DbDriverFailed (dbt1308)]: Database Error in model model_fails (target/run/failing/models/model_fails.sql)",
+    '  Binder Error: Referenced column "this_column_does_not_exist" not found in FROM clause!',
+    '  Candidate bindings: "id", "first_name"',
+    "  ",
+    '  LINE 11: select id, this_column_does_not_exist from "db"."main"."model_ok"',
+    "                      ^",
+    "  (in run/failing/models/model_fails.sql)",
+    "",
+    "==================== Execution Summary =====================",
+    "Finished 'run' with 1 error for target 'dev' [1.3s]",
+    "Summary: 2 total | 1 success | 1 error",
+]
+# ... for a failing ``dbt run-operation``.
+DBT_V2_FAILED_MACRO_OUTPUT = [
+    "   dbt-oss 2.0.8",
+    "   Loading profiles.yml",
+    "",
+    "=================== Errors and Warnings ====================",
+    "[error] [JinjaError (dbt1501)]: Failed to run operation invalid operation: Compilation Error: cosmos116: boom",
+    "(in :2:5)",
+    "  --> :2:5",
+    "",
+    "==================== Execution Summary =====================",
+    "Finished 'run-operation' with 1 error for target 'dev' [675ms]",
+]
+# ... for a source past ``error_after``, with a warning before the error.
+DBT_V2_STALE_SOURCE_OUTPUT = [
+    "   dbt-oss 2.0.8",
+    "     Stale source raw.raw_orders_stale (last updated 8years 9months 26days 12h 2m 29s ago) [0.01s]",
+    "Successfully wrote sources.json",
+    "",
+    "=================== Errors and Warnings ====================",
+    "[warning] [Unexpected (dbt9002)]: Source 'source.jaffle_shop.raw.raw_orders_stale' loaded_at_field has a timestamp type",
+    "  --> models/staging/sources.yml",
+    "[error] [StaleSource (dbt1063)]: Stale source source.jaffle_shop.raw.raw_orders_stale",
+    "  --> models/staging/sources.yml",
+    "",
+    "==================== Execution Summary =====================",
+    "Finished 'freshness' with 1 warning and 1 error for target 'dev' [640ms]",
+]
+
+
+def test_extract_dbt_failure_details_dbt_v2_failed_model() -> None:
+    assert extract_dbt_failure_details(DBT_V2_FAILED_MODEL_OUTPUT) == [
+        "DbDriverFailed (dbt1308): Database Error in model model_fails (target/run/failing/models/model_fails.sql)\n"
+        '  Binder Error: Referenced column "this_column_does_not_exist" not found in FROM clause!\n'
+        '  Candidate bindings: "id", "first_name"\n'
+        '  LINE 11: select id, this_column_does_not_exist from "db"."main"."model_ok"\n'
+        "  ^\n"
+        "  (in run/failing/models/model_fails.sql)"
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_failed_macro() -> None:
+    assert extract_dbt_failure_details(DBT_V2_FAILED_MACRO_OUTPUT) == [
+        "JinjaError (dbt1501): Failed to run operation invalid operation: Compilation Error: cosmos116: boom\n"
+        "  (in :2:5)\n"
+        "  --> :2:5"
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_stale_source_skips_the_warning_before_it() -> None:
+    assert extract_dbt_failure_details(DBT_V2_STALE_SOURCE_OUTPUT) == [
+        "StaleSource (dbt1063): Stale source source.jaffle_shop.raw.raw_orders_stale\n  --> models/staging/sources.yml"
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_keeps_every_error_and_skips_the_warnings_between() -> None:
+    log_list = [
+        "=================== Errors and Warnings ====================",
+        "[error] [DbDriverFailed (dbt1308)]: Database Error in model a",
+        "  first cause",
+        "[warning] [Unexpected (dbt9002)]: not an error",
+        "  --> models/schema.yml",
+        "[error] [DbDriverFailed (dbt1308)]: Database Error in model b",
+        "  second cause",
+        "",
+        "==================== Execution Summary =====================",
+        "Summary: 2 total | 2 error",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "DbDriverFailed (dbt1308): Database Error in model a\n  first cause",
+        "DbDriverFailed (dbt1308): Database Error in model b\n  second cause",
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_failed_test_and_error_are_each_reported_once() -> None:
+    log_list = [
+        "    Failed test  unique_m_id (models/schema.yml:12:22) [1 of 2 in 0.01s]",
+        "    Failed model main.m (table) [2 of 2 in 1.01s]",
+        "=================== Errors and Warnings ====================",
+        "[error] [DbDriverFailed (dbt1308)]: Database Error in model m",
+        "  cause",
+        "==================== Test Failures =======================",
+        "Test failed (1 failed row(s)): unique_m_id",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Failure in test unique_m_id (models/schema.yml:12:22) 1 failed row(s)",
+        "DbDriverFailed (dbt1308): Database Error in model m\n  cause",
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_error_json_log_format() -> None:
+    """In JSON output the whole message is one event: the events after it are not part of the error."""
+    log_list = [
+        _json_log_line("[error] [JinjaError (dbt1501)]: Failed to run operation\n(in :2:5)\n  --> :2:5"),
+        _json_log_line("a later message that is not an error"),
+        _json_log_line("Finished 'run-operation' with 1 error for target 'dev' [675ms]"),
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "JinjaError (dbt1501): Failed to run operation\n  (in :2:5)\n  --> :2:5"
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_error_without_more_lines() -> None:
+    log_list = [
+        "[error] [Unexpected (dbt9999)]: only one line",
+        "==================== Execution Summary =====================",
+        "[error] [Unexpected (dbt9998)]:",
+        "==================== Execution Summary =====================",
+    ]
+    assert extract_dbt_failure_details(log_list) == ["Unexpected (dbt9999): only one line", "Unexpected (dbt9998)"]
+
+
+def test_extract_dbt_failure_details_dbt_v2_error_is_capped() -> None:
+    """A long error keeps its first ``DBT_V2_ERROR_MAX_LINES`` lines, so the exception stays short."""
+    log_list = ["[error] [DbDriverFailed (dbt1308)]: Database Error in model m"] + [f"  line {i}" for i in range(1, 16)]
+    log_list.append("==================== Execution Summary =====================")
+
+    details = extract_dbt_failure_details(log_list)
+
+    assert len(details) == 1
+    assert details[0].split("\n") == [
+        "DbDriverFailed (dbt1308): Database Error in model m",
+        *[f"  line {i}" for i in range(1, DBT_V2_ERROR_MAX_LINES)],
+        "  ...",
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_1_is_unchanged_by_the_dbt_2_errors() -> None:
+    """What dbt 1.10 prints for a failing model and for a stale source, and what was extracted before dbt 2 support."""
+    log_list = [
+        "11:04:35  Failure in model model_fails (models/model_fails.sql)",
+        "11:04:35    Runtime Error in model model_fails (models/model_fails.sql)",
+        '  Binder Error: Referenced column "this_column_does_not_exist" not found in FROM clause!',
+        "11:04:45  Failure in source raw_orders_stale (models/staging/sources.yml)",
+        "11:04:45    Status: error",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "Failure in model model_fails (models/model_fails.sql) Runtime Error in model model_fails (models/model_fails.sql)",
+        "Failure in source raw_orders_stale (models/staging/sources.yml) Status: error",
+    ]
+
+
 def test_extract_dbt_runner_issues():
     """Tests that the function extracts the correct node names and messages from a dbt runner result
     for warnings by default.
@@ -190,4 +555,125 @@ def test_extract_freshness_warn_msg():
     assert node_names == ["postgres_db.raw_orders"]
     assert node_results == [
         "INFO - 11:50:42  1 of 1 WARN freshness of postgres_db.raw_orders ................................ [WARN in 0.01s]"
+    ]
+
+
+def test_extract_freshness_warn_msg_json_log_format():
+    warn_msg = "1 of 1 WARN freshness of postgres_db.raw_orders ................................ [WARN in 0.01s]"
+    result = FullOutputSubprocessResult(
+        full_output=[_json_log_line(warn_msg), _json_log_line("Done.")],
+        output=_json_log_line("Done."),
+        exit_code=0,
+    )
+    node_names, node_results = extract_freshness_warn_msg(result)
+
+    assert node_names == ["postgres_db.raw_orders"]
+    assert node_results == [warn_msg]
+
+
+# Abridged output of dbt 2 (dbt-oss 2.0.8) for ``dbt source freshness`` when raw_orders is past ``warn_after`` and
+# raw_orders_stale is past ``error_after``.
+DBT_V2_FRESHNESS_OUTPUT = [
+    "   dbt-oss 2.0.8",
+    "   Loading profiles.yml",
+    "    Warned source raw.raw_orders (last updated 8years 9months 26days 11h 44m 36s ago) [0.01s]",
+    "     Stale source raw.raw_orders_stale (last updated 8years 9months 26days 11h 44m 36s ago) [0.01s]",
+    "Successfully wrote sources.json",
+    "=================== Errors and Warnings ====================",
+    "[warning] [StaleSource (dbt1063)]: Stale source source.jaffle_shop.raw.raw_orders",
+    "  --> models/staging/sources.yml",
+    "[error] [StaleSource (dbt1063)]: Stale source source.jaffle_shop.raw.raw_orders_stale",
+    "  --> models/staging/sources.yml",
+    "==================== Execution Summary =====================",
+    "Finished 'freshness' with 3 warnings and 1 error for target 'dev' [646ms]",
+]
+
+
+def test_extract_freshness_warn_msg_dbt_v2():
+    """dbt 2 prints ``Warned source`` for a warning: the stale (error) source and the diagnostics are not warnings."""
+    result = FullOutputSubprocessResult(
+        full_output=DBT_V2_FRESHNESS_OUTPUT, output=DBT_V2_FRESHNESS_OUTPUT[-1], exit_code=1
+    )
+    node_names, node_results = extract_freshness_warn_msg(result)
+
+    assert node_names == ["raw.raw_orders"]
+    assert node_results == ["Warned source raw.raw_orders (last updated 8years 9months 26days 11h 44m 36s ago) [0.01s]"]
+
+
+def test_extract_freshness_warn_msg_dbt_v2_ignores_colors_and_timestamps():
+    lines = [
+        "\x1b[33m    Warned source raw.raw_orders (last updated 1day ago) [0.01s]\x1b[0m",
+        "10:46:31  Warned source raw.raw_payments (last updated 2days ago) [0.02s]",
+    ]
+    result = FullOutputSubprocessResult(full_output=lines, output=lines[-1], exit_code=0)
+    node_names, node_results = extract_freshness_warn_msg(result)
+
+    assert node_names == ["raw.raw_orders", "raw.raw_payments"]
+    assert node_results == [
+        "Warned source raw.raw_orders (last updated 1day ago) [0.01s]",
+        "10:46:31  Warned source raw.raw_payments (last updated 2days ago) [0.02s]",
+    ]
+
+
+def test_extract_freshness_warn_msg_dbt_v2_without_warnings():
+    lines = ["   dbt-oss 2.0.8", "     Passed source raw.raw_orders (last updated 1h ago) [0.01s]"]
+    result = FullOutputSubprocessResult(full_output=lines, output=lines[-1], exit_code=0)
+
+    assert extract_freshness_warn_msg(result) == ([], [])
+
+
+def test_extract_dbt_failure_details_dbt_v2_error_continues_over_indented_lines_that_start_with_a_bracket() -> None:
+    log_list = [
+        "[error] [DbDriverFailed (dbt1308)]: Database Error in model a",
+        "  [SQL: select 1]",
+        "  [1, 2, 3] not matched",
+        "  more",
+        "==================== Execution Summary =====================",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "DbDriverFailed (dbt1308): Database Error in model a\n  [SQL: select 1]\n  [1, 2, 3] not matched\n  more"
+    ]
+
+
+def test_extract_dbt_failure_details_dbt_v2_error_stops_at_a_test_failure_line() -> None:
+    log_list = [
+        "[error] [DbDriverFailed (dbt1308)]: Database Error in model a",
+        "  cause",
+        "Failed test  unique_a_id (models/schema.yml:12:22) [1 of 2 in 0.01s]",
+        "Failure in test not_null_a_id (models/schema.yml:14:22)",
+        "  Got 1 result, configured to fail if != 0",
+    ]
+    assert extract_dbt_failure_details(log_list) == [
+        "DbDriverFailed (dbt1308): Database Error in model a\n  cause",
+        "Failure in test unique_a_id (models/schema.yml:12:22)",
+        "Failure in test not_null_a_id (models/schema.yml:14:22) Got 1 result, configured to fail if != 0",
+    ]
+
+
+# Abridged output of ``dbt build`` on dbt-oss 2.0.8 for a test that errors (``errors_out`` selects from a missing table) and
+# a test that returns rows.
+DBT_V2_ERRORED_TEST_OUTPUT = [
+    " Succeeded model main.m (view) [3 of 3 in 0.01s]",
+    "    Failed test  errors_out (tests/errors_out.sql) [2 of 3 in 1.01s]",
+    "    Failed test  returns_rows (tests/returns_rows.sql) [1 of 3 in 1.01s]",
+    "",
+    "=================== Errors and Warnings ====================",
+    "[error] [DbDriverFailed (dbt1308)]: Error materializing test test.proj.errors_out (target/run/proj/tests/errors_out.sql)",
+    "  Catalog Error: Table with name no_such_table does not exist!",
+    "  ",
+    "  (in run/proj/tests/errors_out.sql:1:1)",
+    "",
+    "==================== Execution Summary =====================",
+    "Summary: 3 total | 1 success | 2 error",
+]
+
+
+def test_extract_dbt_failure_details_dbt_v2_test_that_errors_is_listed_from_its_line_and_its_error() -> None:
+    """A test that errors prints a ``Failed test`` line and an ``[error]`` block, so it is listed twice, the second time with the cause."""
+    assert extract_dbt_failure_details(DBT_V2_ERRORED_TEST_OUTPUT) == [
+        "Failure in test errors_out (tests/errors_out.sql)",
+        "Failure in test returns_rows (tests/returns_rows.sql)",
+        "DbDriverFailed (dbt1308): Error materializing test test.proj.errors_out (target/run/proj/tests/errors_out.sql)"
+        "\n  Catalog Error: Table with name no_such_table does not exist!"
+        "\n  (in run/proj/tests/errors_out.sql:1:1)",
     ]

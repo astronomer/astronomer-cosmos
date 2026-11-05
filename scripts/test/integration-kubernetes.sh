@@ -4,7 +4,7 @@ set -x
 set -e
 
 # So we can validate ExecutionMode.WATCHER_KUBERNETES
-actual_version=$(airflow version | cut -d. -f1)
+actual_version=$(python -c 'from importlib.metadata import version; print(version("apache-airflow"))' | cut -d. -f1)
 if [ "$actual_version" = "3" ] ; then
     pip install "apache-airflow-providers-cncf-kubernetes==10.8.0" "protobuf==6.33.2"
 

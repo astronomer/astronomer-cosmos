@@ -28,7 +28,7 @@ The dbt docs are available in the Airflow menu under ``Browse``:
 For Airflow 3, Cosmos exposes the docs under a FastAPI sub-app and external view entries under **Browse**.
 
 .. important::
-   The Airflow 3 plugin support in Cosmos requires Airflow >= 3.1.
+   The Airflow 3 plugin support in Cosmos requires Airflow >= 3.1. Opening the docs from the Airflow UI requires Airflow >= 3.1.1.
 
 You can configure one or more projects via ``[cosmos].dbt_docs_projects``:
 
@@ -51,6 +51,7 @@ Endpoints per project (``<slug>``):
 - ``/cosmos/<slug>/dbt_docs`` (wrapper page)
 - ``/cosmos/<slug>/dbt_docs_index.html`` (docs index)
 - ``/cosmos/<slug>/manifest.json`` and ``/cosmos/<slug>/catalog.json``
+- ``/cosmos/<slug>/assets/...`` and ``/cosmos/<slug>/info_schema/...`` (the files of the dbt-oss docs site, read from the same ``dir``)
 
 
 Local vs Remote docs (Apache Airflow® 3)
@@ -77,6 +78,7 @@ Remote docs (S3, GCS, Azure, HTTP[S])
   - Files (index, manifest.json, catalog.json) are read via Airflow ObjectStorage (uPath/fsspec).
   - For cloud object storage, set ``conn_id`` or embed it inline (e.g. ``s3://aws_default@my-bucket/path``).
   - HTTP/HTTPS does not require a connection (an Airflow HTTP connection can be used if desired).
+  - Azure Blob Storage needs a different scheme on Airflow 3 than on Airflow 2. Use ``abfs://<container>/<path>`` (or ``abfss://``) on Airflow 3, with the storage account taken from the connection. A ``wasb://`` URI works only on Airflow 2: Airflow 3 registers no filesystem for it, so every request for that project returns HTTP 500 (``No filesystem registered for scheme wasb``), including ``index.html`` and ``manifest.json``.
   - Example (S3):
 
     .. code-block:: ini
@@ -92,6 +94,10 @@ Notes and behavior
 - Missing artifacts return HTTP 404 with the attempted path; other IO errors return HTTP 500 and are logged.
 - The docs iframe page (``/cosmos/<slug>/dbt_docs``) links to the index and shows within the Airflow UI; the index adds a small inline script to keep browser back/forward behavior intuitive.
 - If you deploy behind a path prefix (e.g. Astronomer hosted Airflow deployments), menu links include the prefix automatically using ``AIRFLOW__API__BASE_URL``.
+- Every ``/cosmos`` route requires an authenticated Airflow user with read access to the ``Website`` view, the same permission the Airflow 2 plugin checks. Unauthenticated requests receive HTTP 401 and users without that permission receive HTTP 403. Both the Airflow UI session and an ``Authorization: Bearer`` token are accepted.
+- Opening dbt docs from the Airflow UI requires Airflow >= 3.1.1. The Airflow 3.1.0 UI discards its session cookie after login, so the browser cannot authenticate to plugin views and the docs return HTTP 401; bearer-token API access still works on 3.1.0.
+- Whether the ``Browse`` menu entry is shown is decided by Airflow, which lists plugin views only for users who can read ``Plugins``. With the FAB auth manager this means the ``Op`` and ``Admin`` roles; ``Viewer`` and ``User`` can still open the docs by URL.
+- Only the dbt docs routes are served under ``/cosmos``: FastAPI's ``/openapi.json``, ``/docs`` and ``/redoc`` are disabled and return HTTP 404. When no project is configured, the plugin registers no routes and no menu entry.
 
 Apache Airflow® 2
 ~~~~~~~~~~~~~~~~~~
@@ -172,6 +178,10 @@ Google Cloud Storage Example
 
 Azure Blob Storage Example
 ++++++++++++++++++++++++++
+
+.. note::
+
+   This example is for Airflow 2. On Airflow 3, configure the project with an ``abfs://`` URI, as described under *Remote docs* above.
 
 .. code-block:: cfg
 

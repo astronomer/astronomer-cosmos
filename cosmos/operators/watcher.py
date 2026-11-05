@@ -9,12 +9,15 @@ from typing import TYPE_CHECKING, Any
 
 from airflow.exceptions import AirflowException
 
+from cosmos.operators._watcher.aggregation import ResultsTestsPerModel, TestsPerModel
+
 try:
     # Airflow 3.1 onwards
     from airflow.sdk import TaskGroup
 except ImportError:
     from airflow.utils.task_group import TaskGroup
 
+import cosmos.dbt.runner as dbt_runner
 from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import (
@@ -23,9 +26,12 @@ from cosmos.constants import (
     PRODUCER_WATCHER_TASK_ID,
     WATCHER_TASK_WEIGHT_RULE,
     DbtResourceType,
+    InvocationMode,
 )
 from cosmos.dataset import get_dataset_namespace
 from cosmos.dbt.graph import DbtNode
+from cosmos.dbt.runner import dbt_event_to_json
+from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
 from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.base import (
@@ -34,19 +40,22 @@ from cosmos.operators._watcher.base import (
 )
 from cosmos.operators._watcher.state import (
     DBT_SOURCE_FRESHNESS_STALE_STATUSES,
-    DBT_SUCCESS_STATUSES,
     DbtNodeStatus,
+    is_dbt_node_status_success,
+    normalize_dbt_node_status,
 )
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
-    _delete_xcom_backup_variable,
+    _delete_xcom_backup,
     _init_xcom_backup,
-    _restore_xcom_from_variable,
+    _log_missing_backup,
+    _restore_xcom_backup,
 )
 from cosmos.operators.base import (
     DbtBuildMixin,
     DbtRunMixin,
     DbtSeedMixin,
+    DbtSemanticMetricViewMixin,
     DbtSnapshotMixin,
 )
 from cosmos.operators.local import (
@@ -79,7 +88,8 @@ def _default_freshness_callback(
 ) -> list[tuple[str, str]]:
     """Return a list of ``(unique_id, state)`` tuples for nodes that must be skipped due to stale sources.
 
-    Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``.
+    Stale sources are those with ``status`` of ``"error"`` or ``"warn"`` in ``sources_json["results"]``, matched
+    case-insensitively because dbt 2 writes ``Warn``.
 
     A node is skipped only when **all** of its upstream dependencies are either stale sources or
     already-skipped nodes.  If a node has at least one clean upstream path it may still execute
@@ -94,7 +104,7 @@ def _default_freshness_callback(
     stale_source_ids = {
         r["unique_id"]
         for r in sources_json.get("results", [])
-        if r.get("status") in DBT_SOURCE_FRESHNESS_STALE_STATUSES
+        if normalize_dbt_node_status(r.get("status")) in DBT_SOURCE_FRESHNESS_STALE_STATUSES
     }
     if not stale_source_ids:
         return []
@@ -110,7 +120,12 @@ def _default_freshness_callback(
     # nodes that have at least one clean upstream path: they may succeed and should not be
     # preemptively excluded.  When a new node is added to visited its own dependents are queued
     # so they can be re-evaluated with the updated skip set.
-    _excludable_resource_types = {DbtResourceType.MODEL, DbtResourceType.SEED, DbtResourceType.SNAPSHOT}
+    _excludable_resource_types = {
+        DbtResourceType.MODEL,
+        DbtResourceType.SEED,
+        DbtResourceType.SNAPSHOT,
+        DbtResourceType.SEMANTIC_METRIC_VIEW,
+    }
     visited: set[str] = set()
     queue = list(stale_source_ids)
     while queue:
@@ -196,8 +211,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
     Both modes feed the same parser (``store_dbt_resource_status_from_log``):
     - SUBPROCESS: each JSON log line from stdout is parsed directly.
     - DBT_RUNNER: each ``EventMsg`` from the dbt callback is serialised to JSON via
-      ``google.protobuf.json_format.MessageToJson`` — a transitive dbt-core dependency — and then
-      passed through the same parser.
+      ``cosmos.dbt.runner.dbt_event_to_json`` and then passed through the same parser.
 
     As each ``NodeFinished`` event arrives the operator pushes the per-model status to XCom under
     key ``<unique_id>_status`` so downstream sensors can react without waiting for the full build
@@ -217,8 +231,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         task_id = kwargs.pop("task_id", PRODUCER_WATCHER_TASK_ID)
-        self.tests_per_model: dict[str, list[str]] = kwargs.pop("tests_per_model", {})
-        self.test_results_per_model: dict[str, dict[str, str]] = {}
+        self.tests_per_model: TestsPerModel = kwargs.pop("tests_per_model", {})
+        self.test_results_per_model: ResultsTestsPerModel = {}
         self._check_source_freshness: bool = kwargs.pop("_check_source_freshness", False)
         self._should_generate_model_uris: bool = kwargs.pop(
             "_should_generate_model_uris", kwargs.get("emit_datasets", True)
@@ -249,9 +263,9 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         self._dataset_namespace: str | None = None
         self._model_outlet_uris: dict[str, list[str]] = {}
         # Mutable set populated by the log parser when dbt emits SkippingDetails
-        # or LogSkipBecauseError for a node; subsequent "skipped" terminal events
-        # for those unique_ids are rewritten to "failed" so the consumer sensor
-        # fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+        # or LogSkipBecauseError (dbt 1), or a skipped MarkSkippedChildren (dbt 2), for a node;
+        # subsequent "skipped" terminal events for those unique_ids are rewritten to "failed"
+        # so the consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
         # See #2698.
         self._upstream_failure_skipped_ids: set[str] = set()
 
@@ -270,6 +284,16 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             upstream_failure_skipped_ids=self._upstream_failure_skipped_ids,
         )
 
+    def _discover_invocation_mode(self) -> None:
+        """Fall back to subprocess on dbt-core 2.x, whose dbtRunner has no event callbacks to stream node status."""
+        super()._discover_invocation_mode()
+        if self.invocation_mode == InvocationMode.DBT_RUNNER and dbt_runner.is_dbt_v2():
+            self.invocation_mode = InvocationMode.SUBPROCESS
+            self.log.info(
+                "dbt-core 2.x does not support dbtRunner event callbacks, which the watcher producer needs. "
+                "Falling back to subprocess for invoking dbt."
+            )
+
     def run_subprocess(self, command: list[str], env: dict[str, str], cwd: str, **kwargs: Any) -> Any:
         """Wire up per-line JSON log parsing before delegating to the subprocess runner.
 
@@ -285,9 +309,6 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         dbt callbacks receive only the ``EventMsg`` protobuf object; context and project_dir are
         captured via closure so the unified ``store_dbt_resource_status_from_log`` parser can be
         reused identically to the SUBPROCESS path.
-
-        ``google.protobuf.json_format`` is a transitive dependency of dbt-core and is always
-        available when ``InvocationMode.DBT_RUNNER`` is in use.
 
         The callback is only registered when ``context`` is present (i.e. during task execution,
         not during auxiliary calls such as ``dbt deps``). Without a context there is no XCom
@@ -315,6 +336,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
                 with contextlib.redirect_stdout(_StdoutFilter()):
                     return super().run_dbt_runner(command, env, cwd, **kwargs)
 
+            if dbt_runner.is_dbt_v2():
+                raise CosmosValueError(
+                    "ExecutionMode.WATCHER streams node status through dbtRunner event callbacks, which dbt-core 2.x "
+                    "does not support. Use InvocationMode.SUBPROCESS, or leave invocation_mode unset."
+                )
             extra_kwargs: dict[str, Any] = {"project_dir": cwd, "context": context}
             parse = self._make_parse_callable()
             # Collect callback errors rather than raising inside the callback: dbt catches
@@ -327,10 +353,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
 
             def _event_callback(event: Any) -> None:
                 try:
-                    from google.protobuf.json_format import MessageToJson
-
-                    json_str = MessageToJson(event, preserving_proto_field_name=True)
-                    parse(json_str, extra_kwargs)
+                    parse(dbt_event_to_json(event), extra_kwargs)
                 except Exception as e:
                     self.log.exception("Error in dbt event callback: %s", e)
                     if not callback_error:
@@ -394,7 +417,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # "error") that a custom freshness_callback may return.  Without exclusion,
         # dbt would run the model anyway and either overwrite the pre-set XCom status
         # or trigger a race condition with the consumer sensor.
-        excluded_ids = [uid for uid, state in node_state_pairs if state not in DBT_SUCCESS_STATUSES]
+        excluded_ids = [uid for uid, state in node_state_pairs if not is_dbt_node_status_success(state)]
         if not excluded_ids:
             return
         resource_names = set()
@@ -486,7 +509,8 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         reliable_retry = settings.enable_watcher_reliable_retry
 
         if try_number > 1:
-            _restore_xcom_from_variable(context)
+            if not _restore_xcom_backup(context, read_task_state_store=reliable_retry):
+                _log_missing_backup(context, try_number, read_task_state_store=reliable_retry)
             raise AirflowSkipException(
                 "Dbt WATCHER producer task does not support Airflow retries. "
                 f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
@@ -503,12 +527,12 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             return_value = super().execute(context=context, **kwargs)
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             if reliable_retry:
-                _delete_xcom_backup_variable(context)
+                _delete_xcom_backup(context)
             return return_value
 
         except Exception:
-            # The on-failure callback flushes the in-memory backup to the Variable; here we only
-            # record that the producer finished so consumer sensors stop waiting.
+            # Without a task store, the retry callback flushes the in-memory backup to the Variable; here we
+            # only record that the producer finished so consumer sensors stop waiting.
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             raise
 
@@ -612,17 +636,30 @@ class DbtRunWatcherOperator(DbtConsumerWatcherSensor):
         super().__init__(*args, **kwargs)
 
 
+class DbtSemanticMetricViewWatcherOperator(DbtSemanticMetricViewMixin, DbtConsumerWatcherSensor):
+    """
+    Watches for the progress of an adapter-native semantic metric view, run by the producer task
+    (DbtProducerWatcherOperator).
+    """
+
+    template_fields: tuple[str, ...] = DbtConsumerWatcherSensor.template_fields + DbtSemanticMetricViewMixin.template_fields  # type: ignore[operator]
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+
 class DbtTestWatcherOperator(DbtConsumerWatcherSensor):
     """Sensor that watches the aggregated test status for a dbt model in watcher execution mode.
 
     The producer task (``DbtProducerWatcherOperator``) collects individual test
     results as they finish and, once every test for a given model has reported,
-    pushes a single aggregated XCom (``"pass"`` or ``"fail"``) under the key
-    ``<model_unique_id>_tests_status``.
+    pushes a single aggregated XCom under the key ``<model_unique_id>_tests_status``: a dict
+    with ``status`` (``"pass"`` or ``"fail"``), ``passed_count``, ``failed_count``, ``skipped_count``, ``total_count``
+    and up to ``MAX_FAILED_TESTS_IN_SUMMARY`` ``failed_tests`` unique_ids.
 
-    This sensor polls that key and:
-    * returns success when the value is ``"pass"``,
-    * raises ``AirflowException`` when the value is ``"fail"``.
+    This sensor polls that key, logs the summary and:
+    * returns success when ``status`` is ``"pass"``,
+    * raises ``AirflowException`` when ``status`` is ``"fail"``.
 
     Deferral is fully supported: the ``WatcherTrigger`` receives
     ``is_test_sensor=True`` and polls the correct aggregated key.

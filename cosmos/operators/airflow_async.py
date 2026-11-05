@@ -16,6 +16,7 @@ from cosmos.operators.local import (
     DbtLSLocalOperator,
     DbtRunOperationLocalOperator,
     DbtSeedLocalOperator,
+    DbtSemanticMetricViewLocalOperator,
     DbtSnapshotLocalOperator,
     DbtSourceLocalOperator,
     DbtTestLocalOperator,
@@ -42,6 +43,13 @@ class DbtSnapshotAirflowAsyncOperator(DbtSnapshotLocalOperator):
 
 class DbtSourceAirflowAsyncOperator(DbtSourceLocalOperator):
     pass
+
+
+class DbtSemanticMetricViewAirflowAsyncOperator(DbtSemanticMetricViewLocalOperator):
+    """
+    Runs on the worker like ``ExecutionMode.LOCAL``, as every non-model resource does in this mode. There is no
+    async operator to compose with: only ``DbtRun`` has one, and only for BigQuery, which has no metric views.
+    """
 
 
 class DbtRunAirflowAsyncOperator(DbtRunAirflowAsyncFactoryOperator):

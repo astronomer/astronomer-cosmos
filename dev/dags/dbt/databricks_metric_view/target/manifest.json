@@ -1,0 +1,990 @@
+{
+  "child_map": {
+    "model.databricks_metric_view.order_metrics": [
+      "model.databricks_metric_view.revenue_by_status",
+      "test.databricks_metric_view.assert_order_metrics_totals"
+    ],
+    "model.databricks_metric_view.orders": [
+      "model.databricks_metric_view.order_metrics",
+      "test.databricks_metric_view.not_null_orders_order_id.cf6c17daed",
+      "test.databricks_metric_view.unique_orders_order_id.fed79b3a6e"
+    ],
+    "model.databricks_metric_view.revenue_by_status": [
+      "test.databricks_metric_view.not_null_revenue_by_status_status.8616e73053",
+      "test.databricks_metric_view.unique_revenue_by_status_status.6c94330710"
+    ],
+    "seed.databricks_metric_view.raw_orders": [
+      "model.databricks_metric_view.orders"
+    ],
+    "test.databricks_metric_view.assert_order_metrics_totals": [],
+    "test.databricks_metric_view.not_null_orders_order_id.cf6c17daed": [],
+    "test.databricks_metric_view.not_null_revenue_by_status_status.8616e73053": [],
+    "test.databricks_metric_view.unique_orders_order_id.fed79b3a6e": [],
+    "test.databricks_metric_view.unique_revenue_by_status_status.6c94330710": []
+  },
+  "disabled": {},
+  "docs": {},
+  "exposures": {},
+  "functions": {},
+  "group_map": {},
+  "groups": {},
+  "macros": {},
+  "metadata": {
+    "adapter_type": "databricks",
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+    "dbt_version": "1.12.5",
+    "env": {},
+    "generated_at": "2026-10-16T17:00:26.682096Z",
+    "invocation_id": "cb32f8ea-6dd3-4e9d-b5c3-487256a9a566",
+    "invocation_started_at": "2026-10-16T17:00:25.341114Z",
+    "project_id": "8bbe38a0cc6c633c1927c6cb1f469e14",
+    "project_name": "databricks_metric_view",
+    "quoting": {
+      "column": null,
+      "database": true,
+      "identifier": true,
+      "schema": true
+    },
+    "run_started_at": "2026-10-16T17:00:25.341410+00:00",
+    "send_anonymous_usage_stats": true,
+    "user_id": "8fb5d710-72c0-4b6c-ab8e-7d4d2d9c8237"
+  },
+  "metrics": {},
+  "nodes": {
+    "model.databricks_metric_view.order_metrics": {
+      "access": "protected",
+      "alias": "order_metrics",
+      "build_path": null,
+      "checksum": {
+        "checksum": "2b9066410b9908eea4bfc307d9bebb9d5e6aae8f5c9d4434f6878fcc294c8c17",
+        "name": "sha256"
+      },
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "access": "protected",
+        "alias": null,
+        "batch_size": null,
+        "begin": null,
+        "column_types": {},
+        "concurrent_batches": null,
+        "contract": {
+          "alias_types": true,
+          "enforced": false
+        },
+        "database": null,
+        "docs": {
+          "node_color": null,
+          "show": true
+        },
+        "enabled": true,
+        "event_time": null,
+        "freshness": null,
+        "full_refresh": null,
+        "grants": {},
+        "group": null,
+        "incremental_strategy": null,
+        "latest_version_pointer": {
+          "alias": null,
+          "enabled": null
+        },
+        "lookback": 1,
+        "materialized": "metric_view",
+        "meta": {},
+        "on_configuration_change": "apply",
+        "on_error": null,
+        "on_schema_change": "ignore",
+        "packages": [],
+        "persist_docs": {},
+        "post-hook": [],
+        "pre-hook": [],
+        "quoting": {},
+        "schema": null,
+        "static_analysis": null,
+        "tags": [],
+        "unique_key": null
+      },
+      "constraints": [],
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170027.5785758,
+      "database": "hive_metastore",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.databricks_metric_view.orders"
+        ]
+      },
+      "deprecation_date": null,
+      "description": "Unity Catalog metric view over orders (adapter-native semantic layer).",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "databricks_metric_view",
+        "order_metrics"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "latest_version": null,
+      "meta": {},
+      "metrics": [],
+      "name": "order_metrics",
+      "original_file_path": "models/order_metrics.sql",
+      "package_name": "databricks_metric_view",
+      "patch_path": "databricks_metric_view://models/schema.yml",
+      "path": "order_metrics.sql",
+      "primary_key": [],
+      "raw_code": "{{ config(materialized='metric_view') }}\nversion: 0.1\nsource: \"{{ ref('orders') }}\"\ndimensions:\n  - name: order_date\n    expr: order_date\n  - name: status\n    expr: status\nmeasures:\n  - name: total_orders\n    expr: count(1)\n  - name: total_revenue\n    expr: sum(revenue)",
+      "refs": [
+        {
+          "name": "orders",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": "`hive_metastore`.`cosmos_demo`.`order_metrics`",
+      "resource_type": "model",
+      "schema": "cosmos_demo",
+      "sources": [],
+      "tags": [],
+      "time_spine": null,
+      "unique_id": "model.databricks_metric_view.order_metrics",
+      "unrendered_config": {
+        "materialized": "metric_view"
+      },
+      "version": null
+    },
+    "model.databricks_metric_view.orders": {
+      "access": "protected",
+      "alias": "orders",
+      "build_path": null,
+      "checksum": {
+        "checksum": "62835debb54988f14cb11094914ca27a975466652280fb5b93861929f48f62b0",
+        "name": "sha256"
+      },
+      "columns": {
+        "order_id": {
+          "config": {
+            "meta": {},
+            "tags": []
+          },
+          "constraints": [],
+          "data_type": null,
+          "description": "",
+          "dimension": null,
+          "doc_blocks": [],
+          "entity": null,
+          "granularity": null,
+          "meta": {},
+          "name": "order_id",
+          "quote": null,
+          "tags": []
+        }
+      },
+      "compiled_path": null,
+      "config": {
+        "access": "protected",
+        "alias": null,
+        "batch_size": null,
+        "begin": null,
+        "column_types": {},
+        "concurrent_batches": null,
+        "contract": {
+          "alias_types": true,
+          "enforced": false
+        },
+        "database": null,
+        "docs": {
+          "node_color": null,
+          "show": true
+        },
+        "enabled": true,
+        "event_time": null,
+        "freshness": null,
+        "full_refresh": null,
+        "grants": {},
+        "group": null,
+        "incremental_strategy": null,
+        "latest_version_pointer": {
+          "alias": null,
+          "enabled": null
+        },
+        "lookback": 1,
+        "materialized": "table",
+        "meta": {},
+        "on_configuration_change": "apply",
+        "on_error": null,
+        "on_schema_change": "ignore",
+        "packages": [],
+        "persist_docs": {},
+        "post-hook": [],
+        "pre-hook": [],
+        "quoting": {},
+        "schema": null,
+        "static_analysis": null,
+        "tags": [],
+        "unique_key": null
+      },
+      "constraints": [],
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170027.57826,
+      "database": "hive_metastore",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "seed.databricks_metric_view.raw_orders"
+        ]
+      },
+      "deprecation_date": null,
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "databricks_metric_view",
+        "orders"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "latest_version": null,
+      "meta": {},
+      "metrics": [],
+      "name": "orders",
+      "original_file_path": "models/orders.sql",
+      "package_name": "databricks_metric_view",
+      "patch_path": "databricks_metric_view://models/schema.yml",
+      "path": "orders.sql",
+      "primary_key": [
+        "order_id"
+      ],
+      "raw_code": "select\n    order_id,\n    customer_id,\n    order_date,\n    status,\n    revenue\nfrom {{ ref('raw_orders') }}",
+      "refs": [
+        {
+          "name": "raw_orders",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": "`hive_metastore`.`cosmos_demo`.`orders`",
+      "resource_type": "model",
+      "schema": "cosmos_demo",
+      "sources": [],
+      "tags": [],
+      "time_spine": null,
+      "unique_id": "model.databricks_metric_view.orders",
+      "unrendered_config": {
+        "materialized": "table"
+      },
+      "version": null
+    },
+    "model.databricks_metric_view.revenue_by_status": {
+      "access": "protected",
+      "alias": "revenue_by_status",
+      "build_path": null,
+      "checksum": {
+        "checksum": "95e80bde5a497162bd7fa0e6454d35839f8a42c37cc7a68e4e78d3750e232696",
+        "name": "sha256"
+      },
+      "columns": {
+        "status": {
+          "config": {
+            "meta": {},
+            "tags": []
+          },
+          "constraints": [],
+          "data_type": null,
+          "description": "",
+          "dimension": null,
+          "doc_blocks": [],
+          "entity": null,
+          "granularity": null,
+          "meta": {},
+          "name": "status",
+          "quote": null,
+          "tags": []
+        }
+      },
+      "compiled_path": null,
+      "config": {
+        "access": "protected",
+        "alias": null,
+        "batch_size": null,
+        "begin": null,
+        "column_types": {},
+        "concurrent_batches": null,
+        "contract": {
+          "alias_types": true,
+          "enforced": false
+        },
+        "database": null,
+        "docs": {
+          "node_color": null,
+          "show": true
+        },
+        "enabled": true,
+        "event_time": null,
+        "freshness": null,
+        "full_refresh": null,
+        "grants": {},
+        "group": null,
+        "incremental_strategy": null,
+        "latest_version_pointer": {
+          "alias": null,
+          "enabled": null
+        },
+        "lookback": 1,
+        "materialized": "table",
+        "meta": {},
+        "on_configuration_change": "apply",
+        "on_error": null,
+        "on_schema_change": "ignore",
+        "packages": [],
+        "persist_docs": {},
+        "post-hook": [],
+        "pre-hook": [],
+        "quoting": {},
+        "schema": null,
+        "static_analysis": null,
+        "tags": [],
+        "unique_key": null
+      },
+      "constraints": [],
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170027.578923,
+      "database": "hive_metastore",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.databricks_metric_view.order_metrics"
+        ]
+      },
+      "deprecation_date": null,
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "databricks_metric_view",
+        "revenue_by_status"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "latest_version": null,
+      "meta": {},
+      "metrics": [],
+      "name": "revenue_by_status",
+      "original_file_path": "models/revenue_by_status.sql",
+      "package_name": "databricks_metric_view",
+      "patch_path": "databricks_metric_view://models/schema.yml",
+      "path": "revenue_by_status.sql",
+      "primary_key": [
+        "status"
+      ],
+      "raw_code": "select\n    status,\n    measure(total_revenue) as total_revenue,\n    measure(total_orders) as total_orders\nfrom {{ ref('order_metrics') }}\ngroup by status",
+      "refs": [
+        {
+          "name": "order_metrics",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": "`hive_metastore`.`cosmos_demo`.`revenue_by_status`",
+      "resource_type": "model",
+      "schema": "cosmos_demo",
+      "sources": [],
+      "tags": [],
+      "time_spine": null,
+      "unique_id": "model.databricks_metric_view.revenue_by_status",
+      "unrendered_config": {
+        "materialized": "table"
+      },
+      "version": null
+    },
+    "seed.databricks_metric_view.raw_orders": {
+      "alias": "raw_orders",
+      "build_path": null,
+      "checksum": {
+        "checksum": "16e0abdaa9b37895f1500edb929de5e54e64d7b6f2df0e2718a092d0bc288e45",
+        "name": "sha256"
+      },
+      "columns": {},
+      "config": {
+        "alias": null,
+        "batch_size": null,
+        "begin": null,
+        "column_types": {
+          "customer_id": "int",
+          "order_date": "date",
+          "order_id": "int",
+          "revenue": "decimal(10, 2)",
+          "status": "string"
+        },
+        "concurrent_batches": null,
+        "contract": {
+          "alias_types": true,
+          "enforced": false
+        },
+        "database": null,
+        "delimiter": ",",
+        "docs": {
+          "node_color": null,
+          "show": true
+        },
+        "enabled": true,
+        "event_time": null,
+        "full_refresh": null,
+        "grants": {},
+        "group": null,
+        "incremental_strategy": null,
+        "lookback": 1,
+        "materialized": "seed",
+        "meta": {},
+        "on_configuration_change": "apply",
+        "on_schema_change": "ignore",
+        "packages": [],
+        "persist_docs": {},
+        "post-hook": [],
+        "pre-hook": [],
+        "quote_columns": null,
+        "quoting": {},
+        "schema": null,
+        "static_analysis": null,
+        "tags": [],
+        "unique_key": null
+      },
+      "created_at": 1792170027.481217,
+      "database": "hive_metastore",
+      "depends_on": {
+        "macros": []
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "databricks_metric_view",
+        "raw_orders"
+      ],
+      "group": null,
+      "meta": {},
+      "name": "raw_orders",
+      "original_file_path": "seeds/raw_orders.csv",
+      "package_name": "databricks_metric_view",
+      "patch_path": null,
+      "path": "raw_orders.csv",
+      "raw_code": "",
+      "relation_name": "`hive_metastore`.`cosmos_demo`.`raw_orders`",
+      "resource_type": "seed",
+      "root_path": "/var/folders/78/cp68zgd94z1gz8934_ck9jmr0000gp/T/tmpsds030qz/databricks_metric_view",
+      "schema": "cosmos_demo",
+      "tags": [],
+      "unique_id": "seed.databricks_metric_view.raw_orders",
+      "unrendered_config": {
+        "column_types": {
+          "customer_id": "int",
+          "order_date": "date",
+          "order_id": "int",
+          "revenue": "decimal(10, 2)",
+          "status": "string"
+        }
+      }
+    },
+    "test.databricks_metric_view.assert_order_metrics_totals": {
+      "alias": "assert_order_metrics_totals",
+      "build_path": null,
+      "checksum": {
+        "checksum": "7137f92dfcb80f57781016c821292a5f5243c4a6426e70a58a85af15baa90617",
+        "name": "sha256"
+      },
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "sql_header": null,
+        "static_analysis": null,
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170027.395419,
+      "database": "hive_metastore",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.databricks_metric_view.order_metrics"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "databricks_metric_view",
+        "assert_order_metrics_totals"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "assert_order_metrics_totals",
+      "original_file_path": "tests/assert_order_metrics_totals.sql",
+      "package_name": "databricks_metric_view",
+      "patch_path": null,
+      "path": "assert_order_metrics_totals.sql",
+      "raw_code": "select *\nfrom (\n    select\n        measure(total_revenue) as total_revenue,\n        measure(total_orders) as total_orders\n    from {{ ref('order_metrics') }}\n)\nwhere total_revenue <> 971.50 or total_orders <> 6",
+      "refs": [
+        {
+          "name": "order_metrics",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "cosmos_demo_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "unique_id": "test.databricks_metric_view.assert_order_metrics_totals",
+      "unrendered_config": {}
+    },
+    "test.databricks_metric_view.not_null_orders_order_id.cf6c17daed": {
+      "alias": "not_null_orders_order_id",
+      "attached_node": "model.databricks_metric_view.orders",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "order_id",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "sql_header": null,
+        "static_analysis": null,
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170027.6235032,
+      "database": "hive_metastore",
+      "depends_on": {
+        "macros": [
+          "macro.dbt.test_not_null"
+        ],
+        "nodes": [
+          "model.databricks_metric_view.orders"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "models.orders",
+      "fqn": [
+        "databricks_metric_view",
+        "not_null_orders_order_id"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "not_null_orders_order_id",
+      "original_file_path": "models/schema.yml",
+      "package_name": "databricks_metric_view",
+      "patch_path": null,
+      "path": "not_null_orders_order_id.sql",
+      "raw_code": "{{ test_not_null(**_dbt_generic_test_kwargs) }}",
+      "refs": [
+        {
+          "name": "orders",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "cosmos_demo_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "order_id",
+          "model": "{{ get_where_subquery(ref('orders')) }}"
+        },
+        "name": "not_null",
+        "namespace": null
+      },
+      "unique_id": "test.databricks_metric_view.not_null_orders_order_id.cf6c17daed",
+      "unrendered_config": {}
+    },
+    "test.databricks_metric_view.not_null_revenue_by_status_status.8616e73053": {
+      "alias": "not_null_revenue_by_status_status",
+      "attached_node": "model.databricks_metric_view.revenue_by_status",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "status",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "sql_header": null,
+        "static_analysis": null,
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170027.625479,
+      "database": "hive_metastore",
+      "depends_on": {
+        "macros": [
+          "macro.dbt.test_not_null"
+        ],
+        "nodes": [
+          "model.databricks_metric_view.revenue_by_status"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "models.revenue_by_status",
+      "fqn": [
+        "databricks_metric_view",
+        "not_null_revenue_by_status_status"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "not_null_revenue_by_status_status",
+      "original_file_path": "models/schema.yml",
+      "package_name": "databricks_metric_view",
+      "patch_path": null,
+      "path": "not_null_revenue_by_status_status.sql",
+      "raw_code": "{{ test_not_null(**_dbt_generic_test_kwargs) }}",
+      "refs": [
+        {
+          "name": "revenue_by_status",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "cosmos_demo_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "status",
+          "model": "{{ get_where_subquery(ref('revenue_by_status')) }}"
+        },
+        "name": "not_null",
+        "namespace": null
+      },
+      "unique_id": "test.databricks_metric_view.not_null_revenue_by_status_status.8616e73053",
+      "unrendered_config": {}
+    },
+    "test.databricks_metric_view.unique_orders_order_id.fed79b3a6e": {
+      "alias": "unique_orders_order_id",
+      "attached_node": "model.databricks_metric_view.orders",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "order_id",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "sql_header": null,
+        "static_analysis": null,
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170027.6222599,
+      "database": "hive_metastore",
+      "depends_on": {
+        "macros": [
+          "macro.dbt.test_unique"
+        ],
+        "nodes": [
+          "model.databricks_metric_view.orders"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "models.orders",
+      "fqn": [
+        "databricks_metric_view",
+        "unique_orders_order_id"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "unique_orders_order_id",
+      "original_file_path": "models/schema.yml",
+      "package_name": "databricks_metric_view",
+      "patch_path": null,
+      "path": "unique_orders_order_id.sql",
+      "raw_code": "{{ test_unique(**_dbt_generic_test_kwargs) }}",
+      "refs": [
+        {
+          "name": "orders",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "cosmos_demo_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "order_id",
+          "model": "{{ get_where_subquery(ref('orders')) }}"
+        },
+        "name": "unique",
+        "namespace": null
+      },
+      "unique_id": "test.databricks_metric_view.unique_orders_order_id.fed79b3a6e",
+      "unrendered_config": {}
+    },
+    "test.databricks_metric_view.unique_revenue_by_status_status.6c94330710": {
+      "alias": "unique_revenue_by_status_status",
+      "attached_node": "model.databricks_metric_view.revenue_by_status",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "status",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "sql_header": null,
+        "static_analysis": null,
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170027.6244311,
+      "database": "hive_metastore",
+      "depends_on": {
+        "macros": [
+          "macro.dbt.test_unique"
+        ],
+        "nodes": [
+          "model.databricks_metric_view.revenue_by_status"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "models.revenue_by_status",
+      "fqn": [
+        "databricks_metric_view",
+        "unique_revenue_by_status_status"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "unique_revenue_by_status_status",
+      "original_file_path": "models/schema.yml",
+      "package_name": "databricks_metric_view",
+      "patch_path": null,
+      "path": "unique_revenue_by_status_status.sql",
+      "raw_code": "{{ test_unique(**_dbt_generic_test_kwargs) }}",
+      "refs": [
+        {
+          "name": "revenue_by_status",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "cosmos_demo_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "status",
+          "model": "{{ get_where_subquery(ref('revenue_by_status')) }}"
+        },
+        "name": "unique",
+        "namespace": null
+      },
+      "unique_id": "test.databricks_metric_view.unique_revenue_by_status_status.6c94330710",
+      "unrendered_config": {}
+    }
+  },
+  "parent_map": {
+    "model.databricks_metric_view.order_metrics": [
+      "model.databricks_metric_view.orders"
+    ],
+    "model.databricks_metric_view.orders": [
+      "seed.databricks_metric_view.raw_orders"
+    ],
+    "model.databricks_metric_view.revenue_by_status": [
+      "model.databricks_metric_view.order_metrics"
+    ],
+    "seed.databricks_metric_view.raw_orders": [],
+    "test.databricks_metric_view.assert_order_metrics_totals": [
+      "model.databricks_metric_view.order_metrics"
+    ],
+    "test.databricks_metric_view.not_null_orders_order_id.cf6c17daed": [
+      "model.databricks_metric_view.orders"
+    ],
+    "test.databricks_metric_view.not_null_revenue_by_status_status.8616e73053": [
+      "model.databricks_metric_view.revenue_by_status"
+    ],
+    "test.databricks_metric_view.unique_orders_order_id.fed79b3a6e": [
+      "model.databricks_metric_view.orders"
+    ],
+    "test.databricks_metric_view.unique_revenue_by_status_status.6c94330710": [
+      "model.databricks_metric_view.revenue_by_status"
+    ]
+  },
+  "saved_queries": {},
+  "selectors": {},
+  "semantic_models": {},
+  "sources": {},
+  "unit_tests": {}
+}

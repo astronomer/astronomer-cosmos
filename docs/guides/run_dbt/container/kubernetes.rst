@@ -85,6 +85,47 @@ Behavior across versions
 - In Cosmos 1.15.0, Cosmos began setting ``cmds`` to ``["dbt"]`` unconditionally. Because setting the Pod ``cmds`` sets the container ``command`` field, this overrode the image ``ENTRYPOINT`` and also discarded any custom ``cmds`` value (`#2889 <https://github.com/astronomer/astronomer-cosmos/issues/2889>`__).
 - Cosmos 1.15.1 restores the earlier behavior: the image ``ENTRYPOINT`` is preserved by default, a custom ``cmds`` is honored as provided, and ``["dbt"]`` is used as the container command only when set explicitly.
 
+.. _kubernetes-dbt-oss:
+
+dbt OSS
+~~~~~~~
+
+To run dbt OSS (dbt 2) in the Pods, install it in the image instead of dbt Core and its adapter. It includes its adapters, and it cannot be installed in the same environment as dbt Core:
+
+.. code-block:: docker
+
+    RUN pip install "dbt-oss~=2.0.0"
+
+Working directory and profile
++++++++++++++++++++++++++++++
+
+With dbt OSS, start the Pod in the dbt project directory and keep the ``profiles.yml`` of the Pod in that directory:
+
+- dbt OSS looks for ``profiles.yml`` in the working directory and then in ``~/.dbt``, not in the directory passed with ``--project-dir``. A ``profiles.yml`` in the working directory takes precedence over the one in ``~/.dbt``. Alternatively, pass ``--profiles-dir`` to dbt.
+- The BigQuery adapter of dbt OSS reads seed CSV files relative to the working directory, not to ``--project-dir``, so seeds fail with ``open "seeds/<name>.csv": no such file or directory`` when the Pod starts elsewhere.
+
+When the image holds one project, set the working directory in the Dockerfile:
+
+.. code-block:: docker
+
+    WORKDIR /usr/app/my_project
+    COPY profiles.yml /usr/app/my_project/profiles.yml
+
+When the image holds several projects, pass an entrypoint script through ``cmds`` (requires Cosmos 1.15.1 or higher, see `Behavior across versions`_). The script changes into the project directory and runs the dbt command Cosmos passes as arguments:
+
+.. code-block:: bash
+
+    #!/bin/sh
+    cd "${DBT_WORKDIR}" && exec "$@"
+
+.. code-block:: python
+
+    operator_args = {
+        "image": "my-dbt-image:1.0.0",
+        "cmds": ["/usr/local/bin/entrypoint.sh"],
+        "env_vars": {"DBT_WORKDIR": "/usr/app/my_project"},
+    }
+
 Step-by-step instructions
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 

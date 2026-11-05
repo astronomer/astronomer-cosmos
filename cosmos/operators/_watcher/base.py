@@ -23,7 +23,14 @@ from cosmos.constants import (
 from cosmos.dbt.graph import DbtNode
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
-from cosmos.operators._watcher.aggregation import get_tests_status_xcom_key, push_test_result_or_aggregate
+from cosmos.operators._watcher.aggregation import (
+    MAX_FAILED_TESTS_IN_SUMMARY,
+    ResultsTestsPerModel,
+    TestResultSummary,
+    TestsPerModel,
+    get_tests_status_xcom_key,
+    push_test_result_or_aggregate,
+)
 from cosmos.operators._watcher.state import (
     DbtNodeStatus,
     ProducerTaskState,
@@ -34,10 +41,12 @@ from cosmos.operators._watcher.state import (
     get_dbt_event_xcom_key,
     get_status_xcom_key,
     get_xcom_val,
+    is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
     is_dbt_node_status_terminal,
     is_dbt_upstream_failure_skip_event,
+    is_producer_task_still_running,
     is_producer_task_terminated,
     safe_xcom_push,
     xcom_set_lock,
@@ -148,11 +157,18 @@ def _extract_compiled_sql(
         return None
 
     package = unique_id.split(".", 2)[1]
-    compiled_sql_path = Path(project_dir) / "target" / "compiled" / package / "models" / node_path
-    if not compiled_sql_path.exists():
+    compiled_root = Path(project_dir) / "target" / "compiled" / package
+    # dbt 1 reports node_path relative to the models folder (``staging/m.sql``), dbt 2 relative to the project
+    # (``models/staging/m.sql``). Both write the file to ``compiled/<package>/models/staging/m.sql``. The dbt 1 layout is
+    # tried first, so it behaves as before.
+    # Known limit: on dbt 1, if the own file is missing (for example with a custom ``model-paths``), the second candidate can
+    # match another model's compiled file when ``node_path`` starts with a folder named ``models``.
+    candidates = [compiled_root / "models" / node_path, compiled_root / node_path]
+    compiled_sql_path = next((path for path in candidates if path.exists()), None)
+    if compiled_sql_path is None:
         logger.warning(
             "Compiled sql path %s does not exist and hence the rendered template field compiled_sql for the model will not be populated",
-            compiled_sql_path,
+            " or ".join(str(path) for path in candidates),
         )
         return None
     return compiled_sql_path.read_text(encoding="utf-8").strip() or None
@@ -263,6 +279,36 @@ def _ensure_subprocess_model_outlet_uris(
         model_outlet_uris[_MODEL_OUTLET_URIS_ATTEMPTED_KEY] = []
 
 
+def _outlet_uris_from_node_relation(node_info: dict[str, Any], dataset_namespace: str | None) -> list[str]:
+    """Outlet URIs of a node from the relation named by its dbt event.
+
+    dbt 2 (dbt-oss) writes ``manifest.json`` only when the run ends, so it is missing while the nodes finish and the
+    URIs cannot be read from it. The events of a node name its relation, with the database, schema and alias that the
+    manifest has.
+    """
+    relation = node_info.get("node_relation") or {}
+    database, schema, alias = relation.get("database"), relation.get("schema"), relation.get("alias")
+    if not dataset_namespace or not all([database, schema, alias]):
+        return []
+
+    from cosmos.dataset import construct_dataset_uri
+
+    return [construct_dataset_uri(dataset_namespace, f"{database}.{schema}.{alias}", warn_uri_migration=False)]
+
+
+def _resolve_outlet_uris(
+    unique_id: str | None,
+    node_info: dict[str, Any],
+    model_outlet_uris: dict[str, list[str]] | None,
+    dataset_namespace: str | None,
+    project_dir: str | None,
+) -> list[str]:
+    """Outlet URIs of a node: the ones of the manifest, or else the ones of the relation of its event."""
+    _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
+    outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris and unique_id else []
+    return outlet_uris or _outlet_uris_from_node_relation(node_info, dataset_namespace)
+
+
 def _rewrite_upstream_failure_skip_status(
     log_line: dict[str, Any],
     unique_id: str | None,
@@ -280,6 +326,9 @@ def _rewrite_upstream_failure_skip_status(
     rewritten XCom with the original ``"skipped"``. Tracking affected
     ``unique_id``\\ s in a per-execution set lets the parser rewrite both. See
     #2698.
+
+    dbt 2 (dbt-oss) emits neither event: ``_track_node_skipped_by_dbt_v2`` adds the node of a skipped
+    ``MarkSkippedChildren`` event to the same set, so the rewrite below covers it too.
     """
     if not unique_id or upstream_failure_skipped_ids is None:
         return dbt_node_status
@@ -288,6 +337,39 @@ def _rewrite_upstream_failure_skip_status(
     if is_dbt_node_status_skipped(dbt_node_status) and unique_id in upstream_failure_skipped_ids:
         return DbtNodeStatus.FAILED
     return dbt_node_status
+
+
+# dbt 2 (dbt-oss) does not emit ``SkippingDetails`` or ``LogSkipBecauseError`` for a node it skipped because an upstream
+# node failed. Every node it handles that way, a skipped one included, emits ``MarkSkippedChildren`` naming itself, with
+# the ``status`` it ends with, before its own ``NodeFinished``. A node that failed reports ``error`` or ``fail``, and one
+# dbt skipped reports ``skipped``.
+_DBT_V2_MARK_SKIPPED_CHILDREN_EVENT = "MarkSkippedChildren"
+_DBT_V2_SKIPPED_STATUS = "skipped"
+
+
+def _track_node_skipped_by_dbt_v2(log_line: dict[str, Any], upstream_failure_skipped_ids: set[str] | None) -> None:
+    """Add the node of a dbt 2 ``MarkSkippedChildren`` event to the upstream-failure skips when dbt skipped it.
+
+    The event comes before the node's ``NodeFinished``, so ``_rewrite_upstream_failure_skip_status`` rewrites that
+    ``skipped`` like the dbt 1 ones.
+    """
+    if upstream_failure_skipped_ids is None:
+        return
+    if log_line.get("info", {}).get("name") != _DBT_V2_MARK_SKIPPED_CHILDREN_EVENT:
+        return
+    data = log_line.get("data", {})
+    if data.get("status") == _DBT_V2_SKIPPED_STATUS and data.get("unique_id"):
+        upstream_failure_skipped_ids.add(data["unique_id"])
+
+
+def _node_status_xcom_value(
+    dbt_node_status: Any, outlet_uris: list[str], is_upstream_failure_skip: bool
+) -> dict[str, Any]:
+    """The ``<unique_id>_status`` XCom value. An upstream-failure skip is marked, since dbt never ran the node (#3023)."""
+    status_value: dict[str, Any] = {"status": dbt_node_status, "outlet_uris": outlet_uris}
+    if is_upstream_failure_skip:
+        status_value["upstream_failure_skip"] = True
+    return status_value
 
 
 def _surface_non_json_stdout(line: str) -> None:
@@ -302,8 +384,8 @@ def store_dbt_resource_status_from_log(
     line: str,
     extra_kwargs: Any,
     *,
-    tests_per_model: dict[str, list[str]] | None = None,
-    test_results_per_model: dict[str, dict[str, str]] | None = None,
+    tests_per_model: TestsPerModel | None = None,
+    test_results_per_model: ResultsTestsPerModel | None = None,
     model_outlet_uris: dict[str, list[str]] | None = None,
     dataset_namespace: str | None = None,
     should_generate_model_uris: bool = True,
@@ -334,7 +416,8 @@ def store_dbt_resource_status_from_log(
         generation is skipped regardless of ``dataset_namespace``.
     :param upstream_failure_skipped_ids: Mutable accumulator set of node unique_ids
         that dbt skipped because of an upstream-node failure. Populated when this
-        function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event; later
+        function sees a ``SkippingDetails`` or ``LogSkipBecauseError`` event (dbt 1), or a ``MarkSkippedChildren`` event
+        with ``status="skipped"`` (dbt 2); later
         ``NodeFinished`` events with ``node_status="skipped"`` for these unique_ids
         are rewritten to ``"failed"`` so the consumer sensor fails (and Airflow can
         retry it) rather than going SKIPPED. See #2698.
@@ -350,19 +433,21 @@ def store_dbt_resource_status_from_log(
         _surface_non_json_stdout(line)
         log_line = {}
     else:
+        _track_node_skipped_by_dbt_v2(log_line, upstream_failure_skipped_ids)
         context = extra_kwargs.get("context")
         if context is not None:
             _store_startup_event_from_log(context["ti"], log_line)
         node_info = log_line.get("data", {}).get("node_info", {})
-        dbt_node_status = node_info.get("node_status")
+        reported_dbt_node_status = node_info.get("node_status")
         dbt_node_resource_type = node_info.get("resource_type")
         unique_id = node_info.get("unique_id")
 
         # Rewrite "skipped" to "failed" when dbt skipped the node because an
         # upstream node failed (#2698). See _rewrite_upstream_failure_skip_status.
         dbt_node_status = _rewrite_upstream_failure_skip_status(
-            log_line, unique_id, dbt_node_status, upstream_failure_skipped_ids
+            log_line, unique_id, reported_dbt_node_status, upstream_failure_skipped_ids
         )
+        is_upstream_failure_skip = dbt_node_status != reported_dbt_node_status
 
         logger.debug("Model: %s is in %s state", unique_id, dbt_node_status)
 
@@ -376,9 +461,9 @@ def store_dbt_resource_status_from_log(
                 )
                 return
             if dbt_node_resource_type == "test" and tests_per_model and test_results_per_model is not None:
-                logger.debug("Test '%s' finished with status '%s'", unique_id, dbt_node_status)
+                logger.debug("Test '%s' finished with status '%s'", unique_id, reported_dbt_node_status)
                 push_test_result_or_aggregate(
-                    unique_id, dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
+                    unique_id, reported_dbt_node_status, tests_per_model, test_results_per_model, context["ti"]
                 )
             else:
                 # Lazily populate per-model outlet URIs from the manifest, but only when the
@@ -386,18 +471,14 @@ def store_dbt_resource_status_from_log(
                 # (models/seeds/snapshots).
                 outlet_uris: list[str] = []
                 if should_generate_model_uris and dbt_node_resource_type in _DATASET_EMITTING_RESOURCE_TYPES:
-                    project_dir = extra_kwargs.get("project_dir")
-                    _ensure_subprocess_model_outlet_uris(model_outlet_uris, dataset_namespace, project_dir)
-                    outlet_uris = model_outlet_uris.get(unique_id, []) if model_outlet_uris else []
+                    outlet_uris = _resolve_outlet_uris(
+                        unique_id, node_info, model_outlet_uris, dataset_namespace, extra_kwargs.get("project_dir")
+                    )
 
-                status_value: dict[str, Any] | str = {
-                    "status": dbt_node_status,
-                    "outlet_uris": outlet_uris,
-                }
                 safe_xcom_push(
                     task_instance=context["ti"],
                     key=get_status_xcom_key(unique_id),
-                    value=status_value,
+                    value=_node_status_xcom_value(dbt_node_status, outlet_uris, is_upstream_failure_skip),
                 )
 
             # Extract and push compiled_sql for models (centralised for both subprocess and node-event)
@@ -457,6 +538,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         self.producer_task_id = producer_task_id
         self.deferrable = deferrable
         self.model_unique_id = extra_context.get("dbt_node_config", {}).get("unique_id")
+        self._test_result_summary: TestResultSummary | None = None
 
     @property
     def is_test_sensor(self) -> bool:
@@ -658,6 +740,10 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         _log_dbt_event(dbt_events)
 
+        test_result_summary = event.get("test_result_summary")
+        if self.is_test_sensor and test_result_summary:
+            self._log_test_result_summary(TestResultSummary.from_dict(test_result_summary))
+
         if status == EventStatus.SKIPPED:
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
@@ -681,9 +767,8 @@ class BaseConsumerSensor(BaseSensorOperator):
             return
 
         if reason == WatcherEventReason.NODE_FAILED:
-            raise AirflowException(
-                f"dbt {self._resource_label.lower()} '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
-            )
+            self._handle_node_failed_event(context, event)
+            return
 
         if reason == WatcherEventReason.PRODUCER_FAILED:
             raise AirflowException(
@@ -700,6 +785,46 @@ class BaseConsumerSensor(BaseSensorOperator):
             self._fallback_to_non_watcher_run(try_number=context["ti"].try_number, context=context)
             return
 
+    def _handle_node_failed_event(self, context: Context, event: dict[str, Any]) -> None:
+        """Build now a node that dbt skipped for an upstream failure (#3023), or raise for the failed node."""
+        if (
+            self._should_fall_back_for_upstream_failure_skip(context["ti"], bool(event.get("upstream_failure_skip")))
+            and is_producer_task_terminated(self._get_producer_task_status(context))
+            and self._fall_back_for_upstream_failure_skip(context)
+        ):
+            return
+        raise AirflowException(
+            f"dbt {self._resource_label.lower()} '{self.model_unique_id}' failed. Review the producer task '{self.producer_task_id}' logs for details."
+        )
+
+    def _log_test_result_summary(self, summary: TestResultSummary) -> None:
+        """Log a human-readable summary of test results for test sensors."""
+        skipped_note = f", {summary.skipped_count} skipped" if summary.skipped_count else ""
+        if summary.failed_count:
+            truncation_note = (
+                f" (showing first {MAX_FAILED_TESTS_IN_SUMMARY} of {summary.failed_count})"
+                if summary.failed_count > MAX_FAILED_TESTS_IN_SUMMARY
+                else ""
+            )
+            logger.info(
+                "%s out of %s tests passed, %s failed%s for '%s'. Failed%s: %s",
+                summary.passed_count,
+                summary.total_count,
+                summary.failed_count,
+                skipped_note,
+                self.model_unique_id,
+                truncation_note,
+                ", ".join(summary.failed_tests),
+            )
+        else:
+            logger.info(
+                "%s out of %s tests passed%s for '%s'.",
+                summary.passed_count,
+                summary.total_count,
+                skipped_note,
+                self.model_unique_id,
+            )
+
     def _log_startup_events(self, ti: Any) -> None:
         dbt_startup_events: list[dict[str, Any]] = ti.xcom_pull(
             task_ids=self.producer_task_id, key=_DBT_STARTUP_EVENTS_XCOM_KEY
@@ -715,17 +840,27 @@ class BaseConsumerSensor(BaseSensorOperator):
         For test sensors, reads the aggregated ``_tests_status`` key.
         For model sensors, reads the per-model ``*_status`` key (same for both
         SUBPROCESS and DBT_RUNNER invocation modes). The value is always a dict
-        with ``status`` and ``outlet_uris`` keys.
+        with ``status`` and ``outlet_uris`` keys, plus ``upstream_failure_skip``
+        for a node that dbt skipped for an upstream failure.
 
         Side effect: stores outlet URIs on ``self._outlet_uris`` for later
-        dataset emission.
+        dataset emission, and the upstream-failure-skip mark on
+        ``self._upstream_failure_skip``.
         """
         if self.is_test_sensor:
-            return get_xcom_val(ti, self.producer_task_id, get_tests_status_xcom_key(self.model_unique_id))
+            xcom_val = get_xcom_val(ti, self.producer_task_id, get_tests_status_xcom_key(self.model_unique_id))
+            if xcom_val is None:
+                return None
+            if isinstance(xcom_val, dict):
+                self._test_result_summary = TestResultSummary.from_dict(xcom_val)
+                return self._test_result_summary.status
+            # Backward compatibility: plain string value
+            return xcom_val
         xcom_val = get_xcom_val(ti, self.producer_task_id, get_status_xcom_key(self.model_unique_id))
         if xcom_val is None:
             return None
         self._outlet_uris = xcom_val.get("outlet_uris", [])
+        self._upstream_failure_skip = bool(xcom_val.get("upstream_failure_skip"))
         return xcom_val.get("status")
 
     def _cache_compiled_sql(self, ti: Any, context: Context) -> None:
@@ -757,6 +892,34 @@ class BaseConsumerSensor(BaseSensorOperator):
             producer_task_state or "unknown",
         )
         return None
+
+    def _should_fall_back_for_upstream_failure_skip(self, ti: Any, upstream_failure_skip: bool) -> bool:
+        """Whether to build now a failed node that dbt skipped for an upstream failure, instead of on a retry.
+
+        Only when the task has ``retries`` configured, so a retry would fall back too. The node then gets
+        ``retries + 1`` real dbt runs, like a node that failed inside the producer, instead of losing try 1.
+        The caller must also check that the producer has terminated. See #3023.
+        """
+        if not self.retries:
+            return False
+        # The cluster policy moves only retries to the retry queue, so leave the build to the retry.
+        retry_queue = settings.watcher_dbt_retry_queue
+        if retry_queue and self.queue != retry_queue:
+            return False
+        if self.is_test_sensor:
+            # dbt never runs a model's tests when the model did not succeed.
+            model_status = get_xcom_val(ti, self.producer_task_id, get_status_xcom_key(self.model_unique_id)) or {}
+            return bool(model_status) and not is_dbt_node_status_success(model_status.get("status"))
+        return upstream_failure_skip
+
+    def _fall_back_for_upstream_failure_skip(self, context: Context) -> bool:
+        """Build the node that dbt skipped for an upstream failure now, instead of on a retry."""
+        self.log.info(
+            "dbt skipped %s '%s' for an upstream failure, so it never ran. Running it now instead of on a retry.",
+            self._resource_label.lower(),
+            self.model_unique_id,
+        )
+        return self._fallback_to_non_watcher_run(context["ti"].try_number, context)
 
     def _handle_no_dbt_node_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
         """Handle the case where no dbt node status has been reported yet."""
@@ -808,13 +971,18 @@ class BaseConsumerSensor(BaseSensorOperator):
         if not self.is_test_sensor:
             self._log_startup_events(ti)
         status = self._get_node_status(ti, context)
-
-        # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
-        if status is not None:
-            self._cache_compiled_sql(ti, context)
-
         if status is None:
             return self._handle_no_dbt_node_status(producer_task_state, try_number, context)
+
+        # compiled_sql is always in the canonical per-model XCom key (same for event and subprocess modes)
+        self._cache_compiled_sql(ti, context)
+
+        # A failed node while the producer is still building is not terminal for the sensor yet: keep
+        # polling (in deferrable mode this defers back to the trigger) so the retry path can fall back
+        # once the producer terminates, instead of burning a retry on an instant re-raise. Return before
+        # logging so the ERROR dbt event is not repeated on every poke. See #2947.
+        if is_dbt_node_status_failed(status) and is_producer_task_still_running(producer_task_state):
+            return False
 
         # Log the dbt event only once the node is terminal; poke runs every interval, so logging before
         # this point would repeat the line on each poke.
@@ -825,14 +993,22 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         _log_dbt_event(dbt_events)
 
+        if (
+            is_dbt_node_status_failed(status)
+            and is_producer_task_terminated(producer_task_state)
+            and self._should_fall_back_for_upstream_failure_skip(ti, getattr(self, "_upstream_failure_skip", False))
+            and self._fall_back_for_upstream_failure_skip(context)
+        ):
+            return True
         if is_dbt_node_status_skipped(status):
             raise AirflowSkipException(
                 f"{self._resource_label} '{self.model_unique_id}' was skipped by the dbt command."
             )
-        elif is_dbt_node_status_success(status):
+        if self.is_test_sensor and self._test_result_summary:
+            self._log_test_result_summary(self._test_result_summary)
+        if is_dbt_node_status_success(status):
             return True
-        else:
-            raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
+        raise AirflowException(f"{self._resource_label} '{self.model_unique_id}' finished with status '{status}'")
 
 
 def create_producer_done_task(dag: DAG, task_group: TaskGroup, task_id: str) -> EmptyOperator:

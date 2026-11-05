@@ -42,7 +42,7 @@ class DbtModelConfig:
     Represents a single model config.
     """
 
-    config_types: ClassVar[list[str]] = ["materialized", "schema", "tags"]
+    config_types: ClassVar[list[str]] = ["materialized", "schema", "tags", "group"]
     config_selectors: set[str] = field(default_factory=set)
     upstream_models: set[str] = field(default_factory=set)
 
@@ -77,7 +77,7 @@ class DbtModelConfig:
         # iterate on each properties.yml config
         # excluding tags because we just want to collect all of them
         if prefixes is None:
-            prefixes = ["materialized", "schema"]
+            prefixes = ["materialized", "schema", "group"]
 
         for config in properties_configs:
             # identify the config_type and its associated value (i.e. materialized:table)

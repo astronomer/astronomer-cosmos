@@ -14,7 +14,8 @@ Overview
 Astronomer Cosmos is committed to maintaining compatibility with a range of
 Python, Apache Airflow, and dbt Core versions to support diverse user
 environments. We remove support for versions when they reach End of Life (EOL)
-or when our dependencies no longer support them.
+or when our dependencies no longer support them. Cosmos follows a fix-forward
+convention.
 
 This policy establishes:
 
@@ -31,24 +32,43 @@ The following versions are currently tested and supported.
 Python
 ++++++
 
-- **Minimum required**: Python 3.10
-- **Supported versions**: 3.10, 3.11, 3.12, 3.13, 3.14
+- **Minimum required**: Python 3.11
+- **Supported versions**: 3.11, 3.12, 3.13, 3.14
+
+.. note::
+
+   From Cosmos 1.16.0, Python 3.10 is no longer supported. It reached End of Life in October 2026 per the
+   `Python release schedule <https://devguide.python.org/versions/>`_. Users who cannot upgrade Python, such as those on
+   Astro Runtime 13 with its Python 3.10 image, can use Cosmos 1.15.x or move to Python 3.11 or 3.12.
 
 Apache Airflow
 ++++++++++++++
 
-New minor or major releases of Cosmos may drop support for Apache Airflow versions that have reached **End of Basic Support**, as defined in the `Astro Runtime Lifecycle schedule <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy#astro-runtime-lifecycle-schedule>`_.
+New minor or major releases of Cosmos may drop support for Apache Airflow versions that have reached **End of Maintenance**, as defined in the `Astro Runtime Lifecycle schedule <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy#astro-runtime-lifecycle-schedule>`_.
 
 In some cases, Cosmos may continue to support older Airflow versions, depending on the Cosmos release cycle.
 
-- **Minimum required version**: Apache Airflow 2.9.0
-- **Supported versions**: 2.9, 2.10, 2.11, 3.0, 3.1, 3.2, 3.3
+- **Minimum required version**: Apache Airflow 2.11.0
+- **Supported versions**: 2.11, 3.0, 3.1, 3.2, 3.3, 3.4
+
+.. note::
+
+   From Cosmos 1.16.0, Apache Airflow 2.9 and 2.10 are no longer supported. Users who cannot upgrade Airflow should
+   stay on Cosmos 1.15.x.
+
+.. note::
+
+   ``ExecutionMode.AIRFLOW_ASYNC`` requires Apache Airflow 3 from Cosmos 1.16.0 onwards. The async operator is built at
+   runtime, and that approach is not supported on Airflow 2.x. Users who run ``AIRFLOW_ASYNC`` and cannot upgrade to
+   Airflow 3 should stay on an earlier Cosmos release (1.15.x or older). All other execution modes are unaffected.
 
 dbt Core
 ++++++++
 
 - **Minimum required version**: dbt Core 1.8
-- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12, 2.0 (dbt Fusion)
+- **Supported versions**: 1.8, 1.9, 1.10, 1.11, 1.12
+- **dbt Fusion**: 2.0. See :ref:`dbt Fusion support <dbt_fusion>`.
+- **dbt OSS** (experimental support): 2.0. See :ref:`dbt OSS support <dbt_oss>`.
 
 .. note::
 
@@ -67,13 +87,11 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
    :header-rows: 1
 
    * - dbt Core
-     - 3.10
      - 3.11
      - 3.12
      - 3.13
      - 3.14
    * - 1.8 – 1.11
-     - OK
      - OK
      - OK
      - OK
@@ -83,9 +101,12 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
      - OK
      - OK
      - OK
-     - OK
-   * - 2.0 (Fusion)
+   * - 2.0 (dbt Fusion)
      - n/a
+     - n/a
+     - n/a
+     - n/a
+   * - 2.0 (dbt OSS, experimental support)
      - n/a
      - n/a
      - n/a
@@ -95,8 +116,13 @@ into a plain Python image, then ``import dbt.cli.main`` — checked
   ``mashumaro`` dependency (e.g. ``mashumaro.exceptions.UnserializableField``),
   which hasn't caught up to Python 3.14's typing changes.
 - dbt Fusion (``2.0``) is **not** installed via ``pip install dbt-core==2.0``
-  — there is no such release on PyPI. Fusion ships as a separate
+  — there is no such release on PyPI. dbt Fusion ships as a separate
   binary/installer; this table's pip-based check does not apply to it.
+- dbt OSS (``2.0``) installs with ``pip install dbt-oss``. This table's
+  pip-based check does not cover it, so ``n/a`` does not mean untested:
+  dbt OSS is tested in Cosmos CI: the unit tests on Python 3.11 to 3.14, and
+  the integration tests on Python 3.11 and 3.12 against BigQuery and DuckDB,
+  plus the Databricks metric view and Snowflake semantic view tests.
 
 .. note::
 
@@ -113,13 +139,12 @@ Astronomer Runtime
 
 Astronomer Runtime bundles a specific Apache Airflow version with a supported
 Python range. Because Cosmos's supported Airflow and Python ranges above track
-Astronomer Runtime, any Runtime series still in **Maintenance** or **Basic
-Support** is compatible with the current Cosmos release — provided the dbt
-Core version you pair it with also supports that Python version (see the
-verified Python × dbt Core table above).
+Astronomer Runtime, any Runtime series still in **Maintenance** is compatible with the current
+Cosmos release — provided the dbt Core version you pair it with also supports
+that Python version (see the verified Python × dbt Core table above).
 
-The table below reflects Runtime series still in Maintenance or Basic Support
-as of 2026-07-23, per the `Astronomer Runtime lifecycle policy
+The table below reflects Runtime series still in Maintenance as of
+2026-10-28, per the `Astronomer Runtime lifecycle policy
 <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_.
 Runtime ships new patch and minor versions frequently — treat this table as a
 snapshot and check the `Runtime release notes
@@ -151,9 +176,8 @@ policy pages directly for the current state.
 .. note::
 
    Runtime 11 (Airflow 2.9) and Runtime 12 (Airflow 2.10) are omitted above
-   because their Basic Support windows have already closed. Cosmos still
-   supports Airflow 2.9/2.10 per the matrix above for users pinned to those
-   Runtime series, but new Astro deployments can no longer be created on them.
+   because they are past End of Maintenance. Cosmos 1.15.x is the last release
+   series that supports them.
 
 .. note::
 
@@ -169,7 +193,8 @@ Cosmos and Astronomer Runtime compatibility
 +++++++++++++++++++++++++++++++++++++++++++
 
 The table below shows which Cosmos releases (1.5.1 to 1.15.0) work on each
-Astronomer Runtime series, verified 2026-07-23. See :doc:`Airflow 3
+Astronomer Runtime series, verified 2026-07-23. It is a historical record, not
+a support commitment. See :doc:`Airflow 3
 compatibility notes </policy/airflow3-compatibility>` for details on
 Cosmos's Airflow 3 support.
 
@@ -285,7 +310,7 @@ following conditions are met:
   to the
   `Apache Airflow release policy <https://airflow.apache.org/docs/apache-airflow/stable/installation/supported-versions.html>`_
 - **Astronomer Runtime EOL**: The Astronomer Runtime version has reached End of
-  Basic Support according to the
+  Maintenance according to the
   `Astronomer Runtime lifecycle policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_
 
 dbt Core version removal criteria

@@ -40,8 +40,7 @@ def test_dbt_azure_container_instance_operator_add_global_flags() -> None:
     )
     assert dbt_base_operator.add_global_flags() == [
         "--vars",
-        "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-        "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+        "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
         "--no-version-check",
     ]
 
@@ -147,8 +146,7 @@ def test_dbt_azure_container_instance_build_command():
             "dbt",
             command_name,
             "--vars",
-            "end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}'\n"
-            "start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'\n",
+            "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
             "--no-version-check",
         ]
 

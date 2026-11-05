@@ -1,0 +1,24 @@
+name: snowflake_semantic_view
+version: "1.0.0"
+config-version: 2
+profile: snowflake_semantic_view
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+target-path: target
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  snowflake_semantic_view:
+    +materialized: table
+
+seeds:
+  snowflake_semantic_view:
+    raw_orders:
+      +column_types:
+        order_id: number(10, 0)
+        customer_id: number(10, 0)
+        order_date: date
+        status: varchar(20)
+        revenue: number(10, 2)

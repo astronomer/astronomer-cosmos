@@ -9,6 +9,8 @@ dbt Fusion support
 Context
 ~~~~~~~
 
+For dbt OSS, the open-source distribution of dbt 2, see :ref:`dbt OSS support <dbt_oss>`.
+
 dbt Labs `launched <https://www.getdbt.com/blog/dbt-launch-showcase-2025-recap>`_ `dbt Fusion <https://github.com/dbt-labs/dbt-fusion>`_ on 28 May 2025. dbt Fusion is the next-generation dbt engine that enables real-time model validation, improved SQL parsing and state-aware orchestration.
 It is a unified approach that aims to merge dbt Core and dbt Cloud features via a completely new CLI,
 implemented in a different programming language (Rust, as opposed to Python).
@@ -70,8 +72,6 @@ Limitations
 ~~~~~~~~~~~
 
 - This feature is available since Cosmos 1.11.0
-- Currently (23 June 2025) dbt Fusion is still in beta
-- dbt Fusion only supports Snowflake
 - Cosmos does not support dbt Fusion when using ``ExecutionMode.AIRFLOW_ASYNC``
 
 To support dbt Fusion, Cosmos modified its interaction with dbt. This works with the latest versions of dbt-core, but may not work with older versions. If you want to continue using dbt-core and was affected, set the environment variable ``AIRFLOW__COSMOS__PRE_DBT_FUSION=1`` and Cosmos interaction with dbt-core will work as previous versions.

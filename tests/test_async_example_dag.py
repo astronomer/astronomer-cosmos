@@ -64,4 +64,6 @@ def get_dag_ids() -> list[str]:
 def test_example_dag(session, dag_id: str):
     dag_bag = get_dag_bag()
     dag = dag_bag.get_dag(dag_id)
+    # Airflow 3.1+ requires the DAG serialized before dag.test().
+    test_utils.serialize_dag_to_db(dag)
     dag.test()

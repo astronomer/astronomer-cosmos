@@ -1,0 +1,990 @@
+{
+  "child_map": {
+    "model.snowflake_semantic_view.orders": [
+      "model.snowflake_semantic_view.orders_semantic_view",
+      "test.snowflake_semantic_view.not_null_orders_order_id.cf6c17daed",
+      "test.snowflake_semantic_view.unique_orders_order_id.fed79b3a6e"
+    ],
+    "model.snowflake_semantic_view.orders_semantic_view": [
+      "model.snowflake_semantic_view.revenue_by_status",
+      "test.snowflake_semantic_view.assert_orders_semantic_view_totals"
+    ],
+    "model.snowflake_semantic_view.revenue_by_status": [
+      "test.snowflake_semantic_view.not_null_revenue_by_status_order_status.21e9afb309",
+      "test.snowflake_semantic_view.unique_revenue_by_status_order_status.acadec2aeb"
+    ],
+    "seed.snowflake_semantic_view.raw_orders": [
+      "model.snowflake_semantic_view.orders"
+    ],
+    "test.snowflake_semantic_view.assert_orders_semantic_view_totals": [],
+    "test.snowflake_semantic_view.not_null_orders_order_id.cf6c17daed": [],
+    "test.snowflake_semantic_view.not_null_revenue_by_status_order_status.21e9afb309": [],
+    "test.snowflake_semantic_view.unique_orders_order_id.fed79b3a6e": [],
+    "test.snowflake_semantic_view.unique_revenue_by_status_order_status.acadec2aeb": []
+  },
+  "disabled": {},
+  "docs": {},
+  "exposures": {},
+  "functions": {},
+  "group_map": {},
+  "groups": {},
+  "macros": {},
+  "metadata": {
+    "adapter_type": "snowflake",
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+    "dbt_version": "1.12.5",
+    "env": {},
+    "generated_at": "2026-10-16T17:00:33.264544Z",
+    "invocation_id": "4a5357b2-390f-48e0-9031-bc7d36d1a2ca",
+    "invocation_started_at": "2026-10-16T17:00:32.377842Z",
+    "project_id": "d8b51401ad4fdf39b25ab4e87f69a205",
+    "project_name": "snowflake_semantic_view",
+    "quoting": {
+      "column": null,
+      "database": false,
+      "identifier": false,
+      "schema": false
+    },
+    "run_started_at": "2026-10-16T17:00:32.377990+00:00",
+    "send_anonymous_usage_stats": true,
+    "user_id": "31448226-c846-4789-b385-ba41b8a180d4"
+  },
+  "metrics": {},
+  "nodes": {
+    "model.snowflake_semantic_view.orders": {
+      "access": "protected",
+      "alias": "orders",
+      "build_path": null,
+      "checksum": {
+        "checksum": "62835debb54988f14cb11094914ca27a975466652280fb5b93861929f48f62b0",
+        "name": "sha256"
+      },
+      "columns": {
+        "order_id": {
+          "config": {
+            "meta": {},
+            "tags": []
+          },
+          "constraints": [],
+          "data_type": null,
+          "description": "",
+          "dimension": null,
+          "doc_blocks": [],
+          "entity": null,
+          "granularity": null,
+          "meta": {},
+          "name": "order_id",
+          "quote": null,
+          "tags": []
+        }
+      },
+      "compiled_path": null,
+      "config": {
+        "access": "protected",
+        "alias": null,
+        "batch_size": null,
+        "begin": null,
+        "column_types": {},
+        "concurrent_batches": null,
+        "contract": {
+          "alias_types": true,
+          "enforced": false
+        },
+        "database": null,
+        "docs": {
+          "node_color": null,
+          "show": true
+        },
+        "enabled": true,
+        "event_time": null,
+        "freshness": null,
+        "full_refresh": null,
+        "grants": {},
+        "group": null,
+        "incremental_strategy": null,
+        "latest_version_pointer": {
+          "alias": null,
+          "enabled": null
+        },
+        "lookback": 1,
+        "materialized": "table",
+        "meta": {},
+        "on_configuration_change": "apply",
+        "on_error": null,
+        "on_schema_change": "ignore",
+        "packages": [],
+        "persist_docs": {},
+        "post-hook": [],
+        "pre-hook": [],
+        "quoting": {},
+        "schema": null,
+        "static_analysis": null,
+        "tags": [],
+        "unique_key": null
+      },
+      "constraints": [],
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170034.057921,
+      "database": "OSS",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "seed.snowflake_semantic_view.raw_orders"
+        ]
+      },
+      "deprecation_date": null,
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "snowflake_semantic_view",
+        "orders"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "latest_version": null,
+      "meta": {},
+      "metrics": [],
+      "name": "orders",
+      "original_file_path": "models/orders.sql",
+      "package_name": "snowflake_semantic_view",
+      "patch_path": "snowflake_semantic_view://models/schema.yml",
+      "path": "orders.sql",
+      "primary_key": [
+        "order_id"
+      ],
+      "raw_code": "select\n    order_id,\n    customer_id,\n    order_date,\n    status,\n    revenue\nfrom {{ ref('raw_orders') }}",
+      "refs": [
+        {
+          "name": "raw_orders",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": "OSS.cosmos_demo.orders",
+      "resource_type": "model",
+      "schema": "cosmos_demo",
+      "sources": [],
+      "tags": [],
+      "time_spine": null,
+      "unique_id": "model.snowflake_semantic_view.orders",
+      "unrendered_config": {
+        "materialized": "table"
+      },
+      "version": null
+    },
+    "model.snowflake_semantic_view.orders_semantic_view": {
+      "access": "protected",
+      "alias": "orders_semantic_view",
+      "build_path": null,
+      "checksum": {
+        "checksum": "fe562fe0fad9244ca911efc438a9c5fa861b6e7872961080af769ec16a550fbb",
+        "name": "sha256"
+      },
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "access": "protected",
+        "alias": null,
+        "batch_size": null,
+        "begin": null,
+        "column_types": {},
+        "concurrent_batches": null,
+        "contract": {
+          "alias_types": true,
+          "enforced": false
+        },
+        "database": null,
+        "docs": {
+          "node_color": null,
+          "show": true
+        },
+        "enabled": true,
+        "event_time": null,
+        "freshness": null,
+        "full_refresh": null,
+        "grants": {},
+        "group": null,
+        "incremental_strategy": null,
+        "latest_version_pointer": {
+          "alias": null,
+          "enabled": null
+        },
+        "lookback": 1,
+        "materialized": "semantic_view",
+        "meta": {},
+        "on_configuration_change": "apply",
+        "on_error": null,
+        "on_schema_change": "ignore",
+        "packages": [],
+        "persist_docs": {},
+        "post-hook": [],
+        "pre-hook": [],
+        "quoting": {},
+        "schema": null,
+        "static_analysis": null,
+        "tags": [],
+        "unique_key": null
+      },
+      "constraints": [],
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170034.058236,
+      "database": "OSS",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.snowflake_semantic_view.orders"
+        ]
+      },
+      "deprecation_date": null,
+      "description": "Snowflake semantic view over orders (adapter-native semantic layer).",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "snowflake_semantic_view",
+        "orders_semantic_view"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "latest_version": null,
+      "meta": {},
+      "metrics": [],
+      "name": "orders_semantic_view",
+      "original_file_path": "models/orders_semantic_view.sql",
+      "package_name": "snowflake_semantic_view",
+      "patch_path": "snowflake_semantic_view://models/schema.yml",
+      "path": "orders_semantic_view.sql",
+      "primary_key": [],
+      "raw_code": "{{ config(materialized='semantic_view') }}\nTABLES (\n    orders AS {{ ref('orders') }}\n        PRIMARY KEY (order_id)\n)\nFACTS (\n    orders.order_key AS order_id,\n    orders.revenue_amount AS revenue\n)\nDIMENSIONS (\n    orders.ordered_on AS order_date,\n    orders.order_status AS status\n)\nMETRICS (\n    orders.total_orders AS COUNT(orders.order_key),\n    orders.total_revenue AS SUM(orders.revenue_amount)\n)",
+      "refs": [
+        {
+          "name": "orders",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": "OSS.cosmos_demo.orders_semantic_view",
+      "resource_type": "model",
+      "schema": "cosmos_demo",
+      "sources": [],
+      "tags": [],
+      "time_spine": null,
+      "unique_id": "model.snowflake_semantic_view.orders_semantic_view",
+      "unrendered_config": {
+        "materialized": "semantic_view"
+      },
+      "version": null
+    },
+    "model.snowflake_semantic_view.revenue_by_status": {
+      "access": "protected",
+      "alias": "revenue_by_status",
+      "build_path": null,
+      "checksum": {
+        "checksum": "7b146e36a22f21ecc612590da525677115626de040ce3b71024ebe6704b03b7d",
+        "name": "sha256"
+      },
+      "columns": {
+        "order_status": {
+          "config": {
+            "meta": {},
+            "tags": []
+          },
+          "constraints": [],
+          "data_type": null,
+          "description": "",
+          "dimension": null,
+          "doc_blocks": [],
+          "entity": null,
+          "granularity": null,
+          "meta": {},
+          "name": "order_status",
+          "quote": null,
+          "tags": []
+        }
+      },
+      "compiled_path": null,
+      "config": {
+        "access": "protected",
+        "alias": null,
+        "batch_size": null,
+        "begin": null,
+        "column_types": {},
+        "concurrent_batches": null,
+        "contract": {
+          "alias_types": true,
+          "enforced": false
+        },
+        "database": null,
+        "docs": {
+          "node_color": null,
+          "show": true
+        },
+        "enabled": true,
+        "event_time": null,
+        "freshness": null,
+        "full_refresh": null,
+        "grants": {},
+        "group": null,
+        "incremental_strategy": null,
+        "latest_version_pointer": {
+          "alias": null,
+          "enabled": null
+        },
+        "lookback": 1,
+        "materialized": "table",
+        "meta": {},
+        "on_configuration_change": "apply",
+        "on_error": null,
+        "on_schema_change": "ignore",
+        "packages": [],
+        "persist_docs": {},
+        "post-hook": [],
+        "pre-hook": [],
+        "quoting": {},
+        "schema": null,
+        "static_analysis": null,
+        "tags": [],
+        "unique_key": null
+      },
+      "constraints": [],
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170034.058573,
+      "database": "OSS",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.snowflake_semantic_view.orders_semantic_view"
+        ]
+      },
+      "deprecation_date": null,
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "snowflake_semantic_view",
+        "revenue_by_status"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "latest_version": null,
+      "meta": {},
+      "metrics": [],
+      "name": "revenue_by_status",
+      "original_file_path": "models/revenue_by_status.sql",
+      "package_name": "snowflake_semantic_view",
+      "patch_path": "snowflake_semantic_view://models/schema.yml",
+      "path": "revenue_by_status.sql",
+      "primary_key": [
+        "order_status"
+      ],
+      "raw_code": "select\n    order_status,\n    total_revenue,\n    total_orders\nfrom semantic_view(\n    {{ ref('orders_semantic_view') }}\n    dimensions orders.order_status\n    metrics orders.total_revenue, orders.total_orders\n)",
+      "refs": [
+        {
+          "name": "orders_semantic_view",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": "OSS.cosmos_demo.revenue_by_status",
+      "resource_type": "model",
+      "schema": "cosmos_demo",
+      "sources": [],
+      "tags": [],
+      "time_spine": null,
+      "unique_id": "model.snowflake_semantic_view.revenue_by_status",
+      "unrendered_config": {
+        "materialized": "table"
+      },
+      "version": null
+    },
+    "seed.snowflake_semantic_view.raw_orders": {
+      "alias": "raw_orders",
+      "build_path": null,
+      "checksum": {
+        "checksum": "16e0abdaa9b37895f1500edb929de5e54e64d7b6f2df0e2718a092d0bc288e45",
+        "name": "sha256"
+      },
+      "columns": {},
+      "config": {
+        "alias": null,
+        "batch_size": null,
+        "begin": null,
+        "column_types": {
+          "customer_id": "number(10, 0)",
+          "order_date": "date",
+          "order_id": "number(10, 0)",
+          "revenue": "number(10, 2)",
+          "status": "varchar(20)"
+        },
+        "concurrent_batches": null,
+        "contract": {
+          "alias_types": true,
+          "enforced": false
+        },
+        "database": null,
+        "delimiter": ",",
+        "docs": {
+          "node_color": null,
+          "show": true
+        },
+        "enabled": true,
+        "event_time": null,
+        "full_refresh": null,
+        "grants": {},
+        "group": null,
+        "incremental_strategy": null,
+        "lookback": 1,
+        "materialized": "seed",
+        "meta": {},
+        "on_configuration_change": "apply",
+        "on_schema_change": "ignore",
+        "packages": [],
+        "persist_docs": {},
+        "post-hook": [],
+        "pre-hook": [],
+        "quote_columns": null,
+        "quoting": {},
+        "schema": null,
+        "static_analysis": null,
+        "tags": [],
+        "unique_key": null
+      },
+      "created_at": 1792170033.9005089,
+      "database": "OSS",
+      "depends_on": {
+        "macros": []
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "snowflake_semantic_view",
+        "raw_orders"
+      ],
+      "group": null,
+      "meta": {},
+      "name": "raw_orders",
+      "original_file_path": "seeds/raw_orders.csv",
+      "package_name": "snowflake_semantic_view",
+      "patch_path": null,
+      "path": "raw_orders.csv",
+      "raw_code": "",
+      "relation_name": "OSS.cosmos_demo.raw_orders",
+      "resource_type": "seed",
+      "root_path": "/var/folders/78/cp68zgd94z1gz8934_ck9jmr0000gp/T/tmpzazl3ts5/snowflake_semantic_view",
+      "schema": "cosmos_demo",
+      "tags": [],
+      "unique_id": "seed.snowflake_semantic_view.raw_orders",
+      "unrendered_config": {
+        "column_types": {
+          "customer_id": "number(10, 0)",
+          "order_date": "date",
+          "order_id": "number(10, 0)",
+          "revenue": "number(10, 2)",
+          "status": "varchar(20)"
+        }
+      }
+    },
+    "test.snowflake_semantic_view.assert_orders_semantic_view_totals": {
+      "alias": "assert_orders_semantic_view_totals",
+      "build_path": null,
+      "checksum": {
+        "checksum": "c62e67d7fa8207f2eedc4f27ea1bd6b517da924f602fb032ad3feb2af8f5a794",
+        "name": "sha256"
+      },
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "sql_header": null,
+        "static_analysis": null,
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170033.810238,
+      "database": "OSS",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.snowflake_semantic_view.orders_semantic_view"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "fqn": [
+        "snowflake_semantic_view",
+        "assert_orders_semantic_view_totals"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "assert_orders_semantic_view_totals",
+      "original_file_path": "tests/assert_orders_semantic_view_totals.sql",
+      "package_name": "snowflake_semantic_view",
+      "patch_path": null,
+      "path": "assert_orders_semantic_view_totals.sql",
+      "raw_code": "select *\nfrom semantic_view(\n    {{ ref('orders_semantic_view') }}\n    metrics orders.total_revenue, orders.total_orders\n)\nwhere total_revenue <> 971.50 or total_orders <> 6",
+      "refs": [
+        {
+          "name": "orders_semantic_view",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "cosmos_demo_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "unique_id": "test.snowflake_semantic_view.assert_orders_semantic_view_totals",
+      "unrendered_config": {}
+    },
+    "test.snowflake_semantic_view.not_null_orders_order_id.cf6c17daed": {
+      "alias": "not_null_orders_order_id",
+      "attached_node": "model.snowflake_semantic_view.orders",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "order_id",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "sql_header": null,
+        "static_analysis": null,
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170034.1111429,
+      "database": "OSS",
+      "depends_on": {
+        "macros": [
+          "macro.dbt.test_not_null"
+        ],
+        "nodes": [
+          "model.snowflake_semantic_view.orders"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "models.orders",
+      "fqn": [
+        "snowflake_semantic_view",
+        "not_null_orders_order_id"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "not_null_orders_order_id",
+      "original_file_path": "models/schema.yml",
+      "package_name": "snowflake_semantic_view",
+      "patch_path": null,
+      "path": "not_null_orders_order_id.sql",
+      "raw_code": "{{ test_not_null(**_dbt_generic_test_kwargs) }}",
+      "refs": [
+        {
+          "name": "orders",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "cosmos_demo_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "order_id",
+          "model": "{{ get_where_subquery(ref('orders')) }}"
+        },
+        "name": "not_null",
+        "namespace": null
+      },
+      "unique_id": "test.snowflake_semantic_view.not_null_orders_order_id.cf6c17daed",
+      "unrendered_config": {}
+    },
+    "test.snowflake_semantic_view.not_null_revenue_by_status_order_status.21e9afb309": {
+      "alias": "not_null_revenue_by_status_order_status",
+      "attached_node": "model.snowflake_semantic_view.revenue_by_status",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "order_status",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "sql_header": null,
+        "static_analysis": null,
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170034.113261,
+      "database": "OSS",
+      "depends_on": {
+        "macros": [
+          "macro.dbt.test_not_null"
+        ],
+        "nodes": [
+          "model.snowflake_semantic_view.revenue_by_status"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "models.revenue_by_status",
+      "fqn": [
+        "snowflake_semantic_view",
+        "not_null_revenue_by_status_order_status"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "not_null_revenue_by_status_order_status",
+      "original_file_path": "models/schema.yml",
+      "package_name": "snowflake_semantic_view",
+      "patch_path": null,
+      "path": "not_null_revenue_by_status_order_status.sql",
+      "raw_code": "{{ test_not_null(**_dbt_generic_test_kwargs) }}",
+      "refs": [
+        {
+          "name": "revenue_by_status",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "cosmos_demo_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "order_status",
+          "model": "{{ get_where_subquery(ref('revenue_by_status')) }}"
+        },
+        "name": "not_null",
+        "namespace": null
+      },
+      "unique_id": "test.snowflake_semantic_view.not_null_revenue_by_status_order_status.21e9afb309",
+      "unrendered_config": {}
+    },
+    "test.snowflake_semantic_view.unique_orders_order_id.fed79b3a6e": {
+      "alias": "unique_orders_order_id",
+      "attached_node": "model.snowflake_semantic_view.orders",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "order_id",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "sql_header": null,
+        "static_analysis": null,
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170034.109954,
+      "database": "OSS",
+      "depends_on": {
+        "macros": [
+          "macro.dbt.test_unique"
+        ],
+        "nodes": [
+          "model.snowflake_semantic_view.orders"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "models.orders",
+      "fqn": [
+        "snowflake_semantic_view",
+        "unique_orders_order_id"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "unique_orders_order_id",
+      "original_file_path": "models/schema.yml",
+      "package_name": "snowflake_semantic_view",
+      "patch_path": null,
+      "path": "unique_orders_order_id.sql",
+      "raw_code": "{{ test_unique(**_dbt_generic_test_kwargs) }}",
+      "refs": [
+        {
+          "name": "orders",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "cosmos_demo_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "order_id",
+          "model": "{{ get_where_subquery(ref('orders')) }}"
+        },
+        "name": "unique",
+        "namespace": null
+      },
+      "unique_id": "test.snowflake_semantic_view.unique_orders_order_id.fed79b3a6e",
+      "unrendered_config": {}
+    },
+    "test.snowflake_semantic_view.unique_revenue_by_status_order_status.acadec2aeb": {
+      "alias": "unique_revenue_by_status_order_status",
+      "attached_node": "model.snowflake_semantic_view.revenue_by_status",
+      "build_path": null,
+      "checksum": {
+        "checksum": "",
+        "name": "none"
+      },
+      "column_name": "order_status",
+      "columns": {},
+      "compiled_path": null,
+      "config": {
+        "alias": null,
+        "database": null,
+        "enabled": true,
+        "error_if": "!= 0",
+        "fail_calc": "count(*)",
+        "group": null,
+        "limit": null,
+        "materialized": "test",
+        "meta": {},
+        "schema": "dbt_test__audit",
+        "severity": "ERROR",
+        "sql_header": null,
+        "static_analysis": null,
+        "store_failures": null,
+        "store_failures_as": null,
+        "tags": [],
+        "warn_if": "!= 0",
+        "where": null
+      },
+      "contract": {
+        "alias_types": true,
+        "checksum": null,
+        "enforced": false
+      },
+      "created_at": 1792170034.112142,
+      "database": "OSS",
+      "depends_on": {
+        "macros": [
+          "macro.dbt.test_unique"
+        ],
+        "nodes": [
+          "model.snowflake_semantic_view.revenue_by_status"
+        ]
+      },
+      "description": "",
+      "doc_blocks": [],
+      "docs": {
+        "node_color": null,
+        "show": true
+      },
+      "file_key_name": "models.revenue_by_status",
+      "fqn": [
+        "snowflake_semantic_view",
+        "unique_revenue_by_status_order_status"
+      ],
+      "functions": [],
+      "group": null,
+      "language": "sql",
+      "meta": {},
+      "metrics": [],
+      "name": "unique_revenue_by_status_order_status",
+      "original_file_path": "models/schema.yml",
+      "package_name": "snowflake_semantic_view",
+      "patch_path": null,
+      "path": "unique_revenue_by_status_order_status.sql",
+      "raw_code": "{{ test_unique(**_dbt_generic_test_kwargs) }}",
+      "refs": [
+        {
+          "name": "revenue_by_status",
+          "package": null,
+          "version": null
+        }
+      ],
+      "relation_name": null,
+      "resource_type": "test",
+      "schema": "cosmos_demo_dbt_test__audit",
+      "sources": [],
+      "tags": [],
+      "test_metadata": {
+        "kwargs": {
+          "column_name": "order_status",
+          "model": "{{ get_where_subquery(ref('revenue_by_status')) }}"
+        },
+        "name": "unique",
+        "namespace": null
+      },
+      "unique_id": "test.snowflake_semantic_view.unique_revenue_by_status_order_status.acadec2aeb",
+      "unrendered_config": {}
+    }
+  },
+  "parent_map": {
+    "model.snowflake_semantic_view.orders": [
+      "seed.snowflake_semantic_view.raw_orders"
+    ],
+    "model.snowflake_semantic_view.orders_semantic_view": [
+      "model.snowflake_semantic_view.orders"
+    ],
+    "model.snowflake_semantic_view.revenue_by_status": [
+      "model.snowflake_semantic_view.orders_semantic_view"
+    ],
+    "seed.snowflake_semantic_view.raw_orders": [],
+    "test.snowflake_semantic_view.assert_orders_semantic_view_totals": [
+      "model.snowflake_semantic_view.orders_semantic_view"
+    ],
+    "test.snowflake_semantic_view.not_null_orders_order_id.cf6c17daed": [
+      "model.snowflake_semantic_view.orders"
+    ],
+    "test.snowflake_semantic_view.not_null_revenue_by_status_order_status.21e9afb309": [
+      "model.snowflake_semantic_view.revenue_by_status"
+    ],
+    "test.snowflake_semantic_view.unique_orders_order_id.fed79b3a6e": [
+      "model.snowflake_semantic_view.orders"
+    ],
+    "test.snowflake_semantic_view.unique_revenue_by_status_order_status.acadec2aeb": [
+      "model.snowflake_semantic_view.revenue_by_status"
+    ]
+  },
+  "saved_queries": {},
+  "selectors": {},
+  "semantic_models": {},
+  "sources": {},
+  "unit_tests": {}
+}

@@ -29,6 +29,7 @@ except ImportError:
     jinja2.escape = markupsafe.escape
 
 import importlib
+import mimetypes
 import sys
 from importlib.util import find_spec
 from unittest.mock import MagicMock, PropertyMock, mock_open, patch
@@ -39,6 +40,7 @@ from airflow.utils.db import initdb, resetdb
 from airflow.www.app import cached_app
 from airflow.www.extensions.init_appbuilder import AirflowAppBuilder
 from flask.testing import FlaskClient
+from werkzeug.exceptions import NotFound
 
 import cosmos
 import cosmos.plugin
@@ -465,3 +467,231 @@ def test_get_storage_type(path, expected_type):
     from cosmos.plugin.storage import get_storage_type_from_path
 
     assert get_storage_type_from_path(path) == expected_type
+
+
+@pytest.mark.integration
+@patch.object(cosmos.plugin.airflow2, "open_file")
+@pytest.mark.parametrize(
+    "url,storage_path,mimetype",
+    [
+        ("/cosmos/assets/index.js", "path/to/docs/dir/assets/index.js", "text/javascript"),
+        ("/cosmos/assets/index.css", "path/to/docs/dir/assets/index.css", "text/css"),
+        (
+            "/cosmos/info_schema/v1/nodes.parquet",
+            "path/to/docs/dir/info_schema/v1/nodes.parquet",
+            # Same lookup as the handler: a host whose MIME database registers ``.parquet`` returns that type.
+            mimetypes.guess_type("nodes.parquet")[0] or "application/octet-stream",
+        ),
+    ],
+)
+def test_dbt_oss_docs_static_files_are_served(mock_open_file, monkeypatch, app, url, storage_path, mimetype):
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", "path/to/docs/dir")
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_conn_id", "mock_conn_id")
+    content = bytes(range(256))
+    mock_open_file.return_value = content
+
+    response = app.get(url)
+
+    mock_open_file.assert_called_once_with(storage_path, conn_id="mock_conn_id", binary=True)
+    assert response.status_code == 200
+    assert response.data == content
+    assert response.mimetype == mimetype
+
+
+@pytest.mark.integration
+@patch.object(cosmos.plugin.airflow2, "open_file")
+@pytest.mark.parametrize("url", ["/cosmos/assets/missing.js", "/cosmos/info_schema/v1/missing.parquet"])
+def test_dbt_oss_docs_static_files_not_found(mock_open_file, monkeypatch, app, url):
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", "path/to/docs/dir")
+    mock_open_file.side_effect = FileNotFoundError
+
+    assert app.get(url).status_code == 404
+
+
+@pytest.mark.integration
+@patch.object(cosmos.plugin.airflow2, "open_file")
+@pytest.mark.parametrize(
+    "url",
+    [
+        "/cosmos/assets/%2e%2e/run_results.json",
+        "/cosmos/assets/../run_results.json",
+        "/cosmos/assets/%252e%252e/private/secret.txt",  # Flask decodes once, and ``requests`` decodes the rest for an HTTP dir
+        "/cosmos/assets/%252e%252e/%252e%252e/secret.txt",
+        "/cosmos/info_schema/%25252e%25252e/secret.txt",
+        "/cosmos/info_schema/%2e%2e/%2e%2e/outside.txt",
+        "/cosmos/assets/v1/%2e%2e/%2e%2e/run_results.json",
+    ],
+)
+def test_dbt_oss_docs_static_files_reject_path_traversal(mock_open_file, monkeypatch, app, url):
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", "path/to/docs/dir")
+
+    assert app.get(url).status_code == 404
+    mock_open_file.assert_not_called()
+
+
+@pytest.mark.integration
+@patch.object(cosmos.plugin.airflow2, "open_file")
+@pytest.mark.parametrize("url", ["/cosmos/run_results.json", "/cosmos/compiled/x.sql", "/cosmos/private/secret.txt"])
+def test_dbt_oss_docs_only_serves_assets_and_info_schema(mock_open_file, monkeypatch, app, url):
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", "path/to/docs/dir")
+
+    assert app.get(url).status_code == 404
+    mock_open_file.assert_not_called()
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("url", ["/cosmos/assets/index.js", "/cosmos/info_schema/v1/nodes.parquet"])
+def test_dbt_oss_docs_static_files_not_configured(app, url):
+    assert app.get(url).status_code == 404
+
+
+@pytest.mark.parametrize(
+    "path,open_file_callback",
+    [
+        ("s3://my-bucket/my/path/", "open_s3_file"),
+        ("gs://my-bucket/my/path/", "open_gcs_file"),
+        ("wasb://my-bucket/my/path/", "open_azure_file"),
+        ("https://my-bucket/my/path/", "open_http_file"),
+    ],
+)
+def test_open_file_binary_calls(path, open_file_callback):
+    with patch.object(cosmos.plugin.airflow2, open_file_callback) as mock_callback:
+        mock_callback.return_value = b"mock file contents"
+
+        res = open_file(path, conn_id="mock_conn_id", binary=True)
+
+        mock_callback.assert_called_once_with(path, conn_id="mock_conn_id", binary=True)
+        assert res == b"mock file contents"
+
+
+@patch("builtins.open", new_callable=mock_open, read_data=b"\x00\x01")
+def test_open_file_local_binary(mock_file):
+    res = open_file("/my/path", binary=True)
+
+    mock_file.assert_called_with("/my/path", "rb")
+    assert res == b"\x00\x01"
+
+
+def test_open_s3_file_binary():
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_module}):
+        mock_hook = mock_module.S3Hook.return_value
+        mock_hook.get_key.return_value.get.return_value = {"Body": MagicMock(read=lambda: b"\x00\x01")}
+
+        res = open_s3_file("s3://mock-path/to/docs", conn_id="mock_conn_id", binary=True)
+
+        mock_hook.get_key.assert_called_once_with(bucket_name="mock-path", key="to/docs")
+        mock_hook.read_key.assert_not_called()
+        assert res == b"\x00\x01"
+
+
+@pytest.mark.skipif(find_spec("botocore") is None, reason="botocore not installed, which is required for this test.")
+@pytest.mark.parametrize("code", ["NoSuchKey", "404"])
+def test_open_s3_file_binary_not_found(code):
+    from botocore.exceptions import ClientError
+
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.amazon.aws.hooks.s3": mock_module}):
+        mock_module.S3Hook.return_value.get_key.side_effect = ClientError({"Error": {"Code": code}}, "")
+
+        with pytest.raises(FileNotFoundError):
+            open_s3_file("s3://mock-path/to/docs", conn_id="mock_conn_id", binary=True)
+
+
+def test_open_gcs_file_binary_returns_bytes():
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.google.cloud.hooks.gcs": mock_module}):
+        mock_hook = mock_module.GCSHook.return_value
+        mock_hook.download.return_value = b"\xff\xfe\x00"  # not valid UTF-8
+
+        res = open_gcs_file("gs://mock-path/to/docs", conn_id="mock_conn_id", binary=True)
+
+        mock_hook.download.assert_called_once_with(bucket_name="mock-path", object_name="to/docs")
+        assert res == b"\xff\xfe\x00"
+
+
+def test_open_azure_file_binary():
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.microsoft.azure.hooks.wasb": mock_module}):
+        mock_hook = mock_module.WasbHook.return_value
+        blob_client = mock_hook.get_conn.return_value.get_blob_client
+        blob_client.return_value.download_blob.return_value.readall.return_value = b"\x00\x01"
+
+        res = open_azure_file("wasb://mock-path/to/docs", conn_id="mock_conn_id", binary=True)
+
+        blob_client.assert_called_once_with(container="mock-path", blob="to/docs")
+        mock_hook.read_file.assert_not_called()
+        assert res == b"\x00\x01"
+
+
+@pytest.mark.skipif(find_spec("azure") is None, reason="azure not installed, which is required for this test.")
+def test_open_azure_file_binary_not_found():
+    from azure.core.exceptions import ResourceNotFoundError
+
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.microsoft.azure.hooks.wasb": mock_module}):
+        mock_hook = mock_module.WasbHook.return_value
+        mock_hook.get_conn.return_value.get_blob_client.return_value.download_blob.side_effect = ResourceNotFoundError
+
+        with pytest.raises(FileNotFoundError):
+            open_azure_file("wasb://mock-path/to/docs", conn_id="mock_conn_id", binary=True)
+
+
+def test_open_http_file_binary():
+    mock_module = MagicMock()
+    with patch.dict(sys.modules, {"airflow.providers.http.hooks.http": mock_module}):
+        mock_response = mock_module.HttpHook.return_value.run.return_value
+        mock_response.content = b"\x00\x01"
+        mock_response.text = "text"
+
+        res = open_http_file("http://mock-path/to/docs", conn_id="mock_conn_id", binary=True)
+
+        assert res == b"\x00\x01"
+
+
+@pytest.mark.integration
+def test_dbt_oss_docs_static_files_do_not_follow_a_symlink_out_of_the_docs_folder(monkeypatch, app, tmp_path):
+    outside = tmp_path / "outside.txt"
+    outside.write_text("secret")
+    docs_dir = tmp_path / "target"
+    (docs_dir / "assets").mkdir(parents=True)
+    (docs_dir / "assets" / "inside.txt").write_text("docs")
+    (docs_dir / "assets" / "linked.txt").symlink_to(outside)
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", str(docs_dir))
+
+    linked = app.get("/cosmos/assets/linked.txt")
+
+    assert linked.status_code == 404
+    assert b"secret" not in linked.data
+    assert app.get("/cosmos/assets/inside.txt").data == b"docs"
+
+
+@pytest.mark.integration
+def test_dbt_oss_docs_static_files_are_served_when_the_docs_folder_is_a_symlink(monkeypatch, app, tmp_path):
+    real_dir = tmp_path / "real_target"
+    (real_dir / "assets").mkdir(parents=True)
+    (real_dir / "assets" / "index.js").write_text("console.log('dbt docs')")
+    docs_dir = tmp_path / "target"
+    docs_dir.symlink_to(real_dir, target_is_directory=True)
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", str(docs_dir))
+
+    assert app.get("/cosmos/assets/index.js").status_code == 200
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("asset_path", ["", "/etc/passwd", "../x"])
+def test_dbt_oss_docs_static_files_reject_an_asset_path_that_does_not_stay_in_its_folder(monkeypatch, asset_path):
+    # An absolute ``asset_path`` replaces the folder in ``PurePosixPath``; routing does not let one through, so call the method.
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", "path/to/docs/dir")
+    with patch.object(cosmos.plugin.airflow2, "open_file") as mock_open_file, pytest.raises(NotFound):
+        cosmos.plugin.airflow2.dbt_docs_view._serve_docs_file("assets", asset_path)
+
+    mock_open_file.assert_not_called()
+
+
+@pytest.mark.integration
+def test_dbt_oss_docs_static_files_directory_is_not_found(monkeypatch, app, tmp_path):
+    (tmp_path / "assets" / "v1").mkdir(parents=True)
+    monkeypatch.setattr("cosmos.plugin.airflow2.dbt_docs_dir", str(tmp_path))
+
+    assert app.get("/cosmos/assets/v1").status_code == 404

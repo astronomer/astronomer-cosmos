@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 CONFIG_META_PATH = "meta"
-SUPPORTED_CONFIG = ["materialized", "schema", "tags", CONFIG_META_PATH]
+SUPPORTED_CONFIG = ["materialized", "schema", "tags", "group", CONFIG_META_PATH]
 PATH_SELECTOR = "path:"
 TAG_SELECTOR = "tag:"
 FQN_SELECTOR = "fqn:"
@@ -29,6 +29,7 @@ CONFIG_SELECTOR = "config."
 SOURCE_SELECTOR = "source:"
 EXPOSURE_SELECTOR = "exposure:"
 PACKAGE_SELECTOR = "package:"
+GROUP_SELECTOR = "group:"
 RESOURCE_TYPE_SELECTOR = "resource_type:"
 EXCLUDE_RESOURCE_TYPE_SELECTOR = "exclude_resource_type:"
 PLUS_SELECTOR = "+"
@@ -36,6 +37,14 @@ AT_SELECTOR = "@"
 GRAPH_SELECTOR_REGEX = r"^(@|[0-9]*\+)?([^\+]+)(\+[0-9]*)?$|"
 
 logger = get_logger(__name__)
+
+
+def _is_supported_config_selector(selector: str) -> bool:
+    """True if ``selector`` is ``config.<key>[:value]`` with an exact supported key or a ``meta.<path>`` key."""
+    if not selector.startswith(CONFIG_SELECTOR):
+        return False
+    key = selector[len(CONFIG_SELECTOR) :].split(":")[0]
+    return key in SUPPORTED_CONFIG or key.startswith(f"{CONFIG_META_PATH}.")
 
 
 def _node_fqn_str(node: DbtNode) -> str | None:
@@ -48,6 +57,14 @@ def _node_fqn_str(node: DbtNode) -> str | None:
     if node.fqn:
         return ".".join(node.fqn)
     return None
+
+
+def _is_matched_by_fqn_method(node: DbtNode) -> bool:
+    """
+    dbt's fqn method (the ``fqn:`` selector and a bare token such as ``staging``) never matches sources, even though
+    a source's fqn includes the folder of its YAML file. Sources are selected with ``source:``.
+    """
+    return node.resource_type != DbtResourceType.SOURCE
 
 
 def _fqn_matches(node_fqn: str, fqn_selector_value: str) -> bool:
@@ -87,6 +104,8 @@ def _node_matches_bare_identifier(node: DbtNode, identifier: str) -> bool:
     (e.g. LoadMode.CUSTOM), match package name, the patched task name (a dotted token maps to the
     dot-to-underscore node name), or a project-relative folder segment (directories only, not the file name).
     """
+    if not _is_matched_by_fqn_method(node):
+        return False
     if node.fqn:
         is_versioned = node.resource_type == DbtResourceType.MODEL and "." in node.resource_name
         return _fqn_selector_matches(node.fqn, identifier, is_versioned) or _fqn_selector_matches(
@@ -296,7 +315,7 @@ class GraphSelector:
             fqn_pattern = self.node_name[len(FQN_SELECTOR) :].strip()
             for node_id, node in nodes.items():
                 node_fqn = _node_fqn_str(node)
-                if node_fqn and _fqn_matches(node_fqn, fqn_pattern):
+                if node_fqn and _is_matched_by_fqn_method(node) and _fqn_matches(node_fqn, fqn_pattern):
                     root_nodes.add(node_id)
 
         elif SOURCE_SELECTOR in self.node_name:
@@ -330,11 +349,19 @@ class GraphSelector:
                     {node_id for node_id, node in nodes.items() if node.package_name == package_selection}
                 )
 
+        elif self.node_name.startswith(GROUP_SELECTOR):
+            group_selection = self.node_name[len(GROUP_SELECTOR) :].strip()
+            if group_selection:
+                root_nodes.update(
+                    {node_id for node_id, node in nodes.items() if node.config.get("group") == group_selection}
+                )
+
         elif CONFIG_SELECTOR in self.node_name:
             config_selection_key, config_selection_value = self.node_name[len(CONFIG_SELECTOR) :].split(":")
-            # currently tags, materialized, schema and meta are the only supported config keys
+            # currently tags, materialized, schema, group and meta are the only supported config keys
             # logic is separated into two conditions because the config 'tags' contains a
-            # list of tags, the config 'materialized' & 'schema' contain strings and meta contains dictionaries
+            # list of tags, the configs 'materialized', 'schema' & 'group' contain strings and meta contains
+            # dictionaries
             if config_selection_key == "tags":
                 root_nodes.update(
                     {
@@ -346,12 +373,13 @@ class GraphSelector:
             elif config_selection_key in (
                 "materialized",
                 "schema",
+                "group",
             ):
                 root_nodes.update(
                     {
                         node_id
                         for node_id, node in nodes.items()
-                        if config_selection_value == node.config.get(config_selection_key, "")
+                        if config_selection_value == node.config.get(config_selection_key)
                     }
                 )
             elif config_selection_key.startswith(CONFIG_META_PATH):
@@ -433,6 +461,7 @@ class SelectorConfig:
         self.sources: list[str] = []
         self.exposures: list[str] = []
         self.packages: list[str] = []
+        self.groups: list[str] = []
         self.bare_identifiers: list[str] = (
             []
         )  # bare strings: match by package_name, node name or folder name (dbt ls-like)
@@ -452,6 +481,7 @@ class SelectorConfig:
             or self.sources
             or self.exposures
             or self.packages
+            or self.groups
             or self.bare_identifiers
             or self.resource_types
             or self.exclude_resource_types
@@ -489,6 +519,7 @@ class SelectorConfig:
             SOURCE_SELECTOR: self._parse_source_selector,
             EXPOSURE_SELECTOR: self._parse_exposure_selector,
             PACKAGE_SELECTOR: self._parse_package_selector,
+            GROUP_SELECTOR: self._parse_group_selector,
             RESOURCE_TYPE_SELECTOR: self._parse_resource_type_selector,
             EXCLUDE_RESOURCE_TYPE_SELECTOR: self._parse_exclude_resource_type_selector,
             FQN_SELECTOR: self._parse_fqn_selector,
@@ -576,6 +607,15 @@ class SelectorConfig:
             )
         self.packages.append(package_name)
 
+    def _parse_group_selector(self, item: str) -> None:
+        index = len(GROUP_SELECTOR)
+        group_name = item[index:].strip()
+        if not group_name:
+            raise CosmosValueError(
+                "group: selector requires a non-empty group name (e.g. select=['group:customer_mart'])"
+            )
+        self.groups.append(group_name)
+
     def __repr__(self) -> str:
         return (
             "SelectorConfig("
@@ -587,6 +627,7 @@ class SelectorConfig:
             + f"resource={self.resource_types}, "
             + f"exposures={self.exposures}, "
             + f"packages={self.packages}, "
+            + f"groups={self.groups}, "
             + f"bare_identifiers={self.bare_identifiers}, "
             + f"exclude_resource={self.exclude_resource_types}, "
             + f"other={self.other}, "
@@ -631,10 +672,6 @@ class NodeSelector:
                 if node_id not in self.nodes:
                     continue
                 node = self.nodes[node_id]
-                # Since the method below changes the tags of test nodes, it can lead to incorrect
-                # results during the application of graph selectors. Therefore, it is being run within
-                # nodes previously selected
-                # This solves https://github.com/astronomer/astronomer-cosmos/pull/1466
                 if self._should_include_node(node_id, node):
                     selected_nodes.add(node_id)
         else:
@@ -679,18 +716,6 @@ class NodeSelector:
 
         self.visited_nodes.add(node_id)
 
-        # Disclaimer: this method currently copies the tags from parent nodes to children nodes
-        # that are tests. This can lead to incorrect results in graph node selectors such as reported in
-        # https://github.com/astronomer/astronomer-cosmos/pull/1466
-        if node.resource_type == DbtResourceType.TEST and node.depends_on and len(node.depends_on) > 0:
-            node.tags = getattr(self.nodes.get(node.depends_on[0]), "tags", [])
-            logger.debug(
-                "The test node <%s> inherited these tags from the parent node <%s>: %s",
-                node_id,
-                node.depends_on[0],
-                node.tags,
-            )
-
         if not self._is_tags_subset(node):
             logger.debug("Excluding node <%s>", node_id)
             return False
@@ -711,7 +736,11 @@ class NodeSelector:
         return True
 
     def _passes_selector_filters(self, node: DbtNode) -> bool:
-        """Return True if node matches all configured selector filters (path, fqn, resource_type, source, exposure)."""
+        """Return True if node matches all configured selector filters.
+
+        Filters: path, fqn, resource_type, exclude_resource_type, source, exposure, package, group,
+        bare identifier.
+        """
         if self.config.paths and not self._is_path_matching(node):
             return False
         if self.config.fqns and not self._is_fqn_matching(node):
@@ -728,6 +757,9 @@ class NodeSelector:
         if self.config.packages and not self._is_package_matching(node):
             return False
 
+        if self.config.groups and not self._is_group_matching(node):
+            return False
+
         if self.config.bare_identifiers and not self._is_bare_identifier_matching(node):
             return False
 
@@ -736,7 +768,7 @@ class NodeSelector:
     def _is_fqn_matching(self, node: DbtNode) -> bool:
         """Checks if the node's fully qualified name exactly matches any of the config's fqn selector values."""
         node_fqn = _node_fqn_str(node)
-        if node_fqn is None:
+        if node_fqn is None or not _is_matched_by_fqn_method(node):
             return False
         return any(_fqn_matches(node_fqn, fqn_value) for fqn_value in self.config.fqns)
 
@@ -770,16 +802,28 @@ class NodeSelector:
         """Checks if the node's package is in the config's package list."""
         return (node.package_name or "") in self.config.packages
 
+    def _is_group_matching(self, node: DbtNode) -> bool:
+        """Checks if the node's dbt group is in the config's group list. Ungrouped nodes never match."""
+        return node.config.get("group") in self.config.groups
+
     def _is_bare_identifier_matching(self, node: DbtNode) -> bool:
         """Match bare identifiers via :func:`_node_matches_bare_identifier` (dbt fqn selector, with a
         package/name/folder fallback when the node has no fqn)."""
         return any(_node_matches_bare_identifier(node, bare) for bare in self.config.bare_identifiers)
 
     def _is_tags_subset(self, node: DbtNode) -> bool:
-        """Checks if the node's tags are a subset of the config's tags."""
-        if not (set(self.config.tags) <= set(node.tags)):
-            return False
-        return True
+        """Checks if the config's tags are a subset of the node's effective tags."""
+        return set(self.config.tags) <= self._effective_tags(node)
+
+    def _effective_tags(self, node: DbtNode) -> set[str]:
+        # A test also carries the tags of every parent, so ``tag:x`` follows a tagged model to its tests like dbt's
+        # default indirect selection; ``node.tags`` itself is left untouched, so graph operators (``+tag:x``) start
+        # only from nodes that carry the tag.
+        tags = set(node.tags)
+        if node.resource_type == DbtResourceType.TEST:
+            for parent_id in node.depends_on or []:
+                tags.update(getattr(self.nodes.get(parent_id), "tags", []))
+        return tags
 
     def _is_config_subset(self, node_config: dict[str, Any]) -> bool:
         """Checks if the node's config is a subset of the config's config."""
@@ -1047,6 +1091,7 @@ class YamlSelectors:
             PATH_SELECTOR[:-1]: PATH_SELECTOR,
             SOURCE_SELECTOR[:-1]: SOURCE_SELECTOR,
             EXPOSURE_SELECTOR[:-1]: EXPOSURE_SELECTOR,
+            GROUP_SELECTOR[:-1]: GROUP_SELECTOR,
             RESOURCE_TYPE_SELECTOR[:-1]: RESOURCE_TYPE_SELECTOR,
             EXCLUDE_RESOURCE_TYPE_SELECTOR[:-1]: EXCLUDE_RESOURCE_TYPE_SELECTOR,
         }
@@ -1055,7 +1100,7 @@ class YamlSelectors:
             if method == method_prefix:
                 return (f"{selector_prefix}{value}", None)
 
-        if any(method.startswith(f"{CONFIG_SELECTOR}{config}") for config in SUPPORTED_CONFIG):
+        if _is_supported_config_selector(method):
             return (f"{method}:{value}", None)
 
         return (None, f"Unsupported selector method: '{method}'")
@@ -1476,14 +1521,20 @@ def select_nodes(
     exclude = exclude or []
     if not select and not exclude:
         return nodes
-    validate_filters(exclude, select)
-    subset_ids = apply_select_filter(nodes, project_dir, select)
-    if select:
-        nodes = get_nodes_from_subset(nodes, subset_ids)
-    exclude_ids = apply_exclude_filter(nodes, project_dir, exclude)
-    subset_ids = set(nodes.keys()) - exclude_ids
+    selected_ids, excluded_ids = select_node_ids(project_dir, nodes, select, exclude)
+    return get_nodes_from_subset(nodes, selected_ids - excluded_ids)
 
-    return get_nodes_from_subset(nodes, subset_ids)
+
+def select_node_ids(
+    project_dir: Path | None, nodes: dict[str, DbtNode], select: list[str], exclude: list[str]
+) -> tuple[set[str], set[str]]:
+    """Return the ids matched by ``select`` (all nodes when empty) and by ``exclude``, both against the full graph."""
+    validate_filters(exclude, select)
+    # `exclude` is resolved against the full graph, not the `select`-narrowed subset, so graph operators (`+tag:x`)
+    # still find their root nodes. This matches dbt.
+    selected_ids = apply_select_filter(nodes, project_dir, select) if select else set(nodes.keys())
+    excluded_ids = apply_exclude_filter(nodes, project_dir, exclude) if exclude else set()
+    return selected_ids, excluded_ids
 
 
 def get_nodes_from_subset(nodes: dict[str, DbtNode], subset_ids: set[str]) -> dict[str, DbtNode]:
@@ -1497,7 +1548,13 @@ def apply_exclude_filter(nodes: dict[str, DbtNode], project_dir: Path | None, ex
         config = SelectorConfig(project_dir, statement)
         node_selector = NodeSelector(nodes, config)
         exclude_ids.update(node_selector.select_nodes_ids_by_intersection)
-    return exclude_ids
+    # dbt's default (eager) indirect selection also excludes every test that depends on an excluded node.
+    excluded_test_ids = {
+        node_id
+        for node_id, node in nodes.items()
+        if node.resource_type == DbtResourceType.TEST and any(parent_id in exclude_ids for parent_id in node.depends_on)
+    }
+    return exclude_ids | excluded_test_ids
 
 
 def apply_select_filter(nodes: dict[str, DbtNode], project_dir: Path | None, select: list[str]) -> set[str]:
@@ -1526,8 +1583,9 @@ def validate_filters(exclude: list[str], select: list[str]) -> None:
                 or filter_parameter.startswith(SOURCE_SELECTOR)
                 or filter_parameter.startswith(EXPOSURE_SELECTOR)
                 or filter_parameter.startswith(PACKAGE_SELECTOR)
+                or filter_parameter.startswith(GROUP_SELECTOR)
                 or PLUS_SELECTOR in filter_parameter
-                or any([filter_parameter.startswith(CONFIG_SELECTOR + config) for config in SUPPORTED_CONFIG])
+                or _is_supported_config_selector(filter_parameter)
             ):
                 continue
             elif ":" in filter_parameter:

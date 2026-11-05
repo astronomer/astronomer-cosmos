@@ -5,7 +5,7 @@ from unittest.mock import Mock, PropertyMock, call, patch
 import pytest
 from packaging.version import Version
 
-from cosmos.config import CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AIConfig, CosmosConfigException, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import ExecutionMode, InvocationMode, SeedRenderingBehavior, SourceRenderingBehavior, TestBehavior
 from cosmos.exceptions import CosmosValueError
 from cosmos.profiles.athena.access_key import AthenaAccessKeyProfileMapping
@@ -51,6 +51,38 @@ def test_init_with_project_path_and_list_relative_paths():
         Path("path/to/dbt/project/snapshots"),
         Path("path/to/dbt/project/snapshots_v2"),
     ]
+
+
+def test_relative_paths_kept_without_project_path():
+    """
+    The configured relative paths must survive even when ProjectConfig.dbt_project_path is not set,
+    because the project root may instead come from RenderConfig/ExecutionConfig. Previously they were
+    silently discarded and rendering fell back to the default `models`/`seeds`/`snapshots` folders.
+    """
+    project_config = ProjectConfig(
+        manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json",
+        project_name="split_path_project",
+        models_relative_paths=["custom/models"],
+        seeds_relative_paths=["custom/seeds"],
+        snapshots_relative_paths=["custom/snapshots"],
+    )
+
+    assert project_config.dbt_project_path is None
+    assert project_config.models_paths == []
+    assert project_config.models_relative_paths == [Path("custom/models")]
+    assert project_config.seeds_relative_paths == [Path("custom/seeds")]
+    assert project_config.snapshots_relative_paths == [Path("custom/snapshots")]
+
+
+def test_relative_paths_default_when_not_configured():
+    """An omitted relative path falls back to the dbt default, an explicitly empty list stays empty."""
+    defaulted = ProjectConfig(manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json", project_name="p")
+    assert defaulted.models_relative_paths == [Path("models")]
+
+    emptied = ProjectConfig(
+        manifest_path=DBT_PROJECTS_ROOT_DIR / "manifest.json", project_name="p", models_relative_paths=[]
+    )
+    assert emptied.models_relative_paths == []
 
 
 def test_models_paths_not_shared_across_instances():
@@ -502,3 +534,104 @@ def test_render_config_seed_rendering_when_seed_changes_allowed_with_non_build(t
 
 def test_render_config_seed_rendering_behavior_defaults_to_always():
     assert RenderConfig().seed_rendering_behavior == SeedRenderingBehavior.ALWAYS
+
+
+def test_ai_config_defaults():
+    ai_config = AIConfig(llm_conn_id="my_llm_conn")
+    assert ai_config.llm_conn_id == "my_llm_conn"
+    assert ai_config.diagnose_on_failure is False
+    assert ai_config.introspect_schema is False
+    assert ai_config.timeout_seconds == 30.0
+    assert (ai_config.max_requests, ai_config.max_failed_nodes) == (8, 5)
+    assert (ai_config.max_message_chars, ai_config.max_sql_chars, ai_config.max_output_chars) == (4000, 8000, 8000)
+    assert ai_config.max_artifact_mb == 50
+    assert ai_config.diagnosis_output_type is None
+    assert ai_config.diagnosis_instructions is None
+    assert ai_config.redactor is None
+
+
+def test_ai_config_custom_values():
+    from pydantic import BaseModel
+
+    class CustomDiagnosis(BaseModel):
+        summary: str
+
+    ai_config = AIConfig(
+        llm_conn_id="my_llm_conn",
+        diagnose_on_failure=True,
+        introspect_schema=True,
+        timeout_seconds=10.0,
+        diagnosis_output_type=CustomDiagnosis,
+        diagnosis_instructions="Be concise.",
+        redactor=str.upper,
+    )
+    assert ai_config.diagnose_on_failure is True
+    assert ai_config.introspect_schema is True
+    assert ai_config.timeout_seconds == 10.0
+    assert ai_config.diagnosis_output_type is CustomDiagnosis
+    assert ai_config.diagnosis_instructions == "Be concise."
+    assert ai_config.redactor is str.upper
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        ({"llm_conn_id": ""}, "llm_conn_id must be a non-empty Airflow connection ID"),
+        ({"llm_conn_id": None}, "llm_conn_id must be a non-empty Airflow connection ID"),
+        ({"llm_conn_id": "c", "timeout_seconds": 0}, "timeout_seconds must be a finite number above 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": -5}, "timeout_seconds must be a finite number above 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": float("nan")}, "timeout_seconds must be a finite number above 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": float("inf")}, "timeout_seconds must be a finite number above 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": None}, "timeout_seconds must be a finite number above 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": "30"}, "timeout_seconds must be a finite number above 0"),
+        ({"llm_conn_id": "c", "timeout_seconds": True}, "timeout_seconds must be a finite number above 0"),
+        ({"llm_conn_id": "c", "diagnosis_output_type": str}, "must be a pydantic model class"),
+        ({"llm_conn_id": "c", "diagnosis_output_type": "DbtFailureDiagnosis"}, "must be a pydantic model class"),
+        ({"llm_conn_id": "c", "redactor": "not callable"}, "redactor must be callable"),
+    ],
+)
+def test_ai_config_rejects_invalid_values(kwargs, message):
+    with pytest.raises(CosmosValueError, match=message):
+        AIConfig(**kwargs)
+
+
+def test_cosmos_config_does_not_import_pydantic_at_module_level():
+    """pydantic is not a dependency of Cosmos, nor of Airflow 2: ``import cosmos`` must not need it."""
+    import ast
+
+    import cosmos.config
+
+    tree = ast.parse(Path(cosmos.config.__file__).read_text())
+    imported = [
+        node.module if isinstance(node, ast.ImportFrom) else alias.name
+        for node in tree.body  # only the top level: imports under ``if TYPE_CHECKING`` or in functions are fine
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        for alias in getattr(node, "names", [])
+    ]
+
+    assert not [name for name in imported if name and name.split(".")[0] == "pydantic"]
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["max_requests", "max_failed_nodes", "max_message_chars", "max_sql_chars", "max_output_chars", "max_artifact_mb"],
+)
+@pytest.mark.parametrize("value", [0, -1, 2.5, "10", None, True])
+def test_ai_config_limits_must_be_whole_numbers_of_at_least_one(name, value):
+    with pytest.raises(CosmosValueError, match=f"AIConfig.{name} must be a whole number of at least 1"):
+        AIConfig(llm_conn_id="c", **{name: value})
+
+
+def test_ai_config_accepts_the_limits_the_user_chooses():
+    ai_config = AIConfig(
+        llm_conn_id="c",
+        max_requests=1,
+        max_failed_nodes=20,
+        max_message_chars=100_000,
+        max_sql_chars=1,
+        max_output_chars=2,
+        max_artifact_mb=500,
+    )
+
+    assert (ai_config.max_requests, ai_config.max_failed_nodes, ai_config.max_artifact_mb) == (1, 20, 500)
+    assert (ai_config.max_message_chars, ai_config.max_sql_chars, ai_config.max_output_chars) == (100_000, 1, 2)

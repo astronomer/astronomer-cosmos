@@ -4,7 +4,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 try:  # Airflow 3
     from airflow.sdk.bases.operator import BaseOperator
@@ -47,6 +47,9 @@ from cosmos.core.graph.entities import Task as TaskMetadata
 from cosmos.dbt.graph import DbtNode
 from cosmos.exceptions import CosmosValueError
 from cosmos.log import get_logger
+
+if TYPE_CHECKING:
+    from cosmos.operators._watcher.aggregation import TestsPerModel
 
 logger = get_logger(__name__)
 
@@ -355,6 +358,7 @@ def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
             DbtResourceType.MODEL: "DbtBuild",
             DbtResourceType.SNAPSHOT: "DbtBuild",
             DbtResourceType.SEED: "DbtBuild",
+            DbtResourceType.SEMANTIC_METRIC_VIEW: "DbtBuild",
             DbtResourceType.TEST: "DbtTest",
             DbtResourceType.SOURCE: "DbtSource",
         }
@@ -363,6 +367,7 @@ def create_dbt_resource_to_class(test_behavior: TestBehavior) -> dict[str, str]:
             DbtResourceType.MODEL: "DbtRun",
             DbtResourceType.SNAPSHOT: "DbtSnapshot",
             DbtResourceType.SEED: "DbtSeed",
+            DbtResourceType.SEMANTIC_METRIC_VIEW: "DbtSemanticMetricView",
             DbtResourceType.TEST: "DbtTest",
             DbtResourceType.SOURCE: "DbtSource",
         }
@@ -407,7 +412,11 @@ def create_task_metadata(  # noqa: C901
             "dbt_dag_task_group_identifier": dbt_dag_task_group_identifier,
             "package_name": node.package_name,
         }
-        resource_suffix_map = {TestBehavior.BUILD: "build", DbtResourceType.MODEL: "run"}
+        resource_suffix_map = {
+            TestBehavior.BUILD: "build",
+            DbtResourceType.MODEL: "run",
+            DbtResourceType.SEMANTIC_METRIC_VIEW: "semantic_metric_run",
+        }
         resource_suffix = (
             resource_suffix_map.get(render_config.test_behavior)
             or resource_suffix_map.get(node.resource_type)
@@ -474,7 +483,10 @@ def create_task_metadata(  # noqa: C901
                 arguments=args,
             )
 
-        if render_config.test_behavior == TestBehavior.BUILD and node.resource_type in SUPPORTED_BUILD_RESOURCES:
+        if render_config.test_behavior == TestBehavior.BUILD and (
+            node.resource_type in SUPPORTED_BUILD_RESOURCES
+            or node.resource_type == DbtResourceType.SEMANTIC_METRIC_VIEW
+        ):
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"
             else:
@@ -523,7 +535,7 @@ def create_task_metadata(  # noqa: C901
                 resource_suffix=r"source",
                 execution_mode=execution_mode,
             )
-            if node.has_freshness is False and render_config.source_rendering_behavior == SourceRenderingBehavior.ALL:
+            if node.has_freshness is False:
                 # render sources without freshness as empty operators
                 # empty operator does not accept custom parameters (e.g., profile_args). recreate the args.
                 if "task_display_name" in args:
@@ -532,10 +544,11 @@ def create_task_metadata(  # noqa: C901
                     args = {}
                 return TaskMetadata(
                     id=task_id,
+                    owner=node.owner if render_config.enable_owner_inheritance else "",
                     operator_class=EMPTY_OPERATOR_CLASS_PATH,
                     arguments=args,
                 )
-        else:  # DbtResourceType.MODEL, DbtResourceType.SEED and DbtResourceType.SNAPSHOT
+        else:  # DbtResourceType.MODEL, SEED, SNAPSHOT and SEMANTIC_METRIC_VIEW
             if node.fqn and len(node.fqn) > 0:
                 args[models_select_key] = f"fqn:{'.'.join(node.fqn)}"
             else:
@@ -643,6 +656,22 @@ def generate_or_convert_task(
     return task
 
 
+def _should_render_tests_in_task_group(node: DbtNode, render_config: RenderConfig) -> bool:
+    """
+    Decide if a node's non-detached tests should run in a dedicated test task, grouped with the node task.
+
+    Under TestBehavior.AFTER_EACH, this applies to every testable resource. Under TestBehavior.BUILD, the
+    tests of models, seeds and snapshots run as part of the node's own ``dbt build`` task, so they do not
+    need a separate test task. Sources are the exception: Cosmos renders them as ``dbt source freshness``
+    tasks, and the build tasks of models, seeds and snapshots select only their own node, so the tests
+    defined on a source would never be selected by any task unless they get a test task of their own, as
+    with AFTER_EACH.
+    """
+    if render_config.test_behavior == TestBehavior.AFTER_EACH:
+        return True
+    return render_config.test_behavior == TestBehavior.BUILD and node.resource_type == DbtResourceType.SOURCE
+
+
 def generate_task_or_group(
     dag: DAG,
     task_group: TaskGroup | None,
@@ -665,7 +694,7 @@ def generate_task_or_group(
     detached_from_parent = detached_from_parent or {}
     use_task_group = (
         node.resource_type in TESTABLE_DBT_RESOURCES
-        and render_config.test_behavior == TestBehavior.AFTER_EACH
+        and _should_render_tests_in_task_group(node, render_config)
         and node.has_non_detached_test is True
     )
     convert_entire_task_group = render_config.node_conversion_by_task_group and node.resource_type in node_converters
@@ -812,6 +841,21 @@ def _add_dbt_setup_async_task(
     tasks_map[DBT_SETUP_ASYNC_TASK_ID] = setup_airflow_task
 
 
+def _reject_cosmos_only_selectors(render_config: RenderConfig) -> None:
+    """
+    ``resource_type:semantic_metric_view`` is resolved by Cosmos, but the watcher producer forwards ``select`` and
+    ``exclude`` to a single ``dbt build``, which rejects it. Fail when building the DAG instead of at run time.
+    """
+    cosmos_only_selector = f"resource_type:{DbtResourceType.SEMANTIC_METRIC_VIEW.value}"  # type: ignore[attr-defined]
+    for argument, items in (("select", render_config.select), ("exclude", render_config.exclude)):
+        if any(cosmos_only_selector in item for item in items):
+            raise CosmosValueError(
+                f"RenderConfig.{argument} uses '{cosmos_only_selector}', which dbt does not know and "
+                "ExecutionMode.WATCHER passes to dbt. Use 'config.materialized:metric_view' and "
+                "'config.materialized:semantic_view' instead."
+            )
+
+
 def _add_watcher_producer_task(
     dag: DAG,
     task_args: dict[str, Any],
@@ -819,7 +863,7 @@ def _add_watcher_producer_task(
     task_group: TaskGroup | None,
     render_config: RenderConfig | None = None,
     execution_mode: ExecutionMode = ExecutionMode.WATCHER,
-    tests_per_model: dict[str, list[str]] | None = None,
+    tests_per_model: TestsPerModel | None = None,
 ) -> BaseOperator:
     """
     Create the producer task for the watcher execution mode and add it to the tasks_map.
@@ -838,6 +882,7 @@ def _add_watcher_producer_task(
         producer_task_args["_check_source_freshness"] = True
 
     if render_config is not None:
+        _reject_cosmos_only_selectors(render_config)
         producer_task_args["select"] = _convert_list_to_str(render_config.select)
         producer_task_args["selector"] = render_config.selector
         producer_task_args["exclude"] = _convert_list_to_str(render_config.exclude)
@@ -978,11 +1023,16 @@ def identify_detached_nodes(
 
 
 def calculate_test_operator_kwargs(
-    nodes: dict[str, DbtNode], detached_nodes: dict[str, DbtNode]
+    nodes: dict[str, DbtNode],
+    detached_nodes: dict[str, DbtNode],
+    render_config: RenderConfig | None = None,
 ) -> dict[str, dict[str, Any]]:
     """
-    Map each tested node ID to the ``operator_kwargs`` declared by the test nodes that run alongside it under
-    TestBehavior.AFTER_EACH. Detached tests are skipped: they run in their own task, using their own kwargs.
+    Map each tested node ID to the ``operator_kwargs`` declared by the test nodes that run alongside it
+    (under TestBehavior.AFTER_EACH, or for source tests under TestBehavior.BUILD). Detached tests are
+    skipped: they run in their own task, using their own kwargs. When ``render_config`` is given, only the
+    parents whose tests get a task of their own (see ``_should_render_tests_in_task_group``) are collected,
+    so the tests that run inside their parent's own ``dbt build`` task are left alone.
 
     Since a node's tests all run in a single Airflow task, when they declare the same kwarg with different values the
     last one wins.
@@ -995,6 +1045,10 @@ def calculate_test_operator_kwargs(
         if not node_kwargs:
             continue
         for parent_id in node.depends_on:
+            if render_config is not None:
+                parent = nodes.get(parent_id)
+                if parent is None or not _should_render_tests_in_task_group(parent, render_config):
+                    continue
             parent_kwargs = test_operator_kwargs.setdefault(parent_id, {})
             for kwarg, value in node_kwargs.items():
                 if kwarg in parent_kwargs and parent_kwargs[kwarg] != value:
@@ -1189,7 +1243,7 @@ def build_airflow_graph(
     on_warning_callback: Callable[..., Any] | None = None,  # argument specific to the DBT test command
     async_py_requirements: list[str] | None = None,
     execution_config: ExecutionConfig | None = None,
-    tests_per_model: dict[str, list[str]] | None = None,
+    tests_per_model: TestsPerModel | None = None,
 ) -> dict[str, TaskGroup | BaseOperator]:
     """
     Instantiate dbt `nodes` as Airflow tasks within the given `task_group` (optional) or `dag` (mandatory).
@@ -1230,11 +1284,12 @@ def build_airflow_graph(
     detached_from_parent: dict[str, list[DbtNode]] = defaultdict(list)
     identify_detached_nodes(nodes, render_config, detached_nodes, detached_from_parent)
 
-    # Operator kwargs declared by the test nodes, so a TestBehavior.AFTER_EACH test task can override the arguments
+    # Operator kwargs declared by the test nodes, so a test task rendered alongside its parent node
+    # (TestBehavior.AFTER_EACH, or source tests under TestBehavior.BUILD) can override the arguments
     # it inherits from the resource being tested
     test_operator_kwargs = (
-        calculate_test_operator_kwargs(nodes, detached_nodes)
-        if render_config.test_behavior == TestBehavior.AFTER_EACH
+        calculate_test_operator_kwargs(nodes, detached_nodes, render_config)
+        if render_config.test_behavior in (TestBehavior.AFTER_EACH, TestBehavior.BUILD)
         else {}
     )
 

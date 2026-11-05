@@ -1,0 +1,23 @@
+version: 2
+
+models:
+  - name: model_a
+    columns:
+      - name: id
+        tests:
+          - not_null
+  - name: model_flaky
+    columns:
+      - name: id
+        tests:
+          - not_null
+  - name: model_downstream
+    columns:
+      - name: id
+        tests:
+          - not_null
+  - name: model_downstream_2
+    columns:
+      - name: id
+        tests:
+          - not_null

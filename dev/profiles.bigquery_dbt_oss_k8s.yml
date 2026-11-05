@@ -1,0 +1,13 @@
+# Profile baked into the image of Dockerfile.bigquery_dbt_oss_k8s. The DAGs set POSTGRES_DB and POSTGRES_SCHEMA in the pod,
+# so the project and dataset come from variables of the image instead. POSTGRES_PASSWORD holds the service account key.
+default:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account-json
+      # POSTGRES_PASSWORD only because the example DAGs name their pod secret that way; it holds the BigQuery key here.
+      keyfile_json: "{{ env_var('POSTGRES_PASSWORD') | as_native }}"
+      project: "{{ env_var('COSMOS_TEST_BIGQUERY_PROJECT') }}"
+      dataset: "{{ env_var('COSMOS_TEST_BIGQUERY_DATASET') }}"
+      threads: 4

@@ -1,27 +1,152 @@
 Changelog
 =========
 
-Unreleased
-----------
+1.16.0 (2026-11-03)
+-------------------
 
 Breaking Changes
 
+* Cosmos now keeps the Airflow DAGs folder out of dbt's plugin discovery path during every dbt invocation (``sys.path`` under ``InvocationMode.DBT_RUNNER``, ``PYTHONPATH`` under ``InvocationMode.SUBPROCESS``). **If you keep a dbt plugin whose module name starts with ``dbt_`` inside the DAGs folder, it will no longer be discovered: move it out of the DAGs folder, or set ``enable_dags_folder_exclusion_from_dbt=False`` (env var ``AIRFLOW__COSMOS__ENABLE_DAGS_FOLDER_EXCLUSION_FROM_DBT``) to restore the previous behaviour.** This fixes dbt importing DAG files named ``dbt_*.py`` as plugins, which leaked or duplicated DAGs across unrelated Cosmos DAGs in-process and could crash the dbt command in subprocess mode. See #1673 and #2893.
+* Bare selectors (no method prefix, such as ``marts`` or ``marts+``) now resolve against each node's fully qualified name (fqn) under ``LoadMode.DBT_MANIFEST``, as dbt does. **Review bare ``select`` and ``exclude`` entries before upgrading: an ``exclude`` that was a silent no-op, or that matched too broadly, now removes exactly the dbt-selected nodes and their descendants, so tasks can disappear from an existing DAG.** A graph operator on a folder or package root (e.g. ``post_processing+`` or ``fhir_dbt_utils+``) now resolves nodes where it previously matched nothing, and a token equal to the model-paths directory (``models``), a filesystem ancestor, or a single middle folder segment no longer matches, because those are not an fqn prefix. See #2962 and #2978.
 * Raised the minimum supported dbt Core version to 1.8. dbt Core 1.5, 1.6, and 1.7 have reached End of Life per the `dbt Labs support policy <https://docs.getdbt.com/docs/dbt-versions/core>`_ and are no longer tested or supported; see the :doc:`compatibility policy </policy/compatibility-policy>` for the current supported range. See #2902.
+* Raised the minimum supported Python version to 3.11. Python 3.10 has reached End of Life per the `Python release schedule <https://devguide.python.org/versions/>`_. Users on Python 3.10 can stay on Cosmos 1.15.x or move to Python 3.11 or newer. See #3159.
+* Raised the minimum supported Apache Airflow version to 2.11. Apache Airflow 2.9 and 2.10 (Astro Runtime 11 and 12) are past End of Maintenance per the `Astronomer Runtime lifecycle policy <https://www.astronomer.io/docs/runtime/runtime-version-lifecycle-policy>`_ and are no longer tested or supported. Users who cannot upgrade Airflow should stay on Cosmos 1.15.x; see the :doc:`compatibility policy </policy/compatibility-policy>` for the current supported range. See #3152.
+* Starting in Cosmos 1.16.0, ``ExecutionMode.AIRFLOW_ASYNC`` is no longer supported on Apache Airflow 2.x. This change was necessary in order to support this execution mode in Airflow 3.4. Users who rely on ``AIRFLOW_ASYNC`` and cannot upgrade to Airflow 3 should stay on an earlier Cosmos release. See more information on `#3050 <https://github.com/astronomer/astronomer-cosmos/pull/3050>`_.
+* The Airflow 3 dbt docs plugin now requires authentication. Every ``/cosmos`` route requires a logged-in Airflow user with read access to the ``Website`` view, matching the Airflow 2 plugin; unauthenticated requests receive HTTP 401 and users without that permission receive HTTP 403. Previously these routes were served without authentication, exposing model SQL and schema metadata to anyone who could reach the API server. As a result, opening dbt docs from the Airflow UI now requires Airflow 3.1.1 or later (Astro Runtime 3.1-3 or later): the Airflow 3.1.0 UI discards its session cookie after login, so on Airflow 3.1.0 (including Astro Runtime 3.1-1 and 3.1-2) the docs return HTTP 401 and the plugin logs a warning. The plugin still loads on Airflow 3.1.0, and bearer-token API access to the docs still works. FastAPI's ``/openapi.json``, ``/docs`` and ``/redoc`` under ``/cosmos`` are disabled, and the plugin registers no sub-application or menu entry when ``dbt_docs_projects`` is empty. See `#3081 <https://github.com/astronomer/astronomer-cosmos/pull/3081>`_.
 
 Behaviour Changes
 
+* Cosmos now passes the ``--vars`` and ``--args`` dbt flags as one-line flow YAML (for example ``{var: '2'}``) instead of block YAML, because dbt OSS rejects block YAML that contains quoted strings, for example ``var: '2'``. dbt 1.x parses both forms to the same values, but the flag text in task logs and rendered commands differs. See `#3099 <https://github.com/astronomer/astronomer-cosmos/pull/3099>`_.
+* ``RenderConfig.exclude`` is now resolved against the full project graph instead of against the subset ``RenderConfig.select`` already narrowed. Graph operators traverse outwards from the nodes their selector matches, so when ``select`` had already dropped those root nodes the traversal had nothing to start from and shared ancestors or descendants were silently kept. For example, given a ``parent`` tagged ``test`` and its ``child``, ``select=["+child"], exclude=["+tag:test"]`` previously rendered both ``parent`` and ``child``, because ``+tag:test`` was evaluated after ``+child`` had already been applied; it now renders only ``child``. This matches dbt, which evaluates both filters against the whole graph and subtracts afterwards. See #2976.
+* ``ProjectConfig`` now keeps the ``models``/``seeds``/``snapshots`` relative paths it was configured with even when it has no ``dbt_project_path`` of its own, and ``LoadMode.CUSTOM`` falls back to them when the project root is supplied through ``RenderConfig``/``ExecutionConfig`` instead. Previously those relative paths were discarded in that split configuration and ``LegacyDbtProject`` silently crawled its defaults, so a project declaring e.g. ``models_relative_paths="custom/models"`` rendered no models at all; it now crawls ``custom/models`` as configured. Projects that set ``dbt_project_path`` on ``ProjectConfig`` are unaffected. See #2977.
+* Under ``LoadMode.DBT_MANIFEST``, ``RenderConfig.exclude`` and a YAML selector's ``exclude`` now apply to test nodes: tests matched by the exclude (for example ``resource_type:test`` or ``tag:<x>``) are no longer rendered, where previously they were added back next to their model. With ``TestBehavior.AFTER_EACH``, a model whose tests are all excluded is rendered as a plain task instead of a run and test group, so its task ids change (for example ``model_a.run`` becomes ``model_a_run``). The tests of excluded models also leave ``DbtGraph.filtered_nodes``. Test nodes also keep their own tags in addition to the tags of every parent, so ``select tag:<x>`` matches a test tagged ``<x>`` whose parent is not. An ``exclude`` now also removes every test that depends on an excluded node, as dbt's default indirect selection does, so a multi-parent test goes with any excluded parent while the other parents stay. Selecting by a test's own tag now renders that test where the test behavior allows it: a detached task for a multi-parent test when ``should_detach_multiple_parents_tests=True``, or the single test task with ``TestBehavior.AFTER_ALL``; previously nothing was rendered. A source whose tests are all excluded no longer counts as having tests, so with ``source_rendering_behavior=WITH_TESTS_OR_FRESHNESS`` it is rendered only if it has a freshness check. See #2981 and #3080.
 * ``emit_datasets`` is now a template field on the dbt operators, so emission can be decided per DAG run:
   ``operator_args={"emit_datasets": "{{ dag_run.run_type != 'backfill' }}"}`` stops backfills from triggering downstream
   asset-scheduled DAGs. ``operator_args`` now takes precedence over ``RenderConfig.emit_datasets`` (which remains a
   parse-time boolean and is not templatable). Previously an ``operator_args`` value was silently discarded, so
-  ``operator_args={"emit_datasets": False}`` now takes effect.
-* Cosmos now removes the Airflow DAGs folder from dbt's plugin discovery path for the duration of each dbt invocation, in both ``InvocationMode.DBT_RUNNER`` (in-process, via ``sys.path``) and ``InvocationMode.SUBPROCESS`` (via ``PYTHONPATH``). Previously dbt-core imported DAG files named ``dbt_*.py`` as a side effect of plugin discovery, which leaked or duplicated DAGs across unrelated Cosmos DAGs when running in-process and could crash the dbt command in subprocess mode. This is enabled by default. As a result, a genuine dbt plugin named ``dbt_*`` placed inside the DAGs folder will no longer be discovered; set ``enable_dags_folder_exclusion_from_dbt=False`` (env var ``AIRFLOW__COSMOS__ENABLE_DAGS_FOLDER_EXCLUSION_FROM_DBT``) to restore the previous behaviour. See #1673 and #2893.
+  ``operator_args={"emit_datasets": False}`` now takes effect. See #2996.
 * When a dbt project cannot be found, Cosmos now raises a clearer error, and on Airflow 3 with an absolute ``dbt_project_path`` it appends guidance to set the path relative to the DAG file (e.g. ``(Path(__file__).parent / "dbt/my_dbt_project").absolute().as_posix()``). This makes failures caused by versioned DAG bundles (e.g. on Astronomer) relocating the project between DAG parsing and task execution self-explanatory in the logs. The missing-project case in ``create_symlinks`` now raises ``CosmosValueError`` instead of a bare ``FileNotFoundError``. See #2921.
-* Bare folder and package selectors now resolve against each node's fully qualified name (fqn) under ``LoadMode.DBT_MANIFEST``, following dbt's default fqn selector (leaf name, or an ordered folder path from the project root). A graph operator on a bare folder or package root (e.g. ``post_processing+`` or ``fhir_dbt_utils+``) now resolves nodes where it previously matched nothing. Bare matching is also stricter: a token equal to the model-paths directory (``models``), a filesystem ancestor, or a single middle folder segment no longer matches, because those are not an fqn prefix. This mainly affects ``exclude``: bare ``exclude`` entries that were previously a silent no-op or matched too broadly now remove exactly the dbt-selected nodes and their descendants, so review them before upgrading. See #2962.
+* In ``ExecutionMode.WATCHER`` (including the Kubernetes and GKE variants), the aggregated test status that the producer pushes to XCom under ``<model_unique_id>_tests_status`` is now a dict (``status``, ``passed_count``, ``failed_count``, ``total_count`` and up to five ``failed_tests`` unique_ids) instead of the ``"pass"`` or ``"fail"`` string, and the test sensors log that summary. The sensors and the trigger still accept the string, so DAG runs in flight during the upgrade are unaffected; anything reading that XCom key directly must now read ``status`` from the dict. See #2750.
+* Under ``SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS``, a source that has tests but no freshness checks now renders its freshness task as an ``EmptyOperator`` instead of a ``DbtSource`` task that always ended with "Nothing to do" and failed when warn-error is enabled, matching the existing ``SourceRenderingBehavior.ALL`` path. The ``EmptyOperator`` keeps the dbt owner and does not receive ``operator_args`` or per-node ``operator_kwargs``. The test tasks are unchanged. See #3044.
+* ``ExecutionMode.WATCHER`` consumers of a node that dbt skipped for an upstream failure now run the node on attempt 1 once the producer has finished, instead of failing and waiting one ``retry_delay`` for attempt 2. Previously every level of the graph below a failed model added one ``retry_delay``. Test consumers whose model did not succeed do the same. This applies only when the task has ``retries`` set, and either ``watcher_dbt_retry_queue`` is unset or the consumer already runs on it. Such a node now gets ``retries + 1`` real dbt runs instead of ``retries``. See #3023 and #3047.
+* On Airflow 3.3 and later, the ``ExecutionMode.WATCHER`` producer keeps its per-node XCom backup in the Airflow task store instead of an Airflow Variable when ``enable_watcher_reliable_retry`` is ``True``, split across keys that roll over at 8 KB so each push rewrites only the open key. Variable writes look the key up in every configured secrets backend first, so with an external backend the producer task ran between about 3 and 6 times faster in our benchmark, depending on how many backends are configured. With ``False`` the Variable flush from the retry callback is unchanged. A producer that finds no backup on a retry logs a warning when the task store was in use. On Airflow 3.4 and later, clearing the producer from the UI or the REST API discards that backup unless "Keep task state" is ticked; see the watcher execution mode guide. See #2771 and `#3076 <https://github.com/astronomer/astronomer-cosmos/pull/3076>`_.
+* Under ``TestBehavior.BUILD``, a rendered dbt source that has tests is now a task group (``<source>.source`` and
+  ``<source>.test``) instead of a single ``<source>_source`` task, so references to the old task id need updating.
+  The source tests, which this mode never executed before, now run and can fail the DAG. See #1683 and #3037.
+* Like dbt, a bare selector (a folder, a package or a name, for example ``staging`` or the project name) and ``fqn:`` no longer select sources under ``LoadMode.DBT_MANIFEST``. Before, a source matched when the folder of its YAML file or its package matched, so with source rendering on, a bare folder or package selector also rendered the source and the models that only read it. Use ``source:`` to select a source; ``package:`` and ``path:`` still select sources. See #3147.
+* With ``dbt-oss`` installed in the Airflow environment and ``openlineage-integration-common`` 1.43.0 or older, local operators now emit datasets (assets); before, they emitted none. ``emit_datasets`` is enabled by default, so DAGs scheduled on the assets of dbt models can be triggered by dbt OSS runs; set ``emit_datasets=False`` to keep the previous behaviour. With ``openlineage-integration-common`` 1.44.0 or later, dbt OSS already emitted datasets and this does not change. On Airflow 2.10.5, a version where registering new datasets is only partially supported, emitting datasets can fail with ``FlushError: Can't flush None value found in collection DatasetModel.aliases``. See #3111.
+* ``ExecutionMode.WATCHER`` now emits the datasets of models, seeds and snapshots when the manifest has no URI for them, as with dbt OSS, which writes ``manifest.json`` when the run ends, and dbt Fusion. The producer builds the URI from the database, schema and alias in the relation of the node event, and the manifest still wins when it has one. With ``emit_datasets=False`` nothing changes, and neither do the Kubernetes and GKE watchers. See #3129.
+
+Features
+
+* Log a per-model test summary (passed and failed counts, and the failing test unique_ids) in the ``ExecutionMode.WATCHER`` test sensors by @michal-mrazek in #2750
+* Add opt-in experimental support for adapter-native semantic metric views (``config.materialized: metric_view`` on Databricks, ``semantic_view`` on Snowflake). When ``enable_semantic_metric_view_reclassification`` is set (env var ``AIRFLOW__COSMOS__ENABLE_SEMANTIC_METRIC_VIEW_RECLASSIFICATION``), these models are reclassified from ``model`` to ``DbtResourceType.SEMANTIC_METRIC_VIEW`` and rendered via a dedicated ``DbtSemanticMetricView*`` operator with a ``semantic_metric_run`` task suffix. Disabled by default. See the "Managing semantic metric views" guide by @corsettigyg in #2885
+* Add dedicated producer, consumer, and retry queues for ``ExecutionMode.WATCHER`` by @jroachgolf84 in #2844
+* Emit per-model outlets in ``ExecutionMode.WATCHER_KUBERNETES`` by @MichaelRBlack in #2595
+* Support lists of paths for the relative-path arguments of ``ProjectConfig`` by @pankajastro in #2875
+* Add a ``retries`` parameter to the ``gcs_upload`` callback by @TTMichaelA in #2871
+* Make ``emit_datasets`` templatable via ``operator_args`` by @tatiana in #2996
+* Support ``config.group`` and ``group:`` selectors by @biswasbiplob in #2980
+* Add ``AIConfig`` (experimental, it may change without a deprecation period), an opt-in diagnosis of failed dbt tasks: on their last attempt, an LLM is asked for the root cause and a fix, which are added after the dbt error. It uses ``apache-airflow-providers-common-ai`` (``pip install astronomer-cosmos[ai]``, for Python 3.11+ and Airflow 2.11+), works with ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``, masks secrets, and lets you set what is sent and how much it can spend. See the :doc:`AI config reference </reference/configs/ai-config>` by @corsettigyg in #3018
+* Add a ``dbt-oss`` extra (``pip install astronomer-cosmos[dbt-oss]``) by @pankajastro in #3130
+* ``DbtDocsS3Operator``, ``DbtDocsAzureStorageOperator`` and ``DbtDocsGCSOperator`` now upload the docs site written by dbt OSS, which has no ``catalog.json``, with the content type of each file. The files uploaded for dbt 1 are unchanged by @pankajastro in #3119
+
+Enhancements
+
+* Surface failing dbt nodes in the subprocess exception passed to ``on_failure_callback`` by @pankajastro in #2845
+* Use ``boto3`` for Kubernetes dbt docs S3 uploads by @jx2lee in #2957
+* Raise the minimum supported dbt Core version to 1.8 by @pankajastro in #2939
+* Clean up leftover dbt Core <1.8 references by @pankajastro in #2995
+* Drop support for Python 3.10 by @pankajastro in #3159
+* Drop support for Apache Airflow 2.9 and 2.10 by @jedcunningham in #3152
+* Add a DAG-bundle hint when a dbt project path is missing by @pankajkoti in #2921
+* Clarify missing profile field errors by @nightcityblade in #2970
+* Improve ``ExecutionMode.WATCHER`` producer failure performance by keeping the per-node XCom backup in the Airflow task store on Airflow 3.3 and later by @tatiana in #3076
 
 Bug Fixes
 
-* Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn, so ``<folder>+`` and ``<package>+`` behave like their ``path:`` and ``package:`` equivalents and like ``dbt ls``. Previously the graph selector resolved its root by exact node name only, and bare-identifier matching keyed off the absolute file path. See #2962.
+* On Airflow 3.0, the Cosmos plugin now logs a warning and skips the dbt docs views instead of raising ``RuntimeError`` on load. Previously, with ``[core] lazy_load_plugins = False`` (as on Astro Runtime), every Airflow CLI command logged a "Failed to import plugin cosmos" traceback, and the plugin's listeners were never registered by @jedcunningham in #3055
+* ``LoadMode.DBT_LS`` now runs ``dbt ls`` through a Python subprocess when dbt OSS (``dbt-core``, ``dbt-oss`` or ``dbt`` at version 2) is installed in the Airflow environment, even under the default ``InvocationMode.DBT_RUNNER``. dbt 2's ``dbtRunner`` returns only node names for ``dbt ls --output json``, which previously rendered an empty DAG. The fallback runs ``dbt_executable_path`` and is logged at INFO level; ``dbt deps`` still runs through ``dbtRunner`` by @tatiana in #3060
+* Fix async operator construction on Airflow 3.4 by @pankajkoti in #3050
+* Fix ``on_warning_callback`` not being called after deferral in Kubernetes mode by @mathiasgout in #3062
+* Fix the ``ExecutionMode.WATCHER`` consumer never reaching the fallback when its node errors early by @pankajkoti in #3011
+* Fix ``ExecutionMode.WATCHER`` dataset emission being silently disabled when ``profiles.yml`` uses dbt Jinja filters by @goingforstudying-ctrl in #2950
+* Fix ``AttributeError`` masking the real dbt error on ``run-operation`` failure by @barking-code in #2983
+* Handle dict ``env_vars`` in the Kubernetes operator env merge by @pankajkoti in #3030
+* Normalize Databricks OAuth hosts by @nightcityblade in #3025
+* Strip the trailing slash from Databricks profile hosts by @tatiana in #3069
+* Require authentication on the Airflow 3 dbt docs routes by @tatiana in #3081
+* Fix duplicate dbt Docs views in the Airflow 3 plugin by @ieCecchetti in #3071
+* Fall back to subprocess in the ``ExecutionMode.WATCHER`` producer on dbt (oss) 2.0 by @fpiped in #2998
+* Parse dbt JSON log output when extracting error and warning messages in subprocess mode by @ieCecchetti in #3072
+* Use ``EmptyOperator`` for freshness tasks of test-only sources, which now carry the dbt owner when owner inheritance is enabled by @JH0917 in #3044
+* Keep the Airflow DAGs folder out of dbt's plugin discovery path by @pankajkoti in #2893
+* Resolve bare folder, package, and node-name roots in graph-operator selectors under ``LoadMode.DBT_MANIFEST`` by matching the node's fqn by @pankajkoti in #2978
+* Stop rendering tests removed by ``exclude`` under ``LoadMode.DBT_MANIFEST`` by @tatiana and @ege-arhan in #3080
+* Resolve ``exclude`` graph selectors against the full project graph by @00yhj22-debug in #2976
+* Keep ``ProjectConfig`` relative paths when the project root comes from ``RenderConfig`` by @00yhj22-debug in #2977
+* Fix ``ExecutionMode.WATCHER`` consumers waiting one ``retry_delay`` per level below a failure by @biswasbiplob in #3047
+* Surface the macro error on ``run-operation`` failure with dbt < 1.12 by @barking-code in #2986
+* Skip dbt event callbacks for ``run-operation`` on dbt 2 by @pankajastro in #3089
+* Fix a circular import when ``cosmos.constants`` is imported before Airflow by @tatiana in #3087
+* Render source tests as a separate task under ``TestBehavior.BUILD`` by @developer-rpai in #3037
+* Compare dbt node statuses case-insensitively in ``ExecutionMode.WATCHER`` and enable the watcher tests on dbt-oss, so a capitalised ``Warn`` or ``Error`` from dbt 2 is recognised by the source sensor and the default freshness callback by @pankajastro in #3088
+* Serialize the ``--vars`` and ``--args`` dbt flags as one-line flow YAML, because dbt OSS rejects block YAML that contains quoted strings by @pankajkoti in #3099
+* Local operators now emit inlets and outlets (datasets) when dbt OSS is installed in the Airflow environment and ``openlineage-integration-common`` is 1.43.0 or older (Airflow's constraints pin 1.27.0 with Airflow 2.10.5, 1.37.0 with 3.1.0 and 1.43.0 with 3.1.7). dbt 2 leaves ``args.profiles_dir`` out of ``run_results.json``. Those library versions read it without a fallback, so parsing the OpenLineage events raised a ``KeyError`` and the task got no inlets or outlets (1.44.0 and later use the ``--profiles-dir`` lookup, and Cosmos does not change their run results). Cosmos now adds the profiles directory (``--profiles-dir`` or ``DBT_PROFILES_DIR``) to the run results of the task's temporary project before parsing, only when dbt did not write it. A dbt 2 executable used with a dbt 1.x environment is not covered. dbt Fusion used with a dbt 2 environment is covered by @pankajastro in #3111
+* In ``InvocationMode.SUBPROCESS``, Cosmos now reads the text output of dbt OSS for dbt tests. ``DbtTestLocalOperator`` now calls ``on_warning_callback`` with the warned tests in ``test_names`` and ``test_results``, and the exception for a failing dbt test, from any local operator, names the failing tests, with the number of failed rows when dbt 2 reports it. Previously the parsers only knew the dbt 1.x lines (``Done. PASS=.. WARN=N .. TOTAL=N``, ``Warning in test <name>``, ``Failure in test <name>``), so on dbt 2 the warning count was 0, the callback never fired, and the exception had no test details. The Kubernetes-based test operators (Kubernetes, GKE and EKS) now also read the dbt 2 ``Summary: .. | N warn`` line, so their ``on_warning_callback`` fires by @pankajastro in #3108
+* ``ExecutionMode.WATCHER`` now recognises the nodes that dbt OSS skips because an upstream node failed. dbt 2 does not emit ``SkippingDetails`` or ``LogSkipBecauseError`` for them, only ``MarkSkippedChildren``, so their consumers ended SKIPPED and were never built after the upstream recovered on a retry. Cosmos now reads the ``MarkSkippedChildren`` event that dbt 2 emits for each node it skips and treats the node as it does for dbt 1, including the nodes below a failed test and below an excluded node by @pankajastro in #3124, see #2698 and #3023
+* ``InvocationMode.DBT_RUNNER`` now matches dbt node statuses case-insensitively when it collects warnings. dbt OSS reports a source freshness warning as ``Warn``, which did not match ``warn``, so ``DbtSourceLocalOperator`` called ``on_warning_callback`` with empty ``test_names`` and ``test_results``. dbt 2 source freshness results have no ``message``, so their status is reported in ``test_results`` instead. dbt 1 is unchanged by @pankajastro in #3123
+* ``ExecutionMode.WATCHER`` now emits the datasets of models, seeds and snapshots when the manifest has no URI for them, as with dbt-oss and dbt Fusion by @pankajastro in #3129
+* Do not select sources with bare and ``fqn:`` selectors under ``LoadMode.DBT_MANIFEST``, as dbt does by @pankajastro in #3147
+* Skip the ``--no-static-parser`` flag under ``InvocationMode.DBT_RUNNER`` when dbt OSS is installed. dbt 2 has no static parser, so the flag logged ``NoLongerSupportedOption (dbt1700)`` on every command, which failed the task when ``warn_error=True`` by @pankajastro in #3144
+* Find the compiled SQL of dbt OSS models in the ``ExecutionMode.WATCHER`` producer. dbt 2 reports ``node_path`` relative to the project instead of the models folder, so the compiled SQL was never found by @pankajastro in #3145
+* In ``InvocationMode.SUBPROCESS``, read the source freshness warnings that dbt OSS prints as ``Warned source <name> (...)``, so ``DbtSourceLocalOperator`` calls ``on_warning_callback`` with the source in ``test_names`` and the line dbt printed in ``test_results`` by @pankajastro in #3146
+* Detect dbt OSS source freshness warnings in the Kubernetes and GKE operators, so ``on_warning_callback`` runs for a stale source by @pankajastro in #3156
+* In ``InvocationMode.SUBPROCESS``, list the ``[error] [<Name> (dbt<code>)]`` blocks of failed models, macros and stale sources of dbt OSS in the exception of a failed command by @pankajastro in #3148
+* In ``InvocationMode.DBT_RUNNER``, report a dbt OSS failure that is not tied to one node, such as a failing ``run-operation`` macro, in one line instead of listing every node of the project by @pankajastro in #3149
+* Serve the ``assets/`` and ``info_schema/`` files of the dbt OSS docs site in the Airflow 2 plugin, which loaded as a blank page before by @pankajastro in #3155
+* Serve the ``assets/`` and ``info_schema/`` files of the dbt OSS docs site in the Airflow 3 plugin, which loaded as a blank page before by @pankajastro in #3154
+
+Docs
+
+* Unify internal doc links to use the ``:ref:`` role by @pankajastro in #2873
+* Document the list-based relative-path arguments of ``ProjectConfig`` by @pankajastro in #2876
+* Link the ``AGENTS.md`` test matrix to ``pyproject.toml`` instead of hardcoding versions by @pankajastro in #2887
+* Add dbt-core 1.12 to the Airflow/dbt conflicts table by @pankajastro in #2938
+* Fix broken Slack invite links to the #airflow-dbt channel by @pankajastro in #2956
+* Document ``on_failure_callback`` access to dbt test failures by @pankajastro in #2846
+* Align Runtime support in the compatibility policy with End of Maintenance by @pankajkoti in #3150
+* Document dbt OSS (dbt 2) in Kubernetes Pods by @pankajastro in #3157
+* Fix the ``enable_dataset_alias`` value that Airflow 3 rejects in the scheduling guide by @jedcunningham in #3153
+* Add a dbt OSS setup guide and list dbt Fusion and dbt OSS 2.0 separately in the compatibility policy by @pankajastro in #3132
+* Add a favicon to the docs site by @jedcunningham in #3162
+
+Architectural Proposal
+
+* Add a proposal for a Snowflake dbt Project execution mode by @tatiana in #2896. Community contributions are welcome on the umbrella issue: https://github.com/astronomer/astronomer-cosmos/issues/3058
+
+Others
+
+* Add a bidirectional cross-project dbt-loom example by @pankajkoti in #2883
+* Exclude flaky and bot-blocked external links from the docs link checker by @tatiana, @pankajkoti and @pankajastro in #2858, #2952, and #2965
+* Pin dbt Fusion and cap the fusion job runtime by @pankajastro in #2966
+* Run the test suite against Astronomer Runtime alpha images by @pankajkoti and @jedcunningham in #2991, #3068, and #3035
+* Add Airflow 3.4 (beta) to the test matrix by @pankajkoti in #3049
+* Keep ``manifest.json`` for ``altered_jaffle_shop`` up to date in tests by @shantanutheone in #3063
+* Fix a mypy ``no-any-return`` error in ``_resolve_env_var`` by @tatiana in #2904
+* Reduce ``create_test_task_metadata`` complexity by @tatiana in #2933
+* Group ``github/codeql-action`` updates in a single Dependabot PR by @tatiana in #2928
+* Rename the dbt Fusion CI matrix value to ``2.0-dbt-fusion`` by @pankajastro in #3043
+* Add end-to-end tests for metric views and semantic views by @tatiana in #3070
+* Run Snowflake CI as ``OSSUSER`` in ``OSS.COSMOS_CI`` with a key pair by @tatiana in #3075
+* Fix the pre-commit black failure on ``main`` by @tatiana in #3077
+* Show the Runtime alpha tag in the ``test-runtime-alpha`` run name and summary by @jedcunningham in #3078
+* Unskip dbt-oss integration tests for dbt ls and profile schema by @pankajastro in #3083
+* Run the integration tests against dbt-oss on BigQuery by @pankajastro in #3046
+* Run unit tests against dbt-oss in CI by @pankajastro in #3052
+* Enable and unskip more integration tests in the dbt-oss CI jobs by @pankajastro and @pankajkoti in #3090, #3093, #3097, #3098, #3100, #3102, #3106, #3107, #3110, #3114, #3115, #3116, #3118, #3120, #3121, #3122, #3125, #3126, #3127, #3128, and #3129
+* Run the test workflows on ``ubuntu-24.04`` by @pankajastro in #3134
+* Dependency updates by @dependabot and @pre-commit-ci in #2854, #2856, #2866, #2872, #2882, #2894, #2897, #2898, #2899, #2907, #2909, #2911, #2912, #2915, #2916, #2919, #2922, #2923, #2924, #2929, #2934, #2937, #2941, #2943, #2946, #2949, #2951, #2954, #2955, #2958, #2963, #2971, #2973, #2974, #2975, #2984, #2985, #2987, #2989, #2994, #3002, #3009, #3010, #3012, #3013, #3014, #3017, #3019, #3020, #3026, #3028, #3029, #3032, #3033, #3039, #3053, #3054, #3056, #3057, #3064, #3065, #3066, #3067, #3074, #3079, #3085, #3086, #3094, #3131, #3141, #3143, #3164, and #3165
 
 1.15.1 (2026-08-04)
 -------------------

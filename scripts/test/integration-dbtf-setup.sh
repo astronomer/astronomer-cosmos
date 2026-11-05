@@ -14,7 +14,7 @@ rm -rf airflow.*
 pip freeze | grep airflow
 airflow db reset -y
 
-AIRFLOW_VERSION=$(airflow version)
+AIRFLOW_VERSION=$(python -c 'from importlib.metadata import version; print(version("apache-airflow"))')
 AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | cut -d. -f1)
 if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
     uv pip install cadwyn!=5.4.0

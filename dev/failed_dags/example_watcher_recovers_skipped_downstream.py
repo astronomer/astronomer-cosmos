@@ -22,19 +22,19 @@ With the fix, the producer parser rewrites the ``"skipped"`` status to
 ``"failed"`` for any node that dbt skipped via ``SkippingDetails`` /
 ``LogSkipBecauseError`` (the only paths reached when ``do_skip(cause=...)``
 fires -- i.e. exclusively on upstream-node failure). The downstream consumer
-then fails on attempt 1, Airflow retries it, and the same consumer-fallback
-path that recovers the failing upstream now runs the downstream locally.
+then sees that dbt never ran the node and, once the upstream has recovered,
+runs the same consumer-fallback path locally on attempt 1 (#3023).
 
 Models used (from ``dev/dags/dbt/watcher_upstream_failure_recovery``):
 - ``model_a``: trivial source-style model, succeeds.
-- ``model_flaky``: uses an ``on-run-start`` Postgres sequence to fail on
-  the first ``nextval`` call (``<= 1`` → ``RAISE EXCEPTION``) and succeed
-  on subsequent calls.
+- ``model_flaky``: calls the ``fail_once`` macro in a ``pre_hook``. The macro
+  counts its runs in a table of the target schema, fails the first run and succeeds
+  on subsequent ones.
 - ``model_downstream``: depends on ``model_flaky``; dbt skips it on
   attempt 1 because its upstream failed.
 
 A ``post_dbt`` ``EmptyOperator`` downstream of the task group makes the
-"green DAG" visible. A ``cleanup`` SQL task drops the sequence at the end
+"green DAG" visible. A ``cleanup`` SQL task drops that table at the end
 so the DAG is re-runnable from a clean state.
 """
 
@@ -105,7 +105,7 @@ with DAG(
     cleanup = SQLExecuteQueryOperator(
         task_id="drop_fail_once_marker",
         conn_id="example_conn",
-        sql="DROP SEQUENCE IF EXISTS public._cosmos_recovery_fail_once_seq;",
+        sql="DROP TABLE IF EXISTS public._cosmos_recovery_fail_once_;",
         trigger_rule="all_done",
     )
 

@@ -160,6 +160,22 @@ def test_plugin_registers_no_app_without_projects():
     assert plugin.external_views == []
 
 
+def test_plugin_builds_the_app_on_the_first_request(docs_dir: Path, auth_manager: MagicMock):
+    import cosmos.plugin.airflow3 as af3
+
+    with (
+        patch.object(af3, "_load_projects_from_conf", return_value={"core": {"dir": str(docs_dir)}}),
+        patch.object(af3, "create_cosmos_fastapi_app", wraps=af3.create_cosmos_fastapi_app) as create_app,
+    ):
+        plugin = af3.CosmosAF3Plugin()
+        create_app.assert_not_called()
+
+        client = TestClient(plugin.fastapi_apps[0]["app"])
+        assert client.get("/core/manifest.json").status_code == 401
+        assert client.get("/core/manifest.json", headers={"Authorization": f"Bearer {VALID_TOKEN}"}).status_code == 200
+        assert create_app.call_count == 1
+
+
 def test_plugin_still_registers_the_dbt_docs_menu_entry(docs_dir: Path):
     import cosmos.plugin.airflow3 as af3
 

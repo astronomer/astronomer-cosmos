@@ -536,7 +536,20 @@ class ProfileConfig:
                 profile_name=self.profile_name, target_name=self.target_name, use_mock_values=use_mock_values
             )
             profile_path = create_cache_profile(current_profile_version, profile_contents)
-            logger.info("Profile not found in cache storing and using profile: %s.", profile_path)
+            if isinstance(profile_contents, str):
+                redacted_profile_contents = self.profile_mapping.get_redacted_profile_file_contents(
+                    profile_name=self.profile_name,
+                    target_name=self.target_name,
+                    use_mock_values=use_mock_values,
+                    profile_contents=profile_contents,
+                )
+                logger.info(
+                    "Profile not found in cache, storing and using profile: %s with the following contents:\n%s",
+                    profile_path,
+                    redacted_profile_contents,
+                )
+            else:
+                logger.info("Profile not found in cache storing and using profile: %s.", profile_path)
             return profile_path
 
     @contextlib.contextmanager

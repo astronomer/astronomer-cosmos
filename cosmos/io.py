@@ -247,7 +247,7 @@ def _construct_dest_file_path(
 def upload_to_cloud_storage(project_dir: str, source_subpath: str = DEFAULT_TARGET_PATH, **kwargs: Any) -> None:
     """
     Helper function demonstrating how to upload files to remote object stores that can be used as a callback. This is
-    an example of a helper function that can be used if on Airflow >= 2.8 and cosmos configurations like
+    an example of a helper function that can be used with cosmos configurations like
     ``remote_target_path`` and ``remote_target_path_conn_id`` when set can be leveraged.
 
     :param project_dir: Path of the cloned project directory which Cosmos tasks work from.

@@ -269,7 +269,7 @@ def test_validate_project_missing_appends_bundle_hint_on_airflow3():
 def test_validate_project_missing_no_bundle_hint_on_airflow2():
     """On Airflow 2 the DAG-bundle hint is not appended -- bundles do not exist there."""
     project_config = ProjectConfig(dbt_project_path=Path("/tmp"))
-    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("2.10.0")):
+    with patch("cosmos.dbt.project.AIRFLOW_VERSION", Version("2.11.0")):
         with pytest.raises(CosmosValueError) as err_info:
             project_config.validate_project()
     assert err_info.value.args[0] == "Could not find dbt_project.yml at /tmp/dbt_project.yml"

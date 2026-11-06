@@ -122,6 +122,7 @@ class ExecutionMode(Enum):
     GCP_GKE = "gcp_gke"
     WATCHER_GCP_GKE = "watcher_gcp_gke"
     WATCHER_KUBERNETES = "watcher_kubernetes"
+    WATCHER_AWS_ECS = "watcher_aws_ecs"
 
 
 # Execution modes whose operators consume ``AIConfig``: they run dbt on the worker, so the dbt artifacts of a failed
@@ -248,5 +249,7 @@ TELEMETRY_TIMEOUT = 1.0
 _AIRFLOW3_MAJOR_VERSION = 3
 
 _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION = Version("10.8.0")
+# First release with `EcsRunTaskOperator._after_execution`, which the ECS watcher producer overrides.
+_ECS_WATCHER_MIN_AMAZON_PROVIDER_VERSION = Version("8.3.0")
 _DBT_STARTUP_EVENTS_XCOM_KEY = "dbt_startup_events"
 _PRODUCER_CMD_FLAGS_XCOM_KEY = "producer_cmd_flags"

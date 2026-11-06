@@ -144,6 +144,7 @@ You can also execute dbt commands in a container. Choosing these kinds of execut
 - :ref:`kubernetes <kubernetes>`: Run ``dbt`` commands within Kubernetes Pods managed by Cosmos.
 - :ref:`watcher_kubernetes <watcher-kubernetes-execution-mode>`: (Stable since Cosmos 1.15.0) Combines the speed of the watcher execution mode with the isolation of Kubernetes.
 - :ref:`aws_ecs <aws-container-run-job>`: Run ``dbt`` commands in containers via AWS ECS.
+- :ref:`watcher_aws_ecs <watcher-aws-ecs-execution-mode>`: (experimental) Combines the speed of the watcher execution mode with the isolation of AWS ECS.
 - :ref:`aws_eks <aws-eks>`: Run ``dbt`` commands via Kubernetes Pods in AWS EKS.
 - :ref:`azure_container_instance <azure-container-instance>`: Run ``dbt`` commands in Azure Container Instances.
 - :ref:`gcp_cloud_run_job <gcp-cloud-run-job>`: Run ``dbt`` commands via a container managed by GCP Cloud Run Job.
@@ -269,6 +270,10 @@ The type of execution mode that you choose directly affects how fast your Cosmos
      - No
    * - AWS ECS
      - Slow
+     - High
+     - No
+   * - Watcher AWS ECS
+     - Fast
      - High
      - No
    * - AWS_EKS

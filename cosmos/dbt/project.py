@@ -321,3 +321,20 @@ def remove_dags_folder_from_pythonpath(env: dict[str, str]) -> dict[str, str]:
     sanitized = dict(env)
     sanitized["PYTHONPATH"] = os.pathsep.join(kept)
     return sanitized
+
+
+@contextmanager
+def override_sys_argv(command: list[str]) -> Generator[None, None, None]:
+    """Temporarily override sys.argv with command during in-process dbt execution.
+
+    dbt-core reads sys.argv[1:] to construct flags.INVOCATION_COMMAND in manifest / event logs.
+    When running via InvocationMode.DBT_RUNNER inside Airflow workers, sys.argv contains the worker's
+    invocation args (e.g. celery worker command). Overriding sys.argv ensures dbt-core logs the actual
+    dbt command instead of worker args.
+    """
+    original_argv = sys.argv
+    sys.argv = command
+    try:
+        yield
+    finally:
+        sys.argv = original_argv

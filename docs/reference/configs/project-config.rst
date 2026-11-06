@@ -34,9 +34,13 @@ variables that should be used for rendering and execution. It takes the followin
   will only be rendered at execution time, not at render time.
 - ``env_vars``: (new in v1.3) A dictionary of environment variables used for rendering and execution. Rendering with
   env vars is only supported when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
+  These variables are also used to resolve ``env_var()`` in the ``packages-install-path`` of ``dbt_project.yml``,
+  taking precedence over the worker environment.
 - ``install_dbt_deps``: (new in v1.9) Run dbt deps during DAG parsing and task execution if True (default).
   To control ``dbt deps`` per DAG run via an Airflow template, set ``ExecutionConfig.install_dbt_deps``
   instead, which overrides this value at task execution time only.
+  If ``dbt deps`` fails at task execution time, the task fails instead of running dbt with the packages already in
+  the project.
   When it is False and ``packages.yml`` lists more packages than ``dbt_packages`` holds, dbt 1.x fails during DAG parsing
   and Cosmos raises ``CosmosLoadDbtException``. dbt OSS installs the missing packages itself during ``dbt ls``,
   so no error is raised. This install still happens at parse time, even though ``install_dbt_deps`` is False.

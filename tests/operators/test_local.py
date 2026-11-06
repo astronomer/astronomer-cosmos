@@ -2639,12 +2639,117 @@ def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog
     )
     operator._clone_project(tmp_dir_path)
 
-    create_symlinks_mock.assert_called_once_with(project_dir, tmp_dir_path, ignore_dbt_packages=True)
-    copy_dbt_packages_mock.assert_called_once_with(project_dir, tmp_dir_path)
+    create_symlinks_mock.assert_called_once_with(project_dir, tmp_dir_path, ignore_dbt_packages=True, env_vars=None)
+    copy_dbt_packages_mock.assert_called_once_with(project_dir, tmp_dir_path, env_vars=None)
 
     assert f"Cloning project to writable temp directory {tmp_dir_path} from {project_dir}" in caplog.text
     assert "Copying dbt packages to temporary folder." in caplog.text
     assert "Completed copying dbt packages to temporary folder." in caplog.text
+
+
+@patch("cosmos.operators.local.copy_dbt_packages")
+@patch("cosmos.operators.local.create_symlinks")
+def test_clone_project_forwards_env_to_packages_path_resolution(create_symlinks_mock, copy_dbt_packages_mock):
+    project_dir = Path("/fake/project")
+    tmp_dir_path = Path("/fake/tmp")
+    env = {"dbt_packages_suffix": "RB"}
+    operator = DbtRunLocalOperator(
+        task_id="test",
+        project_dir=project_dir,
+        install_deps=False,
+        copy_dbt_packages=True,
+        profile_config=profile_config,
+    )
+    operator._clone_project(tmp_dir_path, env)
+
+    create_symlinks_mock.assert_called_once_with(project_dir, tmp_dir_path, ignore_dbt_packages=True, env_vars=env)
+    copy_dbt_packages_mock.assert_called_once_with(project_dir, tmp_dir_path, env_vars=env)
+
+
+@pytest.mark.parametrize(
+    "invocation_mode, runner_attr, failed_result, expected_exception",
+    [
+        (
+            InvocationMode.SUBPROCESS,
+            "run_subprocess",
+            FullOutputSubprocessResult(exit_code=2, output="error", full_output=["error"]),
+            AirflowException,
+        ),
+        (
+            InvocationMode.DBT_RUNNER,
+            "run_dbt_runner",
+            MagicMock(success=False, exception=OSError("Cannot call rmtree on a symbolic link")),
+            CosmosDbtRunError,
+        ),
+    ],
+)
+def test_install_dependencies_raises_when_dbt_deps_fails(
+    invocation_mode, runner_attr, failed_result, expected_exception, tmp_path
+):
+    """A failed ``dbt deps`` must fail the task instead of letting the main command run with stale packages."""
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, invocation_mode=invocation_mode
+    )
+    with patch.object(DbtLocalBaseOperator, runner_attr, return_value=failed_result) as runner_mock:
+        with pytest.raises(expected_exception):
+            operator._install_dependencies(tmp_path, [], {})
+    assert runner_mock.call_args.kwargs["command"][1] == "deps"
+
+
+def test_install_dependencies_succeeds_when_dbt_deps_succeeds(tmp_path):
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir=DBT_PROJ_DIR,
+        invocation_mode=InvocationMode.SUBPROCESS,
+    )
+    ok_result = FullOutputSubprocessResult(exit_code=0, output="", full_output=[])
+    with patch.object(DbtLocalBaseOperator, "run_subprocess", return_value=ok_result) as runner_mock:
+        operator._install_dependencies(tmp_path, [], {})
+    runner_mock.assert_called_once()
+
+
+@patch("cosmos.config.ProfileConfig.ensure_profile")
+def test_run_command_resolves_packages_path_with_operator_env(mock_ensure_profile, tmp_path, monkeypatch):
+    """The temp project must not contain a symlink to the packages folder that ``dbt deps`` will recreate,
+    when ``packages-install-path`` depends on a variable that is only set in the operator ``env``."""
+    monkeypatch.delenv("dbt_packages_suffix", raising=False)
+    project_dir = tmp_path / "project"
+    (project_dir / "dbt_packages_RB").mkdir(parents=True)
+    (project_dir / "packages.yml").write_text("packages:\n  - package: dbt-labs/dbt_utils\n    version: 1.1.1\n")
+    (project_dir / "dbt_project.yml").write_text(
+        "name: project\n"
+        'packages-install-path: \'dbt_packages{{ "_" + env_var("dbt_packages_suffix","") '
+        'if env_var("dbt_packages_suffix","")!="" }}\'\n'
+    )
+    mock_ensure_profile.return_value.__enter__.return_value = (Path("/path/to/profile"), {})
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config,
+        task_id="my-task",
+        project_dir=project_dir,
+        install_deps=True,
+        emit_datasets=False,
+        invocation_mode=InvocationMode.SUBPROCESS,
+    )
+    packages_folder_was_symlinked = []
+
+    def fake_run_subprocess(command, env, cwd, **kwargs):
+        if command[1] == "deps":
+            packages_folder_was_symlinked.append(os.path.lexists(Path(cwd) / "dbt_packages_RB"))
+        return FullOutputSubprocessResult(exit_code=0, output="", full_output=[])
+
+    with (
+        patch.object(DbtLocalBaseOperator, "run_subprocess", side_effect=fake_run_subprocess),
+        patch.object(DbtLocalBaseOperator, "_handle_post_execution"),
+        patch.object(DbtLocalBaseOperator, "calculate_openlineage_events_completes", return_value=False),
+    ):
+        operator.run_command(
+            cmd=["dbt", "run"],
+            env={"dbt_packages_suffix": "RB"},
+            context={"run_id": "test_run_id", "task_instance": MagicMock()},
+        )
+
+    assert packages_folder_was_symlinked == [False]
 
 
 @patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")

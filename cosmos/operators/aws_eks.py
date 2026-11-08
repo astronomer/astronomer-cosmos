@@ -143,7 +143,7 @@ class DbtSnapshotAwsEksOperator(DbtAwsEksBaseOperator, DbtSnapshotKubernetesOper
         super().__init__(*args, **kwargs)
 
 
-class DbtSourceAzureContainerInstanceOperator(DbtAwsEksBaseOperator, DbtSourceKubernetesOperator):
+class DbtSourceAwsEksOperator(DbtAwsEksBaseOperator, DbtSourceKubernetesOperator):
     """
     Executes a dbt source freshness command.
     """

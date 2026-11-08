@@ -4,6 +4,7 @@ import pytest
 from airflow.exceptions import AirflowException
 from packaging.version import Version
 
+import cosmos
 from cosmos._utils.importer import load_method_from_module
 from cosmos.operators.aws_eks import (
     DbtBuildAwsEksOperator,
@@ -14,8 +15,6 @@ from cosmos.operators.aws_eks import (
     DbtSourceAwsEksOperator,
     DbtTestAwsEksOperator,
 )
-
-import cosmos
 
 
 @pytest.fixture()
@@ -169,9 +168,5 @@ def test_dbt_source_aws_eks_operator_is_publicly_exported():
 
     # Regression test for issue #3163 (no more DbtSourceAzureContainerInstanceOperator)
     assert not hasattr(
-        __import__(
-            "cosmos.operators.aws_eks",
-            fromlist=["x"]
-        ),
-        "DbtSourceAzureContainerInstanceOperator"
+        __import__("cosmos.operators.aws_eks", fromlist=["x"]), "DbtSourceAzureContainerInstanceOperator"
     )

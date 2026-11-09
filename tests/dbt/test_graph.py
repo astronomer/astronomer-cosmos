@@ -3046,7 +3046,22 @@ def test_dbt_ls_args(render_config, project_config, dbt_vars, expected_dbt_ls_ar
 def test_dbt_ls_cache_key_args_sorts_envvars():
     project_config = ProjectConfig(env_vars={11: "November", 12: "December", 5: "May"})
     graph = DbtGraph(project=project_config)
-    assert graph.dbt_ls_cache_key_args == ['{"5": "May", "11": "November", "12": "December"}']
+    assert graph.dbt_ls_cache_key_args == [
+        *graph.dbt_ls_output_args,
+        '{"5": "May", "11": "November", "12": "December"}',
+    ]
+
+
+@patch("cosmos.dbt.graph.settings")
+def test_dbt_ls_cache_key_args_changes_with_dbt_ls_output_keys(mock_settings):
+    mock_settings.pre_dbt_fusion = True
+    graph_with_default_keys = DbtGraph(
+        project=ProjectConfig(), render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.NONE)
+    )
+    graph_with_output_keys = DbtGraph(
+        project=ProjectConfig(), render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL)
+    )
+    assert graph_with_default_keys.dbt_ls_cache_key_args != graph_with_output_keys.dbt_ls_cache_key_args
 
 
 @patch("cosmos.dbt.graph.run_command")
@@ -3081,7 +3096,7 @@ def test_dbt_ls_cache_key_args_uses_airflow_vars_to_purge_dbt_ls_cache(airflow_v
             source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR,
         ),
     )
-    assert graph.dbt_ls_cache_key_args == [key, value]
+    assert graph.dbt_ls_cache_key_args == [*graph.dbt_ls_output_args, key, value]
 
 
 @pytest.mark.integration
@@ -3110,7 +3125,7 @@ def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir
     assert mock_variable_set.call_args[0][1]["last_modified"] == "2022-01-01T12:00:00"
     version = mock_variable_set.call_args[0][1].get("version")
     hash_dir, hash_args = version.split(",")
-    assert hash_args == "d41d8cd98f00b204e9800998ecf8427e"
+    assert hash_args == "88f09ee63edd34344108412d0f05f7d3"
     if sys.platform == "darwin":
         # macOS has historically produced a different directory hash than Linux; the hash below is the
         # Linux value, which recent macOS versions also produce. Adjust if a macOS release diverges again.

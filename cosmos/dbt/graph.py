@@ -640,7 +640,7 @@ class DbtGraph:
         executed and the new value will be stored.
         """
         # if dbt deps, we can consider the md5 of the packages or deps file
-        cache_args = list(self.dbt_ls_args)
+        cache_args = [*self.dbt_ls_output_args, *self.dbt_ls_args]
         env_vars = self.env_vars
         if env_vars:
             envvars_str = json.dumps(env_vars, sort_keys=True)
@@ -652,6 +652,40 @@ class DbtGraph:
 
         logger.debug("Value of `dbt_ls_cache_key_args` for <%s>: %s", self.cache_key, cache_args)
         return cache_args
+
+    @cached_property
+    def dbt_ls_output_args(self) -> list[str]:
+        """
+        Output flags set while running dbt ls. They define the keys of the dbt ls output, so this information is also
+        used to define the dbt ls cache key.
+        """
+        # dbt fusion 2.0.0b26 `dbt ls --output json` returns, by default, less keys than dbt-core 1.10.
+        # Default keys returned by dbt-core: ['name', 'resource_type', 'package_name', 'original_file_path', 'unique_id', 'alias', 'config', 'tags', 'depends_on']
+        # Default keys returned by dbt fusion: ['name', 'package_name', 'path', 'resource_type', 'unique_id']
+        # Users can force previous Cosmos behaviour by setting pre_dbt_fusion to True.
+        specify_output_keys = (
+            not settings.pre_dbt_fusion or self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE
+        )
+
+        if specify_output_keys:
+            return [
+                "--output",
+                "json",
+                "--output-keys",
+                "name",
+                "unique_id",
+                "resource_type",
+                "depends_on",
+                "original_file_path",
+                "tags",
+                "config",
+                "freshness",
+                "fqn",
+            ]
+        return [
+            "--output",
+            "json",
+        ]
 
     @cached_property
     def _yaml_selectors_airflow_vars(self) -> list[str]:
@@ -862,38 +896,7 @@ class DbtGraph:
     ) -> dict[str, DbtNode]:
         """Runs dbt ls command and returns the parsed nodes."""
 
-        # dbt fusion 2.0.0b26 `dbt ls --output json` returns, by default, less keys than dbt-core 1.10.
-        # Default keys returned by dbt-core: ['name', 'resource_type', 'package_name', 'original_file_path', 'unique_id', 'alias', 'config', 'tags', 'depends_on']
-        # Default keys returned by dbt fusion: ['name', 'package_name', 'path', 'resource_type', 'unique_id']
-        # Users can force previous Cosmos behaviour by setting pre_dbt_fusion to True.
-        specify_output_keys = (
-            not settings.pre_dbt_fusion or self.render_config.source_rendering_behavior != SourceRenderingBehavior.NONE
-        )
-
-        if specify_output_keys:
-            ls_command = [
-                dbt_cmd,
-                "ls",
-                "--output",
-                "json",
-                "--output-keys",
-                "name",
-                "unique_id",
-                "resource_type",
-                "depends_on",
-                "original_file_path",
-                "tags",
-                "config",
-                "freshness",
-                "fqn",
-            ]
-        else:
-            ls_command = [
-                dbt_cmd,
-                "ls",
-                "--output",
-                "json",
-            ]
+        ls_command = [dbt_cmd, "ls", *self.dbt_ls_output_args]
 
         ls_args = self.dbt_ls_args
         ls_command.extend(self.local_flags)

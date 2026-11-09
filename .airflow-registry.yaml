@@ -144,7 +144,7 @@ operators:
   - module: cosmos.operators.aws_eks.DbtSnapshotAwsEksOperator
     description: Run `dbt snapshot` in a pod on AWS EKS.
   - module: cosmos.operators.aws_eks.DbtSourceAwsEksOperator
-    description: Run `dbt source` in a pod on AWS EKS.
+    description: Run `dbt source freshness` in a pod on AWS EKS.
   - module: cosmos.operators.aws_eks.DbtTestAwsEksOperator
     description: Run `dbt test` in a pod on AWS EKS.
 

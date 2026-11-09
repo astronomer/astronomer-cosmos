@@ -1,3 +1,4 @@
+import importlib
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -7,6 +8,7 @@ from packaging.version import Version
 import cosmos
 from cosmos._utils.importer import load_method_from_module
 from cosmos.operators.aws_eks import (
+    DbtAwsEksBaseOperator,
     DbtBuildAwsEksOperator,
     DbtCloneAwsEksOperator,
     DbtLSAwsEksOperator,
@@ -15,6 +17,7 @@ from cosmos.operators.aws_eks import (
     DbtSourceAwsEksOperator,
     DbtTestAwsEksOperator,
 )
+from cosmos.operators.kubernetes import DbtSourceKubernetesOperator
 
 
 @pytest.fixture()
@@ -167,6 +170,21 @@ def test_dbt_source_aws_eks_operator_is_publicly_exported():
     assert load_method_from_module("cosmos.operators.aws_eks", "DbtSourceAwsEksOperator") is DbtSourceAwsEksOperator
 
     # Regression test for issue #3163 (no more DbtSourceAzureContainerInstanceOperator)
-    assert not hasattr(
-        __import__("cosmos.operators.aws_eks", fromlist=["x"]), "DbtSourceAzureContainerInstanceOperator"
+    eks_module = importlib.import_module("cosmos.operators.aws_eks")
+    assert not hasattr(eks_module, "DbtSourceAzureContainerInstanceOperator")
+
+
+def test_dbt_source_aws_eks_operator_template_fields():
+    assert DbtSourceAwsEksOperator.template_fields == (
+        DbtAwsEksBaseOperator.template_fields + DbtSourceKubernetesOperator.template_fields
     )
+
+
+def test_dbt_source_aws_eks_operator_registers_warning_callback():
+    """on_warning_callback must be wired through to the Kubernetes warning handler for EKS source operators."""
+    operator = DbtSourceAwsEksOperator(on_warning_callback=lambda *args, **kwargs: None, **base_kwargs)
+
+    # Validate that the on_warning_callback is passed through
+    assert operator.warning_handler is not None
+    callbacks = operator.callbacks if isinstance(operator.callbacks, list) else [operator.callbacks]
+    assert operator.warning_handler in callbacks

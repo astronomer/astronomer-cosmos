@@ -3049,6 +3049,41 @@ def test_dbt_ls_cache_key_args_sorts_envvars():
     assert graph.dbt_ls_cache_key_args == ['{"5": "May", "11": "November", "12": "December"}']
 
 
+def _profile_config(profile_name: str = "default", target_name: str = "dev") -> ProfileConfig:
+    return ProfileConfig(
+        profile_name=profile_name,
+        target_name=target_name,
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="example_conn",
+            profile_args={"schema": "public"},
+        ),
+    )
+
+
+def _contains_contiguous(args: list[str], sublist: list[str]) -> bool:
+    n = len(sublist)
+    return any(args[i : i + n] == sublist for i in range(len(args) - n + 1))
+
+
+def test_dbt_ls_cache_key_args_includes_profile_and_target():
+    """A target or profile change must invalidate the dbt ls cache (e.g. models enabled only in prod)."""
+    graph_dev = DbtGraph(project=ProjectConfig(), profile_config=_profile_config(target_name="dev"))
+    graph_prod = DbtGraph(project=ProjectConfig(), profile_config=_profile_config(target_name="prod"))
+    graph_dev_again = DbtGraph(project=ProjectConfig(), profile_config=_profile_config(target_name="dev"))
+    graph_other_profile = DbtGraph(
+        project=ProjectConfig(), profile_config=_profile_config(profile_name="other", target_name="dev")
+    )
+    graph_without_profile = DbtGraph(project=ProjectConfig())
+
+    assert _contains_contiguous(graph_dev.dbt_ls_cache_key_args, ["--profile", "default", "--target", "dev"])
+    assert _contains_contiguous(graph_prod.dbt_ls_cache_key_args, ["--profile", "default", "--target", "prod"])
+    assert graph_dev.dbt_ls_cache_key_args == graph_dev_again.dbt_ls_cache_key_args
+    assert graph_dev.dbt_ls_cache_key_args != graph_prod.dbt_ls_cache_key_args
+    assert graph_dev.dbt_ls_cache_key_args != graph_other_profile.dbt_ls_cache_key_args
+    assert "--profile" not in graph_without_profile.dbt_ls_cache_key_args
+    assert "--target" not in graph_without_profile.dbt_ls_cache_key_args
+
+
 @patch("cosmos.dbt.graph.run_command")
 def test_run_dbt_deps(run_command_mock):
     project_config = ProjectConfig()

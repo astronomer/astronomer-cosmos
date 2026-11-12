@@ -83,6 +83,7 @@ _LAZY_IMPORTS: dict[str, str] = {
     "DbtSeedAwsEksOperator": "cosmos.operators.aws_eks",
     "DbtSemanticMetricViewAwsEksOperator": "cosmos.operators.aws_eks",
     "DbtSnapshotAwsEksOperator": "cosmos.operators.aws_eks",
+    "DbtSourceAwsEksOperator": "cosmos.operators.aws_eks",
     "DbtTestAwsEksOperator": "cosmos.operators.aws_eks",
     # AWS ECS
     "DbtBuildAwsEcsOperator": "cosmos.operators.aws_ecs",
@@ -158,6 +159,7 @@ if TYPE_CHECKING:
     from cosmos.operators.aws_eks import DbtSeedAwsEksOperator as DbtSeedAwsEksOperator
     from cosmos.operators.aws_eks import DbtSemanticMetricViewAwsEksOperator as DbtSemanticMetricViewAwsEksOperator
     from cosmos.operators.aws_eks import DbtSnapshotAwsEksOperator as DbtSnapshotAwsEksOperator
+    from cosmos.operators.aws_eks import DbtSourceAwsEksOperator as DbtSourceAwsEksOperator
     from cosmos.operators.aws_eks import DbtTestAwsEksOperator as DbtTestAwsEksOperator
     from cosmos.operators.azure_container_instance import (
         DbtBuildAzureContainerInstanceOperator as DbtBuildAzureContainerInstanceOperator,

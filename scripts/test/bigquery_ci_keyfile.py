@@ -15,19 +15,11 @@ import os
 import sys
 from pathlib import Path
 
-from airflow.models.connection import Connection
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
-
-def keyfile() -> dict:
-    raw = os.environ["AIRFLOW_CONN_GCP_GS_CONN"]
-    conn = Connection.from_json(raw) if raw.lstrip().startswith("{") else Connection(uri=raw)
-    extra = conn.extra_dejson
-    key = extra.get("keyfile_dict") or extra.get("extra__google_cloud_platform__keyfile_dict")
-    if isinstance(key, str):
-        key = json.loads(key)
-    if not key:
-        raise SystemExit("AIRFLOW_CONN_GCP_GS_CONN has no keyfile_dict")
-    return dict(key)
+from bigquery_ci_common import keyfile
 
 
 def main(argv: list[str]) -> int:

@@ -169,7 +169,6 @@ def test_dbt_source_aws_eks_operator_is_publicly_exported():
     assert cosmos.DbtSourceAwsEksOperator is DbtSourceAwsEksOperator
     assert load_method_from_module("cosmos.operators.aws_eks", "DbtSourceAwsEksOperator") is DbtSourceAwsEksOperator
 
-    # Regression test for issue #3163 (no more DbtSourceAzureContainerInstanceOperator)
     eks_module = importlib.import_module("cosmos.operators.aws_eks")
     assert not hasattr(eks_module, "DbtSourceAzureContainerInstanceOperator")
 

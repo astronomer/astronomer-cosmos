@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 import shutil
 import sys
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import yaml
 from jinja2 import Environment
@@ -54,10 +55,12 @@ def has_non_empty_dependencies_file(project_path: Path) -> bool:
     return False
 
 
-def _render_env_var(template_str: str, environment: Environment) -> str:
-    """Render a Jinja string with dbt's ``env_var`` function."""
+def _render_env_var(template_str: str, environment: Environment, env_vars: Mapping[str, Any] | None = None) -> str:
+    """Render a Jinja string with dbt's ``env_var`` function, looking up ``env_vars`` before ``os.environ``."""
 
     def env_var(name: str, default: str = "") -> str:
+        if env_vars and name in env_vars:
+            return str(env_vars[name])
         return os.getenv(name, default)
 
     template = environment.from_string(template_str)
@@ -65,7 +68,7 @@ def _render_env_var(template_str: str, environment: Environment) -> str:
     return rendered
 
 
-def _resolve_env_var(template_str: str) -> str:
+def _resolve_env_var(template_str: str, env_vars: Mapping[str, Any] | None = None) -> str:
     """
     Given a Jinja template string, resolve the environment variables, declared using the dbt syntax,
     and return the rendered string.
@@ -76,9 +79,12 @@ def _resolve_env_var(template_str: str) -> str:
 
     Then, the rendered string will be:
     '/usr/local/airflow/dags/dbt/dbt_packages_test'
+
+    Values in ``env_vars`` take precedence over ``os.environ``, so the result matches what dbt resolves when it
+    runs with those environment variables.
     """
 
-    return _render_env_var(template_str, _JINJA_ENV)
+    return _render_env_var(template_str, _JINJA_ENV, env_vars)
 
 
 def _resolve_profiles_yml_env_var(template_str: str) -> str:
@@ -87,7 +93,7 @@ def _resolve_profiles_yml_env_var(template_str: str) -> str:
     return _render_env_var(template_str, _PROFILES_JINJA_ENV)
 
 
-def get_dbt_packages_subpath(source_folder: Path) -> str:
+def get_dbt_packages_subpath(source_folder: Path, env_vars: Mapping[str, Any] | None = None) -> str:
     """
     Return the dbt project's package installation sub path.
 
@@ -99,6 +105,7 @@ def get_dbt_packages_subpath(source_folder: Path) -> str:
     https://docs.getdbt.com/reference/project-configs/packages-install-path
 
     :param source_folder: The dbt project root directory
+    :param env_vars: Environment variables dbt will run with, used to resolve ``env_var`` in the path
     :returns: A string containing the dbt_packages subpath within the source folder.
     """
     subpath = DBT_DEFAULT_PACKAGES_FOLDER
@@ -112,19 +119,20 @@ def get_dbt_packages_subpath(source_folder: Path) -> str:
             else:
                 if isinstance(dbt_project_file_content, dict):
                     subpath = dbt_project_file_content.get("packages-install-path", DBT_DEFAULT_PACKAGES_FOLDER)
-    return _resolve_env_var(subpath)
+    return _resolve_env_var(subpath, env_vars)
 
 
-def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:
+def copy_dbt_packages(source_folder: Path, target_folder: Path, env_vars: Mapping[str, Any] | None = None) -> None:
     """
     Copies the dbt packages related files and directories from source_folder to target_folder.
 
     :param source_folder: The base directory where paths are sourced from.
     :param target_folder: The directory where paths will be copied to.
+    :param env_vars: Environment variables dbt will run with, used to resolve ``packages-install-path``.
     """
     logger.info("Copying dbt packages to temporary folder...")
 
-    dbt_packages_folder = get_dbt_packages_subpath(source_folder)
+    dbt_packages_folder = get_dbt_packages_subpath(source_folder, env_vars)
     dbt_packages_paths = [dbt_packages_folder, PACKAGE_LOCKFILE_YML]
 
     for relative_path in dbt_packages_paths:
@@ -191,11 +199,13 @@ def dbt_project_path_bundle_hint(project_path: Path | str | None) -> str:
     )
 
 
-def create_symlinks(project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool) -> None:
+def create_symlinks(
+    project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool, env_vars: Mapping[str, Any] | None = None
+) -> None:
     """Helper function to create symlinks to the dbt project files."""
     ignore_paths = [DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, PACKAGE_LOCKFILE_YML, "profiles.yml"]
     if ignore_dbt_packages:
-        dbt_packages_subpath = get_dbt_packages_subpath(project_path)
+        dbt_packages_subpath = get_dbt_packages_subpath(project_path, env_vars)
         # this is linked to dbt deps so if dbt deps is true then ignore existing dbt_packages folder
         ignore_paths.append(dbt_packages_subpath)
     try:

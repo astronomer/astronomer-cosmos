@@ -1019,10 +1019,15 @@ class DbtGraph:
         # C. (Non-practical) Middle performance and deps may become outdated: Users manage `dbt deps` outside of Cosmos and give pre-generated dbt packages. Dependencies may become outdated. More expensive than A, similar behaviour.
         # D. Middle performance and up-to-date deps: Users run `dbt deps` outside of Cosmos and give pre-generated dbt packages. Cosmos runs dbt deps taking into account those user-generated files.
 
-        create_symlinks(source_dir_path, dest_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link)
+        create_symlinks(
+            source_dir_path,
+            dest_dir_path,
+            ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link,
+            env_vars=self.env_vars,
+        )
 
         if self.project.copy_dbt_packages:
-            copy_dbt_packages(source_dir_path, dest_dir_path)
+            copy_dbt_packages(source_dir_path, dest_dir_path, env_vars=self.env_vars)
 
     def load_via_dbt_ls_without_cache(self) -> None:
         """
@@ -1365,7 +1370,7 @@ class DbtGraph:
     def _load_nodes_from_manifest_data(self, manifest: dict[str, Any], project_path: Path) -> dict[str, DbtNode]:
         """Build a nodes dict from manifest resources (nodes, sources, exposures)."""
         resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
-        packages_subpath = get_dbt_packages_subpath(project_path)
+        packages_subpath = get_dbt_packages_subpath(project_path, self.env_vars)
         manifest_metadata = manifest.get("metadata")
         manifest_project_name = manifest_metadata.get("project_name") if isinstance(manifest_metadata, dict) else None
         nodes: dict[str, DbtNode] = {}

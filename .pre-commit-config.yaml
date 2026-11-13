@@ -92,7 +92,7 @@ repos:
           - --py311-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 25bcf95026b96e2dd3c0aec3090c3d6ef6ca2e6c  # v0.17.3
+    rev: c0f278f1254ccc8fb09676bcdb8d847e7db493e5  # v0.17.4
     hooks:
       - id: ruff-check
         args: [ --fix ]
@@ -108,7 +108,7 @@ repos:
         alias: black
         additional_dependencies: [black==26.10.1]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 2834ec6639549dd6796205c8f011dedcd587288b  # v2.4.0
+    rev: ad26ebfa797fcb9b8f83275937c1c1d6e126719c  # v2.4.1
     hooks:
       - id: mypy
         name: mypy-python

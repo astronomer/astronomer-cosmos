@@ -8,6 +8,14 @@ Breaking Changes
 
 * ``DbtSourceAzureContainerInstanceOperator`` has been removed from ``cosmos.operators.aws_eks``, where it was a misnamed copy of the AWS EKS source freshness operator, so importing it from there now raises ``ImportError``. Use ``DbtSourceAwsEksOperator`` instead, which is now also available as ``cosmos.DbtSourceAwsEksOperator`` and fixes ``ExecutionMode.AWS_EKS`` failing to render dbt ``source`` nodes. The real ``DbtSourceAzureContainerInstanceOperator`` in ``cosmos.operators.azure_container_instance`` is unchanged. See #3163.
 
+Behaviour Changes
+
+* A failed ``dbt deps`` at task execution time now fails the task. Previously Cosmos only logged the failure and ran the dbt command with whatever packages were already in the project, so the task could succeed with outdated packages. This applies to every ``dbt deps`` failure and ignores ``skip_exit_code``, which only applies to the dbt command. **If your workers cannot reach the package sources and you ship pre-installed packages, set** ``install_dbt_deps=False`` **on** ``ProjectConfig`` **or** ``ExecutionConfig`` **so Cosmos uses them instead of running** ``dbt deps``. See #3172.
+
+Bug Fixes
+
+* Cosmos now resolves ``env_var()`` in the ``packages-install-path`` of ``dbt_project.yml`` with ``ProjectConfig.env_vars`` and the operator ``env`` before the worker environment, as dbt does. Previously a path that depended on a variable set only there was resolved to the wrong folder, so Cosmos symlinked the real packages folder into the temporary project and ``dbt deps`` failed with ``Cannot call rmtree on a symbolic link``. See #3172.
+
 1.16.0 (2026-11-03)
 -------------------
 

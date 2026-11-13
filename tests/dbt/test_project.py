@@ -173,6 +173,14 @@ def test_get_dbt_packages_subpath_env_vars_take_precedence_over_os_environ(tmpdi
     assert get_dbt_packages_subpath(tmpdir) == "dbt_packages_worker"
 
 
+def test_get_dbt_packages_subpath_stringifies_env_vars_values(tmpdir, monkeypatch):
+    """dbt only sees strings, so a non-string ``env_vars`` value resolves the same way in every load path."""
+    monkeypatch.delenv("dbt_packages_suffix", raising=False)
+    write_dbt_project_yml(tmpdir, {"packages-install-path": SUFFIXED_PACKAGES_PATH})
+
+    assert get_dbt_packages_subpath(tmpdir, {"dbt_packages_suffix": 2}) == "dbt_packages_2"
+
+
 def test_resolve_env_var_falls_back_to_default_when_missing_from_env_vars(monkeypatch):
     monkeypatch.delenv("NONEXISTENT_VAR", raising=False)
     assert _resolve_env_var('{{ env_var("NONEXISTENT_VAR", "default_path") }}', {}) == "default_path"

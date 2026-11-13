@@ -6,6 +6,7 @@ import sys
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import yaml
 from jinja2 import Environment
@@ -54,12 +55,12 @@ def has_non_empty_dependencies_file(project_path: Path) -> bool:
     return False
 
 
-def _render_env_var(template_str: str, environment: Environment, env_vars: Mapping[str, str] | None = None) -> str:
+def _render_env_var(template_str: str, environment: Environment, env_vars: Mapping[str, Any] | None = None) -> str:
     """Render a Jinja string with dbt's ``env_var`` function, looking up ``env_vars`` before ``os.environ``."""
 
     def env_var(name: str, default: str = "") -> str:
         if env_vars and name in env_vars:
-            return env_vars[name]
+            return str(env_vars[name])
         return os.getenv(name, default)
 
     template = environment.from_string(template_str)
@@ -67,7 +68,7 @@ def _render_env_var(template_str: str, environment: Environment, env_vars: Mappi
     return rendered
 
 
-def _resolve_env_var(template_str: str, env_vars: Mapping[str, str] | None = None) -> str:
+def _resolve_env_var(template_str: str, env_vars: Mapping[str, Any] | None = None) -> str:
     """
     Given a Jinja template string, resolve the environment variables, declared using the dbt syntax,
     and return the rendered string.
@@ -92,7 +93,7 @@ def _resolve_profiles_yml_env_var(template_str: str) -> str:
     return _render_env_var(template_str, _PROFILES_JINJA_ENV)
 
 
-def get_dbt_packages_subpath(source_folder: Path, env_vars: Mapping[str, str] | None = None) -> str:
+def get_dbt_packages_subpath(source_folder: Path, env_vars: Mapping[str, Any] | None = None) -> str:
     """
     Return the dbt project's package installation sub path.
 
@@ -121,7 +122,7 @@ def get_dbt_packages_subpath(source_folder: Path, env_vars: Mapping[str, str] | 
     return _resolve_env_var(subpath, env_vars)
 
 
-def copy_dbt_packages(source_folder: Path, target_folder: Path, env_vars: Mapping[str, str] | None = None) -> None:
+def copy_dbt_packages(source_folder: Path, target_folder: Path, env_vars: Mapping[str, Any] | None = None) -> None:
     """
     Copies the dbt packages related files and directories from source_folder to target_folder.
 
@@ -199,7 +200,7 @@ def dbt_project_path_bundle_hint(project_path: Path | str | None) -> str:
 
 
 def create_symlinks(
-    project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool, env_vars: Mapping[str, str] | None = None
+    project_path: Path, tmp_dir: Path, ignore_dbt_packages: bool, env_vars: Mapping[str, Any] | None = None
 ) -> None:
     """Helper function to create symlinks to the dbt project files."""
     ignore_paths = [DBT_LOG_DIR_NAME, DBT_TARGET_DIR_NAME, PACKAGE_LOCKFILE_YML, "profiles.yml"]

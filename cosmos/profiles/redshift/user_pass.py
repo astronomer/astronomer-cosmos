@@ -36,6 +36,7 @@ class RedshiftUserPasswordProfileMapping(BaseProfileMapping):
         "timeout": "extra.timeout",
         "sslmode": "extra.sslmode",
         "region": "extra.region",
+        "connect_timeout": "extra.timeout",
     }
 
     @property

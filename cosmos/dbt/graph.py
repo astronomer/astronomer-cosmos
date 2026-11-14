@@ -531,6 +531,49 @@ def _build_dbt_node_from_manifest_resource(
     )
 
 
+def _find_nearest_selected_ancestors(
+    graph: dict[str, DbtNode], selected_ids: set[str], start_ids: set[str]
+) -> dict[str, set[str]]:
+    """
+    Map each node in ``start_ids`` to the closest ancestors reachable through unselected
+    nodes that are in ``selected_ids``. Unselected test nodes are dead ends: ordering must
+    not be routed through them.
+    """
+    resolved: dict[str, set[str]] = {}
+
+    def resolve(start_id: str) -> set[str]:
+        # Iterative post-order DFS so deep lineages do not hit the recursion limit
+        stack: list[tuple[str, bool]] = [(start_id, False)]
+        visiting: set[str] = set()
+        while stack:
+            node_id, expanded = stack.pop()
+            if node_id in selected_ids:
+                resolved[node_id] = {node_id}
+                continue
+            if node_id in resolved:
+                continue
+            node = graph.get(node_id)
+            if node is None or node.resource_type == DbtResourceType.TEST:
+                resolved[node_id] = set()
+                continue
+            if expanded:
+                ancestors: set[str] = set()
+                for parent_id in node.depends_on:
+                    ancestors |= resolved.get(parent_id, set())
+                resolved[node_id] = ancestors
+                visiting.discard(node_id)
+            elif node_id in visiting:
+                # dbt rejects cyclic graphs, but guard so a malformed manifest cannot hang parsing
+                resolved[node_id] = set()
+            else:
+                visiting.add(node_id)
+                stack.append((node_id, True))
+                stack.extend((parent_id, False) for parent_id in node.depends_on if parent_id not in resolved)
+        return resolved.get(start_id, set())
+
+    return {start_id: resolve(start_id) for start_id in start_ids}
+
+
 class DbtGraph:
     """
     A dbt project graph (represented by `nodes` and `filtered_nodes`).
@@ -579,6 +622,8 @@ class DbtGraph:
         self.dbt_vars = dbt_vars or {}
         self.operator_args = operator_args or {}
         self.log_dir: Path | None = None
+        # Full graph loaded via an extra unfiltered `dbt ls` when the selection left holes
+        self.unfiltered_nodes: dict[str, DbtNode] | None = None
         self.should_install_dbt_deps = (
             self.render_config.dbt_deps if isinstance(self.render_config.dbt_deps, bool) else True
         )
@@ -611,27 +656,32 @@ class DbtGraph:
         if self.dbt_vars:
             cmd_args.extend(["--vars", json.dumps(self.dbt_vars, sort_keys=True)])
 
-    @cached_property
-    def dbt_ls_args(self) -> list[str]:
-        """
-        Flags set while running dbt ls. This information is also used to define the dbt ls cache key.
-        """
+    def _dbt_ls_args(self, include_selection: bool) -> list[str]:
+        """Flags set while running dbt ls, optionally without the select/exclude filters."""
         ls_args = []
-        if self.render_config.exclude:
-            ls_args.extend(["--exclude", *self.render_config.exclude])
+        if include_selection:
+            if self.render_config.exclude:
+                ls_args.extend(["--exclude", *self.render_config.exclude])
 
-        if self.render_config.select:
-            ls_args.extend(["--select", *self.render_config.select])
+            if self.render_config.select:
+                ls_args.extend(["--select", *self.render_config.select])
 
         self._add_vars_arg(ls_args)
 
-        if self.render_config.selector:
+        if include_selection and self.render_config.selector:
             ls_args.extend(["--selector", self.render_config.selector])
 
         if not self.project.partial_parse:
             ls_args.append("--no-partial-parse")
 
         return ls_args
+
+    @cached_property
+    def dbt_ls_args(self) -> list[str]:
+        """
+        Flags set while running dbt ls. This information is also used to define the dbt ls cache key.
+        """
+        return self._dbt_ls_args(include_selection=True)
 
     @cached_property
     def dbt_ls_cache_key_args(self) -> list[str]:
@@ -830,6 +880,7 @@ class DbtGraph:
         There is automatic, and manual.
         """
         self.excluded_node_ids = set()
+        self.unfiltered_nodes = None
         load_method = {
             LoadMode.CUSTOM: self.load_via_custom_parser,
             LoadMode.DBT_LS: self.load_via_dbt_ls,
@@ -852,15 +903,23 @@ class DbtGraph:
         else:
             load_method[method]()
 
+        self.bridge_filtered_dependencies()
+        # Build reverse dependencies from the final, bridged graph.
         self.update_node_dependency()
 
         logger.info("Total nodes: %i", len(self.nodes))
         logger.info("Total filtered nodes: %i", len(self.filtered_nodes))
 
     def run_dbt_ls(
-        self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str]
+        self, dbt_cmd: str, project_path: Path, tmp_dir: Path, env_vars: dict[str, str], include_selection: bool = True
     ) -> dict[str, DbtNode]:
-        """Runs dbt ls command and returns the parsed nodes."""
+        """Runs dbt ls command and returns the parsed nodes.
+
+        When ``include_selection`` is False the select/exclude filters are left out, so the
+        command returns every node in the project. Used to restore ordering across excluded
+        nodes; the unfiltered output is never written to the dbt ls cache, which is keyed
+        on the selection arguments.
+        """
 
         # dbt fusion 2.0.0b26 `dbt ls --output json` returns, by default, less keys than dbt-core 1.10.
         # Default keys returned by dbt-core: ['name', 'resource_type', 'package_name', 'original_file_path', 'unique_id', 'alias', 'config', 'tags', 'depends_on']
@@ -895,13 +954,13 @@ class DbtGraph:
                 "json",
             ]
 
-        ls_args = self.dbt_ls_args
+        ls_args = self._dbt_ls_args(include_selection)
         ls_command.extend(self.local_flags)
         ls_command.extend(ls_args)
 
         stdout = run_command(ls_command, tmp_dir, env_vars, self.render_config.invocation_mode, self.log_dir)
 
-        if self.should_use_dbt_ls_cache():
+        if include_selection and self.should_use_dbt_ls_cache():
             self.save_dbt_ls_cache(stdout)
 
         nodes = parse_dbt_ls_output(project_path, stdout)
@@ -909,7 +968,20 @@ class DbtGraph:
 
     def load_via_dbt_ls(self) -> None:
         """Retrieve the dbt ls cache if enabled and available or run dbt ls"""
-        if not self.load_via_dbt_ls_cache():
+        if self.load_via_dbt_ls_cache():
+            if self._has_unrendered_model_ancestors():
+                # The cached output only holds the selected nodes, so ordering across excluded
+                # nodes cannot be restored from it. Load live to recover those edges.
+                if self.profile_config:
+                    logger.info("Reloading the project with dbt ls to restore dependencies across excluded nodes...")
+                    self.load_via_dbt_ls_without_cache()
+                else:
+                    logger.warning(
+                        "Some selected nodes depend on excluded models, seeds or snapshots, but their "
+                        "ordering cannot be restored from the dbt ls cache alone. Parsing may produce "
+                        "incomplete task dependencies."
+                    )
+        else:
             self.load_via_dbt_ls_without_cache()
 
     @functools.lru_cache
@@ -1097,6 +1169,7 @@ class DbtGraph:
                 nodes = self.run_dbt_ls(dbt_cmd, self.project_path, tmpdir_path, env)
                 self.nodes = nodes
                 self.filtered_nodes = nodes
+                self._load_unfiltered_nodes_if_selection_gaps(dbt_cmd, tmpdir_path, env)
 
             if self.should_use_partial_parse_cache():
                 partial_parse_file = get_partial_parse_path(tmpdir_path)
@@ -1484,6 +1557,72 @@ class DbtGraph:
         project_path = self.execution_config.project_path
         nodes = self._load_nodes_from_manifest_data(manifest, project_path)
         self._apply_manifest_node_selection(nodes, manifest)
+
+    def _load_unfiltered_nodes_via_dbt_ls(self, dbt_cmd: str, tmp_dir: Path, env: dict[str, str]) -> None:
+        # dbt ls already applied the selection, so excluded nodes and their parents are
+        # invisible in `nodes`. Fetch the full graph once so the gaps can be bridged.
+        logger.info(
+            "Some selected nodes depend on excluded models, seeds or snapshots; "
+            "running an extra unfiltered dbt ls to restore their ordering..."
+        )
+        self.unfiltered_nodes = self.run_dbt_ls(dbt_cmd, self.project_path, tmp_dir, env, include_selection=False)
+
+    def _load_unfiltered_nodes_if_selection_gaps(self, dbt_cmd: str, tmp_dir: Path, env: dict[str, str]) -> None:
+        if self._has_unrendered_model_ancestors():
+            self._load_unfiltered_nodes_via_dbt_ls(dbt_cmd, tmp_dir, env)
+
+    def _has_unrendered_model_ancestors(self) -> bool:
+        """True when a rendered non-test node depends on an unrendered model, seed or snapshot.
+
+        Sources are ignored on purpose: `dbt ls` never lists them, so their absence is
+        expected rather than a selection gap.
+        """
+        for node in self.filtered_nodes.values():
+            if node.resource_type == DbtResourceType.TEST:
+                continue
+            for parent_id in node.depends_on:
+                if parent_id not in self.filtered_nodes and parent_id.split(".", 1)[0] in ("model", "seed", "snapshot"):
+                    return True
+        return False
+
+    def bridge_filtered_dependencies(self) -> None:
+        """
+        Rewire rendered nodes to their nearest rendered ancestors.
+
+        When select/exclude removes a node that sits between two rendered nodes, the
+        rendered subgraph loses the ordering between the two. For every rendered non-test
+        node, replace each unrendered parent by the closest rendered ancestors reachable
+        through it, so the Airflow tasks keep the ordering dbt enforces. Unrendered
+        parents that do not lead to any rendered ancestor (e.g. sources) are kept as-is,
+        and test nodes keep their own ``depends_on``.
+        """
+        graph = self.unfiltered_nodes or self.nodes
+        selected_ids = set(self.filtered_nodes)
+        unrendered_parent_ids = {
+            parent_id
+            for node in self.filtered_nodes.values()
+            if node.resource_type != DbtResourceType.TEST
+            for parent_id in node.depends_on
+            if parent_id not in selected_ids
+        }
+        if not unrendered_parent_ids:
+            return
+
+        nearest = _find_nearest_selected_ancestors(graph, selected_ids, unrendered_parent_ids)
+        for node in self.filtered_nodes.values():
+            if node.resource_type == DbtResourceType.TEST:
+                continue
+            bridged_depends_on: list[str] = []
+            for parent_id in node.depends_on:
+                if parent_id in selected_ids:
+                    bridged_depends_on.append(parent_id)
+                    continue
+                ancestors = nearest.get(parent_id)
+                if ancestors:
+                    bridged_depends_on.extend(sorted(ancestors))
+                else:
+                    bridged_depends_on.append(parent_id)
+            node.depends_on = list(dict.fromkeys(bridged_depends_on))
 
     def update_node_dependency(self) -> None:
         """

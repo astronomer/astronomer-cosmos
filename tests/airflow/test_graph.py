@@ -36,7 +36,7 @@ from cosmos.airflow.graph import (
     exclude_detached_tests_if_needed,
     generate_task_or_group,
 )
-from cosmos.config import ProfileConfig, RenderConfig
+from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     SUPPORTED_BUILD_RESOURCES,
     DbtResourceType,
@@ -47,7 +47,7 @@ from cosmos.constants import (
     TestIndirectSelection,
 )
 from cosmos.converter import airflow_kwargs
-from cosmos.dbt.graph import DbtNode
+from cosmos.dbt.graph import DbtGraph, DbtNode, LoadMode
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators.local import (
     DbtBuildLocalOperator,
@@ -3477,3 +3477,55 @@ def test_test_node_operator_kwargs_do_not_apply_to_after_all_test_task():
         )
     assert dag.task_dict["my_model_run"].retries == 2
     assert dag.task_dict["astro_shop_test"].retries == 3
+
+
+@pytest.mark.integration
+def test_build_airflow_graph_restores_ordering_across_excluded_nodes(hierarchical_naming_disabled):
+    """Regression test for #3151: with the stg_* models excluded, the rendered seed tasks
+    must still be wired upstream of the models that (transitively) depend on them."""
+    manifest_path = Path(__file__).parent.parent / "sample/manifest.json"
+    dbt_project_path = Path(__file__).parent.parent.parent / "dev/dags/dbt/jaffle_shop"
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(dbt_project_path=dbt_project_path, manifest_path=manifest_path),
+        execution_config=ExecutionConfig(dbt_project_path=dbt_project_path),
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profiles_yml_filepath=dbt_project_path / "profiles.yml",
+        ),
+        render_config=RenderConfig(select=["resource_type:seed", "tag:test_tag"]),
+    )
+    dbt_graph.load(method=LoadMode.DBT_MANIFEST)
+
+    with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
+        task_args = {
+            "project_dir": dbt_project_path,
+            "conn_id": "fake_conn",
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        }
+        build_airflow_graph(
+            nodes=dbt_graph.filtered_nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args=task_args,
+            render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+            dbt_project_name="jaffle_shop",
+        )
+
+    assert {t.task_id for t in dag.task_dict["orders_run"].upstream_list} == {
+        "raw_orders_seed",
+        "raw_payments_seed",
+    }
+    assert {t.task_id for t in dag.task_dict["customers_run"].upstream_list} == {
+        "raw_customers_seed",
+        "raw_orders_seed",
+        "raw_payments_seed",
+    }

@@ -28,3 +28,27 @@ updates:
       - "dependencies"
     reviewers:
       - "@astronomer/oss-integrations"
+
+  # Pinned test lockfiles (requirements/requirements-airflow-*-dbt-*.txt). These only build the CI/test
+  # environments and are not shipped with the package, but stale pins here are the source of most of the
+  # repository's Dependabot alerts. Dependabot bumps single pins and does not resolve the whole set, so
+  # treat these PRs as a starting point and let CI confirm the combination installs.
+  - package-ecosystem: "pip"
+    directory: "/requirements"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    # One PR per run instead of one per package per file.
+    groups:
+      test-lockfiles:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    reviewers:
+      - "@astronomer/oss-integrations"

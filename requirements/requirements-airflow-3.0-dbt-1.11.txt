@@ -250,7 +250,7 @@ lz4==4.4.5
 mako==1.4.3
 markdown-it-py==3.0.0
 markupsafe==3.0.2
-marshmallow==4.4.0
+marshmallow==3.26.1
 marshmallow-sqlalchemy==0.28.2
 mashumaro==3.14
 mdurl==0.1.2

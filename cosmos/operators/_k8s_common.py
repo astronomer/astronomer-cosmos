@@ -27,7 +27,6 @@ except ImportError:
 
 from cosmos.airflow._override import CosmosKubernetesPodManager
 from cosmos.airflow.compatibility import AirflowSkipException
-from cosmos.config import ProfileConfig
 from cosmos.constants import _PRODUCER_CMD_FLAGS_XCOM_KEY, PRODUCER_WATCHER_TASK_ID
 from cosmos.operators._watcher import safe_xcom_push
 from cosmos.operators._watcher.xcom import (
@@ -69,7 +68,6 @@ except ImportError:
 
 # The 2 classes below are an attempt at type hinting the operators. Not perfect but workable.
 class K8sOperatorProtocol(Protocol):
-    profile_config: ProfileConfig
     env_vars: list[k8s.V1EnvVar]
     cmds: list[str]
     arguments: list[str]
@@ -163,13 +161,7 @@ def build_kube_args(operator: DbtK8sOperator, context: Context, cmd_flags: list[
     # to add that in the future
     operator.dbt_executable_path = "dbt"
     dbt_cmd, env_vars = operator.build_cmd(context=context, cmd_flags=cmd_flags)
-
-    # Parse ProfileConfig and add additional arguments to the dbt_cmd
-    if operator.profile_config:
-        if operator.profile_config.profile_name:
-            dbt_cmd.extend(["--profile", operator.profile_config.profile_name])
-        if operator.profile_config.target_name:
-            dbt_cmd.extend(["--target", operator.profile_config.target_name])
+    dbt_cmd.extend(operator.add_profile_flags())
 
     if operator.project_dir:
         dbt_cmd.extend(["--project-dir", str(operator.project_dir)])

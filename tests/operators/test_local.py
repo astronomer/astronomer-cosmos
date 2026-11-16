@@ -3862,3 +3862,30 @@ def test_render_template_fields_keeps_conn_id_a_string_with_native_rendering(con
     operator.render_template_fields({"params": {"conn_id": conn_id}})
 
     assert operator.profile_config.profile_mapping.conn_id == conn_id
+
+
+def test_mapped_task_renders_templated_conn_id():
+    with DAG("test-mapped-conn-id", start_date=datetime(2024, 1, 1), params={"conn_id": "rendered_conn"}) as dag:
+        mapped_operator = DbtRunLocalOperator.partial(
+            task_id="run",
+            project_dir="my/dir",
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="{{ params.conn_id }}",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        ).expand(select=["model_a", "model_b"])
+    context = {
+        "ti": MagicMock(map_index=1),
+        "dag": dag,
+        "dag_run": MagicMock(conf={}),
+        "params": dag.params,
+        "run_id": "manual__test",
+    }
+
+    mapped_operator.render_template_fields(context)
+
+    assert context["task"].profile_config.profile_mapping.conn_id == "rendered_conn"

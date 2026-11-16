@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import time
 import zlib
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -153,10 +153,18 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             AbstractDbtLocalBase,
         )
 
-    def render_template_fields(self, context: Context, jinja_env: jinja2.Environment | None = None) -> None:
-        super().render_template_fields(context, jinja_env)
-        self.profile_config = render_templated_conn_id(self, self.profile_config, context)
-        self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore[union-attr]
+    def _do_render_template_fields(
+        self,
+        parent: Any,
+        template_fields: Iterable[str],
+        context: Context,
+        jinja_env: jinja2.Environment,
+        seen_oids: set[int],
+    ) -> None:
+        super()._do_render_template_fields(parent, template_fields, context, jinja_env, seen_oids)
+        if parent is self:
+            self.profile_config = render_templated_conn_id(self, self.profile_config, context)
+            self.gcp_conn_id = self.profile_config.profile_mapping.conn_id
 
     @property
     def base_cmd(self) -> list[str]:

@@ -10,7 +10,7 @@ import time
 import warnings
 import zlib
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
 from functools import cached_property
 from importlib.metadata import PackageNotFoundError, version
@@ -1175,9 +1175,17 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
             operator_kwargs.pop("task_id")
         BaseOperator.__init__(self, task_id=self.task_id, **operator_kwargs)
 
-    def render_template_fields(self, context: Context, jinja_env: jinja2.Environment | None = None) -> None:
-        super().render_template_fields(context, jinja_env)
-        if self.profile_config is not None:
+    def _do_render_template_fields(
+        self,
+        parent: Any,
+        template_fields: Iterable[str],
+        context: Context,
+        jinja_env: jinja2.Environment,
+        seen_oids: set[int],
+    ) -> None:
+        # Mapped tasks render through this method, not through render_template_fields.
+        super()._do_render_template_fields(parent, template_fields, context, jinja_env, seen_oids)
+        if parent is self and self.profile_config is not None:
             self.profile_config = render_templated_conn_id(self, self.profile_config, context)
 
 

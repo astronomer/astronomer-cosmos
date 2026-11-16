@@ -1176,7 +1176,8 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
 
     def render_template_fields(self, context: Context, jinja_env: jinja2.Environment | None = None) -> None:
         super().render_template_fields(context, jinja_env)
-        self.profile_config = render_templated_conn_id(self, self.profile_config, context, jinja_env)
+        if self.profile_config is not None:
+            self.profile_config = render_templated_conn_id(self, self.profile_config, context, jinja_env)
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):

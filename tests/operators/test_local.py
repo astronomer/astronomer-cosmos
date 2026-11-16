@@ -3831,3 +3831,13 @@ def test_render_template_fields_renders_templated_conn_id_on_a_copy():
 
     assert operator.profile_config.profile_mapping.conn_id == "rendered_conn"
     assert templated_profile_config.profile_mapping.conn_id == "{{ params.conn_id }}"
+
+
+def test_render_template_fields_without_profile_config():
+    from cosmos.operators.watcher import DbtConsumerWatcherSensor
+
+    sensor = DbtConsumerWatcherSensor(task_id="model_run", project_dir="my/dir", profile_config=None)
+
+    sensor.render_template_fields({"params": {}})
+
+    assert sensor.profile_config is None

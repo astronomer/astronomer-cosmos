@@ -43,6 +43,7 @@ from cosmos.operators._watcher.state import (
     DbtNodeStatus,
     is_dbt_node_status_success,
     normalize_dbt_node_status,
+    push_unfinished_dbt_events,
 )
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
@@ -268,6 +269,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         # so the consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
         # See #2698.
         self._upstream_failure_skipped_ids: set[str] = set()
+        self._producer_context: Context | None = None
 
     def _handle_datasets(self, context: Context) -> None:
         """No-op override: consumer tasks handle their own dataset emission in WATCHER mode."""
@@ -501,6 +503,7 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
         task_instance = context.get("ti")
         if task_instance is None:
             raise AirflowException("DbtProducerWatcherOperator expects a task instance in the execution context")
+        self._producer_context = context
 
         try_number = getattr(task_instance, "try_number", 1)
 
@@ -535,6 +538,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             # only record that the producer finished so consumer sensors stop waiting.
             safe_xcom_push(task_instance=context["ti"], key="task_status", value="completed")
             raise
+
+    def on_kill(self) -> None:
+        super().on_kill()
+        if self._producer_context is not None:
+            push_unfinished_dbt_events(self._producer_context)
 
 
 class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):

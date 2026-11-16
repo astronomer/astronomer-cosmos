@@ -170,6 +170,20 @@ def get_compiled_sql_xcom_key(unique_id: str) -> str:
 xcom_set_lock = Lock()
 
 
+def get_unfinished_dbt_events(task_instance: Any) -> dict[str, Any]:
+    unfinished_dbt_events: dict[str, Any] = vars(task_instance).setdefault("_cosmos_unfinished_dbt_events", {})
+    return unfinished_dbt_events
+
+
+def push_unfinished_dbt_events(context: Any) -> None:
+    task_instance = context["ti"]
+    unfinished_dbt_events = get_unfinished_dbt_events(task_instance)
+    with xcom_set_lock:
+        for unique_id, dbt_event in list(unfinished_dbt_events.items()):
+            task_instance.xcom_push(key=get_dbt_event_xcom_key(unique_id), value=dbt_event)
+        unfinished_dbt_events.clear()
+
+
 def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
     """
     Safely set an XCom value in a thread-safe manner in Airflow 3.0 and 3.1.

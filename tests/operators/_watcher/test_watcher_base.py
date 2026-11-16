@@ -1,9 +1,15 @@
+import json
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from airflow.exceptions import AirflowException, AirflowSkipException
 
-from cosmos.operators._watcher.base import BaseConsumerSensor, _process_dbt_log_event
+from cosmos.operators._watcher.base import (
+    BaseConsumerSensor,
+    _process_dbt_log_event,
+    store_dbt_resource_status_from_log,
+)
+from cosmos.operators._watcher.state import get_unfinished_dbt_events
 from cosmos.operators.local import DbtRunLocalOperator
 
 
@@ -266,6 +272,32 @@ class TestHandleNoDbtNodeStatus:
         assert result is True
         mock_fallback.assert_called_once_with(1, context)
 
+    @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
+    @patch("cosmos.operators._watcher.base.get_xcom_val")
+    def test_producer_ended_logs_last_dbt_event_and_pointer(self, mock_get_xcom_val, mock_fallback, caplog):
+        mock_get_xcom_val.return_value = {
+            "status": "started",
+            "start_time": "2026-11-16T10:00:00",
+            "finish_time": None,
+            "msg": "",
+        }
+        sensor = self._make_sensor()
+        sensor.poke_retry_number = 0
+
+        with caplog.at_level("INFO"):
+            sensor._handle_no_dbt_node_status("failed", try_number=1, context=MagicMock())
+
+        assert "[STARTED] Start: 10:00:00, Finish: N/A" in caplog.text
+        assert "Search the log of task 'dbt_run_local' for 'model.jaffle_shop.stg_orders'" in caplog.text
+
+    @patch("cosmos.operators._watcher.base.get_xcom_val")
+    def test_producer_running_does_not_log_dbt_event(self, mock_get_xcom_val):
+        sensor = self._make_sensor()
+
+        sensor._handle_no_dbt_node_status("running", try_number=1, context=MagicMock())
+
+        mock_get_xcom_val.assert_not_called()
+
     def test_no_status_increments_poke_retry(self):
         sensor = self._make_sensor()
         sensor.poke_retry_number = 0
@@ -376,3 +408,36 @@ class TestBaseConsumerSensorEmitDatasets:
         with pytest.raises(AirflowException):
             sensor.execute_complete({"ti": MagicMock()}, {"status": "failed", "outlet_uris": ["x"]})
         mock_emit.assert_not_called()
+
+
+def test_store_dbt_resource_status_from_log_buffers_started_node_until_it_finishes():
+    task_instance = MagicMock()
+    extra_kwargs = {"context": {"ti": task_instance}}
+    node_info = {
+        "unique_id": "model.pkg.my_model",
+        "node_status": "started",
+        "node_started_at": "2026-11-16T10:00:00",
+        "resource_type": "model",
+    }
+    start_line = json.dumps({"data": {"node_info": node_info}, "info": {"name": "LogStartLine", "msg": "1 of 1 START"}})
+    finish_line = json.dumps(
+        {
+            "data": {"node_info": {**node_info, "node_status": "success"}},
+            "info": {"name": "LogModelResult", "msg": "1 of 1 OK"},
+        }
+    )
+
+    store_dbt_resource_status_from_log(start_line, extra_kwargs, should_generate_model_uris=False)
+
+    assert get_unfinished_dbt_events(task_instance) == {
+        "model.pkg.my_model": {
+            "status": "started",
+            "start_time": "10:00:00",
+            "finish_time": None,
+            "msg": "1 of 1 START",
+        }
+    }
+
+    store_dbt_resource_status_from_log(finish_line, extra_kwargs, should_generate_model_uris=False)
+
+    assert get_unfinished_dbt_events(task_instance) == {}

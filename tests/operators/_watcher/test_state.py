@@ -18,6 +18,7 @@ from cosmos.operators._watcher.state import (
     get_compiled_sql_xcom_key,
     get_dbt_event_xcom_key,
     get_status_xcom_key,
+    get_unfinished_dbt_events,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
     is_dbt_node_status_success,
@@ -25,6 +26,7 @@ from cosmos.operators._watcher.state import (
     is_producer_task_still_running,
     is_producer_task_terminated,
     normalize_dbt_node_status,
+    push_unfinished_dbt_events,
     safe_xcom_push,
 )
 from cosmos.operators._watcher.xcom import (
@@ -298,11 +300,26 @@ def test_compose_backup_callback():
     def _user(context):
         pass
 
-    assert _compose_backup_callback(None) is _backup_xcom_to_variable
-    assert _compose_backup_callback(_user) == [_user, _backup_xcom_to_variable]
-    assert _compose_backup_callback([_user]) == [_user, _backup_xcom_to_variable]
+    assert _compose_backup_callback(None) == [push_unfinished_dbt_events, _backup_xcom_to_variable]
+    assert _compose_backup_callback(_user) == [_user, push_unfinished_dbt_events, _backup_xcom_to_variable]
+    assert _compose_backup_callback([_user]) == [_user, push_unfinished_dbt_events, _backup_xcom_to_variable]
     # idempotent: does not double-add when already present
-    assert _compose_backup_callback([_user, _backup_xcom_to_variable]) == [_user, _backup_xcom_to_variable]
+    assert _compose_backup_callback([_user, push_unfinished_dbt_events, _backup_xcom_to_variable]) == [
+        _user,
+        push_unfinished_dbt_events,
+        _backup_xcom_to_variable,
+    ]
+
+
+def test_push_unfinished_dbt_events_pushes_each_buffered_event():
+    task_instance = MagicMock()
+    dbt_event = {"status": "started", "start_time": "10:00:00", "finish_time": None, "msg": "1 of 1 START"}
+    get_unfinished_dbt_events(task_instance)["model.pkg.my_model"] = dbt_event
+
+    push_unfinished_dbt_events({"ti": task_instance})
+
+    task_instance.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value=dbt_event)
+    assert get_unfinished_dbt_events(task_instance) == {}
 
 
 class TestPersistBackup:

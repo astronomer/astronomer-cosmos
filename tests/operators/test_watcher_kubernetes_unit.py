@@ -15,6 +15,7 @@ from cosmos.constants import (
     TestBehavior,
     _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION,
 )
+from cosmos.operators._watcher.state import get_unfinished_dbt_events
 
 if Version(airflow_k8s_provider_version) < _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION:
     pytest.skip(
@@ -590,3 +591,16 @@ def test_consumer_emits_datasets_on_success(mock_register):
     assert inlets == []
     assert [o.uri for o in outlets] == ["postgres://h:5432/db/schema/stg_orders"]
     assert ctx is context
+
+
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.on_kill")
+def test_producer_on_kill_pushes_unfinished_dbt_events(mock_parent_on_kill):
+    op = DbtProducerWatcherKubernetesOperator(project_dir=".", profile_config=None, image="dbt-image:latest")
+    ti = MagicMock()
+    get_unfinished_dbt_events(ti)["model.pkg.my_model"] = {"status": "started"}
+    op._context_holder[CONTEXT_KEY] = {"ti": ti}
+
+    op.on_kill()
+
+    mock_parent_on_kill.assert_called_once_with()
+    ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})

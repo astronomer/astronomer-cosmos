@@ -2296,16 +2296,17 @@ def test_watcher_warns_about_profile_overrides_ignored_by_the_producer(
 
 
 @pytest.mark.parametrize(
-    "execution_mode,source_rendering_behavior,is_source_listed",
+    "execution_mode,source_rendering_behavior,has_freshness,is_source_listed",
     [
-        (ExecutionMode.WATCHER, SourceRenderingBehavior.ALL, True),
-        (ExecutionMode.WATCHER, SourceRenderingBehavior.NONE, False),
-        (ExecutionMode.WATCHER_KUBERNETES, SourceRenderingBehavior.ALL, False),
-        (ExecutionMode.WATCHER_GCP_GKE, SourceRenderingBehavior.ALL, False),
+        (ExecutionMode.WATCHER, SourceRenderingBehavior.ALL, True, True),
+        (ExecutionMode.WATCHER, SourceRenderingBehavior.ALL, False, False),
+        (ExecutionMode.WATCHER, SourceRenderingBehavior.NONE, True, False),
+        (ExecutionMode.WATCHER_KUBERNETES, SourceRenderingBehavior.ALL, True, False),
+        (ExecutionMode.WATCHER_GCP_GKE, SourceRenderingBehavior.ALL, True, False),
     ],
 )
 def test_watcher_warns_about_source_overrides_only_when_the_producer_checks_freshness(
-    caplog, execution_mode, source_rendering_behavior, is_source_listed
+    caplog, execution_mode, source_rendering_behavior, has_freshness, is_source_listed
 ):
     source = DbtNode(
         unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.raw.orders",
@@ -2314,6 +2315,7 @@ def test_watcher_warns_about_source_overrides_only_when_the_producer_checks_fres
         path_base=SAMPLE_PROJ_PATH,
         original_file_path=Path("models/sources.yml"),
         config={"meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+        has_freshness=has_freshness,
     )
 
     _warn_about_profile_overrides_ignored_by_watcher_producer(
@@ -2343,13 +2345,30 @@ def test_watcher_does_not_validate_overrides_of_tests_the_producer_skips(caplog)
 
 
 def test_watcher_warning_does_not_validate_meta_left_to_task_creation(caplog):
+    malformed_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.malformed_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/malformed_model.sql"),
+        config={"materialized": "table", "meta": {"cosmos": "not a dict"}},
+    )
+
+    _warn_about_profile_overrides_ignored_by_watcher_producer(
+        {malformed_model.unique_id: malformed_model}, ExecutionMode.WATCHER, RenderConfig()
+    )
+
+    assert "meta.cosmos.profile_config" not in caplog.text
+
+
+def test_watcher_does_not_warn_about_ephemeral_model_overrides(caplog):
     ephemeral_model = DbtNode(
         unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.ephemeral_model",
         resource_type=DbtResourceType.MODEL,
         depends_on=[],
         path_base=SAMPLE_PROJ_PATH,
         original_file_path=Path("models/ephemeral_model.sql"),
-        config={"materialized": "ephemeral", "meta": {"cosmos": "not a dict"}},
+        config={"materialized": "ephemeral", "meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
     )
 
     _warn_about_profile_overrides_ignored_by_watcher_producer(

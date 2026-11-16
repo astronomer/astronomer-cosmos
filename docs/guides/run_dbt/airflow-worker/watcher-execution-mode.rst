@@ -568,7 +568,7 @@ Per-node profile overrides
 
 The producer ``DbtProducerWatcherOperator`` builds every node in a single dbt command, using the ``profile_config`` given to ``DbtDag`` or ``DbtTaskGroup``. It does not apply the per-node ``meta.cosmos.profile_config`` overrides described in :ref:`profile-customise-per-node`.
 
-The consumer tasks do carry the override, so it only takes effect when a consumer falls back to running dbt itself, for example on a retry or a manual clear. The same model can therefore run under different connections, depending on which task ran it. Cosmos logs a warning that lists the overridden nodes when it renders the DAG.
+Model, seed and snapshot consumer tasks carry the override, so it takes effect only when one of them falls back to running dbt itself, for example on a retry or a manual clear. Test tasks under ``TestBehavior.AFTER_EACH`` use the profile of the model they test. The same model can therefore run under different connections, depending on which task ran it. Cosmos logs a warning that lists the overridden nodes when it renders the DAG.
 
 As a workaround, split the project into one ``DbtTaskGroup`` per profile, each with its own ``ProfileConfig`` and a ``RenderConfig`` ``select`` or ``exclude`` that picks its nodes. dbt does not resolve dependencies across the groups, so set the dependencies between them in Airflow:
 

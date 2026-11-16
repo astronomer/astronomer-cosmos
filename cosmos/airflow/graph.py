@@ -857,6 +857,8 @@ def _reject_cosmos_only_selectors(render_config: RenderConfig) -> None:
 
 
 def _is_run_by_watcher_producer(node: DbtNode, execution_mode: ExecutionMode, render_config: RenderConfig) -> bool:
+    if node.has_ephemeral_materialization:
+        return False
     if node.resource_type == DbtResourceType.TEST:
         return render_config.test_behavior not in (TestBehavior.NONE, TestBehavior.AFTER_ALL)
     if node.resource_type == DbtResourceType.SOURCE:
@@ -864,6 +866,7 @@ def _is_run_by_watcher_producer(node: DbtNode, execution_mode: ExecutionMode, re
         return (
             execution_mode == ExecutionMode.WATCHER
             and render_config.source_rendering_behavior != SourceRenderingBehavior.NONE
+            and node.has_freshness
         )
     return True
 
@@ -885,10 +888,8 @@ def _warn_about_profile_overrides_ignored_by_watcher_producer(
     ]
     if overridden_node_ids:
         logger.warning(
-            "ExecutionMode.%s builds every node in a single dbt command using the DbtDag or DbtTaskGroup "
-            "profile_config, so the producer ignores the meta.cosmos.profile_config override of: %s. "
-            "The override only applies when a consumer task falls back to running dbt itself. See "
-            "https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html"
+            "ExecutionMode.%s runs these nodes in the producer, which ignores their meta.cosmos.profile_config: %s. "
+            "See https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html"
             "#per-node-profile-overrides",
             execution_mode.name,
             ", ".join(overridden_node_ids),

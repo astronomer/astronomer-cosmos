@@ -99,6 +99,7 @@ def _ignore_when_copying_dbt_project(directory: str, names: list[str]) -> list[s
     ]
 
 
+@pytest.mark.skipif(_paths_tracked_by_git() is None, reason="Needs a git checkout")
 def test_copying_dbt_project_skips_files_git_does_not_track():
     project_dir = DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
 

@@ -99,6 +99,30 @@ def _ignore_when_copying_dbt_project(directory: str, names: list[str]) -> list[s
     ]
 
 
+def test_copying_dbt_project_skips_files_git_does_not_track():
+    project_dir = DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
+
+    ignored = _ignore_when_copying_dbt_project(str(project_dir), ["dbt_project.yml", "untracked_by_git.sql"])
+
+    assert ignored == ["untracked_by_git.sql"]
+
+
+@pytest.mark.parametrize(
+    "git_run",
+    [MagicMock(side_effect=FileNotFoundError), MagicMock(return_value=MagicMock(returncode=128))],
+    ids=["git_missing", "git_fails"],
+)
+def test_copying_dbt_project_falls_back_to_ignored_names_without_git(git_run):
+    _paths_tracked_by_git.cache_clear()
+    try:
+        with patch(f"{__name__}.run", git_run):
+            ignored = _ignore_when_copying_dbt_project("any_dir", ["target", "untracked_by_git.sql"])
+    finally:
+        _paths_tracked_by_git.cache_clear()
+
+    assert ignored == ["target"]
+
+
 @pytest.fixture
 def tmp_dbt_project_dir():
     """

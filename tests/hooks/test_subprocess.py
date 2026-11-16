@@ -1,5 +1,8 @@
 import json
+import os
 import signal
+import subprocess
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
@@ -78,6 +81,36 @@ def test_send_sigterm(mock_killpg, mock_getpgid):
     hook.sub_process = MagicMock()
     hook.send_sigterm()
     mock_killpg.assert_called_with(123, signal.SIGTERM)
+
+
+FORK_HOOK_PROBE = """
+import os
+import sys
+
+from cosmos.hooks.subprocess import FullOutputSubprocessHook
+
+fork_hook_calls = []
+os.register_at_fork(before=lambda: fork_hook_calls.append("before"))
+FullOutputSubprocessHook().run_command([sys.executable, "-c", "pass"])
+print(f"fork_hook_calls={len(fork_hook_calls)}")
+"""
+
+
+def test_run_command_does_not_run_fork_hooks():
+    # gRPC and other C extensions with fork handlers can hang or abort the task when they run.
+    probe = subprocess.run([sys.executable, "-c", FORK_HOOK_PROBE], capture_output=True, text=True, check=True)
+
+    assert "fork_hook_calls=0" in probe.stdout.splitlines()
+
+
+def test_run_command_starts_the_command_in_its_own_session():
+    result = FullOutputSubprocessHook().run_command(
+        [sys.executable, "-c", "import os; print(os.getpid(), os.getpgid(0), os.getsid(0))"]
+    )
+
+    pid, process_group_id, session_id = map(int, result.output.split())
+    assert pid == process_group_id == session_id
+    assert session_id != os.getsid(0)
 
 
 @pytest.mark.parametrize(

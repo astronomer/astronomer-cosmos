@@ -72,13 +72,6 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
             if cwd is None:
                 cwd = stack.enter_context(TemporaryDirectory(prefix="airflowtmp"))
 
-            def pre_exec() -> None:
-                # Restore default signal disposition and invoke setsid
-                for sig in ("SIGPIPE", "SIGXFZ", "SIGXFSZ"):
-                    if hasattr(signal, sig):
-                        signal.signal(getattr(signal, sig), signal.SIG_DFL)
-                os.setsid()
-
             logger.info("Running command: %s", command)
 
             self.sub_process = Popen(
@@ -87,7 +80,8 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 stderr=STDOUT,
                 cwd=cwd,
                 env=env if env or env == {} else os.environ,
-                preexec_fn=pre_exec,
+                # Unlike preexec_fn, this does not run fork handlers such as gRPC's, which can hang or abort the task.
+                start_new_session=True,
                 bufsize=1,  # line-buffered (works only in text mode)
                 text=True,
                 encoding=output_encoding,

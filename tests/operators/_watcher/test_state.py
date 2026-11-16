@@ -334,6 +334,30 @@ def test_push_unfinished_dbt_events_adds_them_to_the_retry_backup():
     assert task_instance._cosmos_xcom_backup_buffer == {"model__pkg__my_model_dbt_event": {"status": "started"}}
 
 
+def test_push_unfinished_dbt_events_backs_up_every_event_when_the_task_store_rejects_writes():
+    task_instance = MagicMock()
+    task_instance._cosmos_task_state_store.set.side_effect = RuntimeError("task store writes are rejected in callbacks")
+    task_instance._cosmos_xcom_backup_buffer = {}
+    task_instance._cosmos_xcom_backup_open_row = {}
+    task_instance._cosmos_xcom_backup_open_row_persisted = True
+    task_instance._cosmos_xcom_backup_var_key = "cosmos_xcom_backup__dag__run"
+    get_unfinished_dbt_events(task_instance)["model.pkg.first_model"] = {"status": "started"}
+    get_unfinished_dbt_events(task_instance)["model.pkg.second_model"] = {"status": "started"}
+
+    push_unfinished_dbt_events({"ti": task_instance})
+    with patch("cosmos.operators._watcher.xcom.set_variable") as mock_set_variable:
+        _backup_xcom_to_variable({"ti": task_instance})
+
+    assert task_instance.xcom_push.call_count == 2
+    task_instance._cosmos_task_state_store.set.assert_not_called()
+    var_key, compressed = mock_set_variable.call_args[0]
+    assert var_key == "cosmos_xcom_backup__dag__run"
+    assert _decode_backup(compressed) == {
+        "model__pkg__first_model_dbt_event": {"status": "started"},
+        "model__pkg__second_model_dbt_event": {"status": "started"},
+    }
+
+
 def test_push_unfinished_dbt_events_skips_when_the_xcom_lock_is_held():
     task_instance = MagicMock()
     get_unfinished_dbt_events(task_instance)["model.pkg.my_model"] = {"status": "started"}

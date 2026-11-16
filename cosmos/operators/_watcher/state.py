@@ -183,10 +183,25 @@ def push_unfinished_dbt_events(context: Any) -> None:
     try:
         unfinished_dbt_events = get_unfinished_dbt_events(task_instance)
         for unique_id, dbt_event in list(unfinished_dbt_events.items()):
-            _push_xcom_and_backup(task_instance, get_dbt_event_xcom_key(unique_id), dbt_event)
+            key = get_dbt_event_xcom_key(unique_id)
+            task_instance.xcom_push(key=key, value=dbt_event)
+            _add_to_xcom_backup_without_persisting(task_instance, key, dbt_event)
         unfinished_dbt_events.clear()
     finally:
         xcom_set_lock.release()
+
+
+def _add_to_xcom_backup_without_persisting(task_instance: Any, key: str, value: Any) -> None:
+    backup_buffer: dict[str, Any] | None = getattr(task_instance, "_cosmos_xcom_backup_buffer", None)
+    if backup_buffer is None:
+        return
+    backup_buffer[key] = value
+    from cosmos.operators._watcher.xcom import TASK_STATE_STORE_TI_ATTRIBUTE
+
+    # Failure and retry callbacks cannot write the task store, so _backup_xcom_to_variable saves the open row instead.
+    if getattr(task_instance, TASK_STATE_STORE_TI_ATTRIBUTE, None) is not None:
+        task_instance._cosmos_xcom_backup_open_row[key] = value
+        task_instance._cosmos_xcom_backup_open_row_persisted = False
 
 
 def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
@@ -198,27 +213,23 @@ def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
     However, we applied this fix and run over 20 times a pipeline that would fail every 5 runs and this allowed us to no longer face the issue.
     """
     with xcom_set_lock:
-        _push_xcom_and_backup(task_instance, key, value)
+        task_instance.xcom_push(key=key, value=value)
+        backup_buffer: dict[str, Any] | None = getattr(task_instance, "_cosmos_xcom_backup_buffer", None)
+        if backup_buffer is not None:
+            backup_buffer[key] = value
+            if getattr(task_instance, "_cosmos_xcom_persist_incrementally", False):
+                var_key = getattr(task_instance, "_cosmos_xcom_backup_var_key", None)
+                if isinstance(var_key, str):
+                    from cosmos.operators._watcher.xcom import (
+                        TASK_STATE_STORE_TI_ATTRIBUTE,
+                        _persist_backup,
+                        _persist_backup_row,
+                    )
 
-
-def _push_xcom_and_backup(task_instance: TaskInstance, key: str, value: Any) -> None:
-    task_instance.xcom_push(key=key, value=value)
-    backup_buffer: dict[str, Any] | None = getattr(task_instance, "_cosmos_xcom_backup_buffer", None)
-    if backup_buffer is not None:
-        backup_buffer[key] = value
-        if getattr(task_instance, "_cosmos_xcom_persist_incrementally", False):
-            var_key = getattr(task_instance, "_cosmos_xcom_backup_var_key", None)
-            if isinstance(var_key, str):
-                from cosmos.operators._watcher.xcom import (
-                    TASK_STATE_STORE_TI_ATTRIBUTE,
-                    _persist_backup,
-                    _persist_backup_row,
-                )
-
-                if getattr(task_instance, TASK_STATE_STORE_TI_ATTRIBUTE, None) is not None:
-                    _persist_backup_row(task_instance, key, value)
-                else:
-                    _persist_backup(var_key, backup_buffer)
+                    if getattr(task_instance, TASK_STATE_STORE_TI_ATTRIBUTE, None) is not None:
+                        _persist_backup_row(task_instance, key, value)
+                    else:
+                        _persist_backup(var_key, backup_buffer)
 
 
 # TODO: Unify the Airflow call from cosmos/operators/_watcher/triggerer.py and cosmos/operators/watcher.py

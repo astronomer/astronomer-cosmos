@@ -856,14 +856,25 @@ def _reject_cosmos_only_selectors(render_config: RenderConfig) -> None:
             )
 
 
+def _is_run_by_watcher_producer(node: DbtNode, execution_mode: ExecutionMode, render_config: RenderConfig) -> bool:
+    if node.resource_type == DbtResourceType.TEST:
+        return render_config.test_behavior not in (TestBehavior.NONE, TestBehavior.AFTER_ALL)
+    if node.resource_type == DbtResourceType.SOURCE:
+        # Only the local producer checks freshness; the Kubernetes and GKE source tasks check it themselves.
+        return (
+            execution_mode == ExecutionMode.WATCHER
+            and render_config.source_rendering_behavior != SourceRenderingBehavior.NONE
+        )
+    return True
+
+
 def _warn_about_profile_overrides_ignored_by_watcher_producer(
     nodes: dict[str, DbtNode], execution_mode: ExecutionMode, render_config: RenderConfig
 ) -> None:
-    producer_skips_tests = render_config.test_behavior in (TestBehavior.NONE, TestBehavior.AFTER_ALL)
     overridden_node_ids = [
         node_id
         for node_id, node in nodes.items()
-        if node.profile_config_to_override and not (producer_skips_tests and node.resource_type == DbtResourceType.TEST)
+        if _is_run_by_watcher_producer(node, execution_mode, render_config) and node.profile_config_to_override
     ]
     if overridden_node_ids:
         logger.warning(

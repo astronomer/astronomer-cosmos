@@ -25,6 +25,7 @@ from cosmos.airflow.graph import (
     _convert_list_to_str,
     _honor_on_warning_callback,
     _snake_case_to_camelcase,
+    _warn_about_profile_overrides_ignored_by_watcher_producer,
     build_airflow_graph,
     calculate_detached_node_name,
     calculate_leaves,
@@ -2292,6 +2293,53 @@ def test_watcher_warns_about_profile_overrides_ignored_by_the_producer(
     assert f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.restricted_model" in warning
     assert "default_model" not in warning
     assert ("restricted_test" in warning) is is_test_override_ignored
+
+
+@pytest.mark.parametrize(
+    "execution_mode,source_rendering_behavior,is_source_listed",
+    [
+        (ExecutionMode.WATCHER, SourceRenderingBehavior.ALL, True),
+        (ExecutionMode.WATCHER, SourceRenderingBehavior.NONE, False),
+        (ExecutionMode.WATCHER_KUBERNETES, SourceRenderingBehavior.ALL, False),
+        (ExecutionMode.WATCHER_GCP_GKE, SourceRenderingBehavior.ALL, False),
+    ],
+)
+def test_watcher_warns_about_source_overrides_only_when_the_producer_checks_freshness(
+    caplog, execution_mode, source_rendering_behavior, is_source_listed
+):
+    source = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.raw.orders",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/sources.yml"),
+        config={"meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+    )
+
+    _warn_about_profile_overrides_ignored_by_watcher_producer(
+        {source.unique_id: source}, execution_mode, RenderConfig(source_rendering_behavior=source_rendering_behavior)
+    )
+
+    assert (source.unique_id in caplog.text) is is_source_listed
+
+
+def test_watcher_does_not_validate_overrides_of_tests_the_producer_skips(caplog):
+    malformed_test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.malformed_test",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/schema.yml"),
+        config={"meta": {"cosmos": {"profile_config": ""}}},
+    )
+
+    _warn_about_profile_overrides_ignored_by_watcher_producer(
+        {malformed_test.unique_id: malformed_test},
+        ExecutionMode.WATCHER,
+        RenderConfig(test_behavior=TestBehavior.NONE),
+    )
+
+    assert "meta.cosmos.profile_config" not in caplog.text
 
 
 def test_local_does_not_warn_about_profile_overrides(caplog, nodes_with_profile_overrides):

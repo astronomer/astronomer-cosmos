@@ -868,13 +868,20 @@ def _is_run_by_watcher_producer(node: DbtNode, execution_mode: ExecutionMode, re
     return True
 
 
+def _has_profile_override(node: DbtNode) -> bool:
+    # Read the raw meta: validation belongs to task creation, and a warning must not stop the DAG from rendering.
+    meta = node.config.get("meta")
+    cosmos_meta = meta.get("cosmos") if isinstance(meta, dict) else None
+    return isinstance(cosmos_meta, dict) and bool(cosmos_meta.get("profile_config"))
+
+
 def _warn_about_profile_overrides_ignored_by_watcher_producer(
     nodes: dict[str, DbtNode], execution_mode: ExecutionMode, render_config: RenderConfig
 ) -> None:
     overridden_node_ids = [
         node_id
         for node_id, node in nodes.items()
-        if _is_run_by_watcher_producer(node, execution_mode, render_config) and node.profile_config_to_override
+        if _is_run_by_watcher_producer(node, execution_mode, render_config) and _has_profile_override(node)
     ]
     if overridden_node_ids:
         logger.warning(

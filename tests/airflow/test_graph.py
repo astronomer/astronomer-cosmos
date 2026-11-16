@@ -2342,6 +2342,23 @@ def test_watcher_does_not_validate_overrides_of_tests_the_producer_skips(caplog)
     assert "meta.cosmos.profile_config" not in caplog.text
 
 
+def test_watcher_warning_does_not_validate_meta_left_to_task_creation(caplog):
+    ephemeral_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.ephemeral_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/ephemeral_model.sql"),
+        config={"materialized": "ephemeral", "meta": {"cosmos": "not a dict"}},
+    )
+
+    _warn_about_profile_overrides_ignored_by_watcher_producer(
+        {ephemeral_model.unique_id: ephemeral_model}, ExecutionMode.WATCHER, RenderConfig()
+    )
+
+    assert "meta.cosmos.profile_config" not in caplog.text
+
+
 def test_local_does_not_warn_about_profile_overrides(caplog, nodes_with_profile_overrides):
     _render_with_profile_overrides(nodes_with_profile_overrides, ExecutionMode.LOCAL, TestBehavior.AFTER_EACH)
 

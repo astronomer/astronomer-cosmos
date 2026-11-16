@@ -3843,7 +3843,8 @@ def test_render_template_fields_without_profile_config():
     assert sensor.profile_config is None
 
 
-def test_render_template_fields_keeps_conn_id_a_string_with_native_rendering():
+@pytest.mark.parametrize("conn_id", ["123", "1e3", "000"])
+def test_render_template_fields_keeps_conn_id_a_string_with_native_rendering(conn_id):
     with DAG("test-native-conn-id", start_date=datetime(2024, 1, 1), render_template_as_native_obj=True):
         operator = DbtRunLocalOperator(
             task_id="run",
@@ -3858,6 +3859,6 @@ def test_render_template_fields_keeps_conn_id_a_string_with_native_rendering():
             ),
         )
 
-    operator.render_template_fields({"params": {"conn_id": "123"}})
+    operator.render_template_fields({"params": {"conn_id": conn_id}})
 
-    assert operator.profile_config.profile_mapping.conn_id == "123"
+    assert operator.profile_config.profile_mapping.conn_id == conn_id

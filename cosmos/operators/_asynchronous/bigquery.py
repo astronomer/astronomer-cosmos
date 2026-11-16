@@ -155,7 +155,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
 
     def render_template_fields(self, context: Context, jinja_env: jinja2.Environment | None = None) -> None:
         super().render_template_fields(context, jinja_env)
-        self.profile_config = render_templated_conn_id(self, self.profile_config, context, jinja_env)
+        self.profile_config = render_templated_conn_id(self, self.profile_config, context)
         self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore[union-attr]
 
     @property

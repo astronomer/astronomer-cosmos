@@ -131,16 +131,17 @@ from cosmos.profiles.base import is_jinja_template
 logger = get_logger(__name__)
 
 
-def render_templated_conn_id(
-    operator: BaseOperator, profile_config: ProfileConfig, context: Context, jinja_env: jinja2.Environment | None
-) -> ProfileConfig:
+def render_templated_conn_id(operator: BaseOperator, profile_config: ProfileConfig, context: Context) -> ProfileConfig:
     profile_mapping = profile_config.profile_mapping
     if profile_mapping is None or not is_jinja_template(profile_mapping.conn_id):
         return profile_config
     rendered_profile_config = deepcopy(profile_config)
     rendered_profile_mapping = rendered_profile_config.profile_mapping
     assert rendered_profile_mapping is not None
-    rendered_profile_mapping.conn_id = str(operator.render_template(profile_mapping.conn_id, context, jinja_env))
+    # Always render to a string: render_template_as_native_obj would turn IDs such as "1e3" into numbers.
+    dag = operator.get_dag()
+    jinja_env = dag.get_template_env(force_sandboxed=True) if dag else operator.get_template_env()
+    rendered_profile_mapping.conn_id = jinja_env.from_string(profile_mapping.conn_id).render(context)
     return rendered_profile_config
 
 
@@ -1177,7 +1178,7 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
     def render_template_fields(self, context: Context, jinja_env: jinja2.Environment | None = None) -> None:
         super().render_template_fields(context, jinja_env)
         if self.profile_config is not None:
-            self.profile_config = render_templated_conn_id(self, self.profile_config, context, jinja_env)
+            self.profile_config = render_templated_conn_id(self, self.profile_config, context)
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):

@@ -276,6 +276,19 @@ If you want to use the Airflow 3 URI standard while still using Airflow 2, pleas
 
 Remember to update any DAGs that are scheduled using this dataset.
 
+Slow task completion on Airflow 3.0 to 3.3.0
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+On Airflow 3, Cosmos emits one asset event per dbt model through the task's ``AssetAlias``. Before Airflow 3.3.1, Airflow loads the alias's whole event history to record each event, while holding the task instance lock (`apache/airflow#66853 <https://github.com/apache/airflow/issues/66853>`_).
+
+As the alias grows, marking tasks as successful gets slower, and it can delay other tasks' heartbeats until they are killed. Tasks that run many models, such as ``DbtBuildLocalOperator`` or mapped tasks that share one alias, are the most affected.
+
+To avoid it:
+
+- Upgrade to Airflow 3.3.1 or later.
+- If nothing consumes these assets, set ``emit_datasets=False`` in ``RenderConfig`` or in the operator, or per node with ``meta.cosmos.operator_kwargs``.
+- Delete old asset events with ``airflow db clean --tables asset_event --clean-before-timestamp <timestamp>``. This only helps until the alias grows again.
+
 Airflow 2.9 and below, or ``enable_dataset_alias`` set to ``False``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

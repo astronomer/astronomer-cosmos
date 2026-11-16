@@ -7,8 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:  # pragma: no cover
-    import jinja2
+import jinja2
 
 from cosmos.operators.base import _sanitize_xcom_key, resolve_templated_bool
 

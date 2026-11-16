@@ -7,6 +7,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:  # pragma: no cover
+    import jinja2
+
 from cosmos.operators.base import _sanitize_xcom_key, resolve_templated_bool
 
 try:
@@ -32,7 +35,7 @@ from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
-from cosmos.operators.local import AbstractDbtLocalBase
+from cosmos.operators.local import AbstractDbtLocalBase, render_templated_conn_id
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
@@ -150,6 +153,11 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             BigQueryInsertJobOperator,
             AbstractDbtLocalBase,
         )
+
+    def render_template_fields(self, context: Context, jinja_env: jinja2.Environment | None = None) -> None:
+        super().render_template_fields(context, jinja_env)
+        self.profile_config = render_templated_conn_id(self, self.profile_config, context, jinja_env)
+        self.gcp_conn_id = self.profile_config.profile_mapping.conn_id  # type: ignore[union-attr]
 
     @property
     def base_cmd(self) -> list[str]:

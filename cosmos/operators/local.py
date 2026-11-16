@@ -11,6 +11,7 @@ import warnings
 import zlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
+from copy import deepcopy
 from functools import cached_property
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -125,8 +126,22 @@ from cosmos.operators.base import (
     _sanitize_xcom_key,
     resolve_templated_bool,
 )
+from cosmos.profiles.base import is_jinja_template
 
 logger = get_logger(__name__)
+
+
+def render_templated_conn_id(
+    operator: BaseOperator, profile_config: ProfileConfig, context: Context, jinja_env: jinja2.Environment | None
+) -> ProfileConfig:
+    profile_mapping = profile_config.profile_mapping
+    if profile_mapping is None or not is_jinja_template(profile_mapping.conn_id):
+        return profile_config
+    rendered_profile_config = deepcopy(profile_config)
+    rendered_profile_mapping = rendered_profile_config.profile_mapping
+    assert rendered_profile_mapping is not None
+    rendered_profile_mapping.conn_id = operator.render_template(profile_mapping.conn_id, context, jinja_env)
+    return rendered_profile_config
 
 
 def _read_target_sources_json(project_root: Path) -> dict[str, Any] | None:
@@ -1158,6 +1173,10 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
         if "task_id" in operator_kwargs:
             operator_kwargs.pop("task_id")
         BaseOperator.__init__(self, task_id=self.task_id, **operator_kwargs)
+
+    def render_template_fields(self, context: Context, jinja_env: jinja2.Environment | None = None) -> None:
+        super().render_template_fields(context, jinja_env)
+        self.profile_config = render_templated_conn_id(self, self.profile_config, context, jinja_env)
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):

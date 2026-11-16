@@ -3810,3 +3810,24 @@ def test_run_command_does_not_diagnose_the_source_freshness_check(
         )
 
     mock_diagnose.assert_not_called()
+
+
+def test_render_template_fields_renders_templated_conn_id_on_a_copy():
+    templated_profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=PostgresUserPasswordProfileMapping(
+            conn_id="{{ params.conn_id }}",
+            profile_args={"schema": "public"},
+        ),
+    )
+    operator = DbtRunLocalOperator(
+        task_id="run",
+        project_dir="my/dir",
+        profile_config=templated_profile_config,
+    )
+
+    operator.render_template_fields({"params": {"conn_id": "rendered_conn"}})
+
+    assert operator.profile_config.profile_mapping.conn_id == "rendered_conn"
+    assert templated_profile_config.profile_mapping.conn_id == "{{ params.conn_id }}"

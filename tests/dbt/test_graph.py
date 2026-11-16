@@ -1,4 +1,5 @@
 import base64
+import functools
 import importlib
 import json
 import logging
@@ -9,7 +10,7 @@ import tempfile
 import zlib
 from datetime import datetime
 from pathlib import Path
-from subprocess import PIPE, Popen
+from subprocess import PIPE, Popen, run
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -75,9 +76,24 @@ else:
     object_storage_path = "airflow.io.path.ObjectStoragePath"
 
 
+@functools.cache
+def _paths_tracked_by_git() -> frozenset[Path] | None:
+    result = run(["git", "ls-files", "-z"], cwd=DBT_PROJECTS_ROOT_DIR, capture_output=True, text=True)
+    if result.returncode != 0:
+        return None
+    tracked_files = [DBT_PROJECTS_ROOT_DIR.resolve() / path for path in result.stdout.split("\0") if path]
+    return frozenset(path for tracked_file in tracked_files for path in (tracked_file, *tracked_file.parents))
+
+
 def _ignore_when_copying_dbt_project(directory: str, names: list[str]) -> list[str]:
-    """Names to skip in copytree so the fixture tree is deterministic."""
-    return [name for name in names if name in _DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES]
+    """Names to skip in copytree so the fixture tree is deterministic: generated files and anything git does not track."""
+    tracked_paths = _paths_tracked_by_git()
+    return [
+        name
+        for name in names
+        if name in _DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES
+        or (tracked_paths is not None and Path(directory).resolve() / name not in tracked_paths)
+    ]
 
 
 @pytest.fixture

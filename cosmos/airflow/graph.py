@@ -856,6 +856,27 @@ def _reject_cosmos_only_selectors(render_config: RenderConfig) -> None:
             )
 
 
+def _warn_about_profile_overrides_ignored_by_watcher_producer(
+    nodes: dict[str, DbtNode], execution_mode: ExecutionMode, render_config: RenderConfig
+) -> None:
+    producer_skips_tests = render_config.test_behavior in (TestBehavior.NONE, TestBehavior.AFTER_ALL)
+    overridden_node_ids = [
+        node_id
+        for node_id, node in nodes.items()
+        if node.profile_config_to_override and not (producer_skips_tests and node.resource_type == DbtResourceType.TEST)
+    ]
+    if overridden_node_ids:
+        logger.warning(
+            "ExecutionMode.%s builds every node in a single dbt command using the DbtDag or DbtTaskGroup "
+            "profile_config, so the producer ignores the meta.cosmos.profile_config override of: %s. "
+            "The override only applies when a consumer task falls back to running dbt itself. See "
+            "https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html"
+            "#per-node-profile-overrides",
+            execution_mode.name,
+            ", ".join(overridden_node_ids),
+        )
+
+
 def _add_watcher_producer_task(
     dag: DAG,
     task_args: dict[str, Any],
@@ -1299,6 +1320,7 @@ def build_airflow_graph(
         # This property is only relevant for the setup task, not the other tasks:
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
     elif execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES, ExecutionMode.WATCHER_GCP_GKE):
+        _warn_about_profile_overrides_ignored_by_watcher_producer(nodes, execution_mode, render_config)
         setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
         # We are intentionally creating the producer task ahead of the consumer tasks
         # Airflow priority weight is not being respected in multiple versions of the library, including 3.1

@@ -2222,6 +2222,84 @@ def test_watcher_producer_preserves_existing_dbt_cmd_flags(test_behavior):
     assert "--resource-type" in producer_task.dbt_cmd_flags
 
 
+@pytest.fixture
+def nodes_with_profile_overrides():
+    restricted_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.restricted_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/restricted_model.sql"),
+        config={"materialized": "table", "meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+    )
+    default_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.default_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/default_model.sql"),
+        config={"materialized": "table"},
+        has_test=True,
+        has_non_detached_test=True,
+    )
+    restricted_test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.restricted_test",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[default_model.unique_id],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/schema.yml"),
+        config={"meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+    )
+    return {node.unique_id: node for node in (restricted_model, default_model, restricted_test)}
+
+
+def _render_with_profile_overrides(nodes, execution_mode, test_behavior):
+    with DAG("test-profile-overrides", start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=execution_mode,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn", profile_args={"schema": "public"}
+                    ),
+                ),
+            },
+            render_config=RenderConfig(test_behavior=test_behavior),
+            dbt_project_name="astro_shop",
+        )
+
+
+@pytest.mark.parametrize(
+    "test_behavior,is_test_override_ignored",
+    [
+        (TestBehavior.AFTER_EACH, True),
+        (TestBehavior.NONE, False),
+        (TestBehavior.AFTER_ALL, False),
+    ],
+)
+def test_watcher_warns_about_profile_overrides_ignored_by_the_producer(
+    caplog, nodes_with_profile_overrides, test_behavior, is_test_override_ignored
+):
+    _render_with_profile_overrides(nodes_with_profile_overrides, ExecutionMode.WATCHER, test_behavior)
+
+    warning = next(message for message in caplog.messages if "meta.cosmos.profile_config" in message)
+    assert f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.restricted_model" in warning
+    assert "default_model" not in warning
+    assert ("restricted_test" in warning) is is_test_override_ignored
+
+
+def test_local_does_not_warn_about_profile_overrides(caplog, nodes_with_profile_overrides):
+    _render_with_profile_overrides(nodes_with_profile_overrides, ExecutionMode.LOCAL, TestBehavior.AFTER_EACH)
+
+    assert "meta.cosmos.profile_config" not in caplog.text
+
+
 def test_custom_meta(hierarchical_naming_disabled):
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {

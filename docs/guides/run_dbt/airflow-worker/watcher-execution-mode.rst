@@ -563,6 +563,36 @@ As a workaround, set ``max_active_runs=1`` on the DAG.
 
 For details, see `#2596 <https://github.com/astronomer/astronomer-cosmos/issues/2596>`_.
 
+Per-node profile overrides
+++++++++++++++++++++++++++
+
+The producer ``DbtProducerWatcherOperator`` builds every node in a single dbt command, using the ``profile_config`` given to ``DbtDag`` or ``DbtTaskGroup``. It does not apply the per-node ``meta.cosmos.profile_config`` overrides described in :ref:`profile-customise-per-node`.
+
+The consumer tasks do carry the override, so it only takes effect when a consumer falls back to running dbt itself, for example on a retry or a manual clear. The same model can therefore run under different connections, depending on which task ran it. Cosmos logs a warning that lists the overridden nodes when it renders the DAG.
+
+As a workaround, split the project into one ``DbtTaskGroup`` per profile, each with its own ``ProfileConfig`` and a ``RenderConfig`` ``select`` or ``exclude`` that picks its nodes. dbt does not resolve dependencies across the groups, so set the dependencies between them in Airflow:
+
+.. code-block:: python
+
+    with DAG(...):
+        default_models = DbtTaskGroup(
+            group_id="default_models",
+            project_config=project_config,
+            profile_config=default_profile_config,
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            render_config=RenderConfig(exclude=["tag:restricted"]),
+        )
+        restricted_models = DbtTaskGroup(
+            group_id="restricted_models",
+            project_config=project_config,
+            profile_config=restricted_profile_config,
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            render_config=RenderConfig(select=["tag:restricted"]),
+        )
+        default_models >> restricted_models
+
+For details, see `#3196 <https://github.com/astronomer/astronomer-cosmos/issues/3196>`_.
+
 
 Advanced config
 ~~~~~~~~~~~~~~~

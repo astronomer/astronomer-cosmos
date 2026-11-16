@@ -78,7 +78,10 @@ else:
 
 @functools.cache
 def _paths_tracked_by_git() -> frozenset[Path] | None:
-    result = run(["git", "ls-files", "-z"], cwd=DBT_PROJECTS_ROOT_DIR, capture_output=True, text=True)
+    try:
+        result = run(["git", "ls-files", "-z"], cwd=DBT_PROJECTS_ROOT_DIR, capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
     if result.returncode != 0:
         return None
     tracked_files = [DBT_PROJECTS_ROOT_DIR.resolve() / path for path in result.stdout.split("\0") if path]

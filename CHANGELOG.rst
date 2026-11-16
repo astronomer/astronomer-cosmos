@@ -8,6 +8,9 @@ Breaking Changes
 
 * ``DbtSourceAzureContainerInstanceOperator`` has been removed from ``cosmos.operators.aws_eks``, where it was a misnamed copy of the AWS EKS source freshness operator, so importing it from there now raises ``ImportError``. Use ``DbtSourceAwsEksOperator`` instead, which is now also available as ``cosmos.DbtSourceAwsEksOperator`` and fixes ``ExecutionMode.AWS_EKS`` failing to render dbt ``source`` nodes. The real ``DbtSourceAzureContainerInstanceOperator`` in ``cosmos.operators.azure_container_instance`` is unchanged. See #3163.
 
+1.16.1 (Unreleased)
+-------------------
+
 Enhancements
 
 * When the watcher producer stops before a model finishes, for example on a DAG run timeout, the model's watcher task now logs when the model started and which producer task log to search, instead of only ``No XCom value found``, by @tatiana in #3201

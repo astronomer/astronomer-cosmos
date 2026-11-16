@@ -716,6 +716,16 @@ Troubleshooting
 Problem: "I changed from ``ExecutionMode.LOCAL`` to ``ExecutionMode.WATCHER``, but my DAG is running slower."
 Answer: Please, check the number of threads that are being used by searching the producer task logs for a message similar to ``Concurrency: 1 threads (target='DEV')``. To leverage the Watcher mode, you should have a high number of threads, at least dbt's default of 4. Check the `dbt threading docs <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ for more information on how to set the number of threads.
 
+Problem: "A watcher task failed, and its log only shows ``No XCom value found``."
+Answer: The producer stopped before dbt finished the task's model, for example because the model hung until the DAG run timed out. Since Cosmos 1.16.1, the watcher task then logs when the model started and which producer task log to search:
+
+.. code-block:: text
+
+   [STARTED] Start: 09:26:17, Finish: N/A
+   No final status for model 'model.my_project.my_model'. Search the log of task 'dbt_producer_watcher' for 'model.my_project.my_model'.
+
+So that a hung model does not block the whole run until the DAG run times out, set ``execution_timeout`` on the producer through ``setup_operator_args``. The producer then fails, and each watcher task whose model did not finish runs that model itself.
+
 Problem: "I cannot see dbt debug logs in the producer task."
 Answer: When ``ExecutionMode.WATCHER`` runs dbt as a subprocess (i.e. when dbt and Airflow are **not** installed in the same Python virtual environment), pass ``--debug`` via ``dbt_cmd_global_flags`` in ``operator_args``:
 

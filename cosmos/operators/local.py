@@ -140,7 +140,7 @@ def render_templated_conn_id(
     rendered_profile_config = deepcopy(profile_config)
     rendered_profile_mapping = rendered_profile_config.profile_mapping
     assert rendered_profile_mapping is not None
-    rendered_profile_mapping.conn_id = operator.render_template(profile_mapping.conn_id, context, jinja_env)
+    rendered_profile_mapping.conn_id = str(operator.render_template(profile_mapping.conn_id, context, jinja_env))
     return rendered_profile_config
 
 

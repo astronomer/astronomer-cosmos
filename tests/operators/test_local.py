@@ -3841,3 +3841,23 @@ def test_render_template_fields_without_profile_config():
     sensor.render_template_fields({"params": {}})
 
     assert sensor.profile_config is None
+
+
+def test_render_template_fields_keeps_conn_id_a_string_with_native_rendering():
+    with DAG("test-native-conn-id", start_date=datetime(2024, 1, 1), render_template_as_native_obj=True):
+        operator = DbtRunLocalOperator(
+            task_id="run",
+            project_dir="my/dir",
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="{{ params.conn_id }}",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        )
+
+    operator.render_template_fields({"params": {"conn_id": "123"}})
+
+    assert operator.profile_config.profile_mapping.conn_id == "123"

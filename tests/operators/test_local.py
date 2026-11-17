@@ -568,6 +568,15 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
     assert operator.parse_number_of_warnings == dbt_runner.parse_number_of_warnings
 
 
+def _emitted_dataset_alias_names() -> set[str]:
+    """Names of the dataset aliases attached to a dataset in the Airflow 2 metadata database."""
+    from airflow.models.dataset import DatasetModel
+    from airflow.utils.session import create_session
+
+    with create_session() as session:
+        return {alias.name for dataset in session.query(DatasetModel).all() for alias in dataset.aliases}
+
+
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2")
 @pytest.mark.integration
 def test_run_operator_dataset_inlets_and_outlets_airflow2(caplog):
@@ -575,7 +584,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow2(caplog):
         from airflow.models.asset import AssetAliasModel
     except ModuleNotFoundError:
         from airflow.models.dataset import DatasetAliasModel as AssetAliasModel
-    from sqlalchemy.exc import PendingRollbackError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -612,10 +620,13 @@ def test_run_operator_dataset_inlets_and_outlets_airflow2(caplog):
     assert run_operator.outlets == [AssetAliasModel(name="test_id_1__run")]
     assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
 
-    # Known Airflow 2 limitation: running a DAG with DatasetAlias via ``dag.test()`` fails while flushing the alias
-    # https://github.com/apache/airflow/issues/42495
-    with pytest.raises(PendingRollbackError):
-        new_test_dag(dag)
+    # On Airflow 2, dag.test() does not sync the DAG, so the DatasetAlias of the tasks has no row in the database yet
+    # and the first dataset a task emits fails to flush (https://github.com/apache/airflow/issues/42495).
+    dag.sync_to_db()
+    new_test_dag(dag)
+
+    # Only the run task emits a dataset: dbt test produces no model to track.
+    assert "test_id_1__run" in _emitted_dataset_alias_names()
 
 
 @pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2")
@@ -623,7 +634,6 @@ def test_run_operator_dataset_inlets_and_outlets_airflow2(caplog):
 def test_run_operator_dataset_manual_outlets_airflow2(caplog):
     from airflow.datasets import Dataset, DatasetAlias
     from airflow.models.dataset import DatasetAliasModel
-    from sqlalchemy.exc import PendingRollbackError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -709,10 +719,19 @@ def test_run_operator_dataset_manual_outlets_airflow2(caplog):
 
     assert test_operator.outlets == [DatasetAlias(name="test_id_1__test")]
 
-    # Known Airflow 2 limitation: running a DAG with DatasetAlias via ``dag.test()`` fails while flushing the alias
-    # https://github.com/apache/airflow/issues/42495
-    with pytest.raises(PendingRollbackError):
-        new_test_dag(dag)
+    # On Airflow 2, dag.test() does not sync the DAG, so the DatasetAlias of the tasks has no row in the database yet
+    # and the first dataset a task emits fails to flush (https://github.com/apache/airflow/issues/42495).
+    dag.sync_to_db()
+    new_test_dag(dag)
+
+    assert {
+        "manual_outlet__run_dataset",
+        "manual_outlet__run_alias",
+        "manual_outlet__run_alias_model",
+        "test_id_1__run_operator_dataset",
+        "test_id_1__run_operator_alias",
+        "test_id_1__run_operator_alias_model",
+    } <= _emitted_dataset_alias_names()
 
 
 @pytest.mark.skipif(

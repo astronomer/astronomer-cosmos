@@ -3,7 +3,7 @@
 Watcher AWS ECS execution mode
 ==============================
 
-.. versionadded:: 1.16.0
+.. versionadded:: 1.17.0
 
 .. note::
    ``ExecutionMode.WATCHER_AWS_ECS`` is experimental.

@@ -706,6 +706,43 @@ def test_load_from_dbt_manifest_resolves_package_path(tmp_path):
     assert node.file_path.name == "foo.sql"
 
 
+def test_load_from_dbt_manifest_resolves_package_path_with_env_vars(tmp_path, monkeypatch):
+    """A packages-install-path that uses env_var() is resolved with ProjectConfig.env_vars."""
+    monkeypatch.delenv("dbt_packages_suffix", raising=False)
+    (tmp_path / "dbt_project.yml").write_text(
+        'packages-install-path: \'dbt_packages{{ "_" + env_var("dbt_packages_suffix","") '
+        'if env_var("dbt_packages_suffix","")!="" }}\'\n'
+    )
+    manifest = {
+        "metadata": {"project_name": "my_project"},
+        "nodes": {
+            "model.some_package.foo": {
+                "original_file_path": "models/foo.sql",
+                "package_name": "some_package",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_file = tmp_path / "manifest.json"
+    manifest_file.write_text(json.dumps(manifest))
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(
+            manifest_path=manifest_file, project_name="my_project", env_vars={"dbt_packages_suffix": "RB"}
+        ),
+        execution_config=ExecutionConfig(dbt_project_path=tmp_path),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+
+    node = dbt_graph.nodes["model.some_package.foo"]
+    assert node.file_path == tmp_path / "dbt_packages_RB" / "some_package" / "models" / "foo.sql"
+
+
 @pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
 def test_load_from_dbt_manifest_reclassifies_semantic_metric_view_materializations(
     tmp_path, monkeypatch, materialization
@@ -3820,3 +3857,29 @@ def test_add_downstream_nodes():
     target_node = "model.jaffle_shop.stg_payments"
     downstream_nodes = ["model.jaffle_shop.customers", "model.jaffle_shop.orders"]
     assert dbt_graph.nodes.get(target_node).downstream == downstream_nodes
+
+
+@pytest.mark.parametrize("copy_dbt_packages", [True, False])
+@patch("cosmos.dbt.graph.copy_dbt_packages")
+@patch("cosmos.dbt.graph.create_symlinks")
+def test_copy_or_create_symbolic_links_resolves_packages_path_with_env_vars(
+    create_symlinks_mock, copy_dbt_packages_mock, copy_dbt_packages, tmp_path
+):
+    env_vars = {"dbt_packages_suffix": "RB"}
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
+        env_vars=env_vars,
+        copy_dbt_packages=copy_dbt_packages,
+    )
+    dbt_graph = DbtGraph(project=project_config, render_config=RenderConfig())
+    assert dbt_graph.should_install_dbt_deps
+
+    dbt_graph._copy_or_create_symbolic_links(dbt_graph.project_path, tmp_path)
+
+    create_symlinks_mock.assert_called_once_with(
+        dbt_graph.project_path, tmp_path, ignore_dbt_packages=True, env_vars=env_vars
+    )
+    if copy_dbt_packages:
+        copy_dbt_packages_mock.assert_called_once_with(dbt_graph.project_path, tmp_path, env_vars=env_vars)
+    else:
+        copy_dbt_packages_mock.assert_not_called()

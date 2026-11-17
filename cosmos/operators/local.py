@@ -10,7 +10,7 @@ import time
 import warnings
 import zlib
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from functools import cached_property
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -529,7 +529,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             sql_content: str = sql_file.read()
         return sql_content
 
-    def _clone_project(self, tmp_dir_path: Path) -> None:
+    def _clone_project(self, tmp_dir_path: Path, env: Mapping[str, Any] | None = None) -> None:
         self.log.info(
             "Cloning project to writable temp directory %s from %s",
             tmp_dir_path,
@@ -537,11 +537,14 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         )
         should_not_create_dbt_deps_symbolic_link = self._should_install_deps() or self.copy_dbt_packages
         create_symlinks(
-            Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
+            Path(self.project_dir),
+            tmp_dir_path,
+            ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link,
+            env_vars=env,
         )
         if self.copy_dbt_packages:
             self.log.info("Copying dbt packages to temporary folder.")
-            copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
+            copy_dbt_packages(Path(self.project_dir), tmp_dir_path, env_vars=env)
             self.log.info("Completed copying dbt packages to temporary folder.")
 
         copy_manifest_file_if_exists(self.manifest_filepath, Path(tmp_dir_path))
@@ -588,7 +591,23 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self.log.debug("Checking for the %s dependencies file.", str(filename))
                 self.log.debug("Contents of the <%s> dependencies file:\n %s", str(filepath), str(filepath.read_text()))
 
-        self.invoke_dbt(command=deps_command, env=env, cwd=tmp_dir_path)
+        result = self.invoke_dbt(command=deps_command, env=env, cwd=tmp_dir_path)
+        self._handle_dbt_deps_result(result)
+
+    def _handle_dbt_deps_result(self, result: FullOutputSubprocessResult | dbtRunnerResult) -> None:
+        """Fail on any ``dbt deps`` error, ignoring ``skip_exit_code``, so dbt never runs with outdated packages."""
+        if isinstance(result, FullOutputSubprocessResult):
+            if result.exit_code == 0:
+                return
+            self.log.error("\n".join(result.full_output))
+            message = f"dbt deps failed with exit code {result.exit_code}, so the dbt command was not run."
+            failure_details = extract_dbt_failure_details(result.full_output)
+            if failure_details:
+                message += " Details:\n" + "\n".join(failure_details)
+            raise AirflowException(message)
+        if not result.success:
+            cause = f": {result.exception}" if result.exception else "."
+            raise CosmosDbtRunError(f"dbt deps failed, so the dbt command was not run{cause}")
 
     @staticmethod
     def _mock_dbt_adapter(async_context: dict[str, Any] | None) -> None:
@@ -786,7 +805,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
 
-            self._clone_project(tmp_dir_path)
+            self._clone_project(tmp_dir_path, env)
 
             if self.partial_parse:
                 self._handle_partial_parse(tmp_dir_path)

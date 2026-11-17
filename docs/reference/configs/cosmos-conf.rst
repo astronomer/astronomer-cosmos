@@ -361,7 +361,7 @@ This page lists all available `Apache Airflow® <https://airflow.apache.org/>`_ 
 
 `enable_dataset_alias`_:
     Enable or disable Airflow Dataset alias support when emitting datasets from Cosmos operators.
-    Requires Airflow >= 2.10. When disabled on Airflow 3+, dataset emission will fail with an error.
+    When disabled on Airflow 3+, dataset emission will fail with an error.
 
     - Default: ``True``
     - Environment Variable: ``AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS``

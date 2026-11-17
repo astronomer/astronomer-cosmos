@@ -454,14 +454,14 @@ class TestResolveSnowflakeAccount:
 
 
 class TestConstructDatasetUri:
-    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("2.10.0"))
+    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("2.11.0"))
     @patch("cosmos.dataset.settings")
     def test_airflow2_default_uri(self, mock_settings):
         mock_settings.use_dataset_airflow3_uri_standard = False
         uri = construct_dataset_uri("postgres://host:5432", "mydb.public.customers")
         assert uri == "postgres://host:5432/mydb.public.customers"
 
-    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("2.10.0"))
+    @patch("cosmos.dataset.AIRFLOW_VERSION", new=Version("2.11.0"))
     @patch("cosmos.dataset.settings")
     def test_airflow2_with_airflow3_standard(self, mock_settings):
         mock_settings.use_dataset_airflow3_uri_standard = True

@@ -46,7 +46,7 @@ def total_cosmos_tasks(dag: DAG) -> int:
         # In a real Airflow deployment, the following `task` is an instance of
         # `airflow.serialization.serialized_objects.SerializedBaseOperator`
         # and the only reference to Cosmos is in the _task_module.
-        # It is suboptimal, but works as of Airflow 2.10
+        # It is suboptimal, but works on Airflow 2
         task_module = getattr(task, "_task_module", None) or task.__class__.__module__
         if task_module.startswith("cosmos."):
             cosmos_tasks += 1

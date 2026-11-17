@@ -37,14 +37,8 @@ fi
 rm -rf airflow.*
 
 AIRFLOW_VERSION=$(python -c 'from importlib.metadata import version; print(version("apache-airflow"))')
-AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | cut -d. -f1)
-if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
-    echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db migrate'..."
-    airflow db migrate
-else
-    echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db init'..."
-    airflow db init
-fi
+echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db migrate'..."
+airflow db migrate
 
 # Run the cross-project example DAGs that exercise dbt-loom: the manifest-based
 # DAG, the dbt ls-based DAG, and the bidirectional manifest-based DAG. Each is run

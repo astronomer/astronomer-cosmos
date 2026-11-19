@@ -896,15 +896,16 @@ class BaseConsumerSensor(BaseSensorOperator):
     def _should_fall_back_for_upstream_failure_skip(self, ti: Any, upstream_failure_skip: bool) -> bool:
         """Whether to build now a failed node that dbt skipped for an upstream failure, instead of on a retry.
 
-        Only when the task has ``retries`` configured, so a retry would fall back too. The node then gets
-        ``retries + 1`` real dbt runs, like a node that failed inside the producer, instead of losing try 1.
-        The caller must also check that the producer has terminated. See #3023.
+        dbt never ran the node, so building it now is its first build, not a retry. A consumer only starts once
+        its Airflow upstreams have succeeded, or because a user cleared it, so the upstream failure is resolved.
+        With ``retries`` configured, the node gets ``retries + 1`` real dbt runs, like a node that failed inside
+        the producer, instead of losing try 1 (#3023). Without retries left, e.g. a downstream task cleared
+        together with its failed upstream that never had a try of its own, building now is the only way the node
+        runs (#3206). The caller must also check that the producer has terminated.
         """
-        if not self.retries:
-            return False
-        # The cluster policy moves only retries to the retry queue, so leave the build to the retry.
+        # The cluster policy moves only retries to the retry queue, so leave the build to the retry, if one will come.
         retry_queue = settings.watcher_dbt_retry_queue
-        if retry_queue and self.queue != retry_queue:
+        if retry_queue and self.queue != retry_queue and ti.try_number <= self.retries:
             return False
         if self.is_test_sensor:
             # dbt never runs a model's tests when the model did not succeed.

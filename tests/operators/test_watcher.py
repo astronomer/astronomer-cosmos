@@ -2078,12 +2078,23 @@ class TestDbtConsumerWatcherSensor:
         sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
         sensor._get_producer_task_status.assert_called_once()
 
+    @pytest.mark.parametrize("producer_state", ["success", "failed", "skipped"])
+    def test_poke_falls_back_on_first_try_for_upstream_failure_skip_without_retries(self, producer_state):
+        """#3206: clearing a failed consumer with its downstream tasks starts the downstream tasks on try 1, and
+        the producer will not run again. Without retries, building the never-run node now is the only way it runs."""
+        sensor = self.make_sensor(retries=0)
+        sensor._get_producer_task_status.return_value = producer_state
+        sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+
+        assert sensor.poke(context) is True
+        sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
+
     @pytest.mark.parametrize(
         "retries, xcoms, producer_state",
         [
-            # A retry would not fall back either, so the outcome stays a failure.
-            (0, UPSTREAM_SKIP_XCOMS, "success"),
             # dbt ran the node and it failed.
+            (0, REAL_FAILURE_XCOMS, "success"),
             (1, REAL_FAILURE_XCOMS, "success"),
             # Only the status XCom marks an upstream-failure skip, not the dbt event.
             (
@@ -2128,6 +2139,16 @@ class TestDbtConsumerWatcherSensor:
         with pytest.raises(AirflowException, match="finished with status 'failed'"):
             sensor.poke(context)
         sensor._fallback_to_non_watcher_run.assert_not_called()
+
+    @patch("cosmos.settings.watcher_dbt_retry_queue", "dbt_retry")
+    @pytest.mark.parametrize("retries, try_number", [(0, 1), (1, 2)])
+    def test_falls_back_off_the_retry_queue_when_no_retry_is_left(self, retries, try_number):
+        """#3206: with no retry left to move the task to watcher_dbt_retry_queue, build the never-run node now
+        instead of failing it."""
+        sensor = self.make_sensor(retries=retries, queue="dbt_consumer")
+        ti = self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS, try_number=try_number)
+
+        assert sensor._should_fall_back_for_upstream_failure_skip(ti, upstream_failure_skip=True) is True
 
     @patch("cosmos.settings.watcher_dbt_retry_queue", "dbt_retry")
     def test_poke_falls_back_on_first_try_when_already_on_the_retry_queue(self):
@@ -2359,10 +2380,24 @@ class TestDbtConsumerWatcherSensor:
 
         sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
 
+    def test_execute_complete_falls_back_for_upstream_failure_skip_without_retries(self):
+        """#3206: a cleared, deferred downstream consumer without retries builds the never-run node instead of raising."""
+        sensor = self.make_sensor(retries=0)
+        sensor._get_producer_task_status.return_value = "failed"
+        sensor._fallback_to_non_watcher_run = MagicMock(return_value=True)
+        context = self.make_context(self.make_xcom_ti(self.UPSTREAM_SKIP_XCOMS))
+
+        sensor.execute_complete(
+            context=context,
+            event={"status": "failed", "reason": WatcherEventReason.NODE_FAILED, "upstream_failure_skip": True},
+        )
+
+        sensor._fallback_to_non_watcher_run.assert_called_once_with(1, context)
+
     @pytest.mark.parametrize(
         "retries, event",
         [
-            (0, {"status": "failed", "reason": WatcherEventReason.NODE_FAILED, "upstream_failure_skip": True}),
+            (0, {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}),
             (1, {"status": "failed", "reason": WatcherEventReason.NODE_FAILED}),
         ],
     )

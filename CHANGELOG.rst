@@ -8,6 +8,10 @@ Breaking Changes
 
 * ``DbtSourceAzureContainerInstanceOperator`` has been removed from ``cosmos.operators.aws_eks``, where it was a misnamed copy of the AWS EKS source freshness operator, so importing it from there now raises ``ImportError``. Use ``DbtSourceAwsEksOperator`` instead, which is now also available as ``cosmos.DbtSourceAwsEksOperator`` and fixes ``ExecutionMode.AWS_EKS`` failing to render dbt ``source`` nodes. The real ``DbtSourceAzureContainerInstanceOperator`` in ``cosmos.operators.azure_container_instance`` is unchanged. See #3163.
 
+Bug Fixes
+
+* ``ExecutionMode.WATCHER`` consumers of a node that dbt skipped for an upstream failure now build the node once the producer has finished, even without ``retries`` or when ``watcher_dbt_retry_queue`` is set and no retry is left. Previously, clearing a failed consumer task together with its downstream tasks failed the downstream tasks: they had never run, so they started on attempt 1, read the ``failed`` status the producer recorded for them, and raised, because the producer does not run again. If no retry is left to move the task to ``watcher_dbt_retry_queue``, the node is built on the queue the task runs on. See #3206.
+
 1.16.0 (2026-11-03)
 -------------------
 

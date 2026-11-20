@@ -16,6 +16,7 @@ from cosmos.operators._asynchronous.bigquery import (
     _configure_bigquery_async_op_args,
     _mock_bigquery_adapter,
 )
+from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 
 
 @pytest.fixture
@@ -505,3 +506,25 @@ def test_execute_complete_resolves_rendered_emit_datasets(
         operator.execute_complete(MagicMock(), {"job_id": "job", "status": "success"})
 
     assert mock_register_event.called is expected_emission
+
+
+def test_render_template_fields_renders_templated_gcp_conn_id():
+    templated_profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="{{ params.conn_id }}",
+            profile_args={"dataset": "my_dataset"},
+        ),
+    )
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="run",
+        project_dir="/path/to/project",
+        profile_config=templated_profile_config,
+        dbt_kwargs={"task_id": "run"},
+    )
+
+    operator.render_template_fields({"params": {"conn_id": "rendered_conn"}})
+
+    assert operator.gcp_conn_id == "rendered_conn"
+    assert operator.profile_config.profile_mapping.conn_id == "rendered_conn"

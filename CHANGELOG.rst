@@ -8,6 +8,10 @@ Breaking Changes
 
 * ``DbtSourceAzureContainerInstanceOperator`` has been removed from ``cosmos.operators.aws_eks``, where it was a misnamed copy of the AWS EKS source freshness operator, so importing it from there now raises ``ImportError``. Use ``DbtSourceAwsEksOperator`` instead, which is now also available as ``cosmos.DbtSourceAwsEksOperator`` and fixes ``ExecutionMode.AWS_EKS`` failing to render dbt ``source`` nodes. The real ``DbtSourceAzureContainerInstanceOperator`` in ``cosmos.operators.azure_container_instance`` is unchanged. See #3163.
 
+Features
+
+* Add ``ExecutionMode.WATCHER_AWS_ECS``, which runs one ``dbt build`` in an Amazon ECS task and reads the node statuses from its CloudWatch log stream, by @fpiped in #3000
+
 1.16.0 (2026-11-03)
 -------------------
 

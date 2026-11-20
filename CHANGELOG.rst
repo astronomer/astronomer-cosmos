@@ -12,6 +12,13 @@ Features
 
 * Accept a Jinja template as the profile mapping ``conn_id``, rendered when each task runs, so the connection can come from a DAG param or ``dag_run.conf``. Supported with ``ExecutionMode.LOCAL``, ``VIRTUALENV`` and ``WATCHER``, and with ``AIRFLOW_ASYNC`` on BigQuery, by @tatiana in #3198
 
+1.16.1 (Unreleased)
+-------------------
+
+Enhancements
+
+* When the watcher producer stops before a model finishes, for example on a DAG run timeout, the model's watcher task now logs when the model started and which producer task log to search, instead of only ``No XCom value found``, by @tatiana in #3201
+
 1.16.0 (2026-11-03)
 -------------------
 

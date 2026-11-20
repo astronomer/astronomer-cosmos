@@ -540,9 +540,11 @@ class DbtProducerWatcherOperator(DbtBuildMixin, DbtLocalBaseOperator):
             raise
 
     def on_kill(self) -> None:
-        super().on_kill()
-        if self._producer_context is not None:
-            push_unfinished_dbt_events(self._producer_context)
+        try:
+            super().on_kill()
+        finally:
+            if self._producer_context is not None:
+                push_unfinished_dbt_events(self._producer_context)
 
 
 class DbtConsumerWatcherSensor(BaseConsumerSensor, DbtRunLocalOperator):

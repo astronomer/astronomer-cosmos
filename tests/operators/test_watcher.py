@@ -5,6 +5,8 @@ import json
 import logging
 import re
 import shutil
+import subprocess
+import sys
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -4566,6 +4568,21 @@ def test_producer_on_kill_pushes_unfinished_dbt_events(mock_parent_on_kill):
     op.on_kill()
 
     mock_parent_on_kill.assert_called_once_with()
+    ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})
+
+
+def test_producer_on_kill_pushes_unfinished_dbt_events_after_dbt_exited():
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=InvocationMode.SUBPROCESS)
+    exited_dbt = subprocess.Popen([sys.executable, "-c", ""])
+    exited_dbt.wait()
+    op.subprocess_hook.sub_process = exited_dbt
+    ti = MagicMock()
+    get_unfinished_dbt_events(ti)["model.pkg.my_model"] = {"status": "started"}
+    op._producer_context = {"ti": ti}
+
+    with pytest.raises(ProcessLookupError):
+        op.on_kill()
+
     ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})
 
 

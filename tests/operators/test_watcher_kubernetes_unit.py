@@ -604,3 +604,18 @@ def test_producer_on_kill_pushes_unfinished_dbt_events(mock_parent_on_kill):
 
     mock_parent_on_kill.assert_called_once_with()
     ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})
+
+
+@patch(
+    "cosmos.operators.kubernetes.DbtBuildKubernetesOperator.on_kill", side_effect=RuntimeError("pod already deleted")
+)
+def test_producer_on_kill_pushes_unfinished_dbt_events_when_parent_on_kill_raises(mock_parent_on_kill):
+    op = DbtProducerWatcherKubernetesOperator(project_dir=".", profile_config=None, image="dbt-image:latest")
+    ti = MagicMock()
+    get_unfinished_dbt_events(ti)["model.pkg.my_model"] = {"status": "started"}
+    op._context_holder[CONTEXT_KEY] = {"ti": ti}
+
+    with pytest.raises(RuntimeError):
+        op.on_kill()
+
+    ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})

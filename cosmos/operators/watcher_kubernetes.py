@@ -47,8 +47,10 @@ class DbtProducerWatcherKubernetesOperator(DbtBuildKubernetesOperator):
         return _k8s_common.execute_watcher_producer(self, context, parent_execute, **kwargs)
 
     def on_kill(self) -> None:
-        super().on_kill()
-        _k8s_common.push_watcher_producer_unfinished_dbt_events(self)
+        try:
+            super().on_kill()
+        finally:
+            _k8s_common.push_watcher_producer_unfinished_dbt_events(self)
 
 
 class DbtConsumerWatcherKubernetesSensor(BaseConsumerSensor, DbtRunKubernetesOperator):

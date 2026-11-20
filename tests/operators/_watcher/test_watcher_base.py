@@ -9,7 +9,7 @@ from cosmos.operators._watcher.base import (
     _process_dbt_log_event,
     store_dbt_resource_status_from_log,
 )
-from cosmos.operators._watcher.state import get_unfinished_dbt_events
+from cosmos.operators._watcher.state import get_unfinished_dbt_events, push_unfinished_dbt_events
 from cosmos.operators.local import DbtRunLocalOperator
 
 
@@ -441,3 +441,26 @@ def test_store_dbt_resource_status_from_log_buffers_started_node_until_it_finish
     store_dbt_resource_status_from_log(finish_line, extra_kwargs, should_generate_model_uris=False)
 
     assert get_unfinished_dbt_events(task_instance) == {}
+
+
+def _dbt_node_log(event_name: str, node_status: str) -> dict:
+    node_info = {
+        "unique_id": "model.pkg.my_model",
+        "node_status": node_status,
+        "node_started_at": "2026-11-16T10:00:00",
+    }
+    return {"data": {"node_info": node_info}, "info": {"name": event_name, "msg": event_name}}
+
+
+def test_push_unfinished_dbt_events_keeps_a_later_pushed_dbt_event():
+    xcoms = {}
+    task_instance = MagicMock()
+    task_instance.xcom_push.side_effect = lambda key, value: xcoms.__setitem__(key, value)
+    _process_dbt_log_event(task_instance, _dbt_node_log("NodeStart", "started"))
+    _process_dbt_log_event(task_instance, _dbt_node_log("LogStartLine", "started"))
+    _process_dbt_log_event(task_instance, _dbt_node_log("NodeCompiling", "compiling"))
+    _process_dbt_log_event(task_instance, _dbt_node_log("NodeExecuting", "executing"))
+
+    push_unfinished_dbt_events({"ti": task_instance})
+
+    assert xcoms["model__pkg__my_model_dbt_event"]["status"] == "executing"

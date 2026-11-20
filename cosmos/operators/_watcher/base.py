@@ -145,6 +145,7 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
             return None
 
         safe_xcom_push(task_instance=task_instance, key=get_dbt_event_xcom_key(unique_id), value=dbt_event)
+        get_unfinished_dbt_events(task_instance).pop(unique_id, None)
 
 
 def _extract_compiled_sql(

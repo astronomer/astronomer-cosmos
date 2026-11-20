@@ -184,9 +184,13 @@ def push_unfinished_dbt_events(context: Any) -> None:
         unfinished_dbt_events = get_unfinished_dbt_events(task_instance)
         for unique_id, dbt_event in list(unfinished_dbt_events.items()):
             key = get_dbt_event_xcom_key(unique_id)
-            task_instance.xcom_push(key=key, value=dbt_event)
             _add_to_xcom_backup_without_persisting(task_instance, key, dbt_event)
-        unfinished_dbt_events.clear()
+            try:
+                task_instance.xcom_push(key=key, value=dbt_event)
+            except Exception:
+                logger.warning("Could not push the dbt event of %s", unique_id, exc_info=True)
+            else:
+                unfinished_dbt_events.pop(unique_id, None)
     finally:
         xcom_set_lock.release()
 

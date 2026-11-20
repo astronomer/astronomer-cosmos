@@ -14,6 +14,7 @@ from pathlib import Path
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 from urllib.parse import urlparse
 
+import jinja2
 import pytest
 from airflow import DAG
 from airflow import __version__ as airflow_version
@@ -62,6 +63,7 @@ from cosmos.operators.local import (
     DbtTestLocalOperator,
     _read_target_sources_json,
 )
+from cosmos.operators.watcher import DbtConsumerWatcherSensor
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 from tests.conftest import make_task_instance
 from tests.utils import new_test_dag
@@ -3812,12 +3814,16 @@ def test_run_command_does_not_diagnose_the_source_freshness_check(
     mock_diagnose.assert_not_called()
 
 
-def test_render_template_fields_renders_templated_conn_id_on_a_copy():
+@pytest.mark.parametrize(
+    "conn_id_template",
+    ["{{ params.conn_id }}", "{% if params.conn_id %}{{ params.conn_id }}{% endif %}"],
+)
+def test_render_template_fields_renders_templated_conn_id_on_a_copy(conn_id_template):
     templated_profile_config = ProfileConfig(
         profile_name="default",
         target_name="dev",
         profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="{{ params.conn_id }}",
+            conn_id=conn_id_template,
             profile_args={"schema": "public"},
         ),
     )
@@ -3830,12 +3836,69 @@ def test_render_template_fields_renders_templated_conn_id_on_a_copy():
     operator.render_template_fields({"params": {"conn_id": "rendered_conn"}})
 
     assert operator.profile_config.profile_mapping.conn_id == "rendered_conn"
-    assert templated_profile_config.profile_mapping.conn_id == "{{ params.conn_id }}"
+    assert templated_profile_config.profile_mapping.conn_id == conn_id_template
+
+
+def test_render_template_fields_twice_keeps_the_rendered_conn_id():
+    operator = DbtRunLocalOperator(
+        task_id="run",
+        project_dir="my/dir",
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="{{ params.conn_id }}",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
+    context = {"params": {"conn_id": "rendered_conn"}}
+
+    operator.render_template_fields(context)
+    operator.render_template_fields(context)
+
+    assert operator.profile_config.profile_mapping.conn_id == "rendered_conn"
+
+
+@pytest.mark.parametrize("params", [{}, {"conn_id": " "}])
+def test_render_template_fields_rejects_a_conn_id_that_renders_empty(params):
+    operator = DbtRunLocalOperator(
+        task_id="run",
+        project_dir="my/dir",
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profile_mapping=PostgresUserPasswordProfileMapping(
+                conn_id="{{ params.conn_id }}",
+                profile_args={"schema": "public"},
+            ),
+        ),
+    )
+
+    with pytest.raises(CosmosValueError, match="rendered to an empty string in task 'run'"):
+        operator.render_template_fields({"params": params})
+
+
+def test_render_template_fields_applies_the_dag_template_undefined():
+    with DAG("test-strict-conn-id", start_date=datetime(2024, 1, 1), template_undefined=jinja2.StrictUndefined):
+        operator = DbtRunLocalOperator(
+            task_id="run",
+            project_dir="my/dir",
+            profile_config=ProfileConfig(
+                profile_name="default",
+                target_name="dev",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="{{ params.conn_id }}",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        )
+
+    with pytest.raises(jinja2.UndefinedError):
+        operator.render_template_fields({"params": {}})
 
 
 def test_render_template_fields_without_profile_config():
-    from cosmos.operators.watcher import DbtConsumerWatcherSensor
-
     sensor = DbtConsumerWatcherSensor(task_id="model_run", project_dir="my/dir", profile_config=None)
 
     sensor.render_template_fields({"params": {}})

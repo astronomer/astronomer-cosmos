@@ -54,7 +54,7 @@ Choose the connection when the task runs
 
 .. versionadded:: 1.17.0
 
-With ``ExecutionMode.LOCAL``, ``VIRTUALENV``, ``WATCHER`` and ``AIRFLOW_ASYNC``, ``conn_id`` accepts a Jinja template, which Cosmos renders when each task runs. In this example, it comes from the DAG param ``conn_id``, set with ``params={"conn_id": "example_conn"}``:
+With ``ExecutionMode.LOCAL``, ``VIRTUALENV`` and ``WATCHER``, and with ``AIRFLOW_ASYNC`` on BigQuery, ``conn_id`` accepts a Jinja template, which Cosmos renders when each task runs. In this example, it comes from the DAG param ``conn_id``, set with ``params={"conn_id": "example_conn"}``:
 
 .. literalinclude:: ../../../dev/dags/example_model_version.py
     :language: python

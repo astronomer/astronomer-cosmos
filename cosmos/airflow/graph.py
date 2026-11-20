@@ -878,21 +878,37 @@ def _has_profile_override(node: DbtNode) -> bool:
     return isinstance(cosmos_meta, dict) and bool(cosmos_meta.get("profile_config"))
 
 
+def _is_own_profile_override_applied(node: DbtNode, render_config: RenderConfig) -> bool:
+    # A test runs with the profile of the node it tests, unless it is detached into a task of its own.
+    if node.resource_type != DbtResourceType.TEST:
+        return True
+    return should_create_detached_nodes(render_config) and is_detached_test(node)
+
+
+_MAX_LISTED_PROFILE_OVERRIDES = 10
+
+
 def _warn_about_profile_overrides_ignored_by_watcher_producer(
     nodes: dict[str, DbtNode], execution_mode: ExecutionMode, render_config: RenderConfig
 ) -> None:
     overridden_node_ids = [
         node_id
         for node_id, node in nodes.items()
-        if _is_run_by_watcher_producer(node, execution_mode, render_config) and _has_profile_override(node)
+        if _is_run_by_watcher_producer(node, execution_mode, render_config)
+        and _is_own_profile_override_applied(node, render_config)
+        and _has_profile_override(node)
     ]
     if overridden_node_ids:
+        listed_node_ids = ", ".join(overridden_node_ids[:_MAX_LISTED_PROFILE_OVERRIDES])
+        unlisted_count = len(overridden_node_ids) - _MAX_LISTED_PROFILE_OVERRIDES
+        if unlisted_count > 0:
+            listed_node_ids += f" and {unlisted_count} more"
         logger.warning(
             "ExecutionMode.%s runs these nodes in the producer, which ignores their meta.cosmos.profile_config: %s. "
             "See https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html"
             "#per-node-profile-overrides",
             execution_mode.name,
-            ", ".join(overridden_node_ids),
+            listed_node_ids,
         )
 
 

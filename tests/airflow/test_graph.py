@@ -2251,10 +2251,30 @@ def nodes_with_profile_overrides():
         original_file_path=Path("models/schema.yml"),
         config={"meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
     )
-    return {node.unique_id: node for node in (restricted_model, default_model, restricted_test)}
+    restricted_multi_parent_test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.restricted_multi_parent_test",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[restricted_model.unique_id, default_model.unique_id],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/schema.yml"),
+        config={"meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+    )
+    return {
+        node.unique_id: node
+        for node in (restricted_model, default_model, restricted_test, restricted_multi_parent_test)
+    }
 
 
-def _render_with_profile_overrides(nodes, execution_mode, test_behavior):
+PROFILE_OVERRIDE_WARNING = "which ignores their meta.cosmos.profile_config"
+
+
+def _get_profile_override_warning(caplog):
+    warnings = [message for message in caplog.messages if PROFILE_OVERRIDE_WARNING in message]
+    assert warnings, f"No profile override warning in: {caplog.messages}"
+    return warnings[0]
+
+
+def _render_with_profile_overrides(nodes, execution_mode, test_behavior, should_detach_multiple_parents_tests=False):
     with DAG("test-profile-overrides", start_date=datetime(2022, 1, 1)) as dag:
         build_airflow_graph(
             nodes=nodes,
@@ -2271,28 +2291,58 @@ def _render_with_profile_overrides(nodes, execution_mode, test_behavior):
                     ),
                 ),
             },
-            render_config=RenderConfig(test_behavior=test_behavior),
+            render_config=RenderConfig(
+                test_behavior=test_behavior,
+                should_detach_multiple_parents_tests=should_detach_multiple_parents_tests,
+            ),
             dbt_project_name="astro_shop",
         )
 
 
 @pytest.mark.parametrize(
-    "test_behavior,is_test_override_ignored",
+    "test_behavior,should_detach_multiple_parents_tests,is_detached_test_listed",
     [
-        (TestBehavior.AFTER_EACH, True),
-        (TestBehavior.NONE, False),
-        (TestBehavior.AFTER_ALL, False),
+        (TestBehavior.AFTER_EACH, True, True),
+        (TestBehavior.AFTER_EACH, False, False),
+        (TestBehavior.NONE, True, False),
+        (TestBehavior.AFTER_ALL, True, False),
     ],
 )
 def test_watcher_warns_about_profile_overrides_ignored_by_the_producer(
-    caplog, nodes_with_profile_overrides, test_behavior, is_test_override_ignored
+    caplog, nodes_with_profile_overrides, test_behavior, should_detach_multiple_parents_tests, is_detached_test_listed
 ):
-    _render_with_profile_overrides(nodes_with_profile_overrides, ExecutionMode.WATCHER, test_behavior)
+    _render_with_profile_overrides(
+        nodes_with_profile_overrides, ExecutionMode.WATCHER, test_behavior, should_detach_multiple_parents_tests
+    )
 
-    warning = next(message for message in caplog.messages if "meta.cosmos.profile_config" in message)
+    warning = _get_profile_override_warning(caplog)
     assert f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.restricted_model" in warning
     assert "default_model" not in warning
-    assert ("restricted_test" in warning) is is_test_override_ignored
+    assert "restricted_test" not in warning
+    assert ("restricted_multi_parent_test" in warning) is is_detached_test_listed
+
+
+def test_watcher_warning_lists_at_most_ten_overridden_nodes(caplog):
+    overridden_models = [
+        DbtNode(
+            unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.model_{index:02d}",
+            resource_type=DbtResourceType.MODEL,
+            depends_on=[],
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path(f"models/model_{index:02d}.sql"),
+            config={"materialized": "table", "meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+        )
+        for index in range(12)
+    ]
+
+    _warn_about_profile_overrides_ignored_by_watcher_producer(
+        {model.unique_id: model for model in overridden_models}, ExecutionMode.WATCHER, RenderConfig()
+    )
+
+    warning = _get_profile_override_warning(caplog)
+    assert "model_09" in warning
+    assert "model_10" not in warning
+    assert "model_09 and 2 more." in warning
 
 
 @pytest.mark.parametrize(
@@ -2341,7 +2391,7 @@ def test_watcher_does_not_validate_overrides_of_tests_the_producer_skips(caplog)
         RenderConfig(test_behavior=TestBehavior.NONE),
     )
 
-    assert "meta.cosmos.profile_config" not in caplog.text
+    assert PROFILE_OVERRIDE_WARNING not in caplog.text
 
 
 def test_watcher_warning_does_not_validate_meta_left_to_task_creation(caplog):
@@ -2358,7 +2408,7 @@ def test_watcher_warning_does_not_validate_meta_left_to_task_creation(caplog):
         {malformed_model.unique_id: malformed_model}, ExecutionMode.WATCHER, RenderConfig()
     )
 
-    assert "meta.cosmos.profile_config" not in caplog.text
+    assert PROFILE_OVERRIDE_WARNING not in caplog.text
 
 
 def test_watcher_does_not_warn_about_ephemeral_model_overrides(caplog):
@@ -2375,13 +2425,13 @@ def test_watcher_does_not_warn_about_ephemeral_model_overrides(caplog):
         {ephemeral_model.unique_id: ephemeral_model}, ExecutionMode.WATCHER, RenderConfig()
     )
 
-    assert "meta.cosmos.profile_config" not in caplog.text
+    assert PROFILE_OVERRIDE_WARNING not in caplog.text
 
 
 def test_local_does_not_warn_about_profile_overrides(caplog, nodes_with_profile_overrides):
     _render_with_profile_overrides(nodes_with_profile_overrides, ExecutionMode.LOCAL, TestBehavior.AFTER_EACH)
 
-    assert "meta.cosmos.profile_config" not in caplog.text
+    assert PROFILE_OVERRIDE_WARNING not in caplog.text
 
 
 def test_custom_meta(hierarchical_naming_disabled):

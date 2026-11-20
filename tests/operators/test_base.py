@@ -12,6 +12,7 @@ try:
 except ImportError:
     from airflow.utils.context import Context
 
+from cosmos.config import ProfileConfig
 from cosmos.operators.base import (
     AbstractDbtBase,
     DbtBuildMixin,
@@ -250,3 +251,52 @@ def test_process_global_flag_dumps_dicts_as_one_line_flow_yaml_that_round_trips(
     assert flag_name == "--vars"
     assert "\n" not in flag_value
     assert yaml.safe_load(flag_value) == value
+
+
+class _ConcreteDbtBase(AbstractDbtBase):
+    base_cmd = ["run"]
+
+    def build_and_run_cmd(self, *args, **kwargs):
+        pass
+
+
+def _operator_with_profile(profile_config):
+    operator = _ConcreteDbtBase(project_dir="fake_dir", dbt_executable_path="dbt")
+    operator.profile_config = profile_config
+    return operator
+
+
+def test_abstract_dbt_base_profile_config_defaults_to_none():
+    assert _ConcreteDbtBase(project_dir="fake_dir").profile_config is None
+
+
+@pytest.mark.parametrize(
+    "profile_name, target_name, expected_flags",
+    [
+        ("my_profile", "my_target", ["--profile", "my_profile", "--target", "my_target"]),
+        ("my_profile", "", ["--profile", "my_profile"]),
+        ("", "my_target", ["--target", "my_target"]),
+        ("", "", []),
+    ],
+)
+def test_add_profile_flags(profile_name, target_name, expected_flags):
+    profile_config = ProfileConfig(
+        profile_name=profile_name, target_name=target_name, profiles_yml_filepath="/path/profiles.yml"
+    )
+
+    assert _operator_with_profile(profile_config).add_profile_flags() == expected_flags
+
+
+def test_add_profile_flags_without_profile_config():
+    assert _ConcreteDbtBase(project_dir="fake_dir").add_profile_flags() == []
+
+
+def test_build_cmd_does_not_add_profile_flags():
+    """Each execution mode decides where the profile flags go, so ``build_cmd`` leaves them out."""
+    profile_config = ProfileConfig(profile_name="p", target_name="t", profiles_yml_filepath="/path/profiles.yml")
+
+    cmd, _ = _operator_with_profile(profile_config).build_cmd(
+        context=Context(execution_date=datetime(2023, 2, 15, 12, 30))
+    )
+
+    assert cmd == ["dbt", "run"]

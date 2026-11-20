@@ -21,6 +21,8 @@ if TYPE_CHECKING:  # pragma: no cover
     except ImportError:
         from airflow.utils.context import Context  # type: ignore[attr-defined]
 
+    from cosmos.config import ProfileConfig
+
 try:
     from airflow.utils.operator_helpers import context_to_airflow_vars  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover
@@ -128,6 +130,9 @@ class AbstractDbtBase(metaclass=ABCMeta):
     global_boolean_flags = ("no_version_check", "cache_selected_only", "fail_fast", "quiet", "warn_error")
 
     intercept_flag = True
+
+    # Set by each execution mode's operator from its ``profile_config`` argument.
+    profile_config: ProfileConfig | None = None
 
     @property
     @abstractmethod
@@ -310,6 +315,22 @@ class AbstractDbtBase(metaclass=ABCMeta):
     def add_cmd_flags(self) -> list[str]:
         """Allows subclasses to override to add flags for their dbt command"""
         return []
+
+    def add_profile_flags(self) -> list[str]:
+        """
+        Return the dbt ``--profile`` and ``--target`` flags for ``self.profile_config``.
+
+        A name that is not set is left out, so dbt falls back to the profile named in ``dbt_project.yml`` and to its
+        default target. Returns an empty list when the operator has no ``profile_config``.
+        """
+        if self.profile_config is None:
+            return []
+        flags: list[str] = []
+        if self.profile_config.profile_name:
+            flags.extend(["--profile", self.profile_config.profile_name])
+        if self.profile_config.target_name:
+            flags.extend(["--target", self.profile_config.target_name])
+        return flags
 
     def build_cmd(
         self,

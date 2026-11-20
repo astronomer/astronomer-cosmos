@@ -198,6 +198,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
     # overwritten, so reject them at instantiation instead.
     _OUTPUT_ONLY_TEMPLATE_FIELDS: tuple[str, ...] = ("compiled_sql", "freshness")
     _process_log_line_callable: Callable[[str, Any], None] | None = None
+    # Typed like the ``profile_config`` parameter below, which ``AbstractDbtBase`` declares as optional.
+    profile_config: ProfileConfig
 
     @classmethod
     def _reject_output_only_template_fields(cls, kwargs: dict[str, Any]) -> None:

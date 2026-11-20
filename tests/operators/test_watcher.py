@@ -5,6 +5,8 @@ import json
 import logging
 import re
 import shutil
+import subprocess
+import sys
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -36,7 +38,12 @@ from cosmos.dbt.runner import is_dbt_v2
 from cosmos.exceptions import CosmosValueError
 from cosmos.operators._watcher.aggregation import TestResultSummary
 from cosmos.operators._watcher.base import store_compiled_sql_for_model
-from cosmos.operators._watcher.state import DbtTestStatus, safe_xcom_push
+from cosmos.operators._watcher.state import (
+    DbtTestStatus,
+    ProducerTaskState,
+    get_unfinished_dbt_events,
+    safe_xcom_push,
+)
 from cosmos.operators._watcher.triggerer import WatcherEventReason, WatcherTrigger
 from cosmos.operators.watcher import (
     DbtBuildWatcherOperator,
@@ -4568,3 +4575,75 @@ class TestStoreDbtResourceStatusFromLogNonJson:
         with caplog.at_level(logging.INFO, logger="cosmos.operators._watcher.base"):
             store_dbt_resource_status_from_log("", {"context": ctx}, tests_per_model={}, test_results_per_model={})
         assert caplog.text == ""
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator.on_kill")
+def test_producer_on_kill_pushes_unfinished_dbt_events(mock_parent_on_kill):
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    ti = MagicMock()
+    get_unfinished_dbt_events(ti)["model.pkg.my_model"] = {"status": "started"}
+    op._producer_context = {"ti": ti}
+
+    op.on_kill()
+
+    mock_parent_on_kill.assert_called_once_with()
+    ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})
+
+
+def test_producer_on_kill_pushes_unfinished_dbt_events_after_dbt_exited():
+    op = DbtProducerWatcherOperator(project_dir=".", profile_config=None, invocation_mode=InvocationMode.SUBPROCESS)
+    exited_dbt = subprocess.Popen([sys.executable, "-c", ""])
+    exited_dbt.wait()
+    op.subprocess_hook.sub_process = exited_dbt
+    ti = MagicMock()
+    get_unfinished_dbt_events(ti)["model.pkg.my_model"] = {"status": "started"}
+    op._producer_context = {"ti": ti}
+
+    with pytest.raises(ProcessLookupError):
+        op.on_kill()
+
+    ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})
+
+
+def test_consumer_logs_started_model_when_producer_is_killed(caplog):
+    xcoms: dict[str, Any] = {}
+    producer_ti = MagicMock()
+    producer_ti.xcom_push.side_effect = lambda key, value: xcoms.__setitem__(key, value)
+    producer = DbtProducerWatcherOperator(project_dir=".", profile_config=None)
+    producer._producer_context = {"ti": producer_ti}
+    start_line = json.dumps(
+        {
+            "data": {
+                "node_info": {
+                    "unique_id": "model.pkg.my_model",
+                    "node_status": "started",
+                    "node_started_at": "2026-11-07T09:26:17",
+                    "resource_type": "model",
+                }
+            },
+            "info": {"name": "LogStartLine", "msg": "1 of 1 START sql view model public.my_model"},
+        }
+    )
+    store_dbt_resource_status_from_log(start_line, {"context": producer._producer_context})
+    with patch("cosmos.operators.local.DbtLocalBaseOperator.on_kill"):
+        producer.on_kill()
+
+    consumer = DbtConsumerWatcherSensor(
+        task_id="my_model_run",
+        project_dir=".",
+        profiles_dir=".",
+        profile_config=profile_config,
+        extra_context={"dbt_node_config": {"unique_id": "model.pkg.my_model"}},
+        producer_task_id="dbt_producer_watcher",
+    )
+    consumer_ti = MagicMock(try_number=1)
+    consumer_ti.xcom_pull.side_effect = lambda task_ids, key: xcoms.get(key)
+    with (
+        patch.object(DbtConsumerWatcherSensor, "_get_producer_task_status", return_value=ProducerTaskState.FAILED),
+        patch.object(DbtConsumerWatcherSensor, "_fallback_to_non_watcher_run", return_value=True),
+        caplog.at_level(logging.INFO),
+    ):
+        consumer.poke({"ti": consumer_ti})
+
+    assert "[STARTED] Start: 09:26:17, Finish: N/A" in caplog.text
+    assert "Search the log of task 'dbt_producer_watcher' for 'model.pkg.my_model'" in caplog.text

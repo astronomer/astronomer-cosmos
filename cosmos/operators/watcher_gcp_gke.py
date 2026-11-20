@@ -46,6 +46,12 @@ class DbtProducerWatcherGcpGkeOperator(DbtBuildGcpGkeOperator):
         parent_execute = super().execute
         return _k8s_common.execute_watcher_producer(self, context, parent_execute, **kwargs)
 
+    def on_kill(self) -> None:
+        try:
+            super().on_kill()
+        finally:
+            _k8s_common.push_watcher_producer_unfinished_dbt_events(self)
+
 
 class DbtConsumerWatcherGcpGkeSensor(BaseConsumerSensor, DbtRunGcpGkeOperator):
     """Consumer sensor for ``ExecutionMode.WATCHER_GCP_GKE``.

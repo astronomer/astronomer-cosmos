@@ -181,6 +181,44 @@ def get_compiled_sql_xcom_key(unique_id: str) -> str:
 xcom_set_lock = Lock()
 
 
+def get_unfinished_dbt_events(task_instance: Any) -> dict[str, Any]:
+    unfinished_dbt_events: dict[str, Any] = vars(task_instance).setdefault("_cosmos_unfinished_dbt_events", {})
+    return unfinished_dbt_events
+
+
+def push_unfinished_dbt_events(context: Any) -> None:
+    task_instance = context["ti"]
+    # on_kill runs in a SIGTERM handler, which can interrupt the thread that holds this non-reentrant lock.
+    if not xcom_set_lock.acquire(timeout=1):
+        return
+    try:
+        unfinished_dbt_events = get_unfinished_dbt_events(task_instance)
+        for unique_id, dbt_event in list(unfinished_dbt_events.items()):
+            key = get_dbt_event_xcom_key(unique_id)
+            _add_to_xcom_backup_without_persisting(task_instance, key, dbt_event)
+            try:
+                task_instance.xcom_push(key=key, value=dbt_event)
+            except Exception:
+                logger.warning("Could not push the dbt event of %s", unique_id, exc_info=True)
+            else:
+                unfinished_dbt_events.pop(unique_id, None)
+    finally:
+        xcom_set_lock.release()
+
+
+def _add_to_xcom_backup_without_persisting(task_instance: Any, key: str, value: Any) -> None:
+    backup_buffer: dict[str, Any] | None = getattr(task_instance, "_cosmos_xcom_backup_buffer", None)
+    if backup_buffer is None:
+        return
+    backup_buffer[key] = value
+    from cosmos.operators._watcher.xcom import TASK_STATE_STORE_TI_ATTRIBUTE
+
+    # Failure and retry callbacks cannot write the task store, so _backup_xcom_to_variable saves the open row instead.
+    if getattr(task_instance, TASK_STATE_STORE_TI_ATTRIBUTE, None) is not None:
+        task_instance._cosmos_xcom_backup_open_row[key] = value
+        task_instance._cosmos_xcom_backup_open_row_persisted = False
+
+
 def safe_xcom_push(task_instance: TaskInstance, key: str, value: Any) -> None:
     """
     Safely set an XCom value in a thread-safe manner in Airflow 3.0 and 3.1.

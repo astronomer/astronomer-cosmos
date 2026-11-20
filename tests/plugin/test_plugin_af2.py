@@ -36,6 +36,7 @@ from unittest.mock import MagicMock, PropertyMock, mock_open, patch
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
+from airflow import settings
 from airflow.utils.db import initdb, resetdb
 from airflow.www.app import cached_app
 from airflow.www.extensions.init_appbuilder import AirflowAppBuilder
@@ -70,8 +71,17 @@ def app_within_astro_cloud(module_monkeypatch) -> FlaskClient:
     importlib.reload(cosmos)
     initdb()
 
+    # Plugin blueprints are module-level singletons; Flask refuses to register one on a second app once its
+    # setup methods have run (e.g. Astro Runtime's UpdateAvailableView), so reset the flag before rebuilding the app.
+    from airflow import plugins_manager
+
+    plugins_manager.initialize_web_ui_plugins()
+    for flask_blueprint in plugins_manager.flask_blueprints or []:
+        flask_blueprint["blueprint"]._got_registered_once = False
+
     cached_app._cached_app = None
     app = cached_app(testing=True)
+    app.extensions["appbuilder"].sm.sync_roles()
     appbuilder: AirflowAppBuilder = app.extensions["appbuilder"]
 
     appbuilder.sm.check_authorization = lambda *args, **kwargs: True
@@ -87,6 +97,7 @@ def app_within_astro_cloud(module_monkeypatch) -> FlaskClient:
 
     yield app.test_client()
 
+    settings.Session.remove()
     resetdb()
 
 
@@ -96,6 +107,7 @@ def app() -> FlaskClient:
 
     app = cached_app(testing=True)
     appbuilder: AirflowAppBuilder = app.extensions["appbuilder"]
+    appbuilder.sm.sync_roles()
 
     appbuilder.sm.check_authorization = lambda *args, **kwargs: True
 
@@ -105,6 +117,7 @@ def app() -> FlaskClient:
 
     yield app.test_client()
 
+    settings.Session.remove()
     resetdb()
 
 

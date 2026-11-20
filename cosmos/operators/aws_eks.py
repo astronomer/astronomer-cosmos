@@ -143,10 +143,14 @@ class DbtSnapshotAwsEksOperator(DbtAwsEksBaseOperator, DbtSnapshotKubernetesOper
         super().__init__(*args, **kwargs)
 
 
-class DbtSourceAzureContainerInstanceOperator(DbtAwsEksBaseOperator, DbtSourceKubernetesOperator):
+class DbtSourceAwsEksOperator(DbtAwsEksBaseOperator, DbtSourceKubernetesOperator):
     """
     Executes a dbt source freshness command.
     """
+
+    template_fields: Sequence[str] = (
+        DbtAwsEksBaseOperator.template_fields + DbtSourceKubernetesOperator.template_fields  # type: ignore[operator]
+    )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

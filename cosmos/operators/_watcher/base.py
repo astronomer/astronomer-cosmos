@@ -40,6 +40,7 @@ from cosmos.operators._watcher.state import (
     get_compiled_sql_xcom_key,
     get_dbt_event_xcom_key,
     get_status_xcom_key,
+    get_unfinished_dbt_events,
     get_xcom_val,
     is_dbt_node_status_failed,
     is_dbt_node_status_skipped,
@@ -121,7 +122,7 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
     info = dbt_log.get("info", {})
 
     event_name = info.get("name")
-    if event_name not in _DBT_EVENT_ALLOWLIST:
+    if event_name not in _DBT_EVENT_ALLOWLIST and event_name != "LogStartLine":
         return None
     node_info = data.get("node_info") or {}
     status = node_info.get("node_status")
@@ -140,8 +141,12 @@ def _process_dbt_log_event(task_instance: Any, dbt_log: dict[str, Any]) -> None:
             "finish_time": _iso_to_string(finish_time),
             "msg": msg,
         }
+        if event_name == "LogStartLine":
+            get_unfinished_dbt_events(task_instance)[unique_id] = dbt_event
+            return None
 
         safe_xcom_push(task_instance=task_instance, key=get_dbt_event_xcom_key(unique_id), value=dbt_event)
+        get_unfinished_dbt_events(task_instance).pop(unique_id, None)
 
 
 def _extract_compiled_sql(
@@ -461,6 +466,7 @@ def store_dbt_resource_status_from_log(
                     unique_id,
                 )
                 return
+            get_unfinished_dbt_events(context["ti"]).pop(unique_id, None)
             if dbt_node_resource_type == "test" and tests_per_model and test_results_per_model is not None:
                 logger.debug("Test '%s' finished with status '%s'", unique_id, reported_dbt_node_status)
                 push_test_result_or_aggregate(
@@ -734,12 +740,7 @@ class BaseConsumerSensor(BaseSensorOperator):
         reason = event.get("reason")
 
         # Log the node's dbt event once at terminal (poke() does the same for the non-deferrable path).
-        dbt_events = get_xcom_val(
-            task_instance=context["ti"],
-            key=get_dbt_event_xcom_key(self.model_unique_id),
-            task_ids=self.producer_task_id,
-        )
-        _log_dbt_event(dbt_events)
+        self._log_last_dbt_event(context)
 
         test_result_summary = event.get("test_result_summary")
         if self.is_test_sensor and test_result_summary:
@@ -933,8 +934,26 @@ class BaseConsumerSensor(BaseSensorOperator):
         )
         return self._fallback_to_non_watcher_run(context["ti"].try_number, context)
 
+    def _log_last_dbt_event(self, context: Context) -> None:
+        dbt_events = get_xcom_val(
+            task_instance=context["ti"],
+            key=get_dbt_event_xcom_key(self.model_unique_id),
+            task_ids=self.producer_task_id,
+        )
+        _log_dbt_event(dbt_events)
+
     def _handle_no_dbt_node_status(self, producer_task_state: str | None, try_number: int, context: Context) -> bool:
         """Handle the case where no dbt node status has been reported yet."""
+        if producer_task_state in (ProducerTaskState.FAILED, ProducerTaskState.SKIPPED):
+            self._log_last_dbt_event(context)
+            logger.info(
+                "No final status for %s '%s'. Search the log of task '%s' for '%s'.",
+                self._resource_label.lower(),
+                self.model_unique_id,
+                self.producer_task_id,
+                self.model_unique_id,
+            )
+
         if producer_task_state == ProducerTaskState.FAILED:
             if self.poke_retry_number > 0:
                 raise AirflowException(
@@ -1003,12 +1022,7 @@ class BaseConsumerSensor(BaseSensorOperator):
 
         # Log the dbt event only once the node is terminal; poke runs every interval, so logging before
         # this point would repeat the line on each poke.
-        dbt_events = get_xcom_val(
-            task_instance=context["ti"],
-            key=get_dbt_event_xcom_key(self.model_unique_id),
-            task_ids=self.producer_task_id,
-        )
-        _log_dbt_event(dbt_events)
+        self._log_last_dbt_event(context)
 
         if (
             is_dbt_node_status_failed(status)

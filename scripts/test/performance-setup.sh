@@ -16,11 +16,5 @@ pip install -U \
 rm -rf airflow.*
 
 AIRFLOW_VERSION=$(python -c 'from importlib.metadata import version; print(version("apache-airflow"))')
-AIRFLOW_MAJOR_VERSION=$(echo "$AIRFLOW_VERSION" | cut -d. -f1)
-if [ "$AIRFLOW_MAJOR_VERSION" -ge 3 ]; then
-    echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db migrate'..."
-    airflow db migrate
-else
-    echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db init'..."
-    airflow db init
-fi
+echo "Detected Airflow $AIRFLOW_VERSION. Running 'airflow db migrate'..."
+airflow db migrate

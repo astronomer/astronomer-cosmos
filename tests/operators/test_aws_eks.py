@@ -1,17 +1,23 @@
+import importlib
 from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow.exceptions import AirflowException
 from packaging.version import Version
 
+import cosmos
+from cosmos._utils.importer import load_method_from_module
 from cosmos.operators.aws_eks import (
+    DbtAwsEksBaseOperator,
     DbtBuildAwsEksOperator,
     DbtCloneAwsEksOperator,
     DbtLSAwsEksOperator,
     DbtRunAwsEksOperator,
     DbtSeedAwsEksOperator,
+    DbtSourceAwsEksOperator,
     DbtTestAwsEksOperator,
 )
+from cosmos.operators.kubernetes import DbtSourceKubernetesOperator
 
 
 @pytest.fixture()
@@ -45,6 +51,7 @@ def test_dbt_kubernetes_build_command():
         "test": DbtTestAwsEksOperator(**base_kwargs),
         "build": DbtBuildAwsEksOperator(**base_kwargs),
         "seed": DbtSeedAwsEksOperator(**base_kwargs),
+        "source freshness": DbtSourceAwsEksOperator(**base_kwargs),
         "clone": DbtCloneAwsEksOperator(**base_kwargs),
     }
 
@@ -53,7 +60,7 @@ def test_dbt_kubernetes_build_command():
         assert command_operator.cmds == []
         assert command_operator.arguments == [
             "dbt",
-            command_name,
+            *command_name.split(),
             "--vars",
             "{end_time: '{{ data_interval_end.strftime(''%Y%m%d%H%M%S'') }}', start_time: '{{ data_interval_start.strftime(''%Y%m%d%H%M%S'') }}'}",
             "--no-version-check",
@@ -155,3 +162,28 @@ def test_provided_config_file_fails():
             config_file="my/config",
         )
     assert "The config_file is not an allowed parameter for the EksPodOperator." in str(err_context.value)
+
+
+def test_dbt_source_aws_eks_operator_is_publicly_exported():
+    """cosmos.DbtSourceAwsEksOperator must resolve lazily to DbtSourceAwsEksOperator."""
+    assert cosmos.DbtSourceAwsEksOperator is DbtSourceAwsEksOperator
+    assert load_method_from_module("cosmos.operators.aws_eks", "DbtSourceAwsEksOperator") is DbtSourceAwsEksOperator
+
+    eks_module = importlib.import_module("cosmos.operators.aws_eks")
+    assert not hasattr(eks_module, "DbtSourceAzureContainerInstanceOperator")
+
+
+def test_dbt_source_aws_eks_operator_template_fields():
+    assert DbtSourceAwsEksOperator.template_fields == (
+        DbtAwsEksBaseOperator.template_fields + DbtSourceKubernetesOperator.template_fields
+    )
+
+
+def test_dbt_source_aws_eks_operator_registers_warning_callback():
+    """on_warning_callback must be wired through to the Kubernetes warning handler for EKS source operators."""
+    operator = DbtSourceAwsEksOperator(on_warning_callback=lambda *args, **kwargs: None, **base_kwargs)
+
+    # Validate that the on_warning_callback is passed through
+    assert operator.warning_handler is not None
+    callbacks = operator.callbacks if isinstance(operator.callbacks, list) else [operator.callbacks]
+    assert operator.warning_handler in callbacks

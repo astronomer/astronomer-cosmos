@@ -82,6 +82,8 @@ class FullOutputSubprocessHook(BaseHook):  # type: ignore[misc]
                 env=env if env or env == {} else os.environ,
                 # Unlike preexec_fn, this does not run fork handlers such as gRPC's, which can hang or abort the task.
                 start_new_session=True,
+                # Python ignores SIGPIPE, so give dbt the default SIGPIPE, SIGXFZ and SIGXFSZ handling back.
+                restore_signals=True,
                 bufsize=1,  # line-buffered (works only in text mode)
                 text=True,
                 encoding=output_encoding,

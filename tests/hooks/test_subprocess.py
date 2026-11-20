@@ -89,18 +89,37 @@ import sys
 
 from cosmos.hooks.subprocess import FullOutputSubprocessHook
 
-fork_hook_calls = []
-os.register_at_fork(before=lambda: fork_hook_calls.append("before"))
+fork_hook_calls_path = sys.argv[1]
+
+
+def record_fork_hook_call(name):
+    with open(fork_hook_calls_path, "a") as fork_hook_calls:
+        fork_hook_calls.write(name + "\\n")
+
+
+os.register_at_fork(
+    before=lambda: record_fork_hook_call("before"),
+    after_in_parent=lambda: record_fork_hook_call("after_in_parent"),
+    after_in_child=lambda: record_fork_hook_call("after_in_child"),
+)
 FullOutputSubprocessHook().run_command([sys.executable, "-c", "pass"])
-print(f"fork_hook_calls={len(fork_hook_calls)}")
 """
 
 
-def test_run_command_does_not_run_fork_hooks():
-    # gRPC and other C extensions with fork handlers can hang or abort the task when they run.
-    probe = subprocess.run([sys.executable, "-c", FORK_HOOK_PROBE], capture_output=True, text=True, check=True)
+def test_run_command_does_not_run_fork_hooks(tmp_path):
+    # CPython runs at-fork handlers, such as gRPC's, only when Popen is given a preexec_fn.
+    fork_hook_calls_path = tmp_path / "fork_hook_calls.txt"
+    fork_hook_calls_path.write_text("")
 
-    assert "fork_hook_calls=0" in probe.stdout.splitlines()
+    probe = subprocess.run(
+        [sys.executable, "-c", FORK_HOOK_PROBE, str(fork_hook_calls_path)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert probe.returncode == 0, probe.stderr
+    assert fork_hook_calls_path.read_text() == ""
 
 
 def test_run_command_starts_the_command_in_its_own_session():
@@ -111,6 +130,13 @@ def test_run_command_starts_the_command_in_its_own_session():
     pid, process_group_id, session_id = map(int, result.output.split())
     assert pid == process_group_id == session_id
     assert session_id != os.getsid(0)
+
+
+def test_run_command_restores_default_sigpipe_handling():
+    # A Python child ignores SIGPIPE at startup whatever it inherits, so Perl reports what the hook passed on.
+    result = FullOutputSubprocessHook().run_command(["perl", "-e", 'print defined $SIG{PIPE} ? $SIG{PIPE} : "DEFAULT"'])
+
+    assert result.output == "DEFAULT"
 
 
 @pytest.mark.parametrize(

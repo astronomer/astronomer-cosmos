@@ -195,6 +195,9 @@ When the ``dbt build`` command run by ``DbtProducerWatcherOperator`` fails, it w
 The individual watcher tasks that subclass ``DbtConsumerWatcherSensor`` can retry the dbt command themselves, using the same behavior as ``ExecutionMode.LOCAL``.
 
 If a branch of the DAG fails, users can clear the status of a failed consumer task, including its downstream tasks, via the Airflow UI, and each of them will run in ``ExecutionMode.LOCAL``.
+The downstream tasks run in ``ExecutionMode.LOCAL`` even when they never had an attempt of their own and the task has no
+``retries``. When ``watcher_dbt_retry_queue`` is set, such a task fails its first attempt and builds the node on a retry, which
+the cluster policy moves to that queue. If the task has no ``retries``, it builds the node on its own queue instead.
 
 **Producer retry behavior**
 

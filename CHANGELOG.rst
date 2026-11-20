@@ -8,6 +8,10 @@ Breaking Changes
 
 * ``DbtSourceAzureContainerInstanceOperator`` has been removed from ``cosmos.operators.aws_eks``, where it was a misnamed copy of the AWS EKS source freshness operator, so importing it from there now raises ``ImportError``. Use ``DbtSourceAwsEksOperator`` instead, which is now also available as ``cosmos.DbtSourceAwsEksOperator`` and fixes ``ExecutionMode.AWS_EKS`` failing to render dbt ``source`` nodes. The real ``DbtSourceAzureContainerInstanceOperator`` in ``cosmos.operators.azure_container_instance`` is unchanged. See #3163.
 
+Behaviour Changes
+
+* Cosmos now requires ``openlineage-integration-common`` 1.38.0 or later. From that release, the datasets (assets) that ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV`` emit for dbt models are named after the model's ``alias``, which is the relation dbt materializes, instead of its ``name``. **If a model has a version (``stg_users`` materialized as ``stg_users_v1``) or a custom ``alias``, its dataset URI changes to the name of the materialized table; update any DAG scheduled on the previous URI.** Datasets of sources keep their name. Users who already had ``openlineage-integration-common`` 1.38.0 or later installed see no change. See #2525.
+
 1.16.0 (2026-11-03)
 -------------------
 

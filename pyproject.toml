@@ -35,7 +35,8 @@ dependencies = [
     "msgpack",
     "packaging>=22.0",
     "virtualenv",
-    "openlineage-integration-common",  # Without this dependency, Airflow datasets/assets don't work
+    # 1.38.0 names model datasets after the dbt alias, which includes the version suffix of versioned models (#2525)
+    "openlineage-integration-common>=1.38.0",  # Without this dependency, Airflow datasets/assets don't work
 ]
 
 [project.optional-dependencies]
@@ -79,7 +80,7 @@ dbt-spark = ["dbt-spark"]
 dbt-sqlserver = ["dbt-sqlserver"]
 dbt-teradata = ["dbt-teradata"]
 dbt-vertica = ["dbt-vertica<=1.5.4"]
-openlineage = ["openlineage-integration-common!=1.15.0", "apache-airflow-providers-openlineage"]
+openlineage = ["openlineage-integration-common>=1.38.0", "apache-airflow-providers-openlineage"]
 amazon = [
     "apache-airflow-providers-amazon[s3fs]>=3.0.0",
 ]

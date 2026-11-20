@@ -9,6 +9,7 @@ from airflow.providers.cncf.kubernetes import __version__ as airflow_k8s_provide
 from packaging.version import Version
 
 from cosmos.constants import PRODUCER_WATCHER_TASK_ID, _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION
+from cosmos.operators._watcher.state import get_unfinished_dbt_events
 
 if Version(airflow_k8s_provider_version) < _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION:
     pytest.skip(
@@ -506,3 +507,29 @@ def test_consumer_emits_datasets_on_success(mock_register):
     assert inlets == []
     assert [o.uri for o in outlets] == ["postgres://h:5432/db/schema/stg_orders"]
     assert ctx is context
+
+
+@patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.on_kill")
+def test_producer_on_kill_pushes_unfinished_dbt_events(mock_parent_on_kill):
+    op = DbtProducerWatcherGcpGkeOperator(project_dir=".", profile_config=None, image="dbt-image:latest", **GKE_KWARGS)
+    ti = MagicMock()
+    get_unfinished_dbt_events(ti)["model.pkg.my_model"] = {"status": "started"}
+    op._context_holder[CONTEXT_KEY] = {"ti": ti}
+
+    op.on_kill()
+
+    mock_parent_on_kill.assert_called_once_with()
+    ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})
+
+
+@patch("cosmos.operators.gcp_gke.DbtBuildGcpGkeOperator.on_kill", side_effect=RuntimeError("pod already deleted"))
+def test_producer_on_kill_pushes_unfinished_dbt_events_when_parent_on_kill_raises(mock_parent_on_kill):
+    op = DbtProducerWatcherGcpGkeOperator(project_dir=".", profile_config=None, image="dbt-image:latest", **GKE_KWARGS)
+    ti = MagicMock()
+    get_unfinished_dbt_events(ti)["model.pkg.my_model"] = {"status": "started"}
+    op._context_holder[CONTEXT_KEY] = {"ti": ti}
+
+    with pytest.raises(RuntimeError):
+        op.on_kill()
+
+    ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})

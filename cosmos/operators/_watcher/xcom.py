@@ -19,7 +19,7 @@ from packaging.version import Version
 from cosmos.airflow.compatibility import delete_variable, get_variable, set_variable
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.log import get_logger
-from cosmos.operators._watcher.state import safe_xcom_push
+from cosmos.operators._watcher.state import push_unfinished_dbt_events, safe_xcom_push
 
 logger = get_logger(__name__)
 
@@ -217,12 +217,11 @@ def _backup_xcom_to_variable(context: Any) -> None:
 
 
 def _compose_backup_callback(existing: Any) -> Any:
-    """Append ``_backup_xcom_to_variable`` to any existing callback(s), idempotently (used for on_retry_callback and on_failure_callback)."""
-    if existing is None:
-        return _backup_xcom_to_variable
-    callbacks = list(existing) if isinstance(existing, (list, tuple)) else [existing]
-    if _backup_xcom_to_variable not in callbacks:
-        callbacks.append(_backup_xcom_to_variable)
+    """Append ``push_unfinished_dbt_events`` and ``_backup_xcom_to_variable`` to any existing callback(s), idempotently (used for on_retry_callback and on_failure_callback)."""
+    callbacks = [] if existing is None else list(existing) if isinstance(existing, (list, tuple)) else [existing]
+    for callback in (push_unfinished_dbt_events, _backup_xcom_to_variable):
+        if callback not in callbacks:
+            callbacks.append(callback)
     return callbacks
 
 

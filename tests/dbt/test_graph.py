@@ -3820,3 +3820,296 @@ def test_add_downstream_nodes():
     target_node = "model.jaffle_shop.stg_payments"
     downstream_nodes = ["model.jaffle_shop.customers", "model.jaffle_shop.orders"]
     assert dbt_graph.nodes.get(target_node).downstream == downstream_nodes
+
+
+def _make_bridge_node(unique_id, resource_type, depends_on):
+    return DbtNode(
+        unique_id=unique_id,
+        resource_type=resource_type,
+        depends_on=depends_on,
+        path_base=Path("/tmp"),
+        original_file_path=Path(f"{unique_id.split('.')[-1]}.sql"),
+    )
+
+
+class TestBridgeFilteredDependencies:
+    """Tests for DbtGraph.bridge_filtered_dependencies (issue #3151)."""
+
+    def _graph(self, nodes, filtered_ids):
+        graph = DbtGraph(project=ProjectConfig())
+        graph.nodes = {node.unique_id: node for node in nodes}
+        graph.filtered_nodes = {uid: graph.nodes[uid] for uid in filtered_ids}
+        return graph
+
+    def test_bridges_excluded_parent_to_nearest_selected_ancestor(self):
+        raw = _make_bridge_node("seed.proj.raw", DbtResourceType.SEED, [])
+        stg = _make_bridge_node("model.proj.stg", DbtResourceType.MODEL, [raw.unique_id])
+        orders = _make_bridge_node("model.proj.orders", DbtResourceType.MODEL, [stg.unique_id])
+        graph = self._graph([raw, stg, orders], {raw.unique_id, orders.unique_id})
+
+        graph.bridge_filtered_dependencies()
+
+        assert orders.depends_on == [raw.unique_id]
+
+    def test_noop_when_selection_has_no_gaps(self):
+        raw = _make_bridge_node("seed.proj.raw", DbtResourceType.SEED, [])
+        stg = _make_bridge_node("model.proj.stg", DbtResourceType.MODEL, [raw.unique_id])
+        orders = _make_bridge_node("model.proj.orders", DbtResourceType.MODEL, [stg.unique_id])
+        graph = self._graph([raw, stg, orders], {raw.unique_id, stg.unique_id, orders.unique_id})
+
+        graph.bridge_filtered_dependencies()
+
+        assert orders.depends_on == [stg.unique_id]
+        assert stg.depends_on == [raw.unique_id]
+
+    def test_multi_level_chain(self):
+        seed = _make_bridge_node("seed.proj.raw", DbtResourceType.SEED, [])
+        mid1 = _make_bridge_node("model.proj.mid1", DbtResourceType.MODEL, [seed.unique_id])
+        mid2 = _make_bridge_node("model.proj.mid2", DbtResourceType.MODEL, [mid1.unique_id])
+        top = _make_bridge_node("model.proj.top", DbtResourceType.MODEL, [mid2.unique_id])
+        graph = self._graph([seed, mid1, mid2, top], {seed.unique_id, top.unique_id})
+
+        graph.bridge_filtered_dependencies()
+
+        assert top.depends_on == [seed.unique_id]
+
+    def test_diamond_exclusions_converge_to_shared_ancestor(self):
+        root = _make_bridge_node("seed.proj.root", DbtResourceType.SEED, [])
+        left = _make_bridge_node("model.proj.left", DbtResourceType.MODEL, [root.unique_id])
+        right = _make_bridge_node("model.proj.right", DbtResourceType.MODEL, [root.unique_id])
+        top = _make_bridge_node("model.proj.top", DbtResourceType.MODEL, [left.unique_id, right.unique_id])
+        graph = self._graph([root, left, right, top], {root.unique_id, top.unique_id})
+
+        graph.bridge_filtered_dependencies()
+
+        assert top.depends_on == [root.unique_id]
+
+    def test_keeps_parent_that_does_not_resolve_to_selected_ancestor(self):
+        source = _make_bridge_node("source.proj.src", DbtResourceType.SOURCE, [])
+        model = _make_bridge_node("model.proj.model", DbtResourceType.MODEL, [source.unique_id])
+        graph = self._graph([source, model], {model.unique_id})
+
+        graph.bridge_filtered_dependencies()
+
+        assert model.depends_on == [source.unique_id]
+
+    def test_tests_keep_their_depends_on(self):
+        raw = _make_bridge_node("seed.proj.raw", DbtResourceType.SEED, [])
+        stg = _make_bridge_node("model.proj.stg", DbtResourceType.MODEL, [raw.unique_id])
+        test = _make_bridge_node("test.proj.stg_test", DbtResourceType.TEST, [stg.unique_id])
+        graph = self._graph([raw, stg, test], {raw.unique_id, test.unique_id})
+
+        graph.bridge_filtered_dependencies()
+
+        assert test.depends_on == [stg.unique_id]
+
+    def test_unselected_test_is_a_dead_end(self):
+        base = _make_bridge_node("model.proj.base", DbtResourceType.MODEL, [])
+        test = _make_bridge_node("test.proj.test", DbtResourceType.TEST, [base.unique_id])
+        model = _make_bridge_node("model.proj.model", DbtResourceType.MODEL, [test.unique_id])
+        graph = self._graph([base, test, model], {base.unique_id, model.unique_id})
+
+        graph.bridge_filtered_dependencies()
+
+        assert model.depends_on == [test.unique_id]
+
+    def test_dependency_cycle_does_not_hang(self):
+        node_a = _make_bridge_node("model.proj.a", DbtResourceType.MODEL, ["model.proj.b"])
+        node_b = _make_bridge_node("model.proj.b", DbtResourceType.MODEL, ["model.proj.a"])
+        top = _make_bridge_node("model.proj.top", DbtResourceType.MODEL, [node_a.unique_id])
+        graph = self._graph([node_a, node_b, top], {top.unique_id})
+
+        graph.bridge_filtered_dependencies()
+
+        assert top.depends_on == [node_a.unique_id]
+
+    def test_uses_unfiltered_nodes_when_available(self):
+        seed = _make_bridge_node("seed.proj.raw", DbtResourceType.SEED, [])
+        stg = _make_bridge_node("model.proj.stg", DbtResourceType.MODEL, [seed.unique_id])
+        orders = _make_bridge_node("model.proj.orders", DbtResourceType.MODEL, [stg.unique_id])
+        graph = DbtGraph(project=ProjectConfig())
+        # LoadMode.DBT_LS: `nodes` only holds the selected nodes, the full graph comes
+        # from the extra unfiltered `dbt ls`
+        graph.nodes = {orders.unique_id: orders, seed.unique_id: seed}
+        graph.filtered_nodes = graph.nodes
+        graph.unfiltered_nodes = {n.unique_id: n for n in (seed, stg, orders)}
+
+        graph.bridge_filtered_dependencies()
+
+        assert orders.depends_on == [seed.unique_id]
+
+
+class TestHasUnrenderedModelAncestors:
+    def _graph(self, node, filtered_ids):
+        graph = DbtGraph(project=ProjectConfig())
+        graph.nodes = {node.unique_id: node}
+        graph.filtered_nodes = {uid: graph.nodes[uid] for uid in filtered_ids}
+        return graph
+
+    def test_detects_model_gap(self):
+        orders = _make_bridge_node("model.proj.orders", DbtResourceType.MODEL, ["model.proj.stg"])
+        graph = self._graph(orders, {orders.unique_id})
+        assert graph._has_unrendered_model_ancestors() is True
+
+    def test_ignores_source_references(self):
+        orders = _make_bridge_node("model.proj.orders", DbtResourceType.MODEL, ["source.proj.src"])
+        graph = self._graph(orders, {orders.unique_id})
+        assert graph._has_unrendered_model_ancestors() is False
+
+    def test_ignores_test_nodes(self):
+        test = _make_bridge_node("test.proj.test", DbtResourceType.TEST, ["model.proj.stg"])
+        graph = self._graph(test, {test.unique_id})
+        assert graph._has_unrendered_model_ancestors() is False
+
+    def test_false_when_graph_is_complete(self):
+        raw = _make_bridge_node("seed.proj.raw", DbtResourceType.SEED, [])
+        orders = _make_bridge_node("model.proj.orders", DbtResourceType.MODEL, [raw.unique_id])
+        graph = DbtGraph(project=ProjectConfig())
+        graph.nodes = {raw.unique_id: raw, orders.unique_id: orders}
+        graph.filtered_nodes = graph.nodes
+        assert graph._has_unrendered_model_ancestors() is False
+
+
+def test_load_via_manifest_with_selection_gap_bridges_dependencies():
+    """Regression test for #3151: excluding the stg_* models must not disconnect the seeds."""
+    project_config = ProjectConfig(
+        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
+    )
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    render_config = RenderConfig(
+        select=["resource_type:seed", "tag:test_tag"], source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR
+    )
+    execution_config = ExecutionConfig(dbt_project_path=project_config.dbt_project_path)
+    dbt_graph = DbtGraph(
+        project=project_config,
+        execution_config=execution_config,
+        profile_config=profile_config,
+        render_config=render_config,
+    )
+    dbt_graph.load(method=LoadMode.DBT_MANIFEST)
+
+    customers = dbt_graph.filtered_nodes["model.jaffle_shop.customers"]
+    assert customers.depends_on == [
+        "seed.jaffle_shop.raw_customers",
+        "seed.jaffle_shop.raw_orders",
+        "seed.jaffle_shop.raw_payments",
+    ]
+    orders = dbt_graph.filtered_nodes["model.jaffle_shop.orders"]
+    assert orders.depends_on == ["seed.jaffle_shop.raw_orders", "seed.jaffle_shop.raw_payments"]
+    test_node = dbt_graph.filtered_nodes["test.jaffle_shop.not_null_orders_amount.106140f9fd"]
+    assert test_node.depends_on == ["model.jaffle_shop.orders"]
+    assert orders.has_test
+    assert orders.has_non_detached_test
+    assert test_node.unique_id in dbt_graph.tests_per_model[orders.unique_id]
+
+    for node in dbt_graph.nodes.values():
+        expected_downstream = {
+            child.unique_id
+            for child in dbt_graph.nodes.values()
+            if child.resource_type != DbtResourceType.TEST and node.unique_id in child.depends_on
+        }
+        assert set(node.downstream) == expected_downstream
+
+
+def test_load_via_dbt_ls_with_selection_gap_keeps_reverse_dependencies():
+    graph = DbtGraph(project=ProjectConfig())
+    raw = _make_bridge_node("seed.proj.raw", DbtResourceType.SEED, [])
+    orders = _make_bridge_node("model.proj.orders", DbtResourceType.MODEL, ["model.proj.stg"])
+
+    def load_selected_nodes():
+        graph.nodes = {node.unique_id: node for node in (raw, orders)}
+        graph.filtered_nodes = graph.nodes
+        graph.unfiltered_nodes = {
+            node.unique_id: node
+            for node in (
+                _make_bridge_node(raw.unique_id, DbtResourceType.SEED, []),
+                _make_bridge_node("model.proj.stg", DbtResourceType.MODEL, [raw.unique_id]),
+                _make_bridge_node(orders.unique_id, DbtResourceType.MODEL, ["model.proj.stg"]),
+            )
+        }
+
+    with patch.object(graph, "load_via_dbt_ls", side_effect=load_selected_nodes):
+        graph.load(method=LoadMode.DBT_LS)
+
+    assert orders.depends_on == [raw.unique_id]
+    assert raw.downstream == [orders.unique_id]
+    assert orders.downstream == []
+
+
+@patch.object(DbtGraph, "load_via_dbt_ls_without_cache")
+@patch.object(DbtGraph, "load_via_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_uses_cache_when_selection_has_no_gaps(mock_cache, mock_live):
+    graph = DbtGraph(project=ProjectConfig())
+    graph.load_via_dbt_ls()
+    mock_live.assert_not_called()
+
+
+@patch.object(DbtGraph, "load_via_dbt_ls_without_cache")
+@patch.object(DbtGraph, "load_via_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_cache_hit_with_selection_gaps_reloads_live(mock_cache, mock_live):
+    graph = DbtGraph(
+        project=ProjectConfig(),
+        profile_config=ProfileConfig(
+            profile_name="test",
+            target_name="test",
+            profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+        ),
+    )
+    orders = _make_bridge_node("model.proj.orders", DbtResourceType.MODEL, ["model.proj.stg"])
+    graph.filtered_nodes = {orders.unique_id: orders}
+    graph.load_via_dbt_ls()
+    mock_live.assert_called_once()
+
+
+@patch("cosmos.dbt.graph.settings")
+@patch("cosmos.dbt.graph.run_command", return_value="")
+def test_run_dbt_ls_with_selection_keeps_selection_args_and_cache(mock_run_command, mock_settings):
+    mock_settings.pre_dbt_fusion = False
+    graph = DbtGraph(
+        cache_identifier="something",
+        project=ProjectConfig(dbt_project_path="/tmp"),
+        render_config=RenderConfig(select=["tag:x"], exclude=["tag:y"]),
+    )
+    graph.local_flags = []
+    with patch.object(DbtGraph, "save_dbt_ls_cache") as mock_save:
+        graph.run_dbt_ls(dbt_cmd="dbt", project_path=Path("/tmp"), tmp_dir=Path("/tmp"), env_vars={})
+    command = mock_run_command.call_args[0][0]
+    assert "--select" in command
+    assert "--exclude" in command
+    mock_save.assert_called_once()
+
+
+@patch("cosmos.dbt.graph.settings")
+@patch("cosmos.dbt.graph.run_command", return_value="")
+def test_run_dbt_ls_without_selection_omits_selection_args_and_cache(mock_run_command, mock_settings):
+    mock_settings.pre_dbt_fusion = False
+    graph = DbtGraph(
+        cache_identifier="something",
+        project=ProjectConfig(dbt_project_path="/tmp"),
+        render_config=RenderConfig(select=["tag:x"], exclude=["tag:y"]),
+    )
+    graph.local_flags = []
+    with patch.object(DbtGraph, "save_dbt_ls_cache") as mock_save:
+        graph.run_dbt_ls(
+            dbt_cmd="dbt", project_path=Path("/tmp"), tmp_dir=Path("/tmp"), env_vars={}, include_selection=False
+        )
+    command = mock_run_command.call_args[0][0]
+    assert "--select" not in command
+    assert "--exclude" not in command
+    mock_save.assert_not_called()
+
+
+@patch.object(DbtGraph, "load_via_dbt_ls_without_cache")
+@patch.object(DbtGraph, "load_via_dbt_ls_cache", return_value=True)
+def test_load_via_dbt_ls_cache_hit_with_gaps_but_no_profile_keeps_cache(mock_cache, mock_live, caplog):
+    graph = DbtGraph(project=ProjectConfig())
+    orders = _make_bridge_node("model.proj.orders", DbtResourceType.MODEL, ["model.proj.stg"])
+    graph.filtered_nodes = {orders.unique_id: orders}
+    with caplog.at_level(logging.WARNING):
+        graph.load_via_dbt_ls()
+    mock_live.assert_not_called()
+    assert "ordering cannot be restored from the dbt ls cache" in caplog.text

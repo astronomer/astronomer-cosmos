@@ -281,6 +281,41 @@ class BaseProfileMapping(ABC):
 
         return str(yaml.dump(profile_contents, indent=4))
 
+    def get_redacted_profile_file_contents(
+        self,
+        profile_name: str,
+        target_name: str = "cosmos_target",
+        use_mock_values: bool = False,
+        profile_contents: str | None = None,
+    ) -> str:
+        """
+        Translates the profile into a string that can be written to a profiles.yml file,
+        or redacts an already-rendered profiles.yml string, redacting any fields present
+        in secret_fields with '***'.
+        """
+        if profile_contents is None:
+            profile_contents = self.get_profile_file_contents(
+                profile_name=profile_name, target_name=target_name, use_mock_values=use_mock_values
+            )
+
+        if not isinstance(profile_contents, str):
+            return str(profile_contents)
+
+        try:
+            profile_data = yaml.safe_load(profile_contents)
+        except Exception:
+            return profile_contents
+
+        if isinstance(profile_data, dict):
+            outputs = profile_data.get(profile_name, {}).get("outputs", {}).get(target_name, {})
+            if isinstance(outputs, dict):
+                for field in self.secret_fields:
+                    if field in outputs:
+                        outputs[field] = "***"
+            return str(yaml.dump(profile_data, indent=4))
+
+        return profile_contents
+
     def _get_airflow_conn_field(self, airflow_field: str) -> Any:
         # make sure there's no "extra." prefix
         if airflow_field.startswith("extra."):

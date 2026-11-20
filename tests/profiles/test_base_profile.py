@@ -185,3 +185,27 @@ def test_profile_version_sha_consistency():
     profile_mapping = TestProfileMapping(conn_id="fake_conn_id")
     version = profile_mapping.version(profile_name="dev", target_name="dev")
     assert version == "ea3bf1f70b033405ba9ff9cafe65af873fd7a868cac840cdbfd5e8e9a1da9650"
+
+
+def test_get_redacted_profile_file_contents():
+    class CustomProfileMapping(BaseProfileMapping):
+        __test__ = False
+        dbt_profile_type = "fake-type"
+        secret_fields = ["secret_key", "missing_secret"]
+
+        @property
+        def profile(self) -> dict[str, Any]:
+            return {
+                "user": "alice",
+                "secret_key": "{{ env_var('SECRET_KEY') }}",
+            }
+
+    mapping = CustomProfileMapping(conn_id="fake_conn")
+    redacted = mapping.get_redacted_profile_file_contents(profile_name="test_profile", target_name="test_target")
+    data = yaml.safe_load(redacted)
+
+    outputs = data["test_profile"]["outputs"]["test_target"]
+    assert outputs["user"] == "alice"
+    assert outputs["secret_key"] == "***"
+    assert "missing_secret" not in outputs
+    assert "env_var" not in redacted

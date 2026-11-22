@@ -1658,6 +1658,58 @@ def test_sources_and_exposures_are_still_selected_the_dbt_way():
     assert select("weekly_metrics") == {"exposure.proj.weekly_metrics"}
 
 
+def _nodes_with_two_sources() -> dict[str, DbtNode]:
+    def source(name: str, table: str) -> DbtNode:
+        return DbtNode(
+            unique_id=f"source.proj.{name}.{table}",
+            resource_type=DbtResourceType.SOURCE,
+            depends_on=[],
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path(f"models/{name}.yml"),
+            package_name="proj",
+        )
+
+    def model(name: str, parent: str) -> DbtNode:
+        return DbtNode(
+            unique_id=f"model.proj.{name}",
+            resource_type=DbtResourceType.MODEL,
+            depends_on=[parent],
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path(f"models/{name}.sql"),
+            package_name="proj",
+        )
+
+    nodes = [
+        source("raw", "orders"),
+        source("raw", "customers"),
+        source("events", "clicks"),
+        model("stg_orders", "source.proj.raw.orders"),
+        model("stg_clicks", "source.proj.events.clicks"),
+    ]
+    return {node.unique_id: node for node in nodes}
+
+
+@pytest.mark.parametrize(
+    "select,exclude,expected",
+    [
+        (["source:raw"], [], {"source.proj.raw.orders", "source.proj.raw.customers"}),
+        (["source:raw+"], [], {"source.proj.raw.orders", "source.proj.raw.customers", "model.proj.stg_orders"}),
+        (["source:raw.*"], [], {"source.proj.raw.orders", "source.proj.raw.customers"}),
+        (["source:*"], [], {"source.proj.raw.orders", "source.proj.raw.customers", "source.proj.events.clicks"}),
+        (["source:proj.raw.orders"], [], {"source.proj.raw.orders"}),
+        (["source:other_package.raw.orders"], [], set()),
+        ([], ["source:raw+"], {"source.proj.events.clicks", "model.proj.stg_clicks"}),
+    ],
+)
+def test_source_selector_matches_dbt_source_method(select, exclude, expected):
+    """``source:`` follows dbt: a bare source name selects all its tables, and package prefixes and ``*`` work."""
+    selected = select_nodes(
+        project_dir=SAMPLE_PROJ_PATH, nodes=_nodes_with_two_sources(), select=select, exclude=exclude
+    )
+
+    assert set(selected) == expected
+
+
 def test_select_exposure_nodes_by_graph_ancestry():
     """
     Test selecting an exposure node and its directs ancestors using the syntax '+exposure:exposure_name'.

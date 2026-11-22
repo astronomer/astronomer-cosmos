@@ -6,6 +6,7 @@ import inspect
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from fnmatch import fnmatch
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -116,6 +117,27 @@ def _node_matches_bare_identifier(node: DbtNode, identifier: str) -> bool:
         or node.name == identifier.replace(".", "_")
         or identifier in node.original_file_path.parent.parts
     )
+
+
+def _source_selector_matches(node: DbtNode, selector: str) -> bool:
+    """
+    Port of dbt's ``SourceSelectorMethod``: ``source:<source>`` matches every table of the source,
+    ``source:<source>.<table>`` one table and ``source:<package>.<source>.<table>`` also checks the
+    package. Each part accepts ``*`` wildcards.
+    """
+    if node.resource_type != DbtResourceType.SOURCE:
+        return False
+    parts = selector.split(".")
+    if len(parts) == 1:
+        package, source, table = "*", parts[0], "*"
+    elif len(parts) == 2:
+        package, source, table = "*", parts[0], parts[1]
+    elif len(parts) == 3:
+        package, source, table = parts
+    else:
+        return False
+    source_name, _, table_name = node.resource_name.partition(".")
+    return fnmatch(node.package_name or "", package) and fnmatch(source_name, source) and fnmatch(table_name, table)
 
 
 def _check_nested_value_in_dict(dict_: dict[Any, Any], pattern: str) -> bool:
@@ -321,13 +343,8 @@ class GraphSelector:
         elif SOURCE_SELECTOR in self.node_name:
             source_selection = self.node_name[len(SOURCE_SELECTOR) :]
 
-            # match node.resource_type == SOURCE, node.resource_name == source_selection
             root_nodes.update(
-                {
-                    node_id
-                    for node_id, node in nodes.items()
-                    if node.resource_type == DbtResourceType.SOURCE and node.resource_name == source_selection
-                }
+                {node_id for node_id, node in nodes.items() if _source_selector_matches(node, source_selection)}
             )
 
         elif EXPOSURE_SELECTOR in self.node_name:
@@ -783,12 +800,8 @@ class NodeSelector:
         return node.resource_type.value in self.config.exclude_resource_types
 
     def _is_source_matching(self, node: DbtNode) -> bool:
-        """Checks if the node's source is a subset of the config's source."""
-        if node.resource_type != DbtResourceType.SOURCE:
-            return False
-        if node.resource_name not in self.config.sources:
-            return False
-        return True
+        """Checks if the node matches any of the config's ``source:`` selectors."""
+        return any(_source_selector_matches(node, source) for source in self.config.sources)
 
     def _is_exposure_matching(self, node: DbtNode) -> bool:
         """Checks if the node's exposure is a subset of the config's exposure."""

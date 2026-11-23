@@ -60,6 +60,22 @@ The ``select`` and ``exclude`` parameters are lists, with values like the follow
 
     If you're using the ``custom`` parsing method, Cosmos does not currently read the ``dbt_project.yml`` file. You can still select/exclude models if you're selecting on metadata defined in the model code or ``.yml`` files in the models directory.
 
+Task ordering across excluded nodes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the selection removes a node that sits between two rendered nodes, Cosmos still wires the
+two rendered nodes together, so the Airflow tasks keep the ordering that dbt enforces. For
+example, with ``raw_orders`` (seed) -> ``stg_orders`` -> ``orders`` and ``exclude=["tag:staging"]``,
+the ``orders`` task depends on the ``raw_orders`` seed task even though ``stg_orders`` is not
+rendered.
+
+With ``LoadMode.DBT_LS``, dbt applies the selection itself, so Cosmos runs one extra
+unfiltered ``dbt ls`` to recover the full graph, but only when a rendered node actually has an
+unrendered model, seed or snapshot parent. If a valid ``dbt ls`` cache exists but the project
+has such gaps, the cache is skipped and the project is loaded live so the ordering stays
+consistent between parses. Without a ``profile_config``, Cosmos cannot reload the project
+live, so it keeps the cached graph and logs a warning that task dependencies may be incomplete.
+
 Examples:
 
 .. code-block:: python

@@ -164,6 +164,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         super()._do_render_template_fields(parent, template_fields, context, jinja_env, seen_oids)
         if parent is self:
             self.profile_config = render_templated_conn_id(self, self.profile_config, context)
+            assert self.profile_config.profile_mapping is not None
             self.gcp_conn_id = self.profile_config.profile_mapping.conn_id
 
     @property

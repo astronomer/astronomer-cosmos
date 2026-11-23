@@ -4,7 +4,7 @@ dbt Fusion support
 ==================
 
 .. note::
-    Available since Cosmos 1.11.0 when using ``ExecutionMode.LOCAL``.
+    Available since Cosmos 1.11.0 when using ``ExecutionMode.LOCAL``, and tested with ``ExecutionMode.WATCHER`` since Cosmos 1.14.0.
 
 Context
 ~~~~~~~
@@ -34,6 +34,8 @@ Support
 ~~~~~~~
 
 Cosmos 1.11.0 adds initial support for running dbt Fusion with Cosmos when using ``ExecutionMode.LOCAL``.
+
+Cosmos CI has also run ``ExecutionMode.WATCHER`` with dbt Fusion since Cosmos 1.14.0. See :ref:`watcher-dbt-fusion-oss` for the configuration.
 
 We do not have a solution for using :ref:`ExecutionMode.AIRFLOW_ASYNC <async-execution-mode>`.
 
@@ -66,6 +68,8 @@ How to use
            ...,
            execution_config=ExecutionConfig(dbt_executable_path="/home/astro/.local/bin/dbt"),
        )
+
+   If dbt Core or dbt OSS is installed in the Airflow environment, also set ``invocation_mode=InvocationMode.SUBPROCESS``. Otherwise Cosmos runs that dbt in-process instead of the dbt Fusion binary.
 
 
 Limitations

@@ -216,7 +216,7 @@ Cosmos CI has run ``ExecutionMode.WATCHER`` with dbt Fusion since Cosmos 1.14.0.
         ),
     )
 
-Set ``invocation_mode`` explicitly. Cosmos chooses it from the Python environment that Airflow runs in, not from ``dbt_executable_path``: if dbt Core or dbt OSS can be imported there, the producer runs that dbt in-process instead of the dbt Fusion binary. The ``RenderConfig`` values only matter when Cosmos runs ``dbt ls`` to render the DAG (``LoadMode.DBT_LS``).
+Set ``invocation_mode`` explicitly. Cosmos chooses it from the Python environment that Airflow runs in, not from ``dbt_executable_path``: if dbt Core 1.x can be imported there, the producer runs that dbt in-process instead of the dbt Fusion binary. The ``RenderConfig`` values only matter when Cosmos runs ``dbt ls`` to render the DAG (``LoadMode.DBT_LS``).
 
 Cosmos CI runs this configuration against BigQuery. ``ExecutionMode.WATCHER_KUBERNETES`` is not tested with dbt Fusion.
 

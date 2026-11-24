@@ -38,10 +38,10 @@ The ``RenderConfig`` class takes the following arguments:
   .. note::
 
      Each folder becomes a ``TaskGroup``, so models that reference each other across two folders in both
-     directions (a model in ``folder_a`` refs one in ``folder_b``, and another model in ``folder_b`` refs one in
-     ``folder_a``) make the two task groups depend on each other in a cycle, even though the dbt graph itself is
-     acyclic. Airflow 3.3.1 and later order task groups as units, so for such DAGs the Grid and Graph views fail on
-     Airflow 3.3.x, Airflow 3.4 shows a DAG warning (``TaskGroupCycleDeprecationWarning``), and Airflow 3.5 is
+     directions make the two task groups depend on each other in a cycle, even though the dbt graph itself is
+     acyclic. For example, one or more models in ``folder_b`` ref a model in ``folder_a`` and are referenced by
+     another model in ``folder_a``. Airflow 3.3.1 and 3.3.2 fail to render the Grid and Graph views for such DAGs,
+     Airflow 3.4 renders them with a DAG warning (``TaskGroupCycleDeprecationWarning``), and Airflow 3.5 is
      expected to reject the DAG at parse time (`apache/airflow#73678 <https://github.com/apache/airflow/issues/73678>`__).
      Longer chains count too: models in ``A`` -> ``B`` -> ``C`` -> ``A`` also make the groups ``A``, ``B`` and ``C``
      depend on each other in a cycle. To avoid it, move the models so that the dependencies between folders form no

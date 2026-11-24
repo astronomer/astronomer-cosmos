@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from airflow.models import DAG
+from packaging.version import Version
 
 from cosmos.operators.watcher import DbtProducerWatcherOperator, DbtTestWatcherOperator
 
@@ -3754,6 +3755,11 @@ def _cross_folder_model(name: str, folder: str, depends_on: list[str]) -> DbtNod
     )
 
 
+@pytest.fixture
+def airflow_orders_task_groups_as_units(monkeypatch):
+    monkeypatch.setattr("cosmos.airflow.graph.AIRFLOW_VERSION", Version("3.3.1"))
+
+
 def _build_cross_folder_dag(nodes: dict[str, DbtNode]) -> DAG:
     with DAG("test-folder-cycle", start_date=datetime(2022, 1, 1)) as dag:
         build_airflow_graph(
@@ -3779,7 +3785,9 @@ def _build_cross_folder_dag(nodes: dict[str, DbtNode]) -> DAG:
     return dag
 
 
-def test_build_airflow_graph_warns_when_folder_task_groups_form_a_cycle(hierarchical_naming_disabled, caplog):
+def test_build_airflow_graph_warns_when_folder_task_groups_form_a_cycle(
+    hierarchical_naming_disabled, airflow_orders_task_groups_as_units, caplog
+):
     model_2 = _cross_folder_model("model_2", "folder_a", [])
     model_3 = _cross_folder_model("model_3", "folder_b", [])
     model_1 = _cross_folder_model("model_1", "folder_a", [model_3.unique_id])
@@ -3798,7 +3806,9 @@ def test_build_airflow_graph_warns_when_folder_task_groups_form_a_cycle(hierarch
     assert f"{model_3.unique_id} -> {model_1.unique_id}" in warnings[0]
 
 
-def test_build_airflow_graph_does_not_warn_when_folder_task_groups_are_acyclic(hierarchical_naming_disabled, caplog):
+def test_build_airflow_graph_does_not_warn_when_folder_task_groups_are_acyclic(
+    hierarchical_naming_disabled, airflow_orders_task_groups_as_units, caplog
+):
     model_2 = _cross_folder_model("model_2", "folder_a", [])
     model_3 = _cross_folder_model("model_3", "folder_b", [model_2.unique_id])
     model_4 = _cross_folder_model("model_4", "folder_b", [model_2.unique_id])
@@ -3811,7 +3821,7 @@ def test_build_airflow_graph_does_not_warn_when_folder_task_groups_are_acyclic(h
 
 
 def test_build_airflow_graph_warns_when_a_folder_cycle_passes_through_ancestor_folder_tasks(
-    hierarchical_naming_disabled, caplog
+    hierarchical_naming_disabled, airflow_orders_task_groups_as_units, caplog
 ):
     model_a = _cross_folder_model("a", "g", [])
     model_x = DbtNode(
@@ -3844,3 +3854,17 @@ def test_build_airflow_graph_warns_when_a_folder_cycle_passes_through_ancestor_f
     assert len(warnings) == 1
     assert "models.g, models.x_run, models.y_run" in warnings[0]
     assert f"{model_x.unique_id} -> {model_y.unique_id}" in warnings[0]
+
+
+def test_build_airflow_graph_skips_folder_cycle_check_before_airflow_3_3_1(hierarchical_naming_disabled, monkeypatch):
+    monkeypatch.setattr("cosmos.airflow.graph.AIRFLOW_VERSION", Version("3.3.0"))
+    model_2 = _cross_folder_model("model_2", "folder_a", [])
+    model_3 = _cross_folder_model("model_3", "folder_b", [])
+    model_1 = _cross_folder_model("model_1", "folder_a", [model_3.unique_id])
+    model_4 = _cross_folder_model("model_4", "folder_b", [model_2.unique_id])
+    nodes = {node.unique_id: node for node in (model_1, model_2, model_3, model_4)}
+
+    with patch("cosmos.airflow.graph.warn_about_folder_task_group_cycles") as folder_cycle_check:
+        _build_cross_folder_dag(nodes)
+
+    folder_cycle_check.assert_not_called()

@@ -12,6 +12,7 @@ except ImportError:  # Airflow 2
     from airflow.models import BaseOperator
 
 from airflow.models.base import ID_LEN as AIRFLOW_MAX_ID_LENGTH
+from packaging.version import Version
 
 try:
     from airflow.sdk import DAG
@@ -28,6 +29,7 @@ from cosmos import settings
 from cosmos.airflow.compatibility import EMPTY_OPERATOR_CLASS_PATH
 from cosmos.config import ExecutionConfig, RenderConfig
 from cosmos.constants import (
+    AIRFLOW_VERSION,
     DBT_SETUP_ASYNC_TASK_ID,
     DBT_TEARDOWN_ASYNC_TASK_ID,
     DEFAULT_DBT_RESOURCES,
@@ -1416,7 +1418,7 @@ def build_airflow_graph(
     )
 
     create_airflow_task_dependencies(nodes, tasks_map)
-    if group_nodes_by_folder:
+    if group_nodes_by_folder and AIRFLOW_VERSION >= Version("3.3.1"):
         warn_about_folder_task_group_cycles(nodes, tasks_map)
 
     if producer_task:
@@ -1517,10 +1519,7 @@ def warn_about_folder_task_group_cycles(
     Log a warning for every set of folder TaskGroups whose dependencies form a cycle.
 
     ``RenderConfig.group_nodes_by_folder`` creates one TaskGroup per folder, so models that reference each other
-    across two folders in both directions make the groups depend on each other in a cycle, even though the model
-    graph is acyclic. Airflow 3.3.1 and later order TaskGroups as units: the Grid and Graph views fail for such DAGs
-    on 3.3.x, Airflow 3.4 issues a deprecation warning, and Airflow 3.5 is expected to reject them at parse time.
-    See https://github.com/astronomer/astronomer-cosmos/issues/3082.
+    across folders in both directions can make the groups cyclic even though the dbt graph is acyclic.
     """
     graphs: dict[str | None, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     model_edges: dict[str | None, list[tuple[str, str, str, str]]] = defaultdict(list)
@@ -1555,10 +1554,11 @@ def warn_about_folder_task_group_cycles(
             edges = sorted(edges_by_cycle[cycle_index])
             logger.warning(
                 "The folder TaskGroups %s depend on each other in a cycle through these dbt dependencies: %s. "
-                "The dbt graph is acyclic, but Airflow 3.3.1 and later order TaskGroups as units: the Grid and "
-                "Graph views fail on Airflow 3.3.x, Airflow 3.4 warns, and Airflow 3.5 is expected to reject the "
-                "DAG. Move these models so the folder task groups no longer depend on each other in a cycle, or disable "
-                "RenderConfig.group_nodes_by_folder. See https://github.com/astronomer/astronomer-cosmos/issues/3082.",
+                "The dbt graph is acyclic, but Airflow orders TaskGroups as units: Airflow 3.3.1 and 3.3.2 fail to "
+                "render the Grid and Graph views, Airflow 3.4 renders them with a DAG warning, and Airflow 3.5 is "
+                "expected to reject the DAG at parse time. Move these models so the folder task groups no longer "
+                "depend on each other in a cycle, or disable RenderConfig.group_nodes_by_folder. "
+                "See https://github.com/astronomer/astronomer-cosmos/issues/3082.",
                 ", ".join(unit_names),
                 "; ".join(edges),
             )

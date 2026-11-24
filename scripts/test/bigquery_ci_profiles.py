@@ -14,26 +14,19 @@ with). The key ends up in the rewritten files, so run this on the CI runner only
 
 from __future__ import annotations
 
-import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
 
 import yaml
-from airflow.models.connection import Connection
 
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
-def _keyfile() -> dict[str, Any]:
-    raw = os.environ["AIRFLOW_CONN_GCP_GS_CONN"]
-    conn = Connection.from_json(raw) if raw.lstrip().startswith("{") else Connection(uri=raw)
-    extra = conn.extra_dejson
-    keyfile = extra.get("keyfile_dict") or extra.get("extra__google_cloud_platform__keyfile_dict")
-    if isinstance(keyfile, str):
-        keyfile = json.loads(keyfile)
-    if not keyfile:
-        raise SystemExit("AIRFLOW_CONN_GCP_GS_CONN has no keyfile_dict")
-    return dict(keyfile)
+from bigquery_ci_common import keyfile
+
+_keyfile = keyfile
 
 
 def _bigquery_output(keyfile: dict[str, Any], threads: Any) -> dict[str, Any]:
@@ -63,9 +56,9 @@ def rewrite_profiles(profiles_yml: Path, keyfile: dict[str, Any]) -> int:
 def main(argv: list[str]) -> int:
     if not argv:
         raise SystemExit(__doc__)
-    keyfile = _keyfile()
+    key = keyfile()
     for profiles_yml in map(Path, argv):
-        print(f"{profiles_yml}: replaced {rewrite_profiles(profiles_yml, keyfile)} Postgres output(s) with BigQuery")
+        print(f"{profiles_yml}: replaced {rewrite_profiles(profiles_yml, key)} Postgres output(s) with BigQuery")
     return 0
 
 

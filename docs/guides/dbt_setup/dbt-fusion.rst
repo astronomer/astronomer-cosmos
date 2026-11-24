@@ -28,7 +28,7 @@ Some reported dbt Fusion features include:
  - **Multi-dialect support:** Instant error detection across Snowflake, Databricks, BigQuery, and Redshift SQL dialects
 
 .. note::
-    dbt Fusion is in public beta with current support for Snowflake and Databricks projects, with additional data platforms coming soon.
+    dbt v2 reached general availability in September 2026, and dbt Labs now calls dbt Fusion simply "dbt". For the data platforms it supports, see `About data platform connections <https://docs.getdbt.com/docs/local/connect-data-platform/about-dbt-connections?version=2>`_. Cosmos CI tests dbt Fusion against Snowflake and BigQuery.
 
 Support
 ~~~~~~~

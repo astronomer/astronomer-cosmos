@@ -69,7 +69,7 @@ How to use
            execution_config=ExecutionConfig(dbt_executable_path="/home/astro/.local/bin/dbt"),
        )
 
-   If dbt Core or dbt OSS is installed in the Airflow environment, also set ``invocation_mode=InvocationMode.SUBPROCESS``. Otherwise Cosmos runs that dbt in-process instead of the dbt Fusion binary.
+   If dbt Core or dbt OSS is installed in the Airflow environment, also set ``invocation_mode=InvocationMode.SUBPROCESS`` in ``ExecutionConfig`` and in ``RenderConfig`` (with the same ``dbt_executable_path``). Otherwise Cosmos runs that dbt in-process instead of the dbt Fusion binary. See :ref:`watcher-dbt-fusion-oss` for a full example.
 
 
 Limitations

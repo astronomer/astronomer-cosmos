@@ -10,7 +10,7 @@ import time
 import warnings
 import zlib
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from functools import cached_property
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -60,6 +60,7 @@ from cosmos.dataset import get_dataset_alias_name, make_dataset_uri_builder
 from cosmos.dbt.project import (
     copy_dbt_packages,
     copy_manifest_file_if_exists,
+    environ,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
     remove_dags_folder_from_pythonpath,
@@ -529,7 +530,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             sql_content: str = sql_file.read()
         return sql_content
 
-    def _clone_project(self, tmp_dir_path: Path, env: Mapping[str, Any] | None = None) -> None:
+    def _clone_project(self, tmp_dir_path: Path) -> None:
         self.log.info(
             "Cloning project to writable temp directory %s from %s",
             tmp_dir_path,
@@ -537,14 +538,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         )
         should_not_create_dbt_deps_symbolic_link = self._should_install_deps() or self.copy_dbt_packages
         create_symlinks(
-            Path(self.project_dir),
-            tmp_dir_path,
-            ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link,
-            env_vars=env,
+            Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
         )
         if self.copy_dbt_packages:
             self.log.info("Copying dbt packages to temporary folder.")
-            copy_dbt_packages(Path(self.project_dir), tmp_dir_path, env_vars=env)
+            copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
             self.log.info("Completed copying dbt packages to temporary folder.")
 
         copy_manifest_file_if_exists(self.manifest_filepath, Path(tmp_dir_path))
@@ -805,7 +803,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
 
-            self._clone_project(tmp_dir_path, env)
+            with environ(env):
+                self._clone_project(tmp_dir_path)
 
             if self.partial_parse:
                 self._handle_partial_parse(tmp_dir_path)

@@ -1,6 +1,9 @@
 name: 'my_dbt_project'
 version: '1.0.0'
 profile: 'default'
+# example_dbt_deps.py sets DBT_PACKAGES_FOLDER=dbt_packages only in ProjectConfig.env_vars. The default differs on
+# purpose, so that DAG fails if Cosmos resolves this path without ProjectConfig.env_vars.
+packages-install-path: "{{ env_var('DBT_PACKAGES_FOLDER', 'dbt_packages_default') }}"
 
 models:
   my_dbt_project:

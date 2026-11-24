@@ -2640,31 +2640,12 @@ def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog
     )
     operator._clone_project(tmp_dir_path)
 
-    create_symlinks_mock.assert_called_once_with(project_dir, tmp_dir_path, ignore_dbt_packages=True, env_vars=None)
-    copy_dbt_packages_mock.assert_called_once_with(project_dir, tmp_dir_path, env_vars=None)
+    create_symlinks_mock.assert_called_once_with(project_dir, tmp_dir_path, ignore_dbt_packages=True)
+    copy_dbt_packages_mock.assert_called_once_with(project_dir, tmp_dir_path)
 
     assert f"Cloning project to writable temp directory {tmp_dir_path} from {project_dir}" in caplog.text
     assert "Copying dbt packages to temporary folder." in caplog.text
     assert "Completed copying dbt packages to temporary folder." in caplog.text
-
-
-@patch("cosmos.operators.local.copy_dbt_packages")
-@patch("cosmos.operators.local.create_symlinks")
-def test_clone_project_forwards_env_to_packages_path_resolution(create_symlinks_mock, copy_dbt_packages_mock):
-    project_dir = Path("/fake/project")
-    tmp_dir_path = Path("/fake/tmp")
-    env = {"dbt_packages_suffix": "RB"}
-    operator = DbtRunLocalOperator(
-        task_id="test",
-        project_dir=project_dir,
-        install_deps=False,
-        copy_dbt_packages=True,
-        profile_config=profile_config,
-    )
-    operator._clone_project(tmp_dir_path, env)
-
-    create_symlinks_mock.assert_called_once_with(project_dir, tmp_dir_path, ignore_dbt_packages=True, env_vars=env)
-    copy_dbt_packages_mock.assert_called_once_with(project_dir, tmp_dir_path, env_vars=env)
 
 
 @pytest.mark.parametrize(

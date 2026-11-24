@@ -3904,26 +3904,30 @@ def test_add_downstream_nodes():
 
 
 @pytest.mark.parametrize("copy_dbt_packages", [True, False])
-@patch("cosmos.dbt.graph.copy_dbt_packages")
-@patch("cosmos.dbt.graph.create_symlinks")
-def test_copy_or_create_symbolic_links_resolves_packages_path_with_env_vars(
-    create_symlinks_mock, copy_dbt_packages_mock, copy_dbt_packages, tmp_path
-):
-    env_vars = {"dbt_packages_suffix": "RB"}
-    project_config = ProjectConfig(
-        dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME,
-        env_vars=env_vars,
-        copy_dbt_packages=copy_dbt_packages,
+def test_copy_or_create_symbolic_links_resolves_packages_path_with_env_vars(copy_dbt_packages, tmp_path, monkeypatch):
+    """The packages folder named by ``ProjectConfig.env_vars`` must not be symlinked, or ``dbt deps`` cannot replace it."""
+    monkeypatch.delenv("dbt_packages_suffix", raising=False)
+    project_path = tmp_path / "project"
+    (project_path / "dbt_packages_RB" / "some_package").mkdir(parents=True)
+    (project_path / "models").mkdir()
+    (project_path / "package-lock.yml").write_text("packages: []")
+    (project_path / "dbt_project.yml").write_text(
+        'packages-install-path: \'dbt_packages{{ "_" + env_var("dbt_packages_suffix","") '
+        'if env_var("dbt_packages_suffix","")!="" }}\'\n'
     )
-    dbt_graph = DbtGraph(project=project_config, render_config=RenderConfig())
-    assert dbt_graph.should_install_dbt_deps
-
-    dbt_graph._copy_or_create_symbolic_links(dbt_graph.project_path, tmp_path)
-
-    create_symlinks_mock.assert_called_once_with(
-        dbt_graph.project_path, tmp_path, ignore_dbt_packages=True, env_vars=env_vars
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(
+            dbt_project_path=project_path,
+            env_vars={"dbt_packages_suffix": "RB"},
+            copy_dbt_packages=copy_dbt_packages,
+        ),
+        render_config=RenderConfig(),
     )
-    if copy_dbt_packages:
-        copy_dbt_packages_mock.assert_called_once_with(dbt_graph.project_path, tmp_path, env_vars=env_vars)
-    else:
-        copy_dbt_packages_mock.assert_not_called()
+    tmp_dir = tmp_path / "tmp"
+    tmp_dir.mkdir()
+
+    dbt_graph._copy_or_create_symbolic_links(project_path, tmp_dir)
+
+    assert not (tmp_dir / "dbt_packages_RB").is_symlink()
+    assert (tmp_dir / "dbt_packages_RB").is_dir() is copy_dbt_packages
+    assert (tmp_dir / "models").is_symlink()

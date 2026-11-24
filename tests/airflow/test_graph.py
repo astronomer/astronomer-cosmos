@@ -3689,3 +3689,53 @@ def test_test_node_operator_kwargs_do_not_apply_to_after_all_test_task():
         )
     assert dag.task_dict["my_model_run"].retries == 2
     assert dag.task_dict["astro_shop_test"].retries == 3
+
+
+def test_templated_node_conn_id_takes_precedence_over_templated_group_conn_id():
+    overridden_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.overridden_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/overridden_model.sql"),
+        config={
+            "materialized": "table",
+            "meta": {"cosmos": {"profile_config": {"profile_mapping": {"conn_id": "{{ params.node_conn }}"}}}},
+        },
+    )
+    default_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.default_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/default_model.sql"),
+        config={"materialized": "table"},
+    )
+    with DAG("test-templated-node-conn-id", start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes={node.unique_id: node for node in (overridden_model, default_model)},
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="{{ params.group_conn }}", profile_args={"schema": "public"}
+                    ),
+                ),
+            },
+            render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+            dbt_project_name="astro_shop",
+        )
+    context = {"params": {"group_conn": "rendered_group_conn", "node_conn": "rendered_node_conn"}}
+    overridden_task = dag.task_dict["overridden_model_run"]
+    default_task = dag.task_dict["default_model_run"]
+
+    overridden_task.render_template_fields(context)
+    default_task.render_template_fields(context)
+
+    assert overridden_task.profile_config.profile_mapping.conn_id == "rendered_node_conn"
+    assert default_task.profile_config.profile_mapping.conn_id == "rendered_group_conn"

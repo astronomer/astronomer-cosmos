@@ -34,6 +34,10 @@ logger = get_logger(__name__)
 LOG_FORMAT_VALUES = ("text", "json", "default")
 
 
+def is_jinja_template(value: Any) -> bool:
+    return isinstance(value, str) and ("{{" in value or "{%" in value)
+
+
 @dataclass
 class DbtProfileConfigVars:
     send_anonymous_usage_stats: bool | None = False
@@ -153,7 +157,12 @@ class BaseProfileMapping(ABC):
     @property
     def conn(self) -> Connection:
         """Returns the Airflow connection."""
-        if not self._conn:
+        if is_jinja_template(self.conn_id):
+            raise CosmosValueError(
+                f"conn_id {self.conn_id!r} is a Jinja template, rendered only when a task runs. "
+                "Enable the mock profile or use LoadMode.DBT_MANIFEST."
+            )
+        if self._conn is None or self._conn.conn_id != self.conn_id:
             conn = BaseHook.get_connection(self.conn_id)
             if not conn:
                 raise CosmosValueError(f"Could not find connection {self.conn_id}.")

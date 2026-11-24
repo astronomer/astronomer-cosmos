@@ -8,6 +8,10 @@ Breaking Changes
 
 * ``DbtSourceAzureContainerInstanceOperator`` has been removed from ``cosmos.operators.aws_eks``, where it was a misnamed copy of the AWS EKS source freshness operator, so importing it from there now raises ``ImportError``. Use ``DbtSourceAwsEksOperator`` instead, which is now also available as ``cosmos.DbtSourceAwsEksOperator`` and fixes ``ExecutionMode.AWS_EKS`` failing to render dbt ``source`` nodes. The real ``DbtSourceAzureContainerInstanceOperator`` in ``cosmos.operators.azure_container_instance`` is unchanged. See #3163.
 
+Features
+
+* Accept a Jinja template as the profile mapping ``conn_id``, rendered when each task runs, so the connection can come from a DAG param or ``dag_run.conf``. Supported with ``ExecutionMode.LOCAL``, ``VIRTUALENV`` and ``WATCHER``, and with ``AIRFLOW_ASYNC`` on BigQuery, by @tatiana in #3198
+
 1.16.1 (Unreleased)
 -------------------
 

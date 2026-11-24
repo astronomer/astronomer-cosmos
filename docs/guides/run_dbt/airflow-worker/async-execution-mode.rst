@@ -249,4 +249,6 @@ Limitations
 
 9. **Incremental models not supported**: Incremental models using the ``merge`` or ``insert_overwrite`` strategy are not supported. Use ``ExecutionMode.LOCAL`` for incremental models.
 
+10. **Project directory name must match the dbt project name**: The model tasks look for the SQL compiled by the ``SetupAsyncOperator`` under the name of the dbt project directory, while dbt writes it under the ``name`` in ``dbt_project.yml``. When the two differ, the model tasks fail to find the SQL, as described in the issue `#3218 <https://github.com/astronomer/astronomer-cosmos/issues/3218>`_. Until this is fixed, name the dbt project directory after the ``name`` in ``dbt_project.yml``.
+
 For a comparison between different Cosmos execution modes, please, check the :ref:`execution-modes-comparison` section.

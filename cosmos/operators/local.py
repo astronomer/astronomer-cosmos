@@ -10,7 +10,9 @@ import time
 import warnings
 import zlib
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
+from copy import deepcopy
+from dataclasses import replace
 from functools import cached_property
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -125,8 +127,27 @@ from cosmos.operators.base import (
     _sanitize_xcom_key,
     resolve_templated_bool,
 )
+from cosmos.profiles.base import is_jinja_template
 
 logger = get_logger(__name__)
+
+
+def render_templated_conn_id(operator: BaseOperator, profile_config: ProfileConfig, context: Context) -> ProfileConfig:
+    profile_mapping = profile_config.profile_mapping
+    if profile_mapping is None or not is_jinja_template(profile_mapping.conn_id):
+        return profile_config
+    # Always render to a string: render_template_as_native_obj would turn IDs such as "1e3" into numbers.
+    dag = operator.get_dag()
+    jinja_env = dag.get_template_env(force_sandboxed=True) if dag else operator.get_template_env()
+    rendered_conn_id = jinja_env.from_string(profile_mapping.conn_id).render(context).strip()
+    if not rendered_conn_id:
+        raise CosmosValueError(
+            f"conn_id {profile_mapping.conn_id!r} rendered to an empty string in task {operator.task_id!r}. "
+            "Check that every variable in the template is defined."
+        )
+    rendered_profile_mapping = deepcopy(profile_mapping)
+    rendered_profile_mapping.conn_id = rendered_conn_id
+    return replace(profile_config, profile_mapping=rendered_profile_mapping)
 
 
 def _read_target_sources_json(project_root: Path) -> dict[str, Any] | None:
@@ -1158,6 +1179,19 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
         if "task_id" in operator_kwargs:
             operator_kwargs.pop("task_id")
         BaseOperator.__init__(self, task_id=self.task_id, **operator_kwargs)
+
+    def _do_render_template_fields(
+        self,
+        parent: Any,
+        template_fields: Iterable[str],
+        context: Context,
+        jinja_env: jinja2.Environment,
+        seen_oids: set[int],
+    ) -> None:
+        # Mapped tasks render through this method, not through render_template_fields.
+        super()._do_render_template_fields(parent, template_fields, context, jinja_env, seen_oids)
+        if parent is self and self.profile_config is not None:
+            self.profile_config = render_templated_conn_id(self, self.profile_config, context)
 
 
 class DbtBuildLocalOperator(DbtBuildMixin, DbtLocalBaseOperator):

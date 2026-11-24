@@ -45,6 +45,8 @@ This block illustrates a Cosmos-generated dataset for Postgres:
 
     Dataset("postgres://host:5432/database.schema.table")
 
+The table in the URI is the relation that dbt materializes, which is the model's ``alias``. For a `versioned model <https://docs.getdbt.com/docs/mesh/govern/model-versions>`_ such as ``stg_users`` with ``v: 1``, the URI ends with ``stg_users_v1``, and a model with a custom ``alias`` uses that alias.
+
 
 For example, let's say you have:
 

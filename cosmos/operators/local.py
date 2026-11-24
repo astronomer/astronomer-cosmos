@@ -891,6 +891,47 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             return True
 
     @staticmethod
+    def _openlineage_names_datasets_after_model_name() -> bool:
+        """
+        Return whether the installed ``openlineage-integration-common`` names model datasets after the dbt ``name``.
+
+        1.37.0 and older use the ``name`` of models, seeds and snapshots, which leaves out the version suffix of
+        versioned models and ignores custom aliases; 1.38.0 and later use the ``alias``, which is the relation dbt
+        materializes. An unknown version is treated as using the ``name``.
+        """
+        try:
+            return Version(version("openlineage-integration-common")) < Version("1.38.0")
+        except (PackageNotFoundError, InvalidVersion):
+            return True
+
+    @staticmethod
+    def _name_openlineage_datasets_after_alias(openlineage_processor: Any) -> None:
+        """
+        Make ``openlineage-integration-common`` 1.37.0 or older processor name model datasets after the dbt ``alias``.
+
+        The processor names the dataset of a model, seed or snapshot with the ``name`` of its manifest node, so a
+        versioned model ``stg_users`` materialized as ``stg_users_v1`` gets the dataset ``stg_users`` (#2525). The
+        processor reads the manifest with ``get_dbt_metadata``; this wraps it on the instance so that each of these
+        nodes has its ``alias`` as ``name``. Nodes are matched by ``unique_id``, so several versions of one model keep
+        separate datasets. Sources have no alias and keep their ``name``. The manifest file is not changed.
+        """
+        get_dbt_metadata = openlineage_processor.get_dbt_metadata
+
+        def get_dbt_metadata_with_aliases() -> Any:
+            manifest, *other_metadata = get_dbt_metadata()
+            nodes: dict[str, Any] = {}
+
+            for unique_id, node in manifest.get("nodes", {}).items():
+                if unique_id.startswith(("model.", "seed.", "snapshot.")) and node.get("alias"):
+                    node = {**node, "name": node["alias"]}  # Name after alias
+
+                nodes[unique_id] = node
+
+            return {**manifest, "nodes": nodes}, *other_metadata
+
+        openlineage_processor.get_dbt_metadata = get_dbt_metadata_with_aliases
+
+    @staticmethod
     def _add_missing_profiles_dir_to_run_results(run_results_path: Any, dbt_command_line: list[str] | None) -> None:
         """
         Add ``args.profiles_dir`` to ``run_results.json`` when dbt did not write it.
@@ -971,6 +1012,11 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         # Do not raise exception if a command is unsupported, following the openlineage-dbt processor:
         # https://github.com/OpenLineage/OpenLineage/blob/bdcaf828ebc117e0e5ffc5fab44ff8886eb7836b/integration/common/openlineage/common/provider/dbt/processor.py#L141
         openlineage_processor.should_raise_on_unsupported_command = False
+
+        # Name OL datasets after lineage (if openlineage-integration-common < 1.38.0)
+        if self._openlineage_names_datasets_after_model_name():
+            self._name_openlineage_datasets_after_alias(openlineage_processor)
+
         if dbt_runner.is_dbt_v2() and self._openlineage_requires_profiles_dir_in_run_results():
             self._add_missing_profiles_dir_to_run_results(
                 getattr(openlineage_processor, "run_result_path", None), dbt_command_line

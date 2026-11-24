@@ -1678,6 +1678,196 @@ def test_openlineage_requires_profiles_dir_in_run_results_when_the_library_is_no
         assert DbtLocalBaseOperator._openlineage_requires_profiles_dir_in_run_results() is True
 
 
+def _write_versioned_model_artifacts(project_dir: Path) -> None:
+    """Write the dbt artifacts of a ``dbt run`` of a versioned model: ``stg_users`` (versions 1 and 2) reads ``raw.users``."""
+    # Write the dbt project and profiles files
+    (project_dir / "dbt_project.yml").write_text("name: my_project\n" "version: '1.0'\n" "profile: my_profile\n")
+    (project_dir / "profiles.yml").write_text(
+        "my_profile:\n"
+        "  target: dev\n"
+        "  outputs:\n"
+        "    dev:\n"
+        "      type: postgres\n"
+        "      host: my-host\n"
+        "      port: 5432\n"
+        "      dbname: my_db\n"
+        "      schema: my_schema\n"
+    )
+
+    target = project_dir / "target"
+    target.mkdir()
+
+    model_ids = {v: f"model.my_project.stg_users.v{v}" for v in (1, 2)}
+    source_id = "source.my_project.raw.users"
+
+    manifest = {
+        "metadata": {"dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json"},
+        "nodes": {
+            model_id: {
+                "unique_id": model_id,
+                "resource_type": "model",
+                "name": "stg_users",
+                "description": "",
+                "alias": f"stg_users_v{v}",
+                "version": v,
+                "latest_version": 2,
+                "database": "my_db",
+                "schema": "my_schema",
+                "columns": {},
+                "compiled_code": "select * from my_db.raw.users",
+            }
+            for v, model_id in model_ids.items()
+        },
+        "sources": {
+            source_id: {
+                "unique_id": source_id,
+                "resource_type": "source",
+                "name": "users",
+                "description": "",
+                "database": "my_db",
+                "schema": "raw",
+                "columns": {},
+            }
+        },
+        "parent_map": {model_id: [source_id] for model_id in model_ids.values()},
+    }
+
+    run_results = {
+        "metadata": {"dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v6.json"},
+        "args": {"which": "run", "profiles_dir": str(project_dir)},
+        "results": [
+            {
+                "unique_id": model_id,
+                "status": "success",
+                "timing": [
+                    {
+                        "name": "execute",
+                        "started_at": "2026-01-01T00:00:00.000000Z",
+                        "completed_at": "2026-01-01T00:00:01.000000Z",
+                    }
+                ],
+                "adapter_response": {},
+            }
+            for model_id in model_ids.values()
+        ],
+    }
+
+    # Write the manifest and the run results
+    (target / "manifest.json").write_text(json.dumps(manifest))
+    (target / "run_results.json").write_text(json.dumps(run_results))
+
+
+@pytest.mark.parametrize(
+    "names_datasets_after_model_name",
+    [
+        pytest.param(False, id="library_uses_the_alias"),
+        # The alias is also kept when Cosmos applies its fallback for openlineage-integration-common 1.37.0 and older.
+        pytest.param(True, id="cosmos_fallback_applied"),
+    ],
+)
+@patch("cosmos.dataset.settings")
+def test_get_datasets_uses_the_alias_of_versioned_models(mock_settings, tmp_path, names_datasets_after_model_name):
+    """Regression for #2525: the outlet of a versioned model is the materialized relation, including ``_v1``."""
+    # Use the same URI standard on every Airflow version
+    mock_settings.use_dataset_airflow3_uri_standard = True
+    _write_versioned_model_artifacts(tmp_path)
+
+    operator = ConcreteDbtLocalBaseOperator(
+        profile_config=ProfileConfig(
+            profile_name="my_profile", target_name="dev", profiles_yml_filepath=tmp_path / "profiles.yml"
+        ),
+        task_id="my-task",
+        project_dir=tmp_path,
+        should_store_compiled_sql=False,
+    )
+
+    with patch(
+        "cosmos.operators.local.DbtLocalBaseOperator._openlineage_names_datasets_after_model_name",
+        return_value=names_datasets_after_model_name,
+    ):
+        operator.calculate_openlineage_events_completes(env={}, project_dir=tmp_path)
+
+    assert [asset.uri for asset in operator.get_datasets("outputs")] == [
+        "postgres://my-host:5432/my_db/my_schema/stg_users_v1",
+        "postgres://my-host:5432/my_db/my_schema/stg_users_v2",
+    ]
+
+    # Sources keep their name, as they have no alias.
+    assert [asset.uri for asset in operator.get_datasets("inputs")] == ["postgres://my-host:5432/my_db/raw/users"] * 2
+
+
+@pytest.mark.parametrize(
+    "installed_version, expected",
+    [("1.23.0", True), ("1.37.0", True), ("1.38.0", False), ("1.43.0", False), ("not a version", True)],
+)
+def test_openlineage_names_datasets_after_model_name(installed_version, expected):
+    with patch("cosmos.operators.local.version", return_value=installed_version):
+        assert DbtLocalBaseOperator._openlineage_names_datasets_after_model_name() is expected
+
+
+def test_openlineage_names_datasets_after_model_name_when_the_library_is_not_found():
+    with patch("cosmos.operators.local.version", side_effect=PackageNotFoundError):
+        assert DbtLocalBaseOperator._openlineage_names_datasets_after_model_name() is True
+
+
+def test_name_openlineage_datasets_after_alias():
+    """The processor reads model, seed and snapshot nodes with their alias as name; other nodes are unchanged."""
+    nodes = {
+        "model.p.stg_users.v1": {"name": "stg_users", "alias": "stg_users_v1"},
+        "model.p.stg_users.v2": {"name": "stg_users", "alias": "stg_users_v2"},
+        "model.p.orders": {"name": "orders", "alias": "custom_orders"},
+        "seed.p.countries": {"name": "countries", "alias": "countries"},
+        "snapshot.p.users_snapshot": {"name": "users_snapshot", "alias": "users_history"},
+        "model.p.no_alias": {"name": "no_alias"},
+        "test.p.not_null_orders_id": {"name": "not_null_orders_id", "alias": "not_null_orders_id_alias"},
+    }
+    sources = {"source.p.raw.users": {"name": "users"}}
+    manifest = {"nodes": nodes, "sources": sources, "parent_map": {}}
+    processor = MagicMock()
+    processor.get_dbt_metadata.return_value = (manifest, "run_results", "profile", "catalog")
+
+    DbtLocalBaseOperator._name_openlineage_datasets_after_alias(processor)
+    new_manifest, *other_metadata = processor.get_dbt_metadata()
+
+    assert {unique_id: node["name"] for unique_id, node in new_manifest["nodes"].items()} == {
+        "model.p.stg_users.v1": "stg_users_v1",
+        "model.p.stg_users.v2": "stg_users_v2",
+        "model.p.orders": "custom_orders",
+        "seed.p.countries": "countries",
+        "snapshot.p.users_snapshot": "users_history",
+        "model.p.no_alias": "no_alias",
+        "test.p.not_null_orders_id": "not_null_orders_id",
+    }
+    assert new_manifest["sources"] == sources
+    assert other_metadata == ["run_results", "profile", "catalog"]
+    # The manifest read by the processor is not changed in place.
+    assert nodes["model.p.stg_users.v1"]["name"] == "stg_users"
+
+
+@patch("cosmos.operators.local.DbtLocalBaseOperator._name_openlineage_datasets_after_alias")
+@patch("cosmos.operators.local.DbtLocalBaseOperator._get_dbt_local_artifact_processor")
+@pytest.mark.parametrize("names_datasets_after_model_name", [True, False])
+def test_calculate_openlineage_events_completes_names_datasets_after_alias_only_when_needed(
+    mock_get_processor, mock_name_after_alias, names_datasets_after_model_name
+):
+    instance = mock_get_processor.return_value.return_value
+    instance.parse.return_value = MagicMock(completes=[])
+    dbt_base_operator = ConcreteDbtLocalBaseOperator(
+        profile_config=profile_config, task_id="my-task", project_dir=DBT_PROJ_DIR, should_store_compiled_sql=False
+    )
+
+    with patch(
+        "cosmos.operators.local.DbtLocalBaseOperator._openlineage_names_datasets_after_model_name",
+        return_value=names_datasets_after_model_name,
+    ):
+        dbt_base_operator.calculate_openlineage_events_completes(env={}, project_dir=DBT_PROJ_DIR)
+
+    if names_datasets_after_model_name:
+        mock_name_after_alias.assert_called_once_with(instance)
+    else:
+        mock_name_after_alias.assert_not_called()
+
+
 def test_dbt_local_artifact_processor_imported_lazily():
     """Regression: importing ``cosmos.operators.local`` must not import the heavy openlineage
     ``DbtLocalArtifactProcessor`` at module load (that import is what we defer to keep it off the DAG-parse path).

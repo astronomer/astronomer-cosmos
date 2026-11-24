@@ -750,8 +750,26 @@ def test_load_from_dbt_manifest_resolves_package_path(tmp_path):
     assert node.file_path.name == "foo.sql"
 
 
-def test_load_from_dbt_manifest_resolves_package_path_with_env_vars(tmp_path, monkeypatch):
-    """A packages-install-path that uses env_var() is resolved with ProjectConfig.env_vars."""
+@pytest.mark.parametrize(
+    "env_vars,expected_packages_dir",
+    [
+        ({"dbt_packages_suffix": "RB"}, "dbt_packages_RB"),
+        ("xcom_arg", "dbt_packages"),
+    ],
+    ids=["dict", "xcom_arg"],
+)
+def test_load_from_dbt_manifest_resolves_package_path_with_env_vars(
+    tmp_path, monkeypatch, env_vars, expected_packages_dir
+):
+    """A packages-install-path that uses env_var() is resolved with ProjectConfig.env_vars when they are a dict."""
+    if env_vars == "xcom_arg":
+        try:
+            from airflow.sdk import XComArg
+            from airflow.sdk.bases.operator import BaseOperator
+        except ImportError:
+            from airflow.models import BaseOperator
+            from airflow.models.xcom_arg import XComArg
+        env_vars = XComArg(BaseOperator(task_id="build_env"))
     monkeypatch.delenv("dbt_packages_suffix", raising=False)
     (tmp_path / "dbt_project.yml").write_text(
         'packages-install-path: \'dbt_packages{{ "_" + env_var("dbt_packages_suffix","") '
@@ -775,16 +793,14 @@ def test_load_from_dbt_manifest_resolves_package_path_with_env_vars(tmp_path, mo
     manifest_file = tmp_path / "manifest.json"
     manifest_file.write_text(json.dumps(manifest))
     dbt_graph = DbtGraph(
-        project=ProjectConfig(
-            manifest_path=manifest_file, project_name="my_project", env_vars={"dbt_packages_suffix": "RB"}
-        ),
+        project=ProjectConfig(manifest_path=manifest_file, project_name="my_project", env_vars=env_vars),
         execution_config=ExecutionConfig(dbt_project_path=tmp_path),
         render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
     )
     dbt_graph.load_from_dbt_manifest()
 
     node = dbt_graph.nodes["model.some_package.foo"]
-    assert node.file_path == tmp_path / "dbt_packages_RB" / "some_package" / "models" / "foo.sql"
+    assert node.file_path == tmp_path / expected_packages_dir / "some_package" / "models" / "foo.sql"
 
 
 @pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])

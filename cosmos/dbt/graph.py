@@ -1368,7 +1368,9 @@ class DbtGraph:
     def _load_nodes_from_manifest_data(self, manifest: dict[str, Any], project_path: Path) -> dict[str, DbtNode]:
         """Build a nodes dict from manifest resources (nodes, sources, exposures)."""
         resources = {**manifest.get("nodes", {}), **manifest.get("sources", {}), **manifest.get("exposures", {})}
-        with environ(self.env_vars):
+        # env_vars may be an XComArg here, which is only resolved when the task runs
+        render_env_vars = self.env_vars if isinstance(self.env_vars, dict) else {}
+        with environ(render_env_vars):
             packages_subpath = get_dbt_packages_subpath(project_path)
         manifest_metadata = manifest.get("metadata")
         manifest_project_name = manifest_metadata.get("project_name") if isinstance(manifest_metadata, dict) else None

@@ -4,10 +4,12 @@ dbt Fusion support
 ==================
 
 .. note::
-    Available since Cosmos 1.11.0 when using ``ExecutionMode.LOCAL``.
+    Available since Cosmos 1.11.0 when using ``ExecutionMode.LOCAL``, and tested with ``ExecutionMode.WATCHER`` since Cosmos 1.14.0.
 
 Context
 ~~~~~~~
+
+For dbt OSS, the open-source distribution of dbt 2, see :ref:`dbt OSS support <dbt_oss>`.
 
 dbt Labs `launched <https://www.getdbt.com/blog/dbt-launch-showcase-2025-recap>`_ `dbt Fusion <https://github.com/dbt-labs/dbt-fusion>`_ on 28 May 2025. dbt Fusion is the next-generation dbt engine that enables real-time model validation, improved SQL parsing and state-aware orchestration.
 It is a unified approach that aims to merge dbt Core and dbt Cloud features via a completely new CLI,
@@ -26,12 +28,14 @@ Some reported dbt Fusion features include:
  - **Multi-dialect support:** Instant error detection across Snowflake, Databricks, BigQuery, and Redshift SQL dialects
 
 .. note::
-    dbt Fusion is in public beta with current support for Snowflake and Databricks projects, with additional data platforms coming soon.
+    dbt v2 reached general availability in September 2026, and dbt Labs now calls dbt Fusion simply "dbt". For the data platforms it supports, see `About data platform connections <https://docs.getdbt.com/docs/local/connect-data-platform/about-dbt-connections?version=2>`_. Cosmos CI tests dbt Fusion against Snowflake and BigQuery.
 
 Support
 ~~~~~~~
 
 Cosmos 1.11.0 adds initial support for running dbt Fusion with Cosmos when using ``ExecutionMode.LOCAL``.
+
+Cosmos CI has also run ``ExecutionMode.WATCHER`` with dbt Fusion since Cosmos 1.14.0. See :ref:`watcher-dbt-fusion-oss` for the configuration.
 
 We do not have a solution for using :ref:`ExecutionMode.AIRFLOW_ASYNC <async-execution-mode>`.
 
@@ -64,6 +68,8 @@ How to use
            ...,
            execution_config=ExecutionConfig(dbt_executable_path="/home/astro/.local/bin/dbt"),
        )
+
+   If dbt Core or dbt OSS is installed in the Airflow environment, also set ``invocation_mode=InvocationMode.SUBPROCESS`` in ``ExecutionConfig`` and in ``RenderConfig`` (with the same ``dbt_executable_path``). Otherwise Cosmos runs that dbt in-process instead of the dbt Fusion binary. See :ref:`watcher-dbt-fusion-oss` for a full example.
 
 
 Limitations

@@ -12,14 +12,16 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 
+# [START templated_conn_id]
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
     profile_mapping=PostgresUserPasswordProfileMapping(
-        conn_id="example_conn",
+        conn_id="{{ params.conn_id }}",
         profile_args={"schema": "public"},
     ),
 )
+# [END templated_conn_id]
 
 # [START local_example]
 basic_cosmos_dag = DbtDag(
@@ -35,5 +37,6 @@ basic_cosmos_dag = DbtDag(
     catchup=False,
     dag_id="example_model_version",
     default_args={"retries": 0},
+    params={"conn_id": "example_conn"},
 )
 # [END local_example]

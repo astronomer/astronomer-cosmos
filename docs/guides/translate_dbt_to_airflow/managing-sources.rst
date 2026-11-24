@@ -24,6 +24,10 @@ You can control this behavior using the ``source_rendering_behavior`` field in t
 - **with_tests_or_freshness**: When set to ``with_tests_or_freshness``, Cosmos only renders sources that have either tests or freshness checks.
   Sources that have tests but no freshness checks are rendered as ``EmptyOperator``.
 
+How the source test task is rendered follows ``test_behavior``: under ``after_each`` and, since Cosmos 1.16.0, under ``build``,
+source tests run in their own task after the source task, because the build tasks of models, seeds and snapshots select only
+their own node. Under ``after_all`` they run in the project-level test task, and under ``none`` they are not rendered.
+
 Example:
 
 .. code-block:: python

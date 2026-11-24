@@ -10,11 +10,11 @@ with trigger_rule="none_failed", absorbing the skip so it does not propagate out
 
 This DAG demonstrates that:
 - model_a succeeds in the producer and the consumer reads the result from XCom
-- model_retry fails on the first attempt (via a fail_once sequence pre-hook) but succeeds
+- model_retry fails on the first attempt (via the fail_once macro in a pre-hook) but succeeds
   on the consumer retry fallback
 - post_dbt (an EmptyOperator downstream of the group) runs successfully — it is NOT skipped
 
-A cleanup task drops the PostgreSQL sequence so the DAG can be re-triggered.
+A cleanup task drops the table the macro keeps its run count in, so the DAG can be re-triggered.
 """
 
 import os
@@ -85,7 +85,7 @@ with DAG(
     cleanup = SQLExecuteQueryOperator(
         task_id="drop_fail_once_marker",
         conn_id="example_conn",
-        sql="DROP SEQUENCE IF EXISTS public._cosmos_fail_once_seq;",
+        sql="DROP TABLE IF EXISTS public._cosmos_fail_once_;",
         trigger_rule="all_done",
     )
 

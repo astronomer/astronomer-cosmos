@@ -284,6 +284,22 @@ def test_on_kill(mock_clean_dir_if_temporary):
     assert mock_clean_dir_if_temporary.called
 
 
+@patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.clean_dir_if_temporary")
+def test_on_kill_cancels_the_ai_diagnosis_in_flight(mock_clean_dir_if_temporary):
+    """The virtualenv operator overrides ``on_kill``: it must still cancel a running AI diagnosis."""
+    venv_operator = ConcreteDbtVirtualenvBaseOperator(
+        profile_config=profile_config,
+        project_dir="./dev/dags/dbt/jaffle_shop",
+        task_id="okay_task",
+    )
+    venv_operator._ai_diagnosis_handle = MagicMock()
+
+    venv_operator.on_kill()
+
+    venv_operator._ai_diagnosis_handle.cancel.assert_called_once_with()
+    assert mock_clean_dir_if_temporary.called
+
+
 @patch("cosmos.operators.virtualenv.DbtVirtualenvBaseOperator.subprocess_hook")
 def test_run_subprocess(mock_subprocess_hook, tmpdir, caplog):
     venv_operator = ConcreteDbtVirtualenvBaseOperator(

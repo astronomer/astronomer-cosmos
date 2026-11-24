@@ -1,4 +1,5 @@
 import base64
+import functools
 import importlib
 import json
 import logging
@@ -9,7 +10,7 @@ import tempfile
 import zlib
 from datetime import datetime
 from pathlib import Path
-from subprocess import PIPE, Popen
+from subprocess import PIPE, Popen, run
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -38,6 +39,7 @@ from cosmos.dbt.graph import (
     run_command,
     run_command_with_subprocess,
 )
+from cosmos.dbt.runner import is_dbt_v2
 from cosmos.dbt.selector import YamlSelectors
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -51,6 +53,7 @@ SAMPLE_MANIFEST_MODEL_VERSION = Path(__file__).parent.parent / "sample/manifest_
 ALTERED_DBT_PROJECT_MANIFEST = DBT_PROJECTS_ROOT_DIR / ALTERED_DBT_PROJECT_NAME / "target/manifest.json"
 SAMPLE_MANIFEST_SELECTORS = Path(__file__).parent.parent / "sample/manifest_selectors.json"
 SAMPLE_DBT_LS_OUTPUT = Path(__file__).parent.parent / "sample/sample_dbt_ls.txt"
+EXCLUDED_TESTS_PROJECT = DBT_PROJECTS_ROOT_DIR / "excluded_tests"
 SOURCE_RENDERING_BEHAVIOR = SourceRenderingBehavior(os.getenv("SOURCE_RENDERING_BEHAVIOR", "none"))
 
 # File and directory names to skip when copying dbt project trees in tests (keeps fixture output deterministic).
@@ -73,9 +76,52 @@ else:
     object_storage_path = "airflow.io.path.ObjectStoragePath"
 
 
+@functools.cache
+def _paths_tracked_by_git() -> frozenset[Path] | None:
+    try:
+        result = run(["git", "ls-files", "-z"], cwd=DBT_PROJECTS_ROOT_DIR, capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    tracked_files = [DBT_PROJECTS_ROOT_DIR.resolve() / path for path in result.stdout.split("\0") if path]
+    return frozenset(path for tracked_file in tracked_files for path in (tracked_file, *tracked_file.parents))
+
+
 def _ignore_when_copying_dbt_project(directory: str, names: list[str]) -> list[str]:
-    """Names to skip in copytree so the fixture tree is deterministic."""
-    return [name for name in names if name in _DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES]
+    """Names to skip in copytree so the fixture tree is deterministic: generated files and anything git does not track."""
+    tracked_paths = _paths_tracked_by_git()
+    return [
+        name
+        for name in names
+        if name in _DBT_PROJECT_COPY_IGNORED_FILE_AND_DIR_NAMES
+        or (tracked_paths is not None and Path(directory).resolve() / name not in tracked_paths)
+    ]
+
+
+@pytest.mark.skipif(_paths_tracked_by_git() is None, reason="Needs a git checkout")
+def test_copying_dbt_project_skips_files_git_does_not_track():
+    project_dir = DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME
+
+    ignored = _ignore_when_copying_dbt_project(str(project_dir), ["dbt_project.yml", "untracked_by_git.sql"])
+
+    assert ignored == ["untracked_by_git.sql"]
+
+
+@pytest.mark.parametrize(
+    "git_run",
+    [MagicMock(side_effect=FileNotFoundError), MagicMock(return_value=MagicMock(returncode=128))],
+    ids=["git_missing", "git_fails"],
+)
+def test_copying_dbt_project_falls_back_to_ignored_names_without_git(git_run):
+    _paths_tracked_by_git.cache_clear()
+    try:
+        with patch(f"{__name__}.run", git_run):
+            ignored = _ignore_when_copying_dbt_project("any_dir", ["target", "untracked_by_git.sql"])
+    finally:
+        _paths_tracked_by_git.cache_clear()
+
+    assert ignored == ["target"]
 
 
 @pytest.fixture
@@ -352,8 +398,10 @@ def test_load_via_manifest_with_exclude(project_name, manifest_filepath, model_f
     dbt_graph.load_from_dbt_manifest()
 
     assert len(dbt_graph.nodes) == 28
-    assert len(dbt_graph.filtered_nodes) == 26
+    assert len(dbt_graph.filtered_nodes) == 14
     assert "model.jaffle_shop.orders" not in dbt_graph.filtered_nodes
+    excluded_models = {"model.jaffle_shop.orders", "model.jaffle_shop.customers"}
+    assert not [node for node in dbt_graph.filtered_nodes.values() if excluded_models & set(node.depends_on)]
 
     sample_node = dbt_graph.nodes["model.jaffle_shop.customers"]
     assert sample_node.name == "customers"
@@ -995,6 +1043,22 @@ def test_load_dbt_ls_file_without_project_path():
     assert err_info.value.args[0] == "Unable to load dbt ls file without RenderConfig.project_path"
 
 
+@patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
+def test_load_clears_the_exclusions_of_a_previous_load(mock_load_via_dbt_ls):
+    project_config = ProjectConfig(dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(project=project_config, profile_config=profile_config)
+    dbt_graph.excluded_node_ids = {"test.jaffle_shop.left_over"}
+
+    dbt_graph.load(method=LoadMode.DBT_LS, execution_mode=ExecutionMode.LOCAL)
+
+    assert dbt_graph.excluded_node_ids == set()
+
+
 @patch("cosmos.dbt.graph.DbtGraph.load_via_custom_parser", side_effect=None)
 @patch("cosmos.dbt.graph.DbtGraph.load_via_dbt_ls", return_value=None)
 def test_load_automatic_without_manifest_with_profile_yml(mock_load_via_dbt_ls, mock_load_via_custom_parser):
@@ -1158,7 +1222,9 @@ def test_load_via_dbt_ls_does_not_create_target_logs_in_original_folder(
         execution_config=execution_config,
         profile_config=postgres_profile_config,
     )
-    dbt_graph.load_via_dbt_ls()
+    # dbt 2 runs `dbt ls` through a subprocess, which would bypass the dbtRunner this test mocks.
+    with patch("cosmos.dbt.graph.dbt_runner.is_dbt_v2", return_value=False):
+        dbt_graph.load_via_dbt_ls()
     assert not (tmp_dbt_project_dir / "target").exists()
     assert not (tmp_dbt_project_dir / "logs").exists()
 
@@ -1374,6 +1440,10 @@ def test_altered_jaffle_shop_manifest_is_in_sync_with_project():
         assert sorted(manifest_graph.nodes[unique_id].depends_on) == sorted(node.depends_on), unique_id
 
 
+@pytest.mark.skipif(
+    is_dbt_v2(),
+    reason="dbt 2 installs the missing dbt_packages itself on dbt ls, so the missing-packages error never occurs",
+)
 @pytest.mark.integration
 @pytest.mark.parametrize("runner", ("subprocess", "dbt_runner"))
 def test_load_via_dbt_ls_without_dbt_deps(runner, postgres_profile_config):
@@ -1690,6 +1760,59 @@ def test_load_via_custom_parser_with_nested_model_dir(tmp_path):
     assert dbt_graph.nodes["my_model"].unique_id == "model.nested_project.my_model"
 
 
+def test_load_via_custom_parser_with_nested_model_dir_and_split_project_path(tmp_path):
+    """
+    The project root may come from RenderConfig/ExecutionConfig rather than ProjectConfig. In that case
+    ProjectConfig cannot build absolute models_paths, and the relative dirs the user configured must
+    still be honoured instead of falling back to LegacyDbtProject's default "models" directory.
+    """
+    project_dir = tmp_path / "split_project"
+    (project_dir / "custom" / "models").mkdir(parents=True)
+    (project_dir / "custom" / "models" / "my_model.sql").write_text("select 1")
+    (project_dir / "profiles.yml").write_text(
+        "test:\n"
+        "  target: test\n"
+        "  outputs:\n"
+        "    test:\n"
+        "      type: postgres\n"
+        "      host: localhost\n"
+        "      user: user\n"
+        "      password: pass\n"
+        "      port: 5432\n"
+        "      dbname: db\n"
+        "      schema: public\n"
+        "      threads: 1\n"
+    )
+
+    # No dbt_project_path here: the project root is supplied by RenderConfig/ExecutionConfig below,
+    # so ProjectConfig has no root to build absolute paths from.
+    project_config = ProjectConfig(
+        manifest_path=project_dir / "target" / "manifest.json",
+        project_name="split_project",
+        models_relative_paths="custom/models",
+    )
+    assert project_config.models_paths == []
+
+    execution_config = ExecutionConfig(dbt_project_path=project_dir)
+    render_config = RenderConfig(dbt_project_path=project_dir, source_rendering_behavior=SOURCE_RENDERING_BEHAVIOR)
+    profile_config = ProfileConfig(
+        profile_name="test",
+        target_name="test",
+        profiles_yml_filepath=project_dir / "profiles.yml",
+    )
+    dbt_graph = DbtGraph(
+        project=project_config,
+        profile_config=profile_config,
+        render_config=render_config,
+        execution_config=execution_config,
+    )
+
+    dbt_graph.load_via_custom_parser()
+
+    assert "my_model" in dbt_graph.nodes
+    assert dbt_graph.nodes["my_model"].unique_id == "model.split_project.my_model"
+
+
 def test_load_via_custom_parser_with_explicit_empty_models_relative_paths(tmp_path):
     """
     models_relative_paths=[] means "no model directories" and must not fall back to crawling the
@@ -1856,6 +1979,101 @@ def test_update_node_dependency_test_not_exist():
         assert nodes.has_non_detached_test is False
 
 
+@pytest.mark.parametrize(
+    "render_config_args",
+    [
+        {"select": ["path:models"], "exclude": ["tag:excluded"]},
+        {"exclude": ["tag:excluded"]},
+        {"selector": "models_without_excluded_tests"},
+    ],
+)
+def test_update_node_dependency_does_not_add_back_excluded_tests(render_config_args):
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(
+            dbt_project_path=EXCLUDED_TESTS_PROJECT,
+            manifest_path=EXCLUDED_TESTS_PROJECT / "target/manifest.json",
+        ),
+        execution_config=ExecutionConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=EXCLUDED_TESTS_PROJECT / "profiles.yml",
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, **render_config_args),
+    )
+    dbt_graph.load()
+
+    rendered_tests = {
+        node_id for node_id, node in dbt_graph.filtered_nodes.items() if node.resource_type == DbtResourceType.TEST
+    }
+    assert rendered_tests == {
+        "test.excluded_tests.kept_singular_test",
+        "test.excluded_tests.not_null_model_a_id.1e928b9f1f",
+    }
+    assert dbt_graph.tests_per_model["model.excluded_tests.model_a"] == [
+        "test.excluded_tests.kept_singular_test",
+        "test.excluded_tests.not_null_model_a_id.1e928b9f1f",
+    ]
+
+
+def test_select_by_test_tag_selects_the_tests_without_their_parents():
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(
+            dbt_project_path=EXCLUDED_TESTS_PROJECT,
+            manifest_path=EXCLUDED_TESTS_PROJECT / "target/manifest.json",
+        ),
+        execution_config=ExecutionConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=EXCLUDED_TESTS_PROJECT / "profiles.yml",
+        ),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST, select=["tag:excluded"]),
+    )
+    dbt_graph.load()
+
+    assert set(dbt_graph.filtered_nodes) == {
+        "test.excluded_tests.excluded_singular_test",
+        "test.excluded_tests.unique_model_a_id.94b83a3ca6",
+    }
+    assert dbt_graph.tests_per_model == {}
+
+
+def test_apply_manifest_node_selection_exclude_does_not_widen_select():
+    def build_node(unique_id, resource_type, depends_on, tags, original_file_path):
+        return DbtNode(
+            unique_id=unique_id,
+            resource_type=resource_type,
+            depends_on=depends_on,
+            path_base=EXCLUDED_TESTS_PROJECT,
+            original_file_path=Path(original_file_path),
+            tags=tags,
+            config={},
+        )
+
+    nodes = {
+        "model.p.a": build_node("model.p.a", DbtResourceType.MODEL, [], ["chosen"], "models/a.sql"),
+        "model.p.b": build_node("model.p.b", DbtResourceType.MODEL, [], [], "models/b.sql"),
+        "test.p.t": build_node("test.p.t", DbtResourceType.TEST, ["model.p.a", "model.p.b"], [], "tests/t.sql"),
+    }
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        execution_config=ExecutionConfig(dbt_project_path=EXCLUDED_TESTS_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="default",
+            target_name="dev",
+            profiles_yml_filepath=EXCLUDED_TESTS_PROJECT / "profiles.yml",
+        ),
+        render_config=RenderConfig(select=["+tag:chosen"], exclude=["tag:unused"]),
+    )
+
+    dbt_graph._apply_manifest_node_selection(nodes, {})
+
+    assert set(dbt_graph.filtered_nodes) == {"model.p.a"}
+    assert dbt_graph.excluded_node_ids == set()
+    assert nodes["test.p.t"].tags == []
+
+
 def test_tests_per_model_populated():
     project_config = ProjectConfig(
         dbt_project_path=DBT_PROJECTS_ROOT_DIR / DBT_PROJECT_NAME, manifest_path=SAMPLE_MANIFEST
@@ -1966,7 +2184,10 @@ def test_tag_selected_node_test_exist():
     assert len(dbt_graph.filtered_nodes) > 0
 
     for _, node in dbt_graph.filtered_nodes.items():
-        assert node.tags == ["test_tag"]
+        if node.resource_type == DbtResourceType.TEST:
+            assert any("test_tag" in dbt_graph.nodes[parent_id].tags for parent_id in node.depends_on)
+        else:
+            assert node.tags == ["test_tag"]
         if node.resource_type == DbtResourceType.MODEL:
             assert node.has_test is True
             assert node.has_non_detached_test is True
@@ -1989,16 +2210,16 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method, postgres_profi
     )
     getattr(dbt_graph, load_method)()
     expected_dbt_nodes = {
-        "seed.jaffle_shop.raw_customers": "raw_customers",
-        "seed.jaffle_shop.raw_orders": "raw_orders",
-        "seed.jaffle_shop.raw_payments": "raw_payments",
-        "model.jaffle_shop.stg_customers.v1": "stg_customers_v1",
-        "model.jaffle_shop.stg_customers.v2": "stg_customers_v2",
-        "model.jaffle_shop.customers.v1": "customers_v1",
-        "model.jaffle_shop.customers.v2": "customers_v2",
-        "model.jaffle_shop.stg_orders.v1": "stg_orders_v1",
-        "model.jaffle_shop.stg_payments": "stg_payments",
-        "model.jaffle_shop.orders": "orders",
+        "seed.model_version.raw_customers": "raw_customers",
+        "seed.model_version.raw_orders": "raw_orders",
+        "seed.model_version.raw_payments": "raw_payments",
+        "model.model_version.stg_customers.v1": "stg_customers_v1",
+        "model.model_version.stg_customers.v2": "stg_customers_v2",
+        "model.model_version.customers.v1": "customers_v1",
+        "model.model_version.customers.v2": "customers_v2",
+        "model.model_version.stg_orders.v1": "stg_orders_v1",
+        "model.model_version.stg_payments": "stg_payments",
+        "model.model_version.orders": "orders",
     }
 
     for unique_id, name in expected_dbt_nodes.items():
@@ -2007,19 +2228,19 @@ def test_load_dbt_ls_and_manifest_with_model_version(load_method, postgres_profi
 
     # Test dependencies
     assert {
-        "model.jaffle_shop.stg_customers.v1",
-        "model.jaffle_shop.stg_orders.v1",
-        "model.jaffle_shop.stg_payments",
-    } == set(dbt_graph.nodes["model.jaffle_shop.customers.v1"].depends_on)
+        "model.model_version.stg_customers.v1",
+        "model.model_version.stg_orders.v1",
+        "model.model_version.stg_payments",
+    } == set(dbt_graph.nodes["model.model_version.customers.v1"].depends_on)
     assert {
-        "model.jaffle_shop.stg_customers.v2",
-        "model.jaffle_shop.stg_orders.v1",
-        "model.jaffle_shop.stg_payments",
-    } == set(dbt_graph.nodes["model.jaffle_shop.customers.v2"].depends_on)
+        "model.model_version.stg_customers.v2",
+        "model.model_version.stg_orders.v1",
+        "model.model_version.stg_payments",
+    } == set(dbt_graph.nodes["model.model_version.customers.v2"].depends_on)
     assert {
-        "model.jaffle_shop.stg_orders.v1",
-        "model.jaffle_shop.stg_payments",
-    } == set(dbt_graph.nodes["model.jaffle_shop.orders"].depends_on)
+        "model.model_version.stg_orders.v1",
+        "model.model_version.stg_payments",
+    } == set(dbt_graph.nodes["model.model_version.orders"].depends_on)
 
 
 @pytest.mark.integration
@@ -2210,6 +2431,11 @@ def test_run_command_uses_dbt_runner_for_dbt_v1_ls(
     assert not mock_subprocess.called
 
 
+@pytest.mark.skipif(
+    is_dbt_v2(),
+    reason="run_command runs dbt ls as a subprocess on dbt 2, which installs the missing dbt_packages itself, "
+    "so the missing-packages error never occurs",
+)
 @pytest.mark.integration
 def test_run_command_with_dbt_runner_exception(tmp_dbt_project_dir):
     with pytest.raises(CosmosLoadDbtException) as err_info:

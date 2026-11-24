@@ -18,9 +18,6 @@ clean-targets:
 
 require-dbt-version: [">=1.0.0", "<2.0.0"]
 
-on-run-start:
-  - "CREATE SEQUENCE IF NOT EXISTS {{ target.schema }}._cosmos_fail_once_seq"
-
 models:
   watcher_downstream_not_skipped:
       +materialized: table

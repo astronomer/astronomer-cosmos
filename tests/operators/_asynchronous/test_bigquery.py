@@ -16,6 +16,7 @@ from cosmos.operators._asynchronous.bigquery import (
     _configure_bigquery_async_op_args,
     _mock_bigquery_adapter,
 )
+from cosmos.profiles import GoogleCloudServiceAccountDictProfileMapping
 
 
 @pytest.fixture
@@ -316,7 +317,6 @@ def test_execute_does_not_call_register_event_when_emit_datasets_false(
     mock_register_event.assert_not_called()
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), reason="Require Airflow >= 2.10")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "_store_template_fields")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "_register_event")
 def test_execute_complete_calls_register_event_when_emit_datasets_true(
@@ -344,7 +344,6 @@ def test_execute_complete_calls_register_event_when_emit_datasets_true(
     mock_register_event.assert_called_once_with(mock_context)
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), reason="Require Airflow >= 2.10")
 @patch.object(DbtRunAirflowAsyncBigqueryOperator, "register_dataset")
 def test_register_event_with_uri(mock_register_dataset, profile_config_mock):
     """Test that _register_event correctly extracts table name from complex unique_id."""
@@ -374,10 +373,9 @@ def test_register_event_with_uri(mock_register_dataset, profile_config_mock):
         assert args[1][0].uri == "bigquery://my_project.my_dataset.my_complex_table_name/"
 
 
-@pytest.mark.skipif(AIRFLOW_VERSION < Version("2.10.0"), reason="DatasetAlias outlets require Airflow >= 2.10")
 @patch("cosmos.operators._asynchronous.bigquery.settings.enable_dataset_alias", True)
 def test_init_sets_outlets_when_dataset_alias_enabled(profile_config_mock):
-    """When ``settings.enable_dataset_alias`` is True and Airflow >= 2.10, ``__init__`` populates
+    """When ``settings.enable_dataset_alias`` is True, ``__init__`` populates
     ``kwargs['outlets']`` with a DatasetAlias derived from the task_id (and optional task_group)."""
     operator = DbtRunAirflowAsyncBigqueryOperator(
         task_id="test_task",
@@ -508,3 +506,25 @@ def test_execute_complete_resolves_rendered_emit_datasets(
         operator.execute_complete(MagicMock(), {"job_id": "job", "status": "success"})
 
     assert mock_register_event.called is expected_emission
+
+
+def test_render_template_fields_renders_templated_gcp_conn_id():
+    templated_profile_config = ProfileConfig(
+        profile_name="default",
+        target_name="dev",
+        profile_mapping=GoogleCloudServiceAccountDictProfileMapping(
+            conn_id="{{ params.conn_id }}",
+            profile_args={"dataset": "my_dataset"},
+        ),
+    )
+    operator = DbtRunAirflowAsyncBigqueryOperator(
+        task_id="run",
+        project_dir="/path/to/project",
+        profile_config=templated_profile_config,
+        dbt_kwargs={"task_id": "run"},
+    )
+
+    operator.render_template_fields({"params": {"conn_id": "rendered_conn"}})
+
+    assert operator.gcp_conn_id == "rendered_conn"
+    assert operator.profile_config.profile_mapping.conn_id == "rendered_conn"

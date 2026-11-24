@@ -12,24 +12,24 @@ An Apache Airflow provider library that orchestrates dbt projects as Airflow DAG
 
 Unit tests (excluding integration/perf/dbtfusion):
 ```bash
-hatch run tests.py3.11-2.10-1.9:test
-hatch run tests.py3.11-2.10-1.9:test-cov   # with coverage
+hatch run tests.py3.11-2.11-1.9:test
+hatch run tests.py3.11-2.11-1.9:test-cov   # with coverage
 ```
 
 Run a single test file or test:
 ```bash
-hatch run tests.py3.11-2.10-1.9:test tests/perf/test_dag_generation_perf.py
-hatch run tests.py3.11-2.10-1.9:test -k "test_function_name"
+hatch run tests.py3.11-2.11-1.9:test tests/perf/test_dag_generation_perf.py
+hatch run tests.py3.11-2.11-1.9:test -k "test_function_name"
 ```
 
 Integration tests:
 ```bash
-hatch run tests.py3.11-2.10-1.9:test-integration
+hatch run tests.py3.11-2.11-1.9:test-integration
 ```
 
 Type checking:
 ```bash
-hatch run tests.py3.10-3.1-1.9:type-check
+hatch run tests.py3.11-3.1-1.9:type-check
 ```
 
 **Always run the type-check before committing or opening a PR** — mypy is enforced in CI and skipping it locally wastes a CI round-trip. The `type-check` script is an alias for `pre-commit run mypy --files cosmos/**/*`, so if the hatch env's `pre-install-airflow.sh` fails to bootstrap on your machine, fall back to:
@@ -177,7 +177,7 @@ Applies to every `logger.{debug,info,warning,error,exception}` call. f-strings a
 
 | Module | Purpose |
 |---|---|
-| `cosmos/config.py` | `ProjectConfig`, `ProfileConfig`, `RenderConfig`, `ExecutionConfig` — the four user-facing config classes |
+| `cosmos/config.py` | `ProjectConfig`, `ProfileConfig`, `RenderConfig`, `ExecutionConfig`, `AIConfig` — the five user-facing config classes |
 | `cosmos/constants.py` | Enums: `ExecutionMode`, `LoadMode`, `TestBehavior`, `SourceRenderingBehavior`, etc. |
 | `cosmos/converter.py` | Entry point: converts dbt project config into Airflow graph |
 | `cosmos/dbt/graph.py` | Parses dbt manifest/runs `dbt ls`; builds `DbtGraph` with nodes and edges |
@@ -185,6 +185,7 @@ Applies to every `logger.{debug,info,warning,error,exception}` call. f-strings a
 | `cosmos/airflow/graph.py` | Converts `DbtGraph` nodes into Airflow `BaseOperator` instances and task dependencies |
 | `cosmos/operators/` | One operator class per execution mode (`local.py`, `docker.py`, `kubernetes.py`, `virtualenv.py`, cloud variants) |
 | `cosmos/profiles/` | Database-specific dbt profile generators (Postgres, Snowflake, BigQuery, Databricks, etc.) |
+| `cosmos/ai/` | Optional LLM-assisted diagnosis of failed dbt tasks (`AIConfig`): failure context from dbt artifacts, agent run, output formatting |
 | `cosmos/cache.py` | Caches manifest parsing and `dbt ls` results to speed up DAG generation |
 | `cosmos/listeners/` | Airflow event listeners for DAG run and task instance lifecycle events |
 | `cosmos/plugin/` | Registers Cosmos as an Airflow provider plugin; includes cluster retry policy, dbt docs plugin etc |
@@ -224,7 +225,7 @@ Controlled by `TestBehavior` enum:
 ### Code Quality Settings
 
 - Line length: **120** characters
-- Python minimum: **3.10**
+- Python minimum: **3.11**
 - mypy: strict mode
 - Ruff rules: C901 (complexity), D300, I (imports), F (pyflakes); max complexity 10
 - pytest markers: `integration`, `perf`, `dbtfusion`

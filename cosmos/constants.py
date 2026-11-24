@@ -48,13 +48,6 @@ DBT_PROJECT_CONTENT_DIRS = frozenset({"models", "seeds", "snapshots", "analyses"
 DEFAULT_OPENLINEAGE_NAMESPACE = "cosmos"
 OPENLINEAGE_PRODUCER = "https://github.com/astronomer/astronomer-cosmos/"
 
-# Cosmos will not emit datasets for the following Airflow versions, due to a breaking change that's fixed in later Airflow 2.x versions
-# https://github.com/apache/airflow/issues/39486
-# Cosmos Dataset Alias is also broken in Airflow 2.10.5, and won't be fixed:
-# https://github.com/apache/airflow/issues/42495
-PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS = [Version("2.9.0"), Version("2.9.1"), Version("2.10.5")]
-
-
 AIRFLOW_OBJECT_STORAGE_PATH_URL_SCHEMES = ("s3", "gs", "gcs", "wasb", "abfs", "abfss", "az", "http", "https")
 
 
@@ -129,6 +122,12 @@ class ExecutionMode(Enum):
     GCP_GKE = "gcp_gke"
     WATCHER_GCP_GKE = "watcher_gcp_gke"
     WATCHER_KUBERNETES = "watcher_kubernetes"
+
+
+# Execution modes whose operators consume ``AIConfig``: they run dbt on the worker, so the dbt artifacts of a failed
+# task are available to diagnose it. ``ExecutionMode.WATCHER`` is excluded on purpose: its producer runs a single
+# ``dbt build`` for the whole DAG, so there is no per-task failure to diagnose.
+AI_DIAGNOSIS_SUPPORTED_EXECUTION_MODES = frozenset({ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV})
 
 
 class InvocationMode(Enum):

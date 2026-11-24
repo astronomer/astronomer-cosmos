@@ -199,6 +199,12 @@ def _node_label(node_result: Any) -> str:
     return str(getattr(node, "name", None) or getattr(node_result, "unique_id", None) or "unknown")
 
 
+def _status_value(node_result: Any) -> str:
+    """The lower-cased status of a result: dbt 2 reports ``FreshnessStatus.WARN`` as ``Warn``, dbt 1 as ``warn``."""
+    status = node_result.status
+    return str(getattr(status, "value", status)).lower()
+
+
 def extract_message_by_status(
     result: dbtRunnerResult, status_levels: list[str] | None = None
 ) -> tuple[list[str], list[str]]:
@@ -213,15 +219,16 @@ def extract_message_by_status(
     :return: two lists of strings, the first one containing the node names and the second one
         containing the node result message.
     """
-    status_levels = ["warn"] if status_levels is None else status_levels
+    status_levels = ["warn"] if status_levels is None else [level.lower() for level in status_levels]
 
     node_names = []
     node_results = []
 
     for node_result in result.result.results:
-        if node_result.status in status_levels:
+        if _status_value(node_result) in status_levels:
             node_names.append(_node_label(node_result))
-            node_results.append(str(node_result.message))
+            # dbt 2 source freshness results (``FreshnessResultsNode``) have no ``message``: use their status instead.
+            node_results.append(str(getattr(node_result, "message", _status_value(node_result))))
 
     return node_names, node_results
 
@@ -232,9 +239,30 @@ def parse_number_of_warnings(result: dbtRunnerResult) -> int:
     """
     num = 0
     for run_result in result.result.results:
-        if run_result.status == "warn":
+        if _status_value(run_result) == "warn":
             num += 1
     return num
+
+
+# The message dbt 2 puts on every node when a failure is not tied to one node.
+DBT_V2_GENERIC_ERROR_MESSAGE = "Compilation Error"
+
+
+def _failure_reported_on_every_node(result: dbtRunnerResult, error_messages: list[str]) -> bool:
+    """
+    Whether dbt 2 marked every node as failed with its generic message.
+
+    dbt 2 reports a failure that is not tied to one node, for example the error of a ``run-operation`` macro, as an
+    error on every node of the project, all with the same generic message (``Compilation Error``). The cause is only in
+    the dbt output, not in the result. Other failures that share a message are not matched: for example, failing tests
+    all report ``Error``, and their names are what the user needs.
+    """
+    return (
+        is_dbt_v2()
+        and len(error_messages) > 1
+        and len(error_messages) == len(result.result.results)
+        and set(error_messages) == {DBT_V2_GENERIC_ERROR_MESSAGE}
+    )
 
 
 def handle_exception_if_needed(result: dbtRunnerResult) -> None:
@@ -247,5 +275,11 @@ def handle_exception_if_needed(result: dbtRunnerResult) -> None:
             raise CosmosDbtRunError(f"dbt invocation did not complete with unhandled error: {result.exception}")
         else:
             node_names, node_results = extract_message_by_status(result, ["error", "fail", "runtime error"])
+            if _failure_reported_on_every_node(result, node_results):
+                raise CosmosDbtRunError(
+                    f'dbt invocation completed with errors: all {len(node_results)} nodes reported "{node_results[0]}". '
+                    "dbt 2 reports a failure that is not tied to one node (for example the error of a run-operation "
+                    "macro) on every node: see the dbt output above for the cause."
+                )
             error_message = "\n".join([f"{name}: {result}" for name, result in zip(node_names, node_results)])
             raise CosmosDbtRunError(f"dbt invocation completed with errors: {error_message}")

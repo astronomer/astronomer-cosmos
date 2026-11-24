@@ -1,0 +1,9 @@
+selectors:
+  - name: models_without_excluded_tests
+    definition:
+      union:
+        - method: path
+          value: models
+        - exclude:
+            - method: tag
+              value: excluded

@@ -153,3 +153,75 @@ def test_profile_env_vars(
     assert profile_mapping.env_vars == {
         "COSMOS_CONN_REDSHIFT_PASSWORD": mock_redshift_conn.password,
     }
+
+
+@pytest.fixture()
+def mock_redshift_conn_with_timeout():  # type: ignore
+    """Sets the connection as an environment variable, adds extra.timeout."""
+    conn = Connection(
+        conn_id="my_redshift_connection",
+        conn_type="redshift",
+        host="my_host",
+        login="my_user",
+        password="my_password",
+        port=5439,
+        schema="my_database",
+        extra={"timeout": 5},
+    )
+
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        yield conn
+
+
+def test_profile_args_with_timeout(
+    mock_redshift_conn_with_timeout: Connection,
+) -> None:
+    """Tests that the profile values get set correctly (including timeout and connect_timeout)."""
+    profile_mapping = get_automatic_profile_mapping(
+        conn_id=mock_redshift_conn_with_timeout.conn_id,
+        profile_args={"schema": "my_schema"},
+    )
+
+    assert "timeout" in profile_mapping.profile
+    assert "connect_timeout" in profile_mapping.profile
+
+    assert profile_mapping.profile == {
+        "type": mock_redshift_conn_with_timeout.conn_type,
+        "host": mock_redshift_conn_with_timeout.host,
+        "user": mock_redshift_conn_with_timeout.login,
+        "password": "{{ env_var('COSMOS_CONN_REDSHIFT_PASSWORD') }}",
+        "port": mock_redshift_conn_with_timeout.port,
+        "dbname": mock_redshift_conn_with_timeout.schema,
+        "schema": "my_schema",
+        "timeout": 5,
+        "connect_timeout": 5,
+    }
+
+
+def test_profile_args_with_timeout_overrides(
+    mock_redshift_conn_with_timeout: Connection,
+) -> None:
+    """Tests that you can override the profile values (including timeout and connect_timeout)."""
+    profile_mapping = get_automatic_profile_mapping(
+        conn_id=mock_redshift_conn_with_timeout.conn_id,
+        profile_args={
+            "schema": "my_schema",
+            "timeout": 60,
+            "connect_timeout": 30,
+        },
+    )
+
+    assert "timeout" in profile_mapping.profile_args
+    assert "connect_timeout" in profile_mapping.profile_args
+
+    assert profile_mapping.profile == {
+        "type": mock_redshift_conn_with_timeout.conn_type,
+        "host": mock_redshift_conn_with_timeout.host,
+        "user": mock_redshift_conn_with_timeout.login,
+        "password": "{{ env_var('COSMOS_CONN_REDSHIFT_PASSWORD') }}",
+        "port": mock_redshift_conn_with_timeout.port,
+        "dbname": mock_redshift_conn_with_timeout.schema,
+        "schema": "my_schema",
+        "timeout": 60,
+        "connect_timeout": 30,
+    }

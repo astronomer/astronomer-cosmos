@@ -184,6 +184,50 @@ If your Airflow DAG includes multiple stages or integrations (e.g., data ingesti
     :align: center
 
 
+.. _watcher-dbt-fusion-oss:
+
+Use with dbt Fusion and dbt OSS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``ExecutionMode.WATCHER`` works with dbt Core 1.x and with both distributions of dbt 2: :ref:`dbt Fusion <dbt_fusion>` and :ref:`dbt OSS <dbt_oss>`.
+
+dbt Fusion
+++++++++++
+
+Cosmos CI has run ``ExecutionMode.WATCHER`` with dbt Fusion since Cosmos 1.14.0. Set ``dbt_executable_path`` to the dbt Fusion binary and ``invocation_mode`` to ``InvocationMode.SUBPROCESS``:
+
+.. code-block:: python
+
+    from cosmos import DbtDag, ExecutionConfig, RenderConfig
+    from cosmos.constants import ExecutionMode, InvocationMode
+
+    DBT_FUSION_BINARY = "/home/astro/.local/bin/dbt"
+
+    DbtDag(
+        ...,
+        render_config=RenderConfig(
+            dbt_executable_path=DBT_FUSION_BINARY,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        ),
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+            dbt_executable_path=DBT_FUSION_BINARY,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        ),
+    )
+
+Set ``invocation_mode`` explicitly. Cosmos chooses it from the Python environment that Airflow runs in, not from ``dbt_executable_path``: if dbt Core 1.x can be imported there, the producer runs that dbt in-process instead of the dbt Fusion binary. The ``RenderConfig`` values only matter when Cosmos runs ``dbt ls`` to render the DAG (``LoadMode.DBT_LS``).
+
+Cosmos CI runs this configuration against BigQuery. ``ExecutionMode.WATCHER_KUBERNETES`` is not tested with dbt Fusion.
+
+dbt OSS
++++++++
+
+.. versionadded:: 1.16.0
+
+With :ref:`dbt OSS <dbt_oss>`, which Cosmos supports experimentally, use ``ExecutionMode.WATCHER`` as usual. The ``dbtRunner`` of dbt OSS has no event callbacks, so the producer always runs dbt in a subprocess, and setting ``InvocationMode.DBT_RUNNER`` for it raises ``CosmosValueError``. Cosmos CI runs the watcher example DAGs against dbt OSS on BigQuery, for ``ExecutionMode.WATCHER`` and ``ExecutionMode.WATCHER_KUBERNETES``. See :ref:`dbt_oss` for the other differences from dbt Core 1.x.
+
+
 Additional details
 ~~~~~~~~~~~~~~~~~~
 
@@ -217,7 +261,9 @@ By default (``enable_watcher_reliable_retry = True``), each XCom push is increme
 Variable. This ensures that when the producer fails and Airflow clears XCom entries before the retry,
 the backed-up values can be restored. On a successful run, the backup Variable is automatically deleted
 to avoid stale data accumulating over time. These eager per-node writes can be deferred to a single
-on-failure write to improve producer performance — see :ref:`producer-status-backup` below.
+on-failure write to improve producer performance — see :ref:`producer-status-backup` below. On Airflow 3.3
+and later, the per-node backup uses the Airflow task store instead of a Variable; see
+:ref:`producer-status-backup-task-store`.
 
 **How consumer retries work:**
 
@@ -292,12 +338,52 @@ Variable that survives the retry:
 
 Set it via the ``[cosmos]`` section or the ``AIRFLOW__COSMOS__ENABLE_WATCHER_RELIABLE_RETRY`` environment
 variable. Consider ``False`` for large dbt projects where the producer's per-node Variable I/O is a
-bottleneck and occasional duplicate consumer runs after a hard producer kill are acceptable.
+bottleneck and occasional duplicate consumer runs after a hard producer kill are acceptable. On Airflow 3.3
+and later the per-node writes go to the task store and make no secrets-backend calls, which removes most of
+that cost; see the next section.
 
-A future approach that delivers reliability and performance together is tracked in
-`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_ (Airflow 3.3 Task & Asset
-Store, AIP-103), which would let retries resume from the point of failure without the per-node
-Variable backup.
+.. _producer-status-backup-task-store:
+
+Airflow 3.3 and later: backup in the task store
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. versionchanged:: 1.16.0
+
+On Airflow 3.3 and later, with ``enable_watcher_reliable_retry`` left at ``True``, the producer keeps this
+backup in the Airflow `task store <https://cwiki.apache.org/confluence/display/AIRFLOW/AIP-103%3A+Task+State+Management>`_
+instead of a Variable (`#2771 <https://github.com/astronomer/astronomer-cosmos/issues/2771>`_). This means:
+
+- The per-node backup writes make no secrets-backend calls. Every Variable write first looks the key up in each
+  configured secrets backend, so the producer task ran between about 3 and 6 times faster in our benchmark,
+  depending on how many backends are configured (500 dbt nodes, one status pushed per node, a secrets backend
+  stubbed at 20 ms per lookup, SQLite metadata database; the numbers are in
+  `#3076 <https://github.com/astronomer/astronomer-cosmos/pull/3076>`_). A retry still reads the backup Variable
+  once, and the retry callback writes it when the last task store write failed. Without an external backend both
+  cost about the same.
+- The backup is split across task store keys (``cosmos_xcom_backup_0``, ``_1``, ...): each push rewrites only
+  the open key, and a key rolls over before a push that would take it past 8 KB, so the per-push payload does
+  not grow with the project, unlike the single Variable. A single entry is never split: one larger than 8 KB
+  gets a key of its own and Cosmos logs a warning naming it, and one larger than
+  ``[state_store] max_value_storage_bytes`` (65535 bytes by default) also makes Airflow log its size warning.
+  Configure ``[workers] state_store_backend`` to offload such values. Deleting the backup after a restore or a
+  successful run is best effort: the keys go first, from the first key up, and the Variable only once every key
+  is gone, so a failure leaves the whole backup, no readable backup, or only the Variable's newest entries, never
+  a stale value; retention removes the rest.
+- Writes to the task store from the retry callback are rejected, so the task store only serves the per-node
+  backup. If the last task store write failed, the retry callback flushes the entries it missed to the backup
+  Variable, and the restore merges them on top of the task store keys. With ``enable_watcher_reliable_retry = False`` the producer behaves as described above: no per-node
+  writes, one Variable flush from the retry callback, and the task store is not used.
+- Backups left by a failed producer are removed by ``airflow state-store clean`` or ``airflow db clean`` once
+  they are older than ``[state_store] default_retention_days`` (default 30; 0 disables expiry), or when the DAG
+  run is deleted. Nothing removes them on a schedule.
+- On Airflow 3.4 and later, clearing the producer from the Airflow UI or the REST API (a single task or a task
+  group) discards its task store entries unless **Keep task state** is ticked in the clear dialog
+  (Settings > Clearing > *Keep task state on clear* makes that the default for your browser). Without it the
+  cleared producer finds no backup, logs a warning, skips, and every cleared consumer falls back to running its
+  own dbt node. Results stay correct, but the run takes longer. Automatic retries keep the task store, and so do
+  ``airflow dags clear`` and ``airflow tasks clear``.
+
+Older Airflow versions always use a Variable.
 
 Producer done gateway task (DbtTaskGroup only)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -521,6 +607,36 @@ As a workaround, set ``max_active_runs=1`` on the DAG.
 
 For details, see `#2596 <https://github.com/astronomer/astronomer-cosmos/issues/2596>`_.
 
+Per-node profile overrides
+++++++++++++++++++++++++++
+
+The producer ``DbtProducerWatcherOperator`` builds every node in a single dbt command, using the ``profile_config`` given to ``DbtDag`` or ``DbtTaskGroup``. It does not apply the per-node ``meta.cosmos.profile_config`` overrides described in :ref:`profile-customise-per-node`.
+
+Model, seed and snapshot consumer tasks carry the override, so it takes effect only when one of them falls back to running dbt itself, for example on a retry or a manual clear. Test tasks under ``TestBehavior.AFTER_EACH`` use the profile of the model they test, unless ``should_detach_multiple_parents_tests`` gives a test a task of its own. The same model can therefore run under different connections, depending on which task ran it. When it renders the DAG, Cosmos logs a warning that lists up to ten of the overridden nodes.
+
+As a workaround, split the project into one ``DbtTaskGroup`` per profile, each with its own ``ProfileConfig`` and a ``RenderConfig`` ``select`` or ``exclude`` that picks its nodes. dbt does not resolve dependencies across the groups, so set the dependencies between them in Airflow:
+
+.. code-block:: python
+
+    with DAG(...):
+        default_models = DbtTaskGroup(
+            group_id="default_models",
+            project_config=project_config,
+            profile_config=default_profile_config,
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            render_config=RenderConfig(exclude=["tag:restricted"]),
+        )
+        restricted_models = DbtTaskGroup(
+            group_id="restricted_models",
+            project_config=project_config,
+            profile_config=restricted_profile_config,
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            render_config=RenderConfig(select=["tag:restricted"]),
+        )
+        default_models >> restricted_models
+
+For details, see `#3196 <https://github.com/astronomer/astronomer-cosmos/issues/3196>`_.
+
 
 Advanced config
 ~~~~~~~~~~~~~~~
@@ -563,7 +679,7 @@ a list of ``(unique_id, state)`` tuples for any nodes that should be pre-marked;
 list when no nodes need special handling. Each returned node receives a pre-populated XCom entry; nodes
 returned with a non-success state are also added to ``--exclude`` so dbt skips them entirely.
 
-The consumer sensor recognises three state families: ``"skipped"`` raises ``AirflowSkipException``,
+The consumer sensor recognises three state families (matched case-insensitively, since dbt OSS reports some statuses capitalised): ``"skipped"`` raises ``AirflowSkipException``,
 ``"success"`` / ``"pass"`` / ``"warn"`` marks the task as succeeded, and anything else (e.g.
 ``"failed"``, ``"error"``) raises ``AirflowException``.  The default callback always returns
 ``"skipped"`` for stale dependents — a node is skipped only when **all** of its upstream dependencies
@@ -673,6 +789,16 @@ Troubleshooting
 
 Problem: "I changed from ``ExecutionMode.LOCAL`` to ``ExecutionMode.WATCHER``, but my DAG is running slower."
 Answer: Please, check the number of threads that are being used by searching the producer task logs for a message similar to ``Concurrency: 1 threads (target='DEV')``. To leverage the Watcher mode, you should have a high number of threads, at least dbt's default of 4. Check the `dbt threading docs <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ for more information on how to set the number of threads.
+
+Problem: "A watcher task failed, and its log only shows ``No XCom value found``."
+Answer: The producer stopped before dbt finished the task's model, for example because the model hung until the DAG run timed out. Since Cosmos 1.16.1, the watcher task then logs when the model started and which producer task log to search:
+
+.. code-block:: text
+
+   [STARTED] Start: 09:26:17, Finish: N/A
+   No final status for model 'model.my_project.my_model'. Search the log of task 'dbt_producer_watcher' for 'model.my_project.my_model'.
+
+So that a hung model does not block the whole run until the DAG run times out, set ``execution_timeout`` on the producer through ``setup_operator_args``. The producer then fails, and each watcher task whose model did not finish runs that model itself.
 
 Problem: "I cannot see dbt debug logs in the producer task."
 Answer: When ``ExecutionMode.WATCHER`` runs dbt as a subprocess (i.e. when dbt and Airflow are **not** installed in the same Python virtual environment), pass ``--debug`` via ``dbt_cmd_global_flags`` in ``operator_args``:

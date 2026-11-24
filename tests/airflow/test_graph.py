@@ -26,6 +26,7 @@ from cosmos.airflow.graph import (
     _convert_list_to_str,
     _honor_on_warning_callback,
     _snake_case_to_camelcase,
+    _warn_about_profile_overrides_ignored_by_watcher_producer,
     build_airflow_graph,
     calculate_detached_node_name,
     calculate_leaves,
@@ -265,6 +266,166 @@ def test_create_task_group_for_after_each_supported_nodes(node_type: DbtResource
     )
     assert isinstance(output, TaskGroup)
     assert list(output.children.keys()) == [f"dbt_node.{task_suffix}", "dbt_node.test"]
+
+
+@pytest.mark.parametrize("test_behavior", [TestBehavior.AFTER_EACH, TestBehavior.BUILD])
+def test_create_task_group_for_source_node(test_behavior):
+    """
+    Sources are rendered as ``dbt source freshness`` tasks, which do not run the tests defined on the
+    source, and ``dbt build`` does not evaluate sources. So a source with non-detached tests should be
+    rendered as a task group with a dedicated test task under TestBehavior.BUILD as well as under
+    TestBehavior.AFTER_EACH.
+    https://github.com/astronomer/astronomer-cosmos/issues/1683
+    """
+    with DAG("test-task-group-source", start_date=datetime(2022, 1, 1)) as dag:
+        node = DbtNode(
+            unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.dbt_node",
+            resource_type=DbtResourceType.SOURCE,
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path("gen2/models/sources.yml"),
+            tags=[],
+            config={},
+            depends_on=[],
+            has_freshness=True,
+            has_test=True,
+            has_non_detached_test=True,
+        )
+    output = generate_task_or_group(
+        dag=dag,
+        task_group=None,
+        node=node,
+        execution_mode=ExecutionMode.LOCAL,
+        test_indirect_selection=TestIndirectSelection.EAGER,
+        task_args={
+            "project_dir": SAMPLE_PROJ_PATH,
+            "profile_config": ProfileConfig(
+                profile_name="default",
+                target_name="default",
+                profile_mapping=PostgresUserPasswordProfileMapping(
+                    conn_id="fake_conn",
+                    profile_args={"schema": "public"},
+                ),
+            ),
+        },
+        dbt_project_name="astro_shop",
+        node_converters={},
+        render_config=RenderConfig(
+            test_behavior=test_behavior,
+            source_rendering_behavior=SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
+        ),
+        on_warning_callback=None,
+    )
+    assert isinstance(output, TaskGroup)
+    assert list(output.children.keys()) == ["dbt_node.source", "dbt_node.test"]
+
+
+def test_build_airflow_graph_renders_source_tests_with_build_test_behavior():
+    """
+    End-to-end check for https://github.com/astronomer/astronomer-cosmos/issues/1683: with
+    SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS and TestBehavior.BUILD, the tests defined on a
+    source must be rendered as a test task, not silently dropped.
+    """
+    source_node = DbtNode(
+        unique_id="source.astro_shop.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/sources.yml"),
+        tags=[],
+        config={},
+        depends_on=[],
+        has_freshness=True,
+        has_test=True,
+        has_non_detached_test=True,
+    )
+    test_node = DbtNode(
+        unique_id="test.astro_shop.not_null_my_source_id",
+        resource_type=DbtResourceType.TEST,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/sources.yml"),
+        tags=[],
+        config={"meta": {"cosmos": {"operator_kwargs": {"pool": "source_tests_pool"}}}},
+        depends_on=[source_node.unique_id],
+    )
+    nodes = {node.unique_id: node for node in (source_node, test_node)}
+    with DAG("test-source-tests-build", start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn",
+                        profile_args={"schema": "public"},
+                    ),
+                ),
+            },
+            dbt_project_name="astro_shop",
+            render_config=RenderConfig(
+                test_behavior=TestBehavior.BUILD,
+                source_rendering_behavior=SourceRenderingBehavior.WITH_TESTS_OR_FRESHNESS,
+            ),
+        )
+    assert sorted(task.task_id for task in dag.tasks) == ["my_source.source", "my_source.test"]
+    test_task = dag.get_task("my_source.test")
+    assert test_task.__class__.__name__ == "DbtTestLocalOperator"
+    assert test_task.pool == "source_tests_pool"
+
+
+def test_calculate_test_operator_kwargs_only_collects_requested_parent_types():
+    """
+    Under TestBehavior.BUILD only source tests get a task of their own, so the kwargs declared by the tests of
+    models, seeds and snapshots must be left alone: their tests run inside the parent's ``dbt build`` task.
+    """
+    model_node = DbtNode(
+        unique_id="model.astro_shop.customers",
+        resource_type=DbtResourceType.MODEL,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/customers.sql"),
+        tags=[],
+        config={},
+        depends_on=[],
+    )
+    source_node = DbtNode(
+        unique_id="source.astro_shop.my_source",
+        resource_type=DbtResourceType.SOURCE,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/sources.yml"),
+        tags=[],
+        config={},
+        depends_on=[],
+    )
+    model_test = DbtNode(
+        unique_id="test.astro_shop.not_null_customers_id",
+        resource_type=DbtResourceType.TEST,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/schema.yml"),
+        tags=[],
+        config={"meta": {"cosmos": {"operator_kwargs": {"retries": 3}}}},
+        depends_on=[model_node.unique_id],
+    )
+    source_test = DbtNode(
+        unique_id="test.astro_shop.not_null_my_source_id",
+        resource_type=DbtResourceType.TEST,
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("gen2/models/sources.yml"),
+        tags=[],
+        config={"meta": {"cosmos": {"operator_kwargs": {"pool": "source_tests_pool"}}}},
+        depends_on=[source_node.unique_id],
+    )
+    nodes = {node.unique_id: node for node in (model_node, source_node, model_test, source_test)}
+
+    assert calculate_test_operator_kwargs(nodes, {}, RenderConfig(test_behavior=TestBehavior.BUILD)) == {
+        source_node.unique_id: {"pool": "source_tests_pool"}
+    }
+    assert calculate_test_operator_kwargs(nodes, {}, RenderConfig(test_behavior=TestBehavior.AFTER_EACH)) == {
+        model_node.unique_id: {"retries": 3},
+        source_node.unique_id: {"pool": "source_tests_pool"},
+    }
 
 
 def test_generate_task_or_group_with_dynamic_node_type_and_converter():
@@ -2063,6 +2224,217 @@ def test_watcher_producer_preserves_existing_dbt_cmd_flags(test_behavior):
     assert "--resource-type" in producer_task.dbt_cmd_flags
 
 
+@pytest.fixture
+def nodes_with_profile_overrides():
+    restricted_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.restricted_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/restricted_model.sql"),
+        config={"materialized": "table", "meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+    )
+    default_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.default_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/default_model.sql"),
+        config={"materialized": "table"},
+        has_test=True,
+        has_non_detached_test=True,
+    )
+    restricted_test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.restricted_test",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[default_model.unique_id],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/schema.yml"),
+        config={"meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+    )
+    restricted_multi_parent_test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.restricted_multi_parent_test",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[restricted_model.unique_id, default_model.unique_id],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/schema.yml"),
+        config={"meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+    )
+    return {
+        node.unique_id: node
+        for node in (restricted_model, default_model, restricted_test, restricted_multi_parent_test)
+    }
+
+
+PROFILE_OVERRIDE_WARNING = "which ignores their meta.cosmos.profile_config"
+
+
+def _get_profile_override_warning(caplog):
+    warnings = [message for message in caplog.messages if PROFILE_OVERRIDE_WARNING in message]
+    assert warnings, f"No profile override warning in: {caplog.messages}"
+    return warnings[0]
+
+
+def _render_with_profile_overrides(nodes, execution_mode, test_behavior, should_detach_multiple_parents_tests=False):
+    with DAG("test-profile-overrides", start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes=nodes,
+            dag=dag,
+            execution_mode=execution_mode,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="fake_conn", profile_args={"schema": "public"}
+                    ),
+                ),
+            },
+            render_config=RenderConfig(
+                test_behavior=test_behavior,
+                should_detach_multiple_parents_tests=should_detach_multiple_parents_tests,
+            ),
+            dbt_project_name="astro_shop",
+        )
+
+
+@pytest.mark.parametrize(
+    "test_behavior,should_detach_multiple_parents_tests,is_detached_test_listed",
+    [
+        (TestBehavior.AFTER_EACH, True, True),
+        (TestBehavior.AFTER_EACH, False, False),
+        (TestBehavior.NONE, True, False),
+        (TestBehavior.AFTER_ALL, True, False),
+    ],
+)
+def test_watcher_warns_about_profile_overrides_ignored_by_the_producer(
+    caplog, nodes_with_profile_overrides, test_behavior, should_detach_multiple_parents_tests, is_detached_test_listed
+):
+    _render_with_profile_overrides(
+        nodes_with_profile_overrides, ExecutionMode.WATCHER, test_behavior, should_detach_multiple_parents_tests
+    )
+
+    warning = _get_profile_override_warning(caplog)
+    assert f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.restricted_model" in warning
+    assert "default_model" not in warning
+    assert "restricted_test" not in warning
+    assert ("restricted_multi_parent_test" in warning) is is_detached_test_listed
+
+
+def test_watcher_warning_lists_at_most_ten_overridden_nodes(caplog):
+    overridden_models = [
+        DbtNode(
+            unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.model_{index:02d}",
+            resource_type=DbtResourceType.MODEL,
+            depends_on=[],
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path(f"models/model_{index:02d}.sql"),
+            config={"materialized": "table", "meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+        )
+        for index in range(12)
+    ]
+
+    _warn_about_profile_overrides_ignored_by_watcher_producer(
+        {model.unique_id: model for model in overridden_models}, ExecutionMode.WATCHER, RenderConfig()
+    )
+
+    warning = _get_profile_override_warning(caplog)
+    assert "model_09" in warning
+    assert "model_10" not in warning
+    assert "model_09 and 2 more." in warning
+
+
+@pytest.mark.parametrize(
+    "execution_mode,source_rendering_behavior,has_freshness,is_source_listed",
+    [
+        (ExecutionMode.WATCHER, SourceRenderingBehavior.ALL, True, True),
+        (ExecutionMode.WATCHER, SourceRenderingBehavior.ALL, False, False),
+        (ExecutionMode.WATCHER, SourceRenderingBehavior.NONE, True, False),
+        (ExecutionMode.WATCHER_KUBERNETES, SourceRenderingBehavior.ALL, True, False),
+        (ExecutionMode.WATCHER_GCP_GKE, SourceRenderingBehavior.ALL, True, False),
+    ],
+)
+def test_watcher_warns_about_source_overrides_only_when_the_producer_checks_freshness(
+    caplog, execution_mode, source_rendering_behavior, has_freshness, is_source_listed
+):
+    source = DbtNode(
+        unique_id=f"{DbtResourceType.SOURCE.value}.{SAMPLE_PROJ_PATH.stem}.raw.orders",
+        resource_type=DbtResourceType.SOURCE,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/sources.yml"),
+        config={"meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+        has_freshness=has_freshness,
+    )
+
+    _warn_about_profile_overrides_ignored_by_watcher_producer(
+        {source.unique_id: source}, execution_mode, RenderConfig(source_rendering_behavior=source_rendering_behavior)
+    )
+
+    assert (source.unique_id in caplog.text) is is_source_listed
+
+
+def test_watcher_does_not_validate_overrides_of_tests_the_producer_skips(caplog):
+    malformed_test = DbtNode(
+        unique_id=f"{DbtResourceType.TEST.value}.{SAMPLE_PROJ_PATH.stem}.malformed_test",
+        resource_type=DbtResourceType.TEST,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/schema.yml"),
+        config={"meta": {"cosmos": {"profile_config": ""}}},
+    )
+
+    _warn_about_profile_overrides_ignored_by_watcher_producer(
+        {malformed_test.unique_id: malformed_test},
+        ExecutionMode.WATCHER,
+        RenderConfig(test_behavior=TestBehavior.NONE),
+    )
+
+    assert PROFILE_OVERRIDE_WARNING not in caplog.text
+
+
+def test_watcher_warning_does_not_validate_meta_left_to_task_creation(caplog):
+    malformed_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.malformed_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/malformed_model.sql"),
+        config={"materialized": "table", "meta": {"cosmos": "not a dict"}},
+    )
+
+    _warn_about_profile_overrides_ignored_by_watcher_producer(
+        {malformed_model.unique_id: malformed_model}, ExecutionMode.WATCHER, RenderConfig()
+    )
+
+    assert PROFILE_OVERRIDE_WARNING not in caplog.text
+
+
+def test_watcher_does_not_warn_about_ephemeral_model_overrides(caplog):
+    ephemeral_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.ephemeral_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/ephemeral_model.sql"),
+        config={"materialized": "ephemeral", "meta": {"cosmos": {"profile_config": {"target_name": "restricted"}}}},
+    )
+
+    _warn_about_profile_overrides_ignored_by_watcher_producer(
+        {ephemeral_model.unique_id: ephemeral_model}, ExecutionMode.WATCHER, RenderConfig()
+    )
+
+    assert PROFILE_OVERRIDE_WARNING not in caplog.text
+
+
+def test_local_does_not_warn_about_profile_overrides(caplog, nodes_with_profile_overrides):
+    _render_with_profile_overrides(nodes_with_profile_overrides, ExecutionMode.LOCAL, TestBehavior.AFTER_EACH)
+
+    assert PROFILE_OVERRIDE_WARNING not in caplog.text
+
+
 def test_custom_meta(hierarchical_naming_disabled):
     with DAG("test-id", start_date=datetime(2022, 1, 1)) as dag:
         task_args = {
@@ -3318,6 +3690,56 @@ def test_test_node_operator_kwargs_do_not_apply_to_after_all_test_task():
         )
     assert dag.task_dict["my_model_run"].retries == 2
     assert dag.task_dict["astro_shop_test"].retries == 3
+
+
+def test_templated_node_conn_id_takes_precedence_over_templated_group_conn_id():
+    overridden_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.overridden_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/overridden_model.sql"),
+        config={
+            "materialized": "table",
+            "meta": {"cosmos": {"profile_config": {"profile_mapping": {"conn_id": "{{ params.node_conn }}"}}}},
+        },
+    )
+    default_model = DbtNode(
+        unique_id=f"{DbtResourceType.MODEL.value}.{SAMPLE_PROJ_PATH.stem}.default_model",
+        resource_type=DbtResourceType.MODEL,
+        depends_on=[],
+        path_base=SAMPLE_PROJ_PATH,
+        original_file_path=Path("models/default_model.sql"),
+        config={"materialized": "table"},
+    )
+    with DAG("test-templated-node-conn-id", start_date=datetime(2022, 1, 1)) as dag:
+        build_airflow_graph(
+            nodes={node.unique_id: node for node in (overridden_model, default_model)},
+            dag=dag,
+            execution_mode=ExecutionMode.LOCAL,
+            test_indirect_selection=TestIndirectSelection.EAGER,
+            task_args={
+                "project_dir": SAMPLE_PROJ_PATH,
+                "profile_config": ProfileConfig(
+                    profile_name="default",
+                    target_name="default",
+                    profile_mapping=PostgresUserPasswordProfileMapping(
+                        conn_id="{{ params.group_conn }}", profile_args={"schema": "public"}
+                    ),
+                ),
+            },
+            render_config=RenderConfig(test_behavior=TestBehavior.NONE),
+            dbt_project_name="astro_shop",
+        )
+    context = {"params": {"group_conn": "rendered_group_conn", "node_conn": "rendered_node_conn"}}
+    overridden_task = dag.task_dict["overridden_model_run"]
+    default_task = dag.task_dict["default_model_run"]
+
+    overridden_task.render_template_fields(context)
+    default_task.render_template_fields(context)
+
+    assert overridden_task.profile_config.profile_mapping.conn_id == "rendered_node_conn"
+    assert default_task.profile_config.profile_mapping.conn_id == "rendered_group_conn"
 
 
 def _cross_folder_model(name: str, folder: str, depends_on: list[str]) -> DbtNode:

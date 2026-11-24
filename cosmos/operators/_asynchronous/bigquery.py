@@ -3,9 +3,11 @@ from __future__ import annotations
 import base64
 import time
 import zlib
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import jinja2
 
 from cosmos.operators.base import _sanitize_xcom_key, resolve_templated_bool
 
@@ -26,14 +28,13 @@ try:
     from airflow.sdk.definitions.context import Context
 except ImportError:
     from airflow.utils.context import Context  # type: ignore[attr-defined]
-from packaging.version import Version
 
 from cosmos import settings
 from cosmos.config import ProfileConfig
 from cosmos.constants import AIRFLOW_VERSION
 from cosmos.dataset import get_dataset_alias_name
 from cosmos.exceptions import CosmosValueError
-from cosmos.operators.local import AbstractDbtLocalBase
+from cosmos.operators.local import AbstractDbtLocalBase, render_templated_conn_id
 from cosmos.settings import remote_target_path, remote_target_path_conn_id
 
 DEFAULT_PRODUCER_ASYNC_TASK_ID = "dbt_setup_async"
@@ -109,7 +110,7 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
         AbstractDbtLocalBase.__init__(
             self, task_id=task_id, project_dir=project_dir, profile_config=profile_config, **self.dbt_kwargs
         )
-        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias and AIRFLOW_VERSION >= Version("2.10"):
+        if kwargs.get("emit_datasets", True) and settings.enable_dataset_alias:
             try:
                 from airflow.sdk.definitions.asset import AssetAlias as DatasetAlias
             except ImportError:
@@ -151,6 +152,20 @@ class DbtRunAirflowAsyncBigqueryOperator(BigQueryInsertJobOperator, AbstractDbtL
             BigQueryInsertJobOperator,
             AbstractDbtLocalBase,
         )
+
+    def _do_render_template_fields(
+        self,
+        parent: Any,
+        template_fields: Iterable[str],
+        context: Context,
+        jinja_env: jinja2.Environment,
+        seen_oids: set[int],
+    ) -> None:
+        super()._do_render_template_fields(parent, template_fields, context, jinja_env, seen_oids)
+        if parent is self:
+            self.profile_config = render_templated_conn_id(self, self.profile_config, context)
+            assert self.profile_config.profile_mapping is not None
+            self.gcp_conn_id = self.profile_config.profile_mapping.conn_id
 
     @property
     def base_cmd(self) -> list[str]:

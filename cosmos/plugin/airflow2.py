@@ -1,13 +1,15 @@
+import mimetypes
 import os.path as op
-from typing import Any
-from urllib.parse import urlsplit
+from pathlib import Path, PurePosixPath
+from typing import Any, Literal, overload
+from urllib.parse import unquote, urlsplit
 
 from airflow.configuration import conf
 from airflow.plugins_manager import AirflowPlugin
 from airflow.security import permissions
 from airflow.www.auth import has_access
 from airflow.www.views import AirflowBaseView
-from flask import abort
+from flask import Response, abort
 from flask_appbuilder import AppBuilder, expose
 
 from cosmos import telemetry
@@ -27,6 +29,23 @@ else:
     ]
 
 
+# Schemes that ``open_file`` reads from a remote store; any other path is a local file.
+REMOTE_DOCS_SCHEMES = ("s3://", "gs://", "wasb://", "http://", "https://")
+
+
+def _is_parent_segment(segment: str) -> bool:
+    """
+    Whether a URL path segment means ``..`` once it is decoded.
+
+    Flask decodes the URL once, so ``%252e%252e`` arrives as the literal ``%2e%2e``, which passes a check for ``..``. For an
+    HTTP docs folder ``requests`` turns it into ``..`` when it builds the upstream URL, so decode until nothing changes.
+    """
+    decoded = unquote(segment)
+    while decoded != segment:
+        segment, decoded = decoded, unquote(decoded)
+    return segment == ".."
+
+
 def bucket_and_key(path: str) -> tuple[str, str]:
     parsed_url = urlsplit(path)
     bucket = parsed_url.netloc
@@ -34,7 +53,7 @@ def bucket_and_key(path: str) -> tuple[str, str]:
     return bucket, key
 
 
-def open_s3_file(path: str, conn_id: str | None) -> str:
+def open_s3_file(path: str, conn_id: str | None, binary: bool = False) -> str | bytes:
     from airflow.providers.amazon.aws.hooks.s3 import S3Hook
     from botocore.exceptions import ClientError
 
@@ -44,15 +63,18 @@ def open_s3_file(path: str, conn_id: str | None) -> str:
     hook = S3Hook(aws_conn_id=conn_id)
     bucket, key = bucket_and_key(path)
     try:
-        content = hook.read_key(key=key, bucket_name=bucket)
+        if binary:
+            content = hook.get_key(key=key, bucket_name=bucket).get()["Body"].read()
+        else:
+            content = hook.read_key(key=key, bucket_name=bucket)
     except ClientError as e:
-        if e.response.get("Error", {}).get("Code", "") == "NoSuchKey":
+        if e.response.get("Error", {}).get("Code", "") in ("NoSuchKey", "404"):
             raise FileNotFoundError(f"{path} does not exist")
         raise e
     return content  # type: ignore[no-any-return]
 
 
-def open_gcs_file(path: str, conn_id: str | None) -> str:
+def open_gcs_file(path: str, conn_id: str | None, binary: bool = False) -> str | bytes:
     from airflow.providers.google.cloud.hooks.gcs import GCSHook
     from google.cloud.exceptions import NotFound
 
@@ -65,10 +87,12 @@ def open_gcs_file(path: str, conn_id: str | None) -> str:
         content = hook.download(bucket_name=bucket, object_name=blob)
     except NotFound:
         raise FileNotFoundError(f"{path} does not exist")
+    if binary:
+        return content  # type: ignore[no-any-return]
     return content.decode("utf-8")  # type: ignore[no-any-return]
 
 
-def open_azure_file(path: str, conn_id: str | None) -> str:
+def open_azure_file(path: str, conn_id: str | None, binary: bool = False) -> str | bytes:
     from airflow.providers.microsoft.azure.hooks.wasb import WasbHook
     from azure.core.exceptions import ResourceNotFoundError
 
@@ -79,13 +103,17 @@ def open_azure_file(path: str, conn_id: str | None) -> str:
 
     container, blob = bucket_and_key(path)
     try:
-        content = hook.read_file(container_name=container, blob_name=blob)
+        if binary:
+            # ``WasbHook`` has no public ``get_blob_client``: use the client of the Azure SDK that ``get_conn`` returns.
+            content = hook.get_conn().get_blob_client(container=container, blob=blob).download_blob().readall()
+        else:
+            content = hook.read_file(container_name=container, blob_name=blob)
     except ResourceNotFoundError:
         raise FileNotFoundError(f"{path} does not exist")
     return content  # type: ignore[no-any-return]
 
 
-def open_http_file(path: str, conn_id: str | None) -> str:
+def open_http_file(path: str, conn_id: str | None, binary: bool = False) -> str | bytes:
     from airflow.providers.http.hooks.http import HttpHook
     from requests.exceptions import HTTPError
 
@@ -100,23 +128,36 @@ def open_http_file(path: str, conn_id: str | None) -> str:
         if str(e).startswith("404"):
             raise FileNotFoundError(f"{path} does not exist")
         raise e
-    return res.text  # type: ignore[no-any-return]
+    return res.content if binary else res.text  # type: ignore[no-any-return]
 
 
-def open_file(path: str, conn_id: str | None = None) -> str:
+@overload
+def open_file(path: str, conn_id: str | None = None, binary: Literal[False] = False) -> str: ...
+
+
+@overload
+def open_file(path: str, conn_id: str | None = None, *, binary: Literal[True]) -> bytes: ...
+
+
+def open_file(path: str, conn_id: str | None = None, binary: bool = False) -> str | bytes:
     """
     Retrieve a file from http, https, gs, s3, or wasb.
 
     Raise a (base Python) FileNotFoundError if the file is not found.
+    Return ``bytes`` when ``binary`` is True, otherwise ``str``.
     """
+    binary_kwargs: dict[str, Any] = {"binary": True} if binary else {}
     if path.strip().startswith("s3://"):
-        return open_s3_file(path, conn_id=conn_id)
+        return open_s3_file(path, conn_id=conn_id, **binary_kwargs)
     elif path.strip().startswith("gs://"):
-        return open_gcs_file(path, conn_id=conn_id)
+        return open_gcs_file(path, conn_id=conn_id, **binary_kwargs)
     elif path.strip().startswith("wasb://"):
-        return open_azure_file(path, conn_id=conn_id)
+        return open_azure_file(path, conn_id=conn_id, **binary_kwargs)
     elif path.strip().startswith("http://") or path.strip().startswith("https://"):
-        return open_http_file(path, conn_id=conn_id)
+        return open_http_file(path, conn_id=conn_id, **binary_kwargs)
+    elif binary:
+        with open(path, "rb") as fb:
+            return fb.read()
     else:
         with open(path) as f:
             content = f.read()
@@ -195,6 +236,37 @@ class DbtDocsView(AirflowBaseView):  # type: ignore[misc]
             abort(404)
         else:
             return data, 200, {"Content-Type": "application/json"}
+
+    def _serve_docs_file(self, folder: str, asset_path: str) -> Response:
+        # The dbt OSS (dbt 2) docs site is a single-page app: its index.html loads JavaScript and CSS from assets/ and reads
+        # its data from info_schema/. Only these two folders are served, and never a path that leaves them.
+        if dbt_docs_dir is None:
+            abort(404)
+        parts = PurePosixPath(folder, asset_path).parts
+        # ``parts[0] != folder`` keeps an absolute ``asset_path``, which replaces ``folder`` in ``PurePosixPath``, out.
+        if len(parts) < 2 or parts[0] != folder or any(_is_parent_segment(part) for part in parts):
+            abort(404)
+        file_path = op.join(dbt_docs_dir, *parts)
+        # A symlink in the docs folder must not lead to a file outside of it (remote paths are read as they are).
+        if not file_path.strip().startswith(REMOTE_DOCS_SCHEMES) and not Path(file_path).resolve().is_relative_to(
+            Path(dbt_docs_dir).resolve()
+        ):
+            abort(404)
+        try:
+            data = open_file(file_path, conn_id=dbt_docs_conn_id, binary=True)
+        except (FileNotFoundError, IsADirectoryError):
+            abort(404)
+        return Response(data, mimetype=mimetypes.guess_type(parts[-1])[0] or "application/octet-stream")
+
+    @expose("/assets/<path:asset_path>")  # type: ignore[untyped-decorator]
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
+    def assets(self, asset_path: str) -> Response:
+        return self._serve_docs_file("assets", asset_path)
+
+    @expose("/info_schema/<path:asset_path>")  # type: ignore[untyped-decorator]
+    @has_access(MENU_ACCESS_PERMISSIONS)  # type: ignore[untyped-decorator]
+    def info_schema(self, asset_path: str) -> Response:
+        return self._serve_docs_file("info_schema", asset_path)
 
 
 dbt_docs_view = DbtDocsView()

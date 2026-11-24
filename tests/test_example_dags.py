@@ -13,7 +13,7 @@ from airflow.utils.db import create_default_connections
 from airflow.utils.session import provide_session
 from packaging.version import Version
 
-from cosmos.constants import AIRFLOW_VERSION, PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS
+from cosmos.constants import AIRFLOW_VERSION
 
 from . import utils as test_utils
 from .dbt_oss_enabled import dag_files_to_ignore
@@ -23,6 +23,8 @@ AIRFLOW_IGNORE_FILE = EXAMPLE_DAGS_DIR / ".airflowignore"
 KUBERNETES_DAGS = ["jaffle_shop_kubernetes", "jaffle_shop_watcher_kubernetes"]
 # DAGs whose source tables must be seeded first; run via the dedicated tests below.
 DAGS_WITH_SEED_DEPENDENCY = ["watcher_source_rendering_dag", "source_pruning_dag"]
+# DAGs whose source freshness check reads altered_jaffle_shop's raw_orders and can run before the DAG's own seed task.
+DAGS_NEEDING_SEEDED_ALTERED_JAFFLE_SHOP = {"example_watcher_with_freshness", "source_rendering_dag"}
 IGNORED_DAG_FILES = [
     "performance_dag.py",
     "jaffle_shop_kubernetes.py",
@@ -56,9 +58,6 @@ def session():
 def get_dag_bag() -> DagBag:  # noqa: C901
     """Create a DagBag by adding the files that are not supported to .airflowignore"""
 
-    if AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS:
-        return test_utils.make_dag_bag(dag_folder=None, include_examples=False)
-
     with open(AIRFLOW_IGNORE_FILE, "w+") as file:
         for dagfile in IGNORED_DAG_FILES:
             print(f"Adding {dagfile} to .airflowignore")
@@ -81,12 +80,6 @@ def get_dag_bag() -> DagBag:  # noqa: C901
             # `dag.test()` exerciser. Drop once we either depend on AF >= 3.1 or rework the
             # trigger's XCom fetch to not need `SUPERVISOR_COMMS`.
             file.writelines("watcher_with_freshness_check.py\n")
-
-        if AIRFLOW_VERSION == Version("2.9.0"):
-            # aiobotocore can't be installed with all the other Cosmos test dependencies in Airflow 2.9
-            file.writelines("cosmos_example_manifest_dag.py\n")
-            # This DAG is taking too long to run int the CI (https://github.com/astronomer/astronomer-cosmos/actions/runs/21902660682/job/63234728594)
-            file.writelines("example_cosmos_python_models.py\n")
 
     print(".airflowignore contents: ")
     print(AIRFLOW_IGNORE_FILE.read_text())
@@ -135,43 +128,39 @@ def run_dag(dag_id: str):
     test_utils.run_dag(dag)
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs, and Cosmos errors if `emit_datasets` is not False",
-)
+@pytest.fixture()
+def seeded_altered_jaffle_shop():
+    """Seed altered_jaffle_shop so the raw_orders source-freshness check of the DAGs in
+    DAGS_NEEDING_SEEDED_ALTERED_JAFFLE_SHOP has its table regardless of task order. dbt deps first: the project depends
+    on dbt_utils. This runs in every workflow that runs ``test_example_dag`` (an extra ``dbt deps`` and ``dbt seed``).
+    """
+    project_dir = EXAMPLE_DAGS_DIR / "dbt" / "altered_jaffle_shop"
+    dbt_args = ["--project-dir", str(project_dir), "--profiles-dir", str(project_dir)]
+    # cwd: dbt-oss resolves the seed files (seeds/raw_orders.csv) from the working directory, not from --project-dir.
+    subprocess.run(["dbt", "deps", *dbt_args], check=True, cwd=project_dir)
+    subprocess.run(["dbt", "seed", "--full-refresh", *dbt_args], check=True, cwd=project_dir)
+
+
 @pytest.mark.integration
 @pytest.mark.parametrize("dag_id", get_dag_ids())
-def test_example_dag(session, dag_id: str):
+def test_example_dag(session, request, dag_id: str):
     if dag_id in KUBERNETES_DAGS or dag_id in DAGS_WITH_SEED_DEPENDENCY:
         return
+    if dag_id in DAGS_NEEDING_SEEDED_ALTERED_JAFFLE_SHOP:
+        request.getfixturevalue("seeded_altered_jaffle_shop")
     run_dag(dag_id)
 
 
-@pytest.mark.skipif(
-    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
-)
 @pytest.mark.integration
-def test_watcher_source_rendering_dag(session):
-    """Run source_rendering_dag first to load seeds, then watcher_source_rendering_dag."""
+def test_watcher_source_rendering_dag(session, seeded_altered_jaffle_shop):
+    """Run source_rendering_dag first to load seeds, then watcher_source_rendering_dag.
+
+    Seeded by the fixture so the raw_orders source-freshness check is order-independent.
+    """
     run_dag("source_rendering_dag")
     run_dag("watcher_source_rendering_dag")
 
 
-@pytest.fixture()
-def seeded_altered_jaffle_shop():
-    """Seed altered_jaffle_shop so source_pruning_dag's raw_orders source-freshness check has its
-    table regardless of task order. dbt deps first: the project depends on dbt_utils."""
-    project_dir = EXAMPLE_DAGS_DIR / "dbt" / "altered_jaffle_shop"
-    dbt_args = ["--project-dir", str(project_dir), "--profiles-dir", str(project_dir)]
-    subprocess.run(["dbt", "deps", *dbt_args], check=True)
-    subprocess.run(["dbt", "seed", "--full-refresh", *dbt_args], check=True)
-
-
-@pytest.mark.skipif(
-    AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs",
-)
 @pytest.mark.integration
 def test_source_pruning_dag(session, seeded_altered_jaffle_shop):
     """Seeded by the fixture so the raw_orders source-freshness check is order-independent."""
@@ -179,9 +168,8 @@ def test_source_pruning_dag(session, seeded_altered_jaffle_shop):
 
 
 @pytest.mark.skipif(
-    AIRFLOW_VERSION >= Version("3.1.0")  # TODO: Fix https://github.com/astronomer/astronomer-cosmos/issues/2045
-    or AIRFLOW_VERSION in PARTIALLY_SUPPORTED_AIRFLOW_VERSIONS,
-    reason="Airflow 2.9.0 and 2.9.1 have a breaking change in Dataset URIs (see PR: https://github.com/apache/airflow/pull/34585), and Cosmos errors if `emit_datasets` is not False",
+    AIRFLOW_VERSION >= Version("3.1.0"),
+    reason="https://github.com/astronomer/astronomer-cosmos/issues/2045",
 )
 @patch.dict(
     os.environ,

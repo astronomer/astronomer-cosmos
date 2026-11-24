@@ -44,10 +44,15 @@ def resolve_templated_bool(value: bool | str | None) -> bool:
     ``render_template_as_native_obj``, so a flag can arrive as ``"False"`` - which is truthy.
     """
     if isinstance(value, str):
-        # Airflow 2.9-2.11's to_boolean does not strip whitespace (Airflow 3 does), so a
+        # Airflow 2's to_boolean does not strip whitespace (Airflow 3 does), so a
         # rendered " true " would otherwise resolve to False on the Airflow 2 matrix.
         return to_boolean(value.strip())
     return bool(value)
+
+
+def _dump_dbt_mapping(value: dict[str, Any]) -> str:
+    """Serialize a dict for dbt's ``--vars`` and ``--args`` as one-line flow YAML, as dbt 2 rejects block YAML with quoted strings."""
+    return yaml.dump(value, default_flow_style=True, width=float("inf"), allow_unicode=True).strip()
 
 
 class AbstractDbtBase(metaclass=ABCMeta):
@@ -294,8 +299,7 @@ class AbstractDbtBase(metaclass=ABCMeta):
         if flag_value is None:
             return []
         elif isinstance(flag_value, dict):
-            yaml_string = yaml.dump(flag_value)
-            return [flag_name, yaml_string]
+            return [flag_name, _dump_dbt_mapping(flag_value)]
         elif isinstance(flag_value, list) and flag_value:
             return [flag_name, " ".join(flag_value)]
         elif isinstance(flag_value, list):
@@ -527,7 +531,7 @@ class DbtRunOperationMixin:
         flags = []
         if self.args is not None:
             flags.append("--args")
-            flags.append(yaml.dump(self.args))
+            flags.append(_dump_dbt_mapping(self.args))
         return flags
 
 

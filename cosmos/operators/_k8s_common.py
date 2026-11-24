@@ -30,11 +30,13 @@ from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import _PRODUCER_CMD_FLAGS_XCOM_KEY, PRODUCER_WATCHER_TASK_ID
 from cosmos.operators._watcher import safe_xcom_push
+from cosmos.operators._watcher.state import push_unfinished_dbt_events
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
-    _delete_xcom_backup_variable,
+    _delete_xcom_backup,
     _init_xcom_backup,
-    _restore_xcom_from_variable,
+    _log_missing_backup,
+    _restore_xcom_backup,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -56,7 +58,7 @@ except ImportError:
         pass
 
 
-from cosmos.dbt.parser.output import extract_log_issues
+from cosmos.dbt.parser.output import DBT_V2_SUMMARY_WARN_RE, extract_log_issues
 from cosmos.operators._watcher.base import store_dbt_resource_status_from_log
 from cosmos.operators.base import AbstractDbtBase
 
@@ -216,6 +218,9 @@ _FRESHNESS_PATTERN = re.compile(
 # Secondary pattern for simpler source freshness warnings
 # Matches: "WARN freshness of source_name"
 _SIMPLE_FRESHNESS_PATTERN = re.compile(r"WARN\s+freshness\s+of\s+([^\s]+)")
+# dbt 2 (dbt OSS) pattern for source freshness warnings
+# Matches: "Warned source raw.raw_orders (last updated 8years 6months ago) [5.73s]"
+_DBT_V2_FRESHNESS_PATTERN = re.compile(r"Warned\s+source\s+(\S+)(?:[^\n]*?\[([\d.]+)s\])?")
 
 
 class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc]
@@ -224,7 +229,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
 
     This handler can detect warnings from:
     1. Regular dbt tests (using the standard "Done. PASS=X WARN=Y" pattern)
-    2. Source freshness tests (using "WARN freshness of..." pattern)
+    2. Source freshness tests (using the "WARN freshness of..." pattern on dbt 1 and the "Warned source ..." line on dbt 2)
 
     The ``test_operator_class`` and ``source_operator_class`` parameters allow
     the same handler to work for both Kubernetes and GCP GKE operator variants.
@@ -308,12 +313,12 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         """
         Detect warnings using the standard dbt summary pattern.
 
-        Pattern: "Done. PASS=X WARN=Y ERROR=Z SKIP=W"
+        Pattern: "Done. PASS=X WARN=Y ERROR=Z SKIP=W", or "Summary: N total | ... | Y warn" on dbt 2
 
         :param log_text: Complete log text from the pod
         :return: Number of warnings detected, or None if pattern not found
         """
-        match = _WARN_COUNT_PATTERN.search(log_text)
+        match = _WARN_COUNT_PATTERN.search(log_text) or DBT_V2_SUMMARY_WARN_RE.search(log_text)
         if match:
             return int(match.group(1))
         return None
@@ -325,6 +330,7 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
         Pattern examples:
         - "15:49:21 1 of 1 WARN freshness of auction_net.auction_net_raw ... [WARN in 0.90s]"
         - "WARN freshness of source_name.table_name"
+        - dbt 2: "Warned source raw.raw_orders (last updated 8years 6months ago) [5.73s]"
 
         :param log_text: Complete log text from the pod
         :return: List of warning dictionaries
@@ -360,6 +366,20 @@ class DbtTestWarningHandler(KubernetesPodOperatorCallback):  # type: ignore[misc
                         "source": source_name,
                     }
                 )
+
+        for match in _DBT_V2_FRESHNESS_PATTERN.finditer(log_text):
+            source_name = match.group(1)
+            if source_name not in seen_sources:
+                seen_sources.add(source_name)
+                warning: dict[str, Any] = {
+                    "name": f"source_freshness_{source_name}",
+                    "status": "WARN",
+                    "type": "source_freshness",
+                    "source": source_name,
+                }
+                if match.group(2):
+                    warning["execution_time"] = match.group(2)
+                warnings.append(warning)
 
         return warnings
 
@@ -526,9 +546,9 @@ def finalize_watcher_producer(operator: Any) -> None:
     """
     operator.dbt_cmd_flags += ["--log-format", "json"]
     compose_watcher_backup_callbacks(operator)
-    # Populated by the log parser when dbt emits SkippingDetails or LogSkipBecauseError for a node;
-    # subsequent "skipped" terminal events for those unique_ids are rewritten to "failed" so the
-    # consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
+    # Populated by the log parser when dbt emits SkippingDetails or LogSkipBecauseError (dbt 1), or a skipped
+    # MarkSkippedChildren (dbt 2), for a node; subsequent "skipped" terminal events for those unique_ids are
+    # rewritten to "failed" so the consumer sensor fails on attempt 1 (instead of SKIPPED, which Airflow will not retry).
     # Mirrors DbtProducerWatcherOperator._upstream_failure_skipped_ids; see #2698.
     operator._upstream_failure_skipped_ids = set()
 
@@ -610,15 +630,21 @@ def _populate_producer_model_outlet_uris(operator: Any) -> None:
     )
 
 
+def push_watcher_producer_unfinished_dbt_events(operator: Any) -> None:
+    context = operator._context_holder[CONTEXT_KEY]
+    if context is not None:
+        push_unfinished_dbt_events(context)
+
+
 def execute_watcher_producer(operator: Any, context: Context, parent_execute: Callable[..., Any], **kwargs: Any) -> Any:
     """Shared ``execute`` logic for K8s watcher producer operators.
 
     On retry, restores any XCom backup and raises ``AirflowSkipException`` (the
     producer does not support Airflow retries). On the first attempt, initialises
     an XCom backup, exposes the execution context to the log-parsing callback, runs
-    the parent execute, and deletes the backup on success. On failure the producer's
-    on-failure/on-retry callback (see ``compose_watcher_backup_callbacks``) flushes
-    the backup so the next try can restore it.
+    the parent execute, and deletes the backup on success. On failure, unless the backup
+    is kept in the task store, the producer's on-failure/on-retry callback (see
+    ``compose_watcher_backup_callbacks``) flushes it so the next try can restore it.
     """
     task_instance = context.get("ti")
     if task_instance is None:
@@ -631,7 +657,8 @@ def execute_watcher_producer(operator: Any, context: Context, parent_execute: Ca
     reliable_retry = settings.enable_watcher_reliable_retry
 
     if try_number > 1:
-        _restore_xcom_from_variable(context)
+        if not _restore_xcom_backup(context, read_task_state_store=reliable_retry):
+            _log_missing_backup(context, try_number, read_task_state_store=reliable_retry)
         raise AirflowSkipException(
             f"{type(operator).__name__} does not support Airflow retries. "
             f"Detected attempt #{try_number}; skipping execution to avoid running a second dbt build."
@@ -650,8 +677,8 @@ def execute_watcher_producer(operator: Any, context: Context, parent_execute: Ca
 
     safe_xcom_push(task_instance=task_instance, key=_PRODUCER_CMD_FLAGS_XCOM_KEY, value=operator.add_cmd_flags())
 
-    # On failure parent_execute() raises and the on-failure callback flushes the backup.
+    # On failure parent_execute() raises; without a task store the retry callback flushes the backup to the Variable.
     return_value = parent_execute(context, **kwargs)
     if reliable_retry:
-        _delete_xcom_backup_variable(context)
+        _delete_xcom_backup(context)
     return return_value

@@ -8,30 +8,29 @@ try:  # Airflow 3
     from airflow.sdk.definitions.asset import Asset as Dataset
     from airflow.sdk.definitions.asset import AssetAlias as DatasetAlias
 except ImportError:  # Airflow 2
-    from airflow.datasets import Dataset
-
-    try:
-        from airflow.datasets import DatasetAlias
-    except ImportError:  # Airflow < 2.10
-        DatasetAlias = None  # type: ignore[assignment]
+    from airflow.datasets import Dataset, DatasetAlias
 
 from cosmos import (
     DbtRunLocalOperator,
     DbtSeedLocalOperator,
     ProfileConfig,
 )
+from cosmos.profiles import PostgresUserPasswordProfileMapping
 
 # Set contains to be used by local operators
 DEFAULT_DBT_ROOT_PATH = Path(__file__).parent / "dbt"
 DBT_ROOT_PATH = Path(os.getenv("DBT_ROOT_PATH", DEFAULT_DBT_ROOT_PATH))
 DBT_PROJ_DIR = DBT_ROOT_PATH / "jaffle_shop"
-DBT_PROFILE_PATH = DBT_PROJ_DIR / "profiles.yml"
 DBT_ARTIFACT = DBT_PROJ_DIR / "target"
 
 profile_config = ProfileConfig(
     profile_name="default",
     target_name="dev",
-    profiles_yml_filepath=DBT_PROFILE_PATH,
+    profile_mapping=PostgresUserPasswordProfileMapping(
+        conn_id="example_conn",
+        profile_args={"schema": "public"},
+        disable_event_tracking=True,
+    ),
 )
 
 with DAG("example_outlets", start_date=datetime(2024, 1, 1), catchup=False) as dag:
@@ -63,18 +62,15 @@ with DAG("example_outlets", start_date=datetime(2024, 1, 1), catchup=False) as d
         outlets=[Dataset("stg_customers__dataset")],
     )
 
-    if DatasetAlias is not None:
-        run_operator__dataset_alias = DbtRunLocalOperator(
-            profile_config=profile_config,
-            project_dir=DBT_PROJ_DIR,
-            task_id="run__dataset_alias",
-            dbt_cmd_flags=["--select", "stg_orders"],
-            install_deps=True,
-            append_env=True,
-            emit_datasets=True,
-            outlets=[DatasetAlias("stg_orders__dataset_alias")],
-        )
+    run_operator__dataset_alias = DbtRunLocalOperator(
+        profile_config=profile_config,
+        project_dir=DBT_PROJ_DIR,
+        task_id="run__dataset_alias",
+        dbt_cmd_flags=["--select", "stg_orders"],
+        install_deps=True,
+        append_env=True,
+        emit_datasets=True,
+        outlets=[DatasetAlias("stg_orders__dataset_alias")],
+    )
 
-        [seed_operator, seed_raw_orders] >> run_operator__dataset >> run_operator__dataset_alias
-    else:
-        [seed_operator, seed_raw_orders] >> run_operator__dataset
+    [seed_operator, seed_raw_orders] >> run_operator__dataset >> run_operator__dataset_alias

@@ -48,3 +48,19 @@ but override the ``database`` and ``schema`` values:
 
 Note that when using a profile mapping, the profiles.yml file gets generated with the profile name and target name
 you specify in ``ProfileConfig``.
+
+Choose the connection when the task runs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. versionadded:: 1.17.0
+
+With ``ExecutionMode.LOCAL``, ``VIRTUALENV`` and ``WATCHER``, and with ``AIRFLOW_ASYNC`` on BigQuery, ``conn_id`` accepts a Jinja template, which Cosmos renders when each task runs. In this example, it comes from the DAG param ``conn_id``, set with ``params={"conn_id": "example_conn"}``:
+
+.. literalinclude:: ../../../dev/dags/example_model_version.py
+    :language: python
+    :start-after: [START templated_conn_id]
+    :end-before: [END templated_conn_id]
+
+Cosmos cannot render the template while parsing the DAG, so the connection must not be needed then. This is the case with the default mock profile and with ``LoadMode.DBT_MANIFEST``. With ``LoadMode.DBT_LS`` and ``RenderConfig(enable_mock_profile=False)``, or with ``get_automatic_profile_mapping``, Cosmos raises an error.
+
+A per-node ``conn_id`` set in :ref:`profile-customise-per-node` takes precedence.

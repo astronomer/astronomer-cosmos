@@ -7,7 +7,7 @@ repos:
   - repo: local
     hooks:
       - id: check-python-version
-        name: Ensure Python ≥ 3.10
+        name: Ensure Python ≥ 3.11
         language: python
         pass_filenames: false
         always_run: true
@@ -18,7 +18,7 @@ repos:
               import sys
 
               required_major = 3
-              required_minor = 10
+              required_minor = 11
               current_major, current_minor = sys.version_info[:2]
 
               if (current_major, current_minor) < (required_major, required_minor):
@@ -89,10 +89,10 @@ repos:
     hooks:
       - id: pyupgrade
         args:
-          - --py310-plus
+          - --py311-plus
           - --keep-runtime-typing
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 44b5042edab9382aba712eed4f9c7bab7a3d6a3e  # v0.17.0
+    rev: ef6cf06c079dd6b299dfc720b0f14400c9d168e1  # v0.17.5
     hooks:
       - id: ruff-check
         args: [ --fix ]
@@ -108,7 +108,7 @@ repos:
         alias: black
         additional_dependencies: [black==26.10.1]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 2834ec6639549dd6796205c8f011dedcd587288b  # v2.4.0
+    rev: ad26ebfa797fcb9b8f83275937c1c1d6e126719c  # v2.4.1
     hooks:
       - id: mypy
         name: mypy-python

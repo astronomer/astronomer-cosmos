@@ -13,7 +13,9 @@ variables that should be used for rendering and execution. It takes the followin
   ``(Path(__file__).parent / "dbt/my_dbt_project").absolute().as_posix()``. See :doc:`/getting_started/astro`.
 - ``models_relative_paths``: (new in v1.16) The path(s) to your models directories, relative to the ``dbt_project_path``. Accepts a
   single path or a list of paths, mirroring dbt's own support for multiple ``model-paths``. This defaults to ``["models"]``.
-  Replaces ``models_relative_path``, deprecated since v1.16 and will be removed in Cosmos 2.0.
+  Replaces ``models_relative_path``, deprecated since v1.16 and will be removed in Cosmos 2.0. The relative paths are
+  also honoured when the project root is supplied through ``RenderConfig`` or ``ExecutionConfig`` instead of
+  ``dbt_project_path``.
 - ``seeds_relative_paths``: (new in v1.16) The path(s) to your seeds directories, relative to the ``dbt_project_path``. Accepts a
   single path or a list of paths. This defaults to ``["seeds"]``. Replaces ``seeds_relative_path``, deprecated since v1.16
   and will be removed in Cosmos 2.0.
@@ -35,6 +37,9 @@ variables that should be used for rendering and execution. It takes the followin
 - ``install_dbt_deps``: (new in v1.9) Run dbt deps during DAG parsing and task execution if True (default).
   To control ``dbt deps`` per DAG run via an Airflow template, set ``ExecutionConfig.install_dbt_deps``
   instead, which overrides this value at task execution time only.
+  When it is False and ``packages.yml`` lists more packages than ``dbt_packages`` holds, dbt 1.x fails during DAG parsing
+  and Cosmos raises ``CosmosLoadDbtException``. dbt OSS installs the missing packages itself during ``dbt ls``,
+  so no error is raised. This install still happens at parse time, even though ``install_dbt_deps`` is False.
 - ``copy_dbt_packages``: (new in v1.10) Copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
 - ``partial_parse``: (new in v1.4) If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
   for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``

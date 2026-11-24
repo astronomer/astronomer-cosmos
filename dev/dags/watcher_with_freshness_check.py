@@ -19,7 +19,7 @@ except ImportError:
     from airflow.utils.context import Context  # type: ignore[attr-defined]
 
 from cosmos import DbtDag, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
-from cosmos.constants import ExecutionMode, InvocationMode, SourceRenderingBehavior
+from cosmos.constants import ExecutionMode, SourceRenderingBehavior
 from cosmos.dbt.graph import DbtNode
 from cosmos.profiles import PostgresUserPasswordProfileMapping
 
@@ -63,7 +63,6 @@ example_watcher_with_freshness = DbtDag(
     # dbt/cosmos-specific parameters
     execution_config=ExecutionConfig(
         execution_mode=ExecutionMode.WATCHER,
-        invocation_mode=InvocationMode.DBT_RUNNER,
         setup_operator_args={"freshness_callback": freshness_callback},
     ),
     render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL),

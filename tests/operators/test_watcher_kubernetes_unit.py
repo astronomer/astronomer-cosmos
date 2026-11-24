@@ -15,6 +15,7 @@ from cosmos.constants import (
     TestBehavior,
     _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION,
 )
+from cosmos.operators._watcher.state import get_unfinished_dbt_events
 
 if Version(airflow_k8s_provider_version) < _K8s_WATCHER_MIN_K8S_PROVIDER_VERSION:
     pytest.skip(
@@ -114,7 +115,7 @@ def test_producer_honours_explicit_task_id():
     assert op.task_id == "custom_producer"
 
 
-@patch("cosmos.operators._k8s_common._restore_xcom_from_variable")
+@patch("cosmos.operators._k8s_common._restore_xcom_backup")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
 def test_skips_retry_attempt(mock_execute, mock_restore):
     """Smoke-test that the K8s producer delegates to ``execute_watcher_producer``.
@@ -135,7 +136,7 @@ def test_skips_retry_attempt(mock_execute, mock_restore):
     with pytest.raises(AirflowSkipException, match="does not support Airflow retries"):
         op.execute(context=context)
 
-    mock_restore.assert_called_once_with(context)
+    mock_restore.assert_called_once_with(context, read_task_state_store=True)
     mock_execute.assert_not_called()
 
 
@@ -280,7 +281,7 @@ def test_producer_pod_manager_wires_callback_extra_kwargs(mock_manager_cls):
     assert extra[CONTEXT_HOLDER_KEY] is op._context_holder
 
 
-@patch("cosmos.operators._k8s_common._delete_xcom_backup_variable")
+@patch("cosmos.operators._k8s_common._delete_xcom_backup")
 @patch("cosmos.operators._k8s_common._init_xcom_backup")
 @patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.execute")
 def test_pod_manager_created_before_execute_sees_execution_context(mock_execute, mock_init, mock_delete):
@@ -590,3 +591,31 @@ def test_consumer_emits_datasets_on_success(mock_register):
     assert inlets == []
     assert [o.uri for o in outlets] == ["postgres://h:5432/db/schema/stg_orders"]
     assert ctx is context
+
+
+@patch("cosmos.operators.kubernetes.DbtBuildKubernetesOperator.on_kill")
+def test_producer_on_kill_pushes_unfinished_dbt_events(mock_parent_on_kill):
+    op = DbtProducerWatcherKubernetesOperator(project_dir=".", profile_config=None, image="dbt-image:latest")
+    ti = MagicMock()
+    get_unfinished_dbt_events(ti)["model.pkg.my_model"] = {"status": "started"}
+    op._context_holder[CONTEXT_KEY] = {"ti": ti}
+
+    op.on_kill()
+
+    mock_parent_on_kill.assert_called_once_with()
+    ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})
+
+
+@patch(
+    "cosmos.operators.kubernetes.DbtBuildKubernetesOperator.on_kill", side_effect=RuntimeError("pod already deleted")
+)
+def test_producer_on_kill_pushes_unfinished_dbt_events_when_parent_on_kill_raises(mock_parent_on_kill):
+    op = DbtProducerWatcherKubernetesOperator(project_dir=".", profile_config=None, image="dbt-image:latest")
+    ti = MagicMock()
+    get_unfinished_dbt_events(ti)["model.pkg.my_model"] = {"status": "started"}
+    op._context_holder[CONTEXT_KEY] = {"ti": ti}
+
+    with pytest.raises(RuntimeError):
+        op.on_kill()
+
+    ti.xcom_push.assert_called_once_with(key="model__pkg__my_model_dbt_event", value={"status": "started"})

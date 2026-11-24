@@ -602,7 +602,7 @@ def _multi_parent_test_graph():
 
 @pytest.mark.parametrize("exclude", [[], ["tag:zzz"], ["tag:b"]])
 def test_select_nodes_exclude_does_not_change_what_select_sees(exclude):
-    """The selector rewrites test-node tags in place, so `exclude` must not run before `select`."""
+    """`exclude` must not change which nodes `select` sees."""
     base, nodes = _multi_parent_test_graph()
     selected = select_nodes(project_dir=base, nodes=nodes, select=["+tag:a"], exclude=exclude)
     assert sorted(selected) == ["model.p.m", "model.p.up"]
@@ -1552,6 +1552,110 @@ def test_bare_identifier_matches_versioned_model_name():
 
     excluded = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, exclude=["customers_v1"])
     assert set(excluded.keys()) == {other.unique_id}
+
+
+def _nodes_with_a_source_in_the_selected_folder():
+    """
+    A project like jaffle_shop: models/staging holds stg_orders and the YAML file of the ``raw`` source, so dbt records
+    the source's fqn as proj.staging.raw.raw_orders. orders_from_source (models/extra) reads that source and a seed
+    that has the same name as the source table.
+    """
+
+    def node(unique_id, resource_type, fqn, path, deps=()):
+        return DbtNode(
+            unique_id=unique_id,
+            resource_type=resource_type,
+            depends_on=list(deps),
+            path_base=SAMPLE_PROJ_PATH,
+            original_file_path=Path(path),
+            tags=[],
+            config={},
+            package_name="proj",
+            fqn=fqn,
+        )
+
+    nodes = [
+        node(
+            "model.proj.stg_orders",
+            DbtResourceType.MODEL,
+            ["proj", "staging", "stg_orders"],
+            "models/staging/stg_orders.sql",
+        ),
+        node(
+            "source.proj.raw.raw_orders",
+            DbtResourceType.SOURCE,
+            ["proj", "staging", "raw", "raw_orders"],
+            "models/staging/sources.yml",
+        ),
+        node("seed.proj.raw_orders", DbtResourceType.SEED, ["proj", "raw_orders"], "seeds/raw_orders.csv"),
+        node(
+            "model.proj.orders",
+            DbtResourceType.MODEL,
+            ["proj", "marts", "orders"],
+            "models/marts/orders.sql",
+            deps=["model.proj.stg_orders"],
+        ),
+        node(
+            "model.proj.orders_from_source",
+            DbtResourceType.MODEL,
+            ["proj", "extra", "orders_from_source"],
+            "models/extra/orders_from_source.sql",
+            deps=["source.proj.raw.raw_orders", "seed.proj.raw_orders"],
+        ),
+        node(
+            "exposure.proj.weekly_metrics",
+            DbtResourceType.EXPOSURE,
+            ["proj", "weekly_metrics"],
+            "models/exposures.yml",
+            deps=["model.proj.orders"],
+        ),
+    ]
+    return {n.unique_id: n for n in nodes}
+
+
+def test_bare_folder_name_does_not_select_sources_or_their_children():
+    """Like dbt, ``staging`` selects the models in the folder, not the source whose YAML file is there (and so not the
+    models that only read that source). Checked with `dbt ls` on dbt 1.10 and dbt-oss 2.0."""
+    nodes = _nodes_with_a_source_in_the_selected_folder()
+    select = lambda token: set(select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=[token]).keys())
+
+    assert select("staging") == {"model.proj.stg_orders"}
+
+    with_descendants = select("staging+")
+    assert {"model.proj.stg_orders", "model.proj.orders"} <= with_descendants
+    assert "source.proj.raw.raw_orders" not in with_descendants
+    assert "model.proj.orders_from_source" not in with_descendants
+
+
+def test_bare_name_shared_by_a_seed_and_a_source_table_selects_only_the_seed():
+    nodes = _nodes_with_a_source_in_the_selected_folder()
+
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["raw_orders"])
+
+    assert set(selected.keys()) == {"seed.proj.raw_orders"}
+
+
+def test_fqn_selectors_do_not_select_sources():
+    """The ``fqn:`` method skips sources, alone and inside an intersection with a bare folder or ``resource_type:source``."""
+    nodes = _nodes_with_a_source_in_the_selected_folder()
+    select = lambda token: select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=[token])
+
+    assert select("fqn:proj.staging.raw.raw_orders") == {}
+    assert select("fqn:proj.staging.raw.raw_orders+") == {}
+    assert select("fqn:proj.staging.raw.raw_orders,resource_type:source") == {}
+    assert select("resource_type:source,staging") == {}
+
+
+def test_sources_and_exposures_are_still_selected_the_dbt_way():
+    """Guards for the sources fix: ``source:`` and graph ancestry still reach a source, and a bare exposure name matches."""
+    nodes = _nodes_with_a_source_in_the_selected_folder()
+    select = lambda token: set(select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=[token]).keys())
+
+    assert select("source:raw.raw_orders") == {"source.proj.raw.raw_orders"}
+    assert {"source.proj.raw.raw_orders", "seed.proj.raw_orders", "model.proj.orders_from_source"} <= select(
+        "+orders_from_source"
+    )
+    assert select("weekly_metrics") == {"exposure.proj.weekly_metrics"}
 
 
 def test_select_exposure_nodes_by_graph_ancestry():
@@ -2622,3 +2726,68 @@ def test_is_empty_config_with_only_groups(selector_config):
     """``groups`` alone must keep a selector config from being treated as empty."""
     selector_config.groups = ["finance"]
     assert selector_config.is_empty is False
+
+
+@pytest.mark.parametrize("depends_on", [["model.p.tagged", "model.p.plain"], ["model.p.plain", "model.p.tagged"]])
+def test_tag_selector_matches_a_test_through_any_of_its_parents(depends_on):
+    """Like dbt's eager indirect selection: a multi-parent test follows a tagged parent whatever its position."""
+    base = Path("/tmp/proj")
+
+    def node(name, resource_type, node_depends_on, tags):
+        return DbtNode(
+            unique_id=f"{resource_type.value}.p.{name}",
+            resource_type=resource_type,
+            depends_on=node_depends_on,
+            path_base=base,
+            original_file_path=Path(f"models/{name}.sql"),
+            tags=tags,
+            config={},
+        )
+
+    nodes = {
+        n.unique_id: n
+        for n in (
+            node("tagged", DbtResourceType.MODEL, [], ["x"]),
+            node("plain", DbtResourceType.MODEL, [], []),
+            node("shared_test", DbtResourceType.TEST, depends_on, []),
+        )
+    }
+
+    excluded = select_nodes(project_dir=base, nodes=nodes, exclude=["tag:x"])
+    assert sorted(excluded) == ["model.p.plain"]
+
+    selected = select_nodes(project_dir=base, nodes=nodes, select=["tag:x"])
+    assert sorted(selected) == ["model.p.tagged", "test.p.shared_test"]
+
+
+@pytest.mark.parametrize("depends_on", [["model.p.tagged", "model.p.plain"], ["model.p.plain", "model.p.tagged"]])
+@pytest.mark.parametrize("exclude", [["+tag:x"], ["tag:x"], ["tagged"]])
+@pytest.mark.parametrize("select", [[], ["path:models"]])
+def test_exclude_drops_the_tests_of_an_excluded_parent_but_keeps_its_other_parents(select, exclude, depends_on):
+    """Only nodes carrying a tag are graph roots, and a test goes with any excluded parent, as in dbt."""
+    base = Path("/tmp/proj")
+
+    def node(name, resource_type, node_depends_on, tags):
+        return DbtNode(
+            unique_id=f"{resource_type.value}.p.{name}",
+            resource_type=resource_type,
+            depends_on=node_depends_on,
+            path_base=base,
+            original_file_path=Path(f"models/{name}.sql"),
+            tags=tags,
+            config={},
+        )
+
+    nodes = {
+        n.unique_id: n
+        for n in (
+            node("tagged", DbtResourceType.MODEL, [], ["x"]),
+            node("plain", DbtResourceType.MODEL, [], []),
+            node("shared_test", DbtResourceType.TEST, depends_on, []),
+        )
+    }
+
+    selected = select_nodes(project_dir=base, nodes=nodes, select=select, exclude=exclude)
+
+    assert sorted(selected) == ["model.p.plain"]
+    assert nodes["test.p.shared_test"].tags == []

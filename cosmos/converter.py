@@ -37,9 +37,10 @@ except ImportError:
 
 from cosmos import cache, settings
 from cosmos.airflow.graph import build_airflow_graph
-from cosmos.config import ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
+from cosmos.config import AIConfig, ExecutionConfig, ProfileConfig, ProjectConfig, RenderConfig
 from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
+    AI_DIAGNOSIS_SUPPORTED_EXECUTION_MODES,
     AIRFLOW_VERSION,
     DbtResourceType,
     ExecutionMode,
@@ -149,6 +150,19 @@ def validate_arguments(
             "ExecutionMode.VIRTUALENV or ExecutionMode.AIRFLOW_ASYNC, which run dbt directly on the "
             f"Airflow worker. The configured execution_mode is {execution_config.execution_mode}. Use "
             "SeedRenderingBehavior.ALWAYS, or switch to a supported execution mode."
+        )
+
+    ai_config = task_args.get("ai_config")
+    if (
+        ai_config
+        and ai_config.diagnose_on_failure
+        and execution_config.execution_mode not in AI_DIAGNOSIS_SUPPORTED_EXECUTION_MODES
+    ):
+        supported = ", ".join(sorted(f"ExecutionMode.{mode.name}" for mode in AI_DIAGNOSIS_SUPPORTED_EXECUTION_MODES))
+        raise CosmosValueError(
+            f"AIConfig.diagnose_on_failure is only supported with {supported}, "
+            f"but ExecutionConfig.execution_mode is ExecutionMode.{execution_config.execution_mode.name}. "
+            "Set diagnose_on_failure=False or switch to a supported execution mode."
         )
 
     if execution_config.execution_mode in [ExecutionMode.LOCAL, ExecutionMode.VIRTUALENV]:
@@ -303,6 +317,8 @@ class DbtToAirflowConverter:
         or DockerOperator parameters
     :param on_warning_callback: A callback function called on warnings with additional Context variables "test_names"
         and "test_results" of type `List`. Each index in "test_names" corresponds to the same index in "test_results".
+    :param ai_config: Optional AI-assisted features, such as the diagnosis of failed dbt tasks. It is only supported
+        with ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``. See :ref:`ai-config`.
     """
 
     def __init__(
@@ -315,6 +331,7 @@ class DbtToAirflowConverter:
         task_group: TaskGroup | None = None,
         operator_args: dict[str, Any] | None = None,
         on_warning_callback: Callable[..., Any] | None = None,
+        ai_config: AIConfig | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -391,6 +408,13 @@ class DbtToAirflowConverter:
             "cache_dir": cache_dir,
             "manifest_filepath": project_config.manifest_path,
         }
+        if ai_config is not None:
+            if "ai_config" in operator_args:
+                raise CosmosValueError(
+                    "ai_config was set both as an argument and in operator_args. Set it only as an argument."
+                )
+            # Only set when configured: execution modes that do not use it don't accept the argument.
+            task_args["ai_config"] = ai_config
 
         validate_arguments(
             execution_config=execution_config,
@@ -399,6 +423,10 @@ class DbtToAirflowConverter:
             task_args=task_args,
             project_config=project_config,
         )
+
+        if execution_config.execution_mode not in AI_DIAGNOSIS_SUPPORTED_EXECUTION_MODES:
+            # Validation above already rejected an enabled diagnosis. These operators don't take the argument at all.
+            task_args.pop("ai_config", None)
 
         if execution_config.execution_mode == ExecutionMode.VIRTUALENV and execution_config.virtualenv_dir is not None:
             task_args["virtualenv_dir"] = execution_config.virtualenv_dir

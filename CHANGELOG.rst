@@ -16,6 +16,13 @@ Bug Fixes
 
 * Cosmos now resolves ``env_var()`` in the ``packages-install-path`` of ``dbt_project.yml`` with ``ProjectConfig.env_vars`` and the operator ``env`` before the worker environment, as dbt does. Previously a path that depended on a variable set only there was resolved to the wrong folder, so Cosmos symlinked the real packages folder into the temporary project and ``dbt deps`` failed with ``Cannot call rmtree on a symbolic link``. See #3172.
 
+1.16.1 (Unreleased)
+-------------------
+
+Enhancements
+
+* When the watcher producer stops before a model finishes, for example on a DAG run timeout, the model's watcher task now logs when the model started and which producer task log to search, instead of only ``No XCom value found``, by @tatiana in #3201
+
 1.16.0 (2026-11-03)
 -------------------
 

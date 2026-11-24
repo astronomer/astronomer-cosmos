@@ -568,14 +568,22 @@ def test_dbt_test_local_operator_invocation_mode_methods(mock_extract_log_issues
     assert operator.parse_number_of_warnings == dbt_runner.parse_number_of_warnings
 
 
-@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
+def _emitted_dataset_alias_names() -> set[str]:
+    """Names of the dataset aliases attached to a dataset in the Airflow 2 metadata database."""
+    from airflow.models.dataset import DatasetModel
+    from airflow.utils.session import create_session
+
+    with create_session() as session:
+        return {alias.name for dataset in session.query(DatasetModel).all() for alias in dataset.aliases}
+
+
+@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2")
 @pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
+def test_run_operator_dataset_inlets_and_outlets_airflow2(caplog):
     try:
         from airflow.models.asset import AssetAliasModel
     except ModuleNotFoundError:
         from airflow.models.dataset import DatasetAliasModel as AssetAliasModel
-    from sqlalchemy.orm.exc import FlushError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -612,27 +620,20 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_210(caplog):
     assert run_operator.outlets == [AssetAliasModel(name="test_id_1__run")]
     assert test_operator.outlets == [AssetAliasModel(name="test_id_1__test")]
 
-    with pytest.raises(FlushError):
-        run_test_dag(dag, custom_tester=True)
-        # This is a known limitation of Airflow 2.10.0 and 2.10.1
-        # https://github.com/apache/airflow/issues/42495
+    # On Airflow 2, dag.test() does not sync the DAG, so the DatasetAlias of the tasks has no row in the database yet
+    # and the first dataset a task emits fails to flush (https://github.com/apache/airflow/issues/42495).
+    dag.sync_to_db()
+    new_test_dag(dag)
 
-        # When this is solved, we can uncomment the following:
-        # dag_run, session = run_test_dag(dag)
-
-        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
-        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
-        # based on the resolution of the issue logged in Airflow:
-        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
-        # assert dataset_model == 1
+    # Only the run task emits a dataset: dbt test produces no model to track.
+    assert "test_id_1__run" in _emitted_dataset_alias_names()
 
 
-@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2.10 and 2.11")
+@pytest.mark.skipif(version.parse(airflow_version).major >= 3, reason="This test is specific for Airflow 2")
 @pytest.mark.integration
-def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
+def test_run_operator_dataset_manual_outlets_airflow2(caplog):
     from airflow.datasets import Dataset, DatasetAlias
     from airflow.models.dataset import DatasetAliasModel
-    from sqlalchemy.orm.exc import FlushError
 
     with DAG("test_id_1", start_date=datetime(2022, 1, 1)) as dag:
         seed_operator = DbtSeedLocalOperator(
@@ -718,19 +719,19 @@ def test_run_operator_dataset_manual_outlets_airflow_210(caplog):
 
     assert test_operator.outlets == [DatasetAlias(name="test_id_1__test")]
 
-    with pytest.raises(FlushError):
-        run_test_dag(dag, custom_tester=True)
-        # This is a known limitation of Airflow 2.10.0 and 2.10.1
-        # https://github.com/apache/airflow/issues/42495
+    # On Airflow 2, dag.test() does not sync the DAG, so the DatasetAlias of the tasks has no row in the database yet
+    # and the first dataset a task emits fails to flush (https://github.com/apache/airflow/issues/42495).
+    dag.sync_to_db()
+    new_test_dag(dag)
 
-        # When this is solved, we can uncomment the following:
-        # dag_run, session = run_test_dag(dag)
-
-        # Once this issue is solved, we should do some type of check on the actual datasets being emitted,
-        # so we guarantee Cosmos is backwards compatible via tests using something along the lines or an alternative,
-        # based on the resolution of the issue logged in Airflow:
-        # dataset_model = session.scalars(select(DatasetModel).where(DatasetModel.uri == "<something>"))
-        # assert dataset_model == 1
+    assert {
+        "manual_outlet__run_dataset",
+        "manual_outlet__run_alias",
+        "manual_outlet__run_alias_model",
+        "test_id_1__run_operator_dataset",
+        "test_id_1__run_operator_alias",
+        "test_id_1__run_operator_alias_model",
+    } <= _emitted_dataset_alias_names()
 
 
 @pytest.mark.skipif(
@@ -889,7 +890,7 @@ def test_run_operator_dataset_with_airflow_3_and_enabled_dataset_alias_false_fai
 
 @patch("cosmos.settings.enable_dataset_alias", 0)
 @pytest.mark.integration
-def test_run_operator_dataset_inlets_and_outlets_airflow_210_onwards_disabled_via_envvar(caplog):
+def test_run_operator_dataset_inlets_and_outlets_disabled_via_envvar(caplog):
     with DAG("test_id_2", start_date=datetime(2022, 1, 1)) as dag:
         run_operator = DbtRunLocalOperator(
             profile_config=real_profile_config,

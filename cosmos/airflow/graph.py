@@ -856,6 +856,62 @@ def _reject_cosmos_only_selectors(render_config: RenderConfig) -> None:
             )
 
 
+def _is_run_by_watcher_producer(node: DbtNode, execution_mode: ExecutionMode, render_config: RenderConfig) -> bool:
+    if node.has_ephemeral_materialization:
+        return False
+    if node.resource_type == DbtResourceType.TEST:
+        return render_config.test_behavior not in (TestBehavior.NONE, TestBehavior.AFTER_ALL)
+    if node.resource_type == DbtResourceType.SOURCE:
+        # Only the local producer checks freshness; the Kubernetes and GKE source tasks check it themselves.
+        return (
+            execution_mode == ExecutionMode.WATCHER
+            and render_config.source_rendering_behavior != SourceRenderingBehavior.NONE
+            and node.has_freshness
+        )
+    return True
+
+
+def _has_profile_override(node: DbtNode) -> bool:
+    # Read the raw meta: validation belongs to task creation, and a warning must not stop the DAG from rendering.
+    meta = node.config.get("meta")
+    cosmos_meta = meta.get("cosmos") if isinstance(meta, dict) else None
+    return isinstance(cosmos_meta, dict) and bool(cosmos_meta.get("profile_config"))
+
+
+def _is_own_profile_override_applied(node: DbtNode, render_config: RenderConfig) -> bool:
+    # A test runs with the profile of the node it tests, unless it is detached into a task of its own.
+    if node.resource_type != DbtResourceType.TEST:
+        return True
+    return should_create_detached_nodes(render_config) and is_detached_test(node)
+
+
+_MAX_LISTED_PROFILE_OVERRIDES = 10
+
+
+def _warn_about_profile_overrides_ignored_by_watcher_producer(
+    nodes: dict[str, DbtNode], execution_mode: ExecutionMode, render_config: RenderConfig
+) -> None:
+    overridden_node_ids = [
+        node_id
+        for node_id, node in nodes.items()
+        if _is_run_by_watcher_producer(node, execution_mode, render_config)
+        and _is_own_profile_override_applied(node, render_config)
+        and _has_profile_override(node)
+    ]
+    if overridden_node_ids:
+        listed_node_ids = ", ".join(overridden_node_ids[:_MAX_LISTED_PROFILE_OVERRIDES])
+        unlisted_count = len(overridden_node_ids) - _MAX_LISTED_PROFILE_OVERRIDES
+        if unlisted_count > 0:
+            listed_node_ids += f" and {unlisted_count} more"
+        logger.warning(
+            "ExecutionMode.%s runs these nodes in the producer, which ignores their meta.cosmos.profile_config: %s. "
+            "See https://astronomer.github.io/astronomer-cosmos/guides/run_dbt/airflow-worker/watcher-execution-mode.html"
+            "#per-node-profile-overrides",
+            execution_mode.name,
+            listed_node_ids,
+        )
+
+
 def _add_watcher_producer_task(
     dag: DAG,
     task_args: dict[str, Any],
@@ -1299,6 +1355,7 @@ def build_airflow_graph(
         # This property is only relevant for the setup task, not the other tasks:
         virtualenv_dir = task_args.pop("virtualenv_dir", None)
     elif execution_mode in (ExecutionMode.WATCHER, ExecutionMode.WATCHER_KUBERNETES, ExecutionMode.WATCHER_GCP_GKE):
+        _warn_about_profile_overrides_ignored_by_watcher_producer(nodes, execution_mode, render_config)
         setup_operator_args = getattr(execution_config, "setup_operator_args", None) or {}
         # We are intentionally creating the producer task ahead of the consumer tasks
         # Airflow priority weight is not being respected in multiple versions of the library, including 3.1

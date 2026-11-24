@@ -563,6 +563,36 @@ As a workaround, set ``max_active_runs=1`` on the DAG.
 
 For details, see `#2596 <https://github.com/astronomer/astronomer-cosmos/issues/2596>`_.
 
+Per-node profile overrides
+++++++++++++++++++++++++++
+
+The producer ``DbtProducerWatcherOperator`` builds every node in a single dbt command, using the ``profile_config`` given to ``DbtDag`` or ``DbtTaskGroup``. It does not apply the per-node ``meta.cosmos.profile_config`` overrides described in :ref:`profile-customise-per-node`.
+
+Model, seed and snapshot consumer tasks carry the override, so it takes effect only when one of them falls back to running dbt itself, for example on a retry or a manual clear. Test tasks under ``TestBehavior.AFTER_EACH`` use the profile of the model they test, unless ``should_detach_multiple_parents_tests`` gives a test a task of its own. The same model can therefore run under different connections, depending on which task ran it. When it renders the DAG, Cosmos logs a warning that lists up to ten of the overridden nodes.
+
+As a workaround, split the project into one ``DbtTaskGroup`` per profile, each with its own ``ProfileConfig`` and a ``RenderConfig`` ``select`` or ``exclude`` that picks its nodes. dbt does not resolve dependencies across the groups, so set the dependencies between them in Airflow:
+
+.. code-block:: python
+
+    with DAG(...):
+        default_models = DbtTaskGroup(
+            group_id="default_models",
+            project_config=project_config,
+            profile_config=default_profile_config,
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            render_config=RenderConfig(exclude=["tag:restricted"]),
+        )
+        restricted_models = DbtTaskGroup(
+            group_id="restricted_models",
+            project_config=project_config,
+            profile_config=restricted_profile_config,
+            execution_config=ExecutionConfig(execution_mode=ExecutionMode.WATCHER),
+            render_config=RenderConfig(select=["tag:restricted"]),
+        )
+        default_models >> restricted_models
+
+For details, see `#3196 <https://github.com/astronomer/astronomer-cosmos/issues/3196>`_.
+
 
 Advanced config
 ~~~~~~~~~~~~~~~
@@ -715,6 +745,16 @@ Troubleshooting
 
 Problem: "I changed from ``ExecutionMode.LOCAL`` to ``ExecutionMode.WATCHER``, but my DAG is running slower."
 Answer: Please, check the number of threads that are being used by searching the producer task logs for a message similar to ``Concurrency: 1 threads (target='DEV')``. To leverage the Watcher mode, you should have a high number of threads, at least dbt's default of 4. Check the `dbt threading docs <https://docs.getdbt.com/docs/running-a-dbt-project/using-threads>`_ for more information on how to set the number of threads.
+
+Problem: "A watcher task failed, and its log only shows ``No XCom value found``."
+Answer: The producer stopped before dbt finished the task's model, for example because the model hung until the DAG run timed out. Since Cosmos 1.16.1, the watcher task then logs when the model started and which producer task log to search:
+
+.. code-block:: text
+
+   [STARTED] Start: 09:26:17, Finish: N/A
+   No final status for model 'model.my_project.my_model'. Search the log of task 'dbt_producer_watcher' for 'model.my_project.my_model'.
+
+So that a hung model does not block the whole run until the DAG run times out, set ``execution_timeout`` on the producer through ``setup_operator_args``. The producer then fails, and each watcher task whose model did not finish runs that model itself.
 
 Problem: "I cannot see dbt debug logs in the producer task."
 Answer: When ``ExecutionMode.WATCHER`` runs dbt as a subprocess (i.e. when dbt and Airflow are **not** installed in the same Python virtual environment), pass ``--debug`` via ``dbt_cmd_global_flags`` in ``operator_args``:

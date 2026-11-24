@@ -1,5 +1,8 @@
 import json
+import os
 import signal
+import subprocess
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
@@ -78,6 +81,62 @@ def test_send_sigterm(mock_killpg, mock_getpgid):
     hook.sub_process = MagicMock()
     hook.send_sigterm()
     mock_killpg.assert_called_with(123, signal.SIGTERM)
+
+
+FORK_HOOK_PROBE = """
+import os
+import sys
+
+from cosmos.hooks.subprocess import FullOutputSubprocessHook
+
+fork_hook_calls_path = sys.argv[1]
+
+
+def record_fork_hook_call(name):
+    with open(fork_hook_calls_path, "a") as fork_hook_calls:
+        fork_hook_calls.write(name + "\\n")
+
+
+os.register_at_fork(
+    before=lambda: record_fork_hook_call("before"),
+    after_in_parent=lambda: record_fork_hook_call("after_in_parent"),
+    after_in_child=lambda: record_fork_hook_call("after_in_child"),
+)
+FullOutputSubprocessHook().run_command([sys.executable, "-c", "pass"])
+"""
+
+
+def test_run_command_does_not_run_fork_hooks(tmp_path):
+    # CPython runs at-fork handlers, such as gRPC's, only when Popen is given a preexec_fn.
+    fork_hook_calls_path = tmp_path / "fork_hook_calls.txt"
+    fork_hook_calls_path.write_text("")
+
+    probe = subprocess.run(
+        [sys.executable, "-c", FORK_HOOK_PROBE, str(fork_hook_calls_path)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert probe.returncode == 0, probe.stderr
+    assert fork_hook_calls_path.read_text() == ""
+
+
+def test_run_command_starts_the_command_in_its_own_session():
+    result = FullOutputSubprocessHook().run_command(
+        [sys.executable, "-c", "import os; print(os.getpid(), os.getpgid(0), os.getsid(0))"]
+    )
+
+    pid, process_group_id, session_id = map(int, result.output.split())
+    assert pid == process_group_id == session_id
+    assert session_id != os.getsid(0)
+
+
+def test_run_command_restores_default_sigpipe_handling():
+    # A Python child ignores SIGPIPE at startup whatever it inherits, so Perl reports what the hook passed on.
+    result = FullOutputSubprocessHook().run_command(["perl", "-e", 'print defined $SIG{PIPE} ? $SIG{PIPE} : "DEFAULT"'])
+
+    assert result.output == "DEFAULT"
 
 
 @pytest.mark.parametrize(

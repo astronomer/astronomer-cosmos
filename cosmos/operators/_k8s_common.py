@@ -30,6 +30,7 @@ from cosmos.airflow.compatibility import AirflowSkipException
 from cosmos.config import ProfileConfig
 from cosmos.constants import _PRODUCER_CMD_FLAGS_XCOM_KEY, PRODUCER_WATCHER_TASK_ID
 from cosmos.operators._watcher import safe_xcom_push
+from cosmos.operators._watcher.state import push_unfinished_dbt_events
 from cosmos.operators._watcher.xcom import (
     _compose_backup_callback,
     _delete_xcom_backup,
@@ -627,6 +628,12 @@ def _populate_producer_model_outlet_uris(operator: Any) -> None:
     operator._model_outlet_uris.update(
         compute_model_outlet_uris(operator.manifest_filepath, operator._dataset_namespace)
     )
+
+
+def push_watcher_producer_unfinished_dbt_events(operator: Any) -> None:
+    context = operator._context_holder[CONTEXT_KEY]
+    if context is not None:
+        push_unfinished_dbt_events(context)
 
 
 def execute_watcher_producer(operator: Any, context: Context, parent_execute: Callable[..., Any], **kwargs: Any) -> Any:

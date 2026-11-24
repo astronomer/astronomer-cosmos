@@ -336,7 +336,7 @@ def _warn_once_that_airflow_310_cannot_open_dbt_docs() -> None:
 class CosmosAF3Plugin(AirflowPlugin):
     name = "cosmos"
 
-    # Mount our FastAPI sub-app under /cosmos (initialized in __init__ after version check)
+    # Mount our FastAPI sub-app under /cosmos (built lazily on the first request, after the version check at load)
     fastapi_apps: list[dict[str, Any]] = []
 
     # Register external views for navigation

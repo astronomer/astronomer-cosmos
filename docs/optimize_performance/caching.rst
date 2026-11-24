@@ -77,6 +77,8 @@ Additionally, if any of the following DAG configurations are changed, we'll auto
 - ``RenderConfig.exclude``
 - ``RenderConfig.select``
 - ``RenderConfig.selector``
+- ``ProfileConfig.profile_name``
+- ``ProfileConfig.target_name``
 
 Finally, if users would like to define specific Airflow variables that, if changed, will cause the recreation of the cache, they can specify those by using:
 

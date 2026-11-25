@@ -184,6 +184,50 @@ If your Airflow DAG includes multiple stages or integrations (e.g., data ingesti
     :align: center
 
 
+.. _watcher-dbt-fusion-oss:
+
+Use with dbt Fusion and dbt OSS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``ExecutionMode.WATCHER`` works with dbt Core 1.x and with both distributions of dbt 2: :ref:`dbt Fusion <dbt_fusion>` and :ref:`dbt OSS <dbt_oss>`.
+
+dbt Fusion
+++++++++++
+
+Cosmos CI has run ``ExecutionMode.WATCHER`` with dbt Fusion since Cosmos 1.14.0. Set ``dbt_executable_path`` to the dbt Fusion binary and ``invocation_mode`` to ``InvocationMode.SUBPROCESS``:
+
+.. code-block:: python
+
+    from cosmos import DbtDag, ExecutionConfig, RenderConfig
+    from cosmos.constants import ExecutionMode, InvocationMode
+
+    DBT_FUSION_BINARY = "/home/astro/.local/bin/dbt"
+
+    DbtDag(
+        ...,
+        render_config=RenderConfig(
+            dbt_executable_path=DBT_FUSION_BINARY,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        ),
+        execution_config=ExecutionConfig(
+            execution_mode=ExecutionMode.WATCHER,
+            dbt_executable_path=DBT_FUSION_BINARY,
+            invocation_mode=InvocationMode.SUBPROCESS,
+        ),
+    )
+
+Set ``invocation_mode`` explicitly. Cosmos chooses it from the Python environment that Airflow runs in, not from ``dbt_executable_path``: if dbt Core 1.x can be imported there, the producer runs that dbt in-process instead of the dbt Fusion binary. The ``RenderConfig`` values only matter when Cosmos runs ``dbt ls`` to render the DAG (``LoadMode.DBT_LS``).
+
+Cosmos CI runs this configuration against BigQuery. ``ExecutionMode.WATCHER_KUBERNETES`` is not tested with dbt Fusion.
+
+dbt OSS
++++++++
+
+.. versionadded:: 1.16.0
+
+With :ref:`dbt OSS <dbt_oss>`, which Cosmos supports experimentally, use ``ExecutionMode.WATCHER`` as usual. The ``dbtRunner`` of dbt OSS has no event callbacks, so the producer always runs dbt in a subprocess, and setting ``InvocationMode.DBT_RUNNER`` for it raises ``CosmosValueError``. Cosmos CI runs the watcher example DAGs against dbt OSS on BigQuery, for ``ExecutionMode.WATCHER`` and ``ExecutionMode.WATCHER_KUBERNETES``. See :ref:`dbt_oss` for the other differences from dbt Core 1.x.
+
+
 Additional details
 ~~~~~~~~~~~~~~~~~~
 

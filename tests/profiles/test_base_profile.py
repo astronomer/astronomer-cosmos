@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 import yaml
+from airflow.models import Connection
 
 from cosmos.exceptions import CosmosValueError
-from cosmos.profiles.base import BaseProfileMapping, DbtProfileConfigVars
+from cosmos.profiles.base import BaseHook, BaseProfileMapping, DbtProfileConfigVars
 
 
 class TestProfileMapping(BaseProfileMapping):
@@ -185,3 +187,19 @@ def test_profile_version_sha_consistency():
     profile_mapping = TestProfileMapping(conn_id="fake_conn_id")
     version = profile_mapping.version(profile_name="dev", target_name="dev")
     assert version == "ea3bf1f70b033405ba9ff9cafe65af873fd7a868cac840cdbfd5e8e9a1da9650"
+
+
+def test_conn_rejects_templated_conn_id():
+    profile_mapping = TestProfileMapping(conn_id="{{ var.value.conn_id }}")
+
+    with pytest.raises(CosmosValueError, match="is a Jinja template"):
+        profile_mapping.conn
+
+
+def test_conn_is_fetched_again_when_conn_id_changes():
+    profile_mapping = TestProfileMapping(conn_id="group_conn")
+    profile_mapping._conn = Connection(conn_id="group_conn", conn_type="postgres")
+    profile_mapping.conn_id = "node_conn"
+
+    with patch.object(BaseHook, "get_connection", return_value=Connection(conn_id="node_conn", conn_type="postgres")):
+        assert profile_mapping.conn.conn_id == "node_conn"

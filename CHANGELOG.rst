@@ -12,6 +12,10 @@ Behaviour Changes
 
 * A failed ``dbt deps`` at task execution time now fails the task. Previously Cosmos only logged the failure and ran the dbt command with whatever packages were already in the project, so the task could succeed with outdated packages. This applies to every ``dbt deps`` failure and ignores ``skip_exit_code``, which only applies to the dbt command. **If your workers cannot reach the package sources and you ship pre-installed packages, set** ``install_dbt_deps=False`` **on** ``ProjectConfig`` **or** ``ExecutionConfig`` **so Cosmos uses them instead of running** ``dbt deps``. See #3172.
 
+Features
+
+* Accept a Jinja template as the profile mapping ``conn_id``, rendered when each task runs, so the connection can come from a DAG param or ``dag_run.conf``. Supported with ``ExecutionMode.LOCAL``, ``VIRTUALENV`` and ``WATCHER``, and with ``AIRFLOW_ASYNC`` on BigQuery, by @tatiana in #3198
+
 Bug Fixes
 
 * Cosmos now resolves ``env_var()`` in the ``packages-install-path`` of ``dbt_project.yml`` with ``ProjectConfig.env_vars`` and the operator ``env`` before the worker environment, as dbt does. Previously a path that depended on a variable set only there was resolved to the wrong folder, so Cosmos symlinked the real packages folder into the temporary project and ``dbt deps`` failed with ``Cannot call rmtree on a symbolic link``. See #3172.
@@ -246,6 +250,7 @@ These changes adjust observable behaviour. None of them break the documented pub
 * ``on_warning_callback`` now fires for dbt test warnings in ``ExecutionMode.LOCAL`` subprocess mode (previously skipped on dbt 1.10+, where ``PASS=.. WARN=N`` is no longer the final stdout line). See #2832.
 * The output-only template fields ``compiled_sql`` and ``freshness`` are now rejected with ``CosmosValueError`` at task instantiation if passed via ``operator_args`` or directly to a local operator (they were previously overwritten by Cosmos at runtime, so any value silently had no effect); the guard covers both the synchronous local operators and the async BigQuery path. See #2726 and #2852.
 * ``RenderConfig.exclude`` is now applied to per-model and detached test tasks under ``TestBehavior.AFTER_EACH`` and ``BUILD`` (previously only the ``AFTER_ALL`` aggregate test task honoured it), so exclusions such as ``exclude=["resource_type:unit_test"]`` now take effect without an ``operator_args`` workaround. See #2850.
+* The Snowflake profile mappings now forward ``authenticator``, ``host``, ``port``, ``query_tag``, ``insecure_mode`` and ``client_session_keep_alive`` from the Airflow connection extras into the dbt profile (see #2650, #2744 and #2748). Values are copied as-is, so **existing connections that worked unchanged on 1.14.x can now produce an invalid dbt profile**. In particular, ``insecure_mode`` and ``client_session_keep_alive`` must be booleans in dbt: a connection that stores them as strings (for example ``"false"``, common when the connection is defined as a URI) now fails every dbt task at runtime with ``Credentials in profile ... invalid: 'false' is not valid under any of the given schemas``. Before upgrading, check your Snowflake connection extras and store these fields as booleans (or remove them if unused).
 
 Features
 
@@ -263,8 +268,6 @@ Features
 * Map Snowflake ``query_tag`` from connection extras to dbt profile by @pankajastro in #2650
 * Add Snowflake profile mapping for non-encrypted private key file by @pankajastro in #2660
 * Export Clickhouse and encrypted Snowflake mappings from ``cosmos.profiles`` by @pankajastro in #2668
-* Forward Snowflake ``insecure_mode`` from connection Extra into dbt profile by @toor11 in #2744
-* Extend Snowflake profile mappings with ``authenticator``, ``client_session_keep_alive``, ``host``, and ``port`` by @Aaditya-git in #2748
 * Support ``extra__google_cloud_platform__project`` in ``GoogleCloudServiceAccountDictProfileMapping`` by @jroachgolf84 in #2626
 * Warn when users pass output-only template fields to local operators by @goingforstudying-ctrl in #2737
 * Add an ``enable_watcher_reliable_retry`` config to harden ``ExecutionMode.WATCHER`` producer retries by @tatiana in #2816

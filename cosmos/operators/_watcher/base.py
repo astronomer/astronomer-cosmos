@@ -32,6 +32,7 @@ from cosmos.operators._watcher.aggregation import (
     push_test_result_or_aggregate,
 )
 from cosmos.operators._watcher.state import (
+    PRODUCER_NO_DBT_NODE_STATUS_STATES,
     DbtNodeStatus,
     ProducerTaskState,
     _iso_to_string,
@@ -778,7 +779,7 @@ class BaseConsumerSensor(BaseSensorOperator):
 
         if reason == WatcherEventReason.PRODUCER_SKIPPED:
             logger.info(
-                "Watcher producer task '%s' was skipped. Falling back to running dbt for %s '%s'.",
+                "Watcher producer task '%s' published no dbt node status. Falling back to running dbt for %s '%s'.",
                 self.producer_task_id,
                 self._resource_label.lower(),
                 self.model_unique_id,
@@ -948,10 +949,11 @@ class BaseConsumerSensor(BaseSensorOperator):
                     f"The dbt build command failed in producer task. Please check the log of task {self.producer_task_id} for details."
                 )
             else:
-                # This handles the scenario of tasks that failed with `State.UPSTREAM_FAILED`
+                # First poke with a failed producer, e.g. a consumer cleared after it was upstream_failed.
                 return self._fallback_to_non_watcher_run(try_number, context)
 
-        if producer_task_state == ProducerTaskState.SKIPPED:
+        # No dbt node status will ever arrive (e.g. the producer is upstream_failed), so run the node instead of polling.
+        if producer_task_state in PRODUCER_NO_DBT_NODE_STATUS_STATES:
             return self._fallback_to_non_watcher_run(try_number, context)
 
         self.poke_retry_number += 1

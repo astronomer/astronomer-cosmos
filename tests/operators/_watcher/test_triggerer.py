@@ -506,6 +506,17 @@ class TestWatcherTrigger:
         mock_logger.info.assert_not_called()
 
     @patch("cosmos.operators._watcher.triggerer.asyncio.sleep", new_callable=AsyncMock)
+    @pytest.mark.parametrize("producer_state", ["upstream_failed", "removed"])
+    @pytest.mark.asyncio
+    async def test_log_startup_events_returns_when_producer_terminal(self, mock_sleep, producer_state):
+        self.trigger.get_xcom_val = AsyncMock(return_value=None)
+        self.trigger._get_producer_task_status = AsyncMock(return_value=producer_state)
+
+        await self.trigger._log_startup_events()
+
+        mock_sleep.assert_not_called()
+
+    @patch("cosmos.operators._watcher.triggerer.asyncio.sleep", new_callable=AsyncMock)
     @patch("cosmos.operators._watcher.triggerer.is_dbt_node_status_terminal", side_effect=[False, True])
     @pytest.mark.asyncio
     async def test_log_startup_events_waits_and_sleeps(self, mock_terminal, mock_sleep):
@@ -588,11 +599,14 @@ class TestWatcherTriggerProducerSkipped:
         )
 
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._log_startup_events")
+    @pytest.mark.parametrize("producer_state", ["skipped", "upstream_failed", "removed"])
     @pytest.mark.asyncio
-    async def test_run_producer_skipped_yields_producer_skipped_event(self, mock_startup_events, caplog):
-        """Test that when producer is skipped, trigger yields failed with PRODUCER_SKIPPED reason."""
+    async def test_run_producer_not_run_yields_producer_skipped_event(
+        self, mock_startup_events, producer_state, caplog
+    ):
+        """When the producer never ran dbt (skipped, upstream_failed, removed), the trigger yields PRODUCER_SKIPPED."""
         get_xcom_val_mock = AsyncMock(return_value=None)
-        get_producer_status_mock = AsyncMock(return_value="skipped")
+        get_producer_status_mock = AsyncMock(return_value=producer_state)
         parse_mock = AsyncMock(return_value=(None, None))
 
         caplog.set_level("INFO")
@@ -608,7 +622,7 @@ class TestWatcherTriggerProducerSkipped:
 
         assert len(events) == 1
         assert events[0].payload == {"status": "failed", "reason": WatcherEventReason.PRODUCER_SKIPPED}
-        assert "was skipped" in caplog.text
+        assert "ended in state" in caplog.text
 
     @patch("cosmos.operators._watcher.triggerer.WatcherTrigger._get_producer_task_status", new_callable=AsyncMock)
     @pytest.mark.asyncio

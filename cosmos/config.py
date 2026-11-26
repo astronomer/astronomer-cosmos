@@ -90,7 +90,7 @@ class RenderConfig:
     """
 
     emit_assets: bool = True
-    emit_datasets: InitVar[bool | None] = None
+    emit_datasets: bool | None = None
     test_behavior: TestBehavior = TestBehavior.AFTER_EACH
     load_method: LoadMode = LoadMode.AUTOMATIC
     invocation_mode: InvocationMode = InvocationMode.DBT_RUNNER
@@ -118,7 +118,7 @@ class RenderConfig:
     enable_owner_inheritance: bool | None = True
     ephemeral_models_as_empty_operator: bool = True
 
-    def __post_init__(self, dbt_project_path: str | Path | None, emit_datasets: bool | None) -> None:
+    def __post_init__(self, dbt_project_path: str | Path | None) -> None:
         if self.env_vars:
             warnings.warn(
                 "RenderConfig.env_vars is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
@@ -129,12 +129,12 @@ class RenderConfig:
                 "RenderConfig.dbt_deps is deprecated since Cosmos 1.9 and will be removed in Cosmos 2.0. Use ProjectConfig.install_dbt_deps instead.",
                 DeprecationWarning,
             )
-        if emit_datasets is not None:
+        if self.emit_datasets is not None:
             warnings.warn(
                 "RenderConfig.emit_datasets is deprecated since Cosmos 1.16 and will be removed when Cosmos only supports Airflow 3. Use emit_assets instead.",
                 DeprecationWarning,
             )
-            self.emit_assets = emit_datasets
+            self.emit_assets = self.emit_datasets
         if self.source_rendering_behavior is None:
             warnings.warn(
                 "Passing None for source_rendering_behavior is not supported. "

@@ -245,7 +245,7 @@ For example, a Postgres model ``stg_customers`` in schema ``platform`` generates
         project_config=ProjectConfig(dbt_project_path=UPSTREAM_PATH),
         profile_config=ProfileConfig(...),
         render_config=RenderConfig(
-            emit_assets=True,  # Default - each task emits an asset (use emit_datasets on Airflow 2)
+            emit_assets=True,  # Default - each task emits an asset
         ),
         schedule="@daily",
     )
@@ -331,9 +331,7 @@ To disable automatic asset emission:
 
     dag = DbtDag(
         dag_id="my_dag",
-        render_config=RenderConfig(
-            emit_assets=False
-        ),  # Use emit_assets for Airflow 3 (emit_datasets for Airflow 2)
+        render_config=RenderConfig(emit_assets=False),
         # ...
     )
 

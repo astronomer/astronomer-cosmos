@@ -125,7 +125,7 @@ The following operator args support templating, and are accessible both through 
 - ``vars``
 - ``full_refresh`` (for the ``build``, ``seed``, and ``run`` operators since Cosmos 1.4.)
 - ``dbt_cmd_flags``
-- ``emit_assets`` (replaces ``emit_datasets`` in  Cosmos 1.16, preferred name for Airflow 3)
+- ``emit_assets`` (replaces ``emit_datasets`` in Cosmos 1.16)
 
 .. note::
     Using Jinja templating for ``env`` and ``vars`` may cause problems when using ``LoadMode.DBT_LS`` to render your DAG.

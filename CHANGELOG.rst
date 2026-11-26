@@ -10,10 +10,12 @@ Breaking Changes
 
 Behaviour Changes
 
+* ``RenderConfig.emit_assets`` now replaces ``RenderConfig.emit_datasets`` (still supported) following Airflow 3 renaming. Both parameters have the exact same behavior; when both are specified, ``emit_assets`` takes precedence.
 * A failed ``dbt deps`` at task execution time now fails the task. Previously Cosmos only logged the failure and ran the dbt command with whatever packages were already in the project, so the task could succeed with outdated packages. This applies to every ``dbt deps`` failure and ignores ``skip_exit_code``, which only applies to the dbt command. **If your workers cannot reach the package sources and you ship pre-installed packages, set** ``install_dbt_deps=False`` **on** ``ProjectConfig`` **or** ``ExecutionConfig`` **so Cosmos uses them instead of running** ``dbt deps``. See #3172.
 
 Features
 
+* Add ``emit_assets`` as the preferred parameter name in ``RenderConfig`` and ``operator_args``, while retaining ``emit_datasets`` for backward compatibility.
 * Accept a Jinja template as the profile mapping ``conn_id``, rendered when each task runs, so the connection can come from a DAG param or ``dag_run.conf``. Supported with ``ExecutionMode.LOCAL``, ``VIRTUALENV`` and ``WATCHER``, and with ``AIRFLOW_ASYNC`` on BigQuery, by @tatiana in #3198
 
 Bug Fixes

@@ -1898,6 +1898,80 @@ def test_operator_args_emit_datasets_overrides_render_config(
     assert task_args["emit_datasets"] == expected_emit_datasets
 
 
+@pytest.mark.parametrize(
+    "operator_args, expected_emit_datasets",
+    [
+        ({}, True),
+        ({"emit_assets": False}, False),
+        ({"emit_assets": "{{ dag_run.run_type != 'backfill' }}"}, "{{ dag_run.run_type != 'backfill' }}"),
+        ({"emit_assets": True, "emit_datasets": False}, True),
+        ({"emit_assets": False, "emit_datasets": True}, False),
+    ],
+)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+@patch("cosmos.converter.build_airflow_graph")
+def test_operator_args_emit_assets(
+    mock_build_airflow_graph, mock_load_dbt_graph, operator_args, expected_emit_datasets
+):
+    """Test emit_assets in operator_args with precedence over emit_datasets."""
+    DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
+        nodes=nodes,
+        project_config=ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="my_profile_name",
+            target_name="my_target_name",
+            profiles_yml_filepath=SAMPLE_PROFILE_YML,
+        ),
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.LOCAL),
+        render_config=RenderConfig(emit_datasets=True),
+        operator_args=operator_args,
+    )
+
+    task_args = mock_build_airflow_graph.call_args.kwargs["task_args"]
+    assert task_args["emit_datasets"] == expected_emit_datasets
+    assert "emit_assets" not in task_args
+
+
+@pytest.mark.parametrize(
+    "emit_assets, emit_datasets, expected_emit_datasets",
+    [
+        (False, None, False),
+        (True, None, True),
+        (False, True, False),
+    ],
+)
+@patch("cosmos.converter.DbtGraph.filtered_nodes", nodes)
+@patch("cosmos.converter.DbtGraph.load")
+@patch("cosmos.converter.build_airflow_graph")
+def test_render_config_emit_assets(
+    mock_build_airflow_graph, mock_load_dbt_graph, emit_assets, emit_datasets, expected_emit_datasets
+):
+    """Test emit_assets in RenderConfig with precedence over emit_datasets."""
+    if emit_datasets is not None:
+        with pytest.warns(DeprecationWarning, match="emit_datasets is deprecated"):
+            render_config = RenderConfig(emit_assets=emit_assets, emit_datasets=emit_datasets)
+    else:
+        render_config = RenderConfig(emit_assets=emit_assets)
+
+    DbtToAirflowConverter(
+        dag=DAG("sample_dag", start_date=datetime(2024, 4, 16)),
+        nodes=nodes,
+        project_config=ProjectConfig(dbt_project_path=SAMPLE_DBT_PROJECT),
+        profile_config=ProfileConfig(
+            profile_name="my_profile_name",
+            target_name="my_target_name",
+            profiles_yml_filepath=SAMPLE_PROFILE_YML,
+        ),
+        execution_config=ExecutionConfig(execution_mode=ExecutionMode.LOCAL),
+        render_config=render_config,
+    )
+
+    task_args = mock_build_airflow_graph.call_args.kwargs["task_args"]
+    assert task_args["emit_datasets"] is expected_emit_datasets
+
+
 def _convert_with_ai_config(execution_mode, *, ai_config=None, operator_args=None, emit_datasets=True):
     dag = DAG("sample_dag", start_date=datetime(2024, 4, 16))
     DbtToAirflowConverter(

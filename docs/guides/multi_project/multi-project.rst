@@ -192,7 +192,7 @@ This option uses pre-generated ``manifest.json`` files for faster DAG parsing (n
 
 **Option 3: Separate DAGs with Assets (Airflow 3) / Datasets (Airflow 2)**
 
-Cosmos automatically emits assets from each task when ``emit_datasets=True`` (the default).
+Cosmos automatically emits assets from each task when ``emit_assets=True`` (the default).
 You can use these assets to trigger downstream DAGs.
 
 .. figure:: /_static/cross_projects_assets_view.png
@@ -245,7 +245,7 @@ For example, a Postgres model ``stg_customers`` in schema ``platform`` generates
         project_config=ProjectConfig(dbt_project_path=UPSTREAM_PATH),
         profile_config=ProfileConfig(...),
         render_config=RenderConfig(
-            emit_datasets=True,  # Default - each task emits an asset
+            emit_assets=True,  # Default - each task emits an asset (use emit_datasets on Airflow 2)
         ),
         schedule="@daily",
     )
@@ -331,7 +331,7 @@ To disable automatic asset emission:
 
     dag = DbtDag(
         dag_id="my_dag",
-        render_config=RenderConfig(emit_datasets=False),
+        render_config=RenderConfig(emit_assets=False),  # Use emit_assets for Airflow 3 (emit_datasets for Airflow 2)
         # ...
     )
 

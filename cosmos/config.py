@@ -58,8 +58,10 @@ class RenderConfig:
     """
     Class for setting general Cosmos config.
 
-    :param emit_datasets: If enabled model nodes emit Airflow Datasets for downstream cross-DAG
-    dependencies. Defaults to True
+    :param emit_assets: If enabled model nodes emit Airflow Assets for downstream cross-DAG dependencies. Defaults to True.
+    This is the preferred parameter name for Airflow 3 compatibility.
+    :param emit_datasets: (Deprecated in favor of emit_assets) If enabled model nodes emit Airflow Datasets for downstream cross-DAG
+    dependencies. Defaults to True. This is the deprecated parameter name for Airflow 2 backward compatibility.
     :param test_behavior: The behavior for running tests. Defaults to after each (model)
     :param load_method: The parsing method for loading the dbt model. Defaults to AUTOMATIC
     :param invocation_mode: If `LoadMode.DBT_LS` is used, define how dbt ls should be run: using dbtRunner (default) or Python subprocess.
@@ -87,7 +89,8 @@ class RenderConfig:
     :param ephemeral_models_as_empty_operator: A boolean that controls how ephemeral models are rendered. Ephemeral models are inlined as CTEs into downstream models and never written to the warehouse, so running them via a dbt operator is effectively a no-op. When True (default), they are rendered as ``EmptyOperator`` tasks, which preserves the dependency chain that passes through them while avoiding wasted dbt invocations and decluttering the DAG. Set to False to render them as regular dbt run tasks.
     """
 
-    emit_datasets: bool = True
+    emit_assets: bool = True
+    emit_datasets: InitVar[bool | None] = None
     test_behavior: TestBehavior = TestBehavior.AFTER_EACH
     load_method: LoadMode = LoadMode.AUTOMATIC
     invocation_mode: InvocationMode = InvocationMode.DBT_RUNNER
@@ -115,7 +118,7 @@ class RenderConfig:
     enable_owner_inheritance: bool | None = True
     ephemeral_models_as_empty_operator: bool = True
 
-    def __post_init__(self, dbt_project_path: str | Path | None) -> None:
+    def __post_init__(self, dbt_project_path: str | Path | None, emit_datasets: bool | None) -> None:
         if self.env_vars:
             warnings.warn(
                 "RenderConfig.env_vars is deprecated since Cosmos 1.3 and will be removed in Cosmos 2.0. Use ProjectConfig.env_vars instead.",
@@ -126,6 +129,12 @@ class RenderConfig:
                 "RenderConfig.dbt_deps is deprecated since Cosmos 1.9 and will be removed in Cosmos 2.0. Use ProjectConfig.install_dbt_deps instead.",
                 DeprecationWarning,
             )
+        if emit_datasets is not None:
+            warnings.warn(
+                "RenderConfig.emit_datasets is deprecated since Cosmos 1.16 and will be removed when Cosmos only supports Airflow 3. Use emit_assets instead.",
+                DeprecationWarning,
+            )
+            self.emit_assets = emit_datasets
         if self.source_rendering_behavior is None:
             warnings.warn(
                 "Passing None for source_rendering_behavior is not supported. "

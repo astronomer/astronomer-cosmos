@@ -286,7 +286,7 @@ As the alias grows, marking tasks as successful gets slower, and it can delay ot
 To avoid it:
 
 - Upgrade to Airflow 3.3.1 or later.
-- If nothing consumes these assets, set ``emit_datasets=False`` in ``RenderConfig`` or in the operator, or per node with ``meta.cosmos.operator_kwargs``.
+- If nothing consumes these assets, set ``emit_assets=False`` in ``RenderConfig`` or in the operator, or per node with ``meta.cosmos.operator_kwargs``.
 - Delete old asset events with ``airflow db clean --tables asset_event --clean-before-timestamp <timestamp>``. This only helps until the alias grows again.
 
 Airflow 2 with ``enable_dataset_alias`` set to ``False``

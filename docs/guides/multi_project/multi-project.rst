@@ -331,7 +331,9 @@ To disable automatic asset emission:
 
     dag = DbtDag(
         dag_id="my_dag",
-        render_config=RenderConfig(emit_assets=False),  # Use emit_assets for Airflow 3 (emit_datasets for Airflow 2)
+        render_config=RenderConfig(
+            emit_assets=False
+        ),  # Use emit_assets for Airflow 3 (emit_datasets for Airflow 2)
         # ...
     )
 

@@ -402,7 +402,11 @@ class DbtToAirflowConverter:
             "project_dir": execution_config.project_path,
             "partial_parse": project_config.partial_parse,
             "profile_config": profile_config,
-            "emit_datasets": operator_args.get("emit_assets") if "emit_assets" in operator_args else operator_args.get("emit_datasets", render_config.emit_assets),
+            "emit_datasets": (
+                operator_args.get("emit_assets")
+                if "emit_assets" in operator_args
+                else operator_args.get("emit_datasets", render_config.emit_assets)
+            ),
             "env": env_vars,
             "vars": dbt_vars,
             "cache_dir": cache_dir,

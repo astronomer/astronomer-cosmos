@@ -792,6 +792,153 @@ def test_run_operator_dataset_inlets_and_outlets_airflow_3_onwards(caplog):
     assert f"Outlets: [Asset(name='{expected_asset}', uri='{expected_asset}'" in caplog.text
 
 
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="From Airflow 3.0 onwards, outlets are declared via AssetAlias at parse time.",
+)
+def test_run_operator_declares_asset_alias_outlet_at_parse_time_airflow_3():
+    """issue-2417: on Airflow 3 the AssetAlias must be a static (parse-time) outlet, otherwise emitted assets
+    never show up in the Airflow "Assets" graph."""
+    from airflow.sdk.definitions.asset import AssetAlias
+
+    with DAG("test_id_4", start_date=datetime(2022, 1, 1)) as dag:
+        seed_operator = DbtSeedLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="seed",
+            dag=dag,
+            emit_datasets=False,
+            install_deps=False,
+        )
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+        )
+        test_operator = DbtTestLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="test",
+            dag=dag,
+            install_deps=False,
+        )
+        seed_operator >> run_operator >> test_operator
+
+    assert seed_operator.outlets == []  # because emit_datasets=False
+    assert run_operator.outlets == [AssetAlias(name="test_id_4__run")]
+    assert test_operator.outlets == [AssetAlias(name="test_id_4__test")]
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="From Airflow 3.0 onwards, outlets are declared via AssetAlias at parse time (issue-2417).",
+)
+def test_run_operator_manual_outlets_airflow_3(caplog):
+    """issue-2417: user-supplied outlets are preserved as-is on Airflow 3; Cosmos only appends its AssetAlias.
+
+    A concrete ``Asset`` must not be rewritten into an ``AssetAlias``, which would silently stop it emitting and
+    scheduling downstream DAGs.
+    """
+    from airflow.sdk.definitions.asset import Asset, AssetAlias
+
+    manual_asset = Asset(uri="manual_asset")
+    manual_alias = AssetAlias(name="manual_alias")
+    with DAG("test_id_5", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+            outlets=[manual_asset, manual_alias],
+        )
+
+    assert run_operator.outlets == [manual_asset, manual_alias, AssetAlias(name="test_id_5__run")]
+    assert isinstance(run_operator.outlets[0], Asset)
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="From Airflow 3.0 onwards, outlets are declared via AssetAlias at parse time (issue-2417).",
+)
+def test_run_operator_default_args_outlets_airflow_3():
+    """issue-2417: outlets inherited through ``default_args`` must survive alongside the Cosmos AssetAlias.
+
+    Passing an alias-only ``outlets`` list to ``BaseOperator`` overrides the inherited default, which would
+    silently stop a user's concrete ``Asset`` from emitting and scheduling downstream DAGs.
+    """
+    from airflow.sdk.definitions.asset import Asset, AssetAlias
+
+    dag_asset = Asset(uri="dag_default_args_asset")
+    task_asset = Asset(uri="task_default_args_asset")
+
+    # default_args defined on the DAG
+    with DAG("test_id_7", start_date=datetime(2022, 1, 1), default_args={"outlets": [dag_asset]}) as dag:
+        dag_level = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+        )
+    assert dag_level.outlets == [dag_asset, AssetAlias(name="test_id_7__run")]
+
+    # default_args passed directly to the operator
+    with DAG("test_id_8", start_date=datetime(2022, 1, 1)) as dag:
+        task_level = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+            default_args={"outlets": [task_asset]},
+        )
+    assert task_level.outlets == [task_asset, AssetAlias(name="test_id_8__run")]
+
+    # an explicit ``outlets`` argument takes precedence over ``default_args``, as in Airflow
+    with DAG("test_id_9", start_date=datetime(2022, 1, 1), default_args={"outlets": [dag_asset]}) as dag:
+        explicit = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+            outlets=[task_asset],
+        )
+    assert explicit.outlets == [task_asset, AssetAlias(name="test_id_9__run")]
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
+    reason="_ensure_asset_alias_outlet only applies on Airflow 3 (issue-2417).",
+)
+def test_ensure_asset_alias_outlet_airflow_3():
+    """The runtime helper appends the alias only when it is missing, avoiding a duplicate of the parse-time outlet."""
+    from airflow.sdk.definitions.asset import AssetAlias
+
+    from cosmos.dataset import _ensure_asset_alias_outlet
+
+    with DAG("test_id_6", start_date=datetime(2022, 1, 1)) as dag:
+        run_operator = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+        )
+
+    # The alias is already declared at parse time, so re-ensuring it is a no-op (dedup branch).
+    assert run_operator.outlets == [AssetAlias(name="test_id_6__run")]
+    _ensure_asset_alias_outlet(run_operator, "test_id_6__run")
+    assert run_operator.outlets == [AssetAlias(name="test_id_6__run")]
+
+    # A new alias name is appended (append branch).
+    _ensure_asset_alias_outlet(run_operator, "another_alias")
+    assert run_operator.outlets == [AssetAlias(name="test_id_6__run"), AssetAlias(name="another_alias")]
+
+
 @pytest.mark.integration
 def test_dbt_dag_with_group_nodes_by_folder():
     """

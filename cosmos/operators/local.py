@@ -1193,6 +1193,27 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
                 operator_kwargs["outlets"] = outlets + [
                     DatasetAlias(name=get_dataset_alias_name(dag_id, task_group_id, self.task_id))
                 ]
+        elif (
+            kwargs.get("emit_datasets", True)
+            and settings.enable_dataset_alias
+            and AIRFLOW_VERSION.major == _AIRFLOW3_MAJOR_VERSION
+        ):
+            # issue-2417: On Airflow 3, declare the AssetAlias as a static (parse-time) outlet so the producing
+            # task is serialized with an asset reference; otherwise it is only attached at runtime (register_dataset).
+            from airflow.sdk.definitions.asset import AssetAlias
+
+            dag = kwargs.get("dag")
+            task_group = kwargs.get("task_group")
+
+            # Keep user outlets as-is so concrete Assets keep emitting/scheduling; only append the Cosmos alias.
+            # Passing an explicit ``outlets`` list to BaseOperator overrides any value inherited from
+            # ``default_args``, so resolve it the way Airflow would: explicit argument, then the operator's
+            # ``default_args``, then the DAG's ``default_args``.
+            inherited_outlets = default_args.get("outlets") or (getattr(dag, "default_args", None) or {}).get("outlets")
+            user_outlets = list(kwargs["outlets"] if kwargs.get("outlets") is not None else inherited_outlets or [])
+            operator_kwargs["outlets"] = user_outlets + [
+                AssetAlias(name=get_dataset_alias_name(dag, task_group, self.task_id))
+            ]
 
         if "task_id" in operator_kwargs:
             operator_kwargs.pop("task_id")

@@ -861,6 +861,57 @@ def test_run_operator_manual_outlets_airflow_3(caplog):
 
 @pytest.mark.skipif(
     version.parse(airflow_version).major < 3,
+    reason="From Airflow 3.0 onwards, outlets are declared via AssetAlias at parse time (issue-2417).",
+)
+def test_run_operator_default_args_outlets_airflow_3():
+    """issue-2417: outlets inherited through ``default_args`` must survive alongside the Cosmos AssetAlias.
+
+    Passing an alias-only ``outlets`` list to ``BaseOperator`` overrides the inherited default, which would
+    silently stop a user's concrete ``Asset`` from emitting and scheduling downstream DAGs.
+    """
+    from airflow.sdk.definitions.asset import Asset, AssetAlias
+
+    dag_asset = Asset(uri="dag_default_args_asset")
+    task_asset = Asset(uri="task_default_args_asset")
+
+    # default_args defined on the DAG
+    with DAG("test_id_7", start_date=datetime(2022, 1, 1), default_args={"outlets": [dag_asset]}) as dag:
+        dag_level = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+        )
+    assert dag_level.outlets == [dag_asset, AssetAlias(name="test_id_7__run")]
+
+    # default_args passed directly to the operator
+    with DAG("test_id_8", start_date=datetime(2022, 1, 1)) as dag:
+        task_level = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+            default_args={"outlets": [task_asset]},
+        )
+    assert task_level.outlets == [task_asset, AssetAlias(name="test_id_8__run")]
+
+    # an explicit ``outlets`` argument takes precedence over ``default_args``, as in Airflow
+    with DAG("test_id_9", start_date=datetime(2022, 1, 1), default_args={"outlets": [dag_asset]}) as dag:
+        explicit = DbtRunLocalOperator(
+            profile_config=real_profile_config,
+            project_dir=DBT_PROJ_DIR,
+            task_id="run",
+            dag=dag,
+            install_deps=False,
+            outlets=[task_asset],
+        )
+    assert explicit.outlets == [task_asset, AssetAlias(name="test_id_9__run")]
+
+
+@pytest.mark.skipif(
+    version.parse(airflow_version).major < 3,
     reason="_ensure_asset_alias_outlet only applies on Airflow 3 (issue-2417).",
 )
 def test_ensure_asset_alias_outlet_airflow_3():

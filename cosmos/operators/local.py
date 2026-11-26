@@ -1206,7 +1206,11 @@ class DbtLocalBaseOperator(AbstractDbtLocalBase, BaseOperator):
             task_group = kwargs.get("task_group")
 
             # Keep user outlets as-is so concrete Assets keep emitting/scheduling; only append the Cosmos alias.
-            user_outlets = list(kwargs.get("outlets", []))
+            # Passing an explicit ``outlets`` list to BaseOperator overrides any value inherited from
+            # ``default_args``, so resolve it the way Airflow would: explicit argument, then the operator's
+            # ``default_args``, then the DAG's ``default_args``.
+            inherited_outlets = default_args.get("outlets") or (getattr(dag, "default_args", None) or {}).get("outlets")
+            user_outlets = list(kwargs["outlets"] if kwargs.get("outlets") is not None else inherited_outlets or [])
             operator_kwargs["outlets"] = user_outlets + [
                 AssetAlias(name=get_dataset_alias_name(dag, task_group, self.task_id))
             ]

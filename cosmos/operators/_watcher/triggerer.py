@@ -13,7 +13,8 @@ from cosmos.constants import _DBT_STARTUP_EVENTS_XCOM_KEY, AIRFLOW_VERSION
 from cosmos.listeners.dag_run_listener import EventStatus
 from cosmos.log import get_logger
 from cosmos.operators._watcher.state import (
-    PRODUCER_FINAL_STATES,
+    PRODUCER_NO_DBT_NODE_STATUS_STATES,
+    PRODUCER_TERMINAL_STATES,
     ProducerTaskState,
     build_producer_state_fetcher,
     get_compiled_sql_xcom_key,
@@ -36,6 +37,7 @@ class WatcherEventReason(str, Enum):
 
     NODE_FAILED = "node_failed"
     PRODUCER_FAILED = "producer_failed"
+    # Also sent when the producer task ends upstream_failed or removed (see PRODUCER_NO_DBT_NODE_STATUS_STATES).
     PRODUCER_SKIPPED = "producer_skipped"
     NODE_NOT_RUN = "node_not_run"
 
@@ -217,7 +219,7 @@ class WatcherTrigger(BaseTrigger):
             # logging the full list. Also ensures we exit if producer finishes before
             # ever pushing _DBT_STARTUP_EVENTS_XCOM_KEY.
             producer_task_state = await self._get_producer_task_status()
-            if producer_task_state in PRODUCER_FINAL_STATES:
+            if producer_task_state in PRODUCER_TERMINAL_STATES:
                 return
 
             # Return if dbt node is in terminal state
@@ -279,11 +281,12 @@ class WatcherTrigger(BaseTrigger):
                 )
                 yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_FAILED})  # type: ignore[no-untyped-call]
                 return
-            elif producer_task_state == ProducerTaskState.SKIPPED:
+            elif producer_task_state in PRODUCER_NO_DBT_NODE_STATUS_STATES:
                 logger.info(
-                    "Watcher producer task '%s' was skipped (e.g. retry). "
-                    "Consumer will fall back to running dbt for node '%s'.",
+                    "Watcher producer task '%s' ended in state '%s' without a dbt node status for '%s'. "
+                    "Consumer will fall back to running dbt for it.",
                     self.producer_task_id,
+                    producer_task_state,
                     self.model_unique_id,
                 )
                 yield TriggerEvent({"status": EventStatus.FAILED, "reason": WatcherEventReason.PRODUCER_SKIPPED})  # type: ignore[no-untyped-call]

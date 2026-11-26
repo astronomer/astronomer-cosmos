@@ -262,12 +262,13 @@ class TestHandleNoDbtNodeStatus:
         with pytest.raises(AirflowException, match="dbt build command failed"):
             sensor._handle_no_dbt_node_status("failed", try_number=1, context=MagicMock())
 
+    @pytest.mark.parametrize("producer_state", ["skipped", "upstream_failed", "removed"])
     @patch("cosmos.operators._watcher.base.BaseConsumerSensor._fallback_to_non_watcher_run", return_value=True)
-    def test_producer_skipped_falls_back(self, mock_fallback):
+    def test_producer_not_run_falls_back(self, mock_fallback, producer_state):
         sensor = self._make_sensor()
         context = MagicMock()
 
-        result = sensor._handle_no_dbt_node_status("skipped", try_number=1, context=context)
+        result = sensor._handle_no_dbt_node_status(producer_state, try_number=1, context=context)
 
         assert result is True
         mock_fallback.assert_called_once_with(1, context)

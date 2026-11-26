@@ -79,13 +79,15 @@ PRODUCER_TERMINAL_STATES = frozenset(
     }
 )
 
-# Airflow task states checked by the watcher trigger to know the producer task has reached its
-# final outcome and the trigger can exit early. Subset of PRODUCER_TERMINAL_STATES.
-PRODUCER_FINAL_STATES = frozenset(
+# Deprecated alias of PRODUCER_TERMINAL_STATES, kept so existing imports keep working. Use PRODUCER_TERMINAL_STATES.
+PRODUCER_FINAL_STATES = PRODUCER_TERMINAL_STATES
+
+# Producer task states in which no dbt node status will ever be published, so the consumer runs its node itself.
+PRODUCER_NO_DBT_NODE_STATUS_STATES = frozenset(
     {
-        ProducerTaskState.FAILED,
-        ProducerTaskState.SUCCESS,
         ProducerTaskState.SKIPPED,
+        ProducerTaskState.UPSTREAM_FAILED,
+        ProducerTaskState.REMOVED,
     }
 )
 

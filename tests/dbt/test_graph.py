@@ -3052,16 +3052,56 @@ def test_dbt_ls_cache_key_args_sorts_envvars():
     ]
 
 
-@patch("cosmos.dbt.graph.settings")
-def test_dbt_ls_cache_key_args_changes_with_dbt_ls_output_keys(mock_settings):
-    mock_settings.pre_dbt_fusion = True
-    graph_with_default_keys = DbtGraph(
-        project=ProjectConfig(), render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.NONE)
-    )
-    graph_with_output_keys = DbtGraph(
-        project=ProjectConfig(), render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.ALL)
-    )
-    assert graph_with_default_keys.dbt_ls_cache_key_args != graph_with_output_keys.dbt_ls_cache_key_args
+DBT_LS_OUTPUT_ARGS_WITH_KEYS = [
+    "--output",
+    "json",
+    "--output-keys",
+    "name",
+    "unique_id",
+    "resource_type",
+    "depends_on",
+    "original_file_path",
+    "tags",
+    "config",
+    "freshness",
+    "fqn",
+]
+DBT_LS_OUTPUT_ARGS_WITHOUT_KEYS = ["--output", "json"]
+
+
+@pytest.mark.parametrize(
+    "pre_dbt_fusion,source_rendering_behavior,expected_output_args",
+    [
+        (True, SourceRenderingBehavior.NONE, DBT_LS_OUTPUT_ARGS_WITHOUT_KEYS),
+        (True, SourceRenderingBehavior.ALL, DBT_LS_OUTPUT_ARGS_WITH_KEYS),
+        (False, SourceRenderingBehavior.NONE, DBT_LS_OUTPUT_ARGS_WITH_KEYS),
+        (False, SourceRenderingBehavior.ALL, DBT_LS_OUTPUT_ARGS_WITH_KEYS),
+    ],
+)
+def test_dbt_ls_cache_key_args_include_dbt_ls_output_args(
+    pre_dbt_fusion, source_rendering_behavior, expected_output_args
+):
+    with patch.object(settings, "pre_dbt_fusion", pre_dbt_fusion):
+        graph = DbtGraph(
+            project=ProjectConfig(), render_config=RenderConfig(source_rendering_behavior=source_rendering_behavior)
+        )
+        assert graph.dbt_ls_output_args == expected_output_args
+        assert graph.dbt_ls_cache_key_args[: len(expected_output_args)] == expected_output_args
+
+
+@pytest.mark.parametrize("pre_dbt_fusion", [True, False])
+@patch("cosmos.dbt.graph.run_command")
+def test_run_dbt_ls_builds_command_from_dbt_ls_output_args(mock_run_command, pre_dbt_fusion):
+    with patch.object(settings, "pre_dbt_fusion", pre_dbt_fusion):
+        graph = DbtGraph(
+            project=ProjectConfig(dbt_project_path="/tmp"),
+            render_config=RenderConfig(source_rendering_behavior=SourceRenderingBehavior.NONE),
+        )
+        graph.local_flags = []
+        graph.run_dbt_ls(dbt_cmd="dbt", project_path=Path("/tmp"), tmp_dir=Path("/tmp"), env_vars={})
+        ls_command = mock_run_command.call_args[0][0]
+        assert ls_command[:2] == ["dbt", "ls"]
+        assert ls_command[2 : 2 + len(graph.dbt_ls_output_args)] == graph.dbt_ls_output_args
 
 
 @patch("cosmos.dbt.graph.run_command")
@@ -3115,7 +3155,9 @@ def test_get_dbt_yaml_selectors_cache_key_args_uses_airflow_vars_to_purge_dbt_ca
 
 @patch("cosmos.dbt.graph.datetime")
 @patch("cosmos.dbt.graph.Variable.set")
-def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir):
+def test_save_dbt_ls_cache(mock_variable_set, mock_datetime, tmp_dbt_project_dir, monkeypatch):
+    # The expected args hash below assumes the default pre_dbt_fusion, whatever AIRFLOW__COSMOS__PRE_DBT_FUSION says.
+    monkeypatch.setattr(settings, "pre_dbt_fusion", False)
     mock_datetime.datetime.now.return_value = datetime(2022, 1, 1, 12, 0, 0)
     graph = DbtGraph(cache_identifier="something", project=ProjectConfig(dbt_project_path=tmp_dbt_project_dir))
     dbt_ls_output = "some output"

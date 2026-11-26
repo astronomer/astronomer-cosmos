@@ -90,7 +90,7 @@ class RenderConfig:
     """
 
     emit_assets: bool = True
-    emit_datasets: bool | None = None
+    emit_datasets: bool = True
     test_behavior: TestBehavior = TestBehavior.AFTER_EACH
     load_method: LoadMode = LoadMode.AUTOMATIC
     invocation_mode: InvocationMode = InvocationMode.DBT_RUNNER
@@ -129,7 +129,7 @@ class RenderConfig:
                 "RenderConfig.dbt_deps is deprecated since Cosmos 1.9 and will be removed in Cosmos 2.0. Use ProjectConfig.install_dbt_deps instead.",
                 DeprecationWarning,
             )
-        if self.emit_datasets is not None:
+        if self.emit_datasets != self.emit_assets:
             warnings.warn(
                 "RenderConfig.emit_datasets is deprecated since Cosmos 1.16 and will be removed when Cosmos only supports Airflow 3. Use emit_assets instead.",
                 DeprecationWarning,

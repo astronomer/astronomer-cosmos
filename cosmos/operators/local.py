@@ -62,6 +62,7 @@ from cosmos.dataset import get_dataset_alias_name, make_dataset_uri_builder
 from cosmos.dbt.project import (
     copy_dbt_packages,
     copy_manifest_file_if_exists,
+    environ,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
     remove_dags_folder_from_pythonpath,
@@ -609,7 +610,23 @@ class AbstractDbtLocalBase(AbstractDbtBase):
                 self.log.debug("Checking for the %s dependencies file.", str(filename))
                 self.log.debug("Contents of the <%s> dependencies file:\n %s", str(filepath), str(filepath.read_text()))
 
-        self.invoke_dbt(command=deps_command, env=env, cwd=tmp_dir_path)
+        result = self.invoke_dbt(command=deps_command, env=env, cwd=tmp_dir_path)
+        self._handle_dbt_deps_result(result)
+
+    def _handle_dbt_deps_result(self, result: FullOutputSubprocessResult | dbtRunnerResult) -> None:
+        """Fail on any ``dbt deps`` error, ignoring ``skip_exit_code``, so dbt never runs with outdated packages."""
+        if isinstance(result, FullOutputSubprocessResult):
+            if result.exit_code == 0:
+                return
+            self.log.error("\n".join(result.full_output))
+            message = f"dbt deps failed with exit code {result.exit_code}, so the dbt command was not run."
+            failure_details = extract_dbt_failure_details(result.full_output)
+            if failure_details:
+                message += " Details:\n" + "\n".join(failure_details)
+            raise AirflowException(message)
+        if not result.success:
+            cause = f": {result.exception}" if result.exception else "."
+            raise CosmosDbtRunError(f"dbt deps failed, so the dbt command was not run{cause}")
 
     @staticmethod
     def _mock_dbt_adapter(async_context: dict[str, Any] | None) -> None:
@@ -807,7 +824,8 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path = Path(tmp_project_dir)
             env = {k: str(v) for k, v in env.items()}
 
-            self._clone_project(tmp_dir_path)
+            with environ(env):
+                self._clone_project(tmp_dir_path)
 
             if self.partial_parse:
                 self._handle_partial_parse(tmp_dir_path)

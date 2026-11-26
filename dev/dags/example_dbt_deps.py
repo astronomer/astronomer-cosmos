@@ -24,7 +24,12 @@ profile_config = ProfileConfig(
 
 dbt_deps_example_dag = DbtDag(
     # dbt/cosmos-specific parameters
-    project_config=ProjectConfig(DBT_ROOT_PATH / "simple", copy_dbt_packages=True),
+    project_config=ProjectConfig(
+        DBT_ROOT_PATH / "simple",
+        copy_dbt_packages=True,
+        # dbt_project.yml reads packages-install-path from this variable, so Cosmos must resolve it with env_vars
+        env_vars={"DBT_PACKAGES_FOLDER": "dbt_packages"},
+    ),
     profile_config=profile_config,
     # normal dag parameters
     schedule="@daily",

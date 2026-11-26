@@ -750,6 +750,59 @@ def test_load_from_dbt_manifest_resolves_package_path(tmp_path):
     assert node.file_path.name == "foo.sql"
 
 
+@pytest.mark.parametrize(
+    "env_vars,expected_packages_dir",
+    [
+        ({"dbt_packages_suffix": "RB"}, "dbt_packages_RB"),
+        ("xcom_arg", "dbt_packages"),
+    ],
+    ids=["dict", "xcom_arg"],
+)
+def test_load_from_dbt_manifest_resolves_package_path_with_env_vars(
+    tmp_path, monkeypatch, env_vars, expected_packages_dir
+):
+    """A packages-install-path that uses env_var() is resolved with ProjectConfig.env_vars when they are a dict."""
+    if env_vars == "xcom_arg":
+        try:
+            from airflow.sdk import XComArg
+            from airflow.sdk.bases.operator import BaseOperator
+        except ImportError:
+            from airflow.models import BaseOperator
+            from airflow.models.xcom_arg import XComArg
+        env_vars = XComArg(BaseOperator(task_id="build_env"))
+    monkeypatch.delenv("dbt_packages_suffix", raising=False)
+    (tmp_path / "dbt_project.yml").write_text(
+        'packages-install-path: \'dbt_packages{{ "_" + env_var("dbt_packages_suffix","") '
+        'if env_var("dbt_packages_suffix","")!="" }}\'\n'
+    )
+    manifest = {
+        "metadata": {"project_name": "my_project"},
+        "nodes": {
+            "model.some_package.foo": {
+                "original_file_path": "models/foo.sql",
+                "package_name": "some_package",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "tags": [],
+                "config": {},
+            },
+        },
+        "sources": {},
+        "exposures": {},
+    }
+    manifest_file = tmp_path / "manifest.json"
+    manifest_file.write_text(json.dumps(manifest))
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(manifest_path=manifest_file, project_name="my_project", env_vars=env_vars),
+        execution_config=ExecutionConfig(dbt_project_path=tmp_path),
+        render_config=RenderConfig(load_method=LoadMode.DBT_MANIFEST),
+    )
+    dbt_graph.load_from_dbt_manifest()
+
+    node = dbt_graph.nodes["model.some_package.foo"]
+    assert node.file_path == tmp_path / expected_packages_dir / "some_package" / "models" / "foo.sql"
+
+
 @pytest.mark.parametrize("materialization", ["metric_view", "semantic_view"])
 def test_load_from_dbt_manifest_reclassifies_semantic_metric_view_materializations(
     tmp_path, monkeypatch, materialization
@@ -3864,3 +3917,33 @@ def test_add_downstream_nodes():
     target_node = "model.jaffle_shop.stg_payments"
     downstream_nodes = ["model.jaffle_shop.customers", "model.jaffle_shop.orders"]
     assert dbt_graph.nodes.get(target_node).downstream == downstream_nodes
+
+
+@pytest.mark.parametrize("copy_dbt_packages", [True, False])
+def test_copy_or_create_symbolic_links_resolves_packages_path_with_env_vars(copy_dbt_packages, tmp_path, monkeypatch):
+    """The packages folder named by ``ProjectConfig.env_vars`` must not be symlinked, or ``dbt deps`` cannot replace it."""
+    monkeypatch.delenv("dbt_packages_suffix", raising=False)
+    project_path = tmp_path / "project"
+    (project_path / "dbt_packages_RB" / "some_package").mkdir(parents=True)
+    (project_path / "models").mkdir()
+    (project_path / "package-lock.yml").write_text("packages: []")
+    (project_path / "dbt_project.yml").write_text(
+        'packages-install-path: \'dbt_packages{{ "_" + env_var("dbt_packages_suffix","") '
+        'if env_var("dbt_packages_suffix","")!="" }}\'\n'
+    )
+    dbt_graph = DbtGraph(
+        project=ProjectConfig(
+            dbt_project_path=project_path,
+            env_vars={"dbt_packages_suffix": "RB"},
+            copy_dbt_packages=copy_dbt_packages,
+        ),
+        render_config=RenderConfig(),
+    )
+    tmp_dir = tmp_path / "tmp"
+    tmp_dir.mkdir()
+
+    dbt_graph._copy_or_create_symbolic_links(project_path, tmp_dir)
+
+    assert not (tmp_dir / "dbt_packages_RB").is_symlink()
+    assert (tmp_dir / "dbt_packages_RB").is_dir() is copy_dbt_packages
+    assert (tmp_dir / "models").is_symlink()

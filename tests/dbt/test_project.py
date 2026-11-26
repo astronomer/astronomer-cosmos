@@ -242,6 +242,14 @@ def test_environ_context_manager():
     assert "value2" == os.environ.get("VAR2")
 
 
+def test_environ_stringifies_values(monkeypatch):
+    """``ProjectConfig.env_vars`` can hold non-string values, which ``os.environ`` rejects."""
+    monkeypatch.delenv("COSMOS_TEST_INT_VAR", raising=False)
+    with environ({"COSMOS_TEST_INT_VAR": 2}):
+        assert os.environ["COSMOS_TEST_INT_VAR"] == "2"
+    assert "COSMOS_TEST_INT_VAR" not in os.environ
+
+
 @patch("os.chdir")
 def test_change_working_directory(mock_chdir):
     """Tests that the working directory is changed and then restored correctly."""

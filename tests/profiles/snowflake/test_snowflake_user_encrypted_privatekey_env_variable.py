@@ -443,6 +443,20 @@ def test_client_session_keep_alive_absent_when_not_set(mapping_class, password, 
         assert "client_session_keep_alive" not in profile_mapping.profile
 
 
+@pytest.mark.parametrize("field", ["insecure_mode", "client_session_keep_alive"])
+@pytest.mark.parametrize(
+    "raw_value, expected",
+    [("true", True), ("True", True), ("TRUE", True), ("false", False), ("False", False), (True, True)],
+)
+@pytest.mark.parametrize("mapping_class, password, extra_fields", SNOWFLAKE_PROFILE_MAPPINGS)
+def test_boolean_extra_string_is_coerced(mapping_class, password, extra_fields, field, raw_value, expected) -> None:
+    """String booleans in the connection Extra (e.g. from a URI) are rendered as real booleans for dbt."""
+    conn = _build_snowflake_conn(password, extra_fields, **{field: raw_value})
+    with patch("cosmos.profiles.base.BaseHook.get_connection", return_value=conn):
+        profile_mapping = mapping_class(conn)
+        assert profile_mapping.profile[field] is expected
+
+
 @pytest.mark.parametrize("mapping_class, password, extra_fields", SNOWFLAKE_PROFILE_MAPPINGS)
 def test_host_and_port_from_connection_extra(mapping_class, password, extra_fields) -> None:
     """host and port set on the Airflow connection Extra are forwarded to every profile mapping."""

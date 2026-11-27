@@ -19,6 +19,7 @@ Features
 Bug Fixes
 
 * Cosmos now resolves ``env_var()`` in the ``packages-install-path`` of ``dbt_project.yml`` with ``ProjectConfig.env_vars`` and the operator ``env`` before the worker environment, as dbt does. Previously a path that depended on a variable set only there was resolved to the wrong folder, so Cosmos symlinked the real packages folder into the temporary project and ``dbt deps`` failed with ``Cannot call rmtree on a symbolic link``. See #3172.
+* The Snowflake profile mappings now convert ``"true"`` and ``"false"`` strings (any case) in the connection Extra fields ``insecure_mode`` and ``client_session_keep_alive`` to booleans. Previously the string was copied to the dbt profile as is, for example from a connection defined as a URI, and every dbt task failed with ``'false' is not valid under any of the given schemas``. See #3217.
 
 1.16.1 (Unreleased)
 -------------------

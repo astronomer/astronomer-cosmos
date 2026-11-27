@@ -33,6 +33,21 @@ class SnowflakeBaseProfileMapping(BaseProfileMapping):
 
         return str(account)
 
+    @staticmethod
+    def _coerce_bool(value: Any) -> Any:
+        """Convert "true"/"false" strings (e.g. from a connection URI) to booleans, as dbt-snowflake expects."""
+        if isinstance(value, str) and value.lower() in ("true", "false"):
+            return value.lower() == "true"
+        return value
+
+    def transform_insecure_mode(self, value: Any) -> Any:
+        """Coerce a string boolean from the connection Extra to a boolean."""
+        return self._coerce_bool(value)
+
+    def transform_client_session_keep_alive(self, value: Any) -> Any:
+        """Coerce a string boolean from the connection Extra to a boolean."""
+        return self._coerce_bool(value)
+
     def _decode_private_key_content(self, private_key_content: str) -> str:
         """
         Decodes the private key content from either base64-encoded or plain-text PEM format.

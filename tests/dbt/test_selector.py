@@ -1429,7 +1429,8 @@ def _fqn_node(name, folder, deps=()):
     )
 
 
-def test_graph_operator_bare_root_unions_node_name_and_folder():
+@pytest.mark.parametrize("extra_selectors", [[], ["tag:unrelated"]])
+def test_graph_operator_bare_root_unions_node_name_and_folder(extra_selectors):
     """A bare root that is both a node name and a folder name resolves to both, plus descendants (BOSS-615).
 
     Mirrors dbt: model 'shared' (models/misc) and folder models/shared/ (alpha, beta) both match 'shared',
@@ -1445,8 +1446,8 @@ def test_graph_operator_bare_root_unions_node_name_and_folder():
             _fqn_node("down", "", deps=["shared"]),
         ]
     }
-    without_operator = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["shared"])
-    with_descendants = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["shared+"])
+    without_operator = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["shared", *extra_selectors])
+    with_descendants = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["shared+", *extra_selectors])
     resource_names = lambda selected: {uid.split(".")[-1] for uid in selected}
     assert resource_names(without_operator) == {"shared", "alpha", "beta"}
     assert resource_names(with_descendants) == {"shared", "alpha", "beta", "down"}
@@ -1522,7 +1523,8 @@ def test_bare_dotted_root_does_not_match_underscore_model_name():
     assert set(selected.keys()) == {nested.unique_id}
 
 
-def test_bare_identifier_matches_versioned_model_name():
+@pytest.mark.parametrize("extra_selectors", [[], ["tag:unrelated"]])
+def test_bare_identifier_matches_versioned_model_name(extra_selectors):
     """Bare select/exclude must still match a versioned model by its patched task name (BOSS-615 regression).
 
     dbt keeps a versioned model's version as a separate trailing fqn element
@@ -1547,7 +1549,7 @@ def test_bare_identifier_matches_versioned_model_name():
 
     assert versioned.name == "customers_v1"  # sanity check on the patched task name
 
-    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["customers_v1"])
+    selected = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, select=["customers_v1", *extra_selectors])
     assert set(selected.keys()) == {versioned.unique_id}
 
     excluded = select_nodes(project_dir=SAMPLE_PROJ_PATH, nodes=nodes, exclude=["customers_v1"])

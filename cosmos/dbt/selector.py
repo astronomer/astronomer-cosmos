@@ -5,6 +5,7 @@ import hashlib
 import inspect
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -116,6 +117,40 @@ def _node_matches_bare_identifier(node: DbtNode, identifier: str) -> bool:
         or node.name == identifier.replace(".", "_")
         or identifier in node.original_file_path.parent.parts
     )
+
+
+class _BareIdentifierIndex:
+    """Index possible matches and let the existing matcher check each candidate."""
+
+    def __init__(self, nodes: dict[str, DbtNode]) -> None:
+        self.by_prefix: dict[str, set[str]] = defaultdict(set)
+        self.by_name: dict[str, set[str]] = defaultdict(set)
+        self.by_normalized_name: dict[str, set[str]] = defaultdict(set)
+
+        for node_id, node in nodes.items():
+            if not _is_matched_by_fqn_method(node):
+                continue
+            if node.fqn:
+                # Cosmos checks the prefix both with and without the package segment.
+                for part in node.fqn[:2]:
+                    self.by_prefix[part.split(".", 1)[0]].add(node_id)
+                self.by_name[node.fqn[-1]].add(node_id)
+                if len(node.fqn) >= 2 and node.resource_type == DbtResourceType.MODEL and "." in node.resource_name:
+                    self.by_name[node.fqn[-2]].add(node_id)
+                    self.by_normalized_name["_".join(node.fqn[-2:])].add(node_id)
+            else:
+                self.by_name[node.package_name or ""].add(node_id)
+                for part in node.original_file_path.parent.parts:
+                    self.by_name[part].add(node_id)
+                self.by_normalized_name[node.name].add(node_id)
+
+    def candidates(self, identifier: str) -> set[str]:
+        return (
+            self.by_prefix.get(identifier.split(".", 1)[0], set())
+            | self.by_name.get(identifier, set())
+            | self.by_normalized_name.get(identifier.replace(".", "_"), set())
+            | self.by_normalized_name.get("_".join(identifier.split(".")[-2:]), set())
+        )
 
 
 def _check_nested_value_in_dict(dict_: dict[Any, Any], pattern: str) -> bool:
@@ -291,7 +326,9 @@ class GraphSelector:
                 previous_generation = new_generation
                 depth -= 1
 
-    def filter_nodes(self, nodes: dict[str, DbtNode]) -> set[str]:  # noqa: C901
+    def filter_nodes(  # noqa: C901
+        self, nodes: dict[str, DbtNode], bare_identifier_index: _BareIdentifierIndex | None = None
+    ) -> set[str]:
         """
         Given a dictionary with the original dbt project nodes, applies the current graph selector to
         identify the subset of nodes that matches the selection criteria.
@@ -301,8 +338,6 @@ class GraphSelector:
         """
         selected_nodes: set[str] = set()
         root_nodes: set[str] = set()
-        # Index nodes by name, we can improve performance by doing this once
-        # for multiple GraphSelectors
         if PATH_SELECTOR in self.node_name:
             path_selection = self.node_name[len(PATH_SELECTOR) :].rstrip("*")
             root_nodes.update({node_id for node_id, node in nodes.items() if path_selection in str(node.file_path)})
@@ -393,11 +428,11 @@ class GraphSelector:
             else:
                 logger.warning("Unsupported config key selector: %s", config_selection_key)
         else:
-            # Resolve the bare token the dbt way (package, fqn-prefix folder, or model name). Scan
-            # every node rather than a name-keyed dict so duplicate node names across packages all
-            # contribute roots.
+            candidate_ids = (
+                nodes.keys() if bare_identifier_index is None else bare_identifier_index.candidates(self.node_name)
+            )
             root_nodes.update(
-                node_id for node_id, node in nodes.items() if _node_matches_bare_identifier(node, self.node_name)
+                node_id for node_id in candidate_ids if _node_matches_bare_identifier(nodes[node_id], self.node_name)
             )
             if not root_nodes:
                 logger.warning("Selector %s not found.", self.node_name)
@@ -643,9 +678,15 @@ class NodeSelector:
     :param config: User-defined select statements
     """
 
-    def __init__(self, nodes: dict[str, DbtNode], config: SelectorConfig) -> None:
+    def __init__(
+        self,
+        nodes: dict[str, DbtNode],
+        config: SelectorConfig,
+        bare_identifier_index: _BareIdentifierIndex | None = None,
+    ) -> None:
         self.nodes = nodes
         self.config = config
+        self.bare_identifier_index = bare_identifier_index
         self.selected_nodes: set[str] = set()
 
     @property
@@ -675,8 +716,14 @@ class NodeSelector:
                 if self._should_include_node(node_id, node):
                     selected_nodes.add(node_id)
         else:
-            for node_id, node in self.nodes.items():
-                if self._should_include_node(node_id, node):
+            candidate_ids: Iterable[str] = self.nodes.keys()
+            # Path filters can also visit a test's parent. Keep their traversal order.
+            if self.bare_identifier_index is not None and self.config.bare_identifiers and not self.config.paths:
+                candidate_ids = set().union(
+                    *(self.bare_identifier_index.candidates(identifier) for identifier in self.config.bare_identifiers)
+                )
+            for node_id in candidate_ids:
+                if self._should_include_node(node_id, self.nodes[node_id]):
                     selected_nodes.add(node_id)
 
         self.selected_nodes = selected_nodes
@@ -860,7 +907,7 @@ class NodeSelector:
         selected_nodes_by_selector: list[set[str]] = []
 
         for graph_selector in self.config.graph_selectors:
-            selected_nodes_by_selector.append(graph_selector.filter_nodes(self.nodes))
+            selected_nodes_by_selector.append(graph_selector.filter_nodes(self.nodes, self.bare_identifier_index))
         return set.intersection(*selected_nodes_by_selector)
 
 
@@ -1559,9 +1606,16 @@ def apply_exclude_filter(nodes: dict[str, DbtNode], project_dir: Path | None, ex
 
 def apply_select_filter(nodes: dict[str, DbtNode], project_dir: Path | None, select: list[str]) -> set[str]:
     subset_ids: set[str] = set()
+    bare_identifier_index = None
     for statement in select:
         config = SelectorConfig(project_dir, statement)
-        node_selector = NodeSelector(nodes, config)
+        if (
+            bare_identifier_index is None
+            and len(select) > 1
+            and (config.bare_identifiers or any(":" not in selector.node_name for selector in config.graph_selectors))
+        ):
+            bare_identifier_index = _BareIdentifierIndex(nodes)
+        node_selector = NodeSelector(nodes, config, bare_identifier_index)
         select_ids = node_selector.select_nodes_ids_by_intersection
         subset_ids.update(select_ids)
     return subset_ids
